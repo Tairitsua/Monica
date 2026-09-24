@@ -7,6 +7,12 @@ namespace Monica.Core.Results;
 public static class ResultMetadataKeys
 {
     /// <summary>
+    /// Response-owned exception catalog. Call-chain exception identifiers refer to this document;
+    /// remote responses carry independent catalogs. Reserved for diagnostic hosts.
+    /// </summary>
+    public const string Diagnostics = "diagnostics";
+
+    /// <summary>
     /// Correlation identifier of the host request that produced the envelope. Set by the result metadata
     /// filter when chain tracing is attached; safe to expose in every environment.
     /// </summary>

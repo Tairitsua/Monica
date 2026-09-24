@@ -70,6 +70,50 @@ builder.AddMonica(monica =>
 
 Use `AddKeyedCommonStateStore(key, useDistributed: true)` to expose the selected common provider under a key, or `AddKeyedStateStore<TProvider>(key)`, `AddKeyedRedisStateStore(key, configureOptions)`, or `AddKeyedDaprStateStore(key, configureOptions)` for independently configured instances. Resolve with `GetRequiredKeyedService<IStateStore>(key)`. A keyed Redis/Dapr store does not automatically replace the unkeyed default. Selecting a distributed common store declares and satisfies the `distributed-provider` feature; requesting distributed storage without a provider fails composition rather than silently falling back to memory.
 
+## Exception responses and diagnostic visibility
+
+`AddExceptionHandling()` requires a Web host and converts unhandled failures into Monica result envelopes. Configure diagnostic visibility on `AddResultEnvelope(...)`; `ExposeDiagnosticDetails` defaults to `false` and does not follow the ASP.NET Core environment automatically. For a host whose consumers may inspect technical details, add these registrations inside the existing `builder.AddMonica(...)` callback:
+
+```csharp
+monica.AddExceptionHandling();
+monica.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+```
+
+With the switch enabled, an exception response contains `metadata.diagnostics`, an `ExceptionDiagnosticDocument` with `schemaVersion: 1`, a root `exceptionId`, optional request context, and an `exceptions` catalog. Each entry has an `id`, CLR `type`, its own `message`, its own `stackTrace` array, and optional `innerExceptionIds`. Runtime exceptions are captured once by object identity at response projection: the same propagated exception and shared causes use the same ID, while distinct exceptions with identical text remain distinct. Aggregate exceptions retain their direct causes. This avoids copying `Exception.ToString()` into each boundary or chain node; repeated frames within one actual stack remain meaningful evidence and are retained.
+
+The following diagnostic metadata fragment shows a wrapper and its cause. Call-chain nodes, when enabled, refer to the same catalog through `exceptionId`:
+
+```json
+{
+  "diagnostics": {
+    "schemaVersion": 1,
+    "exceptionId": "e1",
+    "exceptions": [
+      {
+        "id": "e1",
+        "type": "System.InvalidOperationException",
+        "message": "The operation failed.",
+        "stackTrace": ["at Example.Service.Execute()"],
+        "innerExceptionIds": ["e2"]
+      },
+      {
+        "id": "e2",
+        "type": "System.ArgumentException",
+        "message": "The supplied value is invalid.",
+        "stackTrace": ["at Example.Validator.Validate()"]
+      }
+    ]
+  },
+  "chain": { "exceptionId": "e1", "children": [] }
+}
+```
+
+Remote failures belong to a separate `remote` object with the reported status, transport, service, trace identifier, request information, and its own `diagnostics` and `chain` when available. A transport exception owns this object on its catalog entry; a returned remote result can instead attach it to the corresponding local call-chain node. Every remote document has an independent ID scope, so a remote `e1` never refers to the caller's `e1`. Readers must resolve chain and cause references within their owning document. The receiver normalizes current catalogs and recognized legacy `metadata.exception` / chain `exceptionMessage` forms, including historical additional-chain keys, allowing services to upgrade separately. New consumers should read `metadata.diagnostics` rather than the removed local `metadata.exception` or per-node `exceptionMessage` output. Capture limits bound text, stacks, catalog size, and remote/chain nesting; `truncated` marks omitted detail.
+
+When diagnostics are disabled, presentation removes reserved technical metadata, including `diagnostics`, `exception`, `detail`, `chain`, `chain_error`, and historical numeric variants such as `chain1` and `chain_1`. The public error and correlation contract remains available. The remote-call boundary follows the receiving host's diagnostic switch; enabling it does not make downstream hosts disclose details they did not send. Operator logging continues to receive the full exception object independently of this response switch.
+
+Enabling diagnostics also configures the host's canonical JSON encoder for readable UTF-8 text and CLR punctuation, such as Chinese messages, backticks, and angle brackets in stack frames. This is a host-wide wire-contract setting shared by its JSON consumers, not a postprocessing pass over exception strings. JSON escaping for quotes, backslashes, and control characters remains valid; a literal `\\u0060` string remains literal. Parse JSON once and consume it as JSON rather than embedding raw response text into HTML or script. See `$monica-infra-observability` for chain attachment and `$monica-infra-messaging` for the Dapr transport adapter.
+
 ## Source checks
 
-When working inside the repository, verify version-sensitive calls in `Monica.Core/Modularity/Extensions/MonicaHostBuilderExtensions.cs`, `Monica.Core/Modularity/Extensions/MonicaApplicationBuilderExtensions.cs`, `Monica.DependencyInjection/Modules/ModuleDependencyInjection.cs`, `Monica.Core/Modules/ModuleHostedService.cs`, `Monica.ServiceDiscovery/Modules/ModuleServiceDiscovery.cs`, `Monica.StateStore/Modules/ModuleStateStore.cs`, `Monica.StateStore.StackExchange/Modules/ModuleRedisStateStore.cs`, and `Monica.Dapr/Modules/ModuleDaprStateStore.cs`. `examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Program.cs` is a working host composition example.
+When working inside the repository, verify version-sensitive calls in `Monica.Core/Modularity/Extensions/MonicaHostBuilderExtensions.cs`, `Monica.Core/Modularity/Extensions/MonicaApplicationBuilderExtensions.cs`, `Monica.DependencyInjection/Modules/ModuleDependencyInjection.cs`, `Monica.Core/Modules/ModuleHostedService.cs`, `Monica.ServiceDiscovery/Modules/ModuleServiceDiscovery.cs`, `Monica.StateStore/Modules/ModuleStateStore.cs`, `Monica.StateStore.StackExchange/Modules/ModuleRedisStateStore.cs`, and `Monica.Dapr/Modules/ModuleDaprStateStore.cs`. Exception response contracts are owned by `Monica.Core/Modules/ModuleResultEnvelope.cs`, `Monica.Core/ExceptionHandling/Models/ExceptionDiagnosticDocument.cs`, and `Monica.Core/ExceptionHandling/Services/ExceptionDiagnosticProjection.cs`; behavior is covered by `Tests/Test.Monica.Core/ExceptionHandling/ExceptionDiagnosticProjectionTests.cs` and `ModuleExceptionHandlingIntegrationTests.cs`. `examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Program.cs` is a working host composition example.

@@ -1,4 +1,3 @@
-using Monica.Core.Extensions;
 using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Models;
 
@@ -70,7 +69,7 @@ public class ChainTracingScope : IDisposable
     {
         if (!_disposed)
         {
-            _chainTracing.EndTrace(TraceId, result ?? $"Exception: {exception.GetMessageRecursively()}", false, exception, extraInfo);
+            _chainTracing.EndTrace(TraceId, result ?? $"Exception: {exception.GetType().Name}", false, exception, extraInfo);
             _disposed = true;
         }
     }

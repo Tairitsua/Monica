@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -21,6 +22,8 @@ namespace Test.Monica.Core.ExceptionHandling;
 
 public sealed class ModuleExceptionHandlingIntegrationTests
 {
+    private const string READABLE_DIAGNOSTIC_MESSAGE = """航班保存失败：Func`1 <Flight> "引用" 路径 C:\logs\u0060.txt""";
+
     [Fact]
     public async Task MissingRequiredJsonMember_InProduction_ReturnsStructuredBadRequest()
     {
@@ -96,7 +99,8 @@ public sealed class ModuleExceptionHandlingIntegrationTests
         raw.Should().Contain("\"code\":\"internal.unexpected\"");
         raw.Should().NotContain("secret-token");
         raw.Should().NotContain("InvalidOperationException");
-        raw.Should().NotContain("StackTrace");
+        raw.Should().NotContain("stackTrace");
+        raw.Should().NotContain("\"diagnostics\"");
     }
 
     [Fact]
@@ -112,7 +116,62 @@ public sealed class ModuleExceptionHandlingIntegrationTests
         raw.Should().Contain("\"code\":\"internal.unexpected\"");
         raw.Should().Contain("secret-token");
         raw.Should().Contain("InvalidOperationException");
-        raw.Should().Contain("\"exception\":{\"type\"");
+        using var document = JsonDocument.Parse(raw);
+        var metadata = document.RootElement.GetProperty("metadata");
+        metadata.TryGetProperty("exception", out _).Should().BeFalse();
+        var diagnostics = metadata.GetProperty("diagnostics");
+        diagnostics.GetProperty("schemaVersion").GetInt32().Should().Be(1);
+        var entry = Assert.Single(diagnostics.GetProperty("exceptions").EnumerateArray());
+        entry.GetProperty("id").GetString().Should().Be(diagnostics.GetProperty("exceptionId").GetString());
+        entry.GetProperty("message").GetString().Should().Be("secret-token failure");
+        diagnostics.GetProperty("request").GetProperty("path").GetString().Should().Be("/throw");
+    }
+
+    [Fact]
+    public async Task UnexpectedException_WhenDetailsEnabled_ShouldKeepUnicodeAndDiagnosticSymbolsReadableInJson()
+    {
+        await using var application = await StartApplicationAsync(static () => { }, includeExceptionDetails: true);
+
+        using var response = await application.GetTestClient().GetAsync(
+            "/throw-readable", TestContext.Current.CancellationToken);
+        var raw = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        raw.Should().Contain("航班保存失败");
+        raw.Should().Contain("Func`1 <Flight>");
+        raw.Should().Contain(@"C:\\logs\\u0060.txt");
+        raw.Should().NotContain(@"\u822A");
+        raw.Should().NotContain(@"\u003CFlight\u003E");
+        raw.Should().NotContain(@"Func\u00601");
+        using var document = JsonDocument.Parse(raw);
+        var entry = Assert.Single(document.RootElement.GetProperty("metadata")
+            .GetProperty("diagnostics").GetProperty("exceptions").EnumerateArray());
+        entry.GetProperty("message").GetString().Should().Be(READABLE_DIAGNOSTIC_MESSAGE);
+    }
+
+    [Fact]
+    public async Task UnexpectedException_WhenDetailsArePrivate_ShouldHideReadableDiagnosticsAndKeepSafeCorrelation()
+    {
+        await using var application = await StartApplicationAsync(static () => { });
+
+        using var response = await application.GetTestClient().GetAsync(
+            "/throw-readable", TestContext.Current.CancellationToken);
+        var raw = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        raw.Should().NotContain("航班保存失败");
+        raw.Should().NotContain("Func`1");
+        raw.Should().NotContain("<Flight>");
+        raw.Should().NotContain(@"\\u0060.txt");
+        using var document = JsonDocument.Parse(raw);
+        var metadata = document.RootElement.GetProperty("metadata");
+        metadata.TryGetProperty("diagnostics", out _).Should().BeFalse();
+        metadata.TryGetProperty("exception", out _).Should().BeFalse();
+        metadata.TryGetProperty("chain", out _).Should().BeFalse();
+        var error = metadata.GetProperty("error");
+        error.GetProperty("code").GetString().Should().Be("internal.unexpected");
+        error.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -180,6 +239,8 @@ public sealed class ModuleExceptionHandlingIntegrationTests
             "/empty-rejection/{statusCode:int}",
             (int statusCode) => Microsoft.AspNetCore.Http.Results.StatusCode(statusCode)).WithMonicaEndpoint();
         application.MapGet("/throw", (HttpContext _) => throw new InvalidOperationException("secret-token failure"))
+            .WithMonicaEndpoint();
+        application.MapGet("/throw-readable", (HttpContext _) => throw new InvalidOperationException(READABLE_DIAGNOSTIC_MESSAGE))
             .WithMonicaEndpoint();
         application.MapMonica();
         await application.StartAsync(TestContext.Current.CancellationToken);

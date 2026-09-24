@@ -1,4 +1,5 @@
 using Monica.Core.Results;
+using Monica.Core.ExceptionHandling.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core.JsonSerialization.Abstractions;
@@ -192,7 +193,8 @@ public class AsyncLocalChainTracingService(IOptions<ModuleChainTracingOption> op
     /// Links remote response correlation to a local trace node for every outcome. Chain tracing is the
     /// debugging channel when no distributed-tracing infrastructure exists, so successful calls record the
     /// target identity and the remote correlation identifier just like failed ones; failures additionally
-    /// keep the typed error origin. Payloads and chain graphs are not copied.
+    /// keep the typed error origin. Structured remote diagnostics remain scoped to that remote response
+    /// so the local exception table never reinterprets a downstream exception identifier.
     /// </summary>
     /// <param name="traceId">The local trace node that should receive the remote correlation.</param>
     /// <param name="remoteRes">The response returned by the remote-call boundary.</param>
@@ -202,6 +204,8 @@ public class AsyncLocalChainTracingService(IOptions<ModuleChainTracingOption> op
 
         node.RemoteTraceId = ResolveRemoteTraceId(remoteRes);
         node.RemoteService ??= AsString(remoteRes.Metadata?.GetOrDefault(ResultMetadataKeys.RemoteService));
+        node.Remote = ExceptionDiagnosticProjection.CaptureRemote(remoteRes, jsonSerializerOptionsProvider.SerializerOptions);
+        node.RemoteEnvelope = remoteRes;
 
         if (remoteRes.TryGetError(jsonSerializerOptionsProvider.SerializerOptions, out var error))
             node.EndExtraInfo = new { error.Code, error.Service, error.Operation };

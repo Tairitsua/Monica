@@ -51,10 +51,11 @@ public interface IChainTracing
     ChainTraceNode? GetCurrentNode();
 
     /// <summary>
-    /// Links a remote public error to a local trace node using its origin trace identifier.
+    /// Links a remote response to a local trace node using its origin trace identifier and an independent
+    /// structured diagnostic response. Remote exception identifiers retain their original document scope.
     /// </summary>
     /// <param name="traceId">The local trace node that should receive the remote correlation details.</param>
-    /// <param name="remoteRes">The remote response carrying a typed error. Payloads and chain graphs are not copied.</param>
+    /// <param name="remoteRes">The remote response carrying correlation and optional diagnostic metadata.</param>
     void MergeRemoteChain(string traceId, IResultEnvelope remoteRes);
 
     /// <summary>

@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Monica.Core.ExceptionHandling.Models;
+using Monica.Core.Results.Abstractions;
 
 namespace Monica.Framework.ChainTracing.Models;
 
@@ -12,7 +14,6 @@ public class ChainTraceNode
     /// </summary>
     public int Depth { get; set; }
 
-    private string[]? _exceptionMessage;
     private string? _duration;
     private EChainTracingType _type;
     private int _repeatCount;
@@ -169,20 +170,28 @@ public class ChainTraceNode
     public string? RemoteTraceId { get; set; }
 
     /// <summary>
+    /// Structured diagnostics returned by this call's remote service. Exception identifiers inside this
+    /// response belong to its own diagnostics document, independently of the enclosing host's document.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RemoteDiagnosticResponse? Remote { get; set; }
+
+    // Keeps direct envelope forwarding associated with its originating invocation until response projection.
+    [JsonIgnore]
+    internal IResultEnvelope? RemoteEnvelope { get; set; }
+
+    /// <summary>
     /// Captured exception.
     /// </summary>
     [JsonIgnore]
     public Exception? Exception { get; set; }
 
     /// <summary>
-    /// Serialized representation of the exception.
+    /// Identifier of this node's exception in the owning response's diagnostics document. Propagating the
+    /// same exception through multiple scopes reuses this identifier instead of repeating its stack.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string[]? ExceptionMessage
-    {
-        get => _exceptionMessage ?? Exception?.ToString().Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-        set => _exceptionMessage = value;
-    }
+    public string? ExceptionId { get; set; }
 
     /// <summary>
     /// Extra metadata captured when the node starts.

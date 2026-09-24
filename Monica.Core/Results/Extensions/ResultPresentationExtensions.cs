@@ -7,7 +7,7 @@ namespace Monica.Core.Results;
 public static class ResultPresentationExtensions
 {
     private static readonly string[] DIAGNOSTIC_KEYS =
-        ["originResponse", "response", "request", "deserializationError", "exception", "detail", "chain", "chain_error", "remoteService"];
+        ["originResponse", "response", "request", "deserializationError", "exception", "diagnostics", "detail", "chain", "chain_error", "remoteService"];
 
     /// <summary>
     /// Removes reserved technical metadata and fills missing failure presentation. Domain data and public
@@ -22,7 +22,7 @@ public static class ResultPresentationExtensions
     /// <param name="operation">Optional owning operation name stamped onto synthesized errors.</param>
     /// <param name="exposeReservedDiagnostics">
     /// Retains reserved diagnostic members in the response. Only trusted development hosts may enable this;
-    /// remote-call boundaries always strip diagnostics.
+    /// remote-call boundaries apply the same host diagnostic policy before forwarding.
     /// </param>
     public static T PrepareForPresentation<T>(this T result, JsonSerializerOptions json,
         IResultErrorMessageProvider messages, string traceId, string? service = null, string? operation = null,
@@ -56,7 +56,11 @@ public static class ResultPresentationExtensions
     }
 
     private static bool IsDiagnosticKey(string key) => DIAGNOSTIC_KEYS.Any(reserved =>
-        key.Equals(reserved, StringComparison.OrdinalIgnoreCase) ||
-        key.StartsWith(reserved, StringComparison.OrdinalIgnoreCase) &&
-        key.AsSpan(reserved.Length).ContainsAnyExceptInRange('0', '9') == false);
+    {
+        if (key.Equals(reserved, StringComparison.OrdinalIgnoreCase)) return true;
+        if (!key.StartsWith(reserved, StringComparison.OrdinalIgnoreCase)) return false;
+        var suffix = key.AsSpan(reserved.Length);
+        if (suffix.StartsWith("_")) suffix = suffix[1..];
+        return !suffix.IsEmpty && !suffix.ContainsAnyExceptInRange('0', '9');
+    });
 }

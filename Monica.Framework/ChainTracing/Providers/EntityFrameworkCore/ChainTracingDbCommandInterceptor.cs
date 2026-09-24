@@ -132,7 +132,7 @@ public class ChainTracingDbCommandInterceptor(
 
             if (aggregated)
             {
-                AggregateRepeat(traceId, success, resultDescription);
+                AggregateRepeat(traceId, success, resultDescription, exception);
             }
             else
             {
@@ -152,7 +152,8 @@ public class ChainTracingDbCommandInterceptor(
     /// <param name="traceId">The aggregated node's trace identifier.</param>
     /// <param name="success">Whether the repeated execution succeeded.</param>
     /// <param name="resultDescription">The repeated execution's result description.</param>
-    private void AggregateRepeat(string traceId, bool success, string resultDescription)
+    /// <param name="exception">The repeated execution's failure, when present.</param>
+    private void AggregateRepeat(string traceId, bool success, string resultDescription, Exception? exception)
     {
         if (chainTracing.GetCurrentChain()?.NodeMap.TryGetValue(traceId, out var node) is not true || node is null)
         {
@@ -160,6 +161,7 @@ public class ChainTracingDbCommandInterceptor(
         }
 
         node.AddRepeat(!success, DateTime.UtcNow);
+        node.Exception ??= exception;
         node.Result = $"{resultDescription} ×{node.RepeatCount + 1}";
     }
 

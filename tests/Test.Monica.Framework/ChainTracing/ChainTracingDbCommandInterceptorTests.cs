@@ -117,6 +117,8 @@ public sealed class ChainTracingDbCommandInterceptorTests
         node.RepeatCount.Should().Be(1);
         node.Result.Should().Contain("×2");
         node.IsFailed.Should().BeTrue("a failed aggregated execution marks the node failed");
+        node.Exception.Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("batch 2 failed", "aggregating a later failure must retain its diagnostic cause");
     }
 
     private static List<ChainTraceNode> DatabaseChildrenOf(IChainTracing tracing)

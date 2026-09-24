@@ -12,8 +12,20 @@ namespace Monica.Framework.ChainTracing.Providers.AspNetCore;
 /// </summary>
 public class ChainTracingResultMetadataActionFilter(
     IChainTracing chainTracing,
-    ChainResultMetadataAttacher attacher) : IActionFilter
+    ChainResultMetadataAttacher attacher) : IActionFilter, IOrderedFilter
 {
+    /// <summary>
+    /// MVC registration order for both this filter and its factory descriptor. Factory attributes must
+    /// receive this value explicitly because MVC sorts them before creating the filter instance.
+    /// </summary>
+    public const int ExecutionOrder = int.MinValue;
+
+    /// <summary>
+    /// Enters before controller tracing and therefore runs its completion callback last. Exception
+    /// references are projected only after the controller scope has recorded its final outcome.
+    /// </summary>
+    public int Order => ExecutionOrder;
+
     /// <summary>
     /// Runs before the action executes.
     /// </summary>

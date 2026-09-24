@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Text.Encodings.Web;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
@@ -52,6 +53,11 @@ public class ModuleResultEnvelope : MonicaModule<ModuleResultEnvelopeOption>
         contracts.Modules.Get<ModuleJsonSerialization, ModuleJsonSerializationOption>()
             .WireContract
             .ConfigureResultEnvelope(contracts.Options.FieldNames);
+        if (contracts.Options.ExposeDiagnosticDetails)
+        {
+            contracts.Modules.Get<ModuleJsonSerialization, ModuleJsonSerializationOption>()
+                .WireContract.Configure(options => options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping);
+        }
     }
 
     public override void ConfigureServices(ModuleContext<ModuleResultEnvelopeOption> context)
@@ -70,10 +76,13 @@ public class ModuleResultEnvelopeOption : ModuleOptions<ModuleResultEnvelope>
 
     /// <summary>
     /// Gets or sets the single diagnostic switch for this host. The default is <see langword="false"/>.
-    /// When enabled, unhandled exceptions carry bounded <c>metadata.exception</c> details, reserved diagnostic
-    /// members (<c>exception</c>, <c>detail</c>, <c>chain</c>, <c>chain_error</c>) are retained in HTTP responses,
+    /// When enabled, unhandled exceptions carry a bounded <c>metadata.diagnostics</c> exception catalog,
+    /// chain nodes refer to catalog entries through <c>exceptionId</c>, and reserved diagnostic
+    /// members (<c>diagnostics</c>, legacy <c>exception</c>, <c>detail</c>, <c>chain</c>, <c>chain_error</c>) are retained in HTTP responses,
     /// the remote-call boundary forwards a downstream's reserved details instead of stripping them, and the
     /// chain-tracing filter attaches the call chain (including recorded SQL commands) to result envelopes.
+    /// Diagnostic hosts use readable UTF-8 JSON escaping, including Unicode and CLR stack punctuation;
+    /// consume these JSON responses as JSON rather than embedding their raw text in HTML or script.
     /// Operator logs always contain full exception objects regardless of this switch; enable it only on hosts
     /// whose consumers may see SQL text, parameter values, and stack traces.
     /// </summary>

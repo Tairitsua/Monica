@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging;
-using Monica.Core.Extensions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
@@ -54,7 +53,7 @@ public class ChainTracingControllerActionFilter(IChainTracing chainTracing, ILog
             if (context.Exception != null)
             {
                 // Complete the trace with exception details.
-                chainTracing.EndTrace(actionTraceId, $"Exception: {context.Exception.GetMessageRecursively()}", false, context.Exception);
+                chainTracing.EndTrace(actionTraceId, $"Exception: {context.Exception.GetType().Name}", false, context.Exception);
             }
             else
             {

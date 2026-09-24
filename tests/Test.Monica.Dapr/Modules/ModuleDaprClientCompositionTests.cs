@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.Core;
+using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Modularity.Extensions;
+using Monica.Dapr.Providers;
 using Monica.Modules;
 using Xunit;
 
@@ -35,6 +37,8 @@ public sealed class ModuleDaprClientCompositionTests
                         && snapshot.IsWebModule
                         && !snapshot.RequiresWebHost);
         Assert.Same(jsonOptions.SerializerOptions, daprClient.JsonSerializerOptions);
+        Assert.IsType<DaprRemoteExceptionDiagnosticsExtractor>(Assert.Single(
+            host.Services.GetServices<IRemoteExceptionDiagnosticsExtractor>()));
     }
 
     [Fact]

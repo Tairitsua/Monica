@@ -4,12 +4,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.ExceptionHandling.Exceptions;
-using Monica.Core.Extensions;
+using Monica.Core.ExceptionHandling.Models;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
 using Monica.Modules;
-using Monica.Tool.Extensions;
 
 namespace Monica.Core.ExceptionHandling.Services;
 
@@ -20,7 +19,8 @@ internal class ExceptionHandlerService(
     IOptions<ModuleResultEnvelopeOption> envelopeOptions,
     IJsonSerializerOptionsProvider serializer,
     IResultErrorMessageProvider messages,
-    IExceptionResponseDiagnostics? diagnostics = null) : IExceptionHandlerService
+    IExceptionResponseDiagnostics? diagnostics = null,
+    IEnumerable<IRemoteExceptionDiagnosticsExtractor>? remoteExtractors = null) : IExceptionHandlerService
 {
     public Task<Res> HandleCurrentHttpContextAsync(Exception exception, CancellationToken cancellationToken) =>
         HandleAsync(accessor.HttpContext, exception, cancellationToken);
@@ -60,37 +60,22 @@ internal class ExceptionHandlerService(
                 .WithDetail(display.TechnicalDetail),
             _ => Res.Fail("", ResStatus.InternalError)
         };
-        if (exposeDiagnostics)
-            result.SetMetadata("exception", ExceptionDiagnostics.From(exception, httpContext));
-
         // All mappers pass through the same reserved-metadata policy. Outer context cannot replace an error.
         foreach (var entry in metadata.Where(entry => entry.Key != "error"))
             result.SetMetadata(entry.Key, entry.Value);
         result.PrepareForPresentation(serializer.SerializerOptions, messages, ResultTraceId.Capture(httpContext),
             exposeReservedDiagnostics: exposeDiagnostics);
+        if (exposeDiagnostics)
+        {
+            var document = ExceptionDiagnosticProjection.GetOrCreate(result);
+            document.ExceptionId = ExceptionDiagnosticProjection.Capture(document, exception, remoteExtractors);
+            document.Request = new DiagnosticRequest(httpContext?.Request.Method, httpContext?.Request.Path,
+                httpContext?.GetEndpoint()?.DisplayName, DateTime.UtcNow);
+        }
         // Exception-path diagnostics (call-chain correlation) run after presentation so the reserved-member
         // policy has already been applied.
         diagnostics?.Attach(httpContext, result);
         return Task.FromResult(result);
     }
 
-    /// <summary>Bounded technical detail for development hosts; production presentation strips this member.</summary>
-    private sealed record ExceptionDiagnostics(
-        string Type,
-        string Message,
-        IReadOnlyList<string> StackTrace,
-        string? Method,
-        string? Path,
-        string? Endpoint,
-        DateTime UtcTime)
-    {
-        public static ExceptionDiagnostics From(Exception exception, HttpContext? httpContext) => new(
-            exception.GetType().GetCleanFullName(),
-            exception.GetMessageRecursively(),
-            exception.ToString().Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries),
-            httpContext?.Request.Method,
-            httpContext?.Request.Path,
-            httpContext?.GetEndpoint()?.DisplayName,
-            DateTime.UtcNow);
-    }
 }

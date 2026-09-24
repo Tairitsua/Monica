@@ -7,11 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Monica.Core;
+using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.JsonSerialization.Extensions;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Dapr.Abstractions;
+using Monica.Dapr.Providers;
 using Monica.Dapr.Services;
 using Monica.HealthCheck.Extensions;
 
@@ -43,6 +45,8 @@ public sealed class ModuleDaprClient : MonicaModule<ModuleDaprClientOption>, IWe
     public override void ConfigureServices(ModuleContext<ModuleDaprClientOption> context)
     {
         var services = context.Services;
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRemoteExceptionDiagnosticsExtractor,
+            DaprRemoteExceptionDiagnosticsExtractor>());
         services.RemoveAll<DaprClient>();
         services.AddDaprClient(builder => builder.UseGrpcChannelOptions(new GrpcChannelOptions()
         {
