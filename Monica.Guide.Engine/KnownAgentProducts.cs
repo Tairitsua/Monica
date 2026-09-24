@@ -48,7 +48,7 @@ public static class KnownAgentProducts
         SkillNamespacePrefix = "monica-",
         DefaultPort = null,
         SupportedHosts = ["claude", "codex"],
-        DotnetSdk = "10.0.401",
+        DotnetSdk = "10.0",
         Platforms = PortablePlatforms("Monica.Guide"),
         ProgramEntryTree = "setup",
         GitHubSlug = "Tairitsua/Monica",
@@ -80,7 +80,7 @@ public static class KnownAgentProducts
             ["ui"] = "/workflow"
         },
         SupportedHosts = ["claude", "codex"],
-        DotnetSdk = "10.0.401",
+        DotnetSdk = "10.0",
         Platforms = PortablePlatforms("Monica.Workflow"),
         GitHubSlug = "Tairitsua/Monica.Workflow",
         ArchiveAssetNameTemplate = "monica-workflow-v{version}-{rid}.zip",

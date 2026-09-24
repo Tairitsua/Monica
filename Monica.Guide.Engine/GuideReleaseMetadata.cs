@@ -198,7 +198,8 @@ public static class GuideReleaseMetadata
         }
         if (manifest.ProductName != definition.ProductName
             || manifest.Tag != $"v{manifest.ProductVersion}"
-            || (definition.DotnetSdk is not null && manifest.DotnetSdk != definition.DotnetSdk)
+            || (definition.DotnetSdk is not null
+                && !manifest.DotnetSdk.StartsWith($"{definition.DotnetSdk}.", StringComparison.Ordinal))
             || manifest.DistributionKind != platform.DistributionKind
             || manifest.SelfContained is null
             || (manifest.SelfContained is false

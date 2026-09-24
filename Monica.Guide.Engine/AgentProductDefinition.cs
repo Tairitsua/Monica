@@ -36,7 +36,10 @@ public sealed record AgentProductDefinition
     /// <summary>Agent hosts a release declares support for, ordered exactly as pinned.</summary>
     public IReadOnlyList<string> SupportedHosts { get; init; } = [];
 
-    /// <summary>Exact .NET SDK pin a release must carry; null skips the pin.</summary>
+    /// <summary>
+    /// .NET runtime band (major.minor, for example "10.0") a release's SDK must stay inside; null
+    /// skips the pin. The SDK patch level is build provenance, not a product contract.
+    /// </summary>
     public string? DotnetSdk { get; init; }
 
     /// <summary>
