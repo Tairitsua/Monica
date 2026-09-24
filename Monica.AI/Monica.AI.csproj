@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Harness" Version="1.21.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.0" />
