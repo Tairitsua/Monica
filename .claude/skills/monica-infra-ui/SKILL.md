@@ -5,6 +5,12 @@ description: Register and use Monica Blazor UI modules, the shell, Markdown view
 
 # Monica UI hosting
 
-Read [references/usage.md](references/usage.md) for the shell, feature UI registrations, document groups, and access behavior. Add UI modules inside `AddMonica(...)`; complete the Web app with `UseMonica()` and `MapMonica()` so static assets, antiforgery, Razor components, and module endpoints are mapped.
+The shell hosts pages; feature UI modules add operational views, while Markdown provides searchable document groups.
 
-For creating or editing Razor components and styles, use `$monica-ui-development`; for localized strings and resource validation, use `$monica-ui-localization`; for page structure, use `$monica-architecture`. `$monica-infra-ai` covers AI service configuration behind AI pages.
+| Task | Read |
+| --- | --- |
+| Compose the shell, add feature pages, configure navigation, or authorize operational pages | [Shell and access](references/shell-and-access.md) |
+| Publish searchable documents, use the viewer, or serve local images | [Markdown](references/markdown.md) |
+| Set theme/language defaults or integrate custom page localization | [Theme and localization](references/theme-and-localization.md) |
+
+For building components, use [UI development](../monica-ui-development/SKILL.md); for authoring translation resources, use [UI localization](../monica-ui-localization/SKILL.md); configure each feature's underlying service through its owning infrastructure skill.

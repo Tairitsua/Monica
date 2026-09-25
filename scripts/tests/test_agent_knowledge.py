@@ -69,6 +69,15 @@ class KnowledgePublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Multiple skill owners"):
             knowledge.collect_skills(self.root, self.catalog)
 
+    def test_publishes_every_supported_markdown_reference_extension(self):
+        directory, _ = self.add_skill("monica-infra-example", ["example"])
+        references = directory / "references"
+        references.mkdir()
+        for name in ("setup.md", "operations.markdown", "advanced.MD"):
+            (references / name).write_text(f"# {name}\n", encoding="utf-8")
+        paths = {file["path"] for file in knowledge.collect_skills(self.root, self.catalog)[0]["files"]}
+        self.assertEqual({"SKILL.md", "references/setup.md", "references/operations.markdown", "references/advanced.MD"}, paths)
+
     def test_preserves_bom_and_windows_line_endings_in_resource_digests(self):
         directory, _ = self.add_skill("monica-infra-example", ["example"])
         content = b"\xef\xbb\xbf# Reference\r\n\r\nExact source bytes.\r\n"

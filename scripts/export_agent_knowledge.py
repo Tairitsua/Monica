@@ -17,6 +17,11 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
+try:
+    from agent_skill_references import markdown_documents
+except ModuleNotFoundError:  # Supports import-by-path test runners.
+    from scripts.agent_skill_references import markdown_documents
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -56,7 +61,7 @@ def collect_skills(root: Path, catalog: dict[str, Any]) -> list[dict[str, Any]]:
         if not (directory / "SKILL.md").is_file():
             raise ValueError(f"Missing entrypoint for {name}")
         files = []
-        for path in sorted(directory.rglob("*.md")):
+        for path in markdown_documents(directory):
             if path.is_symlink() or not path.resolve().is_relative_to(directory):
                 raise ValueError(f"Skill publication cannot follow a symlink: {path}")
             content = path.read_bytes()

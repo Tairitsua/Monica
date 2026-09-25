@@ -1086,7 +1086,7 @@
           },
           {
             "id": "canonical-knowledge",
-            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical skill reference in the same change and regenerate agent and website projections; explain a no-impact decision when no knowledge change is needed."
+            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical task reference and any affected read-when routes in the same change; follow monica-docs-authoring for topic boundaries and regenerate agent and website projections. Explain a no-impact decision when no knowledge change is needed."
           }
         ]
       }

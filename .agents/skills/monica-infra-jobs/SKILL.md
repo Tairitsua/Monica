@@ -5,8 +5,12 @@ description: Use when adding Monica JobScheduler recurring or triggered jobs, ch
 
 # Monica jobs and seeders
 
-Choose JobScheduler for recurring or on-demand work with execution history and a queue; choose Seeder for finite dependency-aware startup work. Read [the usage reference](references/usage.md) for registration, examples, retry/lease behavior, and troubleshooting. It is sufficient for normal host integration. Open the linked source and tests when implementing a custom store, changing execution policy, or diagnosing a result that conflicts with the reference.
+Choose JobScheduler for recurring or on-demand work with managed execution history; choose Seeder for finite startup work with dependencies and readiness requirements.
 
-For JobScheduler, always select a store and stable scheduler scope. Use the in-memory store only for standalone development or deterministic tests; select an EF Core store for durable execution across replicas. For Seeder, make the work idempotent and declare dependencies when order matters. Seeder readiness is distinct from process startup: seeders run after `ApplicationStarted`.
+| Task | Read |
+| --- | --- |
+| Register recurring or typed triggered jobs, select storage and scope, or enqueue application work | [Scheduler](references/scheduler.md) |
+| Inspect execution history, trigger or cancel work, change policy, or expose the operator UI | [Scheduler operations](references/scheduler-operations.md) |
+| Declare startup seeders, order dependencies, or diagnose readiness | [Startup seeding](references/startup-seeding.md) |
 
-Use `$monica-development` as well when changing module registration or hosted-service implementation. For operational UI changes, use `$monica-ui-development`.
+For application job placement, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md); for module or worker implementation, use [development](../monica-development/SKILL.md).

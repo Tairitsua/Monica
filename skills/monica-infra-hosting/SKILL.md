@@ -5,8 +5,15 @@ description: Compose a Monica host and use module diagnostics, conventional DI, 
 
 # Monica infrastructure hosting
 
-Use this skill when an application consumes Monica modules or diagnoses host composition. Read [references/usage.md](references/usage.md) for the host lifecycle, registration choices, and failure behavior.
+Start with composition for module-graph or host-lifecycle problems, then select the runtime capability involved.
 
-Start from the current application's host type. Register modules inside its single `AddMonica(...)` callback, then complete a Web host with `UseMonica()` and `MapMonica()` on the same application. Generic hosts have no web mapping. Prefer a module's public registration extensions over direct service registrations when the extension declares dependencies or features.
+| Task | Read |
+| --- | --- |
+| Compose a Web or generic host, select discovery assemblies, or inspect module diagnostics | [Host composition](references/host-composition.md) |
+| Discover application services, choose DI lifetimes, or decorate an interface | [Dependency injection](references/dependency-injection.md) |
+| Register workers or diagnose their startup, state, and shutdown | [Hosted services](references/hosted-services.md) |
+| Configure registry/worker roles or inspect registered services | [Service discovery](references/service-discovery.md) |
+| Store key-value state using a memory, distributed, or keyed provider | [State stores](references/state-stores.md) |
+| Inspect local or remote failures and choose response diagnostic visibility | [Exception diagnostics](references/exception-diagnostics.md) |
 
-For module strategy design, type discovery rules, and hosted-service subclass implementation, use `$monica-development`. For database repositories and units of work, use `$monica-infra-persistence`. For telemetry/exporting, use `$monica-infra-observability`. The old `dynamic-proxy` documentation describes no current production `AddDynamicProxy` module; inspect the requested decoration scenario before suggesting an API.
+For database aggregates and write boundaries, use [persistence](../monica-infra-persistence/SKILL.md); for telemetry, use [observability](../monica-infra-observability/SKILL.md); for module implementation, use [development](../monica-development/SKILL.md).

@@ -39,7 +39,11 @@ python3 scripts/test_agent_skills.py
 
 Edit Monica-owned skills only under `skills/<name>/`. Their matching `.agents/skills/<name>` and `.claude/skills/<name>` directories are generated projections and must not be edited directly. The generator owns only catalog-managed Monica directories: unrelated external skills, files, and caches in either projection root are preserved and ignored by projection checks. Monica-owned skills use portable `SKILL.md` frontmatter containing only `name` and `description`. Skill release versions live in `.monica/agent-skill-catalog.json` and `.monica/agent-skill-index.json`, not in skill frontmatter.
 
-Nine `monica-infra-*` skills own reusable consumer guidance for persistence, messaging, jobs, configuration, hosting, observability, AI, web, and UI. Keep framework-authoring contracts in their distinct skills. For an implementation change, check whether the catalog-owned knowledge changed:
+Nine `monica-infra-*` skills own reusable consumer guidance for persistence, messaging, jobs, configuration, hosting, observability, AI, web, and UI. Keep framework-authoring contracts in their distinct skills.
+
+Follow [reference organization](skills/monica-docs-authoring/references/reference-organization.md): infrastructure entrypoints carry selection knowledge and direct task routing; references own execution guidance. An overview is optional. Update the existing contract owner and affected routes together, and check published URLs before retiring a topic. The validator checks entrypoint context budgets, links, and reachability; source accuracy, task completeness, and nonduplicated ownership require representative consumer-task review.
+
+For an implementation change, check whether the catalog-owned knowledge changed:
 
 ```bash
 python3 scripts/check_knowledge_impact.py --base <git-revision>
@@ -53,7 +57,7 @@ The checker assigns changed source files to their most specific catalog owner an
 
 1. Open an issue or discussion first for broad design changes.
 2. Keep changes focused on one feature, fix, or refactor.
-3. Update the owning `skills/monica-infra-*/references/` when public behavior or reusable usage guidance changes. Update its example or behavioral check in the same change, or explain why the change has no knowledge impact. Monica.Docs keeps stable guides and renders the published skills; do not duplicate module manuals.
+3. Update the owning task reference under `skills/monica-infra-*/references/` when public behavior or reusable usage guidance changes. Update its routing, example, or behavioral check as needed in the same change, or explain why the change has no knowledge impact. Monica.Docs keeps stable guides and renders the published skills; do not duplicate module manuals.
 4. Keep public XML documentation accurate for developer-facing APIs.
 5. Run the relevant build and test commands before opening the pull request.
 

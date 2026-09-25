@@ -5,6 +5,13 @@ description: Compose Monica Web API, generated controllers, AutoModel, Swagger, 
 
 # Monica Web integration
 
-Read [references/usage.md](references/usage.md) to choose the Web API bundle or individual modules and to understand the route, authentication, and execution boundaries. Complete Web composition through `UseMonica()` then `MapMonica()` after building the application.
+Choose host composition for the Web bundle or individual modules; choose endpoint guidance for request discovery and execution, and policy guidance for caller access.
 
-Use `$monica-application-project-unit-development` to author ProjectUnit request endpoints and application services. Use `$monica-infra-hosting` for general graph setup, `$monica-infra-observability` for probes and metrics, and `$monica-development` when implementing a new Web module.
+| Task | Read |
+| --- | --- |
+| Compose an HTTP host and choose the Web bundle or individual capabilities | [Web composition](references/web-composition.md) |
+| Expose request-owned endpoints, configure AutoModel, or inspect and extend execution behaviors | [Endpoints and execution](references/endpoints-and-execution.md) |
+| Configure JWT authentication, permission checks, or CORS | [Access control](references/access-control.md) |
+| Configure Swagger documents or control the visibility of module routes | [API documentation and visibility](references/api-documentation-and-visibility.md) |
+
+For application request and handler design, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md); for module implementation, use [development](../monica-development/SKILL.md).

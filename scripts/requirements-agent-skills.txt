@@ -1,2 +1,3 @@
 jsonschema==4.25.1
+markdown-it-py==4.2.0
 skills-ref @ git+https://github.com/agentskills/agentskills.git@27a9f0c075e876ad632fc2e88b8866c5dc8ca15c#subdirectory=skills-ref

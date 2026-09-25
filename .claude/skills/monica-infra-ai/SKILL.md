@@ -5,6 +5,14 @@ description: Configure and use Monica AI providers, chat, knowledge bases, RAG, 
 
 # Monica AI integration
 
-Read [references/usage.md](references/usage.md) for the separate registration paths: chat and provider discovery, knowledge inventory, vector search, class or file skills, and MCP. Select the smallest capability graph that serves the application. Module dependencies add underlying services but do not choose a vector provider or an AI provider for you.
+Choose conversational runs, document inventory or retrieval, and agent tool exposure separately.
 
-Use `$monica-infra-ui` when enabling the AI management pages; use `$monica-infra-hosting` for general host setup. For authoring business ProjectUnit behavior, use `$monica-application-project-unit-development`. For implementing a new Monica module rather than consuming these modules, use `$monica-development`.
+| Task | Read |
+| --- | --- |
+| Chat from code or the AI UI, select a provider, or manage sessions and attachments | [Chat and providers](references/chat-and-providers.md) |
+| Maintain document inventory without semantic search | [Knowledge and RAG](references/knowledge-and-rag.md) |
+| Index documents, search vectors, or connect knowledge retrieval to chat | [Knowledge and RAG](references/knowledge-and-rag.md) |
+| Make class or file skills available inside an agent | [Runtime skills](references/runtime-skills.md) |
+| Expose tools through MCP or connect an external MCP server | [MCP](references/mcp.md) |
+
+For shell hosting, use [UI](../monica-infra-ui/SKILL.md); for implementing Monica modules, use [development](../monica-development/SKILL.md).

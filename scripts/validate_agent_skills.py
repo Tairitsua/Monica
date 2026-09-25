@@ -24,12 +24,14 @@ try:
         validate_revision_history,
     )
     from agent_skill_file_manifest import digest_files
+    from agent_skill_references import validate_entrypoint_budget, validate_reference_navigation
 except ModuleNotFoundError:  # pragma: no cover - supports import-by-path test runners
     from scripts.agent_skill_release_contract import (
         ReleaseContractError,
         validate_revision_history,
     )
     from scripts.agent_skill_file_manifest import digest_files
+    from scripts.agent_skill_references import validate_entrypoint_budget, validate_reference_navigation
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -483,6 +485,9 @@ def validate_catalog(validation: Validation, catalog: dict[str, Any]) -> None:
         frontmatter_name, _ = parse_frontmatter(skill_file, validation)
         validation.check(frontmatter_name == skill_name, f"{skill_file}: name must match directory")
         parse_openai_yaml(skill_path / "agents" / "openai.yaml", skill_name, validation)
+        if skill_name.startswith("monica-infra-"):
+            validation.errors.extend(validate_entrypoint_budget(skill_file))
+            validation.errors.extend(validate_reference_navigation(skill_path, REPOSITORY_ROOT))
 
         dependencies = entry.get("dependencies", {})
         local_buckets = [

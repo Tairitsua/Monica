@@ -5,8 +5,12 @@ description: Use when integrating Monica managed configuration, bootstrap input 
 
 # Monica managed configuration
 
-Use an immutable `MonicaConfigurationInputPlan` when startup code and the runtime module must read the same managed store and JSON sources. Read [the usage reference](references/usage.md) for the input-plan flow, annotated options, storage, runtime mutation and reload, and UI. The reference is sufficient for ordinary integration; inspect the linked implementation and tests for a custom store, cross-process reload, schema migration, or surprising precedence.
+Choose bootstrap guidance when managed values determine host construction; choose runtime changes when inspecting or changing a running application's values.
 
-Treat bootstrap values and later runtime values as distinct snapshots. A bootstrap read does not publish metadata or write effective values. Runtime activation projects managed values into Microsoft configuration and binds annotated options. Choose validation behavior deliberately: the default reports invalid effective values without blocking startup or options resolution; `FailFast` enforces them. Configuration stored in an EF Core store needs host-owned migrations before startup loading.
+| Task | Read |
+| --- | --- |
+| Select a managed store, compose an input plan, or read values before host construction | [Bootstrap and stores](references/bootstrap-and-stores.md) |
+| Declare managed options, choose binding identity, or diagnose validation | [Options and validation](references/options-and-validation.md) |
+| Inspect source precedence, change or roll back values, reload replicas, or use the operator UI | [Runtime changes](references/runtime-changes.md) |
 
-For module implementation changes, also use `$monica-development`. For configuration UI component work, use `$monica-ui-development` and `$monica-ui-localization`.
+For module implementation, use [development](../monica-development/SKILL.md); for building configuration UI components, use [UI development](../monica-ui-development/SKILL.md).

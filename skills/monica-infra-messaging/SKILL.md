@@ -5,8 +5,14 @@ description: Use when integrating Monica EventBus, RPC clients, DataChannel pipe
 
 # Monica messaging
 
-First identify the communication shape: EventBus publishes typed local or distributed events; RPC calls a request-owned remote contract; DataChannel builds host-owned bidirectional pipelines; SignalR sends to connected web clients. Read [the usage reference](references/usage.md) for the selected shape's registration, example, and failure semantics. The reference covers ordinary usage; inspect the linked source and tests for custom transports, version-specific options, or behavior that differs from the guide.
+Choose the communication boundary before the transport; database-coupled delivery also needs the persistence skill's [transactional events](../monica-infra-persistence/references/transactional-events.md).
 
-Keep transport selection explicit. A local EventBus does not provide cross-process delivery. A distributed EventBus needs a provider; a no-op provider is only for tests or hosts that intentionally do not send externally. Do not equate successful outbox staging with transport delivery. DataChannel and SignalR need a web host. The RPC client's gRPC selection is reserved and currently fails validation.
+| Task | Read |
+| --- | --- |
+| Notify typed handlers within one process or across processes | [EventBus](references/event-bus.md) |
+| Call another application's published request contract and await a result | [RPC client](references/rpc.md) |
+| Recover structured remote failures from Dapr actor calls | [Dapr diagnostics](references/dapr-diagnostics.md) |
+| Send through a named bidirectional pipeline owned by one host | [DataChannel](references/data-channels.md) |
+| Invoke typed methods on connected Web clients | [SignalR](references/signalr.md) |
 
-For module implementation work, also use `$monica-development`. For a request-owned RPC contract, use `$monica-application-project-unit-development` to place the application boundary.
+For application contract placement, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md); for transport/module implementation, use [development](../monica-development/SKILL.md).
