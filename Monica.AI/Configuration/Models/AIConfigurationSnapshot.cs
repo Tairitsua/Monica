@@ -11,6 +11,8 @@ public sealed record AIProviderSettings
     public bool IsCodeDefined { get; init; }
     /// <summary>Whether persisted settings currently override or define this provider.</summary>
     public bool HasOverride { get; init; }
+    /// <summary>Startup validation findings that currently keep this provider disabled; empty when the configuration is valid.</summary>
+    public IReadOnlyList<string> ValidationErrors { get; init; } = [];
 }
 
 /// <summary>
