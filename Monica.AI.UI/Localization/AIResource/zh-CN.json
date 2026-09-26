@@ -760,6 +760,7 @@
     "Unsupported": "不支持",
     "ModelCount": "{0} 个模型",
     "Disabled": "已禁用",
+    "ValidationErrors": "启动校验未通过，该提供方已被禁用：",
     "NoProviders": "添加提供方后开始聊天。",
     "OfficialEndpoint": "官方服务地址",
     "EditProvider": "编辑提供方",

@@ -27,7 +27,11 @@ internal sealed class ConfigurationTestWorkspace : IDisposable
     }
 
     public AIConfigurationService CreateService(params AIProviderDefinition[] definitions) =>
-        new(Store, definitions, Catalog, DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(RootPath, "test-key-ring"))));
+        CreateService(new ModuleAIOption(), definitions);
+
+    public AIConfigurationService CreateService(ModuleAIOption options, params AIProviderDefinition[] definitions) =>
+        new(Store, definitions, Catalog, DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(RootPath, "test-key-ring"))),
+            Options.Create(options));
 
     public void Dispose() => _directory.Delete(recursive: true);
 }

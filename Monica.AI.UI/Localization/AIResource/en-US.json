@@ -760,6 +760,7 @@
     "Unsupported": "Unsupported",
     "ModelCount": "{0} models",
     "Disabled": "Disabled",
+    "ValidationErrors": "Startup validation keeps this provider disabled:",
     "NoProviders": "Add a provider to start chatting.",
     "OfficialEndpoint": "Official endpoint",
     "EditProvider": "Edit provider",

@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
 using Monica.AI.Abstractions;
 using Monica.AI.Configuration.Abstractions;
 using Monica.AI.Configuration.Models;
 using Monica.AI.Providers;
 using Monica.AI.Services;
+using Monica.Modules;
 
 namespace Monica.AI.Configuration.Services;
 
@@ -14,14 +16,19 @@ internal sealed class AIConfigurationService(
     IEnumerable<AIProviderDefinition> definitions,
     AIModelCatalog catalog,
     IDataProtectionProvider dataProtection,
+    IOptions<ModuleAIOption> moduleOptions,
     IEnumerable<IAIProvider>? customProviders = null)
 {
-    private readonly SemaphoreSlim _writeGate = new(1, 1);
-    private readonly IReadOnlyDictionary<string, CodeProvider> _defaults = CreateDefaults(definitions, catalog);
-    private readonly IReadOnlyList<IAIProvider> _customProviders = customProviders?.ToArray() ?? [];
-    private AIConfigurationDocument _document = ValidateDocument(store.Read());
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NO_VALIDATION_ERRORS =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
 
-    public long CurrentRevision => Volatile.Read(ref _document).Revision;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly AIConfigurationValidationMode _validationMode = moduleOptions.Value.ConfigurationValidationMode;
+    private readonly ValidatedDefaults _defaults = LoadDefaults(definitions, catalog, moduleOptions.Value.ConfigurationValidationMode);
+    private readonly IReadOnlyList<IAIProvider> _customProviders = customProviders?.ToArray() ?? [];
+    private ValidatedSettings _settings = LoadSettings(store, moduleOptions.Value.ConfigurationValidationMode);
+
+    public long CurrentRevision => Volatile.Read(ref _settings).Document.Revision;
 
     public string Redact(string message)
     {
@@ -33,15 +40,15 @@ internal sealed class AIConfigurationService(
         return message;
     }
 
-    public AIConfigurationSnapshot GetSnapshot() => ProjectSnapshot(Volatile.Read(ref _document));
+    public AIConfigurationSnapshot GetSnapshot() => ProjectSnapshot(Volatile.Read(ref _settings));
 
     public async Task<AIConfigurationSnapshot> RefreshAsync(CancellationToken ct)
     {
         await _writeGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var latest = ValidateDocument(store.Read());
-            Volatile.Write(ref _document, latest);
+            var latest = LoadSettings(store, _validationMode);
+            Volatile.Write(ref _settings, latest);
             return ProjectSnapshot(latest);
         }
         finally
@@ -52,13 +59,13 @@ internal sealed class AIConfigurationService(
 
     public EffectiveAIConfiguration Resolve()
     {
-        var document = Volatile.Read(ref _document);
-        var overrides = document.Providers.ToDictionary(static entry => entry.Configuration.ProviderId, StringComparer.OrdinalIgnoreCase);
-        var ids = _defaults.Keys.Concat(overrides.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
+        var settings = Volatile.Read(ref _settings);
+        var overrides = settings.Document.Providers.ToDictionary(static entry => entry.Configuration.ProviderId, StringComparer.OrdinalIgnoreCase);
+        var ids = _defaults.Providers.Keys.Concat(overrides.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
         var providers = new List<ResolvedAIProvider>();
         foreach (var id in ids)
         {
-            _defaults.TryGetValue(id, out var baseline);
+            _defaults.Providers.TryGetValue(id, out var baseline);
             overrides.TryGetValue(id, out var persisted);
             var configuration = persisted?.Configuration ?? baseline!.Configuration;
             string? apiKey;
@@ -75,10 +82,14 @@ internal sealed class AIConfigurationService(
                 credentialError = "The stored API key cannot be decrypted by this host. Restore the data-protection key ring or enter the API key again.";
             }
 
-            providers.Add(new ResolvedAIProvider(configuration, apiKey, credentialError));
+            // A persisted override replaces a code default entirely, so its own validation outcome applies.
+            var validationErrors = persisted is not null
+                ? settings.ValidationErrors.GetValueOrDefault(id, [])
+                : _defaults.ValidationErrors.GetValueOrDefault(id, []);
+            providers.Add(new ResolvedAIProvider(configuration, apiKey, credentialError, validationErrors));
         }
 
-        return new EffectiveAIConfiguration(document.Revision, providers);
+        return new EffectiveAIConfiguration(settings.Document.Revision, providers);
     }
 
     internal ResolvedAIProvider ResolveDraft(AIProviderConfiguration draft, string? apiKey, bool useSavedApiKey)
@@ -96,7 +107,7 @@ internal sealed class AIConfigurationService(
             apiKey = existing.ApiKey;
         }
         if (string.IsNullOrWhiteSpace(apiKey)) throw new ArgumentException("Enter an API key before fetching available models.");
-        return new ResolvedAIProvider(connection, apiKey, null);
+        return new ResolvedAIProvider(connection, apiKey, null, []);
     }
 
     public Task<AIConfigurationSnapshot> UpsertAsync(
@@ -133,13 +144,13 @@ internal sealed class AIConfigurationService(
                     ? GetProtector(normalized.ProviderId).Protect(apiKey)
                     : existing?.ProtectedApiKey,
                 UseCodeApiKey = !clearApiKey && string.IsNullOrEmpty(apiKey)
-                    && (existing?.UseCodeApiKey ?? _defaults.ContainsKey(normalized.ProviderId))
+                    && (existing?.UseCodeApiKey ?? _defaults.Providers.ContainsKey(normalized.ProviderId))
             };
             entries.RemoveAll(entry => SameId(entry.Configuration.ProviderId, normalized.ProviderId));
             if (normalized.IsDefault)
             {
                 // Choosing a new default is one atomic settings mutation, including inherited code defaults.
-                foreach (var current in ProjectSnapshot(new AIConfigurationDocument { Providers = entries }).Providers)
+                foreach (var current in ProjectSnapshot(new ValidatedSettings(new AIConfigurationDocument { Providers = entries.ToArray() }, NO_VALIDATION_ERRORS)).Providers)
                 {
                     if (!current.Configuration.IsDefault || SameId(current.Configuration.ProviderId, normalized.ProviderId))
                     {
@@ -161,7 +172,7 @@ internal sealed class AIConfigurationService(
 
     public Task<AIConfigurationSnapshot> RemoveAsync(string providerId, long expectedRevision, CancellationToken ct)
     {
-        if (_defaults.ContainsKey(providerId))
+        if (_defaults.Providers.ContainsKey(providerId))
         {
             throw new InvalidOperationException("Code-defined providers cannot be deleted. Disable the provider or reset its override.");
         }
@@ -177,7 +188,7 @@ internal sealed class AIConfigurationService(
 
     public Task<AIConfigurationSnapshot> ResetAsync(string providerId, long expectedRevision, CancellationToken ct)
     {
-        if (!_defaults.ContainsKey(providerId))
+        if (!_defaults.Providers.ContainsKey(providerId))
         {
             throw new InvalidOperationException("Only code-defined providers have a baseline to restore.");
         }
@@ -197,7 +208,7 @@ internal sealed class AIConfigurationService(
         await _writeGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var current = Volatile.Read(ref _document);
+            var current = Volatile.Read(ref _settings).Document;
             if (current.Revision != expectedRevision)
             {
                 throw new AIConfigurationConflictException(expectedRevision, current.Revision);
@@ -207,12 +218,13 @@ internal sealed class AIConfigurationService(
             mutation(entries);
             var committed = await store.WriteAsync(new AIConfigurationDocument { Providers = entries.ToArray() }, expectedRevision, ct)
                 .ConfigureAwait(false);
-            Volatile.Write(ref _document, ValidateDocument(committed));
-            return ProjectSnapshot(committed);
+            var validated = ValidateSettings(committed, _validationMode);
+            Volatile.Write(ref _settings, validated);
+            return ProjectSnapshot(validated);
         }
         catch (AIConfigurationConflictException)
         {
-            Volatile.Write(ref _document, ValidateDocument(store.Read()));
+            Volatile.Write(ref _settings, LoadSettings(store, _validationMode));
             throw;
         }
         finally
@@ -221,33 +233,35 @@ internal sealed class AIConfigurationService(
         }
     }
 
-    private AIConfigurationSnapshot ProjectSnapshot(AIConfigurationDocument document)
+    private AIConfigurationSnapshot ProjectSnapshot(ValidatedSettings settings)
     {
-        var providers = _defaults.ToDictionary(static entry => entry.Key, static entry => new AIProviderSettings
+        var providers = _defaults.Providers.ToDictionary(static entry => entry.Key, entry => new AIProviderSettings
         {
-            Configuration = Clone(entry.Value.Configuration), HasApiKey = !string.IsNullOrWhiteSpace(entry.Value.ApiKey), IsCodeDefined = true
+            Configuration = Clone(entry.Value.Configuration), HasApiKey = !string.IsNullOrWhiteSpace(entry.Value.ApiKey), IsCodeDefined = true,
+            ValidationErrors = _defaults.ValidationErrors.GetValueOrDefault(entry.Key, [])
         }, StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in document.Providers)
+        foreach (var entry in settings.Document.Providers)
         {
-            _defaults.TryGetValue(entry.Configuration.ProviderId, out var baseline);
+            _defaults.Providers.TryGetValue(entry.Configuration.ProviderId, out var baseline);
             providers[entry.Configuration.ProviderId] = new AIProviderSettings
             {
                 Configuration = Clone(entry.Configuration), IsCodeDefined = baseline is not null, HasOverride = true,
                 HasApiKey = !string.IsNullOrWhiteSpace(entry.ProtectedApiKey)
-                    || entry.UseCodeApiKey && !string.IsNullOrWhiteSpace(baseline?.ApiKey)
+                    || entry.UseCodeApiKey && !string.IsNullOrWhiteSpace(baseline?.ApiKey),
+                ValidationErrors = settings.ValidationErrors.GetValueOrDefault(entry.Configuration.ProviderId, [])
             };
         }
 
         return new AIConfigurationSnapshot
         {
-            Revision = document.Revision,
+            Revision = settings.Document.Revision,
             Providers = providers.Values.OrderBy(static entry => entry.Configuration.DisplayName ?? entry.Configuration.ProviderId, StringComparer.OrdinalIgnoreCase).ToArray()
         };
     }
 
     private void EnsureOneDefault(List<AIPersistedProvider> entries)
     {
-        var defaults = ProjectSnapshot(new AIConfigurationDocument { Providers = entries }).Providers
+        var defaults = ProjectSnapshot(new ValidatedSettings(new AIConfigurationDocument { Providers = entries.ToArray() }, NO_VALIDATION_ERRORS)).Providers
             .Where(static entry => entry.Configuration.Enabled && entry.Configuration.IsDefault).ToArray();
         if (defaults.Length > 1)
         {
@@ -278,7 +292,10 @@ internal sealed class AIConfigurationService(
         }).ToArray()
     };
 
-    private static AIConfigurationDocument ValidateDocument(AIConfigurationDocument document)
+    private static ValidatedSettings LoadSettings(IAIConfigurationStore store, AIConfigurationValidationMode mode) =>
+        ValidateSettings(store.Read(), mode);
+
+    private static ValidatedSettings ValidateSettings(AIConfigurationDocument document, AIConfigurationValidationMode mode)
     {
         if (document.Revision < 0 || document.Providers.Select(static entry => entry.Configuration.ProviderId)
             .Distinct(StringComparer.OrdinalIgnoreCase).Count() != document.Providers.Count)
@@ -286,21 +303,49 @@ internal sealed class AIConfigurationService(
             throw new InvalidDataException("The AI configuration document has an invalid revision or duplicate provider identifiers.");
         }
 
+        var validationErrors = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        var entries = new List<AIPersistedProvider>();
         foreach (var entry in document.Providers)
         {
-            ValidateConfiguration(entry.Configuration);
+            var configuration = entry.Configuration;
+            var findings = CollectConfigurationErrors(configuration);
+            if (findings.Count > 0)
+            {
+                if (mode == AIConfigurationValidationMode.Throw)
+                {
+                    throw new ArgumentException(string.Join(" ", findings));
+                }
+
+                configuration = configuration with { Enabled = false };
+                validationErrors[configuration.ProviderId] = findings;
+            }
+
+            entries.Add(entry with { Configuration = Clone(configuration) });
         }
 
-        return document with { Providers = document.Providers.Select(static entry => entry with { Configuration = Clone(entry.Configuration) }).ToArray() };
+        return new ValidatedSettings(
+            new AIConfigurationDocument { Revision = document.Revision, Providers = [.. entries] }, validationErrors);
     }
 
-    private static IReadOnlyDictionary<string, CodeProvider> CreateDefaults(IEnumerable<AIProviderDefinition> definitions, AIModelCatalog catalog)
+    private static ValidatedDefaults LoadDefaults(IEnumerable<AIProviderDefinition> definitions, AIModelCatalog catalog, AIConfigurationValidationMode mode)
     {
         var providers = new Dictionary<string, CodeProvider>(StringComparer.OrdinalIgnoreCase);
+        var validationErrors = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var definition in definitions)
         {
             var configuration = Normalize(definition.ToConfiguration(catalog));
-            ValidateConfiguration(configuration);
+            var findings = CollectConfigurationErrors(configuration);
+            if (findings.Count > 0)
+            {
+                if (mode == AIConfigurationValidationMode.Throw)
+                {
+                    throw new ArgumentException(string.Join(" ", findings));
+                }
+
+                configuration = configuration with { Enabled = false };
+                validationErrors[configuration.ProviderId] = findings;
+            }
+
             if (!providers.TryAdd(configuration.ProviderId, new CodeProvider(configuration, definition.ApiKey)))
             {
                 throw new InvalidOperationException($"Duplicate AI provider identifier '{configuration.ProviderId}'.");
@@ -312,32 +357,46 @@ internal sealed class AIConfigurationService(
             throw new InvalidOperationException("Only one enabled AI provider may be configured as the default.");
         }
 
-        return providers;
+        return new ValidatedDefaults(providers, validationErrors);
     }
 
     private static void ValidateConfiguration(AIProviderConfiguration configuration)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(configuration.ProviderId);
-        if (configuration.ProviderId.Length > 128 || configuration.ProviderId.Any(char.IsControl))
+        var findings = CollectConfigurationErrors(configuration);
+        if (findings.Count > 0)
         {
-            throw new ArgumentException("Provider identifiers must contain at most 128 characters and no control characters.");
+            throw new ArgumentException(string.Join(" ", findings));
+        }
+    }
+
+    private static IReadOnlyList<string> CollectConfigurationErrors(AIProviderConfiguration configuration)
+    {
+        var findings = new List<string>();
+        if (string.IsNullOrWhiteSpace(configuration.ProviderId))
+        {
+            findings.Add("The provider identifier is required.");
+        }
+        else if (configuration.ProviderId.Length > 128 || configuration.ProviderId.Any(char.IsControl))
+        {
+            findings.Add("Provider identifiers must contain at most 128 characters and no control characters.");
         }
 
         if (configuration.ProviderType is not (EAIProviderType.OpenAI or EAIProviderType.Anthropic))
         {
-            throw new ArgumentException("Runtime configuration supports OpenAI-compatible and Anthropic providers.");
+            findings.Add("Runtime configuration supports OpenAI-compatible and Anthropic providers.");
+            return findings;
         }
 
         if (configuration.TimeoutSeconds is < 1 or > 3600)
         {
-            throw new ArgumentException("Request timeout must be between 1 and 3600 seconds.");
+            findings.Add("Request timeout must be between 1 and 3600 seconds.");
         }
 
         if (!Enum.IsDefined(configuration.OpenAIApiMode) || !Enum.IsDefined(configuration.OpenAIProtocolProfile)
             || !Enum.IsDefined(configuration.ResponsesHistoryMode)
             || configuration.PromptCacheRetention is { } retention && !Enum.IsDefined(retention))
         {
-            throw new ArgumentException("The provider has an unsupported API mode, protocol profile, history mode, or cache-retention setting.");
+            findings.Add("The provider has an unsupported API mode, protocol profile, history mode, or cache-retention setting.");
         }
 
         if (configuration.BaseUrl is { } baseUrl
@@ -345,69 +404,94 @@ internal sealed class AIConfigurationService(
                 || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo)
                 || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)))
         {
-            throw new ArgumentException("The provider endpoint must be an absolute HTTP(S) URL without embedded credentials, query, or fragment.");
+            findings.Add("The provider endpoint must be an absolute HTTP(S) URL without embedded credentials, query, or fragment.");
         }
 
         if (configuration.Models.Select(static model => model.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count() != configuration.Models.Count)
         {
-            throw new ArgumentException("Model identifiers must be unique within a provider.");
+            findings.Add("Model identifiers must be unique within a provider.");
         }
 
         foreach (var model in configuration.Models)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(model.ModelName);
-            if (!Enum.IsDefined(model.Kind))
-            {
-                throw new ArgumentException($"Model '{model.ModelName}' has an unsupported model kind.");
-            }
-
-            if (model.ContextWindow is <= 0 || model.MaxOutputTokens is <= 0 || model.EmbeddingDimensions is <= 0
-                || model.ContextWindow is { } context && model.MaxOutputTokens is { } output && output >= context)
-            {
-                throw new ArgumentException($"Model '{model.ModelName}' needs positive capacities and an output budget smaller than its context window.");
-            }
-
-            if (model.ReasoningLevels.Select(static level => level.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != model.ReasoningLevels.Count
-                || model.ReasoningLevels.Any(static level => string.IsNullOrWhiteSpace(level.Id) || level.BudgetTokens is <= 0))
-            {
-                throw new ArgumentException($"Model '{model.ModelName}' has invalid or duplicate reasoning levels.");
-            }
-
-            if (model.SupportsReasoning == false && model.ReasoningLevels.Count > 0)
-            {
-                throw new ArgumentException($"Model '{model.ModelName}' cannot declare reasoning levels while reasoning support is disabled.");
-            }
-
-            foreach (var level in model.ReasoningLevels.Where(static level => level.BudgetTokens is not null))
-            {
-                if (configuration.ProviderType == EAIProviderType.OpenAI)
-                {
-                    throw new ArgumentException("OpenAI-compatible model configuration supports reasoning effort but has no standard thinking-token budget field.");
-                }
-
-                if (level.BudgetTokens < 1024 || model.MaxOutputTokens is { } maximum && level.BudgetTokens >= maximum
-                    || string.Equals(level.ProviderValue, "none", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new ArgumentException($"Model '{model.ModelName}' requires a thinking budget of at least 1024, below its maximum output budget, with reasoning enabled.");
-                }
-            }
-
-            if (model.DefaultReasoningLevel is { } selected
-                && !model.ReasoningLevels.Any(level => SameId(level.Id, selected)))
-            {
-                throw new ArgumentException($"Model '{model.ModelName}' has a default reasoning level that is not configured.");
-            }
+            CollectModelError(configuration, model, findings);
         }
 
         if (configuration.DefaultModel is { } defaultModel
             && !configuration.Models.Any(model => model.Kind == AIModelKind.Chat && SameId(model.ModelName, defaultModel)))
         {
-            throw new ArgumentException("The default model must be a configured chat model belonging to this provider.");
+            findings.Add("The default model must be a configured chat model belonging to this provider.");
+        }
+
+        return findings;
+    }
+
+    private static void CollectModelError(AIProviderConfiguration configuration, AIModelConfiguration model, List<string> findings)
+    {
+        if (string.IsNullOrWhiteSpace(model.ModelName))
+        {
+            findings.Add("Every model requires a name.");
+            return;
+        }
+
+        if (!Enum.IsDefined(model.Kind))
+        {
+            findings.Add($"Model '{model.ModelName}' has an unsupported model kind.");
+            return;
+        }
+
+        if (model.ContextWindow is <= 0 || model.MaxOutputTokens is <= 0 || model.EmbeddingDimensions is <= 0
+            || model.ContextWindow is { } context && model.MaxOutputTokens is { } output && output >= context)
+        {
+            findings.Add($"Model '{model.ModelName}' needs positive capacities and an output budget smaller than its context window.");
+        }
+
+        if (model.ReasoningLevels.Select(static level => level.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != model.ReasoningLevels.Count
+            || model.ReasoningLevels.Any(static level => string.IsNullOrWhiteSpace(level.Id) || level.BudgetTokens is <= 0))
+        {
+            findings.Add($"Model '{model.ModelName}' has invalid or duplicate reasoning levels.");
+        }
+
+        if (model.SupportsReasoning == false && model.ReasoningLevels.Count > 0)
+        {
+            findings.Add($"Model '{model.ModelName}' cannot declare reasoning levels while reasoning support is disabled.");
+        }
+
+        foreach (var level in model.ReasoningLevels.Where(static level => level.BudgetTokens is not null))
+        {
+            if (configuration.ProviderType == EAIProviderType.OpenAI)
+            {
+                findings.Add("OpenAI-compatible model configuration supports reasoning effort but has no standard thinking-token budget field.");
+                break;
+            }
+
+            if (level.BudgetTokens < 1024 || model.MaxOutputTokens is { } maximum && level.BudgetTokens >= maximum
+                || string.Equals(level.ProviderValue, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                findings.Add($"Model '{model.ModelName}' requires a thinking budget of at least 1024, below its maximum output budget, with reasoning enabled.");
+                break;
+            }
+        }
+
+        if (model.DefaultReasoningLevel is { } selected
+            && !model.ReasoningLevels.Any(level => SameId(level.Id, selected)))
+        {
+            findings.Add($"Model '{model.ModelName}' has a default reasoning level that is not configured.");
         }
     }
 
     private sealed record CodeProvider(AIProviderConfiguration Configuration, string? ApiKey);
+    private sealed record ValidatedDefaults(
+        IReadOnlyDictionary<string, CodeProvider> Providers,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> ValidationErrors);
+    private sealed record ValidatedSettings(
+        AIConfigurationDocument Document,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> ValidationErrors);
 }
 
 internal sealed record EffectiveAIConfiguration(long Revision, IReadOnlyList<ResolvedAIProvider> Providers);
-internal sealed record ResolvedAIProvider(AIProviderConfiguration Configuration, string? ApiKey, string? CredentialError);
+internal sealed record ResolvedAIProvider(
+    AIProviderConfiguration Configuration,
+    string? ApiKey,
+    string? CredentialError,
+    IReadOnlyList<string> ValidationErrors);

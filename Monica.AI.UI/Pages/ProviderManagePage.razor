@@ -50,6 +50,13 @@
                     </div>
                 </div>
                 <div class="provider-facts"><span>@Source(selected)</span><span>@(selected.HasApiKey ? L["Settings:CredentialConfigured"] : L["Settings:CredentialMissing"])</span><span>@L["Settings:AppliesNextRequest"]</span></div>
+                @if (selected.ValidationErrors is { Count: > 0 })
+                {
+                    <div class="validation-errors" role="alert">
+                        <span>@L["Settings:ValidationErrors"]</span>
+                        @foreach (var error in selected.ValidationErrors) { <div>@error</div> }
+                    </div>
+                }
                 <div class="models-heading"><MudText Typo="Typo.subtitle1">@L["Settings:Models"]</MudText><div class="provider-actions"><MudButton Size="Size.Small" OnClick="DiscoverAsync" Disabled="@(_busy || !provider.Enabled)" StartIcon="@Icons.Material.Outlined.Search">@L["Settings:Discover"]</MudButton><MudButton Size="Size.Small" OnClick="@(() => EditModelAsync(null))" Disabled="@_busy" StartIcon="@Icons.Material.Filled.Add">@L["Settings:AddModel"]</MudButton></div></div>
                 <div class="model-table-scroll">
                     <MudTable T="AIModelConfiguration" Items="@provider.Models" Dense="true" Hover="true" Elevation="0" Breakpoint="Breakpoint.None">

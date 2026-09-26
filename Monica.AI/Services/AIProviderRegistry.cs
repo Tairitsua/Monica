@@ -102,13 +102,13 @@ internal sealed class AIProviderRegistry(
                 }
 
                 var signature = JsonSerializer.Serialize(definition.Configuration);
-                if (_providers.TryGetValue(id, out var current) && current.Matches(signature, definition.ApiKey, definition.CredentialError))
+                if (_providers.TryGetValue(id, out var current) && current.Matches(signature, definition.ApiKey, definition.CredentialError, definition.ValidationErrors))
                 {
                     next.Add(id, current);
                     continue;
                 }
 
-                var generation = new ProviderGeneration(CreateProvider(definition), signature, definition.ApiKey, definition.CredentialError, ownsProvider: true);
+                var generation = new ProviderGeneration(CreateProvider(definition), signature, definition.ApiKey, definition.CredentialError, definition.ValidationErrors, ownsProvider: true);
                 created.Add(generation);
                 next.Add(id, generation);
             }
@@ -117,7 +117,7 @@ internal sealed class AIProviderRegistry(
             {
                 if (!_providers.TryGetValue(provider.ProviderId, out var generation))
                 {
-                    generation = new ProviderGeneration(provider, null, null, null, ownsProvider: false);
+                    generation = new ProviderGeneration(provider, null, null, null, [], ownsProvider: false);
                     created.Add(generation);
                 }
 
@@ -160,7 +160,7 @@ internal sealed class AIProviderRegistry(
         var configuration = resolved.Configuration;
         var options = AIConfiguredProviderFactory.CreateOptions(configuration, resolved.ApiKey);
 
-        var errors = new List<string>();
+        var errors = new List<string>(resolved.ValidationErrors);
         if (!configuration.Enabled) errors.Add("Provider is disabled in host settings.");
         if (resolved.CredentialError is { } credentialError) errors.Add(credentialError);
         else if (string.IsNullOrWhiteSpace(resolved.ApiKey)) errors.Add("API key is empty. Configure a non-empty API key to enable this provider.");
@@ -198,15 +198,17 @@ internal sealed class AIProviderRegistry(
         string? signature,
         string? apiKey,
         string? credentialError,
+        IReadOnlyList<string> validationErrors,
         bool ownsProvider)
     {
         private int _references = 1;
         public IAIProvider Provider { get; } = provider;
 
-        public bool Matches(string candidateSignature, string? candidateKey, string? candidateError) =>
+        public bool Matches(string candidateSignature, string? candidateKey, string? candidateError, IReadOnlyList<string> candidateValidationErrors) =>
             string.Equals(signature, candidateSignature, StringComparison.Ordinal)
             && string.Equals(apiKey, candidateKey, StringComparison.Ordinal)
-            && string.Equals(credentialError, candidateError, StringComparison.Ordinal);
+            && string.Equals(credentialError, candidateError, StringComparison.Ordinal)
+            && validationErrors.SequenceEqual(candidateValidationErrors);
 
         public IAIProviderLease Acquire(long revision)
         {

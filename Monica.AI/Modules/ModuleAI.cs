@@ -7,6 +7,7 @@ using Monica.AI.Chat.Abstractions;
 using Monica.AI.Chat.Facades;
 using Monica.AI.Chat.Providers;
 using Monica.AI.Storage.Providers;
+using Monica.AI.Configuration;
 using Monica.AI.Configuration.Abstractions;
 using Monica.AI.Configuration.Facades;
 using Monica.AI.Configuration.Providers;
@@ -330,6 +331,15 @@ public class ModuleAIOption : ModuleOptions<ModuleAI>
     /// identifiers for independently isolated workspaces that use the same storage provider.
     /// </summary>
     public string WorkspaceId { get; set; } = "default";
+
+    /// <summary>
+    /// Behavior when registered provider or model configuration fails validation at startup. Defaults to
+    /// <see cref="AIConfigurationValidationMode.Disable"/>, which keeps the host running with the affected
+    /// provider disabled and its validation reasons exposed in the provider management UI and diagnostics.
+    /// Choose <see cref="AIConfigurationValidationMode.Throw"/> to fail startup instead. Runtime settings
+    /// edits always validate strictly regardless of this mode.
+    /// </summary>
+    public AIConfigurationValidationMode ConfigurationValidationMode { get; set; } = AIConfigurationValidationMode.Disable;
 
     /// <summary>Maximum unencoded size of one chat attachment. Defaults to 20 MiB.</summary>
     public long MaxChatAttachmentBytes { get; set; } = 20 * 1024 * 1024;
