@@ -417,7 +417,7 @@ jobs:
         run: python3 scripts/export_agent_knowledge.py --release-ref "${{ steps.version.outputs.tag_name }}" --output artifacts/agent-skills/monica-knowledge.json
 
       - name: Download the unified guide bundles
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: monica-guide-bundle-${{ steps.version.outputs.version }}-*
           path: artifacts/guide-release
