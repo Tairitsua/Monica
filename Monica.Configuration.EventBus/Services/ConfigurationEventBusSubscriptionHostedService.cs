@@ -5,6 +5,7 @@ using Monica.Configuration.Abstractions;
 using Monica.Configuration.EventBus.Modules;
 using Monica.Configuration.Models;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Models;
 
 namespace Monica.Configuration.EventBus.Services;
 
@@ -25,10 +26,18 @@ public sealed class ConfigurationEventBusSubscriptionHostedService(
         cancellationToken.ThrowIfCancellationRequested();
 
         using var scope = serviceScopeFactory.CreateScope();
-        var eventBus = ConfigurationEventBusChangeNotifier.ResolveDistributedEventBus(scope.ServiceProvider, options.Value);
-        _subscription = await eventBus.SubscribeAsync<ConfigurationReloadSignal>(
-            receiver.ReceiveAsync,
-            options.Value.TopicName);
+        var currentOptions = options.Value;
+        var eventBus = ConfigurationEventBusChangeNotifier.ResolveDistributedEventBus(scope.ServiceProvider, currentOptions);
+        _subscription = await eventBus.Subscriptions.SubscribeAsync(new EventSubscriptionDescriptor
+        {
+            ServiceKey = string.IsNullOrWhiteSpace(currentOptions.DistributedEventBusServiceKey)
+                ? null : currentOptions.DistributedEventBusServiceKey,
+            EventType = typeof(ConfigurationReloadSignal),
+            TopicName = currentOptions.TopicName,
+            Scope = EventSubscriptionScope.Distributed,
+            HandlerFactory = new ConfigurationReloadEventHandlerFactory(serviceScopeFactory, receiver),
+            IsAutoDiscovered = false
+        }, cancellationToken);
     }
 
     /// <inheritdoc />

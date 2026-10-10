@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.EventBus.Modules;
 using Monica.Configuration.EventBus.Services;
@@ -8,6 +9,7 @@ using Monica.Configuration.Models;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
+using Monica.EventBus.Services;
 using Xunit;
 
 namespace Test.Monica.Configuration.EventBus;
@@ -165,25 +167,23 @@ public sealed class ConfigurationEventBusBridgeTests
 
     private sealed class RecordingDistributedEventBus : IDistributedEventBus
     {
-        private Func<ConfigurationReloadSignal, CancellationToken, Task>? _notificationHandler;
-        private string? _subscriptionTopic;
-
         public List<PublishedEvent> PublishedEvents { get; } = [];
 
-        public IEventSubscriptionRegistry Subscriptions => throw new NotSupportedException();
+        public IEventSubscriptionRegistry Subscriptions { get; } =
+            new EventSubscriptionRegistry(NullLogger<EventSubscriptionRegistry>.Instance);
 
-        public Task PublishAsync<TEvent>(TEvent eventData, string? topicName = null, CancellationToken cancellationToken = default)
+        public async Task PublishAsync<TEvent>(TEvent eventData, string? topicName = null, CancellationToken cancellationToken = default)
             where TEvent : class
         {
             PublishedEvents.Add(new PublishedEvent(typeof(TEvent), eventData, topicName));
-            if (eventData is ConfigurationReloadSignal notification
-                && string.Equals(topicName, _subscriptionTopic, StringComparison.Ordinal)
-                && _notificationHandler is not null)
+            foreach (var subscription in Subscriptions.GetByEventType(typeof(TEvent))
+                         .Where(subscription => subscription.TopicName == topicName &&
+                                                subscription.State == EventSubscriptionState.Active))
             {
-                return _notificationHandler(notification, cancellationToken);
+                await using var scope = await subscription.HandlerFactory.CreateExecutionScopeAsync();
+                await ((IDistributedEventHandler<TEvent>)scope.EventHandler)
+                    .HandleEventAsync(eventData, cancellationToken);
             }
-
-            return Task.CompletedTask;
         }
 
         public Task BulkPublishAsync<TEvent>(IEnumerable<TEvent> eventDataList, string? topicName = null, CancellationToken cancellationToken = default)
@@ -204,15 +204,7 @@ public sealed class ConfigurationEventBusBridgeTests
             string? topicName = null)
             where TEvent : class
         {
-            if (typeof(TEvent) != typeof(ConfigurationReloadSignal))
-            {
-                throw new NotSupportedException();
-            }
-
-            _subscriptionTopic = topicName;
-            _notificationHandler = (notification, cancellationToken) =>
-                handler((TEvent)(object)notification, cancellationToken);
-            return Task.FromResult<IEventSubscription>(new RecordingEventSubscription());
+            throw new NotSupportedException();
         }
 
         public Task PublishAsync(Type eventType, object eventData, string? topicName = null, CancellationToken cancellationToken = default)
@@ -229,57 +221,4 @@ public sealed class ConfigurationEventBusBridgeTests
 
     private sealed record PublishedEvent(Type EventType, object EventData, string? TopicName);
 
-    private sealed class RecordingEventSubscription : IEventSubscription
-    {
-        public EventSubscriptionId Id { get; } = EventSubscriptionId.NewId();
-
-        public string? ServiceKey => null;
-
-        public Type EventType => typeof(ConfigurationReloadSignal);
-
-        public string TopicName => "custom.configuration.reload";
-
-        public Type? HandlerType => null;
-
-        public IEventHandlerFactory HandlerFactory => throw new NotSupportedException();
-
-        public EventSubscriptionScope Scope => EventSubscriptionScope.Distributed;
-
-        public EventSubscriptionState State => EventSubscriptionState.Active;
-
-        public DateTime CreatedAt { get; } = DateTime.UtcNow;
-
-        public DateTime? ActivatedAt => CreatedAt;
-
-        public DateTime? DeactivatedAt => null;
-
-        public bool IsAutoDiscovered => false;
-
-        public IReadOnlyDictionary<string, object> Metadata { get; } = new Dictionary<string, object>();
-
-        public T? GetMetadata<T>(string key)
-        {
-            return default;
-        }
-
-        public Task ActivateAsync()
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task DeactivateAsync()
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReactivateAsync()
-        {
-            return Task.CompletedTask;
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
 }
