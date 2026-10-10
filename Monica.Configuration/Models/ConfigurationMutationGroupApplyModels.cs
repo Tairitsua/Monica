@@ -26,6 +26,16 @@ public sealed record ConfigurationMutationGroupApplyRequest
     public IReadOnlyList<ConfigurationMutationCommand> Commands { get; init; } = [];
 
     /// <summary>
+    /// Gets the complete aggregate fingerprint reviewed by the caller. A mismatch rejects the group before persistence.
+    /// </summary>
+    /// <remarks>
+    /// This opaque token is scoped to the validating host process. Preview and apply must reach the same owner
+    /// process; obtain a fresh preview after a restart or replica change. Apply performs complete validation even
+    /// when this optional reviewed-baseline token is omitted.
+    /// </remarks>
+    public string? ExpectedValidationFingerprint { get; init; }
+
+    /// <summary>
     /// Gets optional definition-level effective values that must be observed after persistence and runtime reload.
     /// </summary>
     /// <remarks>
@@ -184,7 +194,12 @@ public sealed record ConfigurationMutationGroupApplyResult
     /// <summary>
     /// Gets the persisted mutation group.
     /// </summary>
-    public required ConfigurationMutationGroup MutationGroup { get; init; }
+    public ConfigurationMutationGroup? MutationGroup { get; init; }
+
+    /// <summary>
+    /// Gets the complete validation findings when the group was rejected before any persistence.
+    /// </summary>
+    public ConfigurationMutationGroupValidationPreview? ValidationPreview { get; init; }
 
     /// <summary>
     /// Gets outcomes in submitted command order.

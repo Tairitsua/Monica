@@ -29,7 +29,14 @@
                                                                    ShowCount="@(RuntimeValidationIssueCount > 0)"
                                                                    Tooltip="@RuntimeValidationStatusTooltip"
                                                                    AriaLabel="@L["State:RuntimeValidation:OpenDetails"].Value"
-                                                                   OnClick="ToggleRuntimeValidationPopover" />
+                                                                   OnClick="() => ToggleRuntimeValidationPopover(SOURCE_VALIDATION_PANEL)" />
+                                    <ConfigurationStatusIconButton Icon="@OptionsValidationStatusIcon"
+                                                                   Color="@OptionsValidationStatusColor"
+                                                                   Count="@OptionsValidationIssueCount"
+                                                                   ShowCount="@(OptionsValidationIssueCount > 0)"
+                                                                   Tooltip="@OptionsValidationTooltip"
+                                                                   AriaLabel="@L["Validation:OptionsTitle"].Value"
+                                                                   OnClick="() => ToggleRuntimeValidationPopover(OPTIONS_VALIDATION_PANEL)" />
                                 </span>
                             }
                             <ConfigurationReloadStatusButton @ref="_reloadStatusButton"
@@ -76,19 +83,19 @@
                                     <MudStack Spacing="2">
                                         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
                                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                                <MudIcon Icon="@RuntimeValidationStatusIcon"
-                                                         Color="@RuntimeValidationStatusColor" />
+                                                <MudIcon Icon="@ValidationPopoverStatusIcon"
+                                                         Color="@ValidationPopoverStatusColor" />
                                                 <MudStack Spacing="0">
-                                                    <MudText Typo="Typo.subtitle1">@L["State:RuntimeValidation:Title"]</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@RuntimeValidationSummary</MudText>
+                                                    <MudText Typo="Typo.subtitle1">@ValidationPopoverTitle</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@ValidationPopoverSummary</MudText>
                                                 </MudStack>
                                             </MudStack>
                                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                                                 <MudChip T="int"
                                                          Size="Size.Small"
-                                                         Color="@RuntimeValidationStatusColor"
+                                                         Color="@ValidationPopoverStatusColor"
                                                          Variant="Variant.Outlined">
-                                                    @RuntimeValidationIssueCount
+                                                    @ValidationPopoverIssueCount
                                                 </MudChip>
                                                 <MudTooltip Text="@L["Common:Actions:Close"]">
                                                     <MudIconButton Icon="@Icons.Material.Filled.Close"
@@ -99,23 +106,79 @@
                                             </MudStack>
                                         </MudStack>
 
-                                        @if (_runtimeValidationReport is null)
+                                        @if (_validationLoading)
                                         {
-                                            <MudAlert Severity="Severity.Warning">@L["State:RuntimeValidation:Unavailable"]</MudAlert>
-                                        }
-                                        else if (_runtimeValidationReport.IsValid)
-                                        {
-                                            <MudAlert Severity="Severity.Success">@L["State:RuntimeValidation:Valid"]</MudAlert>
+                                            <MudProgressLinear Indeterminate="true" />
                                         }
                                         else
                                         {
-                                            <ConfigurationValidationIssueList Issues="@RuntimeValidationIssues"
-                                                                              ShowRuntimeMetadata="true"
-                                                                              ShowSourceChain="true"
-                                                                              ValueLabel="@L["State:RuntimeValidation:CurrentValue"].Value"
-                                                                              ReasonLabel="@L["State:RuntimeValidation:Problem"].Value"
-                                                                              JumpRequested="JumpToRuntimeValidationIssueAsync"
-                                                                              SourceChainRequested="OpenRuntimeIssueSourceChainAsync" />
+                                            <MudTabs @bind-ActivePanelIndex="_validationPanelIndex">
+                                                <MudTabPanel Text="@L["Validation:SourceTitle"].Value">
+                                                    @if (_runtimeValidationReport is null)
+                                                    {
+                                                        <MudAlert Severity="Severity.Warning">@(_runtimeValidationError ?? L["State:RuntimeValidation:Unavailable"].Value)</MudAlert>
+                                                    }
+                                                    else if (_runtimeValidationReport.DefinitionReports.Count > 0)
+                                                    {
+                                                        <MudExpansionPanels MultiExpansion="true">
+                                                            @foreach (var definition in _runtimeValidationReport.DefinitionReports)
+                                                            {
+                                                                <MudExpansionPanel Text="@ValidationDefinitionName(definition.DefinitionKey)">
+                                                                    <ConfigurationValidationReportView Title="@definition.DefinitionKey"
+                                                                       Coverage="@definition.Coverage" Scope="@definition.Scope"
+                                                                       ValidationRevision="@definition.ValidationRevision"
+                                                                       IsValid="@definition.IsValid" IsSchemaValid="@definition.IsSchemaValid"
+                                                                       Issues="@RuntimeValidationIssues.Where(issue => string.Equals(issue.DefinitionKey, definition.DefinitionKey, StringComparison.OrdinalIgnoreCase)).ToArray()"
+                                                                       ShowRuntimeMetadata="true" ShowSourceChain="true"
+                                                                       JumpRequested="JumpToRuntimeValidationIssueAsync"
+                                                                       SourceChainRequested="OpenRuntimeIssueSourceChainAsync" />
+                                                                </MudExpansionPanel>
+                                                            }
+                                                        </MudExpansionPanels>
+                                                    }
+                                                    else
+                                                    {
+                                                        <ConfigurationValidationReportView Coverage="@_runtimeValidationReport.Coverage"
+                                                           Scope="@_runtimeValidationReport.Scope" ValidationRevision="@_runtimeValidationReport.ValidationRevision"
+                                                           IsValid="@_runtimeValidationReport.IsValid" IsSchemaValid="@_runtimeValidationReport.IsSchemaValid"
+                                                           Issues="@RuntimeValidationIssues" ShowRuntimeMetadata="true" ShowSourceChain="true"
+                                                           JumpRequested="JumpToRuntimeValidationIssueAsync" SourceChainRequested="OpenRuntimeIssueSourceChainAsync" />
+                                                    }
+                                                </MudTabPanel>
+                                                <MudTabPanel Text="@L["Validation:OptionsTitle"].Value">
+                                                    <MudStack Spacing="2" Class="pt-2">
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L["Validation:OptionsNotice"]</MudText>
+                                                        @if (_optionsValidationError is not null)
+                                                        {
+                                                            <MudAlert Severity="Severity.Error">@_optionsValidationError</MudAlert>
+                                                        }
+                                                        else
+                                                        {
+                                                            @foreach (var definitionKey in UnobservedDefinitionKeys)
+                                                            {
+                                                                <MudAlert Severity="Severity.Info" Dense="true">@ValidationDefinitionName(definitionKey): @L["Validation:NoObserved"]</MudAlert>
+                                                            }
+                                                            @if (_optionsValidationReports.Count == 0 && !UnobservedDefinitionKeys.Any())
+                                                            {
+                                                                <MudAlert Severity="Severity.Info" Dense="true">@L["Validation:NoObserved"]</MudAlert>
+                                                            }
+                                                            @foreach (var attempt in _optionsValidationReports)
+                                                            {
+                                                                <ConfigurationValidationReportView Title="@ValidationDefinitionName(attempt.DefinitionKey)"
+                                                                   Coverage="@attempt.Coverage" Scope="@attempt.Scope"
+                                                                   ValidationRevision="@attempt.ValidationRevision" IsValid="@attempt.IsValid"
+                                                                   IsSchemaValid="@attempt.IsSchemaValid"
+                                                                   Issues="@attempt.Issues.Select(issue => ConfigurationValidationPresentation.FromRuntime(issue, actualOptions: true)).ToArray()"
+                                                                   JumpRequested="JumpToRuntimeValidationIssueAsync">
+                                                                    <MudText Typo="Typo.caption">@L["Validation:ObservedAt", attempt.AttemptedAt.LocalDateTime]</MudText>
+                                                                    <MudText Typo="Typo.caption">@L["Validation:Attempt", attempt.AttemptId]</MudText>
+                                                                    <MudText Typo="Typo.caption">@(string.IsNullOrEmpty(attempt.OptionsName) ? L["Validation:DefaultName"].Value : attempt.OptionsName)</MudText>
+                                                                </ConfigurationValidationReportView>
+                                                            }
+                                                        }
+                                                    </MudStack>
+                                                </MudTabPanel>
+                                            </MudTabs>
                                         }
                                     </MudStack>
                                 </MudPaper>
@@ -145,7 +208,9 @@
                             <div class="configuration-runtime-validation-banner-message">
                                 <MudText Typo="Typo.subtitle2">@L["State:RuntimeValidation:WarningTitle"]</MudText>
                                 <MudText Typo="Typo.body2">
-                                    @L["State:RuntimeValidation:WarningMessage", RuntimeValidationIssueCount, RuntimeValidationCountsByDefinition.Count]
+                                    @(_runtimeValidationReport.Coverage == ConfigurationValidationCoverage.Complete
+                                        ? L["State:RuntimeValidation:WarningMessage", RuntimeValidationIssueCount, RuntimeValidationCountsByDefinition.Count].Value
+                                        : RuntimeValidationSummary)
                                 </MudText>
                             </div>
                             <div class="configuration-runtime-validation-banner-action">
@@ -267,6 +332,7 @@
                                             <ConfigurationSchemaMetadataChip SchemaVersion="@_selectedDefinition.SchemaVersion"
                                                                              DefinitionRevision="@_selectedDefinition.DefinitionRevision"
                                                                              SchemaHash="@_selectedDefinition.SchemaHash"
+                                                                             ValidationContract="@_selectedDefinition.ValidationContract"
                                                                              OnClick="() => OpenSelectedDefinitionPublicationAsync(ConfigurationDefinitionPublicationTab.RevisionHistory)" />
                                             <MudTooltip Text="@L["State:Definitions:ReloadContributorsTooltip", ReloadBehaviorLabel(_selectedDefinition.ReloadBehavior)]">
                                                 <MudChip T="string"
@@ -402,6 +468,8 @@
 
 @code {
     public const string PAGE_URL = ConfigurationUiRoutes.STATE_ROUTE;
+    private const int SOURCE_VALIDATION_PANEL = 0;
+    private const int OPTIONS_VALIDATION_PANEL = 1;
 
     private readonly List<ConfigurationDefinitionSummary> _definitions = [];
     private readonly Dictionary<string, ConfigurationDefinition> _definitionDetails = new(StringComparer.OrdinalIgnoreCase);
@@ -420,7 +488,15 @@
     private LogicalPath? _requestedPath;
     private LogicalPath? _highlightedPath;
     private ConfigurationValidationReport? _runtimeValidationReport;
+    private IReadOnlyList<ConfigurationOptionsValidationReport> _optionsValidationReports = [];
+    private string? _runtimeValidationError;
+    private string? _optionsValidationError;
+    private bool _validationLoading;
+    private long _validationGeneration;
+    private readonly CancellationTokenSource _validationLifetime = new();
+    private CancellationTokenSource? _validationCancellation;
     private bool _runtimeValidationPopoverOpen;
+    private int _validationPanelIndex;
     private ConfigurationReloadStatusButton? _reloadStatusButton;
     private ConfigurationMetadataStoreDiagnostic? _metadataStoreDiagnostic;
     private bool _definitionCatalogHealthy;
@@ -494,31 +570,88 @@
     private int RuntimeValidationIssueCount => _runtimeValidationReport?.IssueCount ?? 0;
 
     private Color RuntimeValidationStatusColor =>
-        _runtimeValidationReport is null
+        _validationLoading ? Color.Info : _runtimeValidationReport is null
             ? Color.Warning
-            : RuntimeValidationIssueCount == 0
-                ? Color.Success
-                : Color.Warning;
+            : ConfigurationValidationPresentation.StatusColor(_runtimeValidationReport.Coverage, _runtimeValidationReport.IsValid);
 
     private string RuntimeValidationStatusIcon =>
-        _runtimeValidationReport is null
+        _validationLoading ? Icons.Material.Filled.HourglassEmpty : _runtimeValidationReport is null
             ? Icons.Material.Filled.Help
-            : RuntimeValidationIssueCount == 0
+            : _runtimeValidationReport.IsValid
                 ? Icons.Material.Filled.CheckCircle
                 : Icons.Material.Filled.Warning;
 
     private string RuntimeValidationStatusTooltip =>
-        $"{L["State:RuntimeValidation:Title"]}: {RuntimeValidationSummary}";
+        $"{L["Validation:SourceTitle"]}: {RuntimeValidationSummary}";
 
     private string RuntimeValidationSummary =>
-        _runtimeValidationReport is null
+        _validationLoading ? L["Validation:Pending"].Value : _runtimeValidationReport is null
             ? L["State:RuntimeValidation:Unavailable"].Value
-            : RuntimeValidationIssueCount == 0
-                ? L["State:RuntimeValidation:ValidSummary"].Value
-                : L["State:RuntimeValidation:InvalidSummary", RuntimeValidationIssueCount, RuntimeValidationCountsByDefinition.Count].Value;
+            : _runtimeValidationReport.Coverage switch
+            {
+                ConfigurationValidationCoverage.Failed => L["Validation:FailedSummary"].Value,
+                ConfigurationValidationCoverage.SchemaOnly => L["Validation:SchemaOnlySummary"].Value,
+                _ => _runtimeValidationReport.IsValid
+                    ? L["State:RuntimeValidation:ValidSummary"].Value
+                    : L["State:RuntimeValidation:InvalidSummary", RuntimeValidationIssueCount, RuntimeValidationCountsByDefinition.Count].Value
+            };
 
     private IReadOnlyList<ConfigurationValidationIssue> RuntimeValidationIssues =>
         _runtimeValidationReport?.Issues.Select(ToUiValidationIssue).ToArray() ?? [];
+
+    private int OptionsValidationIssueCount => _optionsValidationReports.Sum(report => report.Issues.Count);
+
+    private Color OptionsValidationStatusColor => _validationLoading ? Color.Info
+        : _optionsValidationError is not null ? Color.Error
+        : _optionsValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed) ? Color.Error
+        : _optionsValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.SchemaOnly) ? Color.Warning
+        : _optionsValidationReports.Any(report => !report.IsValid) ? Color.Error
+        : _optionsValidationReports.Count == 0 || UnobservedDefinitionKeys.Any() ? Color.Default
+        : _optionsValidationReports.All(report => report.IsValid) ? Color.Success : Color.Error;
+
+    private string OptionsValidationStatusIcon => _validationLoading ? Icons.Material.Filled.HourglassEmpty
+        : _optionsValidationError is not null ? Icons.Material.Filled.Warning
+        : _optionsValidationReports.Any(report => !report.IsValid) ? Icons.Material.Filled.Warning
+        : _optionsValidationReports.Count == 0 || UnobservedDefinitionKeys.Any() ? Icons.Material.Filled.VisibilityOff
+        : _optionsValidationReports.All(report => report.IsValid) ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Warning;
+
+    private string OptionsValidationSummary =>
+        _validationLoading ? L["Validation:Pending"].Value
+        : _optionsValidationError is not null ? L["Validation:Unavailable"].Value
+        : _optionsValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed) ? L["Validation:FailedSummary"].Value
+        : _optionsValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.SchemaOnly) ? L["Validation:SchemaOnlySummary"].Value
+        : _optionsValidationReports.Any(report => !report.IsValid) ? L["Validation:Invalid"].Value
+        : _optionsValidationReports.Count == 0 || UnobservedDefinitionKeys.Any() ? L["Validation:NoObserved"].Value
+        : _optionsValidationReports.All(report => report.IsValid) ? L["Validation:Valid"].Value : L["Validation:Invalid"].Value;
+
+    private string OptionsValidationTooltip => $"{L["Validation:OptionsTitle"]}: {OptionsValidationSummary}";
+
+    private bool IsOptionsValidationPanel => _validationPanelIndex == OPTIONS_VALIDATION_PANEL;
+
+    private string ValidationPopoverTitle =>
+        L[IsOptionsValidationPanel ? "Validation:OptionsTitle" : "Validation:SourceTitle"].Value;
+
+    private string ValidationPopoverStatusIcon =>
+        IsOptionsValidationPanel ? OptionsValidationStatusIcon : RuntimeValidationStatusIcon;
+
+    private Color ValidationPopoverStatusColor =>
+        IsOptionsValidationPanel ? OptionsValidationStatusColor : RuntimeValidationStatusColor;
+
+    private int ValidationPopoverIssueCount =>
+        IsOptionsValidationPanel ? OptionsValidationIssueCount : RuntimeValidationIssueCount;
+
+    private string ValidationPopoverSummary =>
+        IsOptionsValidationPanel ? OptionsValidationSummary : RuntimeValidationSummary;
+
+    private IEnumerable<string> UnobservedDefinitionKeys =>
+        _definitions.Select(definition => definition.DefinitionKey)
+            .Union((_runtimeValidationReport?.DefinitionReports ?? []).Select(report => report.DefinitionKey),
+                StringComparer.OrdinalIgnoreCase)
+            .Except(_optionsValidationReports.Select(report => report.DefinitionKey), StringComparer.OrdinalIgnoreCase);
+
+    private string ValidationDefinitionName(string definitionKey) =>
+        _definitions.FirstOrDefault(definition => string.Equals(definition.DefinitionKey, definitionKey, StringComparison.OrdinalIgnoreCase))?.DisplayName
+        ?? definitionKey;
 
     private IReadOnlyList<ConfigurationSectionItem> SectionItems =>
         _selectedDefinition is null
@@ -565,6 +698,11 @@
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        ++_validationGeneration;
+        _validationCancellation?.Cancel();
+        _validationCancellation?.Dispose();
+        _validationLifetime.Cancel();
+        _validationLifetime.Dispose();
         StateStore.Changed -= OnStateStoreChanged;
         await _pendingStateRender;
     }
@@ -586,6 +724,11 @@
             _definitions.Clear();
             _metadataStoreDiagnostic = null;
             _runtimeValidationReport = null;
+            ++_validationGeneration;
+            _validationCancellation?.Cancel();
+            _validationLoading = false;
+            _optionsValidationReports = [];
+            _optionsValidationError = L["Validation:Unavailable"].Value;
             ClearSelectedDefinition();
             _loadingDefinitions = false;
             return;
@@ -665,25 +808,73 @@
 
     private async Task LoadRuntimeValidationReportAsync()
     {
-        var result = await Facade.GetRuntimeValidationReportAsync();
-        if (result.IsFailed(out var error, out var report))
+        if (_disposed)
         {
-            Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
-            _runtimeValidationReport = null;
-            CloseRuntimeValidationPopover();
             return;
         }
 
-        _runtimeValidationReport = report;
+        var generation = ++_validationGeneration;
+        _validationCancellation?.Cancel();
+        _validationCancellation?.Dispose();
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_validationLifetime.Token);
+        _validationCancellation = cancellation;
+        _validationLoading = true;
+        _runtimeValidationError = null;
+        _optionsValidationError = null;
+        try
+        {
+            var sourceTask = Facade.GetRuntimeValidationReportAsync(cancellation.Token);
+            var optionsTask = Facade.GetOptionsValidationReportsAsync(cancellation.Token);
+            await Task.WhenAll(sourceTask, optionsTask);
+            if (_disposed || generation != _validationGeneration)
+            {
+                return;
+            }
+
+            var sourceResult = await sourceTask;
+            if (sourceResult.IsFailed(out var sourceError, out var report))
+            {
+                _runtimeValidationError = sourceError.Message ?? L["Validation:Unavailable"].Value;
+                _runtimeValidationReport = null;
+            }
+            else
+            {
+                _runtimeValidationReport = report;
+            }
+
+            var optionsResult = await optionsTask;
+            if (optionsResult.IsFailed(out var optionsError, out var attempts))
+            {
+                _optionsValidationError = optionsError.Message ?? L["Validation:Unavailable"].Value;
+                _optionsValidationReports = [];
+            }
+            else
+            {
+                _optionsValidationReports = attempts;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (!_disposed && generation == _validationGeneration)
+            {
+                _validationLoading = false;
+            }
+        }
     }
 
-    private void ToggleRuntimeValidationPopover()
+    private void ToggleRuntimeValidationPopover(int panelIndex)
     {
-        _runtimeValidationPopoverOpen = !_runtimeValidationPopoverOpen;
+        var closeCurrentPanel = _runtimeValidationPopoverOpen && _validationPanelIndex == panelIndex;
+        _validationPanelIndex = panelIndex;
+        _runtimeValidationPopoverOpen = !closeCurrentPanel;
     }
 
     private void OpenRuntimeValidationPopover()
     {
+        _validationPanelIndex = SOURCE_VALIDATION_PANEL;
         _runtimeValidationPopoverOpen = true;
     }
 
@@ -693,22 +884,7 @@
     }
 
     private static ConfigurationValidationIssue ToUiValidationIssue(ConfigurationRuntimeValidationIssue issue)
-    {
-        return new ConfigurationValidationIssue
-        {
-            DefinitionKey = issue.DefinitionKey,
-            DefinitionDisplayName = issue.DefinitionDisplayName,
-            LogicalPath = issue.LogicalPath,
-            NodeDisplayName = issue.NodeDisplayName,
-            InvalidDisplayValue = issue.EffectiveDisplayValue,
-            ConfigurationPath = issue.ConfigurationPath,
-            ValidationError = issue.Problem,
-            EffectiveSource = issue.EffectiveSource,
-            IsMissing = issue.IsMissing,
-            IsSensitive = issue.IsSensitive,
-            ValidationRules = issue.ValidationRules
-        };
-    }
+        => ConfigurationValidationPresentation.FromRuntime(issue);
 
     private void ReadRouteTarget()
     {
@@ -1310,9 +1486,13 @@
                 FullWidth = true
             });
             var result = await dialog.Result;
-            if (result is { Canceled: false, Data: ConfigurationJsonDraftResult draft })
+            if (result is { Canceled: false, Data: ConfigurationJsonEditResult edit })
             {
-                StateStore.ReplaceScope(_selectedDefinition.DefinitionKey, LogicalPath.Root, draft.Changes, draft.ValidationIssues);
+                if (!StateStore.TryReplaceJsonEditorScope(edit))
+                {
+                    Snackbar.Add(L["ImportExport:JsonEditor:PendingStateUnavailable"], Severity.Warning);
+                    return;
+                }
                 await RefreshPendingCount();
             }
         }

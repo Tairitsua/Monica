@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Logging;
 using Monica.Configuration.Annotations;
 using Monica.Configuration.Binding;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services.Support;
 
@@ -93,12 +94,17 @@ public static class MonicaConfigurationBootstrapExtensions
 
         try
         {
-            return MonicaConfigurationBinder.Get<TOptions>(section);
+            return MonicaConfigurationBinder.Get<TOptions>(configuration, sectionPath);
         }
         catch (Exception ex)
         {
+            var safeFault = ex is ConfigurationValidationExecutionException typed
+                ? new ConfigurationValidationExecutionException(typeof(TOptions).FullName ?? typeof(TOptions).Name,
+                    typed.LogicalPath, typed.Stage, typed.Kind)
+                : new ConfigurationValidationExecutionException(typeof(TOptions).FullName ?? typeof(TOptions).Name,
+                    LogicalPath.Root, "bootstrap-binding");
             logger.LogWarning(
-                ex,
+                safeFault,
                 "Failed to bind configuration section '{SectionPath}' to Monica bootstrap options '{OptionsType}'. CLR defaults are used.",
                 sectionPath,
                 typeof(TOptions).FullName ?? typeof(TOptions).Name);

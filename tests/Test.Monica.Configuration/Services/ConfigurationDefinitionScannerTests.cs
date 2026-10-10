@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Annotations;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services;
 using Monica.Configuration.Services.Support;
@@ -11,6 +12,19 @@ namespace Test.Monica.Configuration.Services;
 
 public class ConfigurationDefinitionScannerTests
 {
+    [Fact]
+    public void Scan_WhenTheRootConstructorIsPrivate_ShouldRejectTheContractWithoutExecutingIt()
+    {
+        var act = () => CreateScanner().Scan(typeof(PrivateConstructorOptions));
+
+        var fault = act.Should().Throw<ConfigurationValidationExecutionException>().Which;
+        fault.Kind.Should().Be(ConfigurationValidationIssueKind.Contract);
+        fault.Stage.Should().Be("options-constructor");
+        fault.LogicalPath.Should().Be(LogicalPath.Root);
+        fault.InnerException.Should().BeNull();
+        fault.ToString().Should().NotContain("synthetic-secret");
+    }
+
     [Fact]
     public void Scan_WhenTypeHasScalarProperties_ShouldBuildObjectRootWithScalarChildren()
     {
@@ -296,6 +310,13 @@ public class ConfigurationDefinitionScannerTests
             NodeKey = "sample.apiKey",
             ReloadBehavior = ConfigurationReloadBehavior.RequiresRestart)]
         public string? ApiKey { get; set; }
+    }
+
+    [Configuration("Sample:PrivateConstructor")]
+    private sealed class PrivateConstructorOptions
+    {
+        private PrivateConstructorOptions() => throw new InvalidOperationException("synthetic-secret");
+        public string Value { get; set; } = "safe";
     }
 
     [Configuration("Sample:WideDouble")]

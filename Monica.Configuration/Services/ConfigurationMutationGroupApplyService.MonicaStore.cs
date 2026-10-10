@@ -15,7 +15,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
         CancellationToken cancellationToken)
     {
         var states = new Dictionary<string, DefinitionMutationState>(StringComparer.OrdinalIgnoreCase);
-        var commitItems = new List<ConfigurationMutationBatchCommitItem>(mutations.Count);
+        var orderedStates = new List<DefinitionMutationState>();
         var plannedResults = new List<PlannedMutationResult>(mutations.Count);
 
         foreach (var mutation in mutations)
@@ -40,8 +40,9 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                         $"Expected version {target.ExpectedVersion} for '{mutation.Definition.DefinitionKey}', but current version is {document.Version}.");
                 }
 
-                state = new DefinitionMutationState(document, target.ExpectedVersion);
+                state = new DefinitionMutationState(mutation.Definition, document, target.ExpectedVersion);
                 states.Add(mutation.Definition.DefinitionKey, state);
+                orderedStates.Add(state);
             }
             else if (state.StagedExpectedVersion != target.ExpectedVersion)
             {
@@ -59,7 +60,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                 : documentEditor.ReadValue(mutation.Definition, updatedJson, mutation.Request.LogicalPath)
                   ?? ConfigurationStoredValue.Null;
             var modifiedTime = DateTimeOffset.UtcNow;
-            var newVersion = state.Version + 1;
+            var newVersion = state.FinalVersion;
             var history = new ConfigurationValueHistory
             {
                 HistoryId = Guid.NewGuid().ToString("N"),
@@ -82,18 +83,8 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                 Reason = context.Reason,
                 MutationGroupId = context.MutationGroupId
             };
-            commitItems.Add(new ConfigurationMutationBatchCommitItem
-            {
-                RequestId = mutation.Command.RequestId,
-                SaveRequest = new ConfigurationEffectiveValueSaveRequest
-                {
-                    Definition = mutation.Definition,
-                    Json = updatedJson,
-                    ExpectedVersion = state.Version,
-                    Context = context
-                },
-                History = history
-            });
+            state.RequestIds.Add(mutation.Command.RequestId);
+            state.Histories.Add(history);
             var result = new ConfigurationMutationResult
             {
                 DefinitionKey = mutation.Definition.DefinitionKey,
@@ -106,7 +97,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                     .RequiresProcessRestart()
             };
             plannedResults.Add(new PlannedMutationResult(mutation.Command.RequestId, result));
-            state.Advance(updatedJson, newVersion);
+            state.Advance(updatedJson);
         }
 
         var definitionKeys = mutations
@@ -132,26 +123,42 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             new ConfigurationMutationBatchCommitRequest
             {
                 MutationGroup = group,
-                Items = commitItems
+                Items = orderedStates.Select(state => new ConfigurationMutationBatchCommitItem
+                {
+                    RequestIds = state.RequestIds.ToArray(),
+                    Histories = state.Histories.ToArray(),
+                    SaveRequest = new ConfigurationEffectiveValueSaveRequest
+                    {
+                        Definition = state.Definition,
+                        Json = state.Json,
+                        ExpectedVersion = state.Version,
+                        Context = context
+                    }
+                }).ToArray()
             },
             plannedResults);
     }
 
     private sealed class DefinitionMutationState(
+        ConfigurationDefinition definition,
         ConfigurationEffectiveValueDocument document,
         long? stagedExpectedVersion)
     {
+        public ConfigurationDefinition Definition { get; } = definition;
+
         public string Json { get; private set; } = document.Json;
 
-        public long Version { get; private set; } = document.Version;
+        public long Version { get; } = document.Version;
+
+        public long FinalVersion { get; } = checked(document.Version + 1);
 
         public long? StagedExpectedVersion { get; } = stagedExpectedVersion;
 
-        public void Advance(string json, long version)
-        {
-            Json = json;
-            Version = version;
-        }
+        public List<string> RequestIds { get; } = [];
+
+        public List<ConfigurationValueHistory> Histories { get; } = [];
+
+        public void Advance(string json) => Json = json;
     }
 
     private sealed record PlannedMutationResult(string RequestId, ConfigurationMutationResult Result);

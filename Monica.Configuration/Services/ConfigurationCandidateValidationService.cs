@@ -31,15 +31,18 @@ internal sealed class ConfigurationCandidateValidationService(
             DefinitionKey = definition.DefinitionKey,
             DefinitionDisplayName = definition.DisplayName,
             ScopePath = scopePath,
+            Coverage = ConfigurationValidationCoverage.SchemaOnly,
+            Scope = ConfigurationValidationScope.Fragment,
+            ValidationRevision = definition.ValidationContract.Revision,
             Issues = issues
         };
     }
 
-    private static ConfigurationCandidateValidationIssue ToCandidateIssue(
+    internal static ConfigurationCandidateValidationIssue ToCandidateIssue(
         ConfigurationDefinition definition,
         ConfigurationValueValidationIssue issue)
     {
-        var isSensitive = ConfigurationSchemaNavigator.IsSensitivePath(
+        var isSensitive = issue.IsSensitive || ConfigurationSchemaNavigator.IsSensitivePath(
             definition.Root,
             issue.LogicalPath);
 
@@ -48,9 +51,12 @@ internal sealed class ConfigurationCandidateValidationService(
             DefinitionKey = definition.DefinitionKey,
             DefinitionDisplayName = definition.DisplayName,
             LogicalPath = issue.LogicalPath,
+            LogicalPaths = issue.LogicalPaths.Count == 0 ? [issue.LogicalPath] : issue.LogicalPaths,
+            Kind = issue.Kind,
             NodeDisplayName = GetNodeLabel(definition, issue.Node),
-            Problem = issue.Message,
-            CandidateDisplayValue = isSensitive ? null : issue.DisplayValue,
+            Problem = isSensitive ? "A configuration constraint failed for a sensitive value." : issue.Message,
+            CandidateDisplayValue = !isSensitive && issue.Kind == ConfigurationValidationIssueKind.Schema
+                && issue.Node.NodeKind == ConfigurationNodeKind.Scalar && !issue.BlocksProjection ? issue.DisplayValue : null,
             IsMissing = issue.IsMissing,
             IsSensitive = isSensitive,
             ValidationRules = issue.ValidationRules

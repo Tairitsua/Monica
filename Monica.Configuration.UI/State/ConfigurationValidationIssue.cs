@@ -3,7 +3,7 @@ using Monica.Configuration.Models;
 namespace Monica.Configuration.UI.State;
 
 /// <summary>
-/// Represents one invalid UI edit that cannot be converted into a persisted configuration mutation.
+/// Presents a safe validation diagnostic without changing the staged mutation state.
 /// </summary>
 public sealed record ConfigurationValidationIssue
 {
@@ -21,6 +21,21 @@ public sealed record ConfigurationValidationIssue
     /// Gets the target logical path.
     /// </summary>
     public required LogicalPath LogicalPath { get; init; }
+
+    /// <summary>
+    /// Gets every member location associated with the diagnostic, including sibling and object-level locations.
+    /// </summary>
+    public IReadOnlyList<LogicalPath> LogicalPaths { get; init; } = [];
+
+    /// <summary>
+    /// Gets whether a display value is available. Object rules and actual-options diagnostics never expose values.
+    /// </summary>
+    public bool HasDisplayValue { get; init; } = true;
+
+    /// <summary>
+    /// Gets the diagnostic kind. Local input errors use the schema category.
+    /// </summary>
+    public ConfigurationValidationIssueKind Kind { get; init; } = ConfigurationValidationIssueKind.Schema;
 
     /// <summary>
     /// Gets the target node display name.

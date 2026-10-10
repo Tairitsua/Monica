@@ -10,6 +10,18 @@ public sealed record ConfigurationHistoryRollbackPreview
     /// </summary>
     public required string PlanToken { get; init; }
 
+    /// <summary>Gets complete target-aware validation findings for the inverse mutation group.</summary>
+    public IReadOnlyList<ConfigurationCandidateValidationReport> ValidationReports { get; init; } = [];
+
+    /// <summary>Gets safe planning findings for the inverse mutation group.</summary>
+    public IReadOnlyList<ConfigurationMutationValidationProblem> Problems { get; init; } = [];
+
+    /// <summary>Gets whether the complete inverse group is safe to persist.</summary>
+    public bool CanApply => ValidationReports.Count > 0 && Problems.Count == 0 && ValidationReports.All(static report => report.IsValid);
+
+    /// <summary>Gets the complete aggregate review fingerprint used by the apply operation.</summary>
+    public string? ValidationFingerprint { get; init; }
+
     /// <summary>
     /// Gets the current physical target value for each history row identity.
     /// </summary>

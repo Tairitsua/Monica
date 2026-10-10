@@ -15,10 +15,23 @@ public sealed record ConfigurationValidationReport
     /// </summary>
     public IReadOnlyList<ConfigurationRuntimeValidationIssue> Issues { get; init; } = [];
 
+    /// <summary>Gets how much of the applicable contracts was evaluated.</summary>
+    public ConfigurationValidationCoverage Coverage { get; init; } = ConfigurationValidationCoverage.SchemaOnly;
+    /// <summary>Gets the complete source-snapshot boundary.</summary>
+    public ConfigurationValidationScope Scope { get; init; } = ConfigurationValidationScope.CompleteAggregate;
+    /// <summary>Gets the executable revision for a single-owner report; aggregate reports use DefinitionReports.</summary>
+    public string? ValidationRevision { get; init; }
+    /// <summary>Gets coverage and executable revision for every evaluated owner.</summary>
+    public IReadOnlyList<ConfigurationValidationDefinitionReport> DefinitionReports { get; init; } = [];
+    /// <summary>Gets whether portable schema checks passed without operational faults.</summary>
+    public bool IsSchemaValid => Coverage != ConfigurationValidationCoverage.Failed
+        && Issues.All(issue => issue.Kind != ConfigurationValidationIssueKind.Schema);
+
     /// <summary>
     /// Gets whether every local configuration definition is valid.
     /// </summary>
-    public bool IsValid => Issues.Count == 0;
+    public bool IsValid => Coverage == ConfigurationValidationCoverage.Complete && Issues.Count == 0
+        && DefinitionReports.All(report => report.IsValid);
 
     /// <summary>
     /// Gets the total number of runtime validation issues.
@@ -50,6 +63,11 @@ public sealed record ConfigurationRuntimeValidationIssue
     /// Gets the target logical path inside the definition.
     /// </summary>
     public required LogicalPath LogicalPath { get; init; }
+
+    /// <summary>Gets all associated locations for a multi-member object rule.</summary>
+    public IReadOnlyList<LogicalPath> LogicalPaths { get; init; } = [];
+    /// <summary>Gets the owner of this problem.</summary>
+    public ConfigurationValidationIssueKind Kind { get; init; } = ConfigurationValidationIssueKind.Schema;
 
     /// <summary>
     /// Gets the target node display name.

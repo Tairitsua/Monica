@@ -2,6 +2,7 @@
 @using Monica.UI.UIDiffHighlight.Models
 @inject ConfigurationFacade Facade
 @inject IStringLocalizer<ConfigurationUIResource> L
+@implements IDisposable
 
 <MudDialog>
     <DialogContent>
@@ -22,6 +23,18 @@
             }
             else if (_rollbackPreview is not null)
             {
+                @foreach (var problem in _rollbackPreview.Problems)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@problem.Message</MudAlert>
+                }
+                @foreach (var report in _rollbackPreview.ValidationReports)
+                {
+                    <ConfigurationValidationReportView Title="@report.DefinitionDisplayName"
+                       Coverage="@report.Coverage" Scope="@report.Scope" ValidationRevision="@report.ValidationRevision"
+                       Target="@report.Target" HasEffectiveChange="@report.HasEffectiveChange"
+                       IsValid="@report.IsValid" IsSchemaValid="@report.IsSchemaValid"
+                       Issues="@report.Issues.Select(ConfigurationValidationPresentation.FromCandidate).ToArray()" />
+                }
                 <MudPaper Outlined="true" Class="pa-3">
                     <MudStack Spacing="2">
                         <MudText Typo="Typo.subtitle2">@L["Rollback:PreviewTitle"]</MudText>
@@ -56,11 +69,14 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" Disabled="_saving">@L["Common:Actions:Cancel"]</MudButton>
+        <MudButton OnClick="() => LoadRollbackPreviewAsync()" Disabled="@(_saving || _loadingGroupRows || _loadingRollbackPreview)">
+            @L["Validation:PreviewRefresh"]
+        </MudButton>
         <MudButton Color="Color.Warning"
                    Variant="Variant.Filled"
                    StartIcon="@Icons.Material.Filled.Restore"
                    OnClick="RollbackAsync"
-                   Disabled="@(_saving || _loadingGroupRows || _loadingRollbackPreview || _loadingDiffPreview || _rollbackPreview is null || PreviewRows.Count == 0)"
+                   Disabled="@(_saving || _loadingGroupRows || _loadingRollbackPreview || _loadingDiffPreview || _rollbackPreview?.CanApply != true || PreviewRows.Count == 0)"
                    aria-label="@L["Rollback:Confirm"]">
             @L["Rollback:Confirm"]
         </MudButton>
@@ -79,6 +95,10 @@
     private bool _loadingGroupRows;
     private bool _loadingRollbackPreview;
     private bool _loadingDiffPreview = true;
+    private bool _disposed;
+    private long _previewGeneration;
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _previewCancellation;
     private IReadOnlyList<ConfigurationValueHistory> _loadedGroupRows = [];
     private ConfigurationHistoryRollbackPreview? _rollbackPreview;
 
@@ -103,6 +123,10 @@
         {
             _loadingGroupRows = true;
             var result = await Facade.GetGroupHistoryAsync(Group.GroupId);
+            if (_disposed)
+            {
+                return;
+            }
             if (result.IsFailed(out var error, out var rows))
             {
                 _error = error.Message;
@@ -121,8 +145,24 @@
         }
     }
 
-    private async Task LoadRollbackPreviewAsync()
+    private async Task LoadRollbackPreviewAsync(bool preserveError = false)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var generation = ++_previewGeneration;
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _previewCancellation = cancellation;
+        _rollbackPreview = null;
+        if (!preserveError)
+        {
+            _error = null;
+        }
+
         var historyIds = PreviewRows.Select(static row => row.HistoryId).ToArray();
         if (historyIds.Length == 0)
         {
@@ -131,22 +171,41 @@
         }
 
         _loadingRollbackPreview = true;
-        var result = await Facade.PreviewHistoryRollbackAsync(historyIds);
-        if (result.IsFailed(out var error, out var preview))
+        try
         {
-            _error = error.Message;
-        }
-        else
-        {
-            _rollbackPreview = preview;
-        }
+            var result = await Facade.PreviewHistoryRollbackAsync(historyIds, cancellation.Token);
+            if (_disposed || generation != _previewGeneration)
+            {
+                return;
+            }
 
-        _loadingRollbackPreview = false;
+            if (result.IsFailed(out var error, out var preview))
+            {
+                _error = preserveError && !string.IsNullOrWhiteSpace(_error)
+                    ? $"{_error}{Environment.NewLine}{error.Message}" : error.Message;
+                _rollbackPreview = result.Data;
+            }
+            else
+            {
+                _rollbackPreview = preview;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (!_disposed && generation == _previewGeneration)
+            {
+                _loadingRollbackPreview = false;
+            }
+        }
     }
 
     private async Task RollbackAsync()
     {
-        if (_rollbackPreview is null)
+        var preview = _rollbackPreview;
+        if (_disposed || _saving || _loadingRollbackPreview || preview?.CanApply != true)
         {
             _error = L["Common:States:NotFound"];
             return;
@@ -157,11 +216,10 @@
 
         if (Group is not null)
         {
-            var result = await Facade.RollbackGroupAsync(Group.GroupId, _rollbackPreview.PlanToken, _reason);
+            var result = await Facade.RollbackGroupAsync(Group.GroupId, preview.PlanToken, _reason);
             if (result.IsFailed(out var error, out var appliedMutations))
             {
-                _error = error.Message;
-                _saving = false;
+                await DisplayRejectionAsync(error.Message);
                 return;
             }
 
@@ -181,12 +239,11 @@
 
             var batchResult = await Facade.RollbackHistoriesAsync(
                 rows.Select(row => row.HistoryId).ToArray(),
-                _rollbackPreview.PlanToken,
+                preview.PlanToken,
                 _reason);
             if (batchResult.IsFailed(out var batchError, out var appliedMutations))
             {
-                _error = batchError.Message;
-                _saving = false;
+                await DisplayRejectionAsync(batchError.Message);
                 return;
             }
 
@@ -196,12 +253,11 @@
 
         var singleResult = await Facade.RollbackHistoryAsync(
             HistoryRow.HistoryId,
-            _rollbackPreview.PlanToken,
+            preview.PlanToken,
             _reason);
         if (singleResult.IsFailed(out var singleError, out var appliedMutation))
         {
-            _error = singleError.Message;
-            _saving = false;
+            await DisplayRejectionAsync(singleError.Message);
             return;
         }
 
@@ -210,7 +266,25 @@
 
     private void CompleteRollback(ConfigurationHistoryRollbackDialogResult rollback)
     {
-        MudDialog.Close(DialogResult.Ok(rollback));
+        if (!_disposed)
+        {
+            MudDialog.Close(DialogResult.Ok(rollback));
+        }
+    }
+
+    private async Task DisplayRejectionAsync(string? message)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _error = message;
+        await LoadRollbackPreviewAsync(preserveError: true);
+        if (!_disposed)
+        {
+            _saving = false;
+        }
     }
 
     private void OnPreviewLoadingChanged(bool loading)
@@ -221,5 +295,15 @@
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_previewGeneration;
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        _lifetime.Cancel();
+        _lifetime.Dispose();
     }
 }

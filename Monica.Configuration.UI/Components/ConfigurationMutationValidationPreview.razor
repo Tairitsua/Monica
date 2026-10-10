@@ -1,0 +1,38 @@
+@inject IStringLocalizer<ConfigurationUIResource> L
+
+<MudStack Spacing="2">
+    @if (!Preview.CanApply)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">@L["Validation:PreviewBlocked"]</MudAlert>
+    }
+    @foreach (var problem in Preview.Problems)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">
+            @if (!string.IsNullOrWhiteSpace(problem.DefinitionKey))
+            {
+                <MudText Typo="Typo.caption">@($"{problem.DefinitionKey}: ")</MudText>
+            }
+            @problem.Message
+        </MudAlert>
+    }
+    @foreach (var report in Preview.Definitions)
+    {
+        <ConfigurationValidationReportView Title="@report.DefinitionDisplayName"
+                                           Coverage="@report.Coverage"
+                                           Scope="@report.Scope"
+                                           ValidationRevision="@report.ValidationRevision"
+                                           Target="@report.Target" HasEffectiveChange="@report.HasEffectiveChange"
+                                           IsValid="@report.IsValid"
+                                           IsSchemaValid="@report.IsSchemaValid"
+                                           Issues="@report.Issues.Select(ConfigurationValidationPresentation.FromCandidate).ToArray()"
+                                           JumpRequested="JumpRequested" />
+    }
+</MudStack>
+
+@code {
+    /// <summary>Gets the authoritative final-aggregate preview; rendering never performs validation.</summary>
+    [Parameter, EditorRequired] public ConfigurationMutationGroupValidationPreview Preview { get; set; } = null!;
+
+    /// <summary>Gets the callback used to locate an associated member while retaining its staged changes.</summary>
+    [Parameter] public EventCallback<ConfigurationValidationIssue> JumpRequested { get; set; }
+}

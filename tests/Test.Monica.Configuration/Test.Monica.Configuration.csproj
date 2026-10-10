@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Monica.Configuration\Monica.Configuration.csproj" />
+    <ProjectReference Include="..\..\Monica.Testing\Monica.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

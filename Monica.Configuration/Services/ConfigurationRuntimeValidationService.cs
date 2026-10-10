@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Primitives;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
@@ -12,14 +11,12 @@ namespace Monica.Configuration.Services;
 /// </summary>
 internal sealed class ConfigurationRuntimeValidationService(
     IConfigurationDefinitionRegistry definitionRegistry,
-    ConfigurationEffectiveValueSeedFactory seedFactory,
-    ConfigurationValueValidationEngine validationEngine,
+    ConfigurationValidationCoordinator validationCoordinator,
     IConfigurationSourceInspector sourceInspector,
     MonicaConfigurationProviderAccessor providerAccessor,
     ConfigurationRuntimeContext runtimeContext)
     : IConfigurationRuntimeValidationService, IDisposable
 {
-    private static readonly ConfigurationValueValidationOptions RUNTIME_OPTIONS = new();
     private readonly Lock _cacheLock = new();
     private readonly Dictionary<string, ConfigurationValidationReport> _definitionReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimeReloadRevisionTracker _runtimeReloadRevisionTracker = new(runtimeContext);
@@ -51,7 +48,14 @@ internal sealed class ConfigurationRuntimeValidationService(
                     continue;
                 }
 
-                _fullReport = CreateReport(definitionReports.SelectMany(static report => report.Issues));
+                _fullReport = new ConfigurationValidationReport
+                {
+                    Coverage = definitionReports.All(report => report.Coverage == ConfigurationValidationCoverage.Complete)
+                        ? ConfigurationValidationCoverage.Complete : definitionReports.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed)
+                            ? ConfigurationValidationCoverage.Failed : ConfigurationValidationCoverage.SchemaOnly,
+                    Issues = Array.AsReadOnly(definitionReports.SelectMany(report => report.Issues).ToArray()),
+                    DefinitionReports = Array.AsReadOnly(definitionReports.SelectMany(report => report.DefinitionReports).ToArray())
+                };
                 return _fullReport;
             }
         }
@@ -113,67 +117,10 @@ internal sealed class ConfigurationRuntimeValidationService(
             return report;
         }
 
-        report = CreateReport(GetIssues(definition));
+        report = ConfigurationValidationReportFactory.Create(definition,
+            validationCoordinator.ValidateConfiguration(definition, runtimeContext.Configuration), sourceInspector);
         _definitionReports[definition.DefinitionKey] = report;
         return report;
-    }
-
-    private static ConfigurationValidationReport CreateReport(IEnumerable<ConfigurationRuntimeValidationIssue> issues)
-    {
-        var immutableIssues = Array.AsReadOnly(issues.ToArray());
-        return new ConfigurationValidationReport
-        {
-            GeneratedAt = DateTimeOffset.UtcNow,
-            Issues = immutableIssues
-        };
-    }
-
-    private IEnumerable<ConfigurationRuntimeValidationIssue> GetIssues(ConfigurationDefinition definition)
-    {
-        var json = seedFactory.CreateRuntimeJson(definition.Root, definition.SectionPath);
-        using var document = JsonDocument.Parse(json);
-        var issues = validationEngine.Validate(definition.Root, LogicalPath.Root, document.RootElement, RUNTIME_OPTIONS);
-        foreach (var issue in issues)
-        {
-            yield return BuildRuntimeIssue(definition, issue);
-        }
-    }
-
-    private ConfigurationRuntimeValidationIssue BuildRuntimeIssue(
-        ConfigurationDefinition definition,
-        ConfigurationValueValidationIssue issue)
-    {
-        var isSensitive = ConfigurationSchemaNavigator.IsSensitivePath(
-            definition.Root,
-            issue.LogicalPath);
-        var sourceChain = sourceInspector.GetSourceChain(definition, issue.LogicalPath);
-        var effectiveSource = sourceChain.Values.FirstOrDefault(value => value.IsEffective)?.Source;
-        return new ConfigurationRuntimeValidationIssue
-        {
-            DefinitionKey = definition.DefinitionKey,
-            DefinitionDisplayName = definition.DisplayName,
-            DefinitionCategory = definition.Category,
-            LogicalPath = issue.LogicalPath,
-            NodeDisplayName = GetNodeLabel(definition, issue.Node),
-            ConfigurationPath = sourceChain.ConfigurationPath,
-            Problem = issue.Message,
-            EffectiveDisplayValue = isSensitive ? null : issue.DisplayValue,
-            IsMissing = issue.IsMissing,
-            IsSensitive = isSensitive,
-            EffectiveSource = effectiveSource,
-            SourceChain = sourceChain,
-            ValidationRules = issue.ValidationRules
-        };
-    }
-
-    private static string GetNodeLabel(ConfigurationDefinition definition, ConfigurationNodeDefinition node)
-    {
-        if (node.RelativePath.Depth == 0)
-        {
-            return definition.DisplayName;
-        }
-
-        return string.IsNullOrWhiteSpace(node.DisplayName) ? node.Name : node.DisplayName;
     }
 
     /// <inheritdoc />

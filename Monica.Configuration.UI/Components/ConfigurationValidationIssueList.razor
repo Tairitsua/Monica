@@ -13,8 +13,21 @@
                             <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="1">
                                 <MudStack Spacing="0">
                                     <MudText Typo="Typo.subtitle2">@Title(issue)</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.LogicalPath.ToCanonicalString()</MudText>
-                                    @if (ShowRuntimeMetadata && !string.IsNullOrWhiteSpace(issue.ConfigurationPath))
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@PathLabel(issue.LogicalPath)</MudText>
+                                    @foreach (var relatedPath in RelatedLocations(issue))
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@PathLabel(relatedPath)</MudText>
+                                            @if (ShowJump && JumpRequested.HasDelegate)
+                                            {
+                                                <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="ActionsDisabled"
+                                                           OnClick="() => JumpRequested.InvokeAsync(issue with { LogicalPath = relatedPath })">
+                                                    @L["Common:Actions:Jump"]
+                                                </MudButton>
+                                            }
+                                        </MudStack>
+                                    }
+                                    @if (ShowSourceFor(issue) && !string.IsNullOrWhiteSpace(issue.ConfigurationPath))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
                                             @L["State:RuntimeValidation:ConfigurationPath"]: @issue.ConfigurationPath
@@ -28,7 +41,7 @@
                                                        aria-label="@RuleTip(issue)"
                                                        Color="Color.Info" />
                                     </MudTooltip>
-                                    @if (ShowSourceChain && !string.IsNullOrWhiteSpace(issue.ConfigurationPath))
+                                    @if (ShowSourceChain && ShowSourceFor(issue) && !string.IsNullOrWhiteSpace(issue.ConfigurationPath))
                                     {
                                         <MudTooltip Text="@L["State:RuntimeValidation:Actions:SourceChain"]">
                                             <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
@@ -66,17 +79,20 @@
                             </MudStack>
 
                             <MudGrid Spacing="2">
-                                <MudItem xs="12" md="@(ShowRuntimeMetadata ? 4 : 5)">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@ValueLabelText</MudText>
-                                    <div class="configuration-validation-issue-value">
-                                        <MudText Typo="Typo.body2">@DisplayInvalidValue(issue)</MudText>
-                                    </div>
-                                </MudItem>
-                                <MudItem xs="12" md="@(ShowRuntimeMetadata ? 4 : 7)">
+                                @if (issue.HasDisplayValue)
+                                {
+                                    <MudItem xs="12" md="@(ShowSourceFor(issue) ? 4 : 5)">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@ValueLabelText</MudText>
+                                        <div class="configuration-validation-issue-value">
+                                            <MudText Typo="Typo.body2">@DisplayInvalidValue(issue)</MudText>
+                                        </div>
+                                    </MudItem>
+                                }
+                                <MudItem xs="12" md="@(ShowSourceFor(issue) ? 4 : issue.HasDisplayValue ? 7 : 12)">
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@ReasonLabelText</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Error">@issue.ValidationError</MudText>
                                 </MudItem>
-                                @if (ShowRuntimeMetadata)
+                                @if (ShowSourceFor(issue))
                                 {
                                     <MudItem xs="12" md="4">
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@L["State:RuntimeValidation:EffectiveSource"]</MudText>
@@ -113,6 +129,15 @@
     private string ReasonLabelText => ReasonLabel ?? L["PendingReview:Validation:Reason"].Value;
 
     private string UndoLabelText => UndoLabel ?? L["PendingReview:Actions:UndoIssue"].Value;
+
+    private bool ShowSourceFor(ConfigurationValidationIssue issue) =>
+        ShowRuntimeMetadata && issue.HasDisplayValue && issue.Kind == ConfigurationValidationIssueKind.Schema;
+
+    private IEnumerable<LogicalPath> RelatedLocations(ConfigurationValidationIssue issue) =>
+        issue.LogicalPaths.Where(path => !path.Equals(issue.LogicalPath)).Distinct();
+
+    private string PathLabel(LogicalPath path) => path.Depth == 0
+        ? L["State:Tree:Root"].Value : path.ToCanonicalString();
 
     private IEnumerable<ConfigurationValidationIssue> OrderedIssues =>
         Issues
@@ -152,12 +177,22 @@
 
     private string RuleTip(ConfigurationValidationIssue issue)
     {
+        if (issue.Kind != ConfigurationValidationIssueKind.Schema)
+        {
+            return issue.Kind switch
+            {
+                ConfigurationValidationIssueKind.Code => L["Validation:RuleCode"].Value,
+                ConfigurationValidationIssueKind.Contract => L["Validation:RuleContract"].Value,
+                _ => L["Validation:RuleExecution"].Value
+            };
+        }
+
         if (issue.ValidationRules.Count == 0)
         {
             return L["PendingReview:Validation:NoRuleTip"].Value;
         }
 
-        return string.Join(
+        return L["Validation:RuleSchema"].Value + Environment.NewLine + string.Join(
             Environment.NewLine,
             issue.ValidationRules.Select(rule => ConfigurationValidationRuleFormatter.Format(rule, L)));
     }

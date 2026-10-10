@@ -57,8 +57,7 @@ public sealed class ConfigurationRuntimeValidationServiceCacheTests
         var provider = CreateProvider(accessor, registry, runtimeContext, store);
         using var validationService = new ConfigurationRuntimeValidationService(
             registry,
-            new ConfigurationEffectiveValueSeedFactory(runtimeContext),
-            new ConfigurationValueValidationEngine(),
+            ConfigurationValidationTestServices.CreateCoordinator(),
             Substitute.For<IConfigurationSourceInspector>(),
             accessor,
             runtimeContext);
@@ -107,7 +106,7 @@ public sealed class ConfigurationRuntimeValidationServiceCacheTests
         services.AddSingleton(runtimeContext);
         services.AddSingleton(registry);
         services.AddSingleton(store);
-        services.AddSingleton<ConfigurationEffectiveValueSeedFactory>();
+        ConfigurationValidationTestServices.AddCoreServices(services);
         services.AddSingleton<ConfigurationStoredValueCodec>();
         services.AddSingleton<ConfigurationEffectiveValuePatchEngine>();
         services.AddSingleton<ConfigurationEffectiveValueDocumentEditor>();

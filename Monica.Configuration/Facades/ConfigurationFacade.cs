@@ -34,6 +34,7 @@ public sealed class ConfigurationFacade(
     IConfigurationJsonFileSourceWriter sourceWriter,
     ConfigurationRuntimeContext runtimeContext,
     IConfigurationRuntimeValidationService runtimeValidationService,
+    IConfigurationOptionsValidationDiagnostics optionsValidationDiagnostics,
     IConfigurationCandidateValidationService candidateValidationService,
     IConfigurationRuntimeReloadService runtimeReloadService,
     IConfigurationReloadBroadcastService reloadBroadcastService)
@@ -118,8 +119,9 @@ public sealed class ConfigurationFacade(
     /// Gets source-aware runtime validation diagnostics for the current process.
     /// </summary>
     /// <returns>The runtime validation report.</returns>
-    public Task<Res<ConfigurationValidationReport>> GetRuntimeValidationReportAsync()
+    public Task<Res<ConfigurationValidationReport>> GetRuntimeValidationReportAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             return Task.FromResult(Res.Ok(runtimeValidationService.GetReport()));
@@ -127,7 +129,7 @@ public sealed class ConfigurationFacade(
         catch (Exception ex)
         {
             return Task.FromResult<Res<ConfigurationValidationReport>>(
-                Res.Fail($"Failed to get runtime configuration validation report: {ex.GetMessageRecursively()}"));
+                Res.Fail(SafeMutationFailure(ex)));
         }
     }
 
@@ -149,7 +151,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to validate candidate configuration value: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -652,13 +654,85 @@ public sealed class ConfigurationFacade(
     {
         try
         {
-            return Res.Ok(await mutationGroupApplyService.ApplyAsync(request, CancellationToken.None));
+            var result = await mutationGroupApplyService.ApplyAsync(request, CancellationToken.None);
+            return result.Status == ConfigurationMutationGroupApplyStatus.Rejected
+                ? Res.Fail("The complete configuration validation rejected this group before persistence.").WithData(result)
+                : Res.Ok(result);
+        }
+        catch (ConfigurationValidationExecutionException ex)
+        {
+            return Res.Fail(SafeMutationFailure(ex)).WithData(new ConfigurationMutationGroupApplyResult
+            {
+                Status = ConfigurationMutationGroupApplyStatus.Rejected,
+                ValidationPreview = new ConfigurationMutationGroupValidationPreview
+                {
+                    ValidationFingerprint = string.Empty,
+                    Definitions = [new ConfigurationCandidateValidationReport
+                    {
+                        DefinitionKey = ex.DefinitionKey, DefinitionDisplayName = ex.DefinitionKey,
+                        ScopePath = LogicalPath.Root, Scope = ConfigurationValidationScope.CompleteAggregate,
+                        Coverage = ConfigurationValidationCoverage.Failed,
+                        Issues = [new ConfigurationCandidateValidationIssue
+                        {
+                            DefinitionKey = ex.DefinitionKey, DefinitionDisplayName = ex.DefinitionKey,
+                            LogicalPath = ex.LogicalPath, LogicalPaths = [ex.LogicalPath],
+                            Kind = ex.Kind, NodeDisplayName = ex.DefinitionKey, Problem = ex.Message
+                        }]
+                    }],
+                    Problems = [new ConfigurationMutationValidationProblem
+                    {
+                        Code = "ValidationExecution", DefinitionKey = ex.DefinitionKey,
+                        Message = "The complete validation could not execute safely."
+                    }]
+                }
+            });
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to apply configuration mutation group: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
+
+    /// <summary>Previews complete, target-aware validation without persisting any configuration.</summary>
+    /// <param name="request">The proposed mutation commands and their physical targets.</param>
+    /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
+    /// <returns>The complete validation reports and review fingerprint.</returns>
+    public async Task<Res<ConfigurationMutationGroupValidationPreview>> PreviewMutationGroupAsync(
+        ConfigurationMutationGroupApplyRequest request, CancellationToken cancellationToken = default)
+    {
+        try { return Res.Ok(await mutationGroupApplyService.PreviewAsync(request, cancellationToken)); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) { return Res.Fail(SafeMutationFailure(ex)); }
+    }
+
+    /// <summary>Reads the latest observed default-options attempt without resolving or retaining options instances.</summary>
+    /// <param name="definitionKey">The locally discovered configuration owner.</param>
+    /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
+    /// <returns>The latest attempt, or null when default options have not been observed.</returns>
+    public Task<Res<ConfigurationOptionsValidationReport?>> GetOptionsValidationReportAsync(
+        string definitionKey, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Res.Ok(optionsValidationDiagnostics.GetLatestReport(definitionKey)));
+    }
+
+    /// <summary>Reads bounded latest default-options attempts separately from effective-source validation.</summary>
+    /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
+    /// <returns>The latest observed attempts for locally discovered definitions.</returns>
+    public Task<Res<IReadOnlyList<ConfigurationOptionsValidationReport>>> GetOptionsValidationReportsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Res.Ok(optionsValidationDiagnostics.GetReports()));
+    }
+
+    private static string SafeMutationFailure(Exception exception) => exception switch
+    {
+        ConfigurationValidationExecutionException => "Configuration validation could not execute safely. No configuration values were persisted.",
+        ConfigurationConcurrencyConflictException => "The reviewed configuration changed. Request a new preview before applying it.",
+        ConfigurationSchemaMismatchException => "The reviewed configuration contract changed. Request a new preview before applying it.",
+        _ => "The configuration operation failed. Review the current configuration before retrying."
+    };
 
     /// <summary>
     /// Mutates a configuration value.
@@ -695,7 +769,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to mutate configuration value: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -735,7 +809,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to mutate configuration source value: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -932,15 +1006,18 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="version">The version number.</param>
     /// <returns>The apply preview.</returns>
-    public async Task<Res<ConfigurationUnifiedVersionApplyPreview>> PreviewUnifiedVersionRollbackAsync(long version)
+    /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
+    public async Task<Res<ConfigurationUnifiedVersionApplyPreview>> PreviewUnifiedVersionRollbackAsync(
+        long version, CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await unifiedVersionService.PreviewRollbackAsync(version, CancellationToken.None));
+            return Res.Ok(await unifiedVersionService.PreviewRollbackAsync(version, cancellationToken));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to preview unified configuration version rollback: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -961,12 +1038,12 @@ public sealed class ConfigurationFacade(
         catch (ConfigurationConcurrencyConflictException ex)
         {
             return Res.Fail(
-                $"Failed to roll back unified configuration version: {ex.GetMessageRecursively()}",
+                SafeMutationFailure(ex),
                 ResStatus.Conflict);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to roll back unified configuration version: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -1051,17 +1128,19 @@ public sealed class ConfigurationFacade(
     /// Previews selected history rollbacks against the current physical target values.
     /// </summary>
     /// <param name="historyIds">The history identities to preview.</param>
+    /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
     /// <returns>The current values and concurrency-bound rollback plan.</returns>
     public async Task<Res<ConfigurationHistoryRollbackPreview>> PreviewHistoryRollbackAsync(
-        IReadOnlyList<string> historyIds)
+        IReadOnlyList<string> historyIds, CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await rollbackService.PreviewHistoriesAsync(historyIds, CancellationToken.None));
+            return Res.Ok(await rollbackService.PreviewHistoriesAsync(historyIds, cancellationToken));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to preview configuration history rollback: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -1087,7 +1166,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to roll back configuration history: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -1113,7 +1192,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to roll back selected configuration histories: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 
@@ -1139,7 +1218,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to roll back configuration mutation group: {ex.GetMessageRecursively()}");
+            return Res.Fail(SafeMutationFailure(ex));
         }
     }
 }

@@ -57,6 +57,7 @@ public sealed class ConfigurationStoredValueCodec
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
+                if (!element.EnumerateObject().Any()) values[path] = null;
                 foreach (var property in element.EnumerateObject())
                 {
                     Flatten($"{path}:{property.Name}", property.Value, values);
@@ -69,6 +70,7 @@ public sealed class ConfigurationStoredValueCodec
                     Flatten($"{path}:{index}", item, values);
                     index++;
                 }
+                if (index == 0) values[path] = string.Empty;
                 break;
             case JsonValueKind.String:
                 values[path] = element.GetString();

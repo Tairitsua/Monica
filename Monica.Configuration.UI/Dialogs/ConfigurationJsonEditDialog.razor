@@ -1,9 +1,11 @@
 @using Monica.Configuration.UI.Localization
 @inject ConfigurationJsonDraftService DraftService
+@inject ConfigurationStateStore StateStore
 @inject IStringLocalizer<ConfigurationUIResource> L
 
 <MudDialog>
     <DialogContent>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@L["Validation:FragmentNotice"]</MudAlert>
         <MudStack Spacing="3" Class="configuration-json-edit-dialog">
             <MudPaper Outlined="true" Class="pa-3">
                 <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
@@ -14,7 +16,8 @@
                     <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
                         <ConfigurationSchemaMetadataChip SchemaVersion="@Definition.SchemaVersion"
                                                          DefinitionRevision="@Definition.DefinitionRevision"
-                                                         SchemaHash="@Definition.SchemaHash" />
+                                                         SchemaHash="@Definition.SchemaHash"
+                                                         ValidationContract="@Definition.ValidationContract" />
                         @if (_editorDocument.RedactedPaths.Count > 0)
                         {
                             <MudChip T="int" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
@@ -25,12 +28,25 @@
                 </MudStack>
             </MudPaper>
 
-            <MudTextField T="string"
-                          @bind-Value="_json"
-                          Label="@L["ImportExport:JsonEditor:Json"]"
-                          Variant="Variant.Outlined"
-                          Lines="18"
-                          Immediate="false" />
+            @if (_blockedByPendingState)
+            {
+                <MudAlert Severity="Severity.Warning">@L["ImportExport:JsonEditor:PendingStateUnavailable"]</MudAlert>
+            }
+            else if (!_editorDocument.CanAnalyze)
+            {
+                <MudAlert Severity="Severity.Warning">@L["ImportExport:JsonEditor:BaselineUnavailable"]</MudAlert>
+            }
+
+            @if (CanAnalyze)
+            {
+                <MudTextField T="string"
+                              @bind-Value="_json"
+                              @bind-Value:after="InvalidateDraft"
+                              Label="@L["ImportExport:JsonEditor:Json"]"
+                              Variant="Variant.Outlined"
+                              Lines="18"
+                              Immediate="false" />
+            }
 
             @if (_draft is { IsJsonValid: false })
             {
@@ -86,6 +102,7 @@
         <MudButton OnClick="Cancel">@L["Common:Actions:Cancel"]</MudButton>
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Rule"
+                   Disabled="@(!CanAnalyze)"
                    OnClick="Analyze">
             @L["Common:Actions:Analyze"]
         </MudButton>
@@ -112,21 +129,30 @@
     private ConfigurationJsonEditorDocument _editorDocument = new("{}", []);
     private ConfigurationJsonDraftResult? _draft;
     private string _json = "{}";
+    private IReadOnlyList<LogicalPath> _redactedPaths = [];
+    private bool _blockedByPendingState;
 
     private string PathTitle => Node.RelativePath.Depth == 0
         ? L["State:Tree:Root"]
         : Node.RelativePath.ToCanonicalString();
 
-    private bool CanApply => _draft is { IsJsonValid: true, HasState: true };
+    private bool CanAnalyze => _editorDocument.CanAnalyze && !_blockedByPendingState;
+    private bool CanApply => CanAnalyze && _draft is { IsJsonValid: true, HasState: true };
 
     protected override void OnInitialized()
     {
-        _editorDocument = DraftService.BuildEditorDocument(Definition, Node, EffectiveValue, PendingChanges);
+        _editorDocument = DraftService.BuildEditorDocument(Definition, Node, EffectiveValue, ScalarEffectiveValues, PendingChanges);
+        _redactedPaths = _editorDocument.RedactedPaths.Select(LogicalPath.Parse).ToArray();
+        _blockedByPendingState = _editorDocument.PendingStateUnavailable
+            || !StateStore.CanReplaceJsonEditorScope(Definition.DefinitionKey, Node.RelativePath, _redactedPaths);
         _json = _editorDocument.Json;
     }
 
     private void Analyze()
     {
+        if (!CanAnalyze)
+            return;
+
         _draft = DraftService.Analyze(new ConfigurationJsonDraftRequest
         {
             Definition = Definition,
@@ -136,8 +162,10 @@
             Json = _json,
             RedactedPaths = _editorDocument.RedactedPaths.ToHashSet(StringComparer.Ordinal),
             CompactChanges = CompactChanges
-        });
+        }, _editorDocument);
     }
+
+    private void InvalidateDraft() => _draft = null;
 
     private void Apply()
     {
@@ -146,7 +174,7 @@
             return;
         }
 
-        MudDialog.Close(DialogResult.Ok(_draft));
+        MudDialog.Close(DialogResult.Ok(new ConfigurationJsonEditResult(_draft!, _redactedPaths)));
     }
 
     private void Cancel()

@@ -220,19 +220,7 @@ internal sealed class ConfigurationJsonFileSourceWriter : IConfigurationJsonFile
         {
             var pathSegments = mutation.ConfigurationPath.Split(':', StringSplitOptions.RemoveEmptyEntries);
             var oldValue = Read(root, pathSegments);
-            if (mutation.MutationKind == ConfigurationMutationKind.Remove)
-            {
-                Remove(root, pathSegments);
-            }
-            else
-            {
-                ConfigurationJsonStructureValidator.ValidateNoCaseInsensitiveDuplicates(
-                    mutation.Value.Json,
-                    DOCUMENT_OPTIONS,
-                    "configuration mutation");
-                var newValue = JsonNode.Parse(mutation.Value.Json, documentOptions: DOCUMENT_OPTIONS);
-                Set(root, pathSegments, newValue);
-            }
+            ApplyPhysicalMutation(root, mutation);
 
             results.Add(new ConfigurationJsonFileMutationResult
             {
@@ -327,6 +315,31 @@ internal sealed class ConfigurationJsonFileSourceWriter : IConfigurationJsonFile
         finally
         {
             sourceLock.Release();
+        }
+    }
+
+    /// <summary>Uses the physical writer's exact path, casing, array, and removal rules without file I/O.</summary>
+    internal static string PreviewMutationBatch(string documentJson,
+        IReadOnlyList<ConfigurationJsonFileMutation> mutations)
+    {
+        ConfigurationJsonStructureValidator.ValidateNoCaseInsensitiveDuplicates(documentJson, DOCUMENT_OPTIONS, "configuration preview");
+        var root = JsonNode.Parse(documentJson, documentOptions: DOCUMENT_OPTIONS) ?? new JsonObject();
+        foreach (var mutation in mutations) ApplyPhysicalMutation(root, mutation);
+        return root.ToJsonString();
+    }
+
+    internal static ConfigurationStoredValue? ReadSection(string documentJson, string sectionPath) =>
+        Read(JsonNode.Parse(documentJson, documentOptions: DOCUMENT_OPTIONS), sectionPath.Split(':', StringSplitOptions.RemoveEmptyEntries));
+
+    private static void ApplyPhysicalMutation(JsonNode root, ConfigurationJsonFileMutation mutation)
+    {
+        var segments = mutation.ConfigurationPath.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        if (mutation.MutationKind == ConfigurationMutationKind.Remove) Remove(root, segments);
+        else
+        {
+            ConfigurationJsonStructureValidator.ValidateNoCaseInsensitiveDuplicates(
+                mutation.Value.Json, DOCUMENT_OPTIONS, "configuration mutation");
+            Set(root, segments, JsonNode.Parse(mutation.Value.Json, documentOptions: DOCUMENT_OPTIONS));
         }
     }
 

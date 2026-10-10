@@ -3,6 +3,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<ConfigurationUIResource> L
+@implements IDisposable
 
 <MudDialog>
     <DialogContent>
@@ -78,6 +79,8 @@
     private ConfigurationSourceChain? _chain;
     private string? _error;
     private bool _loading = true;
+    private bool _disposed;
+    private long _loadGeneration;
 
     protected override async Task OnInitializedAsync()
     {
@@ -86,8 +89,18 @@
 
     private async Task LoadAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var generation = ++_loadGeneration;
         _loading = true;
         var result = await Facade.GetSourceChainAsync(Definition.DefinitionKey, LogicalPath ?? Node.RelativePath);
+        if (_disposed || generation != _loadGeneration)
+        {
+            return;
+        }
         if (result.IsFailed(out var error, out var chain))
         {
             _error = error.Message;
@@ -112,11 +125,40 @@
             MaxWidth = MaxWidth.Medium,
             FullWidth = true
         });
+        if (_disposed)
+        {
+            dialog.Close();
+            return;
+        }
+
         var result = await dialog.Result;
+        if (_disposed)
+        {
+            return;
+        }
         if (result is { Canceled: false })
         {
-            Snackbar.Add(L["Sources:Edit:Saved"], Severity.Success);
+            var applied = result.Data as ConfigurationMutationGroupApplyResult;
+            var issues = applied?.PostCommitIssues ?? [];
+            Snackbar.Add(applied?.Status == ConfigurationMutationGroupApplyStatus.PartiallyApplied
+                    ? L["Group:PartiallyApplied"] : L["Sources:Edit:Saved"],
+                issues.Count == 0 && applied?.Status == ConfigurationMutationGroupApplyStatus.Applied ? Severity.Success : Severity.Warning);
             await LoadAsync();
+            if (!_disposed && issues.Count > 0)
+            {
+                var issueParameters = new DialogParameters<ConfigurationPostCommitIssuesDialog>();
+                issueParameters.Add(dialog => dialog.Issues, issues);
+                var issueDialog = await DialogService.ShowAsync<ConfigurationPostCommitIssuesDialog>(
+                    L["Dialogs:PostCommitIssues:Title"], issueParameters,
+                    ConfigurationPostCommitIssuesDialog.DefaultOptions);
+                if (_disposed)
+                {
+                    issueDialog.Close();
+                    return;
+                }
+
+                await issueDialog.Result;
+            }
         }
     }
 
@@ -138,5 +180,11 @@
     private void Close()
     {
         MudDialog.Close();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_loadGeneration;
     }
 }

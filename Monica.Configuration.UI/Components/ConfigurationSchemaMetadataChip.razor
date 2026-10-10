@@ -42,6 +42,14 @@
                 <MudText Typo="Typo.caption" Class="configuration-schema-hash-value">
                     @DisplayHash
                 </MudText>
+                @if (ValidationContract is not null)
+                {
+                    <MudText Typo="Typo.caption">@L["Validation:Capability", CapabilityText]</MudText>
+                    <MudText Typo="Typo.caption">
+                        @(string.IsNullOrWhiteSpace(ValidationContract.Revision)
+                            ? L["Validation:RevisionUnavailable"] : L["Validation:Revision", ValidationContract.Revision])
+                    </MudText>
+                }
             </MudStack>
         </div>
     </TooltipContent>
@@ -51,6 +59,8 @@
     [Parameter] public int SchemaVersion { get; set; }
     [Parameter] public int DefinitionRevision { get; set; }
     [Parameter] public string? SchemaHash { get; set; }
+    /// <summary>Gets the owner's executable contract when full definition metadata is available.</summary>
+    [Parameter] public ConfigurationValidationContract? ValidationContract { get; set; }
     [Parameter] public bool CompactLabel { get; set; }
     [Parameter] public Size Size { get; set; } = Size.Small;
     [Parameter] public Color Color { get; set; } = Color.Primary;
@@ -61,6 +71,13 @@
     private string ChipLabel => CompactLabel
         ? L["State:Definitions:SchemaVersionCompactChip", SchemaVersion]
         : L["State:Definitions:SchemaVersionChip", SchemaVersion, DefinitionRevision];
+
+    private string CapabilityText => ValidationContract?.Capability switch
+    {
+        ConfigurationValidationCapability.PortableOnly => L["Validation:CapabilityPortableOnly"].Value,
+        ConfigurationValidationCapability.ObjectCode => L["Validation:CapabilityObjectCode"].Value,
+        _ => L["Validation:CapabilityUnknown"].Value
+    };
 
     private string DisplayHash =>
         string.IsNullOrWhiteSpace(SchemaHash)

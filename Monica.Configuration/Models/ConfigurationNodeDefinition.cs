@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace Monica.Configuration.Models;
 
 /// <summary>
@@ -126,8 +124,7 @@ public sealed record ConfigurationNodeDefinition
             return false;
         }
 
-        if (TryNormalizeFromPortableEnumValues(value, out normalized)
-            || TryNormalizeFromRuntimeEnumType(value, out normalized))
+        if (TryNormalizeFromPortableEnumValues(value, out normalized))
         {
             return true;
         }
@@ -152,33 +149,4 @@ public sealed record ConfigurationNodeDefinition
         return false;
     }
 
-    private bool TryNormalizeFromRuntimeEnumType(string value, out string normalized)
-    {
-        var enumType = Type.GetType(ClrTypeName, throwOnError: false);
-        if (enumType?.IsEnum is not true)
-        {
-            normalized = value;
-            return false;
-        }
-
-        foreach (var name in Enum.GetNames(enumType))
-        {
-            if (string.Equals(name, value, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(ToInvariantEnumNumber(Enum.Parse(enumType, name)), value, StringComparison.OrdinalIgnoreCase))
-            {
-                normalized = name;
-                return true;
-            }
-        }
-
-        normalized = value;
-        return false;
-    }
-
-    private static string ToInvariantEnumNumber(object enumValue)
-    {
-        var underlyingType = Enum.GetUnderlyingType(enumValue.GetType());
-        var numericValue = Convert.ChangeType(enumValue, underlyingType, CultureInfo.InvariantCulture);
-        return Convert.ToString(numericValue, CultureInfo.InvariantCulture) ?? string.Empty;
-    }
 }

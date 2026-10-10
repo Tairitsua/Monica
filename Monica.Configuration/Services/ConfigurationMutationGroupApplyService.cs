@@ -17,6 +17,8 @@ namespace Monica.Configuration.Services;
 /// </summary>
 internal sealed partial class ConfigurationMutationGroupApplyService(
     ConfigurationMutationPlanner mutationPlanner,
+    ConfigurationRuntimeContext runtimeContext,
+    ConfigurationValidationCoordinator validationCoordinator,
     ConfigurationDefinitionResolver definitionResolver,
     IConfigurationEffectiveValueStore effectiveValueStore,
     IConfigurationMutationBatchStore batchStore,
@@ -69,14 +71,35 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
             MutationGroupId = groupId,
             Reason = reason
         };
-        var prepared = new List<PreparedConfigurationMutation>(request.Commands.Count);
-        foreach (var command in request.Commands)
+        var validationPlan = await BuildValidationPlanAsync(request, context, cancellationToken, throwOnExecutionFault: true);
+        var prepared = validationPlan.Mutations;
+        var validationPreview = validationPlan.Preview;
+        if (!string.IsNullOrEmpty(request.ExpectedValidationFingerprint)
+            && !string.Equals(request.ExpectedValidationFingerprint, validationPreview.ValidationFingerprint, StringComparison.Ordinal))
         {
-            prepared.Add(await mutationPlanner.PrepareAsync(command, context, cancellationToken));
+            validationPreview = validationPreview with
+            {
+                Problems = [.. validationPreview.Problems, new ConfigurationMutationValidationProblem
+                {
+                    Code = "StaleAggregate",
+                    Message = "A contributing value or validation contract changed. Review the complete group again."
+                }]
+            };
         }
-
-        ValidateReviewedSourceChains(prepared);
-        ValidateTargets(prepared);
+        if (!validationPreview.CanApply)
+        {
+            return new ConfigurationMutationGroupApplyResult
+            {
+                Status = ConfigurationMutationGroupApplyStatus.Rejected,
+                ValidationPreview = validationPreview,
+                Outcomes = request.Commands.Select(command => new ConfigurationMutationOutcome
+                {
+                    RequestId = command.RequestId,
+                    Status = ConfigurationMutationOutcomeStatus.Skipped,
+                    ErrorMessage = "Complete configuration validation rejected the group before persistence."
+                }).ToArray()
+            };
+        }
         var monicaMutations = prepared
             .Where(static mutation => mutation.Command.Target is ConfigurationEffectiveStoreMutationTarget)
             .ToArray();
@@ -99,13 +122,16 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                 monicaMutations,
                 externalMutations.Length > 0,
                 cancellationToken);
-            var commit = await runtimeSnapshotLock.ExecuteAsync(token =>
+            var commit = await runtimeSnapshotLock.ExecuteAsync(async token =>
             {
                 ValidateReviewedSourceChains(monicaMutations);
-                return batchStore.CommitAsync(plan.CommitRequest, token);
+                await EnsureValidationBaselineAsync(request, context, validationPreview.ValidationFingerprint, token);
+                return await batchStore.CommitAsync(plan.CommitRequest, token);
             }, cancellationToken);
             mutationGroup = commit.MutationGroup;
             committedDocuments = commit.Documents;
+            foreach (var document in commit.Documents.Values)
+                validationPlan.DocumentVersions[document.DefinitionKey] = document.Version;
             monicaPersistenceFailed = commit.Failure is not null;
             postCommitIssues.AddRange(commit.PostCommitIssues);
             var appliedRequestIds = commit.AppliedRequestIds.ToHashSet(StringComparer.Ordinal);
@@ -122,7 +148,8 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                     metricsRecorder.RecordMutation(effectiveValueStore.Descriptor.StoreKey);
                 }
                 else if (commit.Failure is { } failure
-                         && string.Equals(failure.RequestId, planned.RequestId, StringComparison.Ordinal))
+                         && plan.CommitRequest.Items.Any(item => item.RequestIds.Contains(failure.RequestId)
+                             && item.RequestIds.Contains(planned.RequestId)))
                 {
                     outcomeByRequestId[planned.RequestId] = new ConfigurationMutationOutcome
                     {
@@ -144,6 +171,8 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
         }
         else
         {
+            await runtimeSnapshotLock.ExecuteAsync(token =>
+                EnsureValidationBaselineAsync(request, context, validationPreview.ValidationFingerprint, token), cancellationToken);
             mutationGroup = await mutationGroupService.BeginAsync(
                 NormalizeLabel(request.Label, createdTime),
                 reason,
@@ -172,6 +201,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                     context,
                     outcomeByRequestId,
                     postCommitIssues,
+                    validationPlan,
                     cancellationToken);
             }
         }
@@ -219,7 +249,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                     Kind = ConfigurationPostCommitIssueKind.LocalReload,
                     Source = nameof(ConfigurationMutationGroupApplyService),
                     Message = "External configuration sources were saved, but the current process could not reload them.",
-                    Detail = ex.ToString()
+                    Detail = "See host diagnostics for the runtime reload failure."
                 });
             }
         }
@@ -273,7 +303,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                         Kind = ConfigurationPostCommitIssueKind.UnifiedVersionCapture,
                         Source = nameof(IConfigurationUnifiedVersionCoordinator),
                         Message = "Configuration values were applied, but the unified-version snapshot could not be persisted.",
-                        Detail = ex.ToString()
+                        Detail = "See host diagnostics for the unified-version capture failure."
                     });
                 }
             }, cancellationToken);
@@ -360,7 +390,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                     Kind = ConfigurationPostCommitIssueKind.LocalReload,
                     Source = nameof(ConfigurationMutationGroupApplyService),
                     Message = $"Configuration '{document.DefinitionKey}' was saved, but the current process could not reload it.",
-                    Detail = ex.ToString()
+                    Detail = "See host diagnostics for the local reload failure."
                 });
             }
         }
@@ -405,10 +435,10 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
             {
                 using var document = JsonDocument.Parse(expected.Json);
             }
-            catch (JsonException ex)
+            catch (JsonException)
             {
                 throw new ConfigurationValidationFailedException(
-                    $"Expected effective value for '{expected.DefinitionKey}' is not valid JSON: {ex.Message}");
+                    "An expected effective value is not valid JSON.");
             }
         }
     }

@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Abstractions;
@@ -15,6 +17,48 @@ namespace Test.Monica.Configuration.Services.Support;
 
 public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
 {
+    [Theory]
+    [InlineData(ConfigurationValidationCapability.Unknown)]
+    [InlineData(ConfigurationValidationCapability.ObjectCode)]
+    public async Task CreateAsync_WhenRemoteOwnerHasNoLocalExecutableAuthority_ShouldBlockSchemaOnlyRollback(
+        ConfigurationValidationCapability capability)
+    {
+        var definition = CreateDefinition("Definition.Remote", "Remote") with
+        {
+            Origin = ConfigurationDefinitionOrigin.PublishedMetadata,
+            ValidationContract = new ConfigurationValidationContract { Capability = capability, Revision = "remote-revision" }
+        };
+        var fixture = CreateFixture([definition], [CreateEffectiveDocument(definition, workerId: 1, version: 2)],
+            new Dictionary<string, int> { [definition.DefinitionKey] = 1 });
+
+        var preview = await fixture.Factory.CreateAsync(CreateSnapshot((definition, "{\"WorkerId\":2}")),
+            TestContext.Current.CancellationToken);
+
+        preview.Targets.Should().ContainSingle().Which.Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected);
+        preview.ValidationReports.Should().ContainSingle().Which.Coverage.Should().Be(ConfigurationValidationCoverage.SchemaOnly);
+        preview.SkippedCount.Should().Be(0);
+        preview.BlockedCount.Should().Be(1);
+        preview.CanApply.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenOneKnownCapturedValueIsInvalid_ShouldBlockValidSiblingInsteadOfSkippingInvalidOwner()
+    {
+        var valid = CreateDefinition("Definition.Valid", "Valid");
+        var invalid = CreateDefinition("Definition.Invalid", "Invalid");
+        var fixture = CreateFixture([valid, invalid],
+            [CreateEffectiveDocument(valid, workerId: 1, version: 2), CreateEffectiveDocument(invalid, workerId: 1, version: 2)],
+            new Dictionary<string, int> { [valid.DefinitionKey] = 1, [invalid.DefinitionKey] = 1 });
+
+        var preview = await fixture.Factory.CreateAsync(CreateSnapshot((valid, "{\"WorkerId\":2}"), (invalid, "{\"WorkerId\":\"invalid\"}")),
+            TestContext.Current.CancellationToken);
+
+        preview.Targets[0].Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.Ready);
+        preview.Targets[1].Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected);
+        preview.SkippedDefinitionKeys.Should().BeEmpty();
+        preview.CanApply.Should().BeFalse();
+    }
+
     [Fact]
     public async Task CreateAsync_WhenSnapshotContainsAvailableAndMissingDefinitions_ShouldUseOneBulkReadAndPreserveTargetOrder()
     {
@@ -51,8 +95,8 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         preview.ChangeCount.Should().Be(1);
         preview.BlockedCount.Should().Be(0);
         preview.CanApply.Should().BeTrue();
-        preview.PreviewFingerprint.Should().Be(
-            ConfigurationUnifiedVersionRollbackPreviewFingerprint.Compute(snapshot.Summary.Version, preview.Targets));
+        var expectedToken = Encoding.UTF8.GetBytes($"{ConfigurationUnifiedVersionRollbackPreviewFingerprint.Compute(snapshot.Summary.Version, preview.Targets)}|test-complete-group");
+        preview.PreviewFingerprint.Should().Be($"sha256:{Convert.ToHexString(SHA256.HashData(expectedToken)).ToLowerInvariant()}");
         await fixture.EffectiveValueStore.Received(1).GetManyAsync(
             Arg.Is<IReadOnlyList<string>>(keys => keys.SequenceEqual(new[]
             {
@@ -88,7 +132,7 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
     }
 
     [Fact]
-    public async Task CreateAsync_WhenCapturedValueLacksRequiredScalar_ShouldSkipAndReportIncompatibleValue()
+    public async Task CreateAsync_WhenCapturedValueLacksRequiredScalar_ShouldBlockEntireRollback()
     {
         var definition = CreateDefinition("Definition.Evolved", "Evolved");
         var document = CreateEffectiveDocument(definition, workerId: 2, version: 51);
@@ -104,15 +148,16 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         var preview = await fixture.Factory.CreateAsync(snapshot, TestContext.Current.CancellationToken);
 
         var target = preview.Targets.Should().ContainSingle().Which;
-        target.Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.IncompatibleValue);
-        target.IsSkipped.Should().BeTrue();
+        target.Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected);
+        target.IsSkipped.Should().BeFalse();
         target.ValidationIssues.Should().NotBeEmpty();
-        preview.SkippedDefinitionKeys.Should().Equal(definition.DefinitionKey);
-        preview.BlockedCount.Should().Be(0);
+        preview.SkippedDefinitionKeys.Should().BeEmpty();
+        preview.BlockedCount.Should().Be(1);
+        preview.CanApply.Should().BeFalse();
     }
 
     [Fact]
-    public async Task CreateAsync_WhenCapturedValueViolatesScalarKind_ShouldSkipAndReportIncompatibleValue()
+    public async Task CreateAsync_WhenCapturedValueViolatesScalarKind_ShouldBlockEntireRollback()
     {
         var definition = CreateDefinition("Definition.Evolved", "Evolved");
         var document = CreateEffectiveDocument(definition, workerId: 2, version: 51);
@@ -128,11 +173,12 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         var preview = await fixture.Factory.CreateAsync(snapshot, TestContext.Current.CancellationToken);
 
         preview.Targets.Should().ContainSingle().Which.Status
-            .Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.IncompatibleValue);
+            .Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected);
+        preview.CanApply.Should().BeFalse();
     }
 
     [Fact]
-    public async Task CreateAsync_WhenDriftedSchemaAndValueIsIncompatible_ShouldKeepSkipReasonVisible()
+    public async Task CreateAsync_WhenDriftedSchemaAndValueIsIncompatible_ShouldKeepBlockingReasonVisible()
     {
         // Regression for the 2026-09-17 report: schema drift used to blank the incompatibility reason
         // for every definition whose captured SchemaHash evolved, so skipped definitions surfaced only
@@ -165,7 +211,7 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         var preview = await fixture.Factory.CreateAsync(snapshot, TestContext.Current.CancellationToken);
 
         var target = preview.Targets.Should().ContainSingle().Which;
-        target.Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.IncompatibleValue);
+        target.Status.Should().Be(ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected);
         var issue = target.ValidationIssues.Should().ContainSingle().Which;
         issue.DetailsHidden.Should().BeFalse();
         issue.IsSensitive.Should().BeFalse();
@@ -182,7 +228,7 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         var definition = CreateDefinition(
             "Definition.ListWithNulls",
             "ListWithNulls",
-            TestConfigurationFactory.RootNode());
+            CreateListWithNullableTagRoot());
         var document = new ConfigurationEffectiveValueDocument
         {
             DefinitionKey = definition.DefinitionKey,
@@ -356,7 +402,7 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
         var reloadCoordinator = new TestReloadCoordinator(documentsByKey);
         var effectiveSnapshotReader = new ConfigurationEffectiveSnapshotReader(
             effectiveValueStore,
-            new ConfigurationEffectiveValueSeedFactory(runtimeContext),
+            ConfigurationValidationTestServices.CreateSeedFactory(runtimeContext),
             reloadCoordinator);
 
         var monicaSource = new ConfigurationSourceDescriptor
@@ -402,17 +448,55 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
                 new ConfigurationStoredValueCodec()),
             new ConfigurationPathProjector(),
             new MonicaConfigurationProviderAccessor());
+        // Persistence-plan tests delegate the separate group preview boundary; executable object behavior
+        // is exercised by the complete hosts in ConfigurationMutationObjectValidationTests.
+        var groupApplyService = Substitute.For<IConfigurationMutationGroupApplyService>();
+        groupApplyService.PreviewAsync(Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ConfigurationMutationGroupValidationPreview
+            {
+                ValidationFingerprint = "test-complete-group",
+                Definitions = call.ArgAt<ConfigurationMutationGroupApplyRequest>(0).Commands
+                    .Select(static command => command.DefinitionKey).Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Select(key => new ConfigurationCandidateValidationReport
+                    {
+                        DefinitionKey = key, DefinitionDisplayName = key, ScopePath = LogicalPath.Root,
+                        Scope = ConfigurationValidationScope.CompleteAggregate, Coverage = ConfigurationValidationCoverage.Complete
+                    }).ToArray()
+            });
         var factory = new ConfigurationUnifiedVersionRollbackPreviewFactory(
             definitionResolver,
             effectiveSnapshotReader,
-            new ConfigurationValidationCoordinator(new ConfigurationValueValidationEngine()),
-            persistencePlanner);
+            ConfigurationValidationTestServices.CreateCoordinator(),
+            persistencePlanner,
+            groupApplyService);
         return new PreviewFactoryFixture(factory, effectiveValueStore);
     }
 
     private static ConfigurationDefinition CreateDefinition(string definitionKey, string sectionPath)
     {
-        return CreateDefinition(definitionKey, sectionPath, TestConfigurationFactory.RootNode());
+        // These planning fixtures publish only WorkerId. Portable authority requires every declared
+        // member to be present; unrelated collection templates would make the captured value incomplete.
+        return CreateDefinition(definitionKey, sectionPath, TestConfigurationFactory.RootNode() with
+        {
+            Children = [TestConfigurationFactory.ScalarNode("WorkerId", typeof(int), ConfigurationValueKind.Integer)]
+        });
+    }
+
+    private static ConfigurationNodeDefinition CreateListWithNullableTagRoot()
+    {
+        var itemPath = new LogicalPath([new PropertySegment("Services"), new ListItemKeySegment("*")]);
+        return TestConfigurationFactory.RootNode() with
+        {
+            Children =
+            [
+                TestConfigurationFactory.ScalarNode("WorkerId", typeof(int), ConfigurationValueKind.Integer),
+                TestConfigurationFactory.ListNode("Services", TestConfigurationFactory.ObjectNode("Item",
+                    [
+                        TestConfigurationFactory.ScalarNode("Name", typeof(string), ConfigurationValueKind.String),
+                        TestConfigurationFactory.ScalarNode("Tag", typeof(string), ConfigurationValueKind.String)
+                    ], itemPath, "Test:App:Services:*"), "Name")
+            ]
+        };
     }
 
     private static ConfigurationDefinition CreateDefinition(
@@ -427,6 +511,10 @@ public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
             DisplayName = definitionKey,
             SchemaVersion = 1,
             DefinitionRevision = 1,
+            ValidationContract = new ConfigurationValidationContract
+            {
+                Capability = ConfigurationValidationCapability.PortableOnly, Revision = "test-portable-contract"
+            },
             Root = root
         };
         return definition with

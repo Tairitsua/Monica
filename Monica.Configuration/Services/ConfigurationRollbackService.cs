@@ -125,7 +125,8 @@ internal sealed class ConfigurationRollbackService(
             Label = label,
             Reason = context.Reason,
             Context = context with { MutationGroupId = null },
-            Commands = commands
+            Commands = commands,
+            ExpectedValidationFingerprint = plan.Preview.ValidationFingerprint
         }, cancellationToken);
     }
 
@@ -245,13 +246,29 @@ internal sealed class ConfigurationRollbackService(
             });
         }
 
-        return new HistoryRollbackPlan(
+        var plan = new HistoryRollbackPlan(
             new ConfigurationHistoryRollbackPreview
             {
                 PlanToken = ComputePlanToken(tokenEntries),
                 CurrentValuesByHistoryId = currentValues
             },
             targets);
+        var validation = await mutationGroupApplyService.PreviewAsync(new ConfigurationMutationGroupApplyRequest
+        {
+            Label = "Rollback validation preview",
+            Commands = BuildCommands(rows, plan)
+        }, cancellationToken);
+        var tokenBytes = Encoding.UTF8.GetBytes($"{plan.Preview.PlanToken}|{validation.ValidationFingerprint}");
+        return plan with
+        {
+            Preview = plan.Preview with
+            {
+                PlanToken = $"sha256:{Convert.ToHexString(SHA256.HashData(tokenBytes)).ToLowerInvariant()}",
+                ValidationReports = validation.Definitions,
+                Problems = validation.Problems,
+                ValidationFingerprint = validation.ValidationFingerprint
+            }
+        };
     }
 
     private async Task<IReadOnlyDictionary<string, ConfigurationDefinition>> ResolveDefinitionsAsync(
@@ -570,7 +587,7 @@ internal sealed class ConfigurationRollbackService(
         {
             await groupService.MarkRolledBackAsync(
                 originalGroupId,
-                applyResult.MutationGroup.GroupId,
+                applyResult.MutationGroup!.GroupId,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
             return applyResult;
@@ -581,7 +598,7 @@ internal sealed class ConfigurationRollbackService(
                 ex,
                 "Configuration group {OriginalGroupId} was rolled back by {RollbackGroupId}, but the original group audit marker could not be updated.",
                 originalGroupId,
-                applyResult.MutationGroup.GroupId);
+                applyResult.MutationGroup!.GroupId);
             return applyResult with
             {
                 PostCommitIssues =
@@ -592,7 +609,7 @@ internal sealed class ConfigurationRollbackService(
                         Kind = ConfigurationPostCommitIssueKind.AuditFinalization,
                         Source = groupService.GetType().Name,
                         Message = "The rollback was applied, but the original mutation-group audit marker could not be updated.",
-                        Detail = ex.ToString()
+                        Detail = "Review server logs for the original mutation-group audit failure."
                     }
                 ]
             };

@@ -1,177 +1,49 @@
-using System.Globalization;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Monica.Configuration.Models;
-using Monica.Configuration.Serialization;
 
 namespace Monica.Configuration.Services.Support;
 
 /// <summary>
-/// Creates first-run effective value documents from host bootstrap configuration and CLR defaults.
+/// Creates first-run values from actual local defaults and the source-faithful bootstrap stack.
+/// Executable types are supplied by local discovery; published type names are never loaded.
 /// </summary>
-public sealed class ConfigurationEffectiveValueSeedFactory(ConfigurationRuntimeContext runtimeContext)
+public sealed class ConfigurationEffectiveValueSeedFactory
 {
-    private static readonly JsonSerializerOptions WRITE_OPTIONS = ConfigurationPersistedJsonOptions.ReadableValue;
+    private readonly ConfigurationRuntimeContext _runtimeContext;
+    private readonly ConfigurationLocalDefinitionRegistry _localRegistry;
+    private readonly ConfigurationObjectMaterializer _materializer;
 
-    /// <summary>
-    /// Creates a seed JSON document for a configuration definition.
-    /// </summary>
+    internal ConfigurationEffectiveValueSeedFactory(ConfigurationRuntimeContext runtimeContext,
+        ConfigurationLocalDefinitionRegistry localRegistry, ConfigurationObjectMaterializer materializer)
+    {
+        _runtimeContext = runtimeContext;
+        _localRegistry = localRegistry;
+        _materializer = materializer;
+    }
+
+    /// <summary>Creates complete seed JSON through production binding and declared configuration aliases.</summary>
+    /// <param name="definition">The locally discovered owner.</param>
+    /// <returns>The full bound value, including constructor defaults and explicit empty or null values.</returns>
     public string CreateSeedJson(ConfigurationDefinition definition)
     {
-        var defaults = CreateDefaultNode(definition) ?? new JsonObject();
-        var hostValues = BuildNodeFromConfiguration(definition.Root, definition.SectionPath);
-        var merged = hostValues is null ? defaults : Merge(defaults, hostValues);
-        var normalized = ConfigurationRegexTextCodec.NormalizeJsonNode(definition.Root, merged) ?? merged;
-        return normalized.ToJsonString(WRITE_OPTIONS);
+        _localRegistry.GetRequired(definition);
+        return _materializer.Snapshot(definition, _materializer.Materialize(definition, _runtimeContext.Configuration));
     }
 
-    /// <summary>
-    /// Creates a JSON snapshot for one schema node from the current effective Microsoft configuration stack.
-    /// </summary>
-    /// <param name="node">The schema node to read.</param>
-    /// <param name="configurationPath">The Microsoft configuration path for the node.</param>
-    /// <returns>The runtime JSON snapshot.</returns>
+    /// <summary>Reads a schema-owned source value without executing remote object types.</summary>
+    /// <param name="node">The schema node to project.</param>
+    /// <param name="configurationPath">The Microsoft configuration path to read.</param>
+    /// <returns>A shape-preserving JSON source snapshot.</returns>
     public string CreateRuntimeJson(ConfigurationNodeDefinition node, string configurationPath)
     {
-        var current = BuildNodeFromConfiguration(node, configurationPath) ?? CreateEmptyNode(node);
-        var normalized = ConfigurationRegexTextCodec.NormalizeJsonNode(node, current) ?? current;
-        return normalized.ToJsonString(WRITE_OPTIONS);
-    }
-
-    private static JsonNode? CreateDefaultNode(ConfigurationDefinition definition)
-    {
-        var type = Type.GetType(definition.ClrTypeName, throwOnError: false);
-        if (type is null || type.IsAbstract)
+        return _materializer.ReadConfigurationJson(new ConfigurationDefinition
         {
-            return new JsonObject();
-        }
-
-        try
-        {
-            var instance = Activator.CreateInstance(type);
-            return JsonSerializer.SerializeToNode(instance, type, WRITE_OPTIONS) ?? new JsonObject();
-        }
-        catch (Exception ex) when (ex is MissingMethodException or MemberAccessException or TargetInvocationException)
-        {
-            return new JsonObject();
-        }
-    }
-
-    private JsonNode? BuildNodeFromConfiguration(ConfigurationNodeDefinition node, string configurationPath)
-    {
-        return node.NodeKind switch
-        {
-            ConfigurationNodeKind.Scalar => BuildScalarNode(node, configurationPath),
-            ConfigurationNodeKind.Object => BuildObjectNode(node, configurationPath),
-            ConfigurationNodeKind.Dictionary => BuildDictionaryNode(node, configurationPath),
-            ConfigurationNodeKind.List => BuildListNode(node, configurationPath),
-            _ => null
-        };
-    }
-
-    private JsonNode? BuildScalarNode(ConfigurationNodeDefinition node, string configurationPath)
-    {
-        var value = runtimeContext.Configuration[configurationPath];
-        if (value is null)
-        {
-            return null;
-        }
-
-        return node.ValueKind switch
-        {
-            ConfigurationValueKind.Boolean when bool.TryParse(value, out var parsed) => JsonValue.Create(parsed),
-            ConfigurationValueKind.Integer when long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) => JsonValue.Create(parsed),
-            ConfigurationValueKind.Decimal when decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed) => JsonValue.Create(parsed),
-            ConfigurationValueKind.Floating when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => JsonValue.Create(parsed),
-            _ => JsonValue.Create(ConfigurationRegexTextCodec.NormalizeDisplayValue(node, value))
-        };
-    }
-
-    private JsonNode? BuildObjectNode(ConfigurationNodeDefinition node, string configurationPath)
-    {
-        var result = new JsonObject();
-        foreach (var child in node.Children)
-        {
-            var childPath = string.IsNullOrWhiteSpace(configurationPath)
-                ? child.Name
-                : $"{configurationPath}:{child.Name}";
-            var childNode = BuildNodeFromConfiguration(child, childPath);
-            if (childNode is not null)
-            {
-                result[child.Name] = childNode;
-            }
-        }
-
-        return result.Count == 0 ? null : result;
-    }
-
-    private JsonNode? BuildDictionaryNode(ConfigurationNodeDefinition node, string configurationPath)
-    {
-        if (node.DictionaryTemplate is null)
-        {
-            return null;
-        }
-
-        var result = new JsonObject();
-        foreach (var child in runtimeContext.Configuration.GetSection(configurationPath).GetChildren())
-        {
-            var childNode = BuildNodeFromConfiguration(node.DictionaryTemplate.ValueTemplate, child.Path);
-            if (childNode is not null)
-            {
-                result[child.Key] = childNode;
-            }
-        }
-
-        return result.Count == 0 ? null : result;
-    }
-
-    private JsonNode? BuildListNode(ConfigurationNodeDefinition node, string configurationPath)
-    {
-        if (node.ListTemplate is null)
-        {
-            return null;
-        }
-
-        var result = new JsonArray();
-        foreach (var child in runtimeContext.Configuration.GetSection(configurationPath).GetChildren())
-        {
-            var childNode = BuildNodeFromConfiguration(node.ListTemplate.ItemTemplate, child.Path);
-            result.Add(childNode);
-        }
-
-        return result.Count == 0 ? null : result;
-    }
-
-    private static JsonNode CreateEmptyNode(ConfigurationNodeDefinition node)
-    {
-        return node.NodeKind switch
-        {
-            ConfigurationNodeKind.List => new JsonArray(),
-            ConfigurationNodeKind.Object or ConfigurationNodeKind.Dictionary => new JsonObject(),
-            _ => JsonValue.Create((string?)null) ?? JsonValue.Create(string.Empty)
-        };
-    }
-
-    private static JsonNode Merge(JsonNode target, JsonNode source)
-    {
-        if (target is not JsonObject targetObject || source is not JsonObject sourceObject)
-        {
-            return source.DeepClone();
-        }
-
-        foreach (var (key, sourceValue) in sourceObject)
-        {
-            if (sourceValue is JsonObject sourceChild
-                && targetObject[key] is JsonObject targetChild)
-            {
-                targetObject[key] = Merge(targetChild, sourceChild);
-                continue;
-            }
-
-            targetObject[key] = sourceValue?.DeepClone();
-        }
-
-        return targetObject;
+            DefinitionKey = "source-snapshot",
+            SectionPath = configurationPath,
+            DisplayName = node.Name,
+            ClrTypeName = node.ClrTypeName,
+            FromProject = "source-snapshot",
+            SchemaHash = string.Empty,
+            Root = node
+        }, _runtimeContext.Configuration);
     }
 }

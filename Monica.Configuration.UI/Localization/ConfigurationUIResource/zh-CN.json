@@ -107,8 +107,6 @@
       "SaveBlockedMetadata": "至少有一个暂存配置定义不再具备完整的权威元数据，因此当前无法保存。请先修复并刷新该定义。"
     },
     "RuntimeValidation": {
-      "Title": "运行时验证",
-      "Valid": "运行时配置验证通过。",
       "ValidSummary": "未发现运行时验证异常。",
       "InvalidSummary": "发现 {0} 个运行时验证异常，涉及 {1} 个配置定义。",
       "WarningTitle": "运行时配置需要处理",
@@ -863,6 +861,8 @@
     "JsonEditor": {
       "Title": "编辑 JSON",
       "Json": "JSON",
+      "BaselineUnavailable": "无法安全确认当前对象或集合的结构，暂不可编辑 JSON。请改为逐项编辑已知的标量值。",
+      "PendingStateUnavailable": "无法在此安全保留已暂存的敏感或结构修改。请先保存或撤销这些修改，再编辑 JSON。",
       "NoState": "当前 JSON 不会产生暂存修改或验证异常。"
     },
     "Report": {
@@ -933,5 +933,50 @@
     "NoMinimum": "无下限",
     "NoMaximum": "无上限",
     "Unknown": "未知验证规则。"
+  },
+  "Validation": {
+    "FragmentNotice": "此编辑仅检查当前片段和可移植的架构规则。保存分组前，会对最终生效的完整配置执行对象代码规则。",
+    "Coverage": "验证覆盖范围",
+    "Complete": "完整验证",
+    "SchemaOnly": "仅架构检查",
+    "Failed": "验证未能完成",
+    "Valid": "完整配置满足当前规则。",
+    "Invalid": "完整配置存在验证问题。",
+    "SchemaValid": "可移植的架构检查通过，但尚未确认完整对象有效。",
+    "SchemaInvalid": "可移植的架构检查发现问题，且尚未确认完整对象有效。",
+    "FailedNotice": "绑定、规则执行或验证契约失败。请处理所报告的问题后重试。",
+    "Revision": "所有者验证版本：{0}",
+    "RevisionUnavailable": "所有者验证版本不可用。",
+    "Fragment": "配置片段",
+    "CompleteAggregate": "完整生效配置",
+    "ActualOptions": "实际默认选项",
+    "Scope": "验证输入：{0}",
+    "RuleSchema": "可移植架构规则",
+    "RuleCode": "对象代码规则",
+    "RuleContract": "验证契约失败",
+    "RuleExecution": "验证执行失败",
+    "PreviewRequired": "请先验证最终分组再保存。修改草稿会使预览失效。",
+    "PreviewPending": "正在验证最终生效的完整配置…",
+    "PreviewBlocked": "此操作无法应用。请查看下方各配置的完整报告和执行计划问题。",
+    "PreviewRefresh": "刷新验证",
+    "SourceTitle": "当前生效来源",
+    "OptionsTitle": "最近观测的默认选项",
+    "OptionsNotice": "这些诊断描述 Configure 和 PostConfigure 后最近一次观测的实际创建，不代表所有使用者或缓存实例。刷新此视图不会创建选项。",
+    "NoObserved": "尚未观测到实际默认选项实例。",
+    "ObservedAt": "观测时间：{0}",
+    "Attempt": "创建尝试：{0}",
+    "DefaultName": "默认选项名称",
+    "Unavailable": "验证诊断不可用。",
+    "Pending": "等待验证。",
+    "SchemaOnlySummary": "无法执行完整验证。",
+    "FailedSummary": "验证执行失败。",
+    "Capability": "所有者验证能力：{0}",
+    "CapabilityUnknown": "未知",
+    "CapabilityPortableOnly": "仅可移植架构规则",
+    "CapabilityObjectCode": "对象代码规则",
+    "NotApplied": "提交的修改未能应用。请检查当前配置，并刷新预览后重试。",
+    "StoredDocument": "物理目标中保存的文档",
+    "EffectiveAggregate": "最终生效的完整配置",
+    "MaskedChange": "此写入被其他来源覆盖，或不会改变生效配置。保存的文档仍必须满足自身的完整契约。"
   }
 }

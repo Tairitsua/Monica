@@ -107,8 +107,6 @@
       "SaveBlockedMetadata": "Save is unavailable because at least one staged definition no longer has complete authoritative metadata. Repair and refresh it first."
     },
     "RuntimeValidation": {
-      "Title": "Runtime validation",
-      "Valid": "Runtime configuration is valid.",
       "ValidSummary": "No runtime validation issues were found.",
       "InvalidSummary": "{0} runtime validation issues across {1} definitions.",
       "WarningTitle": "Runtime configuration requires attention",
@@ -863,6 +861,8 @@
     "JsonEditor": {
       "Title": "Edit JSON",
       "Json": "JSON",
+      "BaselineUnavailable": "The current object or collection structure cannot be established safely. JSON editing is unavailable; edit known scalar values individually instead.",
+      "PendingStateUnavailable": "Staged sensitive or structural edits cannot be preserved safely here. Save or undo those edits before editing JSON.",
       "NoState": "The JSON does not produce any staged changes or validation issues."
     },
     "Report": {
@@ -933,5 +933,50 @@
     "NoMinimum": "no minimum",
     "NoMaximum": "no maximum",
     "Unknown": "Unknown validation rule."
+  },
+  "Validation": {
+    "FragmentNotice": "This edit checks only the displayed fragment and portable schema rules. Complete object rules are checked against the final effective aggregate before saving the group.",
+    "Coverage": "Validation coverage",
+    "Complete": "Complete validation",
+    "SchemaOnly": "Schema checks only",
+    "Failed": "Validation could not complete",
+    "Valid": "The complete aggregate satisfies the current rules.",
+    "Invalid": "The complete aggregate has validation issues.",
+    "SchemaValid": "Portable schema checks passed; complete object validity has not been established.",
+    "SchemaInvalid": "Portable schema checks found issues; complete object validity has not been established.",
+    "FailedNotice": "Binding, rule execution, or the validation contract failed. Correct the reported problem before retrying.",
+    "Revision": "Owner validation revision: {0}",
+    "RevisionUnavailable": "Owner validation revision is unavailable.",
+    "Fragment": "Fragment",
+    "CompleteAggregate": "Complete effective aggregate",
+    "ActualOptions": "Actual default options",
+    "Scope": "Validated input: {0}",
+    "RuleSchema": "Portable schema rule",
+    "RuleCode": "Object code rule",
+    "RuleContract": "Validation contract failure",
+    "RuleExecution": "Validation execution failure",
+    "PreviewRequired": "Validate the final group before saving. Changing the draft invalidates the preview.",
+    "PreviewPending": "Validating the final effective aggregate…",
+    "PreviewBlocked": "This operation cannot be applied. Review all definition reports and plan problems below.",
+    "PreviewRefresh": "Refresh validation",
+    "SourceTitle": "Current effective sources",
+    "OptionsTitle": "Latest observed default options",
+    "OptionsNotice": "These diagnostics describe the latest observed creation after Configure and PostConfigure. They do not describe every consumer or cached instance, and refreshing this view does not create options.",
+    "NoObserved": "No actual default-options instance has been observed.",
+    "ObservedAt": "Observed at {0}",
+    "Attempt": "Creation attempt: {0}",
+    "DefaultName": "Default options name",
+    "Unavailable": "Validation diagnostics are unavailable.",
+    "Pending": "Validation is pending.",
+    "SchemaOnlySummary": "Complete validation is unavailable.",
+    "FailedSummary": "Validation execution failed.",
+    "Capability": "Owner validation capability: {0}",
+    "CapabilityUnknown": "Unknown",
+    "CapabilityPortableOnly": "Portable schema only",
+    "CapabilityObjectCode": "Object code rules",
+    "NotApplied": "The submitted changes were not applied. Review the current configuration and retry with a fresh preview.",
+    "StoredDocument": "Stored document at the physical target",
+    "EffectiveAggregate": "Final effective aggregate",
+    "MaskedChange": "This write is masked by another source or produces no effective change. The stored document must still satisfy its own complete contract."
   }
 }

@@ -1,5 +1,6 @@
 @inject ConfigurationFacade Facade
 @inject IStringLocalizer<ConfigurationUIResource> L
+@implements IDisposable
 
 <MudDialog>
     <DialogContent>
@@ -49,7 +50,7 @@
         }
         <MudButton Variant="Variant.Text"
                    StartIcon="@Icons.Material.Filled.Refresh"
-                   OnClick="LoadPreviewAsync"
+                   OnClick="() => LoadPreviewAsync()"
                    Disabled="@(_loading || _saving || _reloading)">
             @L["Common:Actions:Refresh"]
         </MudButton>
@@ -73,9 +74,13 @@
     private bool _loading = true;
     private bool _saving;
     private bool _reloading;
+    private bool _disposed;
+    private long _previewGeneration;
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _previewCancellation;
 
     private bool CanApply =>
-        !_saving && !_reloading && _preview?.CanApply == true;
+        !_disposed && !_loading && !_saving && !_reloading && _preview?.CanApply == true;
 
     private bool HasRuntimeOutOfSync => _preview?.Targets.Any(static target =>
         target.Status == ConfigurationUnifiedVersionApplyTargetStatus.RuntimeOutOfSync) == true;
@@ -84,6 +89,7 @@
 
     private Severity PreviewMessageSeverity => _preview switch
     {
+        { } preview when preview.Problems.Count > 0 || preview.ValidationReports.Any(report => !report.IsValid) => Severity.Error,
         { BlockedCount: > 0 } => Severity.Error,
         { HasChanges: false, SkippedCount: > 0 } => Severity.Warning,
         { HasChanges: false } => Severity.Info,
@@ -94,6 +100,10 @@
 
     private string PreviewMessage => _preview switch
     {
+        { } preview when preview.ValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed) => L["Validation:FailedNotice"],
+        { } preview when preview.ValidationReports.Any(report => report.Coverage == ConfigurationValidationCoverage.SchemaOnly) => L["Validation:SchemaOnlySummary"],
+        { } preview when preview.ValidationReports.Any(report => !report.IsValid) => L["Validation:Invalid"],
+        { } preview when preview.Problems.Count > 0 => L["Validation:PreviewBlocked"],
         { BlockedCount: > 0 } => L["Versions:Rollback:Messages:Blocked"],
         { HasChanges: false, SkippedCount: > 0 } => L["Versions:Rollback:Messages:NoChangesSkipped", _preview.SkippedCount],
         { HasChanges: false } => L["Versions:Rollback:Messages:NoChanges"],
@@ -107,51 +117,92 @@
         await LoadPreviewAsync();
     }
 
-    private async Task LoadPreviewAsync()
+    private async Task LoadPreviewAsync(bool preserveError = false)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var generation = ++_previewGeneration;
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _previewCancellation = cancellation;
         _loading = true;
-        _error = null;
+        if (!preserveError)
+        {
+            _error = null;
+        }
         _preview = null;
         try
         {
-            var result = await Facade.PreviewUnifiedVersionRollbackAsync(Version);
+            var result = await Facade.PreviewUnifiedVersionRollbackAsync(Version, cancellation.Token);
+            if (_disposed || generation != _previewGeneration)
+            {
+                return;
+            }
+
             if (result.IsFailed(out var error, out var preview))
             {
-                _error = error.Message;
+                _error = preserveError && !string.IsNullOrWhiteSpace(_error)
+                    ? $"{_error}{Environment.NewLine}{error.Message}" : error.Message;
+                _preview = result.Data;
                 return;
             }
 
             _preview = preview;
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
         finally
         {
-            _loading = false;
+            if (!_disposed && generation == _previewGeneration)
+            {
+                _loading = false;
+            }
         }
     }
 
     private async Task ApplyAsync()
     {
-        if (_preview is null || !_preview.CanApply)
+        if (!CanApply || _preview is null)
         {
             return;
         }
 
         _saving = true;
         _error = null;
-        var result = await Facade.RollbackUnifiedVersionAsync(new ConfigurationUnifiedVersionRollbackRequest
+        try
         {
-            Version = Version,
-            PreviewFingerprint = _preview.PreviewFingerprint,
-            Reason = _reason
-        });
-        _saving = false;
-        if (result.IsFailed(out var error, out var rollback))
-        {
-            _error = error.Message;
-            return;
-        }
+            var result = await Facade.RollbackUnifiedVersionAsync(new ConfigurationUnifiedVersionRollbackRequest
+            {
+                Version = Version,
+                PreviewFingerprint = _preview.PreviewFingerprint,
+                Reason = _reason
+            });
+            if (_disposed)
+            {
+                return;
+            }
 
-        MudDialog.Close(DialogResult.Ok(rollback));
+            if (result.IsFailed(out var error, out var rollback))
+            {
+                _error = error.Message;
+                await LoadPreviewAsync(preserveError: true);
+                return;
+            }
+
+            MudDialog.Close(DialogResult.Ok(rollback));
+        }
+        finally
+        {
+            if (!_disposed)
+            {
+                _saving = false;
+            }
+        }
     }
 
     private async Task ReloadAndRefreshAsync()
@@ -161,6 +212,10 @@
         try
         {
             var result = await Facade.ReloadRuntimeConfigurationAsync();
+            if (_disposed)
+            {
+                return;
+            }
             if (result.IsFailed(out var error, out _))
             {
                 _error = error.Message;
@@ -171,12 +226,25 @@
         }
         finally
         {
-            _reloading = false;
+            if (!_disposed)
+            {
+                _reloading = false;
+            }
         }
     }
 
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_previewGeneration;
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        _lifetime.Cancel();
+        _lifetime.Dispose();
     }
 }

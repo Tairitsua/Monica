@@ -7,6 +7,14 @@ namespace Monica.Configuration.Abstractions;
 /// </summary>
 public interface IConfigurationMutationGroupApplyService
 {
+    /// <summary>Previews complete effective aggregates and independently observable provider adoption states without writes.</summary>
+    /// <param name="request">The proposed commands and persistence targets.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The complete-group validation preview and its review fingerprint.</returns>
+    Task<ConfigurationMutationGroupValidationPreview> PreviewAsync(
+        ConfigurationMutationGroupApplyRequest request,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Applies one reviewed mutation group.
     /// </summary>

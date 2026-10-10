@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Options;
 using Monica.Configuration.Abstractions;
+using Monica.Configuration.Exceptions;
+using Monica.Configuration.Models;
 
 namespace Monica.Configuration.Services.Support;
 
@@ -8,7 +10,10 @@ namespace Monica.Configuration.Services.Support;
 /// </summary>
 /// <typeparam name="TOptions">The managed options type.</typeparam>
 internal sealed class MonicaConfigurationOptionsValidator<TOptions>(
-    IConfigurationRuntimeValidationService validationService,
+    IConfigurationDefinitionRegistry definitions,
+    ConfigurationValidationCoordinator validationCoordinator,
+    ConfigurationOptionsValidationDiagnostics diagnostics,
+    ConfigurationRuntimeValidationBehavior behavior,
     string definitionKey)
     : IValidateOptions<TOptions>
     where TOptions : class
@@ -21,9 +26,18 @@ internal sealed class MonicaConfigurationOptionsValidator<TOptions>(
             return ValidateOptionsResult.Skip;
         }
 
-        var report = validationService.GetReport(definitionKey);
-        return report.IsValid
-            ? ValidateOptionsResult.Success
-            : ValidateOptionsResult.Fail(report.Issues.Select(ConfigurationRuntimeValidationMessageFormatter.FormatOptionsIssue));
+        try
+        {
+            var definition = definitions.GetRequired(definitionKey);
+            var report = diagnostics.Record(definition, validationCoordinator.ValidateInstance(definition, options));
+            return report.IsValid || behavior == ConfigurationRuntimeValidationBehavior.DiagnosticOnly
+                ? ValidateOptionsResult.Success
+                : ValidateOptionsResult.Fail(report.Issues.Select(ConfigurationRuntimeValidationMessageFormatter.FormatOptionsIssue));
+        }
+        catch (ConfigurationValidationExecutionException fault)
+        {
+            diagnostics.RecordFault(definitionKey, fault);
+            throw;
+        }
     }
 }

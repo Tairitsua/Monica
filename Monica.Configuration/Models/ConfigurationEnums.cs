@@ -242,7 +242,12 @@ public enum ConfigurationMutationGroupApplyStatus
     /// <summary>
     /// At least one command was applied and at least one command failed or was skipped.
     /// </summary>
-    PartiallyApplied
+    PartiallyApplied,
+
+    /// <summary>
+    /// Validation rejected the group before values, history, or a mutation-group row were persisted.
+    /// </summary>
+    Rejected
 }
 
 /// <summary>

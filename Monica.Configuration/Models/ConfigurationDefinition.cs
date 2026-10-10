@@ -79,6 +79,11 @@ public sealed record ConfigurationDefinition
     public required ConfigurationNodeDefinition Root { get; init; }
 
     /// <summary>
+    /// Gets the owner's validation capability and executable revision. Missing historical metadata remains unknown.
+    /// </summary>
+    public ConfigurationValidationContract ValidationContract { get; init; } = new();
+
+    /// <summary>
     /// Gets where this definition was resolved from for the current process.
     /// </summary>
     public ConfigurationDefinitionOrigin Origin { get; init; } = ConfigurationDefinitionOrigin.LocalScan;
