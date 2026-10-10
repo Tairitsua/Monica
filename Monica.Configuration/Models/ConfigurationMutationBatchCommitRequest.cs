@@ -11,30 +11,31 @@ public sealed record ConfigurationMutationBatchCommitRequest
     public required ConfigurationMutationGroup MutationGroup { get; init; }
 
     /// <summary>
-    /// Gets prepared document and history steps in application order.
+    /// Gets one final document save per definition, ordered by the definition's first command.
     /// </summary>
     public IReadOnlyList<ConfigurationMutationBatchCommitItem> Items { get; init; } = [];
 }
 
 /// <summary>
-/// Couples one prepared document save with its matching history row.
+/// Couples one final aggregate save with every command and its ordered audit history.
+/// Staged intermediate documents are never persistence items.
 /// </summary>
 public sealed record ConfigurationMutationBatchCommitItem
 {
     /// <summary>
-    /// Gets the caller request identity.
+    /// Gets the caller request identities in this definition's command order.
     /// </summary>
-    public required string RequestId { get; init; }
+    public required IReadOnlyList<string> RequestIds { get; init; }
 
     /// <summary>
-    /// Gets the prepared document save.
+    /// Gets the final document save, with the observed baseline version as its concurrency guard.
     /// </summary>
     public required ConfigurationEffectiveValueSaveRequest SaveRequest { get; init; }
 
     /// <summary>
-    /// Gets the matching history row.
+    /// Gets one history row per request, preserving staging order and sharing the final document version.
     /// </summary>
-    public required ConfigurationValueHistory History { get; init; }
+    public required IReadOnlyList<ConfigurationValueHistory> Histories { get; init; }
 }
 
 /// <summary>
@@ -70,7 +71,8 @@ public sealed record ConfigurationMutationBatchCommitResult
 }
 
 /// <summary>
-/// Describes the first unapplied request in a best-effort mutation batch.
+/// Identifies the first request of a failed definition save in a best-effort mutation batch.
+/// Every request belonging to that batch item remains unapplied.
 /// </summary>
 public sealed record ConfigurationMutationBatchFailure
 {
@@ -85,7 +87,7 @@ public sealed record ConfigurationMutationBatchFailure
     public required string Message { get; init; }
 
     /// <summary>
-    /// Gets complete exception detail.
+    /// Gets display-safe diagnostic guidance without persistence exception text or configuration values.
     /// </summary>
     public required string Detail { get; init; }
 }

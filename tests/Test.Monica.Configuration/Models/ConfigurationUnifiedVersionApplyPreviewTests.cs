@@ -80,6 +80,114 @@ public sealed class ConfigurationUnifiedVersionApplyPreviewTests
         preview.CanApply.Should().BeFalse();
     }
 
+    [Fact]
+    public void CanApply_WhenReadyTargetHasNoValidationReport_ShouldBeFalse()
+    {
+        var preview = CreatePreview(
+            CreateTarget("Definition.Ready", ConfigurationUnifiedVersionApplyTargetStatus.Ready) with
+            {
+                ValidationReport = null
+            });
+
+        preview.HasChanges.Should().BeTrue();
+        preview.ValidationReports.Should().BeEmpty();
+        preview.CanApply.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(ConfigurationValidationCoverage.SchemaOnly)]
+    [InlineData(ConfigurationValidationCoverage.Failed)]
+    public void CanApply_WhenReadyTargetCoverageIsIncomplete_ShouldBeFalse(
+        ConfigurationValidationCoverage coverage)
+    {
+        var preview = CreatePreview(
+            CreateTarget("Definition.Ready", ConfigurationUnifiedVersionApplyTargetStatus.Ready) with
+            {
+                ValidationReport = CreateCompleteReport("Definition.Ready") with { Coverage = coverage }
+            });
+
+        preview.ValidationReports.Should().ContainSingle().Which.Issues.Should().BeEmpty();
+        preview.CanApply.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanApply_WhenKnownDefinitionHasObjectValidationIssues_ShouldBlockRatherThanSkip()
+    {
+        const string definitionKey = "Definition.Invalid";
+        var report = CreateCompleteReport(definitionKey) with
+        {
+            Issues =
+            [
+                new ConfigurationCandidateValidationIssue
+                {
+                    DefinitionKey = definitionKey,
+                    DefinitionDisplayName = definitionKey,
+                    LogicalPath = LogicalPath.Root,
+                    LogicalPaths = [LogicalPath.Root],
+                    Kind = ConfigurationValidationIssueKind.Code,
+                    NodeDisplayName = definitionKey,
+                    Problem = "The current object rule rejected the captured aggregate."
+                }
+            ]
+        };
+        var preview = CreatePreview(
+            CreateTarget("Definition.Missing", ConfigurationUnifiedVersionApplyTargetStatus.MissingDefinition),
+            CreateTarget("Definition.Ready", ConfigurationUnifiedVersionApplyTargetStatus.Ready),
+            CreateTarget(definitionKey, ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected) with
+            {
+                ValidationReport = report
+            });
+
+        report.IsSchemaValid.Should().BeTrue();
+        report.IsValid.Should().BeFalse();
+        preview.SkippedDefinitionKeys.Should().Equal("Definition.Missing");
+        preview.BlockedCount.Should().Be(1);
+        preview.CanApply.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(ConfigurationValidationCoverage.Complete)]
+    [InlineData(ConfigurationValidationCoverage.SchemaOnly)]
+    public void CanApply_WhenAdditionalStoredDocumentReportIsInvalidOrIncomplete_ShouldBeFalse(
+        ConfigurationValidationCoverage storedCoverage)
+    {
+        const string definitionKey = "Definition.Masked";
+        var effectiveReport = CreateCompleteReport(definitionKey) with { HasEffectiveChange = false };
+        var storedReport = CreateCompleteReport(definitionKey) with
+        {
+            Target = ConfigurationCandidateValidationTarget.StoredDocument,
+            Coverage = storedCoverage,
+            Issues = storedCoverage == ConfigurationValidationCoverage.Complete
+                ?
+                [
+                    new ConfigurationCandidateValidationIssue
+                    {
+                        DefinitionKey = definitionKey,
+                        DefinitionDisplayName = definitionKey,
+                        LogicalPath = LogicalPath.Root,
+                        LogicalPaths = [LogicalPath.Root],
+                        Kind = ConfigurationValidationIssueKind.Code,
+                        NodeDisplayName = definitionKey,
+                        Problem = "The masked stored document violates the current object rule."
+                    }
+                ]
+                : []
+        };
+        var preview = CreatePreview(
+            CreateTarget(definitionKey, ConfigurationUnifiedVersionApplyTargetStatus.Ready) with
+            {
+                ValidationReport = effectiveReport
+            }) with
+        {
+            ValidationReports = [effectiveReport, storedReport]
+        };
+
+        effectiveReport.IsValid.Should().BeTrue();
+        storedReport.IsValid.Should().BeFalse();
+        preview.HasChanges.Should().BeTrue();
+        preview.CanApply.Should().BeFalse();
+    }
+
     private static ConfigurationUnifiedVersionApplyPreview CreatePreview(
         params ConfigurationUnifiedVersionApplyTarget[] targets)
     {
@@ -87,7 +195,11 @@ public sealed class ConfigurationUnifiedVersionApplyPreviewTests
         {
             Version = 1,
             PreviewFingerprint = "sha256:test",
-            Targets = targets
+            Targets = targets,
+            ValidationReports = targets
+                .Where(static target => target.ValidationReport is not null)
+                .Select(static target => target.ValidationReport!)
+                .ToArray()
         };
     }
 
@@ -103,7 +215,24 @@ public sealed class ConfigurationUnifiedVersionApplyPreviewTests
             CapturedSchemaHash = "hash",
             CurrentSchemaHash = "hash",
             CurrentSchemaVersion = 1,
-            Status = status
+            Status = status,
+            ValidationReport = status is ConfigurationUnifiedVersionApplyTargetStatus.MissingDefinition
+                or ConfigurationUnifiedVersionApplyTargetStatus.IncompatibleValue
+                ? null
+                : CreateCompleteReport(definitionKey)
+        };
+    }
+
+    private static ConfigurationCandidateValidationReport CreateCompleteReport(string definitionKey)
+    {
+        return new ConfigurationCandidateValidationReport
+        {
+            DefinitionKey = definitionKey,
+            DefinitionDisplayName = definitionKey,
+            ScopePath = LogicalPath.Root,
+            Scope = ConfigurationValidationScope.CompleteAggregate,
+            Coverage = ConfigurationValidationCoverage.Complete,
+            ValidationRevision = "revision:test"
         };
     }
 }

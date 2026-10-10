@@ -99,7 +99,7 @@ internal sealed class ConfigurationValueValidationEngine
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
-            AddIssue(schema, path, "Expected a JSON object.", value, issues);
+            AddIssue(schema, path, "Expected a JSON object.", value, issues, blocksMaterialization: true, blocksProjection: true);
             return;
         }
 
@@ -146,7 +146,7 @@ internal sealed class ConfigurationValueValidationEngine
                 path.Append(new PropertySegment(property.Name)),
                 $"Property '{property.Name}' is not defined by the current configuration schema.",
                 property.Value,
-                issues);
+                issues, blocksProjection: true);
         }
     }
 
@@ -159,7 +159,7 @@ internal sealed class ConfigurationValueValidationEngine
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
-            AddIssue(schema, path, "Expected a JSON object for dictionary configuration.", value, issues);
+            AddIssue(schema, path, "Expected a JSON object for dictionary configuration.", value, issues, blocksMaterialization: true, blocksProjection: true);
             return;
         }
 
@@ -197,7 +197,7 @@ internal sealed class ConfigurationValueValidationEngine
     {
         if (!ConfigurationDictionaryKeyEscaper.TryValidateForProjection(property.Name, out var projectionProblem))
         {
-            AddIssue(schema, path, projectionProblem!, property.Value, issues);
+            AddIssue(schema, path, projectionProblem!, property.Value, issues, blocksMaterialization: true, blocksProjection: true);
             return false;
         }
 
@@ -209,6 +209,18 @@ internal sealed class ConfigurationValueValidationEngine
         }
 
         var keyType = ResolveClrType(template.KeyClrTypeName);
+        if (template.KeyKind == ConfigurationValueKind.Enum)
+        {
+            var numericType = ResolveClrType(template.KeyEnumUnderlyingClrTypeName ?? string.Empty);
+            var named = property.Name.Split(',').All(name => template.KeyEnumValues.Any(value =>
+                string.Equals(value.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)));
+            if (template.KeyEnumValues.Count > 0 && numericType is not null && numericType != typeof(string)
+                && IsConfigurationBinderDictionaryKeyType(numericType)
+                && (named || TryConvertInvariantString(numericType, property.Name, allowNull: false))) return true;
+            AddIssue(schema, path, "Dictionary enum key cannot be converted using the published portable contract.",
+                property.Value, issues, blocksMaterialization: true, blocksProjection: true);
+            return false;
+        }
         if (keyType is null)
         {
             AddIssue(
@@ -216,7 +228,7 @@ internal sealed class ConfigurationValueValidationEngine
                 path,
                 $"Dictionary key CLR type '{template.KeyClrTypeName}' could not be resolved for validation.",
                 property.Value,
-                issues);
+                issues, blocksMaterialization: true, blocksProjection: true);
             return false;
         }
 
@@ -229,7 +241,7 @@ internal sealed class ConfigurationValueValidationEngine
                 + "ConfigurationBinder. Supported key types are string, enum, and the built-in signed or unsigned "
                 + "integer types.",
                 property.Value,
-                issues);
+                issues, blocksMaterialization: true, blocksProjection: true);
             return false;
         }
 
@@ -240,7 +252,7 @@ internal sealed class ConfigurationValueValidationEngine
                 path,
                 $"Dictionary key cannot be converted to '{template.KeyClrTypeName}'.",
                 property.Value,
-                issues);
+                issues, blocksMaterialization: true, blocksProjection: true);
             return false;
         }
 
@@ -270,7 +282,7 @@ internal sealed class ConfigurationValueValidationEngine
     {
         if (value.ValueKind != JsonValueKind.Array)
         {
-            AddIssue(schema, path, "Expected a JSON array for list configuration.", value, issues);
+            AddIssue(schema, path, "Expected a JSON array for list configuration.", value, issues, blocksMaterialization: true, blocksProjection: true);
             return;
         }
 
@@ -316,7 +328,7 @@ internal sealed class ConfigurationValueValidationEngine
                 propertyPath,
                 $"Property '{property.Name}' is duplicated in the same JSON object. Property names are compared case-insensitively.",
                 property.Value,
-                issues);
+                issues, blocksMaterialization: true, blocksProjection: true);
         }
     }
 
@@ -503,7 +515,8 @@ internal sealed class ConfigurationValueValidationEngine
         }
         catch (ConfigurationValueConversionException ex)
         {
-            AddIssue(schema, path, ex.Message, value, issues);
+            AddIssue(schema, path, ex.Message, value, issues, blocksMaterialization: true,
+                blocksProjection: value.ValueKind is JsonValueKind.Object or JsonValueKind.Array);
             return;
         }
 
@@ -537,7 +550,7 @@ internal sealed class ConfigurationValueValidationEngine
         JsonElement value)
     {
         // JSON nodes are intentionally opaque and have no scalar TypeConverter contract.
-        if (schema.ValueKind == ConfigurationValueKind.Json)
+        if (schema.ValueKind is ConfigurationValueKind.Json or ConfigurationValueKind.Enum)
         {
             return;
         }
@@ -561,14 +574,23 @@ internal sealed class ConfigurationValueValidationEngine
 
     private static Type? ResolveClrType(string clrTypeName)
     {
-        try
+        // Published identities never authorize assembly loading or custom TypeConverter execution.
+        var name = clrTypeName;
+        var nullable = name.StartsWith("System.Nullable`1[[", StringComparison.Ordinal);
+        if (nullable) name = name["System.Nullable`1[[".Length..];
+        var separator = name.IndexOf(',');
+        if (separator >= 0) name = name[..separator];
+        Type? type = name.Trim() switch
         {
-            return Type.GetType(clrTypeName, throwOnError: false);
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            return null;
-        }
+            "System.String" => typeof(string), "System.Boolean" => typeof(bool), "System.Char" => typeof(char),
+            "System.SByte" => typeof(sbyte), "System.Byte" => typeof(byte), "System.Int16" => typeof(short),
+            "System.UInt16" => typeof(ushort), "System.Int32" => typeof(int), "System.UInt32" => typeof(uint),
+            "System.Int64" => typeof(long), "System.UInt64" => typeof(ulong), "System.Single" => typeof(float),
+            "System.Double" => typeof(double), "System.Decimal" => typeof(decimal), "System.DateTime" => typeof(DateTime),
+            "System.DateTimeOffset" => typeof(DateTimeOffset), "System.TimeSpan" => typeof(TimeSpan),
+            "System.Uri" => typeof(Uri), "System.Guid" => typeof(Guid), _ => null
+        };
+        return nullable && type is { IsValueType: true } ? typeof(Nullable<>).MakeGenericType(type) : type;
     }
 
     private static bool TryConvertInvariantString(Type targetType, string value, bool allowNull)
@@ -804,6 +826,18 @@ internal sealed class ConfigurationValueValidationEngine
         ConfigurationValueValidationOptions options,
         List<ConfigurationValueValidationIssue> issues)
     {
+        if (!schema.IsNullable)
+        {
+            issues.Add(new ConfigurationValueValidationIssue
+            {
+                LogicalPath = path,
+                LogicalPaths = [path],
+                Node = schema,
+                Message = "Explicit null cannot represent a non-nullable configuration value.",
+                BlocksMaterialization = true,
+                ValidationRules = schema.ValidationRules
+            });
+        }
         if (BuildMissingProblem(schema, options) is { } problem)
         {
             AddMissingIssue(schema, path, problem, issues);
@@ -899,14 +933,20 @@ internal sealed class ConfigurationValueValidationEngine
         LogicalPath path,
         string message,
         JsonElement value,
-        List<ConfigurationValueValidationIssue> issues)
+        List<ConfigurationValueValidationIssue> issues,
+        bool blocksMaterialization = false,
+        bool blocksProjection = false)
     {
         issues.Add(new ConfigurationValueValidationIssue
         {
             LogicalPath = path,
+            LogicalPaths = [path],
+            BlocksMaterialization = blocksMaterialization,
+            BlocksProjection = blocksProjection,
             Node = schema,
             Message = message,
-            DisplayValue = schema.IsSensitive ? null : DisplayValue(schema, value),
+            DisplayValue = schema.IsSensitive || schema.NodeKind != ConfigurationNodeKind.Scalar
+                || value.ValueKind is JsonValueKind.Object or JsonValueKind.Array ? null : DisplayValue(schema, value),
             ValidationRules = schema.ValidationRules
         });
     }
@@ -949,6 +989,11 @@ internal sealed record ConfigurationValueValidationOptions
 /// </summary>
 internal sealed record ConfigurationValueValidationIssue
 {
+    internal ConfigurationValidationIssueKind Kind { get; init; } = ConfigurationValidationIssueKind.Schema;
+    internal IReadOnlyList<LogicalPath> LogicalPaths { get; init; } = [];
+    internal bool IsSensitive { get; init; }
+    internal bool BlocksMaterialization { get; init; }
+    internal bool BlocksProjection { get; init; }
     /// <summary>
     /// Gets the target logical path.
     /// </summary>

@@ -1,5 +1,6 @@
 @inject ConfigurationFacade Facade
 @inject IStringLocalizer<ConfigurationUIResource> L
+@implements IDisposable
 
 <div class="configuration-unified-version-rollback-preview">
     @if (_loading)
@@ -9,6 +10,10 @@
     else
     {
         <MudStack Spacing="2">
+            @foreach (var problem in Preview.Problems)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@problem.DefinitionKey @problem.Message</MudAlert>
+            }
             <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
                 <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
                     @L["Versions:Rollback:Summary:Changes", Preview.ChangeCount]
@@ -123,6 +128,14 @@
                                         </div>
                                     }
 
+                                    @foreach (var report in Preview.ValidationReports.Where(report => string.Equals(report.DefinitionKey, row.Target.DefinitionKey, StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        <ConfigurationValidationReportView Title="@report.DefinitionDisplayName"
+                                           Coverage="@report.Coverage" Scope="@report.Scope" ValidationRevision="@report.ValidationRevision"
+                                           Target="@report.Target" HasEffectiveChange="@report.HasEffectiveChange"
+                                           IsValid="@report.IsValid" IsSchemaValid="@report.IsSchemaValid"
+                                           Issues="@report.Issues.Select(ConfigurationValidationPresentation.FromCandidate).ToArray()" />
+                                    }
                                     @if (row.Target.ValidationIssues.Count > 0)
                                     {
                                         <MudAlert Severity="@(row.Target.IsSkipped ? Severity.Warning : Severity.Error)"
@@ -199,25 +212,38 @@
     private IReadOnlyList<RollbackPreviewRow> _rows = [];
     private string? _previewIdentity;
     private bool _loading;
+    private bool _disposed;
+    private long _previewGeneration;
 
     [Parameter, EditorRequired]
     public ConfigurationUnifiedVersionApplyPreview Preview { get; set; } = null!;
 
     protected override async Task OnParametersSetAsync()
     {
-        var previewIdentity = $"{Preview.Version}:{Preview.PreviewFingerprint}";
+        var preview = Preview;
+        var previewIdentity = $"{preview.Version}:{preview.PreviewFingerprint}";
         if (string.Equals(_previewIdentity, previewIdentity, StringComparison.Ordinal))
         {
             return;
         }
 
+        var generation = ++_previewGeneration;
         _loading = true;
+        var definitions = await LoadDefinitionsAsync(preview, generation);
+        if (_disposed || generation != _previewGeneration)
+        {
+            return;
+        }
+
         _definitions.Clear();
-        await LoadDefinitionsAsync();
+        foreach (var entry in definitions)
+        {
+            _definitions[entry.Key] = entry.Value;
+        }
 
         // Skipped definitions stay visible so operators see exactly which captured values the
         // rollback will not restore; only unchanged targets are omitted.
-        _rows = Preview.Targets
+        _rows = preview.Targets
             .Where(static target => target.HasChanges || target.IsSkipped)
             .Select(CreateRow)
             .ToArray();
@@ -225,18 +251,27 @@
         _loading = false;
     }
 
-    private async Task LoadDefinitionsAsync()
+    private async Task<Dictionary<string, ConfigurationDefinition>> LoadDefinitionsAsync(
+        ConfigurationUnifiedVersionApplyPreview preview, long generation)
     {
-        foreach (var definitionKey in Preview.ChangedTargets
+        var definitions = new Dictionary<string, ConfigurationDefinition>(StringComparer.OrdinalIgnoreCase);
+        foreach (var definitionKey in preview.ChangedTargets
                      .Select(static target => target.DefinitionKey)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var result = await Facade.GetDefinitionAsync(definitionKey);
+            if (_disposed || generation != _previewGeneration)
+            {
+                return definitions;
+            }
+
             if (!result.IsFailed(out _, out var detail))
             {
-                _definitions[definitionKey] = detail.Definition;
+                definitions[definitionKey] = detail.Definition;
             }
         }
+
+        return definitions;
     }
 
     private RollbackPreviewRow CreateRow(ConfigurationUnifiedVersionApplyTarget target)
@@ -372,6 +407,7 @@
             ConfigurationUnifiedVersionApplyTargetStatus.ReadOnlyOverride => L["Versions:Rollback:Statuses:ReadOnlyOverride"],
             ConfigurationUnifiedVersionApplyTargetStatus.CompositeSourceConflict => L["Versions:Rollback:Statuses:CompositeSourceConflict"],
             ConfigurationUnifiedVersionApplyTargetStatus.LowerPriorityFallback => L["Versions:Rollback:Statuses:LowerPriorityFallback"],
+            ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected => L["Validation:PreviewBlocked"],
             _ => L["Versions:Rollback:Statuses:UnsupportedSource"]
         };
     }
@@ -395,4 +431,10 @@
         string TargetText,
         bool HasHiddenChanges,
         bool HasSchemaDrift);
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_previewGeneration;
+    }
 }

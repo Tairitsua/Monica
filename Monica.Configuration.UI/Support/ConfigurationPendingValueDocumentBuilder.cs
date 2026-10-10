@@ -37,6 +37,63 @@ internal static class ConfigurationPendingValueDocumentBuilder
         return root;
     }
 
+    /// <summary>Applies explicit staged values only when no unknown parent or fallback value must be invented.</summary>
+    public static bool TryApplyKnownPendingChanges(
+        ConfigurationNodeDefinition scopeNode,
+        string definitionKey,
+        JsonNode? baseline,
+        IReadOnlyList<PendingChange> pendingChanges,
+        out JsonNode? result)
+    {
+        result = baseline?.DeepClone();
+        foreach (var change in pendingChanges.Where(change => IsInScope(change, definitionKey, scopeNode.RelativePath))
+                     .OrderBy(change => change.LogicalPath.ToCanonicalString(), StringComparer.Ordinal))
+        {
+            if (change.LogicalPath.Equals(scopeNode.RelativePath))
+            {
+                if (change.MutationKind == ConfigurationMutationKind.Remove)
+                    return false;
+                result = JsonNode.Parse(change.NewValue.Json);
+                continue;
+            }
+
+            if (result is null)
+                return false;
+            var segments = change.LogicalPath.Segments.Skip(scopeNode.RelativePath.Depth).ToArray();
+            var parent = result;
+            var parentSchema = scopeNode;
+            foreach (var segment in segments.SkipLast(1))
+            {
+                var child = GetExistingChild(parent, parentSchema, segment);
+                if (child is null)
+                    return false;
+                parentSchema = ResolveChildSchema(parentSchema, segment);
+                parent = child;
+            }
+
+            var leaf = segments[^1];
+            if (parent is JsonObject && (leaf is PropertySegment or DictionaryKeySegment))
+            {
+                if (ReferenceEquals(ResolveChildSchema(parentSchema, leaf), parentSchema))
+                    return false;
+            }
+            else if (parent is JsonArray array && leaf is ListIndexSegment index)
+            {
+                if (index.Index < 0 || index.Index > array.Count)
+                    return false;
+            }
+            else if (parent is not JsonArray || leaf is not ListItemKeySegment
+                     || parentSchema.ListTemplate?.SupportsPerItemMutation is not true)
+                return false;
+
+            if (change.MutationKind == ConfigurationMutationKind.Remove)
+                RemoveChild(parent, parentSchema, leaf);
+            else
+                SetChild(parent, parentSchema, leaf, JsonNode.Parse(change.NewValue.Json));
+        }
+        return true;
+    }
+
     public static bool IsInScope(PendingChange change, string definitionKey, LogicalPath scopePath)
     {
         return string.Equals(change.DefinitionKey, definitionKey, StringComparison.OrdinalIgnoreCase)

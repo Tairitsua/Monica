@@ -1,21 +1,28 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Abstractions.Internal;
+using Monica.Configuration.Binding;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Metrics;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services.Support;
+using Monica.Modules;
 
 namespace Monica.Configuration.Projection;
 
 /// <summary>
 /// Single Microsoft.Extensions.Configuration provider that exposes Monica effective value documents.
 /// </summary>
-internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAccessor accessor) : ConfigurationProvider
+internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAccessor accessor)
+    : ConfigurationProvider, IConfigurationValueShapeProvider
 {
     private readonly Lock _projectionLock = new();
     private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedKeysByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long?> _loadedVersionsByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedShapesByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, ConfigurationValueShape> _shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
     private long _reloadCount;
     private long _failedReloadCount;
     private DateTimeOffset? _lastReloadedAt;
@@ -46,31 +53,37 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         var definitionRegistry = accessor.ServiceProvider.GetRequiredService<IConfigurationDefinitionRegistry>();
         var effectiveValueStore = accessor.ServiceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
         var seedFactory = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueSeedFactory>();
-        var documentEditor = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueDocumentEditor>();
+        var materializer = accessor.ServiceProvider.GetRequiredService<ConfigurationObjectMaterializer>();
         var metricsRecorder = accessor.ServiceProvider.GetRequiredService<ConfigurationMetricsRecorder>();
         var stateTracker = accessor.ServiceProvider.GetRequiredService<IConfigurationStoreStateTracker>();
 
         try
         {
             var projected = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
             var definitions = definitionRegistry.GetAll();
             var seeds = definitions
                 .Select(definition => new ConfigurationEffectiveValueSeed(
                     definition,
-                    () => seedFactory.CreateSeedJson(definition)))
+                    () => CreateValidatedSeed(definition, seedFactory)))
                 .ToArray();
             var documents = await effectiveValueStore.EnsureCreatedAsync(seeds, cancellationToken);
 
             var projectedKeysByDefinitionKey = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
             var loadedVersionsByDefinitionKey = new Dictionary<string, long?>(StringComparer.OrdinalIgnoreCase);
+            var projectedShapesByDefinitionKey = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var (definition, document) in definitions.Zip(documents))
             {
                 var definitionKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var (key, value) in documentEditor.Project(definition, document.Json))
+                var projection = materializer.Project(definition, document.Json);
+                foreach (var (key, value) in projection.Values)
                 {
                     projected[key] = value;
                     definitionKeys.Add(key);
                 }
+
+                foreach (var (key, shape) in projection.Shapes) shapes[key] = shape;
+                projectedShapesByDefinitionKey[definition.DefinitionKey] = projection.Shapes.Keys.ToArray();
 
                 projectedKeysByDefinitionKey[definition.DefinitionKey] = definitionKeys;
                 loadedVersionsByDefinitionKey[definition.DefinitionKey] = document.Version;
@@ -79,6 +92,9 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
             lock (_projectionLock)
             {
                 Data = projected;
+                _shapes = shapes;
+                _projectedShapesByDefinitionKey.Clear();
+                foreach (var (key, keys) in projectedShapesByDefinitionKey) _projectedShapesByDefinitionKey[key] = keys;
                 _projectedKeysByDefinitionKey.Clear();
                 foreach (var (definitionKey, keys) in projectedKeysByDefinitionKey)
                 {
@@ -135,7 +151,7 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
 
         var effectiveValueStore = accessor.ServiceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
         var seedFactory = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueSeedFactory>();
-        var documentEditor = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueDocumentEditor>();
+        var materializer = accessor.ServiceProvider.GetRequiredService<ConfigurationObjectMaterializer>();
         var metricsRecorder = accessor.ServiceProvider.GetRequiredService<ConfigurationMetricsRecorder>();
         var stateTracker = accessor.ServiceProvider.GetRequiredService<IConfigurationStoreStateTracker>();
 
@@ -145,7 +161,7 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
             var document = (await effectiveValueStore.EnsureCreatedAsync(
                 [new ConfigurationEffectiveValueSeed(
                     resolvedDefinition,
-                    () => seedFactory.CreateSeedJson(resolvedDefinition))],
+                    () => CreateValidatedSeed(resolvedDefinition, seedFactory))],
                 cancellationToken))[0];
             var loadedVersion = GetLoadedVersion(definitionKey);
             if (loadedVersion is not null && document.Version <= loadedVersion)
@@ -153,10 +169,13 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
                 return;
             }
 
-            var projected = documentEditor.Project(resolvedDefinition, document.Json);
+            var projected = materializer.Project(resolvedDefinition, document.Json);
             lock (_projectionLock)
             {
                 var nextData = new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase);
+                var nextShapes = new Dictionary<string, ConfigurationValueShape>(_shapes, StringComparer.OrdinalIgnoreCase);
+                if (_projectedShapesByDefinitionKey.TryGetValue(resolvedDefinition.DefinitionKey, out var oldShapes))
+                    foreach (var key in oldShapes) nextShapes.Remove(key);
                 if (_projectedKeysByDefinitionKey.TryGetValue(resolvedDefinition.DefinitionKey, out var oldKeys))
                 {
                     foreach (var key in oldKeys)
@@ -165,13 +184,16 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
                     }
                 }
 
-                foreach (var (key, value) in projected)
+                foreach (var (key, value) in projected.Values)
                 {
                     nextData[key] = value;
                 }
 
                 Data = nextData;
-                _projectedKeysByDefinitionKey[resolvedDefinition.DefinitionKey] = projected.Keys.ToArray();
+                foreach (var (key, shape) in projected.Shapes) nextShapes[key] = shape;
+                _shapes = nextShapes;
+                _projectedShapesByDefinitionKey[resolvedDefinition.DefinitionKey] = projected.Shapes.Keys.ToArray();
+                _projectedKeysByDefinitionKey[resolvedDefinition.DefinitionKey] = projected.Values.Keys.ToArray();
                 _loadedVersionsByDefinitionKey[resolvedDefinition.DefinitionKey] = document.Version;
                 _successfulProjectionRevision++;
             }
@@ -188,6 +210,54 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
             stateTracker.RecordFailure(effectiveValueStore.Descriptor.StoreKey, ex);
             throw;
         }
+    }
+
+    public bool TryGetShape(string path, out ConfigurationValueShape shape)
+    {
+        lock (_projectionLock) return _shapes.TryGetValue(path, out shape);
+    }
+
+    /// <inheritdoc />
+    public override void Set(string key, string? value)
+    {
+        lock (_projectionLock)
+        {
+            var next = ConfigurationValueProjectionFactory.Set(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes, key, value);
+            _shapes = next.Shapes;
+            Data = new Dictionary<string, string?>(next.Values, StringComparer.OrdinalIgnoreCase);
+            foreach (var definitionKey in _projectedShapesByDefinitionKey.Keys.ToArray())
+            {
+                var section = _projectedShapesByDefinitionKey[definitionKey].MinBy(path => path.Length);
+                if (section is null || !(string.Equals(key, section, StringComparison.OrdinalIgnoreCase)
+                    || key.StartsWith($"{section}:", StringComparison.OrdinalIgnoreCase))) continue;
+                _projectedKeysByDefinitionKey[definitionKey] = next.Values.Keys.Where(path =>
+                    string.Equals(path, section, StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith($"{section}:", StringComparison.OrdinalIgnoreCase)).ToArray();
+                _projectedShapesByDefinitionKey[definitionKey] = next.Shapes.Keys.Where(path =>
+                    string.Equals(path, section, StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith($"{section}:", StringComparison.OrdinalIgnoreCase)).ToArray();
+            }
+            Interlocked.Increment(ref _successfulProjectionRevision);
+        }
+    }
+
+    private string CreateValidatedSeed(ConfigurationDefinition definition, ConfigurationEffectiveValueSeedFactory seedFactory)
+    {
+        var provider = accessor.ServiceProvider!;
+        var json = seedFactory.CreateSeedJson(definition);
+        var result = provider.GetRequiredService<ConfigurationValidationCoordinator>().ValidateCompleteValue(
+            definition, json, ConfigurationValidationProfile.Seed);
+        if (result.Coverage == ConfigurationValidationCoverage.Failed)
+            throw new ConfigurationValidationExecutionException(definition.DefinitionKey, LogicalPath.Root, "seed-materialization");
+        if (!result.IsValid)
+        {
+            var report = ConfigurationValidationReportFactory.Create(definition, result);
+            if (provider.GetRequiredService<ConfigurationValidationPolicy>().Behavior == ConfigurationRuntimeValidationBehavior.FailFast)
+                throw new ConfigurationRuntimeValidationException(report);
+            provider.GetRequiredService<ILogger<MonicaConfigurationProvider>>().LogWarning("{ConfigurationSeedDiagnostic}",
+                ConfigurationRuntimeValidationMessageFormatter.FormatDiagnosticReport(report));
+        }
+        return json;
     }
 
     /// <summary>

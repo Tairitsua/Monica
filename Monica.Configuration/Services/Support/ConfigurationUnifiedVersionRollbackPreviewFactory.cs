@@ -1,3 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
+using Monica.Configuration.Abstractions;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 
 namespace Monica.Configuration.Services.Support;
@@ -9,7 +13,8 @@ internal sealed class ConfigurationUnifiedVersionRollbackPreviewFactory(
     ConfigurationDefinitionResolver definitionResolver,
     ConfigurationEffectiveSnapshotReader effectiveSnapshotReader,
     ConfigurationValidationCoordinator validationCoordinator,
-    ConfigurationRollbackPersistencePlanner persistencePlanner)
+    ConfigurationRollbackPersistencePlanner persistencePlanner,
+    IConfigurationMutationGroupApplyService mutationGroupApplyService)
 {
     public async Task<ConfigurationUnifiedVersionApplyPreview> CreateAsync(
         ConfigurationUnifiedVersionSnapshot snapshot,
@@ -44,7 +49,22 @@ internal sealed class ConfigurationUnifiedVersionRollbackPreviewFactory(
                 cancellationToken));
         }
 
-        return CreatePreview(snapshot.Summary.Version, targets);
+        var preview = CreatePreview(snapshot.Summary.Version, targets);
+        if (!preview.CanApply) return preview;
+        var validation = await mutationGroupApplyService.PreviewAsync(new ConfigurationMutationGroupApplyRequest
+        {
+            Label = "Unified rollback validation preview",
+            Commands = Services.ConfigurationUnifiedVersionService.BuildCommands(snapshot.Summary.Version, preview)
+        }, cancellationToken);
+        var token = Encoding.UTF8.GetBytes($"{preview.PreviewFingerprint}|{validation.ValidationFingerprint}");
+        return preview with
+        {
+            PreviewFingerprint = $"sha256:{Convert.ToHexString(SHA256.HashData(token)).ToLowerInvariant()}",
+            ValidationFingerprint = validation.ValidationFingerprint,
+            ValidationReports = [.. preview.ValidationReports.Where(report =>
+                !validation.Definitions.Any(candidate => candidate.DefinitionKey == report.DefinitionKey)), .. validation.Definitions],
+            Problems = validation.Problems
+        };
     }
 
     private async Task<IReadOnlyList<ConfigurationDefinition?>> ResolveTargetDefinitionsAsync(
@@ -79,7 +99,8 @@ internal sealed class ConfigurationUnifiedVersionRollbackPreviewFactory(
             PreviewFingerprint = ConfigurationUnifiedVersionRollbackPreviewFingerprint.Compute(
                 version,
                 targets),
-            Targets = targets
+            Targets = targets,
+            ValidationReports = targets.Select(static target => target.ValidationReport).OfType<ConfigurationCandidateValidationReport>().ToArray()
         };
     }
 
@@ -115,19 +136,46 @@ internal sealed class ConfigurationUnifiedVersionRollbackPreviewFactory(
         };
         var valuesEqual = ConfigurationJsonSemanticComparer.Equals(currentJson, document.Json);
         var schemaDrift = !string.Equals(definition.SchemaHash, document.SchemaHash, StringComparison.Ordinal);
-        var issues = valuesEqual
-            ? []
-            : validationCoordinator.ValidateCapturedValue(definition, document.Json)
-                .Select(issue => CreateValidationIssue(definition, issue))
-                .ToArray();
-        if (issues.Length > 0)
+        ConfigurationCompleteValidationResult validation;
+        try
         {
-            // Hard-incompatible historical values are skipped and reported; they never block the
-            // rollback of the remaining definitions.
+            validation = validationCoordinator.ValidateCompleteValue(definition, document.Json, ConfigurationValidationProfile.CapturedValue);
+        }
+        catch (ConfigurationValidationExecutionException exception)
+        {
             return target with
             {
-                Status = ConfigurationUnifiedVersionApplyTargetStatus.IncompatibleValue,
-                ValidationIssues = issues
+                Status = ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected,
+                ValidationReport = new ConfigurationCandidateValidationReport
+                {
+                    DefinitionKey = definition.DefinitionKey, DefinitionDisplayName = definition.DisplayName,
+                    ScopePath = LogicalPath.Root, Scope = ConfigurationValidationScope.CompleteAggregate,
+                    Coverage = ConfigurationValidationCoverage.Failed, ValidationRevision = definition.ValidationContract.Revision,
+                    Issues = [new ConfigurationCandidateValidationIssue
+                    {
+                        DefinitionKey = definition.DefinitionKey, DefinitionDisplayName = definition.DisplayName,
+                        LogicalPath = exception.LogicalPath, LogicalPaths = [exception.LogicalPath], Kind = exception.Kind,
+                        NodeDisplayName = definition.DisplayName, Problem = exception.Message
+                    }]
+                }
+            };
+        }
+        target = target with
+        {
+            ValidationReport = new ConfigurationCandidateValidationReport
+            {
+                DefinitionKey = definition.DefinitionKey, DefinitionDisplayName = definition.DisplayName,
+                ScopePath = LogicalPath.Root, Scope = validation.Scope, Coverage = validation.Coverage,
+                ValidationRevision = validation.ValidationRevision,
+                Issues = validation.Issues.Select(issue => Services.ConfigurationCandidateValidationService.ToCandidateIssue(definition, issue)).ToArray()
+            }
+        };
+        if (!validation.IsValid)
+        {
+            return target with
+            {
+                Status = ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected,
+                ValidationIssues = validation.Issues.Select(issue => CreateValidationIssue(definition, issue)).ToArray()
             };
         }
 

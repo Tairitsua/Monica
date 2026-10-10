@@ -40,7 +40,7 @@ internal sealed class ConfigurationReloadNotificationDispatcher(
                     Kind = ConfigurationPostCommitIssueKind.DistributedNotification,
                     Source = notifierName,
                     Message = "Configuration was saved, but a distributed reload notification failed.",
-                    Detail = ex.ToString()
+                    Detail = "Review server logs for the reload notification failure."
                 });
             }
         }

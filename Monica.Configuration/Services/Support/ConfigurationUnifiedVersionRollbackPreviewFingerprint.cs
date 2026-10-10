@@ -28,6 +28,8 @@ internal static class ConfigurationUnifiedVersionRollbackPreviewFingerprint
                 target.CapturedSchemaHash,
                 target.CurrentSchemaHash,
                 target.CurrentSchemaVersion,
+                ValidationRevision = target.ValidationReport?.ValidationRevision,
+                ValidationCoverage = target.ValidationReport?.Coverage,
                 target.Status,
                 Mutations = target.Mutations.Select(static mutation => new
                 {

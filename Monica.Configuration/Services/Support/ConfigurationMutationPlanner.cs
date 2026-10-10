@@ -35,7 +35,7 @@ internal sealed class ConfigurationMutationPlanner(
                 : null,
             Context = context
         };
-        validationCoordinator.Validate(definition, request);
+        validationCoordinator.Validate(definition, request, validateFragment: false);
         ValidateEditablePath(definition, command.LogicalPath);
 
         return new PreparedConfigurationMutation

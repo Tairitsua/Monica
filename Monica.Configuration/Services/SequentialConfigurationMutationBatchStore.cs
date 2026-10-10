@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
-using Monica.Core.Extensions;
 
 namespace Monica.Configuration.Services;
 
@@ -32,28 +31,34 @@ internal sealed class SequentialConfigurationMutationBatchStore(
             }
             catch (Exception ex)
             {
+                logger.LogWarning(ex,
+                    "Configuration definition save failed for request {RequestId} in group {GroupId}.",
+                    item.RequestIds[0], request.MutationGroup.GroupId);
                 failure = new ConfigurationMutationBatchFailure
                 {
-                    RequestId = item.RequestId,
-                    Message = ex.GetMessageRecursively(),
-                    Detail = ex.ToString()
+                    RequestId = item.RequestIds[0],
+                    Message = "The configuration definition could not be persisted.",
+                    Detail = "Review server logs for the persistence failure."
                 };
                 break;
             }
 
-            appliedRequestIds.Add(item.RequestId);
+            appliedRequestIds.AddRange(item.RequestIds);
             documents[document.DefinitionKey] = document;
-            try
+            foreach (var history in item.Histories)
             {
-                await historyStore.AppendHistoryAsync(item.History, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                issues.Add(CreateIssue(
-                    ConfigurationPostCommitIssueKind.AuditFinalization,
-                    historyStore.GetType().Name,
-                    "A configuration value was saved, but its history row could not be persisted.",
-                    ex));
+                try
+                {
+                    await historyStore.AppendHistoryAsync(history, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    issues.Add(CreateIssue(
+                        ConfigurationPostCommitIssueKind.AuditFinalization,
+                        historyStore.GetType().Name,
+                        "A configuration value was saved, but one of its history rows could not be persisted.",
+                        ex));
+                }
             }
         }
 
@@ -100,7 +105,7 @@ internal sealed class SequentialConfigurationMutationBatchStore(
             Kind = kind,
             Source = source,
             Message = message,
-            Detail = exception.ToString()
+            Detail = "Review server logs for the audit persistence failure."
         };
     }
 }

@@ -237,6 +237,7 @@ public sealed class SaveMutationGroupDialogTests
             sourceWriter: null!,
             runtimeContext: null!,
             runtimeValidationService: null!,
+            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
             candidateValidationService: null!,
             runtimeReloadService: null!,
             reloadBroadcastService: null!);

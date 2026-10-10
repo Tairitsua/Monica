@@ -25,10 +25,25 @@ internal sealed class ConfigurationJsonDraftService(
     /// Analyzes one JSON snapshot against a definition scope.
     /// </summary>
     /// <param name="request">The draft request.</param>
+    /// <param name="editorDocument">The editor's verified original baseline, when analyzing an editor session.</param>
     /// <returns>The draft result.</returns>
-    public ConfigurationJsonDraftResult Analyze(ConfigurationJsonDraftRequest request)
+    public ConfigurationJsonDraftResult Analyze(
+        ConfigurationJsonDraftRequest request,
+        ConfigurationJsonEditorDocument? editorDocument = null)
     {
-        var state = new DraftState(request, facade, localizer, changeCompactor);
+        if (editorDocument is { CanAnalyze: false })
+        {
+            return new ConfigurationJsonDraftResult
+            {
+                DefinitionKey = request.Definition.DefinitionKey,
+                DefinitionDisplayName = request.Definition.DisplayName,
+                ScopePath = request.ScopeNode.RelativePath,
+                IsJsonValid = false,
+                ParseError = localizer["ImportExport:JsonEditor:BaselineUnavailable"].Value
+            };
+        }
+
+        var state = new DraftState(request, facade, localizer, changeCompactor, editorDocument?.BaselineJson);
         return state.Analyze();
     }
 
@@ -38,22 +53,114 @@ internal sealed class ConfigurationJsonDraftService(
     /// <param name="definition">The owning definition.</param>
     /// <param name="scopeNode">The scope node.</param>
     /// <param name="effectiveValue">The current effective value.</param>
+    /// <param name="scalarEffectiveValues">Already loaded display-safe scalar values for the scope.</param>
     /// <param name="pendingChanges">Existing pending changes.</param>
-    /// <returns>Redacted JSON text plus redacted canonical paths.</returns>
+    /// <returns>Redacted editor JSON and its shared original baseline, or an unavailable document.</returns>
     public ConfigurationJsonEditorDocument BuildEditorDocument(
         ConfigurationDefinition definition,
         ConfigurationNodeDefinition scopeNode,
         ConfigurationEffectiveValue effectiveValue,
+        IReadOnlyDictionary<LogicalPath, ConfigurationEffectiveValue> scalarEffectiveValues,
         IReadOnlyList<PendingChange> pendingChanges)
     {
-        var node = ConfigurationPendingValueDocumentBuilder.Build(
-            scopeNode,
-            definition.DefinitionKey,
-            effectiveValue.DisplayValue,
-            pendingChanges);
-        var redacted = RedactForExport(node, scopeNode, out var redactedPaths);
-        var json = redacted?.ToJsonString(ConfigurationJsonDisplayFormatter.ReadableJsonOptions) ?? "null";
-        return new ConfigurationJsonEditorDocument(json, redactedPaths);
+        string? baselineJson = null;
+        IReadOnlyList<string> knownRedactions = [];
+        try
+        {
+            if (!TryBuildEditorBaseline(definition, scopeNode, effectiveValue, scalarEffectiveValues,
+                    out var original, out var scalarRedactions))
+                return new ConfigurationJsonEditorDocument(string.Empty, []);
+
+            var baseline = RedactForExport(original, scopeNode, out var baselineRedactions);
+            baselineJson = baseline?.ToJsonString() ?? "null";
+            knownRedactions = scalarRedactions.Concat(baselineRedactions).Distinct(StringComparer.Ordinal).ToArray();
+            if (!ConfigurationPendingValueDocumentBuilder.TryApplyKnownPendingChanges(
+                    scopeNode, definition.DefinitionKey, baseline, pendingChanges, out var edited))
+                return new ConfigurationJsonEditorDocument(string.Empty, knownRedactions, baselineJson, true);
+
+            var redacted = RedactForExport(edited, scopeNode, out var editedRedactions);
+            var redactedPaths = scalarRedactions.Concat(baselineRedactions).Concat(editedRedactions)
+                .Distinct(StringComparer.Ordinal).ToArray();
+            var json = redacted?.ToJsonString(ConfigurationJsonDisplayFormatter.ReadableJsonOptions) ?? "null";
+            return new ConfigurationJsonEditorDocument(json, redactedPaths, baselineJson);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or InvalidOperationException)
+        {
+            return new ConfigurationJsonEditorDocument(string.Empty, knownRedactions, baselineJson, baselineJson is not null);
+        }
+    }
+
+    private bool TryBuildEditorBaseline(
+        ConfigurationDefinition definition,
+        ConfigurationNodeDefinition scopeNode,
+        ConfigurationEffectiveValue effectiveValue,
+        IReadOnlyDictionary<LogicalPath, ConfigurationEffectiveValue> scalarEffectiveValues,
+        out JsonNode? baseline,
+        out IReadOnlyList<string> redactedPaths)
+    {
+        baseline = null;
+        redactedPaths = [];
+        if (scopeNode.IsSensitive
+            || !string.Equals(effectiveValue.DefinitionKey, definition.DefinitionKey, StringComparison.OrdinalIgnoreCase)
+            || !effectiveValue.LogicalPath.Equals(scopeNode.RelativePath))
+            return false;
+
+        if (effectiveValue.DisplayValue is { } json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+            baseline = JsonNode.Parse(json);
+            return baseline is null || (scopeNode.NodeKind switch
+            {
+                ConfigurationNodeKind.Object or ConfigurationNodeKind.Dictionary => baseline is JsonObject,
+                ConfigurationNodeKind.List => baseline is JsonArray,
+                ConfigurationNodeKind.Scalar => baseline is JsonValue,
+                _ => false
+            });
+        }
+
+        // A redacted composite does not prove any collection or nullable object structure.
+        if (scopeNode.NodeKind != ConfigurationNodeKind.Object
+            || scopeNode.RelativePath.Depth != 0
+            || scopeNode.Children.Any(child => child.NodeKind != ConfigurationNodeKind.Scalar))
+            return false;
+
+        var result = new JsonObject();
+        var redactions = new List<string>();
+        foreach (var child in scopeNode.Children)
+        {
+            var path = scopeNode.RelativePath.Append(new PropertySegment(child.Name));
+            if (!scalarEffectiveValues.TryGetValue(path, out var scalar)
+                || !string.Equals(scalar.DefinitionKey, definition.DefinitionKey, StringComparison.OrdinalIgnoreCase)
+                || !scalar.LogicalPath.Equals(path))
+                return false;
+
+            if (child.IsSensitive || scalar.IsSensitive)
+            {
+                result[child.Name] = localizer["ImportExport:RedactedValue"].Value;
+                redactions.Add(path.ToCanonicalString());
+                continue;
+            }
+
+            // A missing display value cannot distinguish an actual null from an unavailable value.
+            if (scalar.DisplayValue is not { } displayValue)
+                return false;
+            result[child.Name] = child.ValueKind switch
+            {
+                ConfigurationValueKind.Boolean when bool.TryParse(displayValue, out var boolean) => JsonValue.Create(boolean),
+                ConfigurationValueKind.Integer or ConfigurationValueKind.Decimal or ConfigurationValueKind.Floating =>
+                    JsonNode.Parse(displayValue) is JsonValue number && number.GetValueKind() == JsonValueKind.Number
+                        ? number : throw new JsonException(),
+                ConfigurationValueKind.Boolean => throw new JsonException(),
+                ConfigurationValueKind.Json => JsonNode.Parse(displayValue),
+                ConfigurationValueKind.Enum => JsonValue.Create(ConfigurationScalarValueCodec.NormalizeDisplayValue(child, displayValue)),
+                _ => JsonValue.Create(displayValue)
+            };
+        }
+
+        baseline = result;
+        redactedPaths = redactions;
+        return true;
     }
 
     /// <summary>
@@ -249,14 +356,17 @@ internal sealed class ConfigurationJsonDraftService(
         ConfigurationJsonDraftRequest request,
         ConfigurationFacade facade,
         IStringLocalizer<ConfigurationUIResource> localizer,
-        ConfigurationPendingChangeCompactor changeCompactor)
+        ConfigurationPendingChangeCompactor changeCompactor,
+        string? editorBaselineJson)
     {
         private readonly List<PendingChange> _changes = [];
         private readonly List<ConfigurationValidationIssue> _issues = [];
         private readonly List<ConfigurationImportDiagnostic> _diagnostics = [];
         private readonly HashSet<LogicalPath> _invalidPaths = [];
         private readonly IReadOnlyList<LogicalPath> _redactedPaths = ParseRedactedPaths(request.RedactedPaths);
-        private readonly JsonNode? _originalNode = ParseOriginal(request.EffectiveValue.DisplayValue, request.ScopeNode);
+        private readonly JsonNode? _originalNode = editorBaselineJson is null
+            ? ParseOriginal(request.EffectiveValue.DisplayValue, request.ScopeNode)
+            : JsonNode.Parse(editorBaselineJson);
         private int _unchangedCount;
         private int _redactedSkipCount;
 
@@ -354,7 +464,7 @@ internal sealed class ConfigurationJsonDraftService(
                 AddDiagnostic(
                     ConfigurationImportDiagnosticSeverity.Error,
                     request.ScopeNode.RelativePath,
-                    error.Message ?? "Candidate validation failed.");
+                    error.Message ?? localizer["Validation:Unavailable"].Value);
                 return false;
             }
 
@@ -369,19 +479,9 @@ internal sealed class ConfigurationJsonDraftService(
 
         private ConfigurationValidationIssue ToUiIssue(ConfigurationCandidateValidationIssue issue)
         {
-            return new ConfigurationValidationIssue
+            return ConfigurationValidationPresentation.FromCandidate(issue) with
             {
-                DefinitionKey = issue.DefinitionKey,
-                DefinitionDisplayName = issue.DefinitionDisplayName,
-                LogicalPath = issue.LogicalPath,
-                NodeDisplayName = issue.NodeDisplayName,
-                InvalidDisplayValue = issue.IsSensitive
-                    ? localizer["State:Value:Sensitive"]
-                    : issue.CandidateDisplayValue,
                 ValidationError = LocalizeCandidateProblem(issue),
-                IsMissing = issue.IsMissing,
-                IsSensitive = issue.IsSensitive,
-                ValidationRules = issue.ValidationRules
             };
         }
 
@@ -1595,4 +1695,14 @@ internal sealed class ConfigurationJsonDraftService(
 /// </summary>
 /// <param name="Json">The editor JSON text.</param>
 /// <param name="RedactedPaths">The canonical paths that were redacted in the editor JSON.</param>
-internal sealed record ConfigurationJsonEditorDocument(string Json, IReadOnlyList<string> RedactedPaths);
+/// <param name="BaselineJson">The verified redacted original JSON, or null when its state cannot be established.</param>
+/// <param name="PendingStateUnavailable">Whether existing staged changes require an unknown effective shape.</param>
+internal sealed record ConfigurationJsonEditorDocument(
+    string Json,
+    IReadOnlyList<string> RedactedPaths,
+    string? BaselineJson = null,
+    bool PendingStateUnavailable = false)
+{
+    /// <summary>Gets whether the editor has a known original value against which changes can be analyzed.</summary>
+    public bool CanAnalyze => BaselineJson is not null && !PendingStateUnavailable;
+}

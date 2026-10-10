@@ -3,6 +3,7 @@
 
 <MudDialog>
     <DialogContent>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@L["Validation:FragmentNotice"]</MudAlert>
         <div class="configuration-complex-editor">
             <MudStack Spacing="2">
                 <MudAlert Severity="@ReloadSeverity" Variant="Variant.Outlined">
@@ -18,7 +19,8 @@
                         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
                             <ConfigurationSchemaMetadataChip SchemaVersion="@Definition.SchemaVersion"
                                                              DefinitionRevision="@Definition.DefinitionRevision"
-                                                             SchemaHash="@Definition.SchemaHash" />
+                                                             SchemaHash="@Definition.SchemaHash"
+                                                             ValidationContract="@Definition.ValidationContract" />
                             <MudChip T="ConfigurationNodeKind" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@Node.NodeKind</MudChip>
                         </MudStack>
                     </MudStack>

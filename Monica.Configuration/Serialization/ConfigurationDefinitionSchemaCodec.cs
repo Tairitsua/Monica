@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
-using Monica.Tool.Extensions;
 
 namespace Monica.Configuration.Serialization;
 
@@ -20,7 +19,10 @@ public static class ConfigurationDefinitionSchemaCodec
     /// <returns>The compact schema JSON.</returns>
     public static string SerializeSchema(ConfigurationDefinition definition)
     {
-        return JsonSerializer.Serialize(ToNodeDto(definition.Root, 0), ConfigurationPersistedJsonOptions.CompactSchema);
+        return JsonSerializer.Serialize(ToNodeDto(definition.Root, 0) with
+        {
+            ValidationContract = definition.ValidationContract
+        }, ConfigurationPersistedJsonOptions.CompactSchema);
     }
 
     /// <summary>
@@ -107,6 +109,7 @@ public static class ConfigurationDefinitionSchemaCodec
             Category = category,
             SchemaVersion = schemaVersion,
             SchemaHash = schemaHash,
+            ValidationContract = rootDto.ValidationContract ?? new ConfigurationValidationContract(),
             ReloadBehavior = reloadBehavior,
             Root = FromNodeDto(rootDto, LogicalPath.Root, sectionPath, clrTypeName),
             Origin = origin
@@ -117,7 +120,7 @@ public static class ConfigurationDefinitionSchemaCodec
     /// Converts an assembly-qualified CLR type name into a compact display/search identity.
     /// </summary>
     /// <param name="clrTypeName">The CLR type name captured from scanner metadata.</param>
-    /// <returns>A compact type name without assembly identity when it can be resolved.</returns>
+    /// <returns>A compact type name without assembly identity. Formatting never loads the named assembly or executes owner code.</returns>
     public static string ToCompactClrTypeName(string clrTypeName)
     {
         if (string.IsNullOrWhiteSpace(clrTypeName))
@@ -125,14 +128,64 @@ public static class ConfigurationDefinitionSchemaCodec
             return string.Empty;
         }
 
-        var type = Type.GetType(clrTypeName, throwOnError: false);
-        if (type is not null)
-        {
-            return type.GetCleanFullName();
-        }
+        return CompactTypeName(clrTypeName, 0);
+    }
 
-        var assemblySeparator = clrTypeName.IndexOf(',', StringComparison.Ordinal);
-        return assemblySeparator >= 0 ? clrTypeName[..assemblySeparator].Trim() : clrTypeName.Trim();
+    private static string CompactTypeName(string identity, int depth)
+    {
+        var nesting = 0;
+        var end = identity.Length;
+        for (var i = 0; i < identity.Length; i++)
+        {
+            if (identity[i] == '[') nesting++;
+            else if (identity[i] == ']') nesting--;
+            else if (identity[i] == ',' && nesting == 0) { end = i; break; }
+        }
+        var typeName = identity[..end].Trim();
+        var argumentStart = typeName.IndexOf('[');
+        var generic = typeName.IndexOf('`');
+        if (generic < 0 || argumentStart < generic || depth >= ConfigurationSchemaLimits.MAX_LOGICAL_DEPTH)
+            return typeName.Replace('+', '.');
+        nesting = 0;
+        var argumentEnd = -1;
+        for (var i = argumentStart; i < typeName.Length; i++)
+        {
+            if (typeName[i] == '[') nesting++;
+            else if (typeName[i] == ']' && --nesting == 0) { argumentEnd = i; break; }
+        }
+        if (argumentEnd < 0) return typeName.Replace('+', '.');
+        var baseName = typeName[..argumentStart];
+        var cleanBase = new StringBuilder();
+        for (var i = 0; i < baseName.Length; i++)
+        {
+            if (baseName[i] == '`')
+            {
+                while (i + 1 < baseName.Length && char.IsDigit(baseName[i + 1])) i++;
+            }
+            else cleanBase.Append(baseName[i] == '+' ? '.' : baseName[i]);
+        }
+        var arguments = SplitTypeArguments(typeName[(argumentStart + 1)..argumentEnd])
+            .Select(argument => CompactTypeName(argument, depth + 1));
+        return $"{cleanBase}<{string.Join(',', arguments)}>{typeName[(argumentEnd + 1)..]}";
+    }
+
+    private static IEnumerable<string> SplitTypeArguments(string arguments)
+    {
+        var depth = 0;
+        var start = 0;
+        for (var i = 0; i <= arguments.Length; i++)
+        {
+            if (i < arguments.Length)
+            {
+                if (arguments[i] == '[') depth++;
+                else if (arguments[i] == ']') depth--;
+                if (arguments[i] != ',' || depth != 0) continue;
+            }
+            var argument = arguments[start..i].Trim();
+            if (argument.StartsWith('[') && argument.EndsWith(']')) argument = argument[1..^1];
+            if (argument.Length > 0) yield return argument;
+            start = i + 1;
+        }
     }
 
     private static NodeDto ToNodeDto(ConfigurationNodeDefinition node, int depth)
@@ -178,6 +231,8 @@ public static class ConfigurationDefinitionSchemaCodec
         {
             KeyKind = template.KeyKind,
             KeyClrTypeName = template.KeyClrTypeName,
+            KeyEnumValues = template.KeyEnumValues.Count == 0 ? null : template.KeyEnumValues.Select(ToEnumValueDto).ToArray(),
+            KeyEnumUnderlyingClrTypeName = template.KeyEnumUnderlyingClrTypeName,
             KeyRegexPattern = NormalizeRegexPatternOrNull(template.KeyRegexPattern),
             DisallowColonInKey = template.DisallowColonInKey ? null : false,
             ValueTemplate = ToNodeDto(template.ValueTemplate, depth + 1)
@@ -526,6 +581,8 @@ public static class ConfigurationDefinitionSchemaCodec
                 dictionaryPath,
                 "dictionary key"),
             KeyKind = dto.KeyKind,
+            KeyEnumValues = dto.KeyEnumValues?.Select(value => new ConfigurationEnumValue { Name = value.Name, Value = value.Value }).ToArray() ?? [],
+            KeyEnumUnderlyingClrTypeName = dto.KeyEnumUnderlyingClrTypeName,
             KeyRegexPattern = NormalizeRegexPatternOrNull(dto.KeyRegexPattern),
             ValueTemplate = FromNodeDto(
                 dto.ValueTemplate,
@@ -639,6 +696,8 @@ public static class ConfigurationDefinitionSchemaCodec
 
     private sealed record NodeDto
     {
+        public ConfigurationValidationContract? ValidationContract { get; init; }
+
         public string? NodeKey { get; init; }
 
         public string Name { get; init; } = "";
@@ -686,6 +745,10 @@ public static class ConfigurationDefinitionSchemaCodec
         public ConfigurationValueKind KeyKind { get; init; }
 
         public string? KeyClrTypeName { get; init; }
+
+        public IReadOnlyList<EnumValueDto>? KeyEnumValues { get; init; }
+
+        public string? KeyEnumUnderlyingClrTypeName { get; init; }
 
         public string? KeyRegexPattern { get; init; }
 

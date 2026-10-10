@@ -70,11 +70,10 @@ internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatab
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateConcurrencyException ex)
+        catch (DbUpdateConcurrencyException)
         {
             throw new ConfigurationConcurrencyConflictException(
-                "A configuration document changed while the mutation group was being committed.",
-                ex);
+                "A configuration document changed while the mutation group was being committed.");
         }
 
         return CreateResult(request, request.MutationGroup, entities);
@@ -156,19 +155,22 @@ internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatab
         }
 
         var nextVersion = entity.Version + 1;
-        if (item.History.Version != nextVersion)
+        foreach (var history in item.Histories)
         {
-            throw new InvalidOperationException(
-                $"Prepared history version {item.History.Version} for '{definitionKey}' does not follow store version {entity.Version}.");
+            if (history.Version != nextVersion)
+            {
+                throw new InvalidOperationException(
+                    $"Prepared history version {history.Version} for '{definitionKey}' does not follow store version {entity.Version}.");
+            }
         }
 
         entity.Apply(
             ConfigurationPersistenceValueConverter.NormalizeJson(save.Json),
             save.Definition.SchemaVersion,
-            item.History.ModifiedTime.UtcDateTime,
+            item.Histories[^1].ModifiedTime.UtcDateTime,
             save.Context.ModifierId,
             save.Context.ModifierName);
-        dbContext.ConfigurationValueHistories.Add(ConfigurationHistoryMapper.ToEntity(item.History));
+        dbContext.ConfigurationValueHistories.AddRange(item.Histories.Select(ConfigurationHistoryMapper.ToEntity));
     }
 
     private static ConfigurationMutationBatchCommitResult CreateResult(
@@ -179,7 +181,7 @@ internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatab
         return new ConfigurationMutationBatchCommitResult
         {
             MutationGroup = group,
-            AppliedRequestIds = request.Items.Select(static item => item.RequestId).ToArray(),
+            AppliedRequestIds = request.Items.SelectMany(static item => item.RequestIds).ToArray(),
             Documents = entities.ToDictionary(
                 static pair => pair.Key,
                 static pair => ConfigurationEffectiveValueMapper.ToDocument(pair.Value),

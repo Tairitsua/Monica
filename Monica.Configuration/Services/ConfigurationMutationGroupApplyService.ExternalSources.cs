@@ -13,6 +13,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
         ConfigurationMutationContext context,
         IDictionary<string, ConfigurationMutationOutcome> outcomes,
         ICollection<ConfigurationPostCommitIssue> postCommitIssues,
+        CompleteMutationValidationPlan validationPlan,
         CancellationToken cancellationToken)
     {
         var failed = false;
@@ -40,10 +41,11 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             var source = sourceInspector.GetRequiredSource(target.SourceKey);
             try
             {
-                var write = await runtimeSnapshotLock.ExecuteAsync(token =>
+                var write = await runtimeSnapshotLock.ExecuteAsync(async token =>
                 {
                     ValidateReviewedSourceChains(sourceMutations);
-                    return sourceWriter.WriteBatchAsync(
+                    await EnsureAdoptionBaselineAsync(validationPlan, token);
+                    return await sourceWriter.WriteBatchAsync(
                         source,
                         sourceMutations.Select(static mutation => new ConfigurationJsonFileMutation
                         {
@@ -54,6 +56,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                         target.ExpectedRevision,
                         token);
                 }, cancellationToken);
+                validationPlan.PhysicalRevisions[target.SourceKey] = write.NewRevision;
 
                 for (var index = 0; index < sourceMutations.Length; index++)
                 {
@@ -121,7 +124,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                             Kind = ConfigurationPostCommitIssueKind.AuditFinalization,
                             Source = historyStore.GetType().Name,
                             Message = "An external configuration source was saved, but its history row could not be persisted.",
-                            Detail = ex.ToString()
+                            Detail = "See host diagnostics for the audit persistence failure."
                         });
                     }
                 }
@@ -140,7 +143,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                     {
                         RequestId = mutation.Command.RequestId,
                         Status = ConfigurationMutationOutcomeStatus.Failed,
-                        ErrorMessage = ex.GetMessageRecursively()
+                        ErrorMessage = "The external configuration source could not be saved. Review the current source before retrying."
                     };
                 }
             }
@@ -195,7 +198,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                     : ConfigurationPostCommitIssueKind.AuditFinalization,
                 Source = nameof(ConfigurationMutationGroupService),
                 Message = "Configuration values were applied, but mutation-group finalization failed.",
-                Detail = ex.ToString()
+                Detail = "See host diagnostics for the group finalization failure."
             });
             return new MutationGroupFinalizationResult(
                 currentGroup with
@@ -219,6 +222,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
         var expectedRevisions = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         var pathsByExternalTarget = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var monicaPathsByDefinition = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var sourceKeysByPhysicalPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var mutation in mutations)
         {
             if (mutation.Command.Target is ConfigurationEffectiveStoreMutationTarget)
@@ -267,6 +271,13 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             var externalTargetIdentity = string.IsNullOrWhiteSpace(source.PhysicalPath)
                 ? target.SourceKey
                 : source.PhysicalPath;
+            if (sourceKeysByPhysicalPath.TryGetValue(externalTargetIdentity, out var previousSourceKey)
+                && !string.Equals(previousSourceKey, target.SourceKey, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ConfigurationValidationFailedException(
+                    "One physical source cannot be changed through multiple provider aliases in the same group.");
+            }
+            sourceKeysByPhysicalPath[externalTargetIdentity] = target.SourceKey;
             if (!pathsByExternalTarget.TryGetValue(externalTargetIdentity, out var sourcePaths))
             {
                 sourcePaths = [];

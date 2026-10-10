@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Annotations;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Serialization;
 using Monica.Configuration.Services.Support;
@@ -28,6 +29,7 @@ internal sealed class ConfigurationDefinitionScanner(
             ?? throw new InvalidOperationException($"Type '{optionsType.FullName}' is not marked with {nameof(ConfigurationAttribute)}.");
 
         var definitionKey = attribute.DefinitionKey ?? optionsType.FullName ?? optionsType.Name;
+        ConfigurationLocalDefinitionDescriptor.EnsureRootConstructible(optionsType, definitionKey);
         var sectionPath = ConfigurationSectionPathResolver.Resolve(optionsType, attribute, sectionPathConvention);
         var root = ScanNode(
             optionsType,
@@ -35,7 +37,7 @@ internal sealed class ConfigurationDefinitionScanner(
             LogicalPath.Root,
             sectionPath,
             attribute.ReloadBehavior,
-            new SchemaTraversalContext());
+            new SchemaTraversalContext()) with { IsNullable = false };
         var reloadBehavior = attribute.ReloadBehavior == ConfigurationReloadBehavior.Inherit
             ? ConfigurationReloadBehavior.Unknown
             : attribute.ReloadBehavior;
@@ -56,6 +58,7 @@ internal sealed class ConfigurationDefinitionScanner(
                     ? ConfigurationReloadBehaviorObservationKind.Declared
                     : ConfigurationReloadBehaviorObservationKind.Unresolved,
             Root = root,
+            ValidationContract = ConfigurationLocalDefinitionDescriptor.CreateContract(optionsType, root),
             SchemaHash = hasher.ComputeHash(definitionKey, sectionPath, root)
         };
     }
@@ -82,7 +85,7 @@ internal sealed class ConfigurationDefinitionScanner(
             var option = type.GetCustomAttribute<OptionSettingAttribute>();
             var valueKind = nodeKind == ConfigurationNodeKind.Scalar ? GetValueKind(type) : (ConfigurationValueKind?)null;
             var children = nodeKind == ConfigurationNodeKind.Object
-                ? ScanObjectChildren(type, path, configurationPath, inheritedReloadBehavior, traversal)
+                ? ScanObjectChildren(Nullable.GetUnderlyingType(type) ?? type, path, configurationPath, inheritedReloadBehavior, traversal)
                 : [];
             var textSemantic = ResolveTextSemantic(option, nodeKind, valueKind, type.FullName ?? type.Name);
             var editorHint = ResolveEditorHint(option);
@@ -130,8 +133,17 @@ internal sealed class ConfigurationDefinitionScanner(
         ConfigurationReloadBehavior inheritedReloadBehavior,
         SchemaTraversalContext traversal)
     {
-        return type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0)
+        var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetMethod is { IsPublic: true } && property.GetIndexParameters().Length == 0)
+            .ToArray();
+        if (properties.GroupBy(GetConfigurationPropertyName, StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
+            throw new ConfigurationValidationExecutionException(type.FullName ?? type.Name, parentPath,
+                "duplicate-configuration-alias", ConfigurationValidationIssueKind.Contract);
+        if (properties.Any(property => string.IsNullOrWhiteSpace(GetConfigurationPropertyName(property))
+            || GetConfigurationPropertyName(property).Contains(':')))
+            throw new ConfigurationValidationExecutionException(type.FullName ?? type.Name, parentPath,
+                "invalid-configuration-alias", ConfigurationValidationIssueKind.Contract);
+        return properties
             .Select(property =>
             {
                 var propertyName = GetConfigurationPropertyName(property);
@@ -170,7 +182,7 @@ internal sealed class ConfigurationDefinitionScanner(
         {
             var valueKind = nodeKind == ConfigurationNodeKind.Scalar ? GetValueKind(propertyType) : (ConfigurationValueKind?)null;
             var children = nodeKind == ConfigurationNodeKind.Object
-                ? ScanObjectChildren(propertyType, path, configurationPath, inheritedReloadBehavior, traversal)
+                ? ScanObjectChildren(Nullable.GetUnderlyingType(propertyType) ?? propertyType, path, configurationPath, inheritedReloadBehavior, traversal)
                 : [];
             var textSemantic = ResolveTextSemantic(
                 option,
@@ -236,6 +248,8 @@ internal sealed class ConfigurationDefinitionScanner(
         {
             KeyClrTypeName = keyType.AssemblyQualifiedName ?? keyType.FullName ?? keyType.Name,
             KeyKind = GetValueKind(keyType),
+            KeyEnumValues = GetEnumValues(keyType),
+            KeyEnumUnderlyingClrTypeName = keyType.IsEnum ? Enum.GetUnderlyingType(keyType).FullName : null,
             ValueTemplate = ScanNode(
                 valueType,
                 "Value",
@@ -308,7 +322,8 @@ internal sealed class ConfigurationDefinitionScanner(
             return ConfigurationNodeKind.Scalar;
         }
 
-        if (actual != typeof(string) && typeof(IDictionary).IsAssignableFrom(actual))
+        if (actual != typeof(string) && (typeof(IDictionary).IsAssignableFrom(actual)
+            || GetClosedGenericInterface(actual, typeof(IDictionary<,>)) is not null))
         {
             return ConfigurationNodeKind.Dictionary;
         }
@@ -434,7 +449,23 @@ internal sealed class ConfigurationDefinitionScanner(
         Type nodeType,
         IEnumerable<ValidationAttribute> attributes)
     {
-        var rules = attributes.Select<ValidationAttribute, ConfigurationValidationRule?>(attribute => attribute switch
+        var rules = new List<ConfigurationValidationRule>();
+        foreach (var attribute in attributes)
+        {
+            var supported = attribute.GetType() == typeof(RequiredAttribute)
+                || attribute.GetType() == typeof(RangeAttribute)
+                || attribute.GetType() == typeof(RegularExpressionAttribute)
+                || attribute.GetType() == typeof(MaxLengthAttribute)
+                || attribute.GetType() == typeof(MinLengthAttribute)
+                || attribute.GetType() == typeof(StringLengthAttribute);
+            if (!supported)
+            {
+                throw new ConfigurationValidationExecutionException(
+                    nodeType.FullName ?? nodeType.Name, LogicalPath.Root, "unsupported-validation-attribute",
+                    ConfigurationValidationIssueKind.Contract);
+            }
+
+            var rule = attribute switch
             {
                 RequiredAttribute required => new RequiredRule { ErrorMessage = required.ErrorMessage },
                 RangeAttribute range => new RangeRule(ToDecimal(range.Minimum), ToDecimal(range.Maximum)) { ErrorMessage = range.ErrorMessage },
@@ -442,11 +473,14 @@ internal sealed class ConfigurationDefinitionScanner(
                 MaxLengthAttribute max => new MaxLengthRule(max.Length) { ErrorMessage = max.ErrorMessage },
                 MinLengthAttribute min => new MinLengthRule(min.Length) { ErrorMessage = min.ErrorMessage },
                 StringLengthAttribute length => new MaxLengthRule(length.MaximumLength) { ErrorMessage = length.ErrorMessage },
-                _ => null
-            })
-            .Where(rule => rule is not null)
-            .Cast<ConfigurationValidationRule>()
-            .ToList();
+                _ => (ConfigurationValidationRule?)null
+            };
+            if (rule is not null) rules.Add(rule);
+            if (attribute is StringLengthAttribute { MinimumLength: > 0 } minimum)
+            {
+                rules.Add(new MinLengthRule(minimum.MinimumLength) { ErrorMessage = minimum.ErrorMessage });
+            }
+        }
 
         var actual = Nullable.GetUnderlyingType(nodeType) ?? nodeType;
         if (actual.IsEnum && !rules.OfType<AllowedValuesRule>().Any())

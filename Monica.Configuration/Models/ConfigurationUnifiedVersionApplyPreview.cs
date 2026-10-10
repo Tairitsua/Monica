@@ -19,6 +19,15 @@ public sealed record ConfigurationUnifiedVersionApplyPreview
     /// </remarks>
     public required string PreviewFingerprint { get; init; }
 
+    /// <summary>Gets complete validation reports under the current owner contracts.</summary>
+    public IReadOnlyList<ConfigurationCandidateValidationReport> ValidationReports { get; init; } = [];
+
+    /// <summary>Gets safe final-aggregate or provider-adoption planning findings.</summary>
+    public IReadOnlyList<ConfigurationMutationValidationProblem> Problems { get; init; } = [];
+
+    /// <summary>Gets the complete mutation-group fingerprint for the reviewed physical write plan.</summary>
+    public string? ValidationFingerprint { get; init; }
+
     /// <summary>
     /// Gets the per-definition apply targets, including definitions that require no change and definitions
     /// that will be skipped because they are unknown to the current process or incompatible with the
@@ -99,11 +108,13 @@ public sealed record ConfigurationUnifiedVersionApplyPreview
     public bool HasChanges => ChangeCount > 0;
 
     /// <summary>
-    /// Gets whether the plan can be applied. Skipped definitions never block the apply; every
-    /// non-skipped changed target must be safely applicable.
+    /// Gets whether the plan can be applied. Skipped historical definitions do not block the apply;
+    /// every remaining target and every stored/effective validation report must be valid.
     /// </summary>
     public bool CanApply =>
-        HasChanges && Targets
+        HasChanges && Problems.Count == 0 && ValidationReports.All(static report => report.IsValid)
+        && Targets.Where(static target => !target.IsSkipped).All(target =>
+            ValidationReports.Any(report => report.DefinitionKey == target.DefinitionKey && report.IsValid)) && Targets
             .Where(static target => !target.IsSkipped)
             .All(static target => target.CanApply());
 }
@@ -172,6 +183,9 @@ public sealed record ConfigurationUnifiedVersionApplyTarget
     /// </summary>
     public IReadOnlyList<ConfigurationUnifiedVersionValidationIssue> ValidationIssues { get; init; } = [];
 
+    /// <summary>Gets complete current-contract coverage for the captured aggregate.</summary>
+    public ConfigurationCandidateValidationReport? ValidationReport { get; init; }
+
     /// <summary>
     /// Gets whether this target is skipped by the apply: its definition is unknown to the current
     /// process, or its captured value is hard-incompatible with the current schema.
@@ -196,7 +210,8 @@ public sealed record ConfigurationUnifiedVersionApplyTarget
     /// they are neutral for the apply decision.
     /// </summary>
     public bool IsBlocked => Status is
-        ConfigurationUnifiedVersionApplyTargetStatus.RuntimeOutOfSync
+        ConfigurationUnifiedVersionApplyTargetStatus.ValidationRejected
+        or ConfigurationUnifiedVersionApplyTargetStatus.RuntimeOutOfSync
         or ConfigurationUnifiedVersionApplyTargetStatus.ReadOnlyOverride
         or ConfigurationUnifiedVersionApplyTargetStatus.CompositeSourceConflict
         or ConfigurationUnifiedVersionApplyTargetStatus.LowerPriorityFallback
@@ -420,5 +435,8 @@ public enum ConfigurationUnifiedVersionApplyTargetStatus
     /// <summary>
     /// The resolved source type cannot be written by Monica.Configuration.
     /// </summary>
-    UnsupportedSource
+    UnsupportedSource,
+
+    /// <summary>The captured value fails the current complete contract or cannot be fully validated.</summary>
+    ValidationRejected
 }

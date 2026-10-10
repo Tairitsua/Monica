@@ -7,6 +7,9 @@ namespace Monica.Configuration.Annotations;
 /// </summary>
 /// <remarks>
 /// Configuration identity is declared per options type and is not inherited by derived classes.
+/// A locally discovered owner must be a concrete, closed class with a public parameterless instance constructor,
+/// matching Microsoft options creation. The class itself need not be public. Discovery rejects an unsupported
+/// root constructor before registration or effective-value seeding; nested binding retains its own construction rules.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ConfigurationAttribute : Attribute

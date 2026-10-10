@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Configuration.Abstractions;
+using Monica.Configuration.Binding;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services.Support;
 using Monica.Core.Modularity.Abstractions;
@@ -68,6 +69,8 @@ public sealed class MonicaConfigurationInputPlan
     public MonicaBootstrapConfiguration BuildBootstrapConfiguration(IHostApplicationBuilder hostBuilder)
     {
         ArgumentNullException.ThrowIfNull(hostBuilder);
+
+        ShapeAwareJsonConfigurationExtensions.PreserveJsonShapes(hostBuilder.Configuration);
 
         var builder = CreateConfigurationBuilder(hostBuilder);
         builder.AddConfiguration(hostBuilder.Configuration);
@@ -153,7 +156,7 @@ public sealed class MonicaConfigurationInputPlan
         {
             module.ConfigureBuilder(context =>
             {
-                context.HostApplicationBuilder.Configuration.AddJsonFile(
+                context.HostApplicationBuilder.Configuration.AddShapeAwareJsonFile(
                     source.Path,
                     source.Optional,
                     source.ReloadOnChange);
@@ -207,7 +210,7 @@ public sealed class MonicaConfigurationInputPlan
     {
         foreach (var source in _managedJsonSources)
         {
-            builder.AddJsonFile(source.Path, source.Optional, reloadOnChange: false);
+            builder.AddShapeAwareJsonFile(source.Path, source.Optional, reloadOnChange: false);
         }
     }
 

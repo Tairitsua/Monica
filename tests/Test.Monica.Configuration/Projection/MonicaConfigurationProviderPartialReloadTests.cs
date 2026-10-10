@@ -76,7 +76,7 @@ public sealed class MonicaConfigurationProviderPartialReloadTests : IDisposable
         services.AddSingleton<IConfigurationDefinitionRegistry>(registry);
         services.AddSingleton(store);
         services.AddSingleton<IConfigurationEffectiveValueStore>(store);
-        services.AddSingleton<ConfigurationEffectiveValueSeedFactory>();
+        ConfigurationValidationTestServices.AddCoreServices(services);
         services.AddSingleton<ConfigurationStoredValueCodec>();
         services.AddSingleton<ConfigurationEffectiveValuePatchEngine>();
         services.AddSingleton<ConfigurationEffectiveValueDocumentEditor>();

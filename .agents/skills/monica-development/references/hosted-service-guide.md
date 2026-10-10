@@ -73,6 +73,10 @@ The base class seals `StartAsync`, `StopAsync`, and `ExecuteAsync`. Customize li
 - `OnStoppingAsync` and `OnStoppedAsync`
 - `OnHeartbeatAsync` when `HeartbeatInterval` is enabled
 
+Heartbeat shutdown is cooperative inside its worker loop. Stopping before that worker begins must still drain it,
+complete background cleanup, and run the remaining stop hooks inside the lifecycle pipeline. Await `StopAsync`
+before disposing the service.
+
 Do not create an unmanaged scope around the permanent background loop. For finite business work that should run through Monica's execution pipeline, register an `IHostedServiceWorkItem` and invoke `ExecuteWorkItemAsync<TWorkItem>(...)` or its typed input/result overload.
 
 Register the service normally:

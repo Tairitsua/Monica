@@ -39,7 +39,7 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
         result.IsFailed(out var error, out _).Should().BeTrue();
         error!.Status.Should().Be(ResStatus.Conflict);
-        error.Message.Should().Contain("preview is stale");
+        error.Message.Should().Contain("reviewed configuration changed").And.Contain("new preview");
         await applyService.DidNotReceive()
             .ApplyAsync(Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
     }
@@ -59,7 +59,7 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
         // An empty snapshot never resolves definition collaborators; it still exercises the production fingerprint
         // computation and stale-preview guard without requiring persistence or configuration-provider integration.
-        var previewFactory = new ConfigurationUnifiedVersionRollbackPreviewFactory(null!, null!, null!, null!);
+        var previewFactory = new ConfigurationUnifiedVersionRollbackPreviewFactory(null!, null!, null!, null!, applyService);
         var service = new ConfigurationUnifiedVersionService(
             versionStore,
             applyService,
@@ -99,6 +99,7 @@ public sealed class ConfigurationUnifiedVersionServiceTests
             sourceWriter: null!,
             runtimeContext: null!,
             runtimeValidationService: null!,
+            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
             candidateValidationService: null!,
             runtimeReloadService: null!,
             reloadBroadcastService: null!);

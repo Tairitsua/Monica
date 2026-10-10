@@ -19,7 +19,8 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
     private readonly MonicaEffectiveOptionsSnapshotOptions _options;
     private readonly ConfigurationDefinitionScanner _definitionScanner;
     private readonly ConfigurationEffectiveValueSeedFactory _seedFactory;
-    private readonly ConfigurationEffectiveValueDocumentEditor _documentEditor;
+    private readonly ConfigurationLocalDefinitionRegistry _localRegistry = new();
+    private readonly ConfigurationObjectMaterializer _materializer;
     private readonly ILogger _logger;
     private bool _disposed;
 
@@ -49,10 +50,8 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
 
         var runtimeContext = new ConfigurationRuntimeContext();
         runtimeContext.Capture(bootstrapConfiguration);
-        _seedFactory = new ConfigurationEffectiveValueSeedFactory(runtimeContext);
-        _documentEditor = new ConfigurationEffectiveValueDocumentEditor(
-            new ConfigurationEffectiveValuePatchEngine(),
-            new ConfigurationStoredValueCodec());
+        _materializer = new ConfigurationObjectMaterializer(_localRegistry);
+        _seedFactory = new ConfigurationEffectiveValueSeedFactory(runtimeContext, _localRegistry, _materializer);
     }
 
     public MonicaEffectiveOptionsSnapshot Load(IReadOnlyCollection<Type> optionsTypes)
@@ -133,6 +132,8 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
         var definitions = optionsTypes
             .Select(ScanOptionsType)
             .ToArray();
+        _localRegistry.RegisterRange(optionsTypes.Zip(definitions,
+            (type, definition) => new ConfigurationDefinitionRegistration(type, definition)));
 
         var definitionKeys = definitions
             .Select(static definition => definition.DefinitionKey)
@@ -194,11 +195,12 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
         }
     }
 
-    private Dictionary<string, string?> ProjectDocuments(
+    private ConfigurationValueProjection ProjectDocuments(
         IReadOnlyList<ConfigurationDefinition> definitions,
         IReadOnlyList<ConfigurationEffectiveValueDocument?> documents)
     {
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < definitions.Count; i++)
         {
             var definition = definitions[i];
@@ -213,10 +215,12 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
             try
             {
                 var json = document?.Json ?? _seedFactory.CreateSeedJson(definition);
-                foreach (var (key, value) in _documentEditor.Project(definition, json))
+                var projection = _materializer.Project(definition, json);
+                foreach (var (key, value) in projection.Values)
                 {
                     values[key] = value;
                 }
+                foreach (var (key, shape) in projection.Shapes) shapes[key] = shape;
             }
             catch (Exception ex)
             {
@@ -226,10 +230,10 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
             }
         }
 
-        return values;
+        return new ConfigurationValueProjection(values, shapes);
     }
 
-    private IConfigurationRoot BuildConfiguration(IReadOnlyDictionary<string, string?> monicaValues)
+    private IConfigurationRoot BuildConfiguration(ConfigurationValueProjection monicaValues)
     {
         var builder = new ConfigurationBuilder();
         if (!string.IsNullOrWhiteSpace(_contentRootPath))
@@ -238,11 +242,11 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
         }
 
         builder.AddConfiguration(_hostConfiguration);
-        builder.AddInMemoryCollection(monicaValues);
+        builder.Add(new ConfigurationValueProjectionSource(monicaValues));
 
         foreach (var source in _managedJsonSources)
         {
-            builder.AddJsonFile(source.Path, source.Optional, reloadOnChange: false);
+            builder.AddShapeAwareJsonFile(source.Path, source.Optional, reloadOnChange: false);
         }
 
         return builder.Build();
@@ -255,12 +259,7 @@ internal sealed class MonicaEffectiveOptionsSnapshotLoader : IDisposable, IAsync
     {
         try
         {
-            var instance = Activator.CreateInstance(optionsType, nonPublic: true)
-                ?? throw new InvalidOperationException(
-                    $"Failed to create Monica effective options type '{optionsType.FullName ?? optionsType.Name}'. A parameterless constructor is required.");
-
-            MonicaConfigurationBinder.Bind(configuration.GetSection(definition.SectionPath), instance);
-            return instance;
+            return _materializer.Materialize(definition, configuration);
         }
         catch (Exception ex)
         {

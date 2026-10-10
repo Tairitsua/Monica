@@ -1,0 +1,89 @@
+@inject IStringLocalizer<ConfigurationUIResource> L
+
+<MudPaper Outlined="true" Class="pa-3">
+    <MudStack Spacing="2">
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <MudText Typo="Typo.subtitle2">@Title</MudText>
+            }
+            <MudTooltip Text="@L["Validation:Coverage"].Value">
+                <MudChip T="string" Size="Size.Small" Color="@StatusColor" Variant="Variant.Outlined">@CoverageText</MudChip>
+            </MudTooltip>
+        </MudStack>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@L["Validation:Scope", ScopeText]</MudText>
+        @if (Scope == ConfigurationValidationScope.CompleteAggregate && Target is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @(Target == ConfigurationCandidateValidationTarget.StoredDocument
+                    ? L["Validation:StoredDocument"] : L["Validation:EffectiveAggregate"])
+            </MudText>
+            @if (Target == ConfigurationCandidateValidationTarget.EffectiveAggregate && HasEffectiveChange == false)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">@L["Validation:MaskedChange"]</MudAlert>
+            }
+        }
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @(string.IsNullOrWhiteSpace(ValidationRevision) ? L["Validation:RevisionUnavailable"] : L["Validation:Revision", ValidationRevision])
+        </MudText>
+        @ChildContent
+        <MudAlert Severity="@StatusSeverity" Dense="true">@StatusText</MudAlert>
+        <ConfigurationValidationIssueList Issues="Issues"
+                                          ShowRuntimeMetadata="ShowRuntimeMetadata"
+                                          ShowSourceChain="ShowSourceChain"
+                                          ValueLabel="@(ShowRuntimeMetadata ? L["State:RuntimeValidation:CurrentValue"].Value : null)"
+                                          ReasonLabel="@(ShowRuntimeMetadata ? L["State:RuntimeValidation:Problem"].Value : null)"
+                                          JumpRequested="JumpRequested"
+                                          SourceChainRequested="SourceChainRequested" />
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter, EditorRequired] public ConfigurationValidationCoverage Coverage { get; set; }
+    [Parameter, EditorRequired] public ConfigurationValidationScope Scope { get; set; }
+    [Parameter] public string? ValidationRevision { get; set; }
+    /// <summary>Gets the candidate target; source and actual-options diagnostics do not use this label.</summary>
+    [Parameter] public ConfigurationCandidateValidationTarget? Target { get; set; }
+    /// <summary>Gets whether a reviewed aggregate changes the effective configuration, when known.</summary>
+    [Parameter] public bool? HasEffectiveChange { get; set; }
+    [Parameter] public bool IsValid { get; set; }
+    [Parameter] public bool IsSchemaValid { get; set; }
+    [Parameter] public IReadOnlyList<ConfigurationValidationIssue> Issues { get; set; } = [];
+    [Parameter] public bool ShowRuntimeMetadata { get; set; }
+    [Parameter] public bool ShowSourceChain { get; set; }
+    [Parameter] public EventCallback<ConfigurationValidationIssue> JumpRequested { get; set; }
+    [Parameter] public EventCallback<ConfigurationValidationIssue> SourceChainRequested { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Color StatusColor => ConfigurationValidationPresentation.StatusColor(Coverage, IsValid);
+
+    private Severity StatusSeverity => Coverage switch
+    {
+        ConfigurationValidationCoverage.Failed => Severity.Error,
+        ConfigurationValidationCoverage.SchemaOnly => Severity.Warning,
+        _ => IsValid ? Severity.Success : Severity.Error
+    };
+
+    private string CoverageText => Coverage switch
+    {
+        ConfigurationValidationCoverage.Complete => L["Validation:Complete"].Value,
+        ConfigurationValidationCoverage.SchemaOnly => L["Validation:SchemaOnly"].Value,
+        _ => L["Validation:Failed"].Value
+    };
+
+    private string ScopeText => Scope switch
+    {
+        ConfigurationValidationScope.Fragment => L["Validation:Fragment"].Value,
+        ConfigurationValidationScope.ActualOptions => L["Validation:ActualOptions"].Value,
+        _ => L["Validation:CompleteAggregate"].Value
+    };
+
+    private string StatusText => Coverage switch
+    {
+        ConfigurationValidationCoverage.Failed => L["Validation:FailedNotice"].Value,
+        ConfigurationValidationCoverage.SchemaOnly => IsSchemaValid
+            ? L["Validation:SchemaValid"].Value : L["Validation:SchemaInvalid"].Value,
+        _ => IsValid ? L["Validation:Valid"].Value : L["Validation:Invalid"].Value
+    };
+}

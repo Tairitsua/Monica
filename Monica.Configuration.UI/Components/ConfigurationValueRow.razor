@@ -530,9 +530,13 @@
             FullWidth = true
         });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: ConfigurationJsonDraftResult draft })
+        if (result is { Canceled: false, Data: ConfigurationJsonEditResult edit })
         {
-            StateStore.ReplaceScope(Definition.DefinitionKey, Node.RelativePath, draft.Changes, draft.ValidationIssues);
+            if (!StateStore.TryReplaceJsonEditorScope(edit))
+            {
+                Snackbar.Add(L["ImportExport:JsonEditor:PendingStateUnavailable"], Severity.Warning);
+                return;
+            }
             await Changed.InvokeAsync();
         }
     }

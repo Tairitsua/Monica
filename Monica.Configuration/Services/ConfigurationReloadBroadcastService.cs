@@ -32,7 +32,7 @@ internal sealed class ConfigurationReloadBroadcastService(
                 Kind = ConfigurationPostCommitIssueKind.LocalReload,
                 Source = nameof(ConfigurationReloadBroadcastService),
                 Message = "The current process could not reload its Monica configuration projection.",
-                Detail = ex.ToString()
+                Detail = "Review server logs for the local projection reload failure."
             });
         }
 

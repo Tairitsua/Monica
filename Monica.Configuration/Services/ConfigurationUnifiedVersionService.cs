@@ -121,6 +121,7 @@ internal sealed class ConfigurationUnifiedVersionService(
             Reason = request.Reason,
             Context = new ConfigurationMutationContext { Reason = request.Reason },
             Commands = commands,
+            ExpectedValidationFingerprint = preview.ValidationFingerprint,
             // Skipped definitions (unknown or schema-incompatible) must not participate in post-commit
             // verification, which requires a resolvable definition and effective value.
             ExpectedEffectiveValues = preview.Targets
@@ -131,6 +132,8 @@ internal sealed class ConfigurationUnifiedVersionService(
                     Json = target.TargetJson
                 }).ToArray()
         }, cancellationToken);
+        if (applyResult.Status == ConfigurationMutationGroupApplyStatus.Rejected)
+            throw new InvalidOperationException("Complete configuration validation rejected the rollback before persistence.");
         var results = applyResult.Outcomes
             .Where(static outcome => outcome is
                 { Status: ConfigurationMutationOutcomeStatus.Applied, Result: not null })
@@ -140,14 +143,14 @@ internal sealed class ConfigurationUnifiedVersionService(
         return new ConfigurationUnifiedVersionRollbackResult
         {
             Version = request.Version,
-            MutationGroup = applyResult.MutationGroup,
+            MutationGroup = applyResult.MutationGroup ?? throw new InvalidOperationException("The applied rollback has no persisted mutation group."),
             Results = results,
             ApplyResult = applyResult,
             SkippedDefinitionKeys = preview.SkippedDefinitionKeys
         };
     }
 
-    private static IReadOnlyList<ConfigurationMutationCommand> BuildCommands(
+    internal static IReadOnlyList<ConfigurationMutationCommand> BuildCommands(
         long version,
         ConfigurationUnifiedVersionApplyPreview preview)
     {

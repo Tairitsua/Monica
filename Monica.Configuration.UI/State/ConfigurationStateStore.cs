@@ -1,4 +1,5 @@
 using Monica.Configuration.Models;
+using Monica.Configuration.UI.Models;
 
 namespace Monica.Configuration.UI.State;
 
@@ -167,6 +168,53 @@ public sealed class ConfigurationStateStore
         {
             NotifyChanged();
         }
+    }
+
+    /// <summary>Checks that an editor can preserve redacted drafts without splitting an overlapping parent edit.</summary>
+    internal bool CanReplaceJsonEditorScope(string definitionKey, LogicalPath scopePath, IReadOnlyList<LogicalPath> redactedPaths)
+    {
+        bool IsHidden(LogicalPath path) => redactedPaths.Any(redacted => IsPrefix(redacted, path));
+        bool IsAmbiguous(LogicalPath path) =>
+            IsPrefix(path, scopePath) && !path.Equals(scopePath)
+            || redactedPaths.Any(redacted => IsPrefix(path, redacted) && !IsHidden(path));
+
+        if (_pendingChanges.Values.Any(change =>
+                string.Equals(change.DefinitionKey, definitionKey, StringComparison.Ordinal)
+                && (IsPrefix(scopePath, change.LogicalPath) || IsPrefix(change.LogicalPath, scopePath))
+                && IsAmbiguous(change.LogicalPath)))
+            return false;
+
+        foreach (var issue in _validationIssues.Values.Where(issue =>
+                     string.Equals(issue.DefinitionKey, definitionKey, StringComparison.Ordinal)))
+        {
+            var locations = issue.LogicalPaths.Append(issue.LogicalPath).Distinct().ToArray();
+            if (!locations.Any(path => IsPrefix(scopePath, path) || IsPrefix(path, scopePath)))
+                continue;
+            if (locations.Any(IsAmbiguous) || locations.Any(IsHidden) && !locations.All(IsHidden))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>Replaces visible editor state while retaining current drafts and issues wholly inside redacted paths.</summary>
+    internal bool TryReplaceJsonEditorScope(ConfigurationJsonEditResult result)
+    {
+        var draft = result.Draft;
+        bool IsHidden(LogicalPath path) => result.RedactedPaths.Any(redacted => IsPrefix(redacted, path));
+        bool TouchesHidden(LogicalPath path) => result.RedactedPaths.Any(redacted =>
+            IsPrefix(redacted, path) || IsPrefix(path, redacted));
+        if (!CanReplaceJsonEditorScope(draft.DefinitionKey, draft.ScopePath, result.RedactedPaths)
+            || draft.Changes.Any(change => TouchesHidden(change.LogicalPath))
+            || draft.ValidationIssues.Any(issue => issue.LogicalPaths.Append(issue.LogicalPath).Any(TouchesHidden)))
+            return false;
+
+        var changes = draft.Changes.Concat(GetScope(draft.DefinitionKey, draft.ScopePath)
+            .Where(change => IsHidden(change.LogicalPath))).ToArray();
+        var issues = draft.ValidationIssues.Concat(_validationIssues.Values.Where(issue =>
+            string.Equals(issue.DefinitionKey, draft.DefinitionKey, StringComparison.Ordinal)
+            && IsPrefix(draft.ScopePath, issue.LogicalPath) && IsHidden(issue.LogicalPath))).ToArray();
+        ReplaceScope(draft.DefinitionKey, draft.ScopePath, changes, issues);
+        return true;
     }
 
     /// <summary>

@@ -94,9 +94,10 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
     private static readonly MethodInfo BIND_OPTIONS_METHOD = GetRequiredGenericMethod(
         typeof(MonicaConfigurationBinder),
         nameof(MonicaConfigurationBinder.BindOptions),
-        [typeof(OptionsBuilder<>), typeof(IConfiguration)]);
+        [typeof(OptionsBuilder<>), typeof(IConfiguration), typeof(string), typeof(string)]);
 
     private readonly ConfigurationDefinitionRegistry _definitionRegistry = new();
+    private readonly ConfigurationLocalDefinitionRegistry _localDefinitionRegistry = new();
     private readonly ConfigurationRuntimeContext _runtimeContext = new();
     private readonly ConfigurationSchemaHasher _schemaHasher = new();
     private ConfigurationDefinitionScanner? _definitionScanner;
@@ -119,6 +120,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
     public override void ConfigureBuilder(ModuleBuilderContext<ModuleConfigurationOption> context)
     {
         var builder = context.HostApplicationBuilder;
+        ShapeAwareJsonConfigurationExtensions.PreserveJsonShapes(builder.Configuration);
         _definitionScanner = new ConfigurationDefinitionScanner(
             _schemaHasher,
             Option.DefaultSectionPathConvention);
@@ -141,6 +143,14 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
 
         _services = services;
         services.TryAddSingleton<IConfigurationDefinitionRegistry>(_definitionRegistry);
+        services.TryAddSingleton(_localDefinitionRegistry);
+        services.TryAddSingleton(new ConfigurationValidationPolicy(Option.RuntimeValidationBehavior));
+        services.TryAddSingleton<ConfigurationObjectMaterializer>();
+        services.TryAddSingleton<ConfigurationObjectValidationWalker>();
+        services.TryAddSingleton<ConfigurationOptionsValidationDiagnostics>();
+        services.TryAddSingleton<IConfigurationOptionsValidationDiagnostics>(provider =>
+            provider.GetRequiredService<ConfigurationOptionsValidationDiagnostics>());
+        services.TryAddSingleton<IConfigurationOptionsInstanceValidationService, ConfigurationOptionsInstanceValidationService>();
         services.TryAddSingleton<IConfigurationEffectiveValueReader>(serviceProvider =>
             serviceProvider.GetRequiredService<IConfigurationEffectiveValueStore>());
         services.TryAddSingleton<ConfigurationDefinitionResolver>();
@@ -174,7 +184,8 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton<ConfigurationPathProjector>();
         services.TryAddSingleton<ConfigurationEffectiveValuePatchEngine>();
         services.TryAddSingleton<ConfigurationEffectiveValueDocumentEditor>();
-        services.TryAddSingleton<ConfigurationEffectiveValueSeedFactory>();
+        services.TryAddSingleton(provider => new ConfigurationEffectiveValueSeedFactory(
+            _runtimeContext, _localDefinitionRegistry, provider.GetRequiredService<ConfigurationObjectMaterializer>()));
         services.TryAddSingleton<IConfigurationSourceInspector, ConfigurationSourceInspector>();
         services.TryAddSingleton<IConfigurationRuntimeValidationService, ConfigurationRuntimeValidationService>();
         services.TryAddSingleton<IConfigurationRuntimeReloadService, ConfigurationRuntimeReloadService>();
@@ -262,6 +273,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
 
         _definitionRegistry.RegisterRange(
             analysis.Registrations.Select(static registration => registration.Definition));
+        _localDefinitionRegistry.RegisterRange(analysis.Registrations);
 
         foreach (var conflict in analysis.SectionPathConflicts)
         {
@@ -340,22 +352,20 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         var optionsBuilder = ADD_OPTIONS_METHOD.MakeGenericMethod(optionsType).Invoke(null, [services])
             ?? throw new InvalidOperationException($"Failed to create OptionsBuilder for '{optionsType.FullName}'.");
 
-        var configurationSection = _runtimeContext.Configuration.GetSection(sectionPath);
-        BIND_OPTIONS_METHOD.MakeGenericMethod(optionsType).Invoke(null, [optionsBuilder, configurationSection]);
-        if (Option.RuntimeValidationBehavior == ConfigurationRuntimeValidationBehavior.FailFast)
-        {
-            RegisterOptionsValidator(services, optionsType, definitionKey);
-        }
+        BIND_OPTIONS_METHOD.MakeGenericMethod(optionsType).Invoke(null,
+            [optionsBuilder, _runtimeContext.Configuration, sectionPath, definitionKey]);
+        RegisterOptionsValidator(services, optionsType, definitionKey, Option.RuntimeValidationBehavior);
     }
 
     private static void RegisterOptionsValidator(
         IServiceCollection services,
         Type optionsType,
-        string definitionKey)
+        string definitionKey,
+        ConfigurationRuntimeValidationBehavior behavior)
     {
         var serviceType = typeof(IValidateOptions<>).MakeGenericType(optionsType);
         var validatorType = typeof(MonicaConfigurationOptionsValidator<>).MakeGenericType(optionsType);
-        services.AddSingleton(serviceType, provider => ActivatorUtilities.CreateInstance(provider, validatorType, definitionKey));
+        services.AddSingleton(serviceType, provider => ActivatorUtilities.CreateInstance(provider, validatorType, behavior, definitionKey));
     }
 
     private static MethodInfo GetRequiredGenericMethod(Type extensionType, string methodName, IReadOnlyList<Type> parameterTypeDefinitions)

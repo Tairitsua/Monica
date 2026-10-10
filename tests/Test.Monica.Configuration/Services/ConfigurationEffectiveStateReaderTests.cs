@@ -137,7 +137,7 @@ public sealed class ConfigurationEffectiveStateReaderTests
         runtimeContext.Capture(configuration);
         return new ConfigurationEffectiveStateReader(
             store,
-            new ConfigurationEffectiveValueSeedFactory(runtimeContext),
+            ConfigurationValidationTestServices.CreateSeedFactory(runtimeContext),
             new ConfigurationEffectiveValueDocumentEditor(
                 new ConfigurationEffectiveValuePatchEngine(),
                 new ConfigurationStoredValueCodec()),

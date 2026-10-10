@@ -551,6 +551,7 @@ public sealed class ConfigurationDefinitionChangeImpactServiceTests
             sourceWriter: null!,
             runtimeContext: null!,
             runtimeValidationService: null!,
+            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
             candidateValidationService: null!,
             runtimeReloadService: null!,
             reloadBroadcastService: null!);

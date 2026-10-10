@@ -15,6 +15,12 @@ public sealed record ConfigurationDictionaryTemplate
     /// </summary>
     public ConfigurationValueKind KeyKind { get; init; }
 
+    /// <summary>Gets portable named enum-key values without loading the owner's enum type remotely.</summary>
+    public IReadOnlyList<ConfigurationEnumValue> KeyEnumValues { get; init; } = [];
+
+    /// <summary>Gets the built-in integral enum storage identity for exact numeric dictionary-key conversion.</summary>
+    public string? KeyEnumUnderlyingClrTypeName { get; init; }
+
     /// <summary>
     /// Gets the optional key validation regular expression.
     /// </summary>
