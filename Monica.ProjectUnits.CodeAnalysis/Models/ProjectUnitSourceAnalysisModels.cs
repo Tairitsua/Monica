@@ -133,18 +133,25 @@ public enum ProjectUnitSourceAnalysisStage
     ResolvingDependencies,
 
     /// <summary>The source catalog is complete.</summary>
-    Completed
+    Completed,
+
+    /// <summary>Selected projects and their referenced build inputs are being observed.</summary>
+    EvaluatingInputs
 }
 
 /// <summary>Workspace and project input for one source analysis.</summary>
 /// <remarks>
 /// Project paths are analyzed for ProjectUnits; test project paths are analyzed only for test classes —
-/// they contribute no units of their own.
+/// they contribute no units of their own. Supply SolutionPath for solution-backed workspaces so the
+/// selected projects can be loaded together through a temporary solution filter. The original solution
+/// supplies SolutionDir; unselected projects contribute only when referenced by the selected graph.
+/// Selected projects absent from that solution are loaded individually in the same workspace.
 /// </remarks>
 public sealed record ProjectUnitSourceAnalysisRequest(
     string WorkspaceRoot,
     IReadOnlyList<string> ProjectPaths,
-    IReadOnlyList<string>? TestProjectPaths = null);
+    IReadOnlyList<string>? TestProjectPaths = null,
+    string? SolutionPath = null);
 
 /// <summary>Progress reported while loading and analyzing projects.</summary>
 public sealed record ProjectUnitSourceAnalysisProgress(

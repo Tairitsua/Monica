@@ -13,7 +13,8 @@ public interface IProjectUnitSourceAnalyzer
     /// </summary>
     /// <param name="request">
     /// Workspace root with normalized project files to analyze. Test project files are analyzed for test classes
-    /// only and contribute no units.
+    /// only and contribute no units. An optional workspace solution batches selected projects through a temporary
+    /// solution filter without widening the requested catalog scope.
     /// </param>
     /// <param name="progress">Optional progress observer. Callbacks may occur on background threads.</param>
     /// <param name="cancellationToken">Cancellation token for project loading and semantic analysis.</param>
@@ -25,6 +26,8 @@ public interface IProjectUnitSourceAnalyzer
     /// facts. Test class traits and method traits remain separate. InputPaths describes SDK-evaluated imports and
     /// source/reference files; EvaluationContexts records the corresponding design-time properties. Incomplete
     /// input evaluation yields partial results. InputsChangedDuringAnalysis reports stamp drift, not cryptographic evidence.
+    /// Solution-backed analysis and individual-project recovery share SolutionDir. Compilations are obtained from
+    /// the final loaded solution so referenced compilations and source generators can be shared across the analysis.
     /// </remarks>
     Task<ProjectUnitSourceCatalog> AnalyzeAsync(
         ProjectUnitSourceAnalysisRequest request,

@@ -8,23 +8,33 @@ internal static class ProjectUnitBuildInputs
 {
     // Keep this explicit context shared with MSBuildWorkspace. These are the .NET design-time
     // defaults in Roslyn 5.0 ProjectBuildManager; they are not inferred from host build settings.
-    public static Dictionary<string, string> CreateGlobalProperties() => new(StringComparer.OrdinalIgnoreCase)
+    public static Dictionary<string, string> CreateGlobalProperties(string? solutionPath = null)
     {
-        ["DesignTimeBuild"] = "True",
-        ["NonExistentFile"] = "__NonExistentSubDir__\\__NonExistentFile__",
-        ["BuildProjectReferences"] = "False",
-        ["BuildingProject"] = "False",
-        ["ProvideCommandLineArgs"] = "True",
-        ["SkipCompilerExecution"] = "True",
-        ["ContinueOnError"] = "ErrorAndContinue",
-        ["ShouldUnsetParentConfigurationAndPlatform"] = "False"
-    };
+        var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["DesignTimeBuild"] = "True",
+            ["NonExistentFile"] = "__NonExistentSubDir__\\__NonExistentFile__",
+            ["BuildProjectReferences"] = "False",
+            ["BuildingProject"] = "False",
+            ["ProvideCommandLineArgs"] = "True",
+            ["SkipCompilerExecution"] = "True",
+            ["ContinueOnError"] = "ErrorAndContinue",
+            ["ShouldUnsetParentConfigurationAndPlatform"] = "False"
+        };
+        if (solutionPath is not null)
+        {
+            // Roslyn's solution loader adds SolutionDir, including its trailing separator.
+            // Input evaluation and individual-project recovery must use the same context.
+            properties["SolutionDir"] = Path.GetDirectoryName(solutionPath) + Path.DirectorySeparatorChar;
+        }
+        return properties;
+    }
 
     // MSBuildLocator must register before the JIT resolves Microsoft.Build types in this method.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static EvaluatedProjectInputs Evaluate(string projectPath)
+    public static EvaluatedProjectInputs Evaluate(string projectPath, string? solutionPath = null)
     {
-        using var collection = new ProjectCollection(CreateGlobalProperties());
+        using var collection = new ProjectCollection(CreateGlobalProperties(solutionPath));
         var project = new Project(projectPath, null, null, collection,
             ProjectLoadSettings.RejectCircularImports | ProjectLoadSettings.IgnoreEmptyImports
             | ProjectLoadSettings.DoNotEvaluateElementsWithFalseCondition | ProjectLoadSettings.FailOnUnresolvedSdk);

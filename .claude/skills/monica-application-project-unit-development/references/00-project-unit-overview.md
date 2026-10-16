@@ -28,6 +28,12 @@ The framework also recognizes `IDomainEvent`, `IDistributedEventHandler<TEvent>`
 
 Ordinary internal `IRequestHandler<TRequest, TResult>` handlers, Facades, DTOs/value objects, modules, mappers, validators, and pure helpers are support types unless their actual shape matches a discovered role. `IResultRequest` itself is discoverable as `RequestDto` even when its handler is internal. Do not add a fake ProjectUnit base or new application role merely to make a support type appear in the catalog.
 
+## Source Analysis
+
+Consumers of `IProjectUnitSourceAnalyzer` should supply `ProjectUnitSourceAnalysisRequest.SolutionPath` when the selected workspace has a solution. The analyzer uses a temporary solution filter to batch the requested production and test projects without adding unselected projects to the catalog. Referenced projects still provide semantic context. Selected projects absent from the solution, or workspaces without a solution, use individual loading. All selected projects compile against the final loaded solution so shared references and source generators are not repeatedly compiled from earlier snapshots.
+
+The original solution supplies `SolutionDir` for input evaluation, loading, and recovery. The solution file participates in disposable input freshness observations. Progress reports input evaluation separately from loading; both counts include production and test projects. These source observations do not execute the application or its tests, and they do not establish test coverage or authorize changes.
+
 ## Agent Context Contract
 
 Every application-authored discovered unit must declare its own human-readable responsibility and associate applicable actual requirement IDs when they can be resolved. Generated types remain generator-owned. Missing legitimate traceability is [coverage debt](03-project-unit-context-metadata.md), not permission to invent a behavioral commitment:

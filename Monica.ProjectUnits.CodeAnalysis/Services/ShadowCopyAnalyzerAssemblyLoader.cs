@@ -63,8 +63,9 @@ public sealed class ShadowCopyAnalyzerAssemblyLoader : IAnalyzerAssemblyLoader
     /// Creates an MSBuild workspace whose analyzer service loads analyzer and generator assemblies
     /// through shadow copies instead of Roslyn's original-file-mapping default.
     /// </summary>
-    public static MSBuildWorkspace CreateWorkspace()
-        => MSBuildWorkspace.Create(ProjectUnitBuildInputs.CreateGlobalProperties(), HOST_SERVICES);
+    /// <param name="solutionPath">Optional absolute solution path supplying the design-time SolutionDir.</param>
+    public static MSBuildWorkspace CreateWorkspace(string? solutionPath = null)
+        => MSBuildWorkspace.Create(ProjectUnitBuildInputs.CreateGlobalProperties(solutionPath), HOST_SERVICES);
 
     private string ShadowCopy(string sourcePath)
     {

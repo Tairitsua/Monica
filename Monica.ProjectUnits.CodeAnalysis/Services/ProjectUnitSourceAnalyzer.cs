@@ -83,8 +83,31 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
                 diagnostics);
         }
 
-        var inputObservation = new SourceInputObservation(root, diagnostics);
-        using var workspace = ShadowCopyAnalyzerAssemblyLoader.CreateWorkspace();
+        var solutionPath = string.IsNullOrWhiteSpace(request.SolutionPath)
+            ? null
+            : Path.GetFullPath(request.SolutionPath, root);
+        if (solutionPath is not null && !IsWithinRoot(root, solutionPath))
+        {
+            throw new ArgumentException("The analysis solution must be inside the workspace root.", nameof(request));
+        }
+
+        var inputObservation = new SourceInputObservation(root, diagnostics, solutionPath);
+        for (var index = 0; index < allProjects.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var path = allProjects[index];
+            var relativePath = ToRelativePath(root, path);
+            Report(progress, ProjectUnitSourceAnalysisStage.EvaluatingInputs,
+                index, allProjects.Count, relativePath, $"Observing build inputs for {relativePath}.");
+            if (File.Exists(path))
+            {
+                inputObservation.ObserveBuildInputs(path, cancellationToken);
+            }
+        }
+        Report(progress, ProjectUnitSourceAnalysisStage.EvaluatingInputs,
+            allProjects.Count, allProjects.Count, null, "Build input observation completed.");
+
+        using var workspace = ShadowCopyAnalyzerAssemblyLoader.CreateWorkspace(solutionPath);
         var workspaceDiagnostics = new List<WorkspaceDiagnostic>();
         var workspaceDiagnosticsLock = new Lock();
         workspace.RegisterWorkspaceFailedHandler(args =>
@@ -95,53 +118,14 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
             }
         });
 
-        var loadedProjects = new List<Project>();
-        var transientFailures = new List<(string AbsolutePath, string RelativePath)>();
-        for (var index = 0; index < allProjects.Count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var projectPath = allProjects[index];
-            var relativePath = ToRelativePath(root, projectPath);
-            Report(
-                progress,
-                ProjectUnitSourceAnalysisStage.LoadingProjects,
-                index,
-                projects.Count,
-                relativePath,
-                $"Loading {relativePath}.");
-
-            if (!File.Exists(projectPath))
-            {
-                diagnostics.Add(new ProjectUnitSourceDiagnostic(
-                    "ProjectUnit.Analysis.Project.Missing",
-                    ProjectUnitSourceDiagnosticSeverity.Error,
-                    "The selected project file does not exist.",
-                    relativePath));
-                continue;
-            }
-
-            inputObservation.ObserveBuildInputs(projectPath);
-            try
-            {
-                var loaded = workspace.CurrentSolution.Projects.FirstOrDefault(project => string.Equals(
-                                 project.FilePath,
-                                 projectPath,
-                                 StringComparison.OrdinalIgnoreCase))
-                             ?? await workspace.OpenProjectAsync(
-                                 projectPath,
-                                 cancellationToken: cancellationToken);
-                loadedProjects.Add(loaded);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                diagnostics.Add(new ProjectUnitSourceDiagnostic(
-                    "ProjectUnit.Analysis.Project.LoadFailed",
-                    ProjectUnitSourceDiagnosticSeverity.Error,
-                    $"MSBuild could not load the project: {exception.GetType().Name}: {exception.Message}",
-                    relativePath));
-                transientFailures.Add((projectPath, relativePath));
-            }
-        }
+        var loader = new ProjectUnitWorkspaceLoader(root, allProjects, diagnostics, (completed, path) =>
+            Report(progress, ProjectUnitSourceAnalysisStage.LoadingProjects, completed, allProjects.Count, path,
+                path is null ? "Loading the selected project graph." : $"Loading {path}."));
+        var loaded = await loader.LoadAsync(workspace, solutionPath, cancellationToken);
+        var loadedProjects = loaded.Projects;
+        var transientFailures = loaded.FailedProjectPaths
+            .Select(path => (AbsolutePath: path, RelativePath: ToRelativePath(root, path)))
+            .ToList();
 
         lock (workspaceDiagnosticsLock)
         {
@@ -155,7 +139,7 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
                 diagnostic.Message)));
         }
 
-        inputObservation.Observe(workspace.CurrentSolution, loadedProjects);
+        inputObservation.Observe(workspace.CurrentSolution, loadedProjects, cancellationToken);
         var analyzedProjects = 0;
         var candidates = new List<AnalyzedProjectUnitCandidate>();
         var testClasses = new List<ProjectUnitSourceTestClass>();
@@ -307,8 +291,12 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
         return result;
     }
 
-    private sealed class SourceInputObservation(string root, List<ProjectUnitSourceDiagnostic> diagnostics)
+    private sealed class SourceInputObservation(
+        string root,
+        List<ProjectUnitSourceDiagnostic> diagnostics,
+        string? solutionPath)
     {
+        public string? SolutionPath { get; } = solutionPath;
         private readonly Dictionary<string, ProjectUnitSourceInput> _initialStamps = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, EvaluatedProjectInputs?> _evaluations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _projectPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -325,26 +313,32 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
                 static pair => (IReadOnlyList<string>)pair.Value.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
-        public void Observe(Solution solution, IReadOnlyList<Project> projects)
+        public void Observe(Solution solution, IReadOnlyList<Project> projects, CancellationToken cancellationToken)
         {
             foreach (var (project, paths) in CaptureInputPaths(solution, projects))
             {
-                ObserveBuildInputs(project);
+                cancellationToken.ThrowIfCancellationRequested();
+                ObserveBuildInputs(project, cancellationToken);
                 Record(project, paths);
             }
         }
 
-        public void ObserveBuildInputs(string selectedProject)
+        public void ObserveBuildInputs(string selectedProject, CancellationToken cancellationToken)
         {
+            if (SolutionPath is not null)
+            {
+                Record(selectedProject, [SolutionPath]);
+            }
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var pending = new Queue<string>();
             pending.Enqueue(Path.GetFullPath(selectedProject));
             while (pending.TryDequeue(out var path))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!visited.Add(path)) continue;
                 if (!_evaluations.TryGetValue(path, out var inputs))
                 {
-                    try { inputs = ProjectUnitBuildInputs.Evaluate(path); }
+                    try { inputs = ProjectUnitBuildInputs.Evaluate(path, SolutionPath); }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         inputs = null;
@@ -512,7 +506,7 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
             null,
             $"Retrying {failures.Count} transiently failed project(s) in a fresh workspace.");
         var recovered = 0;
-        using var retryWorkspace = ShadowCopyAnalyzerAssemblyLoader.CreateWorkspace();
+        using var retryWorkspace = ShadowCopyAnalyzerAssemblyLoader.CreateWorkspace(inputObservation.SolutionPath);
         var retryWorkspaceDiagnostics = new List<WorkspaceDiagnostic>();
         var retryWorkspaceDiagnosticsLock = new Lock();
         retryWorkspace.RegisterWorkspaceFailedHandler(args =>
@@ -528,11 +522,11 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                inputObservation.ObserveBuildInputs(absolutePath);
+                inputObservation.ObserveBuildInputs(absolutePath, cancellationToken);
                 var project = await retryWorkspace.OpenProjectAsync(
                     absolutePath,
                     cancellationToken: cancellationToken);
-                inputObservation.Observe(retryWorkspace.CurrentSolution, [project]);
+                inputObservation.Observe(retryWorkspace.CurrentSolution, [project], cancellationToken);
                 if (project.Language != LanguageNames.CSharp)
                 {
                     continue;
@@ -847,7 +841,8 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
         return stage switch
         {
             ProjectUnitSourceAnalysisStage.Initializing => 0m,
-            ProjectUnitSourceAnalysisStage.LoadingProjects => 5m + 35m * ratio,
+            ProjectUnitSourceAnalysisStage.EvaluatingInputs => 5m + 15m * ratio,
+            ProjectUnitSourceAnalysisStage.LoadingProjects => 20m + 20m * ratio,
             ProjectUnitSourceAnalysisStage.AnalyzingProjects => 40m + 50m * ratio,
             ProjectUnitSourceAnalysisStage.ResolvingDependencies => 95m,
             ProjectUnitSourceAnalysisStage.Completed => 100m,
