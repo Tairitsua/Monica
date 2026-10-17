@@ -8,12 +8,13 @@ Use request contracts for use-case input. Keep them stable and serializable.
 
 ```csharp
 using Monica.ProjectUnits.Annotations;
-using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Abstractions;
+using Monica.Application.Annotations;
 
 namespace $ContractNamespace$.Requests;
 
-[ApiEndpoint(ApiHttpMethod.Get, "$QueryRoute$", Binding = ApiRequestBinding.Query)]
+/// <summary>Reads the $FeatureName$ view.</summary>
+[ApiEndpoint(ApiHttpMethod.Get, "queries/$FeatureName$/{Id}")]
 [ProjectUnitMetadata(
     "$FeatureName$ Query",
     Description = "Requests the $FeatureName$ query use case.",
@@ -21,7 +22,8 @@ namespace $ContractNamespace$.Requests;
 [ProjectUnitRequirement("$RequirementId$")]
 public sealed record Query$FeatureName$(long Id) : IResultRequest<$ResponseName$>;
 
-[ApiEndpoint(ApiHttpMethod.Post, "$CommandRoute$", Binding = ApiRequestBinding.Body)]
+/// <summary>Executes the $FeatureName$ action.</summary>
+[ApiEndpoint(ApiHttpMethod.Post, "commands/$FeatureName$")]
 [ProjectUnitMetadata(
     "$FeatureName$ Command",
     Description = "Requests the $FeatureName$ command use case.",
@@ -35,8 +37,8 @@ Rules:
 - Use request types for commands and queries, not for persistence state.
 - Keep request contracts small and explicit.
 - Place response DTOs near contracts, not near persistence.
-- Let `[ApiEndpoint]` own the HTTP verb, relative route, request binding, and optional operation name. Generated handlers must not repeat these with MVC attributes.
-- Requests in the exact `*.PublishedLanguages.Domain{DomainName}.Requests` namespace are published RPC contracts when their source assembly has matching `WebApiGenerationConfig`; attributed requests elsewhere are local HTTP contracts only.
+- One ApiEndpoint(method, route) declares the operation together with HTTP method, relative route and optional Binding. Generated method names always remove the request name's Command or Query prefix. Local calls retain this metadata without using HTTP. Handlers never repeat MVC metadata.
+- Requests in the exact PublishedLanguages.Domain{DomainName}.Requests namespace generate domain interfaces without HTTP configuration. Hosts select adapters and owned receivers; requests elsewhere do not enter published RPC contracts.
 - Published RPC result envelopes must implement `IRemoteResultEnvelope<TSelf>`. Built-in `Res`, `Res<T>`, and `ResPaged<T>` already do; custom envelopes must construct remote failures through `CreateRemoteFailure` without bypassing their invariants.
 - Treat moving a request into or out of `PublishedLanguages` as a public compatibility decision because it changes RPC client generation.
 - Use `DateTime` only for a timezone-free wall-clock value. Monica's default wire policy writes it as `yyyy-MM-dd'T'HH:mm:ss.FFFFFFF`; a host may select the built-in space-separated wall-clock policy for its complete RPC contract. Both policies preserve significant fractional ticks and omit `Kind`, and receivers treat the value as `DateTimeKind.Unspecified`.

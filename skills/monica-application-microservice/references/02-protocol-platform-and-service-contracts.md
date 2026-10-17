@@ -13,7 +13,7 @@ Within solution-project references, use the chain `{Subdomain}Service.API -> {Su
 ## What Belongs Here
 
 - Put requests that another service or shared gateway may invoke into the strict `Platform.Protocol/PublishedLanguages/Domain{Domain}/Requests` namespace.
-- Add `[ApiEndpoint]` to a published `Command*` or `Query*` only when it is an HTTP/RPC operation. Its XML summary, verb, relative route, binding, and optional `OperationName` are the source of truth.
+- Add `[ApiEndpoint(ApiHttpMethod, route)]` to published `Command*` or `Query*` operations. This one attribute owns HTTP method, route and binding; namespace and request family determine domain and command/query kind. Generated method names always remove the request name's Command or Query prefix. Retain its HTTP metadata for Local calls without publishing HTTP receivers.
 - Use `Res`, `Res<T>`, `ResPaged<T>`, or a custom `IRemoteResultEnvelope<TSelf>` for published RPC results. A custom envelope must create transport failures through its normal constructor in `CreateRemoteFailure`.
 - Put DTOs and enums that form part of a stable service contract into `Platform.Protocol/PublishedLanguages`.
 - Put events that other services may subscribe to into `Platform.Protocol/PublishedLanguages`.
@@ -33,7 +33,7 @@ Within solution-project references, use the chain `{Subdomain}Service.API -> {Su
 
 - Prefer async collaboration through events when eventual consistency is acceptable.
 - Prefer direct service contracts only when the caller truly needs synchronous data or command execution.
-- Generated contracts are named `I{Domain}CommandApi` and `I{Domain}QueryApi`, with `Http*` and/or `Local*` implementations selected by the protocol assembly's `WebApiGenerationConfig`. Do not check in parallel generated surfaces.
+- Generated interfaces are I{Domain}CommandApi and I{Domain}QueryApi. Host ApplicationApiGenerationConfig selects Local or Http adapters independently of interface generation. Do not check in duplicate generated surfaces.
 - Keep `PublishedLanguages` narrow. If a contract is only used inside one service, keep it local.
 - Do not use metadata JSON, `AdditionalFiles`, bootstrap scans, or source-tree writes to discover RPC operations; attributed published source is the contract.
 

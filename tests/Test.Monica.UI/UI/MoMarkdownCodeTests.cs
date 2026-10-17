@@ -160,7 +160,7 @@ public sealed class MoMarkdownCodeTests
         context.Services.AddMudServices();
         context.Services.AddMudMarkdownServices();
         context.Services.AddSingleton<IStringLocalizer<SharedResource>, EchoStringLocalizer<SharedResource>>();
-        context.Services.AddSingleton(new ThemeState(Options.Create(new ModuleShellUIOption())));
+        context.Services.AddSingleton(new ThemeState(Options.Create(new ModuleUIOption())));
         context.Services.AddSingleton<IMoMarkdownAssetResolver, PassThroughMarkdownAssetResolver>();
         return context;
     }

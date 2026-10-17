@@ -34,6 +34,7 @@ using Monica.ProjectUnits.Services.Support;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 using Xunit;
@@ -254,6 +255,7 @@ public sealed class ProjectUnitSymbolClassifierParityTests
         using Monica.Repository.Entity.Abstractions;
         using Monica.Repository.Persistence.Abstractions;
         using Monica.Repository.Persistence.Services;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.AutoControllers.Abstractions;
 

@@ -11,6 +11,7 @@ using Monica.JobScheduler.Abstractions;
 using Monica.ProjectUnits.Models;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 

@@ -8,6 +8,7 @@ The entrypoint activates for design, implementation, refactoring, and review of 
 
 Local references own:
 
+- For applications with UI: presentation projects, task features, layout/navigation, invocation profile, caller/tenant context, and contract-only references. The same project specification owns backend and UI.
 - The actual macro view: hosts, domains/services, shared projects, their responsibilities, and dependency direction. Distinguish code facts from approved target intent.
 - Concrete local conventions: namespaces, placement, metadata language and requirement source, public/internal boundaries, and approved extension families with their consumers and lifecycle.
 - Deliberate deviations: shared rule, precise scope, rationale, human approval evidence, and any conditions.

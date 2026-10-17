@@ -18,7 +18,7 @@ public sealed class OperationalPageAccessOption
     /// </summary>
     /// <remarks>
     /// This is an authorization bypass intended for explicitly trusted diagnostic hosts. It is independent from
-    /// <see cref="ModuleShellUIOption.EnableDebug"/>, which controls detailed Blazor and SignalR errors.
+    /// <see cref="ModuleUIHostOption.EnableDebug"/>, which controls detailed Blazor and SignalR errors.
     /// </remarks>
     public bool DebugMode { get; set; }
 

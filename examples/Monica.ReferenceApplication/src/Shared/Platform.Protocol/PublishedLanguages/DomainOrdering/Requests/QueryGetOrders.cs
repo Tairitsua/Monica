@@ -1,15 +1,12 @@
-using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Abstractions;
+using Monica.Application.Annotations;
 using Platform.Protocol.PublishedLanguages.DomainOrdering.Models;
 
 namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 
 /// <summary>
-/// Requests all orders in reverse creation order. The GET binding classifies this request as read-only,
+/// Requests all orders in reverse creation order. The published Query convention marks this request read-only,
 /// so mediated dispatch opens no automatic write transaction.
 /// </summary>
-[ApiEndpoint(
-    ApiHttpMethod.Get,
-    "orders",
-    Binding = ApiRequestBinding.Query)]
+[ApiEndpoint(ApiHttpMethod.Post, "queries/GetOrders")]
 public sealed record QueryGetOrders : IResultRequest<IReadOnlyList<OrderDto>>;

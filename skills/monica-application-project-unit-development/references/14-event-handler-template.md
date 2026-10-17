@@ -24,6 +24,7 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 
 ```csharp
 using Monica.ProjectUnits.Annotations;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using $ContractNamespace$.Events;
 using $DomainNamespace$.DomainServices;
@@ -51,6 +52,7 @@ public sealed class DomainEventHandlerOrderApproved(DomainNotifyWarehouse domain
 
 ```csharp
 using Monica.ProjectUnits.Annotations;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using $ContractNamespace$.Events;
 using $DomainNamespace$.DomainServices;

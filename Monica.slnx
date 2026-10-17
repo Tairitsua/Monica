@@ -13,6 +13,7 @@
   <Folder Name="/examples/Monica.ReferenceApplication/">
     <Project Path="examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Monica.Reference.Api.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Domains.Ordering.csproj" />
+    <Project Path="examples/Monica.ReferenceApplication/src/Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Infrastructure/Platform.Infrastructure.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Protocol/Platform.Protocol.csproj" />
@@ -46,6 +47,7 @@
     <Project Path="tests/Test.Monica.ProjectUnits/Test.Monica.ProjectUnits.csproj" />
     <Project Path="tests/Test.Monica.AI/Test.Monica.AI.csproj" />
     <Project Path="tests/Test.Monica.AI.UI/Test.Monica.AI.UI.csproj" />
+    <Project Path="tests/Test.Monica.Application/Test.Monica.Application.csproj" />
     <Project Path="tests/Test.Monica.Authority/Test.Monica.Authority.csproj" />
     <Project Path="tests/Test.Monica.Profiling/Test.Monica.Profiling.csproj" />
     <Project Path="tests/Test.Monica.OpenTelemetry/Test.Monica.OpenTelemetry.csproj" />
@@ -58,6 +60,8 @@
  
   <Project Path="Monica.AI.UI/Monica.AI.UI.csproj" />
   <Project Path="Monica.AI/Monica.AI.csproj" />
+  <Project Path="Monica.Application.UI/Monica.Application.UI.csproj" />
+  <Project Path="Monica.Application/Monica.Application.csproj" />
   <Project Path="Monica.Authority/Monica.Authority.csproj" />
   <Project Path="Monica.AutoModel/Monica.AutoModel.csproj" />
   <Project Path="Monica.Configuration.EfCore/Monica.Configuration.EfCore.csproj" />
@@ -97,6 +101,7 @@
   <Project Path="Monica.ServiceDiscovery/Monica.ServiceDiscovery.csproj" />
   <Project Path="Monica.Repository.UI/Monica.Repository.UI.csproj" />
   <Project Path="Monica.Repository/Monica.Repository.csproj" />
+  <Project Path="Monica.Rpc/Monica.Rpc.csproj" />
   <Project Path="Monica.SignalR/Monica.SignalR.csproj" />
   <Project Path="Monica.StateStore.StackExchange/Monica.StateStore.StackExchange.csproj" />
   <Project Path="Monica.StateStore.UI/Monica.StateStore.UI.csproj" />

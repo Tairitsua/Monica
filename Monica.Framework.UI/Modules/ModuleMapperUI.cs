@@ -35,9 +35,9 @@ public class ModuleMapperUI : MonicaModule<ModuleMapperUIOption>, IUIModule
         module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<MapperResource>());
+        module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
-            option.EnableMarkdown = true;
             option.ConfigureNavigation(static registry =>
                 registry.RegisterLocalizedPage<UIMapperDebugPage, MapperResource>(
                     UIMapperDebugPage.PAGE_URL,

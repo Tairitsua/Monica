@@ -247,7 +247,7 @@ else
                         <Icon Name="install" Size="16"/>
                         @Session.T("ws-install")
                     </button>
-                    @if (DetectionIsAmbiguous)
+                    @if (DetectionIsAmbiguous || Detection.ConfiguredProfile == "application")
                     {
                         <button class="btn btn-ghost" disabled="@Busy" @onclick="BeginProfileConfirm">
                             <Icon Name="update" Size="16"/>
@@ -289,6 +289,22 @@ else
                 </div>
                 @if (SelectedProfile == "application")
                 {
+                    <div class="field">
+                        <label>@Session.T("ws-application-ui")</label>
+                        <div class="option-grid">
+                            @foreach (var withUi in new[] { false, true })
+                            {
+                                <label class="option-card @(ApplicationWithUI == withUi ? "selected" : null)">
+                                    <input type="radio" name="ws-application-ui" checked="@(ApplicationWithUI == withUi)"
+                                           @onchange="() => ApplicationWithUI = withUi" />
+                                    <span class="option-main">
+                                        <span class="option-title">@Session.T(withUi ? "ws-application-with-ui" : "ws-application-backend")</span>
+                                        <span class="option-desc">@Session.T(withUi ? "ws-application-with-ui-desc" : "ws-application-backend-desc")</span>
+                                    </span>
+                                </label>
+                            }
+                        </div>
+                    </div>
                     <div class="field">
                         <label>@Session.T("ws-architecture")</label>
                         <div class="option-grid">
@@ -543,11 +559,14 @@ else
 
         SelectedArchitecture = Detection?.ConfiguredCapabilities?
             .FirstOrDefault(capability => Architectures.Contains(capability));
+        ApplicationWithUI = Detection?.ConfiguredCapabilities?.Contains("ui") == true;
     }
 
     private string? SelectedProfile { get; set; }
 
     private string? SelectedArchitecture { get; set; }
+
+    private bool ApplicationWithUI { get; set; }
 
     private SetupOperationView? Operation { get; set; }
 
@@ -606,6 +625,7 @@ else
         ValidationError = null;
         SelectedProfile = null;
         SelectedArchitecture = null;
+        ApplicationWithUI = false;
         ConfirmingProfile = false;
         Closure = null;
         if (string.IsNullOrWhiteSpace(CandidatePath))
@@ -699,10 +719,7 @@ else
         PendingRuleSwitches = null;
         try
         {
-            var capabilities = SelectedProfile == "application" && SelectedArchitecture is not null
-                ? [SelectedArchitecture]
-                : Array.Empty<string>();
-            Operation = await Facade.PreviewWorkspaceInitAsync(CandidatePath, SelectedProfile, capabilities);
+            Operation = await Facade.PreviewWorkspaceInitAsync(CandidatePath, SelectedProfile, CapabilitiesForInit());
         }
         finally
         {
@@ -805,9 +822,19 @@ else
     }
 
     private IReadOnlyList<string> CapabilitiesForInit()
-        => SelectedProfile == "application" && SelectedArchitecture is not null
-            ? [SelectedArchitecture]
-            : Array.Empty<string>();
+    {
+        var capabilities = Detection is { } detection && detection.ConfiguredProfile == SelectedProfile
+            ? detection.ConfiguredCapabilities?.Where(capability => !Architectures.Contains(capability)
+                && (SelectedProfile != "application" || capability != "ui")).ToList() ?? []
+            : [];
+        if (SelectedProfile == "application" && SelectedArchitecture is not null)
+        {
+            capabilities.Add(SelectedArchitecture);
+            if (ApplicationWithUI) capabilities.Add("ui");
+        }
+
+        return capabilities;
+    }
 
     private Progress<GuidePhase> CreatePhaseProgress()
     {

@@ -30,7 +30,7 @@ Rules:
 
 - Put only stable cross-domain requests, DTOs, enums, events, and optional shared `Contracts/` or `Implementations/*` surfaces here.
 - Add `[ApiEndpoint]` only to published `Command*` or `Query*` requests that should become HTTP/RPC operations. Leave other shared language unattributed.
-- Configure the protocol assembly with `[assembly: WebApiGenerationConfig("api/v1", RpcClientTargets = ...)]`; omit `DomainName` when it publishes several domains.
+- Add the analyzer to Protocol for stable interfaces. Select caller adapters with ApplicationApiGenerationConfig in the host, not Protocol. See [RPC generation](../../monica-infra-messaging/references/rpc.md).
 - Keep persistence entities and repositories out of `Platform.Protocol`.
 
 ## Step 3. Create the domain package
@@ -61,7 +61,7 @@ Use `monica-application-project-unit-development` to place domain-owned units in
 - `DomainService` units go under `DomainServices/`.
 - Pure helpers go under `Utilities/` and use `Utils*` names.
 - Keep repository implementations, `DbContext`, and EF mapping in `Repository/`.
-- Add one assembly-level `WebApiGenerationConfig("api/v1", DomainName = "{Subdomain}")` file at the project root for local requests.
+- Keep private HTTP request wire settings in HttpApiContract with the owning DomainName. Configure receiver publication in the host and select referenced handler assemblies explicitly.
 - Co-locate domain-private endpoint requests and responses with their handlers by default. Put `[ApiEndpoint]` and the XML summary on the request; do not put endpoint metadata on the handler.
 
 ## Step 4. Keep AppHost composition-only

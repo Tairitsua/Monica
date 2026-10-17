@@ -122,7 +122,7 @@ public sealed class ProjectUnitSourceAnalyzerTests
             """);
         File.WriteAllText(Path.Combine(consumerDirectory, "ConsumerUnit.cs"), """
             namespace Consumer;
-            public sealed class ConsumerUnit(Sample.ManagedUnit target) : Monica.WebApi.Abstractions.DomainService
+            public sealed class ConsumerUnit(Sample.ManagedUnit target) : Monica.Application.Abstractions.DomainService
             {
                 public Sample.ManagedUnit Target => target;
             }
@@ -177,7 +177,7 @@ public sealed class ProjectUnitSourceAnalyzerTests
                 </Project>
                 """);
             File.WriteAllText(Path.Combine(Root, "ManagedUnit.cs"), """
-                namespace Monica.WebApi.Abstractions
+                namespace Monica.Application.Abstractions
                 {
                     public abstract class DomainService { }
                 }
@@ -197,7 +197,7 @@ public sealed class ProjectUnitSourceAnalyzerTests
                 namespace Sample
                 {
                     using Monica.ProjectUnits.Annotations;
-                    using Monica.WebApi.Abstractions;
+                    using Monica.Application.Abstractions;
 
                     /// <summary>Fallback documentation.</summary>
                     [ProjectUnitMetadata("Managed unit", Owner = "Sample Team",

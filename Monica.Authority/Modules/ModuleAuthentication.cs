@@ -85,6 +85,7 @@ public class ModuleAuthentication : MonicaModule<ModuleAuthenticationOption>, IW
         services.AddSingleton<IJwtAuthManager, JwtAuthManager>();
         services.AddSingleton<IAccessTokenIssuer, JwtAuthManager>();
         services.AddSingleton<ICurrentPrincipalAccessor, CurrentPrincipalAccessor>(); // Singleton is sufficient here
+        services.AddSingleton<CurrentPrincipalContext>();
 
         services.AddSingleton<IPasswordCrypto, PasswordCrypto>();
         services.Configure<SystemUserOptions>(options => options.SetCurSystemUser(EDefaultSystemUser.System));

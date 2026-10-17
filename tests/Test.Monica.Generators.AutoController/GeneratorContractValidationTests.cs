@@ -26,16 +26,30 @@ public sealed class GeneratorContractValidationTests
         { NestedPublishedRequestNamespace, "AC1005" },
         { InvalidRoutePrefix, "AC1004" },
         { PublishedEnvelopeWithoutRemoteFactory, "AC1017" },
-        { ReadOnlyPocoRouteProperty, "AC1018" }
+        { ReadOnlyPocoRouteProperty, "AC1018" },
+        { InvalidMethodSuffix, "AC1016" }
     };
+
+    private const string InvalidMethodSuffix = """
+        using Monica.Application.Abstractions;
+        using Monica.Application.Annotations;
+
+        namespace Scenario.PublishedLanguages.DomainOrdering.Requests;
+
+        /// <summary>Uses a type suffix that cannot become a method name.</summary>
+        [ApiEndpoint(ApiHttpMethod.Get, "orders")]
+        public sealed record Query123Orders : IResultRequest<string>;
+        """;
 
     private const string NestedPublishedRequestNamespace = """
         using System;
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -60,8 +74,10 @@ public sealed class GeneratorContractValidationTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1?debug=true", DomainName = "Ordering")]
 
@@ -84,6 +100,7 @@ public sealed class GeneratorContractValidationTests
         using Monica.Core.Results;
         using Monica.Core.Results.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -110,8 +127,10 @@ public sealed class GeneratorContractValidationTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 

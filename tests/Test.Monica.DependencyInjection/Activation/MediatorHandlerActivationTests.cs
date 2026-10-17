@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Monica.Core.Mediator;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Xunit;
 

@@ -63,14 +63,15 @@ Recommended `.slnx` folders should mirror the physical layout:
 - For shared specialization naming, mechanism choice, and capability placement, follow the [project-level extension rules](../../monica-application-project-unit-development/references/01-project-unit-naming-and-boundaries.md#project-level-extensions) within this topology.
 - Split by subdomain under `Domains/` first. Do not create global `Application`, `Domain`, or `Infrastructure` buckets for the whole solution.
 - Keep the same shared platform split across solution styles to reduce learning overhead.
-- Use the strict solution-project reference chain `AppHost -> Domains.{Subdomain} -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
+- For applications with UI, adopt the [presentation branch](../../monica-application-ui/references/presentation-specification.md): `AppHost -> Presentation -> Platform.Protocol`. A host may compose presentation alongside its backend; a remote presentation host must not reference remote service implementations. Product UI libraries reference no domain implementation or Platform.Infrastructure.
+- Use the strict backend solution-project reference chain `AppHost -> Domains.{Subdomain} -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
 - Put project-agnostic infrastructure extensions into `Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj`.
 - Put solution-owned infrastructure composition and integration configuration into `Shared/Platform.Infrastructure/Platform.Infrastructure.csproj`.
 - Keep `Shared/Platform.Protocol/PublishedLanguages` stable and referenceable from other domains. Only attributed `Command*` and `Query*` requests are RPC endpoints.
 - Keep subdomain-specific package references in the owning `Domains.{Subdomain}.csproj`; do not introduce extra shared-project references just to reach them.
 - Keep domain models, repositories, `DbContext` ownership, and helper code inside the owning `Domains.{Subdomain}.csproj`.
 - Put application services, event handlers, and background workers in the owning domain package under `Application/HandlersCommand`, `Application/HandlersQuery`, `Application/HandlersEvent`, and `Application/BackgroundWorkers`.
-- Add one assembly-level `WebApiGenerationConfig("api/v1", DomainName = "{Subdomain}")` file at the domain project root for local endpoint requests. Put verb, relative route, binding, operation name, and XML summary on each request's `[ApiEndpoint]`, never on its handler.
+- Keep private HTTP request wire settings in HttpApiContract with the owning DomainName. Configure receiver publication in the host and select referenced handler assemblies explicitly.
 - Configure published RPC targets in the `Platform.Protocol` assembly and do not create `RpcMetadata` JSON or build export tasks.
 - Keep `DomainServices/` as the standard folder for `DomainService` units.
 - Keep `Utilities/` as the standard folder for pure helpers and name them `Utils*`.

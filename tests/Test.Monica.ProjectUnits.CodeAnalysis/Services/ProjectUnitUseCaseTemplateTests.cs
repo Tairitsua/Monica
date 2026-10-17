@@ -16,6 +16,7 @@ using Monica.ProjectUnits.CodeAnalysis.Services;
 using Monica.ProjectUnits.Models;
 using Monica.ProjectUnits.Services.Support;
 using Monica.Repository.Persistence.Abstractions;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Xunit;
 
@@ -203,6 +204,7 @@ public sealed class ProjectUnitUseCaseTemplateTests
         using System.Threading.Tasks;
         using Monica.Core.Results;
         using Monica.ProjectUnits.Annotations;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Domains.Ordering.Interfaces;
         using Domains.Ordering.Models;

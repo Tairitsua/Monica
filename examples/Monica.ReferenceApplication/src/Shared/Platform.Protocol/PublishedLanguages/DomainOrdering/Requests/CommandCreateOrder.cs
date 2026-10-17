@@ -1,5 +1,6 @@
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 using Platform.Protocol.PublishedLanguages.DomainOrdering.Models;
 
 namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
@@ -10,10 +11,7 @@ namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 /// <param name="OrderNumber">The unique business-visible order number.</param>
 /// <param name="CustomerName">The customer display name.</param>
 /// <param name="Total">The positive order total.</param>
-[ApiEndpoint(
-    ApiHttpMethod.Post,
-    "orders",
-    Binding = ApiRequestBinding.Body)]
+[ApiEndpoint(ApiHttpMethod.Post, "commands/CreateOrder")]
 public sealed record CommandCreateOrder(
     string OrderNumber,
     string CustomerName,

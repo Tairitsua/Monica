@@ -1,5 +1,6 @@
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.JobScheduler.Abstractions;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 
 namespace Monica.Testing.ProjectUnits;

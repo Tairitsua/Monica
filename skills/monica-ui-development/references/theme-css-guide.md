@@ -11,7 +11,7 @@ Monica's theme system is split between C# theme definitions and theme CSS.
 - Each built-in theme is identified by `MonicaThemeKind`; theme definitions expose `Kind`, not a string name
 - `ThemeCatalog` registers the available definitions
 - `ThemeState` owns the active theme kind, dark-mode state, and generated CSS/data-theme identifiers
-- `ModuleShellUIOption.DefaultTheme` and `ModuleShellUIOption.DefaultDarkMode` provide the first-visit browser defaults; persisted browser preferences still win after the user changes theme settings
+- `ModuleUIOption.DefaultTheme` and `ModuleUIOption.DefaultDarkMode` provide the first-visit browser defaults independently of the Shell; persisted browser preferences still win after the user changes theme settings
 - `ThemeProviderHost` renders the wrapper that applies:
   - `class="mo-theme-{theme-token}-{mode}"`
   - `data-theme="{theme-token}-{mode}"`

@@ -8,10 +8,13 @@ using Monica.UI.Theming;
 
 builder.AddMonica(monica =>
 {
-    monica.AddUIShell(options =>
+    monica.AddUI(options =>
     {
         options.DefaultTheme = MonicaThemeKind.Default;
         options.DefaultDarkMode = false;
+    });
+    monica.AddUIShell(options =>
+    {
         options.DefaultNavigationLayout = ShellNavigationLayout.Sidebar;
         options.ShowLanguageSwitcher = true;
     });
@@ -51,4 +54,4 @@ The language control has a localized accessible button name. Escape closes a mou
 
 For first-party styling, prefer `--mud-palette-*` variables and the small `--mo-color-*` contract in `Monica.UI/wwwroot/css/mo-theme-main.css`. The page-feature roles default to a primary-tinted surface, normal text, and a primary action; themes with a distinct feature treatment override the background/text pair together. This keeps large working surfaces readable without requiring the theme's full-strength action color to fill them. These roles do not change the configured palette or the colors of ordinary primary actions. Component construction, MudBlazor v9 APIs, CSS isolation, and browser checks belong to `$monica-ui-development`.
 
-Source: `Monica.UI/Modules/ModuleShellUI.cs`, `Monica.Core/Modules/ModuleLocalization.cs`, `Monica.UI/Theming/Definitions/DefaultTheme.cs`, `GroveTheme.cs`, `FreshTheme.cs`, `Monica.UI/Shell/Components/Layout/ThemeDialog.razor`, `ThemeProviderHost.razor`, `CultureSelector.razor`, `Monica.UI/Shell/State/ShellState.cs`, `Monica.UI/Shared/Components/Branding/MonicaIcon.razor`, and `Monica.UI/wwwroot/css/themes/mo-theme-components.css`.
+Source: `Monica.UI/Modules/ModuleUI.cs`, `Monica.Core/Modules/ModuleLocalization.cs`, `Monica.UI/Theming/Definitions/DefaultTheme.cs`, `GroveTheme.cs`, `FreshTheme.cs`, `Monica.UI/Shell/Components/Layout/ThemeDialog.razor`, `ThemeProviderHost.razor`, `CultureSelector.razor`, `Monica.UI/Shell/State/ShellState.cs`, `Monica.UI/Shared/Components/Branding/MonicaIcon.razor`, and `Monica.UI/wwwroot/css/themes/mo-theme-components.css`.

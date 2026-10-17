@@ -8,7 +8,7 @@ using Monica.Core.JsonSerialization.Models;
 using Monica.Core.JsonSerialization.Services;
 using Monica.DependencyInjection.Abstractions;
 using Monica.DependencyInjection.Services;
-using Monica.WebApi.RpcClient.Abstractions;
+using Monica.Rpc.Abstractions;
 using Xunit;
 
 namespace Test.Monica.Generators.AutoController;

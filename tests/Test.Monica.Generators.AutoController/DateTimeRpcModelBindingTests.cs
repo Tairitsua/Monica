@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.Core.JsonSerialization.Models;
-using Monica.WebApi.RpcClient.Extensions;
+using Monica.Rpc.Extensions;
 using Xunit;
 
 namespace Test.Monica.Generators.AutoController;

@@ -51,16 +51,8 @@ public static class ModuleShellUIBuilderExtensions
             string fromPath,
             string toPath)
         {
-            return registration.Configure(option =>
-            {
-                if (option.RouteRedirects.TryGetValue(fromPath, out var existingTarget))
-                {
-                    throw new InvalidOperationException(
-                        $"Route redirect '{fromPath}' is already registered and points to '{existingTarget}'.");
-                }
-
-                option.RouteRedirects[fromPath] = toPath;
-            });
+            registration.Require<ModuleUIHost, ModuleUIHostOption>().AddRouteRedirect(fromPath, toPath);
+            return registration;
         }
     }
 }
@@ -76,134 +68,33 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
     /// </summary>
     public override void Describe(ModuleDescriptor module)
     {
+        module.Require<ModuleUIHost, ModuleUIHostOption>(options =>
+        {
+            options.CatalogPageLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
+            options.DefaultLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
+        });
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
-            static option =>
-            {
-                option.AddResource<SharedResource>();
-                option.AddResource<NavigationSearchResource>();
-            });
+            options => options.AddResource<NavigationSearchResource>());
     }
 
     /// <inheritdoc />
-    public override void ConfigureBuilder(ModuleBuilderContext<ModuleShellUIOption> context)
-    {
-        var builder = context.HostApplicationBuilder;
-        if (builder is not WebApplicationBuilder webBuilder)
-        {
-            return;
-        }
-
-        if (builder.Environment.IsProduction())
-        {
-            return;
-        }
-
-        // Monica UI modules are Razor class libraries and are commonly consumed only through NuGet packages.
-        // Loading static web assets in the builder phase lets ASP.NET Core discover package-provided framework and
-        // component assets before the shell maps static asset endpoints in local, staging, or other non-production hosts.
-        webBuilder.WebHost.UseStaticWebAssets();
-    }
-
-    /// <summary>
-    /// Configuration service
-    /// </summary>
-    /// <param name="context">The typed module composition context.</param>
     public override void ConfigureServices(ModuleContext<ModuleShellUIOption> context)
     {
-        var services = context.Services;
-        // Add MudBlazor service
-        services.AddMudServices(options =>
-        {
-            options.SnackbarConfiguration.NormalIcon = MoIcons.CalendarDays;
-            options.SnackbarConfiguration.InfoIcon = MoIcons.Info;
-            options.SnackbarConfiguration.SuccessIcon = MoIcons.Success;
-            options.SnackbarConfiguration.WarningIcon = MoIcons.Warning;
-            options.SnackbarConfiguration.ErrorIcon = MoIcons.Error;
-        });
-        if (Option.EnableMarkdown)
-        {
-            services.AddMudMarkdownServices();
-        }
-
-        // Add Razor component and interactive server component services
-        services.AddRazorComponents()
-            .AddInteractiveServerComponents(circuitOptions =>
-            {
-                circuitOptions.DetailedErrors = Option.EnableDebug;
-            }).AddHubOptions(options =>
-            {
-                options.EnableDetailedErrors = Option.EnableDebug;
-            });
-
-        // Keep startup contributions write-only and publish a separate immutable read catalog.
-        services.AddSingleton<PageRegistry>();
-        services.AddSingleton<INavigationRegistryBuilder>(
-            static serviceProvider => serviceProvider.GetRequiredService<PageRegistry>());
-        services.AddSingleton<IPageCatalog>(
-            static serviceProvider => serviceProvider.GetRequiredService<PageRegistry>());
-        services.AddScoped<PageAccessEvaluator>();
-        services.AddScoped<OperationalPageAccessEvaluator>();
-        services.AddScoped<NavigationSearchCatalog>();
-
+        context.Services.AddScoped<OperationalPageAccessEvaluator>();
+        context.Services.AddScoped<NavigationSearchCatalog>();
+        context.Services.AddScoped<ShellState>();
+        context.Services.AddScoped<UserContextState>();
         if (Option.OperationalPageAccess.DebugMode)
         {
-            Logger.LogWarning(
-                "OperationalPageAccess.DebugMode is enabled. Monica operational diagnostics bypass authorization in every environment.");
+            Logger.LogWarning("OperationalPageAccess.DebugMode is enabled. Monica operational diagnostics bypass authorization in every environment.");
         }
-
-        // Register for browser storage service
-        services.AddScoped<IBrowserStorage, BrowserStorage>();
-
-        // Register theme service (Scoped: each Blazor circuit gets its own theme state)
-        services.AddScoped<ThemeState>();
-        services.AddScoped<IThemeState>(sp => sp.GetRequiredService<ThemeState>());
-        services.AddScoped<ShellState>();
-
-        // Register the default markdown asset resolver so Markdown components work without optional modules.
-        services.TryAddScoped<IMoMarkdownAssetResolver, PassThroughMarkdownAssetResolver>();
-
-        // Register user context service
-        services.AddScoped<UserContextState>();
     }
 
+    /// <inheritdoc />
     public override void ConfigureApplicationBuilder(WebModuleContext<ModuleShellUIOption> context)
-    {
-        var app = context.ApplicationBuilder;
-        var webApp = context.RequireWebApplication();
-        var navigation = app.ApplicationServices.GetRequiredService<INavigationRegistryBuilder>();
+        => Option.ApplyNavigation(context.ApplicationBuilder.ApplicationServices.GetRequiredService<INavigationRegistryBuilder>());
 
-        Option.ApplyNavigation(navigation);
-
-        webApp.MapStaticAssets()
-            .WithMonicaEndpoint(MonicaEndpointKind.StaticAsset);  // .NET 9 support
-
-        // Antiforgery middleware must stay in the routed pipeline.
-        app.UseAntiforgery();
-    }
-
-    public override void ConfigureEndpoints(WebModuleContext<ModuleShellUIOption> context)
-    {
-        var app = context.ApplicationBuilder;
-        var webApp = context.RequireWebApplication();
-        var registry = app.ApplicationServices.GetRequiredService<PageRegistry>();
-        registry.Seal();
-
-        foreach (var redirect in Option.RouteRedirects)
-        {
-            var fromPath = redirect.Key;
-            var toPath = redirect.Value;
-            webApp.MapGet(fromPath, () => Results.LocalRedirect(toPath))
-                .WithMonicaEndpoint(MonicaEndpointKind.Ui);
-        }
-
-        webApp.MapRazorComponents<AppShell>()
-            .AddInteractiveServerRenderMode()
-            .AddAdditionalAssemblies(registry.GetAdditionalAssemblies())
-            .WithMonicaEndpoint(MonicaEndpointKind.Ui);
-        // Huge pitfall: if AddAdditionalAssemblies is missing here, pressing F5 refresh may return 404,
-        // while navigation through Router may still work.
-    }
-
+    /// <inheritdoc />
     protected override ModuleWebStage GetApplicationBuilderStage() => ModuleWebStage.AfterRouting;
 
 }
@@ -213,12 +104,6 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
 /// </summary>
 public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
 {
-#if DEBUG
-    private const bool ENABLE_DEBUG_DEFAULT = true;
-#else
-    private const bool ENABLE_DEBUG_DEFAULT = false;
-#endif
-
     private readonly List<Action<INavigationRegistryBuilder>> _navigationContributions = [];
 
     /// <summary>
@@ -268,15 +153,6 @@ public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
                                      ?? Application.ResolveAppVersion(fallback: "v1.0")!;
 
     /// <summary>
-    /// Enables UI debug diagnostics, including Blazor circuit detailed errors and SignalR hub detailed errors.
-    /// </summary>
-    /// <remarks>
-    /// Defaults to <see langword="true"/> in DEBUG builds and <see langword="false"/> otherwise.
-    /// Keep this disabled for production because detailed errors can expose sensitive information to clients.
-    /// </remarks>
-    public bool EnableDebug { get; set; } = ENABLE_DEBUG_DEFAULT;
-
-    /// <summary>
     /// Gets the shared authorization configuration for Monica operational pages and protected diagnostics surfaces.
     /// </summary>
     /// <remarks>
@@ -285,29 +161,6 @@ public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
     /// <see cref="OperationalPageAccessOption.DebugMode"/> bypasses both policies in every environment.
     /// </remarks>
     public OperationalPageAccessOption OperationalPageAccess { get; } = new();
-
-    /// <summary>
-    /// Enable Markdown support
-    /// </summary>
-    public bool EnableMarkdown { get; set; }
-
-    /// <summary>
-    /// The theme applied when a browser initializes the Monica shell without a saved theme preference.
-    /// </summary>
-    /// <remarks>
-    /// Defaults to <see cref="MonicaThemeKind.Default"/>. Once the browser stores a user-selected theme, the stored
-    /// preference takes precedence over this option on later visits.
-    /// </remarks>
-    public MonicaThemeKind DefaultTheme { get; set; } = MonicaThemeKind.Default;
-
-    /// <summary>
-    /// Whether the shell should start in dark mode when a browser has no saved theme preference.
-    /// </summary>
-    /// <remarks>
-    /// Defaults to <see langword="false"/>. Once the browser stores a user-selected mode, the stored preference takes
-    /// precedence over this option on later visits.
-    /// </remarks>
-    public bool DefaultDarkMode { get; set; }
 
     /// <summary>
     /// The desktop navigation layout used when the browser has no saved shell preference.
@@ -362,11 +215,6 @@ public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
     /// Gets or sets the host-owned action invoked by the sign-out menu item.
     /// </summary>
     public Func<Task>? UserLogoutAction { get; set; }
-
-    /// <summary>
-    /// A collection of routing redirection rules, where the key is the source path and the value is the target path.
-    /// </summary>
-    internal Dictionary<string, string> RouteRedirects { get; set; } = new();
 
     /// <summary>
     /// Whether to show the language switcher

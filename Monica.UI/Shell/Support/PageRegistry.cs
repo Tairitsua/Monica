@@ -22,6 +22,18 @@ internal sealed class PageRegistry : INavigationRegistryBuilder, IPageCatalog
     private readonly object _sync = new();
     private Snapshot? _snapshot;
 
+    internal void AddAssembly(Assembly assembly)
+    {
+        lock (_sync)
+        {
+            EnsureMutable();
+            if (!_excludedAssemblies.Contains(assembly))
+            {
+                _assemblies.Add(assembly);
+            }
+        }
+    }
+
     /// <summary>
     /// Initializes a registry with the shared category taxonomy owned by the Monica UI shell.
     /// </summary>

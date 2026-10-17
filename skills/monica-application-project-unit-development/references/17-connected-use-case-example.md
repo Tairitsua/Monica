@@ -6,22 +6,20 @@ This illustrative modular-monolith use case connects local HTTP requests, handle
 
 ## Local Requests and Handlers
 
-The attributed requests are outside `PublishedLanguages`, so they are local HTTP contracts. Put the assembly declaration in the domain's `WebApiGeneratorConfig.cs`, the command in `Application/HandlersCommand/CommandHandlerApproveOrder.cs`, and the query in `Application/HandlersQuery/QueryHandlerGetOrder.cs`.
+The attributed requests are outside `PublishedLanguages`, so they are local HTTP contracts. Put the wire declaration in the domain's HttpApiContract.cs, select that handler assembly from a publishing host with WebApiGenerationConfig, the command in `Application/HandlersCommand/CommandHandlerApproveOrder.cs`, and the query in `Application/HandlersQuery/QueryHandlerGetOrder.cs`.
 
 ```csharp
 using System.Threading;
 using System.Threading.Tasks;
 using Monica.Core.Results;
 using Monica.ProjectUnits.Annotations;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 using Domains.Ordering.Interfaces;
 using Domains.Ordering.Models;
 
-[assembly: WebApiGenerationConfig(
-    "api/v1",
-    DomainName = "Ordering",
-    RpcClientTargets = RpcClientGenerationTargets.None)]
+[assembly: HttpApiContract("api/v1", DomainName = "Ordering")]
 
 namespace Domains.Ordering.Application.HandlersCommand
 {

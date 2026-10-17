@@ -80,7 +80,7 @@ public class ModuleSwaggerUI : MonicaModule<ModuleSwaggerUIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<ModuleShellUI, ModuleShellUIOption>();
+        module.AfterIfPresent<ModuleUI, ModuleUIOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static options => options.AddResource<SwaggerUiResource>());
         module.Require<ModuleSwagger, ModuleSwaggerOption>();
@@ -92,7 +92,7 @@ public class ModuleSwaggerUI : MonicaModule<ModuleSwaggerUIOption>, IUIModule
             .Where(static button => button.Enabled)
             .OrderBy(static button => button.Order)
             .ToArray());
-        var defaults = TryGetOptions<ModuleShellUI, ModuleShellUIOption>(out var shellOptions)
+        var defaults = TryGetOptions<ModuleUI, ModuleUIOption>(out var shellOptions)
             && shellOptions is not null
                 ? new ThemePreference(shellOptions.DefaultTheme, shellOptions.DefaultDarkMode).Normalize()
                 : new ThemePreference(MonicaThemeKind.Default, false);

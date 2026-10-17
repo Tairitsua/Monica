@@ -69,7 +69,6 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
         services.TryAddSingleton<IConventionalHttpMethodResolver, ConventionalHttpMethodResolver>();
         // Mediated GET endpoints reach the write-transaction decision through the mediator, not MVC;
         // the convention classifies them from the request's own endpoint binding.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadOnlyRequestConvention, ApiEndpointReadOnlyConvention>());
         services.AddTransient<IServiceConvention, CrudControllerServiceConvention>();
         services.AddTransient<IApiDescriptionProvider, CrudApiDescriptionProvider>();
         services.AddTransient<IApiDescriptionProvider, RequestEndpointApiDescriptionProvider>();

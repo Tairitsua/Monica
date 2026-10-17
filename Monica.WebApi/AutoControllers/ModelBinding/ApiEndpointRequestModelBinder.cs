@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
-using Monica.WebApi.Annotations;
 
 namespace Monica.WebApi.AutoControllers.ModelBinding;
 
@@ -52,10 +51,9 @@ public sealed class ApiEndpointRequestModelBinder(
             return;
         }
 
-        var endpoint = bindingContext.ModelType.GetCustomAttribute<ApiEndpointAttribute>()
-                       ?? throw new InvalidOperationException(
-                           $"Request type '{bindingContext.ModelType}' must declare {nameof(ApiEndpointAttribute)}.");
-        var routeValues = await BindRouteValuesAsync(bindingContext, requestMetadata, endpoint.Route);
+        // The generated receiver owns the resolved route. Neutral contracts need no HTTP attribute at runtime.
+        var route = bindingContext.ActionContext.ActionDescriptor.AttributeRouteInfo?.Template ?? string.Empty;
+        var routeValues = await BindRouteValuesAsync(bindingContext, requestMetadata, route);
         if (routeValues is null)
         {
             bindingContext.Result = ModelBindingResult.Failed();

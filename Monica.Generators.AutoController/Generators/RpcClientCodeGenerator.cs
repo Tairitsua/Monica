@@ -13,7 +13,8 @@ internal static class RpcClientCodeGenerator
     public static void Generate(
         SourceProductionContext context,
         IReadOnlyList<EndpointModel> endpoints,
-        GeneratorConfig config)
+        GeneratorConfig config,
+        bool generateInterfaces = true)
     {
         var invalidEndpoints = ReportDuplicates(context, endpoints);
         foreach (var group in endpoints
@@ -29,15 +30,18 @@ internal static class RpcClientCodeGenerator
                 .OrderBy(static endpoint => endpoint.OperationName, StringComparer.Ordinal)
                 .ToArray();
             var interfaceName = $"I{group.Key.Domain}{group.Key.RequestKind}Api";
-            context.AddSource(
-                $"{interfaceName}.g.cs",
-                GenerateInterface(group.Key.ContractNamespaceRoot, interfaceName, orderedEndpoints));
+            if (generateInterfaces)
+            {
+                context.AddSource(
+                    $"{interfaceName}.g.cs",
+                    GenerateInterface(group.Key.ContractNamespaceRoot, interfaceName, orderedEndpoints));
+            }
 
             if (config.GenerateHttpClient)
             {
                 var implementationName = $"Http{group.Key.Domain}{group.Key.RequestKind}Api";
                 var baseType = config.HttpClientBaseTypeName
-                               ?? "global::Monica.WebApi.RpcClient.Abstractions.HttpRpcApi";
+                               ?? "global::Monica.Rpc.Abstractions.HttpRpcApi";
                 context.AddSource(
                     $"{implementationName}.g.cs",
                     GenerateHttpImplementation(
@@ -53,7 +57,7 @@ internal static class RpcClientCodeGenerator
             {
                 var implementationName = $"Local{group.Key.Domain}{group.Key.RequestKind}Api";
                 var baseType = config.LocalClientBaseTypeName
-                               ?? "global::Monica.WebApi.RpcClient.Abstractions.LocalRpcApi";
+                               ?? "global::Monica.Rpc.Abstractions.LocalRpcApi";
                 context.AddSource(
                     $"{implementationName}.g.cs",
                     GenerateLocalImplementation(
@@ -128,7 +132,7 @@ internal static class RpcClientCodeGenerator
         builder.Append("namespace ").Append(contractNamespaceRoot).AppendLine(".Contracts;");
         builder.AppendLine();
         builder.Append("public interface ").Append(interfaceName)
-            .AppendLine(" : global::Monica.WebApi.RpcClient.Abstractions.IRpcApi");
+            .AppendLine(" : global::Monica.Rpc.Abstractions.IRpcApi");
         builder.AppendLine("{");
         foreach (var endpoint in endpoints)
         {
@@ -156,12 +160,12 @@ internal static class RpcClientCodeGenerator
         var builder = CreateFileBuilder();
         builder.Append("namespace ").Append(contractNamespaceRoot).AppendLine(".Implementations.Http;");
         builder.AppendLine();
-        builder.Append("[global::Monica.WebApi.RpcClient.Annotations.RpcClientDomain(\"")
+        builder.Append("[global::Monica.Rpc.Annotations.RpcClientDomain(\"")
             .Append(EscapeString(domain)).AppendLine("\")]");
         builder.Append("public class ").Append(implementationName).AppendLine("(");
         builder.AppendLine("    global::System.Net.Http.HttpClient httpClient,");
         builder.AppendLine("    global::Monica.DependencyInjection.Abstractions.ICachedServiceProvider serviceProvider,");
-        builder.AppendLine("    global::Monica.WebApi.RpcClient.Models.RpcServiceDescriptor serviceDescriptor)");
+        builder.AppendLine("    global::Monica.Rpc.Models.RpcServiceDescriptor serviceDescriptor)");
         builder.Append("    : ").Append(baseType).Append("(serviceProvider, httpClient), ")
             .Append(contractNamespaceRoot).Append(".Contracts.").AppendLine(interfaceName);
         builder.AppendLine("{");
@@ -185,7 +189,7 @@ internal static class RpcClientCodeGenerator
         var builder = CreateFileBuilder();
         builder.Append("namespace ").Append(contractNamespaceRoot).AppendLine(".Implementations.Local;");
         builder.AppendLine();
-        builder.Append("[global::Monica.WebApi.RpcClient.Annotations.RpcClientDomain(\"")
+        builder.Append("[global::Monica.Rpc.Annotations.RpcClientDomain(\"")
             .Append(EscapeString(domain)).AppendLine("\")]");
         builder.Append("public class ").Append(implementationName).AppendLine("(");
         builder.AppendLine("    global::Monica.DependencyInjection.Abstractions.ICachedServiceProvider serviceProvider)");
@@ -200,7 +204,7 @@ internal static class RpcClientCodeGenerator
                 .Append(endpoint.RequestTypeName).AppendLine(" request,");
             builder.AppendLine("        global::System.Threading.CancellationToken cancellationToken = default)");
             builder.AppendLine("    {");
-            builder.AppendLine("        return await Mediator.Send(request, cancellationToken);");
+            builder.AppendLine("        return await InvokeAsync(request, cancellationToken);");
             builder.AppendLine("    }");
             builder.AppendLine();
         }
@@ -228,7 +232,7 @@ internal static class RpcClientCodeGenerator
             .Append(includeQueryString).Append(", includeBody: ")
             .Append(endpoint.Binding == "Body" ? "true" : "false").AppendLine("));");
         builder.AppendLine("            },");
-        builder.Append("            new global::Monica.WebApi.RpcClient.Models.RemoteCallContext(serviceDescriptor, \"")
+        builder.Append("            new global::Monica.Rpc.Models.RemoteCallContext(serviceDescriptor, \"")
             .Append(EscapeString(endpoint.OperationName)).Append("\", \"")
             .Append(EscapeString(endpoint.CompleteRoute)).AppendLine("\"),");
         builder.AppendLine("            cancellationToken);");

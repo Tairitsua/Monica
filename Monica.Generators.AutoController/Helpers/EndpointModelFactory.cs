@@ -54,11 +54,7 @@ internal static class EndpointModelFactory
         var configResult = GeneratorConfigurationReader.Read(request.ContainingAssembly);
         if (configResult.Missing)
         {
-            return Failure(
-                DiagnosticDescriptors.MissingConfiguration,
-                location,
-                request.ContainingAssembly.Name,
-                requestDisplayName);
+            configResult = GeneratorConfigReadResult.Valid(new GeneratorConfig("api/v1", null, 0, null, null));
         }
 
         if (configResult.Error is not null || configResult.Config is null)
@@ -116,8 +112,7 @@ internal static class EndpointModelFactory
                 endpointAttribute,
                 out var method,
                 out var route,
-                out var binding,
-                out var operationName))
+                out var binding))
         {
             return Failure(
                 DiagnosticDescriptors.InvalidRoute,
@@ -143,9 +138,7 @@ internal static class EndpointModelFactory
             return new AnalysisSnapshot<EndpointModel>(null, routeDiagnostics);
         }
 
-        var resolvedOperationName = string.IsNullOrWhiteSpace(operationName)
-            ? request.Name.Substring(requestKind.Length)
-            : operationName!;
+        var resolvedOperationName = request.Name.Substring(requestKind.Length);
         if (!SyntaxFacts.IsValidIdentifier(resolvedOperationName))
         {
             return Failure(
@@ -330,15 +323,13 @@ internal static class EndpointModelFactory
         AttributeData attribute,
         out string? method,
         out string? route,
-        out int binding,
-        out string? operationName)
+        out int binding)
     {
         method = null;
         route = attribute.ConstructorArguments.Length > 1
             ? attribute.ConstructorArguments[1].Value as string
             : null;
         binding = GeneratorConstants.BINDING_AUTO;
-        operationName = null;
 
         if (attribute.ConstructorArguments.Length != 2 ||
             attribute.ConstructorArguments[0].Value is not int methodValue)
@@ -358,14 +349,9 @@ internal static class EndpointModelFactory
 
         foreach (var namedArgument in attribute.NamedArguments)
         {
-            switch (namedArgument.Key)
+            if (namedArgument.Key == "Binding" && namedArgument.Value.Value is int bindingValue)
             {
-                case "Binding" when namedArgument.Value.Value is int bindingValue:
-                    binding = bindingValue;
-                    break;
-                case "OperationName":
-                    operationName = namedArgument.Value.Value as string;
-                    break;
+                binding = bindingValue;
             }
         }
 

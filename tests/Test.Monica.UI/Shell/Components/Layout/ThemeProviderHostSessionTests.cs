@@ -473,7 +473,7 @@ public sealed class ThemeProviderHostSessionTests
         storage.DisposeCount.Should().Be(0);
     }
 
-    private static ThemeState CreateState() => new(Options.Create(new ModuleShellUIOption()));
+    private static ThemeState CreateState() => new(Options.Create(new ModuleUIOption()));
     private static ThemePreference CurrentPreference(ThemeState state) => new(state.CurrentThemeKind, state.IsDarkMode);
     private static TaskCompletionSource NewCompletion() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static TaskCompletionSource<T> NewCompletion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);

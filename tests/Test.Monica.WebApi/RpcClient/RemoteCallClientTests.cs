@@ -14,12 +14,12 @@ using Monica.Core.Results.Abstractions;
 using Monica.Modules;
 using Monica.Testing.Hosting;
 using Monica.DependencyInjection.Abstractions;
-using Monica.WebApi.RpcClient.Abstractions;
-using Monica.WebApi.RpcClient.Annotations;
-using Monica.WebApi.RpcClient.Models;
+using Monica.Rpc.Abstractions;
+using Monica.Rpc.Annotations;
+using Monica.Rpc.Models;
 using Xunit;
 
-namespace Test.Monica.WebApi.RpcClient;
+namespace Test.Monica.Rpc;
 
 public sealed class RemoteCallClientTests
 {

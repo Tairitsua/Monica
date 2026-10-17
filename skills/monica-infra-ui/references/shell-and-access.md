@@ -1,5 +1,8 @@
 # Compose the shell and protect feature pages
 
+The default Shell is optional. For foundation-only or business application composition, use [application hosting](application-hosting.md). Providers now live above the router; layout components own navigation and geometry only. Theme and Markdown options belong to `AddUI`, and detailed circuit errors belong to `AddUIHost`.
+
+
 For a custom page's native modal, `Monica.UI.Shared.Components.Dialogs.MoDialogHeading` supplies a visible localized heading and names the enclosing dialog when placed in `TitleContent`. Pass the page's localized `Text`; the shell's normal dialog provider retains focus and dismissal ownership. See [native dialog heading authoring](../../monica-ui-development/references/blazor-best-practices.md#14-native-dialog-headings) for component and local-asset lifetime requirements rather than copying feature-specific interop into the host.
 
 For related operational routes within a page family, `Monica.UI.Shared.Components.Navigation.MoWorkbenchNavigation` supplies the shared contextual navigation treatment. Pass a localized accessible `Label` and native anchors as `ChildContent`; the feature owns each destination, localized text, and exact `aria-current="page"` selection. It does not register routes, evaluate authorization, or turn them into local tab state. Register the actual destinations with the shell and apply their access policy separately. Follow the [contextual navigation contract](../../monica-ui-development/references/monica-workbench-design-language.md#keep-contextual-navigation-consistent) when authoring their contents.

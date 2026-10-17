@@ -30,7 +30,7 @@ The execution adapters choose these defaults:
 
 | Entry point | Default |
 | --- | --- |
-| Mediator handler | `Automatic`; a registered `IReadOnlyRequestConvention` selects `None` for reads, including GET-bound requests with the Web API convention |
+| Mediator handler | `Automatic`; a registered `IReadOnlyRequestConvention` selects `None` for reads, including published Query requests with the application convention, independently of HTTP method |
 | MVC action | `None` for GET, HEAD, and OPTIONS; `Automatic` for other HTTP methods |
 | EventBus handler | `Automatic` |
 | JobScheduler job | `None` |

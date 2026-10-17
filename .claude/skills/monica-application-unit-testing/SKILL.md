@@ -35,7 +35,7 @@ Use `$monica-infra-persistence` for the current repository and UnitOfWork contra
 - application.ExecuteAsync creates a fresh scope and calls the production IExecutionPipeline. Resolve the handler inside its callback. Exceptions, cancellation and failed Monica result envelopes roll back; an early FlushAsync or direct context save stays inside that transaction.
 - AddRepositoryDbContext defaults to UnitOfWork participation and enables the module. Independently managed infrastructure stores explicitly use Default. Multiple business contexts require explicit operation selection.
 - Completed/faulted operation scopes are terminal. Each retry or independent operation gets a fresh scope. A caught nested failure still prevents commit.
-- For mediator-specific behavior, resolve IMediator in a fresh scope and Send the actual request. GET-bound query requests are read-only by convention and avoid an automatic write transaction.
+- For mediator-specific behavior, resolve IMediator in a fresh scope and Send the actual request. Published Query requests are read-only by application convention regardless of HTTP method and avoid an automatic write transaction.
 - For direct read-only calls, use application.CreateScope and resolve the service there. Direct resolution alone does not invoke the pipeline.
 - Native EF queries stay in infrastructure; business query interfaces return materialized projections. Do not enumerate an IQueryable after its scope is disposed.
 
@@ -93,3 +93,5 @@ Replace external boundaries, not domain services, repositories or policy logic. 
 Read references/standards.md for layout and ownership, references/templates.md for exact API examples, and references/database-isolation.md for provider choices.
 
 Run the relevant test project using the repository's verification policy and paths understood by the selected SDK. Keep build/test processes sharing outputs sequential and resolve all build warnings.
+
+For adopted application UI, verify sequential and concurrent operation scopes, current circuit identity (including explicit anonymous callers), nested mediator scope preservation, validation/authorization parity with HTTP, rollback and cancellation through a real host. Use browser smoke checks for layout, themes and route refresh; UI rendering tests remain opt-in.

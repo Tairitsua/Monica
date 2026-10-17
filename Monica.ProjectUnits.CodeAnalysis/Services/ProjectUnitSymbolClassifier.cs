@@ -6,10 +6,10 @@ namespace Monica.ProjectUnits.CodeAnalysis.Services;
 
 internal sealed class ProjectUnitSymbolClassifier
 {
-    private const string APPLICATION_SERVICE = "Monica.WebApi.Abstractions.ApplicationService";
-    private const string APPLICATION_SERVICE_GENERIC = "Monica.WebApi.Abstractions.ApplicationService`2";
-    private const string APPLICATION_SERVICE_WITHOUT_RESPONSE = "Monica.WebApi.Abstractions.ApplicationService`1";
-    private const string CUSTOM_APPLICATION_SERVICE_GENERIC = "Monica.WebApi.Abstractions.CustomApplicationService`2";
+    private const string APPLICATION_SERVICE = "Monica.Application.Abstractions.ApplicationService";
+    private const string APPLICATION_SERVICE_GENERIC = "Monica.Application.Abstractions.ApplicationService`2";
+    private const string APPLICATION_SERVICE_WITHOUT_RESPONSE = "Monica.Application.Abstractions.ApplicationService`1";
+    private const string CUSTOM_APPLICATION_SERVICE_GENERIC = "Monica.Application.Abstractions.CustomApplicationService`2";
     private const string DISTRIBUTED_EVENT_HANDLER_EXECUTION_POINT = "eventbus.distributed-handler";
     private const string CONTROLLER_BASE = "Microsoft.AspNetCore.Mvc.ControllerBase";
     private const string CONFIGURATION_ATTRIBUTE = "Monica.Configuration.Annotations.ConfigurationAttribute";
@@ -17,7 +17,7 @@ internal sealed class ProjectUnitSymbolClassifier
     private const string DISTRIBUTED_EVENT_HANDLER = "Monica.EventBus.Abstractions.Handlers.IDistributedEventHandler`1";
     private const string DOMAIN_EVENT = "Monica.EventBus.Events.IDomainEvent";
     private const string DOMAIN_EVENT_BASE = "Monica.EventBus.Events.DomainEvent";
-    private const string DOMAIN_SERVICE = "Monica.WebApi.Abstractions.DomainService";
+    private const string DOMAIN_SERVICE = "Monica.Application.Abstractions.DomainService";
     private const string ENTITY = "Monica.Repository.Entity.Abstractions.IEntity";
     private const string EXCLUDE_FROM_BUSINESS_TYPE_DISCOVERY_ATTRIBUTE =
         "Monica.Core.Modularity.Annotations.ExcludeFromBusinessTypeDiscoveryAttribute";
@@ -38,7 +38,7 @@ internal sealed class ProjectUnitSymbolClassifier
     private const string METADATA_ATTRIBUTE = "Monica.ProjectUnits.Annotations.ProjectUnitMetadataAttribute";
     private const string RECURRING_JOB = "Monica.JobScheduler.Abstractions.RecurringJob";
     private const string REPOSITORY = "Monica.Repository.Persistence.Abstractions.IRepository`1";
-    private const string REQUEST = "Monica.WebApi.Abstractions.IResultRequestBase";
+    private const string REQUEST = "Monica.Application.Abstractions.IResultRequestBase";
     private const string REQUIREMENT_ATTRIBUTE = "Monica.ProjectUnits.Annotations.ProjectUnitRequirementAttribute";
     private const string TRIGGERED_JOB = "Monica.JobScheduler.Abstractions.TriggeredJob`1";
     private const string TRIGGERED_JOB_EXECUTION_POINT = "jobs.triggered-attempt";

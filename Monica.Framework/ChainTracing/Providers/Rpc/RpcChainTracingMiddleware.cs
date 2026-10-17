@@ -4,7 +4,7 @@ using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Extensions;
 using Monica.Framework.ChainTracing.Models;
-using Monica.WebApi.RpcClient.Models;
+using Monica.Rpc.Models;
 
 namespace Monica.Framework.ChainTracing.Providers.Rpc;
 

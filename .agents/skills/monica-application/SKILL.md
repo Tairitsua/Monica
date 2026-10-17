@@ -11,6 +11,8 @@ Read [specification evolution](references/01-specification-evolution.md) when a 
 
 ## Routing
 
+- Business presentation layout, references, product navigation, or local/remote calls: use `$monica-application-ui`; implement its pages and state with `$monica-application-ui-development`.
+
 - Exact Monica framework source needed outside the active checkout: use `$monica-guide source resolve --repository monica --json` as a read-only locator.
 - Microservice solution layout, service boundaries, `Platform.Protocol`, published language, migrations, or cross-service collaboration: use `$monica-application-microservice`.
 - Modular monolith layout, bounded contexts under `Domains/`, AppHost composition, cross-domain collaboration, or persistence ownership: use `$monica-application-modular-monolith`.

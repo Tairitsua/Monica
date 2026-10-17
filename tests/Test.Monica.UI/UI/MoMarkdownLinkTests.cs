@@ -21,7 +21,7 @@ public sealed class MoMarkdownLinkTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
         context.Services.AddMudMarkdownServices();
-        context.Services.AddSingleton(new ThemeState(Options.Create(new ModuleShellUIOption())));
+        context.Services.AddSingleton(new ThemeState(Options.Create(new ModuleUIOption())));
         context.Services.AddSingleton<IMoMarkdownAssetResolver, TestResolver>();
         string? activated = null;
         Func<MoMarkdownLink, RenderFragment?> template = link => link.Url == "topic.md#section"

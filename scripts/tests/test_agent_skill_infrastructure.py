@@ -119,7 +119,12 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
             self.catalog["skills"], application, capabilities=["ui"]
         )
         self.assertIn("monica-ui-development", application_ui)
-        self.assertIn("monica-development", application_ui)
+        self.assertIn("monica-application-ui", application_ui)
+        self.assertIn("monica-application-ui-development", application_ui)
+        self.assertNotIn("monica-development", application_ui)
+        self.assertNotIn("monica-architecture", application_ui)
+        self.assertNotIn("monica-infra-ui", application_default)
+        self.assertNotIn("monica-application-ui", application_default)
         self.assertNotIn("monica-framework", application_ui)
 
     def test_bootstrap_prompt_manifest_has_one_universal_prompt_per_locale(self) -> None:

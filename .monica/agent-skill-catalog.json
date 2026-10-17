@@ -58,7 +58,9 @@
         "monica-infra-observability",
         "monica-infra-ai",
         "monica-infra-web",
-        "monica-infra-ui"
+        "monica-infra-ui",
+        "monica-application-ui",
+        "monica-application-ui-development"
       ],
       "dependencies": {
         "required": [
@@ -69,8 +71,7 @@
           "monica-infra-configuration",
           "monica-infra-observability",
           "monica-infra-ai",
-          "monica-infra-web",
-          "monica-infra-ui"
+          "monica-infra-web"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -91,9 +92,8 @@
           {
             "capability": "ui",
             "skills": [
-              "monica-ui-development",
-              "monica-ui-localization",
-              "monica-ui-audit"
+              "monica-application-ui",
+              "monica-application-ui-development"
             ]
           }
         ],
@@ -415,11 +415,10 @@
       "ownership": "monica",
       "managed": true,
       "dependencies": {
-        "required": [
-          "monica-architecture",
-          "monica-development"
-        ],
+        "required": [],
         "recommended": [
+          "monica-architecture",
+          "monica-development",
           "monica-ui-localization",
           "monica-ui-audit"
         ],
@@ -547,8 +546,7 @@
           "Monica.Framework.UI/Pages/UIEventBusChangesPage.razor",
           "Monica.Framework.UI/Pages/UIEventBusTestToolsPage.razor",
           "Monica.Dapr/Modules/ModuleDaprEventBus.cs",
-          "Monica.WebApi/RpcClient",
-          "Monica.WebApi/Modules/ModuleRpcClient.cs",
+          "Monica.Rpc",
           "Monica.WebApi/Annotations/RpcClientGenerationTargets.cs"
         ]
       }
@@ -701,7 +699,8 @@
           "Monica.Framework.UI/UIExecutionPipeline",
           "Monica.Framework.UI/UIProjectUnits",
           "Monica.Framework.UI/Modules/ModuleExecutionPipelineUI.cs",
-          "Monica.Framework.UI/Modules/ModuleProjectUnitsUI.cs"
+          "Monica.Framework.UI/Modules/ModuleProjectUnitsUI.cs",
+          "Monica.Application"
         ]
       }
     },
@@ -744,8 +743,41 @@
           "Monica.Framework.UI/UIMapper",
           "Monica.Framework.UI/Modules/ModuleMapperUI.cs",
           "Monica.Framework.UI/Localization/MapperResource",
-          "Monica.Framework.UI/wwwroot/UIMapper"
+          "Monica.Framework.UI/wwwroot/UIMapper",
+          "Monica.Application.UI"
         ]
+      }
+    },
+    "monica-application-ui": {
+      "path": "skills/monica-application-ui",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [
+          "monica-application",
+          "monica-infra-ui"
+        ],
+        "recommended": [],
+        "conditional": [],
+        "external": []
+      }
+    },
+    "monica-application-ui-development": {
+      "path": "skills/monica-application-ui-development",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [
+          "monica-application-ui",
+          "monica-ui-development",
+          "monica-ui-localization",
+          "monica-ui-audit"
+        ],
+        "recommended": [],
+        "conditional": [],
+        "external": []
       }
     }
   },
@@ -791,8 +823,7 @@
           "monica-infra-configuration",
           "monica-infra-observability",
           "monica-infra-ai",
-          "monica-infra-web",
-          "monica-infra-ui"
+          "monica-infra-web"
         ],
         "recommended": [
           "monica-application-unit-testing",
@@ -814,9 +845,8 @@
           {
             "capability": "ui",
             "skills": [
-              "monica-ui-development",
-              "monica-ui-localization",
-              "monica-ui-audit"
+              "monica-application-ui",
+              "monica-application-ui-development"
             ]
           }
         ]
@@ -1067,7 +1097,7 @@
           },
           {
             "id": "monica-application-routing",
-            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references."
+            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references. For business UI also load monica-application-ui; the same project specification owns presentation and backend."
           },
           {
             "id": "monica-application-specification-evolution",

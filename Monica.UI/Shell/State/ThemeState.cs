@@ -8,7 +8,7 @@ namespace Monica.UI.Shell.State;
 /// <summary>
 /// Monica Theme Service - Manage theme switching and custom styles
 /// </summary>
-public class ThemeState(IOptions<ModuleShellUIOption> options) : IThemeState
+public class ThemeState(IOptions<ModuleUIOption> options) : IThemeState
 {
     private bool _isDarkMode = options.Value.DefaultDarkMode;
     private MonicaThemeKind _currentThemeKind = ResolveThemeKind(options.Value.DefaultTheme);

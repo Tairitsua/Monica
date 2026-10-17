@@ -1,12 +1,24 @@
 @using Monica.UI.Pages
 @using Monica.UI.Shell.Components.Layout
 @using Monica.UI.Shell.Support
+@using Monica.UI.Hosting
+@using Microsoft.Extensions.Options
+@using Monica.Modules
 @inject IPageCatalog PageCatalog
+@inject IOptions<ModuleUIHostOption> Options
 
+<UIProviders>
 <Router AppAssembly="@typeof(AppRouter).Assembly" 
         AdditionalAssemblies="@PageCatalog.GetAdditionalAssemblies()"
         NotFoundPage="@typeof(NotFoundPage)">
     <Found Context="routeData">
-        <PageRouteView RouteData="routeData" DefaultLayout="@typeof(MainLayout)" />
+        <PageRouteView RouteData="routeData" DefaultLayout="@ResolveLayout(routeData.PageType)" />
     </Found>
 </Router>
+</UIProviders>
+
+@code {
+    private Type ResolveLayout(Type page) => Options.Value.CatalogPageLayout is { } shellLayout
+        && PageCatalog.GetRegisteredPages().Any(entry => entry.ComponentType == page)
+            ? shellLayout : Options.Value.DefaultLayout;
+}

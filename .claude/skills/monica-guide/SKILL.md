@@ -49,6 +49,8 @@ Monica skills install **into the project by default**, never globally unless the
 
    `init` writes `.monica/guide.json` (including the optional `skillTargets` list of workspace-relative install directories, default `.agents/skills`) plus one managed instruction block in the root `AGENTS.md` (and the minimal `@AGENTS.md` import in `CLAUDE.md` when a Claude target is installed), and registers the workspace in the engine registry. The managed block also projects this machine's verified first-party source locators and the issue-reporting policy while the wizard's projection switches are on; a workspace update converges those sections with the same preview and apply. Inspect advisory detection with `status --workspace <path>` first; detection is a suggestion, confirmation is the user's.
 
+   For `application`, choose backend architecture independently of UI. Without `--capability ui` the workspace is backend-only. Add `--capability ui` to include the application UI specification, development skills and shared UI mechanics. The wizard exposes the same Backend only / With application UI choice. One project application spec owns both sides.
+
 4. Install or refresh that workspace's skills — this is the default skill flow:
 
    ```bash

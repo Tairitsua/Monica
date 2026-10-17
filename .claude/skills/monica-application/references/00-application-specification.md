@@ -1,6 +1,6 @@
 # Shared Application Specification
 
-The five `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the two architecture profiles own topology and boundaries; ProjectUnit development owns unit responsibilities and shapes; application testing owns verification boundaries. Infrastructure skills explain the native capabilities used by these patterns.
+The `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the two architecture profiles own topology and boundaries; ProjectUnit development owns unit responsibilities and shapes; application testing owns verification boundaries. Application UI owns the presentation branch and its development workflow; backend architecture and UI inclusion are independent selections. Pure backend applications need no UI skills. Infrastructure skills explain the native capabilities used by these patterns.
 
 ## Rule Strength
 

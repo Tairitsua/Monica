@@ -21,6 +21,11 @@ public static class ModuleAuthorizationBuilderExtensions
 {
     extension(IMonicaBuilder builder)
     {
+        /// <summary>Registers standard policy-based authorization without a permission-bit model.</summary>
+        public ModuleRegistration<ModuleAuthorization, ModuleAuthorizationOption> AddAuthorization(
+            Action<ModuleAuthorizationOption>? configure = null)
+            => builder.AddModule<ModuleAuthorization, ModuleAuthorizationOption>(configure);
+
         /// <summary>
         /// Registers authorization with the host's primary permission-bit definition.
         /// </summary>
@@ -42,7 +47,10 @@ public static class ModuleAuthorizationBuilderExtensions
             return registration
                 .AddPermissionBit<TEnum>(claimTypeDefinition)
                 .ConfigureServices(context =>
-                    context.Services.AddSingleton<IPermissionChecker, PermissionChecker<TEnum>>())
+                {
+                    context.Services.AddSingleton<IPermissionChecker, PermissionChecker<TEnum>>();
+                    context.Services.AddSingleton<IAuthorizationHandler, PolicyEnumPermissionRequirementHandler>();
+                })
                 .SatisfyFeature(ModuleAuthorization.DEFAULT_PERMISSION_FEATURE);
         }
 
@@ -87,7 +95,6 @@ public class ModuleAuthorization : MonicaModule<ModuleAuthorizationOption>, IWeb
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.RequireFeature(DEFAULT_PERMISSION_FEATURE);
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static localization => localization.AddResource<AuthorityResource>());
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>(
@@ -113,7 +120,6 @@ public class ModuleAuthorization : MonicaModule<ModuleAuthorizationOption>, IWeb
         var services = context.Services;
         services.TryAddSingleton<AuthorityMessageLocalizer>();
         services.AddAuthorization();
-        services.AddSingleton<IAuthorizationHandler, PolicyEnumPermissionRequirementHandler>();
         services.AddTransient<DefaultAuthorizationPolicyProvider>();
         services.AddSingleton<IAuthorizationService, AuthorityAuthorizationService>();
         services.AddSingleton<IAuthorityAuthorizationService, AuthorityAuthorizationService>();

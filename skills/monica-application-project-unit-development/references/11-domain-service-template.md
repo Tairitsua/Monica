@@ -26,6 +26,7 @@ A handler that loads one order and calls `order.Approve()` does not need a Domai
 
 ```csharp
 using Monica.ProjectUnits.Annotations;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 
 namespace $DomainNamespace$.DomainServices;

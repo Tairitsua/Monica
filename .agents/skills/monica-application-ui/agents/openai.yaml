@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monica Application UI"
+  short_description: "Design a DDD application's presentation boundary"
+  default_prompt: "Use $monica-application-ui with the repository application specification to design the presentation structure, layout ownership, and application invocation boundary."

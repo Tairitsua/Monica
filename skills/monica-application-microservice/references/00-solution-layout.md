@@ -62,7 +62,8 @@ Recommended `.slnx` folders should mirror the physical layout:
 
 - For shared specialization naming, mechanism choice, and capability placement, follow the [project-level extension rules](../../monica-application-project-unit-development/references/01-project-unit-naming-and-boundaries.md#project-level-extensions) within this topology.
 - Keep the same shared platform split across solution styles to reduce learning overhead.
-- Use the strict solution-project reference chain `{Subdomain}Service.API -> {Subdomain}Service.Domain -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
+- For applications with UI, adopt the [presentation branch](../../monica-application-ui/references/presentation-specification.md): `AppHost -> Presentation -> Platform.Protocol`. A host may compose presentation alongside its backend; a remote presentation host must not reference remote service implementations. Product UI libraries reference no domain implementation or Platform.Infrastructure.
+- Use the strict backend solution-project reference chain `{Subdomain}Service.API -> {Subdomain}Service.Domain -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
 - Put project-agnostic infrastructure extensions into `Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj`.
 - Put solution-owned infrastructure composition and integration configuration into `Shared/Platform.Infrastructure/Platform.Infrastructure.csproj`.
 - Put cross-service contracts in `Shared/Platform.Protocol/PublishedLanguages`, not inside a service project. Only attributed `Command*` and `Query*` requests are generated RPC endpoints.

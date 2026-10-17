@@ -24,11 +24,11 @@ When adding or refactoring application EventBus events and consumers, including 
 - Add explicit `[ProjectUnitMetadata]` to each application-authored discovered unit and `[ProjectUnitRequirement]` for applicable actual requirement IDs, following the [metadata and coverage-debt rules](references/03-project-unit-context-metadata.md). Do not inherit metadata or invent a requirement merely to fill the catalog.
 - Keep metadata, description, and requirement traceability explicit. Resolve optional ownership through the [metadata rules](references/03-project-unit-context-metadata.md).
 - If a handler returns `Res<string>`, use `Res.Ok<string>(value)` instead of `Res.Ok(value)` to avoid the non-generic string overload.
-- Make HTTP contracts request-owned. Put `[ApiEndpoint]` on the request type and keep route, verb, binding, and optional operation name off the `ApplicationService` handler.
+- Make HTTP contracts request-owned. Put `[ApiEndpoint]` on the request type and keep route, verb, and binding off the `ApplicationService` handler.
 - A request is published for generated RPC clients only when it is attributed source in the exact namespace `*.PublishedLanguages.Domain{DomainName}.Requests`. Attributed requests outside that boundary remain local HTTP endpoints.
-- Put `[assembly: WebApiGenerationConfig(...)]` in each assembly that owns attributed requests. Protocol assemblies select the required `RpcClientTargets`; local-only assemblies normally use `None`.
+- Generate interfaces in Protocol independently of transport. Host `ApplicationApiGenerationConfig` selects Local for monolith internals or Http for cross-service calls. Owned HTTP receivers follow that mode or a host WebApiGenerationConfig opt-in. See [RPC generation](../monica-infra-messaging/references/rpc.md).
 - Do not add MVC `[Http*]`, `[Route]`, or `[From*]` attributes to generated `ApplicationService` endpoints. The request contract is the single endpoint authority.
-- Use `ApplicationService` only for HTTP-exposed mediator handlers. If a request is intentionally internal and must have no HTTP endpoint, implement `IRequestHandler<TRequest, TResult>` as a normal transient dependency instead of omitting `[ApiEndpoint]` from an `ApplicationService`.
+- Use transport-independent ApplicationService for use cases. `[ApiEndpoint(ApiHttpMethod, route)]` publishes a domain interface for UI and application callers while retaining HTTP metadata without exposing receivers. Unattributed requests and plain IRequestHandler remain internal mediator operations.
 - For capability setup and runtime behavior, use `$monica-infra-configuration`, `$monica-infra-jobs`, `$monica-infra-messaging`, and `$monica-infra-web` as applicable. This skill owns the application unit's shape and placement.
 
 ## Reference Navigation

@@ -10,4 +10,7 @@
     <Project Path="src/Shared/Platform.Infrastructure/Platform.Infrastructure.csproj" />
     <Project Path="src/Shared/Platform.Protocol/Platform.Protocol.csproj" />
   </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
+  </Folder>
 </Solution>

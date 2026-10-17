@@ -86,7 +86,7 @@ IncludeSoftDeleted disables only Monica's soft-delete filter. Do not bypass tena
 
 ## Read-Only and Mediator Scenarios
 
-Arrange in a seed scope first. Then a direct read can resolve IOrganUnitQueries in a fresh application.CreateScope(token). To exercise the mediator adapter, resolve IMediator in that scope and Send a GET-bound query request (read-only by convention).
+Arrange in a seed scope first. Then a direct read can resolve IOrganUnitQueries in a fresh application.CreateScope(token). To exercise the mediator adapter, resolve IMediator in that scope and Send a published Query request (read-only by application convention).
 
 ## Durable Notification Scenario
 

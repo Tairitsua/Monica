@@ -28,13 +28,20 @@ public sealed class RpcClientSourceGenerator : IIncrementalGenerator
                     AnalyzeEndpoint(attributeContext, cancellationToken))
             .WithTrackingName(ENDPOINT_ANALYSIS_STEP);
 
-        var endpointCollection = analyzedEndpoints
-            .Collect()
+        var endpointCollection = analyzedEndpoints.Collect()
             .WithTrackingName(ENDPOINT_COLLECTION_STEP);
 
         context.RegisterSourceOutput(
             endpointCollection,
             static (productionContext, analyses) => Emit(productionContext, analyses));
+
+        context.RegisterSourceOutput(context.CompilationProvider.Select(static (compilation, cancellationToken) =>
+            HostGenerationReader.Clients(compilation, cancellationToken)), static (productionContext, analysis) =>
+        {
+            foreach (var diagnostic in analysis.Diagnostics) productionContext.ReportDiagnostic(diagnostic.ToDiagnostic());
+            if (analysis.Configuration is { } config && analysis.Diagnostics.Count == 0)
+                RpcClientCodeGenerator.Generate(productionContext, analysis.Endpoints, config, generateInterfaces: false);
+        });
     }
 
     private static AnalysisSnapshot<EndpointModel> AnalyzeEndpoint(

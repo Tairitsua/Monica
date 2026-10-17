@@ -20,7 +20,7 @@ using Monica.Testing.Hosting;
 using Swashbuckle.AspNetCore.Swagger;
 using Xunit;
 
-namespace Test.Monica.WebApi.Validation;
+namespace Test.Monica.Application.Validation;
 
 public sealed class RequestRejectionTests
 {

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Transport-independent application use cases, validation, and execution composition for Monica DDD applications.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monica.Rpc/Monica.Rpc.csproj" />
+    <ProjectReference Include="../Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
+    <ProjectReference Include="../Monica.Authority/Monica.Authority.csproj" />
+  </ItemGroup>
+</Project>

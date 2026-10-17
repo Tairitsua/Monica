@@ -31,7 +31,7 @@ Within solution-project references, use the chain `Domains.{Subdomain} -> Platfo
 
 - Use direct contract-driven requests when another domain needs synchronous data or command execution.
 - Use events when the collaboration can be asynchronous and loosely coupled.
-- Generated synchronous contracts are `I{Domain}CommandApi` and `I{Domain}QueryApi`; `WebApiGenerationConfig` selects HTTP and/or local implementations. Only check in wrappers when intentionally extending that surface.
+- Generated interfaces are I{Domain}CommandApi and I{Domain}QueryApi. Host ApplicationApiGenerationConfig selects Local or Http adapters independently of interface generation. Do not check in duplicate generated surfaces.
 - Keep multipart, download, raw-object, and other transport-only requests beside their handlers as local HTTP endpoints; they must not enter published RPC language.
 - Do not use JSON snapshots, `AdditionalFiles`, bootstrap scans, or source-tree writes for RPC discovery.
 - Keep collaboration intentional. A modular monolith should not simulate service calls for everything, but it should still preserve domain boundaries.

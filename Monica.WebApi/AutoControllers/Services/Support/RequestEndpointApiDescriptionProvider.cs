@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing.Patterns;
-using Monica.WebApi.Annotations;
 using Monica.WebApi.AutoControllers.ModelBinding;
 
 namespace Monica.WebApi.AutoControllers.Services.Support;
@@ -51,14 +50,14 @@ public sealed class RequestEndpointApiDescriptionProvider(
             .OfType<ControllerParameterDescriptor>()
             .SingleOrDefault(static parameter =>
                 parameter.ParameterInfo.GetCustomAttribute<ApiEndpointRequestAttribute>() is not null);
-        if (requestParameter is null ||
-            requestParameter.ParameterType.GetCustomAttribute<ApiEndpointAttribute>() is not { } endpoint)
+        if (requestParameter is null)
         {
             return;
         }
 
         var requestMetadata = modelMetadataProvider.GetMetadataForType(requestParameter.ParameterType);
-        foreach (var placeholder in RoutePatternFactory.Parse(endpoint.Route).Parameters
+        var route = actionDescriptor.AttributeRouteInfo?.Template ?? string.Empty;
+        foreach (var placeholder in RoutePatternFactory.Parse(route).Parameters
                      .Select(static parameter => parameter.Name)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {

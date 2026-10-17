@@ -354,8 +354,10 @@ public sealed class IncrementalGeneratorPipelineTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -384,6 +386,7 @@ public sealed class IncrementalGeneratorPipelineTests
 
     private const string AssemblyConfigurationBefore = """
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -393,6 +396,7 @@ public sealed class IncrementalGeneratorPipelineTests
 
     private const string AssemblyConfigurationAfter = """
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig(
             "api/v2",
@@ -405,8 +409,10 @@ public sealed class IncrementalGeneratorPipelineTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
         {
@@ -430,8 +436,10 @@ public sealed class IncrementalGeneratorPipelineTests
         """;
 
     private const string ProtocolMetadataScenario = """
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v4", DomainName = "Ordering")]
 
@@ -448,6 +456,7 @@ public sealed class IncrementalGeneratorPipelineTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
@@ -486,6 +495,7 @@ public sealed class IncrementalGeneratorPipelineTests
         using Monica.Core.Results;
         using Monica.Core.Results.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -520,6 +530,7 @@ public sealed class IncrementalGeneratorPipelineTests
     private const string InvalidPublishedEnvelopeScenario = """
         using Monica.Core.Mediator;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -536,8 +547,10 @@ public sealed class IncrementalGeneratorPipelineTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -565,8 +578,10 @@ public sealed class IncrementalGeneratorPipelineTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -619,9 +634,11 @@ public sealed class IncrementalGeneratorPipelineTests
     private const string InvalidConfiguredBaseScenario = """
         using System.Net.Http;
         using Monica.DependencyInjection.Abstractions;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
-        using Monica.WebApi.RpcClient.Abstractions;
+        using Monica.Application.Annotations;
+        using Monica.Rpc.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -646,9 +663,11 @@ public sealed class IncrementalGeneratorPipelineTests
     private const string GenericConfiguredBaseScenario = """
         using System.Net.Http;
         using Monica.DependencyInjection.Abstractions;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
-        using Monica.WebApi.RpcClient.Abstractions;
+        using Monica.Application.Annotations;
+        using Monica.Rpc.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -675,9 +694,11 @@ public sealed class IncrementalGeneratorPipelineTests
     private const string FileLocalConfiguredBaseScenario = """
         using System.Net.Http;
         using Monica.DependencyInjection.Abstractions;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
-        using Monica.WebApi.RpcClient.Abstractions;
+        using Monica.Application.Annotations;
+        using Monica.Rpc.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",

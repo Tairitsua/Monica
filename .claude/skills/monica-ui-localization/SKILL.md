@@ -5,6 +5,9 @@ description: This skill should be used when creating, modifying, validating, or 
 
 # Monica UI Localization
 
+For application presentation libraries, the host registers the project-root resource through `AddLocalization`; no business UI module or navigation entry is required. Module/page registry rules below apply to framework diagnostic destinations and Shell menu contributions.
+
+
 This skill owns Monica UI localization and i18n validation.
 
 All script paths in this document are relative to the `monica-ui-localization` skill directory.

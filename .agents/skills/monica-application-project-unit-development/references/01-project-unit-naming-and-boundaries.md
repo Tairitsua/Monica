@@ -34,7 +34,7 @@ These names describe support types; they do not create additional discovered rol
 | Support type | Recommended naming | Purpose |
 | --- | --- | --- |
 | `Utility` helper | `Utils*` | Pure helper code that stays inside the domain boundary and does not deserve its own `DomainService` |
-| Facade | `*Facade` | Public UI/API entry point owned by its domain |
+| Facade | `*Facade` | Existing deliberate adapter; new business UI normally consumes application use cases |
 | Internal mediator handler | `CommandHandler*`, `QueryHandler*`, or meaningful `*Handler*` | Internal use-case orchestration through the existing mediator contract |
 | Response/read DTO, value object, mapper, validator | Business meaning plus an existing repository convention | Data shape, invariant value, mapping, or validation without a new role |
 | Composition module | Existing `Module*` convention | Registration and host integration, including composition-only AppHost modules |
@@ -123,7 +123,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 - For microservice projects, repository implementations stay in `{Subdomain}Service.Domain/Repository/`.
 - Keep libraries that are only used by one repository or adapter in the owning subdomain/service project. Do not move that implementation into `Platform` unless the implementation itself is project-common reusable infrastructure.
 - Keep request, response, and event contracts separate from persistence entities.
-- Keep endpoint metadata on the request contract. `[ApiEndpoint]` is the single source for HTTP method, route, binding, and operation name; generated `ApplicationService` handlers do not carry MVC endpoint or binding attributes.
+- Keep endpoint metadata on the request contract. the single ApiEndpoint declares the operation and its HTTP mapping; optional shared wire settings stay with its assembly; generated `ApplicationService` handlers do not carry MVC endpoint or binding attributes.
 - Use `DateTime` for timezone-free wall-clock contract values and `DateTimeOffset` for instants or explicit offsets. Do not compensate for transport with ad hoc UTC/local conversions in handlers.
 - Publish a request to RPC clients only through the explicit `*.PublishedLanguages.Domain{DomainName}.Requests` namespace boundary. Local HTTP requests stay outside that namespace even when they reuse published DTOs.
 - Keep adapter code thin. Generated endpoint registration, RPC transports, or background-host wiring should not replace ProjectUnits.

@@ -43,6 +43,7 @@ public sealed class OrderProcessingOptions
 ```csharp
 using Microsoft.Extensions.Options;
 using Monica.ProjectUnits.Annotations;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 
 namespace $DomainNamespace$.DomainServices;

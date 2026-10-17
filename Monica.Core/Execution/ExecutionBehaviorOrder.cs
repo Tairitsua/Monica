@@ -20,6 +20,9 @@ public static class ExecutionBehaviorOrder
     /// </summary>
     public const int Routing = -1000;
 
+    /// <summary>Authoritative application-input validation before opening a unit of work.</summary>
+    public const int Validation = -500;
+
     /// <summary>
     /// Transaction and unit-of-work boundaries around local application work.
     /// </summary>

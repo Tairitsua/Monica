@@ -8,6 +8,14 @@ namespace Test.Monica.Generators.AutoController;
 public sealed class RequestOwnedWebApiGeneratorTests
 {
     [Fact]
+    public void Run_WhenExplicitHttpMappingHasNoPublicationConfig_ShouldGenerateOnlyStableContracts()
+    {
+        var run = RunGenerators(MissingConfigurationScenario);
+        run.OutputErrors.Should().BeEmpty();
+        run.GeneratedSources.Keys.Should().BeEquivalentTo("IOrderingQueryApi.g.cs");
+    }
+
+    [Fact]
     public void Run_WhenPublishedContractsAreReferencedInTheSameCompilation_ShouldGenerateCompilableControllersAndClients()
     {
         var run = RunGenerators(PublishedOrderingScenario);
@@ -56,7 +64,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
     }
 
     [Fact]
-    public void Run_WhenEndpointOverridesOperationAndBinding_ShouldPreserveTheExactPublicContract()
+    public void Run_WhenHttpRouteDiffersFromRequestName_ShouldDeriveMethodNameFromRequestAndPreserveMapping()
     {
         var run = RunGenerators(ExactEndpointScenario);
 
@@ -68,10 +76,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         controller.Should().Contain("HttpGet");
         controller.Should().Contain("orders/{OrderId}");
         controller.Should().Contain(
-            "ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Query)");
-        controller.Should().Contain("FindOrder");
+            "ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Query)");
+        controller.Should().Contain("OrderById(");
         controller.Should().Contain("Finds one published order by its identifier.");
-        rpcContract.Should().Contain("FindOrder");
+        rpcContract.Should().Contain("OrderById(");
         rpcContract.Should().Contain("CancellationToken");
     }
 
@@ -94,9 +102,9 @@ public sealed class RequestOwnedWebApiGeneratorTests
         generatedControllers.Should().Contain("HttpDelete");
         generatedControllers.Should().Contain("items/{Id}");
         generatedControllers.Should().Contain(
-            "ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Query)");
+            "ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Query)");
         generatedControllers.Should().Contain(
-            "ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Body)");
+            "ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Body)");
     }
 
     [Fact]
@@ -135,7 +143,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         run.OutputErrors.Should().BeEmpty();
         var controller = run.GeneratedSources["HttpEndpointCommandOrdering.g.cs"];
         controller.Should().Contain(
-            "ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Form)");
+            "ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Form)");
         controller.Should().Contain("local-upload");
         run.GeneratedSources.Keys.Should().NotContain("IOrderingCommandApi.g.cs");
     }
@@ -151,7 +159,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             .ContainSingle(static diagnostic => diagnostic.Id == "AC1019");
         var controller = run.GeneratedSources["HttpEndpointCommandOrdering.g.cs"];
         controller.Should().Contain("HttpDelete");
-        controller.Should().Contain("ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Query)");
+        controller.Should().Contain("ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Query)");
     }
 
     [Fact]
@@ -165,7 +173,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             .Should()
             .NotContain("AC1019");
         var controller = run.GeneratedSources["HttpEndpointCommandOrdering.g.cs"];
-        controller.Should().Contain("ApiEndpointRequestAttribute(global::Monica.WebApi.Annotations.ApiRequestBinding.Body)");
+        controller.Should().Contain("ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Body)");
     }
 
     [Theory]
@@ -223,9 +231,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
     public static TheoryData<string, string> InvalidScenarios => new()
     {
-        { MissingEndpointScenario, "AC1001" },
         { LegacyHandlerAttributeScenario, "AC1002" },
-        { MissingConfigurationScenario, "AC1003" },
         { MissingPlaceholderPropertyScenario, "AC1012" },
         { InvalidRouteScenario.Replace("$ROUTE$", "orders?active=true", StringComparison.Ordinal), "AC1011" },
         { InvalidRouteScenario.Replace("$ROUTE$", "orders#active", StringComparison.Ordinal), "AC1011" },
@@ -234,6 +240,18 @@ public sealed class RequestOwnedWebApiGeneratorTests
         { MissingSummaryScenario, "AC1014" },
         { DuplicateOperationScenario, "AC1010" }
     };
+
+    [Fact]
+    public void Run_WhenApplicationServiceIsLocalOnly_ShouldCompileWithoutPublishingHttp()
+    {
+        var first = RunGenerators(MissingEndpointScenario);
+        var second = RunGenerators(MissingEndpointScenario);
+        first.RunResult.Diagnostics.Should().BeEmpty();
+        first.OutputErrors.Should().BeEmpty();
+        first.GeneratedSources.Should().BeEmpty();
+        second.GeneratedSources.Should().BeEquivalentTo(first.GeneratedSources);
+        second.OutputErrors.Should().BeEmpty();
+    }
 
     private static GeneratorTestHarness.GeneratorTestRun RunGenerators(string source)
     {
@@ -254,8 +272,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
         using Scenario.PublishedLanguages.DomainOrdering.Contracts;
         using Scenario.PublishedLanguages.DomainOrdering.Models;
         using Scenario.PublishedLanguages.DomainOrdering.Requests;
@@ -318,23 +338,25 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
         {
             /// <summary>Gets orders through the published contract.</summary>
-            [ApiEndpoint(ApiHttpMethod.Get, "published-orders", OperationName = "GetPublishedOrders")]
-            public sealed record QueryPublishedOrders : IResultRequest<IReadOnlyList<string>>;
+            [ApiEndpoint(ApiHttpMethod.Get, "published-orders")]
+            public sealed record QueryGetPublishedOrders : IResultRequest<IReadOnlyList<string>>;
         }
 
         namespace Scenario.Local.Requests
         {
             /// <summary>Gets process-local health details.</summary>
-            [ApiEndpoint(ApiHttpMethod.Get, "local-health", OperationName = "GetLocalHealth")]
-            public sealed record QueryLocalHealth : IResultRequest<string>;
+            [ApiEndpoint(ApiHttpMethod.Get, "local-health")]
+            public sealed record QueryGetLocalHealth : IResultRequest<string>;
         }
 
         namespace Scenario.Application
@@ -343,18 +365,18 @@ public sealed class RequestOwnedWebApiGeneratorTests
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
             public sealed class QueryHandlerPublishedOrders
-                : ApplicationService<QueryPublishedOrders, IReadOnlyList<string>>
+                : ApplicationService<QueryGetPublishedOrders, IReadOnlyList<string>>
             {
                 public override Task<Res<IReadOnlyList<string>>> Handle(
-                    QueryPublishedOrders request,
+                    QueryGetPublishedOrders request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerLocalHealth
-                : ApplicationService<QueryLocalHealth, string>
+                : ApplicationService<QueryGetLocalHealth, string>
             {
                 public override Task<Res<string>> Handle(
-                    QueryLocalHealth request,
+                    QueryGetLocalHealth request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
@@ -365,8 +387,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v2", DomainName = "Ordering")]
 
@@ -383,8 +407,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             [ApiEndpoint(
                 ApiHttpMethod.Get,
                 "orders/{OrderId}",
-                Binding = ApiRequestBinding.Query,
-                OperationName = "FindOrder")]
+                Binding = ApiRequestBinding.Query)]
             public sealed record QueryOrderById(long OrderId) : IResultRequest<OrderDto>;
         }
 
@@ -407,8 +430,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Inventory")]
 
@@ -475,8 +500,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using Monica.Core.Mediator;
         using Monica.Core.Results;
         using Monica.Core.Results.Abstractions;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -570,8 +597,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -599,8 +628,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -628,8 +659,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -654,9 +687,11 @@ public sealed class RequestOwnedWebApiGeneratorTests
     private const string CustomTransportBaseScenario = """
         using System.Net.Http;
         using Monica.DependencyInjection.Abstractions;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
-        using Monica.WebApi.RpcClient.Abstractions;
+        using Monica.Application.Annotations;
+        using Monica.Rpc.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
@@ -689,8 +724,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -709,8 +746,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading.Tasks;
         using Microsoft.AspNetCore.Mvc;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -730,8 +769,12 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
+
+        namespace Scenario.PublishedLanguages.DomainOrdering.Requests;
 
         /// <summary>Has an endpoint but no assembly configuration.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
@@ -748,8 +791,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -768,8 +813,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -784,8 +831,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         """;
 
     private const string PublishedFormScenario = """
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -798,8 +847,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
         """;
 
     private const string MissingSummaryScenario = """
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -811,20 +862,24 @@ public sealed class RequestOwnedWebApiGeneratorTests
         """;
 
     private const string DuplicateOperationScenario = """
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
-        namespace Scenario.PublishedLanguages.DomainOrdering.Requests
+        namespace First.PublishedLanguages.DomainOrdering.Requests
         {
             /// <summary>First duplicate operation.</summary>
-            [ApiEndpoint(ApiHttpMethod.Get, "first", OperationName = "Find")]
-            public sealed record QueryFirst : IResultRequest<string>;
-
+            [ApiEndpoint(ApiHttpMethod.Get, "first")]
+            public sealed record QueryFind : IResultRequest<string>;
+        }
+        namespace Second.PublishedLanguages.DomainOrdering.Requests
+        {
             /// <summary>Second duplicate operation.</summary>
-            [ApiEndpoint(ApiHttpMethod.Get, "second", OperationName = "Find")]
-            public sealed record QuerySecond : IResultRequest<string>;
+            [ApiEndpoint(ApiHttpMethod.Get, "second")]
+            public sealed record QueryFind : IResultRequest<string>;
         }
         """;
 }

@@ -1,5 +1,6 @@
 ﻿using Monica.DependencyInjection.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
+using Monica.Application.Abstractions;
 
 namespace Monica.WebApi.Abstractions;
 

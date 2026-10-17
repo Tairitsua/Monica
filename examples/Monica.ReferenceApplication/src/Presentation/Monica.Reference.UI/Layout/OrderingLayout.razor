@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+@using Monica.UI.Shell.State
+@using Monica.UI.Shell.Support
+@inject ThemeState Theme
+@inject IPageCatalog Pages
+@inject IStringLocalizer<OrderingUIResource> L
+@inject IDialogService Dialogs
+
+<div class="product-layout">
+    <aside aria-label="@L["Product"]">
+        <strong>@L["Product"]</strong>
+        <NavLink href="/" Match="NavLinkMatch.All">@L["Orders"]</NavLink>
+        @if (Pages.GetRegisteredPages().Any(page => page.Route == "module-system-dashboard"))
+        {
+            <a href="/module-system-dashboard">@L["Diagnostics"]</a>
+        }
+        <button type="button" @onclick="Theme.ToggleTheme">@L["Theme"]</button>
+        <button type="button" @onclick="ShowHelpAsync">@L["Help"]</button>
+    </aside>
+    <main>@Body</main>
+</div>
+
+@code {
+    private Task ShowHelpAsync() => Dialogs.ShowMessageBoxAsync(L["Help"], L["HelpText"], yesText: L["Close"]);
+}

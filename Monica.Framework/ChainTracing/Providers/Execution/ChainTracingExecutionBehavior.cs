@@ -6,7 +6,7 @@ using Monica.Framework.ChainTracing.Extensions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Services.Support;
 using Monica.Tool.Extensions;
-using Monica.WebApi.RpcClient.Abstractions;
+using Monica.Rpc.Abstractions;
 
 namespace Monica.Framework.ChainTracing.Providers.Execution;
 

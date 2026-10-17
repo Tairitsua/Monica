@@ -6,7 +6,7 @@ The current runtime and source discovery implementations recognize the following
 
 | Unit | Base type or contract | Naming convention | Primary responsibility |
 | --- | --- | --- | --- |
-| `ApplicationService` | `ApplicationService<TRequest, TResponse>`, `ApplicationService<TRequest>`, or native `CustomApplicationService<TRequest, TResult>` | `CommandHandler*`, `QueryHandler*`, or another `*Handler*` name | HTTP-exposed mediator use-case orchestration with a deliberate result boundary |
+| `ApplicationService` | `ApplicationService<TRequest, TResponse>`, `ApplicationService<TRequest>`, or native `CustomApplicationService<TRequest, TResult>` | `CommandHandler*`, `QueryHandler*`, or another `*Handler*` name | Transport-independent mediator use-case orchestration (HTTP exposure is opt-in) with a deliberate result boundary |
 | `RequestDto` | `IResultRequest<TResponse>` or `IResultRequest` | `Command*`, `Query*`, `Request*` | Stable request contract for a use case |
 | `DomainService` | `DomainService` | `Domain*` | Meaningful domain rule with no natural entity owner, often spanning aggregates |
 | `Entity` | `Entity<TKey>` or `Entity` plus `IEntity` | Place under `Entities/` | Own state, invariants, and behavior |

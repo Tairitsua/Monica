@@ -1,0 +1,125 @@
+@page "/"
+@page "/orders"
+@using Monica.Core.Results
+@using Monica.Reference.UI.Features.Orders.Models
+@using Platform.Protocol.PublishedLanguages.DomainOrdering.Models
+@using Platform.Protocol.PublishedLanguages.DomainOrdering.Requests
+@using Platform.Protocol.PublishedLanguages.DomainOrdering.Contracts
+@inject IOrderingCommandApi Commands
+@inject IOrderingQueryApi Queries
+@inject IStringLocalizer<OrderingUIResource> L
+@implements IAsyncDisposable
+
+<PageTitle>@L["Orders"]</PageTitle>
+<h1>@L["Orders"]</h1>
+<p>@L["Description"]</p>
+@if (_summary is { } summary)
+{
+    <p class="summary">@L["Summary", summary.TotalOrders, summary.DraftOrders]</p>
+}
+<section aria-labelledby="create-order-title">
+    <h2 id="create-order-title">@L["Create"]</h2>
+    <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <label>@L["Number"]<input required @bind="_form.Number" @bind:event="oninput" disabled="@_busy" /></label>
+        <label>@L["Customer"]<input required @bind="_form.Customer" @bind:event="oninput" disabled="@_busy" /></label>
+        <label>@L["Total"]<input type="number" min="0.01" step="0.01" required @bind="_form.Total" @bind:event="oninput" disabled="@_busy" /></label>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_busy">@L["Create"]</MudButton>
+    </form>
+</section>
+@if (_message is not null)
+{
+    <MudAlert Severity="@(_failed ? Severity.Error : Severity.Success)" role="status">@_message</MudAlert>
+}
+<div class="list-heading">
+    <h2>@L["Orders"]</h2>
+    <MudButton OnClick="RefreshAsync" Disabled="@_busy">@L["Refresh"]</MudButton>
+</div>
+@if (_busy)
+{
+    <p role="status">@L["Loading"]</p>
+}
+@if (_orders.Count == 0 && !_busy)
+{
+    <p>@L["Empty"]</p>
+}
+else
+{
+    <div class="table-scroll">
+        <table>
+            <thead><tr><th>@L["Number"]</th><th>@L["Customer"]</th><th>@L["Total"]</th><th>@L["Status"]</th><th>@L["Approve"]</th></tr></thead>
+            <tbody>
+                @foreach (var order in _orders)
+                {
+                    <tr @key="order.Id">
+                        <td>@order.OrderNumber</td><td>@order.CustomerName</td><td>@order.Total.ToString("N2")</td>
+                        <td>@L[order.Status == OrderStatus.Draft ? "Draft" : "Approved"]</td>
+                        <td><MudButton Disabled="@(_busy || order.Status != OrderStatus.Draft)" OnClick="() => ApproveAsync(order.Id)">@L["Approve"]</MudButton></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task _pending = Task.CompletedTask;
+    private CreateOrderForm _form = new();
+    private IReadOnlyList<OrderDto> _orders = [];
+    private OrderSummaryDto? _summary;
+    private string? _message;
+    private bool _failed;
+    private bool _busy;
+    private bool _retired;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+    private Task RefreshAsync() => RunAsync(LoadAsync);
+    private Task SubmitAsync() => RunAsync(async () =>
+    {
+        var result = await Commands.CreateOrder(_form.ToRequest(), _lifetime.Token);
+        if (_retired) return;
+        Present(result.ToRes());
+        if (result.IsOk()) { _form = new(); await LoadAsync(); }
+    });
+
+    private Task ApproveAsync(Guid id) => RunAsync(async () =>
+    {
+        var result = await Commands.ApproveOrder(new CommandApproveOrder(id), _lifetime.Token);
+        if (_retired) return;
+        Present(result.ToRes());
+        if (result.IsOk()) await LoadAsync();
+    });
+
+    private Task RunAsync(Func<Task> action)
+    {
+        if (_busy || _retired) return _pending;
+        _busy = true;
+        return _pending = CompleteAsync(action);
+    }
+
+    private async Task CompleteAsync(Func<Task> action)
+    {
+        try { await action(); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { if (!_retired) _busy = false; }
+    }
+
+    private async Task LoadAsync()
+    {
+        var orders = await Queries.GetOrders(new QueryGetOrders(), _lifetime.Token);
+        var summary = await Queries.GetOrderSummary(new QueryGetOrderSummary(), _lifetime.Token);
+        if (_retired) return;
+        if (orders.IsOk()) _orders = orders.Data ?? []; else Present(orders.ToRes());
+        if (summary.IsOk()) _summary = summary.Data; else Present(summary.ToRes());
+    }
+
+    private void Present(Res result) { _failed = !result.IsOk(); _message = _failed ? result.Message : L["Saved"]; }
+
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        await _lifetime.CancelAsync();
+        await _pending;
+        _lifetime.Dispose();
+    }
+}

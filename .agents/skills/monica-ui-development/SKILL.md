@@ -5,7 +5,7 @@ description: Implement Monica Blazor and MudBlazor v9 components, pages, themes,
 
 # Monica UI Development
 
-Use `$monica-architecture` for UI module boundaries and page decomposition. For a focused UI change, inspect the owning component, its CSS, and the rendered DOM. Use `$monica-ui-audit` when the task asks for a compliance review or the change has a concrete cross-cutting risk. Use `$monica-ui-localization` for user-facing strings, resources, or registry keys; use `$monica-infra-ui` for consumer registration.
+For framework modules use `$monica-architecture` for UI boundaries and decomposition. For business application pages use `$monica-application-ui` and `$monica-application-ui-development`; reuse the mechanics here without importing module/Facade placement or the default Shell geometry. For a focused UI change, inspect the owning component, its CSS, and the rendered DOM. Use `$monica-ui-audit` when the task asks for a compliance review or the change has a concrete cross-cutting risk. Use `$monica-ui-localization` for user-facing strings, resources, or registry keys; use `$monica-infra-ui` for consumer registration.
 
 For a page redesign, apply the shared [visual language](references/monica-visual-language.md) for the signature region, color role map, scale tiers, and component vocabulary, and the [working-interface language](references/monica-workbench-design-language.md) for task analysis, evidence honesty, responsive containment, and review. A neutral, single-accent page does not meet the visual language.
 

@@ -1,6 +1,7 @@
 using Monica.Core.TypeDiscovery.Models;
 using Monica.Modules;
 using Monica.ProjectUnits.Services.Support;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 
 namespace Monica.ProjectUnits.Models;

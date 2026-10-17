@@ -6,11 +6,6 @@ internal static class DiagnosticDescriptors
 {
     private const string CATEGORY = "RequestOwnedWebApi";
 
-    public static readonly DiagnosticDescriptor MissingEndpoint = Create(
-        "AC1001",
-        "Application request has no endpoint contract",
-        "ApplicationService request '{0}' must declare [ApiEndpoint].");
-
     public static readonly DiagnosticDescriptor LegacyHandlerAttribute = Create(
         "AC1002",
         "Handler contains endpoint metadata",
@@ -84,7 +79,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidOperationName = Create(
         "AC1016",
         "Invalid RPC operation name",
-        "Endpoint request '{0}' resolves to invalid RPC operation name '{1}'. Use a valid C# identifier in OperationName.");
+        "Endpoint request '{0}' resolves to invalid RPC operation name '{1}'. Rename the request so the suffix after Command or Query is a valid C# identifier.");
 
     public static readonly DiagnosticDescriptor InvalidPublishedResultEnvelope = Create(
         "AC1017",
@@ -95,6 +90,11 @@ internal static class DiagnosticDescriptors
         "AC1018",
         "Route property cannot receive the route value",
         "Route placeholder '{{{0}}}' matches property '{1}' on request '{2}', but the property must expose a public setter/init accessor or belong to the request record constructor.");
+
+    public static readonly DiagnosticDescriptor InvalidReceiverOwnership = Create(
+        "AC1020",
+        "Invalid receiver ownership",
+        "Selected handler assembly '{0}' contains no concrete ApplicationService with an ApiEndpoint request. Select an implementation assembly, not a protocol assembly.");
 
     public static readonly DiagnosticDescriptor GenerationFailure = Create(
         "AC1099",

@@ -1,5 +1,6 @@
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 using Platform.Protocol.PublishedLanguages.DomainOrdering.Models;
 
 namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
@@ -8,8 +9,5 @@ namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 /// Requests the one-way transition of a draft order to approved.
 /// </summary>
 /// <param name="OrderId">The order identifier.</param>
-[ApiEndpoint(
-    ApiHttpMethod.Post,
-    "orders/approve",
-    Binding = ApiRequestBinding.Body)]
+[ApiEndpoint(ApiHttpMethod.Post, "commands/ApproveOrder")]
 public sealed record CommandApproveOrder(Guid OrderId) : IResultRequest<OrderDto>;

@@ -5,8 +5,10 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Monica.Core.Results;
 using Monica.DependencyInjection.Abstractions;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 
 namespace Test.Monica.Generators.AutoController;
 

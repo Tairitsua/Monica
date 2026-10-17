@@ -2,10 +2,14 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <!-- The document and pages live in Razor libraries, so explicitly include the Blazor runtime. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../../../../Monica.Generators.AutoController/Monica.Generators.AutoController.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../Domains/Ordering/Domains.Ordering.csproj" />
+    <ProjectReference Include="../../Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
   </ItemGroup>
 
 </Project>

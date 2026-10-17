@@ -5,7 +5,6 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-AC1001 | RequestOwnedWebApi | Error | Application request has no endpoint contract
 AC1002 | RequestOwnedWebApi | Error | Handler contains endpoint metadata
 AC1003 | RequestOwnedWebApi | Error | Missing Web API generation configuration
 AC1004 | RequestOwnedWebApi | Error | Invalid Web API generation configuration
@@ -24,4 +23,5 @@ AC1016 | RequestOwnedWebApi | Error | Invalid RPC operation name
 AC1017 | RequestOwnedWebApi | Error | Published endpoint result is not a self-constructing remote result envelope
 AC1018 | RequestOwnedWebApi | Error | Route property cannot receive the route value
 AC1019 | RequestOwnedWebApi | Warning | DELETE endpoint binds a collection or complex request from the query string
+AC1020 | RequestOwnedWebApi | Error | Selected handler assembly has no owned operation implementations
 AC1099 | RequestOwnedWebApi | Error | Request-owned API generation failed

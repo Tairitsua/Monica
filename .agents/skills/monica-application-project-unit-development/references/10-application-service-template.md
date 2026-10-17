@@ -7,14 +7,13 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - `$FeatureName$`: use-case name, such as `GetOrder` or `ApproveOrder`
 - `$RequestName$`: request type, such as `QueryGetOrder` or `CommandApproveOrder`
 - `$RequestRoute$`: request-specific route segment, such as `tree`, `publish`, or `approve`
-- `$OperationName$`: stable generated method name, such as `GetOrder` or `ApproveOrder`
 - `$ResponseName$`: response DTO type when the handler returns data
 - `$RepositoryName$`: repository abstraction, such as `IRepositoryOrder`
 - `$ApplicationNamespace$`: the application-layer namespace chosen by the architecture skill, such as `OrderingService.API` or `Domains.Ordering.Application`
 
 ## Use When
 
-- You need a new externally visible use case.
+- You need an application use case for a local UI, an internal consumer, or an explicitly published HTTP operation.
 - The entry point should return `Res` or `Res<T>`.
 - The use case orchestrates domain logic, repositories, and mapping, but does not own the business rules itself.
 
@@ -24,36 +23,23 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - Declare business collaborators in the constructor, preferably a primary constructor, and inject only dependencies the handler uses. Current-user access and ID generation are explicit application dependencies; do not add them to a shared service base or resolve them through `IServiceProvider` / `CachedServiceProvider`.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
-- Make the request implement `IResultRequest<TResponse>` or `IResultRequest`.
-- GET-bound queries use the Web API read convention and open no automatic write transaction. For a read without a GET binding, put `[ExecutionTransaction(ExecutionTransactionMode.None)]` on its concrete `Handle` method. Ordinary writes need no attribute; use the same method declaration for any transaction override or context selection, following the persistence [transaction contract](../../monica-infra-persistence/references/transactions.md).
+- Make the request implement `IResultRequest<TResponse>` or `IResultRequest`. Generated API method names always remove the request type's `Command` or `Query` prefix; choose the request name accordingly.
+- Published Query requests default to read-only independently of HTTP. Explicit concrete-handler ExecutionTransaction metadata overrides the default. Internal unmarked reads can use ExecutionTransactionMode.None; ordinary writes need no attribute. See the [transaction contract](../../monica-infra-persistence/references/transactions.md).
 - Keep the handler focused on orchestration. Entities own their invariants; select a DomainService only for a meaningful domain rule with no natural entity owner.
 - Catch exceptions only when you are adding boundary-specific context. Do not smother useful failures.
-- Put `[ApiEndpoint]` on the request type. It owns the HTTP method, request-specific route, binding source, and optional generated operation name.
+- Use `Monica.Application.Abstractions` for application primitives; compose `AddApplication()` for shared execution without HTTP.
+- Publish UI and cross-domain operations with the single ApiEndpoint(method, route) in Protocol; callers inject generated domain interfaces. HTTP metadata stays on the request even in Local mode. Unattributed requests remain internal mediator operations.
 - Do not put MVC `[Http*]`, `[Route]`, or `[From*]` attributes on the handler. The handler owns execution only.
-- For a published RPC contract, place the attributed request in `Platform.Protocol.PublishedLanguages.Domain{Subdomain}.Requests` and configure its protocol assembly with `WebApiGenerationConfig` plus the required `RpcClientTargets`.
-- For a local-only HTTP endpoint, keep the attributed request outside `PublishedLanguages` and configure its owning assembly with `WebApiGenerationConfig`. Use `RpcClientTargets.None` unless that assembly also owns published contracts.
-- If the mediator request must remain entirely internal, do not derive its handler from `ApplicationService`; implement `IRequestHandler<TRequest, TResult>` and a transient dependency marker directly. Missing `[ApiEndpoint]` on an `ApplicationService` is a generator error, not an opt-out switch.
+- Published requests use the strict Protocol published-language namespace. Generate adapters in the host with ApplicationApiGenerationConfig; Protocol itself chooses no transport.
+- Keep private HTTP-only requests beside their handlers outside PublishedLanguages. Put wire settings in HttpApiContract and publish owned receivers from the host.
+- A local-only `ApplicationService` needs no `[ApiEndpoint]` or Web API generation configuration. Plain `IRequestHandler<TRequest, TResult>` remains available for internal support operations; both shapes execute through the mediator, not direct calls.
 - Place handlers in `HandlersCommand/` or `HandlersQuery/` under the application layer chosen by the architecture skill.
 
-## Routing Convention
+## Generation and HTTP Mapping
 
-- Prefer the composed route shape `api/{version}/{DomainName(PascalCase)}/{request-route}`.
-- Let `WebApiGenerationConfig` provide the route prefix and domain once per contract domain.
-- Put only the request-specific segment on `[ApiEndpoint]`, such as `[ApiEndpoint(ApiHttpMethod.Get, "tree")]`, which produces `GET api/v1/Documentation/tree`.
-- Use `ApiRequestBinding.Query` for query-string requests and `ApiRequestBinding.Body` for JSON commands when `Auto` would make the public contract less obvious.
+Use [RPC generation and registration](../../monica-infra-messaging/references/rpc.md) for the authoritative contract. Interfaces are stable across Debug/Release and HTTP publication. A monolith generates Local clients and optionally publishes HTTP. An HTTP microservice generates paired clients and owned receivers in Release too.
 
-For a protocol assembly that publishes HTTP and local RPC clients:
-
-```csharp
-using Monica.WebApi.Annotations;
-
-[assembly: WebApiGenerationConfig(
-    "api/v1",
-    DomainName = "$DomainName$",
-    RpcClientTargets = RpcClientGenerationTargets.Http | RpcClientGenerationTargets.Local)]
-```
-
-For an assembly that owns only local HTTP endpoints, use the same configuration with `RpcClientTargets.None`. The generator still creates controllers for its attributed requests but does not publish requests outside the strict published-language namespace.
+ApiEndpoint declares the HTTP method, relative route and binding for every published operation, including Local-only calls. HttpApiContract optionally sets an assembly-wide shared prefix without exposing receivers. Host publication does not change the shared mapping.
 
 ## Minimal Query Example
 
@@ -62,16 +48,15 @@ using Monica.Core.Results;
 using Monica.Core.Execution;
 using Monica.ProjectUnits.Annotations;
 using Monica.Repository.Persistence.Abstractions;
-using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Abstractions;
+using Monica.Application.Annotations;
 
 namespace $ApplicationNamespace$.HandlersQuery;
 
 [ApiEndpoint(
     ApiHttpMethod.Get,
     "$RequestRoute$",
-    Binding = ApiRequestBinding.Query,
-    OperationName = "$OperationName$")]
+    Binding = ApiRequestBinding.Query)]
 [ProjectUnitMetadata(
     "$FeatureName$ Query",
     Description = "Requests the $FeatureName$ use case.",
@@ -110,16 +95,15 @@ public sealed class QueryHandler$FeatureName$($RepositoryName$ repository)
 ```csharp
 using Monica.Core.Results;
 using Monica.ProjectUnits.Annotations;
-using Monica.WebApi.Abstractions;
-using Monica.WebApi.Annotations;
+using Monica.Application.Abstractions;
+using Monica.Application.Annotations;
 
 namespace $ApplicationNamespace$.HandlersCommand;
 
 [ApiEndpoint(
     ApiHttpMethod.Post,
     "$RequestRoute$",
-    Binding = ApiRequestBinding.Body,
-    OperationName = "$OperationName$")]
+    Binding = ApiRequestBinding.Body)]
 [ProjectUnitMetadata(
     "$FeatureName$ Command",
     Description = "Requests the $FeatureName$ use case.",

@@ -119,7 +119,7 @@ internal static class ControllerCodeGenerator
         builder.Append("    public async global::System.Threading.Tasks.Task<object> ")
             .Append(endpoint.OperationName).AppendLine("(");
         builder.Append("        [global::Monica.WebApi.AutoControllers.ModelBinding.ApiEndpointRequestAttribute(")
-            .Append("global::Monica.WebApi.Annotations.ApiRequestBinding.")
+            .Append("global::Monica.Application.Annotations.ApiRequestBinding.")
             .Append(endpoint.Binding)
             .Append(")] ")
             .Append(endpoint.RequestTypeName).AppendLine(" request,");

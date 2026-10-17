@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Interactive Server application invocation and UI hosting integration for Monica DDD applications.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monica.Application/Monica.Application.csproj" />
+    <ProjectReference Include="../Monica.UI/Monica.UI.csproj" />
+  </ItemGroup>
+</Project>

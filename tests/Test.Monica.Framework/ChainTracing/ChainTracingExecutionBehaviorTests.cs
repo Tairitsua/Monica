@@ -5,7 +5,7 @@ using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Providers.Execution;
-using Monica.WebApi.RpcClient.Abstractions;
+using Monica.Rpc.Abstractions;
 using Xunit;
 
 namespace Test.Monica.Framework.ChainTracing;

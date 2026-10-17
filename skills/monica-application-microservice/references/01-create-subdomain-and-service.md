@@ -30,7 +30,7 @@ Rules:
 
 - Put only stable cross-service contracts here.
 - Add `[ApiEndpoint]` only to `Command*` or `Query*` requests that are callable endpoints. Shared DTOs, events, and non-endpoint language stay unattributed.
-- Configure the protocol assembly with `[assembly: WebApiGenerationConfig("api/v1", RpcClientTargets = ...)]`. Omit `DomainName` when one protocol assembly publishes more than one domain.
+- Add the analyzer to Protocol for stable interfaces. Select caller adapters with ApplicationApiGenerationConfig in the host, not Protocol. See [RPC generation](../../monica-infra-messaging/references/rpc.md).
 - Put checked-in synchronous abstractions in `Contracts/`.
 - Put checked-in shared providers in `Implementations/Local/` or deliberate wrappers in `Implementations/Http/`.
 - Do not copy entity types into this area.
@@ -63,8 +63,8 @@ Use `monica-application-project-unit-development` to fill the correct ProjectUni
 - Keep pure helpers in `{Subdomain}Service.Domain/Utilities/` and name them `Utils*`.
 - Keep repository implementations, `DbContext`, and EF mapping in `{Subdomain}Service.Domain/Repository/`.
 - Use the strict solution-project reference chain `{Subdomain}Service.API -> {Subdomain}Service.Domain -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
-- Put `[assembly: WebApiGenerationConfig("api/v1", DomainName = "{Subdomain}")]` in `{Subdomain}Service.API/Program.cs` for service-local requests.
-- Co-locate a service-private request and response with its handler by default. Give the request `[ApiEndpoint]`; keep all HTTP verb, route, binding, operation-name, and XML-summary metadata off the handler.
+- Keep private HTTP request wire settings in HttpApiContract with the owning DomainName. Configure receiver publication in the host and select referenced handler assemblies explicitly.
+- Co-locate a service-private request and response with its handler by default. Give the request `[ApiEndpoint]`; keep all HTTP verb, route, binding, and XML-summary metadata off the handler.
 
 ## Step 4. Add persistence ownership
 

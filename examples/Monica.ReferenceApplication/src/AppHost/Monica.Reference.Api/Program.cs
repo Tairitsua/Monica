@@ -1,6 +1,8 @@
 using Monica.Configuration.Bootstrap;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
+using Monica.Reference.UI.Layout;
+using Monica.Reference.UI.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,12 +33,28 @@ builder.AddMonica(monica =>
     monica.AddEventBus()
         .UseNoOpDistributedEventBus();
     monica.AddResultEnvelope();
+#if DEBUG || MONICA_HTTP_ENDPOINTS
     monica.AddWebApi();
+#endif
+    monica.AddRpcClient().ConfigDomainInfoProvider(new OrderingRpcDomains()).UseLocalTransport();
+    monica.AddApplicationUI();
+    monica.AddUIHost(options =>
+    {
+        options.DefaultLayout = typeof(OrderingLayout);
+        options.AddPageAssembly(typeof(OrderingLayout).Assembly);
+    });
+    monica.AddLocalization(options => options.AddResource<OrderingUIResource>());
+    if (builder.Configuration.GetValue<bool>("ReferenceUI:EnableDiagnostics"))
+    {
+        monica.AddModuleSystemUI();
+    }
+#if DEBUG || MONICA_HTTP_ENDPOINTS
     monica.AddSwagger(options =>
     {
         options.AppName = "Monica Ordering Reference";
         options.ApiVersion = "v1";
     });
+#endif
     monica.AddUnitOfWork();
     monica.AddProjectUnits(options =>
     {
@@ -57,15 +75,18 @@ var app = builder.Build();
 
 app.UseMonica();
 
-app.MapGet("/", () => Results.Ok(new
+app.MapGet("/overview", () => Results.Ok(new
 {
     application = "Monica Ordering Reference",
     architecture = "Domain-first modular monolith",
     endpoints = new
     {
-        orders = "/api/v1/Ordering/orders",
-        approveOrder = "/api/v1/Ordering/orders/approve",
+        product = "/orders",
+#if DEBUG || MONICA_HTTP_ENDPOINTS
+        orders = "/api/v1/Ordering/queries/GetOrders",
+        approveOrder = "/api/v1/Ordering/commands/ApproveOrder",
         swagger = "/swagger",
+#endif
         metrics = "/metrics",
         projectUnits = "/framework/units",
         readiness = "/health",

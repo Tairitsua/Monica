@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Platform.Protocol.PublishedLanguages.DomainOrdering.Events;
 

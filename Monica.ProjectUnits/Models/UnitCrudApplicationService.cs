@@ -1,6 +1,7 @@
 using Monica.Core.Execution.Mvc;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.ProjectUnits.Services.Support;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 

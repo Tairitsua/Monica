@@ -46,9 +46,9 @@ public class ModuleMarkdownUI : MonicaModule<ModuleMarkdownUIOption>, IWebHostRe
         module.Require<ModuleMarkdown, ModuleMarkdownOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<MarkdownResource>());
+        module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
-            option.EnableMarkdown = true;
             option.ConfigureNavigation(static registry =>
                 registry.RegisterLocalizedPage<UIMarkdownPage, MarkdownResource>(
                     MarkdownViewerLocation.PAGE_URL,

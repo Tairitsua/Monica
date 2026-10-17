@@ -17,7 +17,9 @@ internal static class GeneratorConfigurationReader
     public static GeneratorConfigReadResult Read(IAssemblySymbol assembly)
     {
         var attribute = assembly.GetAttributes().FirstOrDefault(static attributeData =>
-            attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.WEB_API_CONFIG_ATTRIBUTE);
+            attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.HTTP_CONTRACT_ATTRIBUTE)
+            ?? assembly.GetAttributes().FirstOrDefault(static attributeData =>
+                attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.WEB_API_CONFIG_ATTRIBUTE);
         if (attribute is null)
         {
             return GeneratorConfigReadResult.MissingConfiguration;
@@ -72,7 +74,7 @@ internal static class GeneratorConfigurationReader
             !TryValidateClientBaseType(
                 httpClientBaseType,
                 assembly,
-                "Monica.WebApi.RpcClient.Abstractions.HttpRpcApi",
+                "Monica.Rpc.Abstractions.HttpRpcApi",
                 new[] { CACHED_SERVICE_PROVIDER, HTTP_CLIENT },
                 out var httpBaseError))
         {
@@ -84,7 +86,7 @@ internal static class GeneratorConfigurationReader
             !TryValidateClientBaseType(
                 localClientBaseType,
                 assembly,
-                "Monica.WebApi.RpcClient.Abstractions.LocalRpcApi",
+                "Monica.Rpc.Abstractions.LocalRpcApi",
                 new[] { CACHED_SERVICE_PROVIDER },
                 out var localBaseError))
         {
@@ -123,7 +125,7 @@ internal static class GeneratorConfigurationReader
         return false;
     }
 
-    private static bool TryValidateClientBaseType(
+    internal static bool TryValidateClientBaseType(
         INamedTypeSymbol type,
         IAssemblySymbol generatedAssembly,
         string requiredBaseType,
