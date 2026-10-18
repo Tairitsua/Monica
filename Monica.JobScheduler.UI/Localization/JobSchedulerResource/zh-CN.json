@@ -861,7 +861,7 @@
       "Description": "采集此运行时快照的宿主所报告的确切身份与存储。",
       "DebugMode": "周期调试模式",
       "Scope": "调度范围",
-      "Owner": "宿主所有者标识",
+      "Owner": "当前作业归属",
       "WorkerInstanceId": "Worker 实例",
       "CronTimeZone": "Cron 时区",
       "DebugModeHelp": "此宿主已停止自动物化周期执行记录。"

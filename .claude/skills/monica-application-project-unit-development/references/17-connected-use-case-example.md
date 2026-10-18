@@ -1,12 +1,12 @@
 # Connected Use-Case Example
 
-This illustrative modular-monolith use case connects local HTTP requests, handlers, an entity, a narrow repository, and its EF implementation. An approval command loads the tracked state owner and calls its invariant directly. A query receives a completed read projection. Neither use case needs a DomainService, event, or job for this requirement.
+This illustrative domain-owned role use case connects local HTTP requests, handlers, an entity, a narrow repository, and its EF implementation. An approval command loads the tracked state owner and calls its invariant directly. A query receives a completed read projection. Neither use case needs a DomainService, event, or job for this requirement.
 
-`Order` and the `Ordering` names are examples. Replace `$RequirementId$` with an applicable actual project requirement when available; follow [metadata debt handling](03-project-unit-context-metadata.md) otherwise. Split these sections into the project's normal source files. For a microservice, place the same roles in the corresponding API/Domain projects.
+`Order` and the `Ordering` names are examples. Replace `$RequirementId$` with an applicable actual project requirement when available; follow [metadata debt handling](03-project-unit-context-metadata.md) otherwise. Split these sections into the project's normal source files. Place handlers in Roles.Ordering and the entity/repository in Domains.Ordering under the unified layout.
 
 ## Local Requests and Handlers
 
-The attributed requests are outside `PublishedLanguages`, so they are local HTTP contracts. Put the wire declaration in the domain's HttpApiContract.cs, select that handler assembly from a publishing host with WebApiGenerationConfig, the command in `Application/HandlersCommand/CommandHandlerApproveOrder.cs`, and the query in `Application/HandlersQuery/QueryHandlerGetOrder.cs`.
+The attributed requests are outside `PublishedLanguages`, so they are local HTTP contracts. Put the wire declaration in the role assembly's HttpApiContract.cs, reference the declared role assembly from the complete ApplicationHost, the command in `Roles.Ordering/HandlersCommand/CommandHandlerApproveOrder.cs`, and the query in `Roles.Ordering/HandlersQuery/QueryHandlerGetOrder.cs`.
 
 ```csharp
 using System.Threading;

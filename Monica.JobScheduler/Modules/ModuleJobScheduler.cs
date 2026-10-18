@@ -7,6 +7,7 @@ using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.HealthCheck.Extensions;
 using Monica.JobScheduler.Abstractions;
@@ -29,8 +30,8 @@ public static class ModuleJobSchedulerBuilderExtensions
     {
         /// <summary>
         /// Adds the durable JobScheduler runtime. Every host schedules and executes the jobs it discovers under its
-        /// own owner identity; a store and scope must be selected on the returned registration before the module graph
-        /// is finalized.
+        /// effective logical owners; a store and scope must be selected on the returned registration before the module
+        /// graph is finalized. Application activation selects role-owned jobs before they enter the local catalog.
         /// </summary>
         public ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> AddJobScheduler(
             Action<ModuleJobSchedulerOption>? action = null)
@@ -169,6 +170,11 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             {
                 foreach (var match in matches)
                 {
+                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.Job) == false)
+                    {
+                        continue;
+                    }
+
                     var isRecurring = match.Shape.IsAssignableTo(typeof(IRecurringJob));
                     var argumentsType = isRecurring
                         ? null
@@ -189,6 +195,8 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
     /// <inheritdoc />
     public override void PostConfigureServices(ModuleContext<ModuleJobSchedulerOption> context)
     {
+        foreach (var owner in Application.TypeActivation?.ActiveWorkloadOwners ?? [])
+            JobSchedulerIdentity.ValidateStandard(owner, "WorkloadOwner");
         var services = context.Services;
         IReadOnlyList<LocalJobDefinition> localDefinitions =
             Array.AsReadOnly(_localJobDefinitions.OrderBy(
@@ -266,8 +274,11 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         };
 
         declaration = NormalizeDeclaration(declaration);
+        var ownerKey = Application.TypeActivation?.GetWorkloadOwner(jobClrType) ?? Option.GetProjectName();
+        JobSchedulerIdentity.ValidateStandard(ownerKey, nameof(LocalJobDefinition.OwnerKey));
         return new LocalJobDefinition
         {
+            OwnerKey = ownerKey,
             Declaration = declaration,
             JobClrType = jobClrType,
             JobArgsClrType = argumentsType
@@ -376,8 +387,8 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public string SchedulerScopeKey { get; internal set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the Monica project name used as the local owner identity. Jobs discovered by this host are
-    /// registered, scheduled, and executed under this owner.
+    /// Gets or sets the fallback owner identity for jobs without application-model workload ownership.
+    /// Role-owned jobs use the logical owner selected by the host's activation policy instead.
     /// </summary>
     public string? ProjectName { get; set; }
 
@@ -529,8 +540,9 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     };
 
     /// <summary>
-    /// Resolves the local project identity from explicit scheduler configuration, Monica application configuration,
-    /// or the process entry assembly. An explicitly configured project name resolves without host binding.
+    /// Resolves the fallback job-owner identity from explicit scheduler configuration, Monica application configuration,
+    /// or the process entry assembly. Workload-specific owners take precedence for discovered jobs.
+    /// An explicitly configured project name resolves without host binding.
     /// </summary>
     public string GetProjectName()
     {

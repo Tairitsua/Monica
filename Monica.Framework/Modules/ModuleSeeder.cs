@@ -5,6 +5,7 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.TypeDiscovery.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Framework.Seeder.Abstractions;
 using Monica.Framework.Seeder.Facades;
 using Monica.Framework.Seeder.Models;
@@ -29,6 +30,8 @@ public static class ModuleSeederBuilderExtensions
         /// <remarks>
         /// Seeder execution begins only after the Generic Host publishes <c>ApplicationStarted</c>. Required
         /// seeders keep the <c>monica.seeder</c> readiness check unhealthy until they complete successfully.
+        /// Application activation filters startup entries before dependency validation. A selected seeder cannot
+        /// depend on an inactive seeder; place both prerequisites together or remove that startup dependency.
         /// </remarks>
         public ModuleRegistration<ModuleSeeder, ModuleSeederOption> AddSeeder(Action<ModuleSeederOption>? action = null)
         {
@@ -65,7 +68,9 @@ public sealed class ModuleSeeder : MonicaModule<ModuleSeederOption>
             TypeQuery.ConcreteClass.AssignableTo<ISeeder>(),
             (context, matches) =>
             {
-                var seederTypes = matches.Select(static match => match.Type).ToArray();
+                var seederTypes = matches.Select(static match => match.Type)
+                    .Where(type => Application.TypeActivation?.IsEnabled(type, TypeActivationKind.HostedService) != false)
+                    .ToArray();
                 _graph = SeederGraph.Create(seederTypes, Option);
 
                 foreach (var descriptor in _graph.Nodes)

@@ -3,12 +3,14 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using Monica.Core.Results;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.Annotations;
 using Monica.Application.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace Test.Monica.Generators.AutoController;
 
@@ -41,6 +43,35 @@ internal static class GeneratorTestHarness
             optionsProvider: null,
             MetadataReferences.AddRange(additionalReferences),
             generators);
+    }
+
+    public static GeneratorTestRun RunNamedWithReferences(string assemblyName, string source,
+        IReadOnlyCollection<MetadataReference> additionalReferences, params IIncrementalGenerator[] generators)
+    {
+        var compilation = CreateCompilation(assemblyName, [source], MetadataReferences.AddRange(additionalReferences));
+        var driver = CSharpGeneratorDriver.Create(generators.Select(static generator => generator.AsSourceGenerator()),
+            parseOptions: ParseOptions);
+        return Run(compilation, driver);
+    }
+
+    public static GeneratorTestRun RunCatalog(string assemblyName, IReadOnlyCollection<MetadataReference> contractReferences,
+        IReadOnlyCollection<string> metadataInputs)
+    {
+        var compilation = CreateCompilation(assemblyName, [""], MetadataReferences.AddRange(contractReferences));
+        var options = new TestAnalyzerConfigOptionsProvider(new Dictionary<string, string>
+        {
+            ["build_property.MonicaApplicationCatalog"] = "true"
+        });
+        var driver = CSharpGeneratorDriver.Create([new global::Monica.Generators.AutoController.ApplicationCatalogSourceGenerator().AsSourceGenerator()],
+            metadataInputs.Select((value, index) => new InMemoryAdditionalText($"metadata-{index}.monica-application.xml", value)),
+            ParseOptions, options);
+        return Run(compilation, driver);
+    }
+
+    private sealed class InMemoryAdditionalText(string path, string content) : AdditionalText
+    {
+        public override string Path => path;
+        public override SourceText GetText(CancellationToken cancellationToken = default) => SourceText.From(content);
     }
 
     public static PortableExecutableReference CompileToMetadataReference(
@@ -183,6 +214,7 @@ internal static class GeneratorTestHarness
         AddAssemblyClosure(typeof(ICachedServiceProvider).Assembly, assemblyPaths);
         AddAssemblyClosure(typeof(ApplicationService).Assembly, assemblyPaths);
         AddAssemblyClosure(typeof(ApiEndpointAttribute).Assembly, assemblyPaths);
+        AddAssemblyClosure(typeof(ApplicationHostAttribute).Assembly, assemblyPaths);
 
         return assemblyPaths
             .Where(File.Exists)

@@ -19,7 +19,7 @@
             <TemplateColumn Title="@L["ServiceList:Columns:ServiceName"]" Sortable="false">
                 <CellTemplate><div class="registry-service-identity"><button type="button" @onclick="() => InspectAsync(context.Item)">@context.Item.AppName</button><code>@context.Item.AppId</code><span>@Value(context.Item.ProjectName)</span></div></CellTemplate>
             </TemplateColumn>
-            <PropertyColumn Property="s => s.DomainName" Sortable="false" Title="@L["ServiceList:Columns:Domain"]" />
+            <PropertyColumn Property="@(s => string.Join(", ", s.GetDomainNames()))" Sortable="false" Title="@L["ServiceList:Columns:Domain"]" />
             <TemplateColumn Title="@L["ServiceList:Columns:InstanceCount"]" Sortable="false">
                 <CellTemplate><div class="registry-members"><strong>@context.Item.TotalInstanceCount</strong><span>@(context.Item.TotalInstanceCount > 0 ? L["Workbench:Registered"] : L["Workbench:ExpectedOnly"])</span></div><div class="registry-instance-marks">@foreach (var instance in context.Item.Instances.Values.Take(3)) { <MudTooltip Text="@($"{instance.InstanceId} · {instance.Status.GetText(L)}{(instance.IsLeader ? " · " + L["Workbench:HeartbeatReportedLeader"].Value : string.Empty)}")"><span class="registry-instance-mark">@(instance.IsLeader ? "◇" : "·")</span></MudTooltip> } @if(context.Item.TotalInstanceCount > 3) { <span>+@(context.Item.TotalInstanceCount - 3)</span> }</div></CellTemplate>
             </TemplateColumn>
@@ -64,7 +64,7 @@
     private Task ApplySortAsync() => _grid?.SetSortAsync(_sortField,_descending ? SortDirection.Descending : SortDirection.Ascending,SortValue) ?? Task.CompletedTask;
     private object? SortValue(RegisteredServiceStatus service) => _sortField switch
     {
-        "AppId" => service.AppId, "ProjectName" => service.ProjectName, "DomainName" => service.DomainName,
+        "AppId" => service.AppId, "ProjectName" => service.ProjectName, "DomainName" => string.Join(", ", service.GetDomainNames()),
         "TotalInstanceCount" => service.TotalInstanceCount, "OverallStatus" => service.OverallStatus,
         "AssemblyVersion" => service.GetValidInstanceInfo()?.AssemblyVersion, "BuildTime" => service.GetValidInstanceInfo()?.BuildTime,
         "LastHeartbeatTime" => service.GetValidInstanceInfo()?.LastHeartbeatTime, _ => service.AppName

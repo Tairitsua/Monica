@@ -194,6 +194,7 @@ public sealed class JobSchedulerFacadeTests
         overview.Store.Provider.Should().BeNull();
         overview.Configuration.SchedulerScopeKey.Should().Be(StoreFixture.SCOPE);
         overview.Configuration.OwnerKey.Should().Be(StoreFixture.OWNER_A);
+        overview.Configuration.OwnerKeys.Should().Equal(StoreFixture.OWNER_A);
         overview.Configuration.SnapshotSyncInterval.Should().Be(new ModuleJobSchedulerOption().SnapshotSyncInterval);
         overview.OwnerOnlineThreshold.Should().Be(
             new ModuleJobSchedulerOption().SnapshotSyncInterval * 3,

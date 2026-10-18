@@ -55,8 +55,12 @@ public sealed record JobSchedulerRuntimeConfiguration
     /// <summary>Gets the scheduler scope every durable operation is keyed by.</summary>
     public required string SchedulerScopeKey { get; init; }
 
-    /// <summary>Gets the serving host's owner identity.</summary>
+    /// <summary>Gets the serving host's fallback owner identity for jobs without workload-specific ownership.</summary>
     public required string OwnerKey { get; init; }
+
+    /// <summary>Gets the exact logical owners this host publishes, including selected roles with no remaining jobs.</summary>
+    /// <remarks>Ownership is independent of the process AppId. An empty list means this host publishes no owner snapshots.</remarks>
+    public IReadOnlyList<string> OwnerKeys { get; init; } = [];
 
     /// <summary>Gets the serving host's worker instance identity.</summary>
     public required string WorkerInstanceId { get; init; }

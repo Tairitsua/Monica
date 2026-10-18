@@ -4,6 +4,7 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.TypeDiscovery.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.DependencyInjection.Abstractions;
 using Monica.DependencyInjection.Annotations;
 using Monica.DependencyInjection.Facades;
@@ -65,6 +66,7 @@ public class ModuleDependencyInjection : MonicaModule<ModuleDependencyInjectionO
                 var registrar = new ConventionalRegistrar(Option, Logger, _diagnosticsRegistry);
                 foreach (var match in matches)
                 {
+                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.Service) == false) continue;
                     registrar.AddType(context.Registrations, match);
                 }
             });

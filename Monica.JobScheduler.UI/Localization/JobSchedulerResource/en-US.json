@@ -861,7 +861,7 @@
       "Description": "Exact identities and storage reported by the host that captured this runtime snapshot.",
       "DebugMode": "Recurring debug mode",
       "Scope": "Scheduler scope",
-      "Owner": "Host owner key",
+      "Owner": "Active workload owners",
       "WorkerInstanceId": "Worker instance",
       "CronTimeZone": "Cron timezone",
       "DebugModeHelp": "Automatic recurring materialization is suppressed on this host."

@@ -3,11 +3,13 @@
     <Project Path="src/AppHost/Monica.Reference.Api/Monica.Reference.Api.csproj" />
   </Folder>
   <Folder Name="/src/Domains/">
-    <Project Path="src/Domains/Ordering/Domains.Ordering.csproj" />
+    <Project Path="src/Domains/Ordering/Domains.Ordering/Domains.Ordering.csproj" />
+    <Project Path="src/Domains/Ordering/Roles.Ordering/Roles.Ordering.csproj" />
+    <Project Path="src/Domains/Ordering/Roles.Ordering.Reporting/Roles.Ordering.Reporting.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj" />
-    <Project Path="src/Shared/Platform.Infrastructure/Platform.Infrastructure.csproj" />
+    <Project Path="src/Shared/Platform.Hosting/Platform.Hosting.csproj" />
     <Project Path="src/Shared/Platform.Protocol/Platform.Protocol.csproj" />
   </Folder>
   <Folder Name="/src/Presentation/">

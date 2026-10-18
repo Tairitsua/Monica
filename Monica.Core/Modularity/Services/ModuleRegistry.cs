@@ -459,6 +459,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
             RegisterCoreServices(services);
             var snapshots = ExecuteBuilderAndServiceConfiguration(builder, services, registrations);
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforeTypeDiscovery);
+            application.FreezeTypeActivation();
 
             _registrationWriter = new ModuleServiceRegistrationWriter(services);
             try
@@ -475,6 +476,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforePostConfigureServices);
 
             ExecutePostConfigureServices(builder, services, snapshots);
+            ApplyHostedServiceActivation(services);
             _startupWork.CloseSubmissions();
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforeServiceRegistrationCompletion);
             ValidateServiceRequirements(services, registrations);
@@ -534,6 +536,21 @@ public sealed class ModuleRegistry(MonicaApplication application)
         finally
         {
             application.Profiling.StopPhase(nameof(ModulePhase.Describe));
+        }
+    }
+
+    private void ApplyHostedServiceActivation(IServiceCollection services)
+    {
+        if (application.TypeActivation is not { } activation) return;
+        for (var index = services.Count - 1; index >= 0; index--)
+        {
+            var descriptor = services[index];
+            if (descriptor.IsKeyedService || descriptor.ServiceType != typeof(IHostedService)) continue;
+            var implementation = descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
+            // Factories are intentionally opaque; their role-owned composition must gate registration explicitly.
+            if (implementation is not null && !activation.IsEnabled(implementation,
+                    Monica.Core.TypeDiscovery.Abstractions.TypeActivationKind.HostedService))
+                services.RemoveAt(index);
         }
     }
 

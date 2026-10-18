@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
@@ -16,13 +17,14 @@ namespace Monica.ServiceDiscovery.Providers;
 public class DefaultServiceDiscoveryClientInfo(
     IOptions<ModuleServiceDiscoveryOption> options,
     IMonicaApplicationOptions application,
-    IServerAddressesFeature? serverAddressesFeature = null) : IServiceDiscoveryClientInfo
+    IServerAddressesFeature? serverAddressesFeature = null,
+    IApplicationModel? applicationModel = null) : IServiceDiscoveryClientInfo
 {
     private readonly ModuleServiceDiscoveryOption _options = options.Value;
 
     // Lazy initialization of basic service information (to avoid repeated expensive operations)
     private readonly Lazy<InstanceState> _baseServiceInfo = new(
-        () => BuildBaseServiceInfo(options.Value, application));
+        () => BuildBaseServiceInfo(options.Value, application, applicationModel));
 
     // Thread-safe local state management (similar to LeaderElectionService pattern)
     private readonly object _stateLock = new();
@@ -90,18 +92,26 @@ public class DefaultServiceDiscoveryClientInfo(
     /// </summary>
     private static InstanceState BuildBaseServiceInfo(
         ModuleServiceDiscoveryOption options,
-        IMonicaApplicationOptions application)
+        IMonicaApplicationOptions application,
+        IApplicationModel? model)
     {
         var entryAssembly = Assembly.GetEntryAssembly();
         var assemblyName = entryAssembly?.GetName().Name ?? "Unknown";
+        var appId = application.ResolveAppId(options.AppId, assemblyName);
+        if (model is not null && model.AppId != appId)
+            throw new InvalidOperationException("Service discovery AppId must match the unified application model.");
+        var roles = model?.Roles.Values.Where(role => model.IsRoleActive(role.Id)).ToArray();
+        var domains = roles?.Select(role => role.DomainId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList() ?? [];
 
         return new InstanceState
         {
-            AppId = application.ResolveAppId(options.AppId, assemblyName),
+            AppId = appId,
             InstanceId = options.FromInstance ?? GenerateFromInstance(),
             AppName = application.ResolveAppName(options.AppName, assemblyName),
             ProjectName = application.ResolveProjectName(options.ProjectName, assemblyName),
-            DomainName = application.ResolveDomainName(options.DomainName),
+            DomainName = model is null ? application.ResolveDomainName(options.DomainName) : domains.Count == 1 ? domains[0] : null,
+            DomainNames = domains,
+            RoleIds = roles?.Select(role => role.Id).Order(StringComparer.Ordinal).ToList() ?? [],
             BuildTime = ResolveBuildTimeUtc(options.BuildTime, entryAssembly),
             AssemblyVersion = options.AssemblyVersion ?? GetAssemblyVersion(entryAssembly),
             ReleaseVersion = application.ResolveAppVersion(options.ReleaseVersion),
@@ -195,6 +205,8 @@ public class DefaultServiceDiscoveryClientInfo(
         return new InstanceState
         {
             AppId = original.AppId,
+            DomainNames = original.DomainNames.ToList(),
+            RoleIds = original.RoleIds.ToList(),
             InstanceId = original.InstanceId,
             AppName = original.AppName,
             ProjectName = original.ProjectName,

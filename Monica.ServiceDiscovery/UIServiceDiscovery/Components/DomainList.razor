@@ -154,12 +154,12 @@
     private string GetDomainColorRole(string domainName) => DomainColorResolver.GetDomainColorRole(domainName);
 
     private int GetOwnedServiceCount(string domainName)
-        => _allServices.Count(s => string.Equals(s.DomainName, domainName, StringComparison.OrdinalIgnoreCase));
+        => _allServices.Count(s => s.BelongsToDomain(domainName));
 
     private int GetRelatedServiceCount(string domainName)
     {
         return _allServices.Count(s =>
-            !string.Equals(s.DomainName, domainName, StringComparison.OrdinalIgnoreCase) &&
+            !s.BelongsToDomain(domainName) &&
             (s.DependentSubDomains?.Contains(domainName, StringComparer.OrdinalIgnoreCase) == true));
     }
 

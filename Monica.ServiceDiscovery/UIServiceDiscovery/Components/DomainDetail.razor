@@ -226,13 +226,13 @@
     private int GetOwnedServicesCount()
     {
         return _domainDetail?.RelatedServices.Count(s =>
-            string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase)) ?? 0;
+            s.BelongsToDomain(DomainName)) ?? 0;
     }
 
     private int GetDependentServicesCount()
     {
         return _domainDetail?.RelatedServices.Count(s =>
-            !string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase) &&
+            !s.BelongsToDomain(DomainName) &&
             s.DependentSubDomains?.Contains(DomainName, StringComparer.OrdinalIgnoreCase) == true) ?? 0;
     }
 
@@ -246,14 +246,14 @@
     private List<RegisteredServiceStatus> GetOwnedServices()
     {
         return _domainDetail?.RelatedServices
-            .Where(s => string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.BelongsToDomain(DomainName))
             .ToList() ?? [];
     }
 
     private List<RegisteredServiceStatus> GetDependentServices()
     {
         return _domainDetail?.RelatedServices
-            .Where(s => !string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase) &&
+            .Where(s => !s.BelongsToDomain(DomainName) &&
                        s.DependentSubDomains?.Contains(DomainName, StringComparer.OrdinalIgnoreCase) == true)
             .ToList() ?? [];
     }
@@ -274,10 +274,10 @@
                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="domain-service-card__text">
                             @L["DomainDetail:ServiceCard:Id", service.AppId]
                         </MudText>
-                        @if (!string.IsNullOrEmpty(service.DomainName))
+                        @if (service.GetDomainNames().Any())
                         {
                             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="domain-service-card__text">
-                                @L["DomainDetail:ServiceCard:Domain", service.DomainName]
+                                @L["DomainDetail:ServiceCard:Domain", string.Join(", ", service.GetDomainNames())]
                             </MudText>
                         }
                         @if (!string.IsNullOrEmpty(service.ProjectName))

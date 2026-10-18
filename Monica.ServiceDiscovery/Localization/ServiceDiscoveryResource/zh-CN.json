@@ -41,6 +41,7 @@
       "Updating": "更新中"
     },
     "Values": {
+      "Roles": "已观测角色",
       "NotAvailable": "不可用",
       "NotSet": "未设置",
       "NotSpecified": "未指定",

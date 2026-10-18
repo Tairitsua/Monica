@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
+    <ProjectReference Include="..\Monica.ApplicationModel\Monica.ApplicationModel.csproj" />
     <ProjectReference Include="..\Monica.StateStore\Monica.StateStore.csproj" />
     <ProjectReference Include="..\Monica.UI\Monica.UI.csproj" />
   </ItemGroup>

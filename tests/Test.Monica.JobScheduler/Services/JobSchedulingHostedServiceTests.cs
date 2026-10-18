@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Services;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Operations;
 using Monica.JobScheduler.Models.Definitions;
@@ -19,6 +20,86 @@ namespace Test.Monica.JobScheduler.Services;
 public sealed class JobSchedulingHostedServiceTests
 {
     private static readonly DateTimeOffset NOW = new(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task SelectedRoleWithoutJobs_RetiresOnlyItsOwnSnapshot()
+    {
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
+            [StoreFixture.RecurringDeclaration("removed")]), TestContext.Current.CancellationToken);
+        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B,
+            [StoreFixture.RecurringDeclaration("foreign")]), TestContext.Current.CancellationToken);
+        using var service = CreateService(store, [], time, activation: new EmptySelectedRole());
+        await service.ScheduleAsync(TestContext.Current.CancellationToken);
+        Assert.False((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "removed", TestContext.Current.CancellationToken))!.IsPresent);
+        Assert.True((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "foreign", TestContext.Current.CancellationToken))!.IsPresent);
+    }
+
+    private sealed class EmptySelectedRole : ITypeActivationPolicy
+    {
+        public IReadOnlyCollection<string> ActiveWorkloadOwners => [StoreFixture.OWNER_A];
+        public bool IsEnabled(Type implementationType, TypeActivationKind kind) => true;
+        public void EnsureCanExecuteRequest(Type requestType) { }
+        public string? GetWorkloadOwner(Type implementationType) => StoreFixture.OWNER_A;
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_WhenSeveralOwnersShareAHost_ShouldShareTheCycleBudgetAndPreserveReplicaIdentities()
+    {
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        LocalJobDefinition[] definitions =
+        [
+            new()
+            {
+                OwnerKey = StoreFixture.OWNER_A,
+                Declaration = StoreFixture.RecurringDeclaration("jobs.alpha", cron: "0 0 * * * *"),
+                JobClrType = typeof(object)
+            },
+            new()
+            {
+                OwnerKey = StoreFixture.OWNER_B,
+                Declaration = StoreFixture.RecurringDeclaration("jobs.beta", cron: "0 0 * * * *"),
+                JobClrType = typeof(object)
+            }
+        ];
+        var options = new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = "combined-host",
+            MaxRecurringMaterializationsPerCycle = 1,
+            EnableHistoryCleanup = false
+        };
+        using var firstReplica = CreateService(store, definitions, time, configuredOptions: options);
+        using var secondReplica = CreateService(store, definitions, time, configuredOptions: options);
+        await firstReplica.ScheduleAsync(TestContext.Current.CancellationToken);
+        await secondReplica.ScheduleAsync(TestContext.Current.CancellationToken);
+        (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "jobs.alpha",
+            TestContext.Current.CancellationToken))!.IsPresent.Should().BeTrue();
+        (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "jobs.beta",
+            TestContext.Current.CancellationToken))!.IsPresent.Should().BeTrue();
+        (await store.GetDefinitionAsync(StoreFixture.SCOPE, "combined-host", "jobs.alpha",
+            TestContext.Current.CancellationToken)).Should().BeNull();
+
+        time.Advance(TimeSpan.FromHours(1));
+        await firstReplica.ScheduleAsync(TestContext.Current.CancellationToken);
+        var firstCycle = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE
+        }, TestContext.Current.CancellationToken);
+        firstCycle.Items.Should().ContainSingle().Which.Template.OwnerKey.Should().Be(StoreFixture.OWNER_A);
+
+        await firstReplica.ScheduleAsync(TestContext.Current.CancellationToken);
+        await secondReplica.ScheduleAsync(TestContext.Current.CancellationToken);
+        var afterReplicas = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE
+        }, TestContext.Current.CancellationToken);
+        afterReplicas.TotalCount.Should().Be(2);
+        afterReplicas.Items.Select(execution => execution.Template.OwnerKey)
+            .Should().BeEquivalentTo(new[] { StoreFixture.OWNER_A, StoreFixture.OWNER_B });
+    }
 
     [Fact]
     public void CreateRecurringInstanceId_ShouldPreserveFieldBoundaries()
@@ -247,7 +328,8 @@ public sealed class JobSchedulingHostedServiceTests
         IReadOnlyList<LocalJobDefinition> definitions,
         StoreFixture.ManualTimeProvider time,
         bool debugMode = false,
-        ModuleJobSchedulerOption? configuredOptions = null)
+        ModuleJobSchedulerOption? configuredOptions = null,
+        ITypeActivationPolicy? activation = null)
     {
         var options = configuredOptions ?? new ModuleJobSchedulerOption
         {
@@ -266,6 +348,7 @@ public sealed class JobSchedulingHostedServiceTests
             new ObservableInstanceRegistry(Options.Create(new ModuleObservableInstanceOption())),
             Options.Create(new ModuleHostedServiceOption()),
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<JobSchedulingHostedService>.Instance);
+            NullLogger<JobSchedulingHostedService>.Instance,
+            activation);
     }
 }

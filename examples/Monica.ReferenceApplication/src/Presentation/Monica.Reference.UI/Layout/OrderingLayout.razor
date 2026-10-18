@@ -7,19 +7,19 @@
 @inject IDialogService Dialogs
 
 <div class="product-layout">
-    <aside aria-label="@L["Product"]">
-        <strong>@L["Product"]</strong>
-        <NavLink href="/" Match="NavLinkMatch.All">@L["Orders"]</NavLink>
+    <aside aria-label="@L["Ordering:Product"]">
+        <strong>@L["Ordering:Product"]</strong>
+        <NavLink href="/" Match="NavLinkMatch.All">@L["Ordering:Orders"]</NavLink>
         @if (Pages.GetRegisteredPages().Any(page => page.Route == "module-system-dashboard"))
         {
-            <a href="/module-system-dashboard">@L["Diagnostics"]</a>
+            <a href="/module-system-dashboard">@L["Ordering:Diagnostics"]</a>
         }
-        <button type="button" @onclick="Theme.ToggleTheme">@L["Theme"]</button>
-        <button type="button" @onclick="ShowHelpAsync">@L["Help"]</button>
+        <button type="button" @onclick="Theme.ToggleTheme">@L["Ordering:Theme"]</button>
+        <button type="button" @onclick="ShowHelpAsync">@L["Ordering:Help"]</button>
     </aside>
     <main>@Body</main>
 </div>
 
 @code {
-    private Task ShowHelpAsync() => Dialogs.ShowMessageBoxAsync(L["Help"], L["HelpText"], yesText: L["Close"]);
+    private Task ShowHelpAsync() => Dialogs.ShowMessageBoxAsync(L["Ordering:Help"], L["Ordering:HelpText"], yesText: L["Ordering:Close"]);
 }

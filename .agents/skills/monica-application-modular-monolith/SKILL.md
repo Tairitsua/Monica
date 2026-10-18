@@ -1,14 +1,15 @@
 ---
 name: monica-application-modular-monolith
-description: Apply the Monica modular-monolith specification when designing, implementing, refactoring, or reviewing domain ownership, host composition, project dependencies, contracts, or persistence. Load monica-application and the repository's project specification first.
+description: Plan combined role deployments or migrate existing Monica monolith projects into the unified domain/role application model. Load monica-application and the project specification first.
 ---
 
-# Monica Application Modular Monolith
+# Combined deployment and monolith migration
 
-Before using this profile, load `$monica-application` and the repository-designated project specification. The [shared specification](../monica-application/references/00-application-specification.md) defines mandatory rules, allowed options, and examples; the project specification records the adopted profile and actual topology. Use [specification evolution](../monica-application/references/01-specification-evolution.md) for a new pattern or deviation.
+Load `$monica-application`, the repository-designated project specification, and the [unified architecture](../monica-application/references/03-unified-architecture.md). New applications use that one domain/role layout. This skill covers deployment and migration; it does not define an alternative new-project structure.
 
-Keep one deployment with business boundaries under `Domains/`, rather than global Application/Domain/Infrastructure buckets. Each bounded context uses one `Domains.{Subdomain}.csproj` containing its application units, domain model, and domain-owned infrastructure. The intended chain is `AppHost → Domains.{Subdomain} → Platform.Infrastructure → Platform.Protocol → Platform.BuildingBlocks`. Put project-common libraries in BuildingBlocks, solution wiring in Infrastructure, and subdomain-only dependencies in the owning project. AppHost remains composition-only. See [solution layout](references/00-solution-layout.md) and [new bounded context](references/01-create-subdomain-and-domain.md).
+- [Combined deployment](references/00-solution-layout.md): assign included roles to one AppId; separate specialized runtime dependencies only where needed.
+- [Migrate a bounded context](references/01-create-subdomain-and-domain.md): separate shared domain/persistence from role-owned application entries.
+- [Published collaboration](references/02-protocol-platform-and-internal-collaboration.md): retain generated APIs and Local operation scopes.
+- [Boundaries and persistence](references/03-boundaries-dependencies-and-persistence.md): keep domain stores explicit and migrations independent of host startup.
 
-Published operations belong in `Platform.Protocol.PublishedLanguages.Domain{Subdomain}.Requests`. `[ApiEndpoint(ApiHttpMethod, route)]` generates stable interfaces without publishing HTTP receivers. The host uses `ApplicationApiGenerationConfig` with `Local` for this profile and explicitly selects owned handler assemblies. UI and application callers inject these interfaces. HTTP metadata stays with requests even for Local calls; receiver publication stays with the host. Use the [RPC contract](../monica-infra-messaging/references/rpc.md) for generation and runtime composition.
-
-Keep domain-owned handlers in `Application/HandlersCommand`, `HandlersQuery`, `HandlersEvent`, and `BackgroundWorkers`; repository implementations and context files belong in `Repository/`. Read [boundaries and persistence](references/03-boundaries-dependencies-and-persistence.md) when placing data and host dependencies. Use `$monica-application-project-unit-development` for individual units, and `$monica-infra-persistence`, `$monica-infra-messaging`, or `$monica-infra-configuration` for those capabilities.
+Use `$monica-application-project-unit-development` for feature units and matching `monica-infra-*` skills for native registration. Co-location does not grant peer repository access or atomic commits across independent stores.

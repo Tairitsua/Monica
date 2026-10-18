@@ -317,7 +317,7 @@
             }
 
             _domains = (domains ?? []).GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
-            _unassignedServices = (services ?? []).Where(service => string.IsNullOrWhiteSpace(service.DomainName)).ToList();
+            _unassignedServices = (services ?? []).Where(service => !service.GetDomainNames().Any()).ToList();
             BuildDomainServicesMap(services ?? []);
             BuildDomainDependencies(services ?? []);
             AddUnlistedEndpoints();
@@ -349,8 +349,8 @@
     private void BuildDomainDependencies(List<RegisteredServiceStatus> services)
     {
         _dependencies.Clear();
-        foreach (var source in services.Where(service => !string.IsNullOrWhiteSpace(service.DomainName))
-                     .GroupBy(service => service.DomainName!, StringComparer.OrdinalIgnoreCase))
+        foreach (var source in services.SelectMany(service => service.GetDomainNames().Select(domain => (domain, service)))
+                     .GroupBy(item => item.domain, item => item.service, StringComparer.OrdinalIgnoreCase))
         {
             var targets = source.SelectMany(service => (service.DependentSubDomains ?? [])
                 .Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase))
@@ -388,9 +388,9 @@
     {
         _domainServicesMap.Clear();
         
-        foreach (var service in services.Where(service => !string.IsNullOrWhiteSpace(service.DomainName)))
+        foreach (var service in services)
+        foreach (var domainName in service.GetDomainNames())
         {
-            var domainName = service.DomainName!;
             if (!_domainServicesMap.ContainsKey(domainName))
             {
                 _domainServicesMap[domainName] = new List<RegisteredServiceStatus>();

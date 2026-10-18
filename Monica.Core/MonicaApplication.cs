@@ -27,6 +27,7 @@ public sealed class MonicaApplication : IDisposable
     private TypeFinderOptions _typeFinderOptions = new();
     private ITypeDependencyOrderer? _typeDependencyOrderer;
     private ITypeFinder? _typeFinder;
+    private bool _typeActivationFrozen;
 
     internal MonicaApplication(MonicaStartupOrigin? startupOrigin = null)
     {
@@ -42,6 +43,23 @@ public sealed class MonicaApplication : IDisposable
     /// Gets application identity defaults for this host.
     /// </summary>
     public IMonicaApplicationOptions Application => _applicationOptions;
+
+    /// <summary>Gets the optional immutable business activation policy installed during composition.</summary>
+    public ITypeActivationPolicy? TypeActivation { get; private set; }
+
+    /// <summary>Installs the activation policy before business discovery commits.</summary>
+    /// <remarks>The application-model module owns the policy; replacing it would invalidate committed registrations.</remarks>
+    public void SetTypeActivationPolicy(ITypeActivationPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        if (_typeActivationFrozen)
+            throw new InvalidOperationException("Business activation is frozen after service configuration.");
+        if (TypeActivation is not null)
+            throw new InvalidOperationException("The business activation policy has already been installed.");
+        TypeActivation = policy;
+    }
+
+    internal void FreezeTypeActivation() => _typeActivationFrozen = true;
 
     /// <summary>
     /// Gets module-system defaults for this host.

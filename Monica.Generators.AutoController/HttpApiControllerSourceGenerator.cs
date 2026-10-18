@@ -41,6 +41,8 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(context.CompilationProvider.Select(static (compilation, cancellationToken) =>
         {
             var assembly = compilation.Assembly;
+            if (HostGenerationReader.IsApplicationHost(assembly))
+                return ImmutableArray<AnalysisSnapshot<ControllerCandidate>>.Empty;
             if (!HostGenerationReader.HasOwnedGeneration(assembly))
                 return ImmutableArray<AnalysisSnapshot<ControllerCandidate>>.Empty;
             var app = HostGenerationReader.ApplicationConfig(assembly);
@@ -72,7 +74,8 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
         {
             var handler = syntaxContext.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken)
                 as INamedTypeSymbol;
-            if (HostGenerationReader.HasOwnedGeneration(syntaxContext.SemanticModel.Compilation.Assembly)) return null;
+            if (HostGenerationReader.IsApplicationHost(syntaxContext.SemanticModel.Compilation.Assembly) ||
+                HostGenerationReader.HasOwnedGeneration(syntaxContext.SemanticModel.Compilation.Assembly)) return null;
             return AnalyzeHandler(handler, syntaxContext.SemanticModel.Compilation.Assembly, fallbackLocation);
         }
         catch (OperationCanceledException) { throw; }

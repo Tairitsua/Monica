@@ -71,8 +71,6 @@ public sealed partial class GuideWorkspaceService
         ".git", ".tmp", "bin", "obj", "artifacts", "node_modules", "skills", ".agents", ".claude", ".codex"
     ];
 
-    private static readonly string[] ARCHITECTURE_CAPABILITIES = [CAPABILITY_MICROSERVICE, CAPABILITY_MODULAR_MONOLITH];
-
     private readonly AgentProductDefinition _definition;
     private readonly GuidePaths _enginePaths;
     private readonly SkillCatalog? _catalog;
@@ -691,22 +689,6 @@ public sealed partial class GuideWorkspaceService
             blockers.Add(Check("workspace.capabilities", GuideCheckStatus.Error,
                 $"Unknown capabilities: {string.Join(", ", unknownCapabilities)}.",
                 $"Known capabilities: {CAPABILITY_MICROSERVICE}, {CAPABILITY_MODULAR_MONOLITH}, {CAPABILITY_UI}."));
-        }
-
-        if (profile == PROFILE_APPLICATION)
-        {
-            var architectures = capabilities.Intersect(ARCHITECTURE_CAPABILITIES, StringComparer.Ordinal).ToArray();
-            if (architectures.Length == 0)
-            {
-                blockers.Add(Check("workspace.capabilities", GuideCheckStatus.Error,
-                    "The application profile requires exactly one architecture capability.",
-                    $"Pass --capability {CAPABILITY_MICROSERVICE} or --capability {CAPABILITY_MODULAR_MONOLITH}."));
-            }
-            else if (architectures.Length > 1)
-            {
-                blockers.Add(Check("workspace.capabilities", GuideCheckStatus.Error,
-                    "Application architecture capabilities are mutually exclusive."));
-            }
         }
 
         blockers.AddRange(ProfileRepositoryIssues(root, detection, profile));

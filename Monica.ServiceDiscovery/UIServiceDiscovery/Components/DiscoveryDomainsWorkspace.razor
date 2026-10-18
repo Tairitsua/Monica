@@ -34,7 +34,7 @@
                 {
                     <div class="domain-service-columns">
                         <section><header><span>@L["Workbench:Ownership"]</span><h4>@L["Workbench:OwnedServices"]<em>@OwnedServices.Count</em></h4><p>@L["Workbench:OwnedServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in OwnedServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@L["Workbench:InstancesCount",service.TotalInstanceCount]</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (OwnedServices.Count == 0) { <p>@L["Workbench:NoOwnedServices"]</p> }</div></section>
-                        <section><header><span>@L["Workbench:Declarations"]</span><h4>@L["Workbench:DependentServices"]<em>@DependentServices.Count</em></h4><p>@L["Workbench:DependentServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in DependentServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@(service.DomainName ?? L["Shared:Values:Unknown"].Value)</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (DependentServices.Count == 0) { <p>@L["Workbench:NoDependentServices"]</p> }</div></section>
+                        <section><header><span>@L["Workbench:Declarations"]</span><h4>@L["Workbench:DependentServices"]<em>@DependentServices.Count</em></h4><p>@L["Workbench:DependentServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in DependentServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@(string.Join(", ", service.GetDomainNames().DefaultIfEmpty(L["Shared:Values:Unknown"].Value)))</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (DependentServices.Count == 0) { <p>@L["Workbench:NoDependentServices"]</p> }</div></section>
                     </div>
                 }
             }
@@ -65,8 +65,8 @@
     private DiscoveryInspectorHost? _inspector;
     private DomainInfo? Selected => string.IsNullOrWhiteSpace(SelectedDomainName) ? _domains.FirstOrDefault() : _domains.FirstOrDefault(d => d.Name.Equals(SelectedDomainName,StringComparison.OrdinalIgnoreCase));
     private IEnumerable<DomainInfo> VisibleDomains => _domains.Where(d => (d.DisplayName ?? d.Name).Contains(_search,StringComparison.OrdinalIgnoreCase) || d.Name.Contains(_search,StringComparison.OrdinalIgnoreCase));
-    private List<RegisteredServiceStatus> OwnedServices => _services.Where(s => string.Equals(s.DomainName,Selected?.Name,StringComparison.OrdinalIgnoreCase)).OrderBy(s=>s.AppName).ToList();
-    private List<RegisteredServiceStatus> DependentServices => _services.Where(s => !string.Equals(s.DomainName,Selected?.Name,StringComparison.OrdinalIgnoreCase) && s.DependentSubDomains?.Contains(Selected?.Name ?? string.Empty,StringComparer.OrdinalIgnoreCase) == true).OrderBy(s=>s.AppName).ToList();
+    private List<RegisteredServiceStatus> OwnedServices => _services.Where(s => s.BelongsToDomain(Selected?.Name)).OrderBy(s=>s.AppName).ToList();
+    private List<RegisteredServiceStatus> DependentServices => _services.Where(s => !s.BelongsToDomain(Selected?.Name) && s.DependentSubDomains?.Contains(Selected?.Name ?? string.Empty,StringComparer.OrdinalIgnoreCase) == true).OrderBy(s=>s.AppName).ToList();
     protected override async Task OnInitializedAsync() { _token=_lifetime.Token; await RefreshAsync(); }
     private async Task RefreshAsync()
     {

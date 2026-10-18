@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core.Extensions;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Exceptions;
 using Monica.JobScheduler.Models;
@@ -26,7 +27,9 @@ public sealed class JobSchedulerFacade(
     IOptions<ModuleJobSchedulerOption> options,
     TimeProvider timeProvider,
     JobSchedulerRuntimeState runtimeState,
-    ILogger<JobSchedulerFacade> logger)
+    ILogger<JobSchedulerFacade> logger,
+    IReadOnlyList<LocalJobDefinition>? localDefinitions = null,
+    ITypeActivationPolicy? activation = null)
 {
     private const int MAX_PAGE_SIZE = 200;
     private const int RECENT_EXECUTION_COUNT = 12;
@@ -59,6 +62,7 @@ public sealed class JobSchedulerFacade(
                 {
                     SchedulerScopeKey = option.SchedulerScopeKey,
                     OwnerKey = option.GetProjectName(),
+                    OwnerKeys = GetLocalOwnerKeys(),
                     WorkerInstanceId = option.WorkerInstanceId,
                     RecurringJobDebugMode = option.RecurringJobDebugMode,
                     CronTimeZoneId = option.CronTimeZone.Id,
@@ -95,6 +99,17 @@ public sealed class JobSchedulerFacade(
                 CapturedAtUtc = timeProvider.GetUtcNow()
             };
         }, "load the scheduler runtime overview", cancellationToken);
+
+    private IReadOnlyList<string> GetLocalOwnerKeys()
+    {
+        var owners = (localDefinitions ?? [])
+            .Select(definition => definition.OwnerKey ?? options.Value.GetProjectName())
+            .Concat(activation?.ActiveWorkloadOwners ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+        if (activation is null && owners.Count == 0)
+            owners.Add(options.Value.GetProjectName());
+        return owners.Order(StringComparer.Ordinal).ToArray();
+    }
 
     private JobSchedulerStoreInfo DescribeStore() =>
         store is IJobSchedulerStoreDescriptor descriptor

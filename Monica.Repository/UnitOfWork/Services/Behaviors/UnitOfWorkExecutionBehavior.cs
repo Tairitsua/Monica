@@ -11,7 +11,7 @@ namespace Monica.Repository.UnitOfWork.Services.Behaviors;
 /// Nested execution adapters join the current unit of work. The outermost behavior owns the commit; failure handling
 /// is delegated to <see cref="IUnitOfWorkManager.RunAsync{T}(Func{Task{T}},Monica.Repository.UnitOfWork.Models.UnitOfWorkScopeOptions?,CancellationToken)"/>.
 /// </remarks>
-public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkManager unitOfWorkManager)
+public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkManager unitOfWorkManager, IServiceProvider? services = null)
     : IExecutionBehavior<TInput, TResult>
 {
     /// <inheritdoc />
@@ -24,6 +24,10 @@ public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkMana
         {
             options = new UnitOfWorkScopeOptions(selected);
         }
+        if (options is null && unitOfWorkManager.Current is null &&
+            services?.GetService(typeof(ApplicationTransactionContexts)) is ApplicationTransactionContexts defaults &&
+            defaults.Select(context.Descriptor) is { } ownedContexts)
+            options = new UnitOfWorkScopeOptions(ownedContexts);
         return unitOfWorkManager.RunAsync(next.Invoke, options, context.CancellationToken);
     }
 }

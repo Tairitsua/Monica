@@ -14,7 +14,7 @@ using Monica.Modules;
 namespace Monica.JobScheduler.Services.Support;
 
 /// <summary>
-/// Claims this host's own owner's queued work and executes it under fenced leases with timeout, cooperative
+/// Claims the selected logical owners' queued work and executes it under fenced leases with timeout, cooperative
 /// cancellation, and retry handling. No broker delivery or process-local execution projection participates in
 /// correctness.
 /// </summary>
@@ -34,7 +34,12 @@ internal sealed class JobExecutionWorkerHostedService(
 {
     private readonly ConcurrentDictionary<string, Task> _executions = new(StringComparer.Ordinal);
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
+    private readonly IGrouping<string, LocalJobDefinition>[] _localOwners = localDefinitions
+        .GroupBy(definition => definition.OwnerKey ?? schedulerOptions.Value.GetProjectName(), StringComparer.Ordinal)
+        .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
+        .ToArray();
     private readonly CancellationTokenSource _workerStop = new();
+    private int _nextClaimOwnerIndex;
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
 
@@ -57,7 +62,7 @@ internal sealed class JobExecutionWorkerHostedService(
                 runtimeState.SetInFlightExecutions(_executions.Count);
                 if (runtimeState.SetWorker(
                         true,
-                        $"Worker is active for {_options.GetProjectName()} with {localDefinitions.Count} local job(s)."))
+                        $"Worker is active for {_localOwners.Length} logical owner(s) with {localDefinitions.Count} local job(s)."))
                 {
                     RecordState(
                         $"Worker active with {_executions.Count} in-flight execution(s)",
@@ -158,22 +163,30 @@ internal sealed class JobExecutionWorkerHostedService(
             return;
         }
 
-        var leases = await store.ClaimAsync(new JobClaimRequest
+        var remainingBudget = Math.Min(availableSlots, _options.MaxClaimBatchSize);
+        for (var visited = 0; visited < _localOwners.Length && remainingBudget > 0; visited++)
         {
-            SchedulerScopeKey = _options.SchedulerScopeKey,
-            OwnerKey = _options.GetProjectName(),
-            WorkerInstanceId = _options.WorkerInstanceId,
-            JobKeys = localDefinitions.Select(static definition => definition.Declaration.JobKey).ToArray(),
-            LeaseDuration = _options.ExecutionLeaseDuration,
-            MaxCount = Math.Min(availableSlots, _options.MaxClaimBatchSize)
-        }, workerToken);
-        foreach (var lease in leases)
-        {
-            var task = ExecuteLeaseAsync(lease, workerToken);
-            if (!_executions.TryAdd(lease.Execution.InstanceId, task))
+            var owner = _localOwners[_nextClaimOwnerIndex];
+            _nextClaimOwnerIndex = (_nextClaimOwnerIndex + 1) % _localOwners.Length;
+            var leases = await store.ClaimAsync(new JobClaimRequest
             {
-                throw new InvalidOperationException(
-                    $"Execution '{lease.Execution.InstanceId}' was claimed twice by one worker.");
+                SchedulerScopeKey = _options.SchedulerScopeKey,
+                OwnerKey = owner.Key,
+                WorkerInstanceId = _options.WorkerInstanceId,
+                JobKeys = owner.Select(static definition => definition.Declaration.JobKey).ToArray(),
+                LeaseDuration = _options.ExecutionLeaseDuration,
+                MaxCount = remainingBudget
+            }, workerToken);
+            foreach (var lease in leases)
+            {
+                var task = ExecuteLeaseAsync(lease, workerToken);
+                if (!_executions.TryAdd(lease.Execution.InstanceId, task))
+                {
+                    throw new InvalidOperationException(
+                        $"Execution '{lease.Execution.InstanceId}' was claimed twice by one worker.");
+                }
+
+                remainingBudget--;
             }
         }
     }

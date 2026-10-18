@@ -9,7 +9,7 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - `$RequestRoute$`: request-specific route segment, such as `tree`, `publish`, or `approve`
 - `$ResponseName$`: response DTO type when the handler returns data
 - `$RepositoryName$`: repository abstraction, such as `IRepositoryOrder`
-- `$ApplicationNamespace$`: the application-layer namespace chosen by the architecture skill, such as `OrderingService.API` or `Domains.Ordering.Application`
+- `$ApplicationNamespace$`: the application-layer namespace chosen by the architecture skill, such as `Roles.Ordering` or `Roles.Ordering.Reporting`
 
 ## Use When
 
@@ -30,14 +30,14 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - Use `Monica.Application.Abstractions` for application primitives; compose `AddApplication()` for shared execution without HTTP.
 - Publish UI and cross-domain operations with the single ApiEndpoint(method, route) in Protocol; callers inject generated domain interfaces. HTTP metadata stays on the request even in Local mode. Unattributed requests remain internal mediator operations.
 - Do not put MVC `[Http*]`, `[Route]`, or `[From*]` attributes on the handler. The handler owns execution only.
-- Published requests use the strict Protocol published-language namespace. Generate adapters in the host with ApplicationApiGenerationConfig; Protocol itself chooses no transport.
+- Published requests use the strict Protocol published-language namespace. Generate callers and receivers in the complete ApplicationHost from role metadata; Protocol itself chooses no transport.
 - Keep private HTTP-only requests beside their handlers outside PublishedLanguages. Put wire settings in HttpApiContract and publish owned receivers from the host.
 - A local-only `ApplicationService` needs no `[ApiEndpoint]` or Web API generation configuration. Plain `IRequestHandler<TRequest, TResult>` remains available for internal support operations; both shapes execute through the mediator, not direct calls.
-- Place handlers in `HandlersCommand/` or `HandlersQuery/` under the application layer chosen by the architecture skill.
+- Place handlers in `HandlersCommand/` or `HandlersQuery/` directly under the owning Roles.* project.
 
 ## Generation and HTTP Mapping
 
-Use [RPC generation and registration](../../monica-infra-messaging/references/rpc.md) for the authoritative contract. Interfaces are stable across Debug/Release and HTTP publication. A monolith generates Local clients and optionally publishes HTTP. An HTTP microservice generates paired clients and owned receivers in Release too.
+Use [RPC generation and registration](../../monica-infra-messaging/references/rpc.md) for the authoritative contract. Interfaces are stable across Debug/Release and HTTP publication. The complete ApplicationHost generates per-operation callers and owned HTTP receivers in Release too. Ordinary operations prefer Local, independently of active role ownership; only a real execution requirement warrants RunOnRole.
 
 ApiEndpoint declares the HTTP method, relative route and binding for every published operation, including Local-only calls. HttpApiContract optionally sets an assembly-wide shared prefix without exposing receivers. Host publication does not change the shared mapping.
 

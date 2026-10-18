@@ -13,6 +13,8 @@ namespace Monica.Generators.AutoController.Helpers;
 
 internal static class EndpointModelFactory
 {
+    public static bool IsPublishedRequest(INamedTypeSymbol request) => ResolveNamespace(request).IsValidPublishedNamespace;
+
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAMESPACE = "Monica.Core.Results.Abstractions";
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAME = "IRemoteResultEnvelope`1";
 

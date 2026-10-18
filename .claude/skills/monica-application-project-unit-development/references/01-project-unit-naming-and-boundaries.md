@@ -37,7 +37,7 @@ These names describe support types; they do not create additional discovered rol
 | Facade | `*Facade` | Existing deliberate adapter; new business UI normally consumes application use cases |
 | Internal mediator handler | `CommandHandler*`, `QueryHandler*`, or meaningful `*Handler*` | Internal use-case orchestration through the existing mediator contract |
 | Response/read DTO, value object, mapper, validator | Business meaning plus an existing repository convention | Data shape, invariant value, mapping, or validation without a new role |
-| Composition module | Existing `Module*` convention | Registration and host integration, including composition-only AppHost modules |
+| Composition module | Existing `Module*` convention | Registration and host integration, for product bootstrap and explicit integrations; not one module per business feature |
 
 ## Project-Level Extensions
 
@@ -70,8 +70,8 @@ Inject the dependencies a concrete unit actually uses. Do not create a common se
 | --- | --- |
 | Project-common reusable implementation, including technical extensions | `Platform.BuildingBlocks`, in a folder named for the capability |
 | Shared business language and published contracts | `Platform.Protocol/PublishedLanguages` |
-| Host composition, registration, and solution integration wiring | `Platform.Infrastructure` |
-| A domain's repository, adapter, or other implementation | The owning service/domain project and its existing role folder |
+| Host composition, registration, and solution integration wiring | `Platform.Hosting` |
+| A domain's repository, adapter, or other implementation | The owning domain core or role library |
 
 Preserve the chosen solution's dependency chain. A shared implementation that consumes Protocol contracts must live where that direction allows it; BuildingBlocks cannot reference Protocol or a concrete domain. Technical dependencies do not make BuildingBlocks a pure domain kernel, and do not justify moving a domain-owned repository into Platform. Capability folders for shared extensions do not change the domain's `Repository/` placement.
 
@@ -83,23 +83,21 @@ Validate a specialization through its owning behavior: host registration/discove
 
 ## Placement Rules
 
-Use the same leaf folder semantics across solution styles. Keep folders flat and rely on prefix naming before introducing extra sub-folders.
+Use one domain-core/role layout in combined and split deployments. Keep leaf folders flat and rely on prefix naming before introducing extra subfolders. The [unified architecture](../../monica-application/references/03-unified-architecture.md) owns project boundaries.
 
-| Unit | Microservice placement | Modular monolith placement |
-| --- | --- | --- |
-| `ApplicationService` command | `{Subdomain}Service.API/HandlersCommand/` | `Domains/{Subdomain}/Application/HandlersCommand/` |
-| `ApplicationService` query | `{Subdomain}Service.API/HandlersQuery/` | `Domains/{Subdomain}/Application/HandlersQuery/` |
-| `DomainEventHandler` / `LocalEventHandler` | `{Subdomain}Service.API/HandlersEvent/` | `Domains/{Subdomain}/Application/HandlersEvent/` |
-| `RecurringJob` / `TriggeredJob` | `{Subdomain}Service.API/BackgroundWorkers/` | `Domains/{Subdomain}/Application/BackgroundWorkers/` |
-| `DomainService` | `{Subdomain}Service.Domain/DomainServices/` | `Domains/{Subdomain}/DomainServices/` |
-| `RequestDto` | `Shared/Platform.Protocol/PublishedLanguages/Domain{Subdomain}/Requests/` | `Shared/Platform.Protocol/PublishedLanguages/Domain{Subdomain}/Requests/` |
-| `DomainEvent` | `Shared/Platform.Protocol/PublishedLanguages/Domain{Subdomain}/Events/` | `Shared/Platform.Protocol/PublishedLanguages/Domain{Subdomain}/Events/` |
-| `Entity` | `{Subdomain}Service.Domain/Entities/` | `Domains/{Subdomain}/Entities/` |
-| `Repository` interface | `{Subdomain}Service.Domain/Interfaces/` | `Domains/{Subdomain}/Interfaces/` |
-| `Repository` implementation | `{Subdomain}Service.Domain/Repository/` | `Domains/{Subdomain}/Repository/` |
-| `DbContext` / EF mapping | `{Subdomain}Service.Domain/Repository/` | `Domains/{Subdomain}/Repository/` |
-| `Configuration` | `{Subdomain}Service.Domain/Configurations/` | `Domains/{Subdomain}/Configurations/` |
-| `Utility` helper | `{Subdomain}Service.Domain/Utilities/` | `Domains/{Subdomain}/Utilities/` |
+| Unit | Placement |
+| --- | --- |
+| ApplicationService commands and queries | `Domains/{Domain}/Roles.{Domain}[.{Purpose}]/{HandlersCommand,HandlersQuery}/` |
+| Local event and external subscription entry points | The owning role's `HandlersEvent/` or `Subscribers/`, keeping local invariant behavior distinct from autonomous consumption |
+| RecurringJob / TriggeredJob | The owning role's `BackgroundWorkers/` or `Jobs/` |
+| Entity, value object and DomainService | `Domains/{Domain}/Domains.{Domain}/{Entities,ValueObjects,DomainServices}/` |
+| Repository interface | `Domains/{Domain}/Domains.{Domain}/Interfaces/` |
+| Repository implementation, DbContext and EF mapping | `Domains/{Domain}/Domains.{Domain}/Repository/` |
+| Shared domain options | The domain core's `Configurations/` |
+| Role-local integration options | The owning role's `Configurations/` |
+| Published request, DTO and event | `Shared/Platform.Protocol/PublishedLanguages/Domain{Domain}/{Requests,Models,Events}/` |
+| Pure helper | The owning core or role's `Utilities/` |
+| Real migrations and snapshots | Top-level `Migrations/Migrations.Domain{Domain}/` |
 
 Application EventBus contracts, including shared technical envelopes, use `Event*` names and inherit `Monica.EventBus.Events.DomainEvent`. Place them in the owning published language's `Events/` folder, separate from domain implementation and persistence entities. Generic synchronization envelopes belong to the solution's shared system published language; business-specific facts belong to their business subdomain. Open generic contract types are excluded from ProjectUnit discovery.
 
@@ -110,7 +108,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 - Prefer prefix naming inside a folder instead of adding sub-folders with one or two files.
 - Keep leaf folders directly recognizable in the IDE: `QueryHandlerGetOrder.cs`, `CommandHandlerApproveOrder.cs`, `DomainEventHandlerOrderApproved.cs`, `WorkerRefreshOrderSnapshot.cs`.
 - Use `HandlersEvent` as the standard event-handler folder name. Do not alternate between `HandlersEvent` and `EventHandlers`.
-- Keep AppHost or gateway projects composition-only. Composition modules, registration extensions, and host adapters are allowed there; business ProjectUnits and domain behavior stay in their owners.
+- Keep AppHost or gateway projects composition-only. Registration extensions and host adapters are allowed there; business ProjectUnits and domain behavior stay in their owners. Do not introduce a Monica module per business feature.
 - Put pure helper code in `Utilities/` with `Utils*` names. If a type starts accumulating orchestration or domain rules, move it into a `DomainService` or entity instead.
 
 ## Boundary Rules
@@ -119,8 +117,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 - Keep orchestration in handlers and business rules at their state/domain owner. Handler length alone does not justify a DomainService; select one only for a meaningful domain responsibility.
 - Keep entity invariants on the entity. Do not let handlers or repositories directly toggle domain state through scattered property assignments.
 - Keep repository interfaces on the domain side of the boundary and repository implementations on the infrastructure side.
-- For modular monolith projects, the merged `Domains.{Subdomain}.csproj` is the infrastructure side for that subdomain, so repository implementations stay under `Domains/{Subdomain}/Repository/`.
-- For microservice projects, repository implementations stay in `{Subdomain}Service.Domain/Repository/`.
+- The domain core owns persistence in every deployment: implementations stay in `Domains/{Domain}/Domains.{Domain}/Repository/`; role libraries consume their narrow interfaces.
 - Keep libraries that are only used by one repository or adapter in the owning subdomain/service project. Do not move that implementation into `Platform` unless the implementation itself is project-common reusable infrastructure.
 - Keep request, response, and event contracts separate from persistence entities.
 - Keep endpoint metadata on the request contract. the single ApiEndpoint declares the operation and its HTTP mapping; optional shared wire settings stay with its assembly; generated `ApplicationService` handlers do not carry MVC endpoint or binding attributes.

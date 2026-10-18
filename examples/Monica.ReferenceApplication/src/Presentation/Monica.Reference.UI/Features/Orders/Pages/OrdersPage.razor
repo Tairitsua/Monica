@@ -10,20 +10,20 @@
 @inject IStringLocalizer<OrderingUIResource> L
 @implements IAsyncDisposable
 
-<PageTitle>@L["Orders"]</PageTitle>
-<h1>@L["Orders"]</h1>
-<p>@L["Description"]</p>
+<PageTitle>@L["Ordering:Orders"]</PageTitle>
+<h1>@L["Ordering:Orders"]</h1>
+<p>@L["Ordering:Description"]</p>
 @if (_summary is { } summary)
 {
-    <p class="summary">@L["Summary", summary.TotalOrders, summary.DraftOrders]</p>
+    <p class="summary">@L["Ordering:Summary", summary.TotalOrders, summary.DraftOrders]</p>
 }
 <section aria-labelledby="create-order-title">
-    <h2 id="create-order-title">@L["Create"]</h2>
+    <h2 id="create-order-title">@L["Ordering:Create"]</h2>
     <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
-        <label>@L["Number"]<input required @bind="_form.Number" @bind:event="oninput" disabled="@_busy" /></label>
-        <label>@L["Customer"]<input required @bind="_form.Customer" @bind:event="oninput" disabled="@_busy" /></label>
-        <label>@L["Total"]<input type="number" min="0.01" step="0.01" required @bind="_form.Total" @bind:event="oninput" disabled="@_busy" /></label>
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_busy">@L["Create"]</MudButton>
+        <label>@L["Ordering:Number"]<input required @bind="_form.Number" @bind:event="oninput" disabled="@_busy" /></label>
+        <label>@L["Ordering:Customer"]<input required @bind="_form.Customer" @bind:event="oninput" disabled="@_busy" /></label>
+        <label>@L["Ordering:Total"]<input type="number" min="0.01" step="0.01" required @bind="_form.Total" @bind:event="oninput" disabled="@_busy" /></label>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_busy">@L["Ordering:Create"]</MudButton>
     </form>
 </section>
 @if (_message is not null)
@@ -31,29 +31,29 @@
     <MudAlert Severity="@(_failed ? Severity.Error : Severity.Success)" role="status">@_message</MudAlert>
 }
 <div class="list-heading">
-    <h2>@L["Orders"]</h2>
-    <MudButton OnClick="RefreshAsync" Disabled="@_busy">@L["Refresh"]</MudButton>
+    <h2>@L["Ordering:Orders"]</h2>
+    <MudButton OnClick="RefreshAsync" Disabled="@_busy">@L["Ordering:Refresh"]</MudButton>
 </div>
 @if (_busy)
 {
-    <p role="status">@L["Loading"]</p>
+    <p role="status">@L["Ordering:Loading"]</p>
 }
 @if (_orders.Count == 0 && !_busy)
 {
-    <p>@L["Empty"]</p>
+    <p>@L["Ordering:Empty"]</p>
 }
 else
 {
     <div class="table-scroll">
         <table>
-            <thead><tr><th>@L["Number"]</th><th>@L["Customer"]</th><th>@L["Total"]</th><th>@L["Status"]</th><th>@L["Approve"]</th></tr></thead>
+            <thead><tr><th>@L["Ordering:Number"]</th><th>@L["Ordering:Customer"]</th><th>@L["Ordering:Total"]</th><th>@L["Ordering:Status"]</th><th>@L["Ordering:Approve"]</th></tr></thead>
             <tbody>
                 @foreach (var order in _orders)
                 {
                     <tr @key="order.Id">
                         <td>@order.OrderNumber</td><td>@order.CustomerName</td><td>@order.Total.ToString("N2")</td>
-                        <td>@L[order.Status == OrderStatus.Draft ? "Draft" : "Approved"]</td>
-                        <td><MudButton Disabled="@(_busy || order.Status != OrderStatus.Draft)" OnClick="() => ApproveAsync(order.Id)">@L["Approve"]</MudButton></td>
+                        <td>@L[order.Status == OrderStatus.Draft ? "Ordering:Draft" : "Ordering:Approved"]</td>
+                        <td><MudButton Disabled="@(_busy || order.Status != OrderStatus.Draft)" OnClick="() => ApproveAsync(order.Id)">@L["Ordering:Approve"]</MudButton></td>
                     </tr>
                 }
             </tbody>
@@ -113,7 +113,7 @@ else
         if (summary.IsOk()) _summary = summary.Data; else Present(summary.ToRes());
     }
 
-    private void Present(Res result) { _failed = !result.IsOk(); _message = _failed ? result.Message : L["Saved"]; }
+    private void Present(Res result) { _failed = !result.IsOk(); _message = _failed ? result.Message : L["Ordering:Saved"]; }
 
     public async ValueTask DisposeAsync()
     {

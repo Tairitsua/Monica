@@ -1,3 +1,4 @@
+using Monica.ApplicationModel.Models;
 using Monica.Configuration.Bootstrap;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
@@ -5,6 +6,10 @@ using Monica.Reference.UI.Layout;
 using Monica.Reference.UI.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
+var appId = builder.Configuration["ReferenceAppId"] ?? "monica-ordering-reference";
+var deployments = builder.Configuration.GetSection("Deployment:Applications")
+    .Get<Dictionary<string, ApplicationPlacement>>()
+    ?? throw new InvalidOperationException("Configure Deployment:Applications before starting the reference host.");
 
 var configurationInputPlan = MonicaConfigurationInputPlan.Create(inputs => inputs
     .UseFileConfigurationStore());
@@ -15,7 +20,7 @@ builder.AddMonica(monica =>
     {
         options.ProjectName = "Monica.Reference.Api";
         options.AppName = "Monica Ordering Reference";
-        options.AppId = "monica-ordering-reference";
+        options.AppId = appId;
         options.DomainName = "Ordering";
     });
 
@@ -26,17 +31,17 @@ builder.AddMonica(monica =>
     });
 
     monica.ConfigureTypeDiscovery(options =>
-        options.Add("Domains.Ordering", "Platform.Protocol"));
+        options.Add("Domains.", "Roles.", "Platform.Protocol"));
+
+    monica.AddApplicationModel(options => options.Deployments = deployments);
+    monica.AddApplicationRpc();
 
     monica.AddHealthCheck();
     monica.AddConfiguration(configurationInputPlan);
     monica.AddEventBus()
         .UseNoOpDistributedEventBus();
     monica.AddResultEnvelope();
-#if DEBUG || MONICA_HTTP_ENDPOINTS
     monica.AddWebApi();
-#endif
-    monica.AddRpcClient().ConfigDomainInfoProvider(new OrderingRpcDomains()).UseLocalTransport();
     monica.AddApplicationUI();
     monica.AddUIHost(options =>
     {
@@ -78,13 +83,13 @@ app.UseMonica();
 app.MapGet("/overview", () => Results.Ok(new
 {
     application = "Monica Ordering Reference",
-    architecture = "Domain-first modular monolith",
+    architecture = "One complete application with domain-owned roles",
     endpoints = new
     {
         product = "/orders",
-#if DEBUG || MONICA_HTTP_ENDPOINTS
         orders = "/api/v1/Ordering/queries/GetOrders",
         approveOrder = "/api/v1/Ordering/commands/ApproveOrder",
+#if DEBUG || MONICA_HTTP_ENDPOINTS
         swagger = "/swagger",
 #endif
         metrics = "/metrics",
@@ -97,7 +102,7 @@ app.MapGet("/overview", () => Results.Ok(new
         configuration = "Ordering options are projected from the local Monica configuration store.",
         consistency = "Requests use operation scopes; the process-local demo repository has no transactional rollback.",
         approvalEvent = "The demo publishes locally after updating its dictionary; durable applications use the transactional outbox.",
-        scheduler = "WorkerOrderBacklogReport runs every minute with in-memory scheduler state."
+        scheduler = "WorkerOrderBacklogReport runs every minute only on the ordering.reporting owner, with in-memory scheduler state."
     }
 }));
 

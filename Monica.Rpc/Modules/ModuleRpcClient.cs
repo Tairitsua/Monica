@@ -19,8 +19,6 @@ namespace Monica.Modules;
 
 public static class ModuleRpcClientBuilderExtensions
 {
-    internal const string DOMAIN_PROVIDER_FEATURE = "rpc-domain-provider";
-
     extension(IMonicaBuilder builder)
     {
         /// <summary>
@@ -76,8 +74,7 @@ public static class ModuleRpcClientBuilderExtensions
         {
             ArgumentNullException.ThrowIfNull(domainInfoProvider);
             return registration
-                .Configure(options => options.DomainInfoProvider = domainInfoProvider)
-                .SatisfyFeature(DOMAIN_PROVIDER_FEATURE);
+                .Configure(options => options.DomainInfoProvider = domainInfoProvider);
         }
 
         /// <summary>
@@ -108,7 +105,6 @@ public class ModuleRpcClient : MonicaModule<ModuleRpcClientOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.RequireFeature(ModuleRpcClientBuilderExtensions.DOMAIN_PROVIDER_FEATURE);
         module.Require<ModuleAuthentication, ModuleAuthenticationOption>();
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
         module.Require<ModuleMediator, ModuleMediatorOption>();
@@ -148,6 +144,7 @@ public class ModuleRpcClient : MonicaModule<ModuleRpcClientOption>
 
     public override void PostConfigureServices(ModuleContext<ModuleRpcClientOption> context)
     {
+        if (Option.ApplicationModelRouting) return;
         var services = context.Services;
         var infoProvider = GetRequiredDomainInfoProvider();
         var selectedTransport = Option.Transport;
@@ -177,7 +174,7 @@ public class ModuleRpcClient : MonicaModule<ModuleRpcClientOption>
     private IRpcClientDomainInfoProvider GetRequiredDomainInfoProvider()
     {
         return Option.DomainInfoProvider
-               ?? throw new InvalidOperationException("You must config DomainInfoProvider to use rpc client!");
+               ?? throw new InvalidOperationException("Standalone RPC clients require ConfigDomainInfoProvider. Complete application hosts use AddApplicationRpc with a validated application model.");
     }
 
     private void ValidateTransportConfiguration(RpcTransportKind selectedTransport)
@@ -315,26 +312,10 @@ public class ModuleRpcClient : MonicaModule<ModuleRpcClientOption>
 
         var descriptor = infoProvider.GetDomain(domain);
         var appid = descriptor.AppId;
-        var clientName = $"Monica.Rpc.{appid}";
+        var clientName = RpcHttpClientRegistration.GetClientName(appid);
         if (registeredAppIds.Add(appid))
         {
-            var httpClientBuilder = services.AddHttpClient(clientName);
-            httpClientBuilder.RemoveAllLoggers();
-            httpClientBuilder.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
-
-            if (Option.CustomHttpClientBuilder is { } method)
-            {
-                method.Invoke(httpClientBuilder);
-            }
-
-            services.AddSingleton<IConfigureOptions<HttpClientFactoryOptions>>(provider =>
-                new ConfigureNamedOptions<HttpClientFactoryOptions>(clientName, options =>
-                {
-                    var httpClientRegisterProvider = (IRpcHttpClientRegisterProvider)provider.GetRequiredService(httpClientRegisterProviderType);
-                    httpClientRegisterProvider.ConfigureHttpClientFactoryOptions(options, appid);
-                    // Only clients owned by this module use the complete-call deadline as their sole total timer.
-                    options.HttpClientActions.Add(client => client.Timeout = Timeout.InfiniteTimeSpan);
-                }));
+            RpcHttpClientRegistration.Register(services, appid, httpClientRegisterProviderType, Option.CustomHttpClientBuilder);
         }
 
         services.TryAddTransient(rpcClient.InterfaceType, provider =>
@@ -465,4 +446,5 @@ public class ModuleRpcClientOption : ModuleOptions<ModuleRpcClient>
 
     internal Type? HttpClientRegisterProviderType { get; set; }
     internal IRpcClientDomainInfoProvider? DomainInfoProvider { get; set; }
+    internal bool ApplicationModelRouting { get; set; }
 }

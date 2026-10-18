@@ -22,7 +22,7 @@ The current runtime and source discovery implementations recognize the following
 | `HostedService` | `IHostedService`; Monica observation uses `MoHostedService` / `MoBackgroundService` | Project convention; no native prefix rule | Host lifecycle or continuous infrastructure work |
 | `HttpApi` | `ControllerBase` | Usually `*Controller`; no native prefix rule | HTTP transport adapter, including generated mediated controllers |
 
-For concrete folder placement in microservice and modular-monolith layouts, use [01-project-unit-naming-and-boundaries.md](01-project-unit-naming-and-boundaries.md).
+For concrete domain-core and role-project folder placement, use [01-project-unit-naming-and-boundaries.md](01-project-unit-naming-and-boundaries.md).
 
 The framework also recognizes `IDomainEvent`, `IDistributedEventHandler<TEvent>`, and `ILocalEventHandler<TEvent>` implementations. The table selects the base classes used by application units; transport-level interface support does not replace those conventions. Read [adapters and lifecycle types](04-adapters-lifecycle-and-support-types.md) before selecting CRUD, seeding, host, or controller roles.
 
@@ -74,5 +74,5 @@ An empty catalog reports no data, not 100% coverage. Use [03-project-unit-contex
 
 This skill does not decide the outer folder layout.
 
-- Use `monica-application-microservice` for `Shared/Platform.Protocol/PublishedLanguages`, `Services/{Subdomain}`, service project placement, and migration placement.
-- Use `monica-application-modular-monolith` for `Domains/{Subdomain}`, AppHost composition, and cross-domain contracts.
+- Use the [unified architecture](../../monica-application/references/03-unified-architecture.md) for domain cores, role libraries, Protocol, selective Host composition and top-level migration placement.
+- Use the microservice/modular-monolith skills only for split/combined deployment and migration from existing layouts.

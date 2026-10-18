@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Monica.ApplicationModel.Abstractions;
 using Monica.WebApi.AutoControllers.Services.Support;
 
 namespace Monica.WebApi.AutoControllers.Extensions;
@@ -14,6 +16,7 @@ internal static class MvcOptionsExtensions
     private static void AddConventions(MvcOptions options, IServiceProvider provider)
     {
         options.Conventions.Add(new ServiceConventionWrapper(provider));
+        options.Conventions.Add(new ApplicationApiReceiverConvention(provider.GetService<IApplicationModel>()));
     }
 
     private static void AddActionFilters(MvcOptions options)

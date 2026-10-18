@@ -1,6 +1,8 @@
 # Shared Application Specification
 
-The `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the two architecture profiles own topology and boundaries; ProjectUnit development owns unit responsibilities and shapes; application testing owns verification boundaries. Application UI owns the presentation branch and its development workflow; backend architecture and UI inclusion are independent selections. Pure backend applications need no UI skills. Infrastructure skills explain the native capabilities used by these patterns.
+The `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the unified architecture owns topology and boundaries; the legacy microservice and modular-monolith skills cover split/combined deployment and migration; ProjectUnit development owns unit responsibilities and shapes; application testing owns verification boundaries. Application UI owns the presentation branch and its development workflow; role placement and UI inclusion are independent selections. Pure backend applications need no UI skills. Infrastructure skills explain the native capabilities used by these patterns.
+
+Read [unified architecture](03-unified-architecture.md) for the single domain-core/role-project layout, selective host composition, generated ownership catalogs, placement, activation, RPC and migration ownership. Backend-only and backend-with-UI remain independent skill installation choices.
 
 ## Rule Strength
 
@@ -14,7 +16,7 @@ Recommendations and defaults guide selection among allowed choices. When a proje
 
 ## Shared and Project Ownership
 
-Shared skills own reusable architecture profiles, role vocabulary, dependency direction, lifecycle boundaries, native extension mechanisms, and test patterns. The repository-owned `<project>-application-spec` owns the selected profile, actual domains/services/hosts, dependency map, local naming and placement, adopted specializations, explicit deviations, validation commands, and known migration gaps. Locate it through `AGENTS.md` or the repository's equivalent instructions. Use its references as the current application architecture source; do not maintain a parallel `docs/architecture.md` or Workflow architecture topic.
+Shared skills own the unified domain/role architecture, role vocabulary, dependency direction, lifecycle boundaries, native extension mechanisms, and test patterns. The repository-owned `<project>-application-spec` owns the adopted layout and deployment placement, actual domains/roles/hosts, dependency map, local naming and placement, adopted specializations, explicit deviations, validation commands, and known migration gaps. Locate it through `AGENTS.md` or the repository's equivalent instructions. Use its references as the current application architecture source; do not maintain a parallel `docs/architecture.md` or Workflow architecture topic.
 
 The project specification links to shared rules instead of copying their catalog. A local specialization remains in its native role and preserves the role's ownership and execution contracts. Existing code is evidence of current facts, including drift; it is not implicit approval for a new pattern. A known migration gap describes that drift without making it the target convention for new work.
 

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Fixtures/ApplicationModel.Role/ApplicationModel.Role.csproj" />
+    <ProjectReference Include="../../Monica.Testing/Monica.Testing.csproj" />
+    <ProjectReference Include="../../Monica.ServiceDiscovery/Monica.ServiceDiscovery.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

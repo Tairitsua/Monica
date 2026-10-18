@@ -14,7 +14,7 @@
 		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 		<IncludeSymbols>false</IncludeSymbols>
 		<PackageDescription>Analyzer-only source generator for request-owned HTTP controllers and RPC clients in Monica applications.</PackageDescription>
-		<PackageReleaseNotes>Replaces handler-owned routes and RPC metadata snapshots with request-owned ApiEndpoint contracts. Generates controllers and HTTP/local RPC clients incrementally without build tasks or source-tree writes.</PackageReleaseNotes>
+		<PackageReleaseNotes>Generates request-owned API callers and receivers, role ownership exports, and lightweight product catalogs for selective application hosts. Catalog build assets stay under intermediate output directories.</PackageReleaseNotes>
 		<PackageTags>monica;dotnet;roslyn;source-generator;aspnetcore;rpc;api-controller;cqrs</PackageTags>
 	</PropertyGroup>
 
@@ -25,6 +25,7 @@
 	<!-- Pack as analyzer -->
 	<ItemGroup>
 		<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+		<None Update="build\Monica.ApplicationCatalog.targets" Pack="true" PackagePath="build\Monica.Generators.AutoController.targets" />
 	</ItemGroup>
 
 	<!-- Roslyn release tracking inputs are analyzer-development metadata, not consumer AdditionalFiles. -->

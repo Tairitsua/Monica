@@ -20,7 +20,7 @@
     @if (Instance is { } instance)
     {
         <section class="host-identity">
-            <div class="host-identity-main"><span class="host-eyebrow">@L["CurrentInstance:Fields:AppName"]</span><h3>@instance.AppName</h3><code>@instance.AppId</code><div class="host-context"><span>@Value(instance.ProjectName)</span><span>@Value(instance.DomainName)</span></div></div>
+            <div class="host-identity-main"><span class="host-eyebrow">@L["CurrentInstance:Fields:AppName"]</span><h3>@instance.AppName</h3><code>@instance.AppId</code><div class="host-context"><span>@Value(instance.ProjectName)</span><span>@Value(string.Join(", ", instance.GetDomainNames()))</span><span>@L["Shared:Values:Roles"]: @Value(string.Join(", ", instance.RoleIds))</span></div></div>
             <div class="host-instance-identity"><span>@L["CurrentInstance:Fields:InstanceId"]</span><code>@instance.InstanceId</code><small>@L["Workbench:CapturedUTC"]</small><time datetime="@State.CapturedAt?.ToString("O")">@State.CapturedAt?.ToString("O")</time></div>
         </section>
 

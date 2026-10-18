@@ -1,16 +1,18 @@
 # Sociable Application Test Templates
 
-These examples use UserService.API. Keep the runnable project name equal to Test. plus the exact production project stem.
+These examples use Roles.User and its Domains.User core within its selected production Host composition. Keep the runnable project name equal to Test. plus the exact production project stem.
 
 ## Project Factory
 
+UserHostComposition is an application-owned composition method extracted from the production Host, not a Monica module per feature. It registers the real UserDbContext, domain participation and any application model required by the scenario. Include the actual role, core, Protocol, lightweight catalog where used, and actual local Host manifest assemblies in TypeDiscoveryAssemblies when composition spans them; the anchor alone supplies only its own assembly.
+
 ```csharp
-public sealed class UserServiceTestApplicationFactory
+public sealed class UserRoleTestApplicationFactory
     : MonicaTestApplicationFactory<CommandHandlerGrantPermission>
 {
     protected override void ConfigureMonica(IMonicaBuilder monica)
     {
-        monica.AddUserService(); // Registers the real UserDbContext and operation participation.
+        UserHostComposition.Configure(monica); // Reuses the product-owned native host registrations.
     }
 
     protected override void ConfigureServices(IServiceCollection services)
@@ -26,10 +28,10 @@ The factory is a stateless recipe. CreateAsync builds a new complete host; Creat
 ## Command and Repository Scenario
 
 ```csharp
-public sealed class CommandHandlerGrantPermissionTests(UserServiceTestApplicationFactory factory)
-    : IClassFixture<UserServiceTestApplicationFactory>
+public sealed class CommandHandlerGrantPermissionTests(UserRoleTestApplicationFactory factory)
+    : IClassFixture<UserRoleTestApplicationFactory>
 {
-    private readonly UserServiceTestApplicationFactory _factory = factory;
+    private readonly UserRoleTestApplicationFactory _factory = factory;
 
     [Fact]
     public async Task Handle_WhenUnitExists_ShouldPersistPermission()

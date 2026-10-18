@@ -11,6 +11,8 @@ namespace Monica.Generators.AutoController.Helpers;
 /// <summary>Reads explicit host ownership without inferring receivers from referenced protocol assemblies.</summary>
 internal static class HostGenerationReader
 {
+    public static bool IsApplicationHost(IAssemblySymbol assembly) => Find(assembly, GeneratorConstants.APPLICATION_HOST_ATTRIBUTE) is not null;
+
     public static AttributeData? ApplicationConfig(IAssemblySymbol assembly) => Find(assembly, GeneratorConstants.APPLICATION_API_CONFIG_ATTRIBUTE);
     public static AttributeData? HttpConfig(IAssemblySymbol assembly) => Find(assembly, GeneratorConstants.WEB_API_CONFIG_ATTRIBUTE);
     private static AttributeData? Find(IAssemblySymbol assembly, string name) =>
@@ -62,6 +64,7 @@ internal static class HostGenerationReader
     public static HostClientAnalysis Clients(Compilation compilation, System.Threading.CancellationToken cancellationToken)
     {
         var result = new HostClientAnalysis();
+        if (IsApplicationHost(compilation.Assembly)) return result;
         var attribute = ApplicationConfig(compilation.Assembly);
         if (attribute is null) return result;
         result.Diagnostics.AddRange(ValidateOwnership(compilation.Assembly));

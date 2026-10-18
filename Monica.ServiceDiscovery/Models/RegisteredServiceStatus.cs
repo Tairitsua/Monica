@@ -10,6 +10,20 @@ public class RegisteredServiceStatus
     
     /// <summary>Domain name</summary>
     public string? DomainName { get; set; }
+
+    /// <summary>Gets or sets domains observed across the application's registered instances.</summary>
+    public List<string> DomainNames { get; set; } = [];
+
+    /// <summary>Gets or sets roles observed across registered instances. Inspect each instance during mixed-version rollouts.</summary>
+    public List<string> RoleIds { get; set; } = [];
+
+    /// <summary>Returns observed domain identities, including the legacy singular registration field.</summary>
+    public IEnumerable<string> GetDomainNames() => DomainNames.Append(DomainName)
+        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether any observed instance declares the domain; this does not establish process readiness.</summary>
+    public bool BelongsToDomain(string? domainName) => domainName is not null &&
+        GetDomainNames().Contains(domainName, StringComparer.OrdinalIgnoreCase);
     
     /// <summary>Project name</summary>
     public string? ProjectName { get; set; }

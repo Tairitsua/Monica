@@ -5,8 +5,8 @@ description: Apply <Project>'s application specification when designing, impleme
 
 # <Project> Application Specification
 
-Load `$monica-application` and this skill before application design or code changes, including direct entry through a granular application skill. <Project> adopts the `<microservice or modular-monolith>` profile.
+Load `$monica-application` and this skill before application design or code changes, including direct entry through a granular application skill. <Project> adopts the shared unified domain/role architecture with <combined or split role placement>.
 
-Read [the application specification](references/application-specification.md) for the actual architecture, local conventions and extensions, validation, and migration gaps. Load the relevant shared architecture and ProjectUnit references for the affected work.
+Read [the application specification](references/application-specification.md) for the actual architecture, local conventions and extensions, validation, and migration gaps. Load the unified architecture and relevant ProjectUnit references for the affected work.
 
 Reconcile impacted specification facts and rules in the same change. Apply shared specification evolution before adopting a new pattern or deviation; keep its rationale and exact approved scope with the owning rule.

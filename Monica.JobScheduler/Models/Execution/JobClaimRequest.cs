@@ -1,7 +1,8 @@
 namespace Monica.JobScheduler.Models.Execution;
 
 /// <summary>
-/// Describes one bounded atomic claim operation for a worker host claiming its own owner's queued work.
+/// Describes one bounded atomic claim operation for a logical owner's queued work.
+/// A worker serving several owners issues separate claims within its shared process budget.
 /// </summary>
 public sealed record JobClaimRequest
 {

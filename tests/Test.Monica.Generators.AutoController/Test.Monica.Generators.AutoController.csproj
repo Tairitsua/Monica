@@ -8,6 +8,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../Monica.Core/Monica.Core.csproj" />
+    <ProjectReference Include="../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
     <ProjectReference Include="../../Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
     <ProjectReference Include="../../Monica.Generators.AutoController/Monica.Generators.AutoController.csproj" />
     <ProjectReference Include="../../Monica.WebApi/Monica.WebApi.csproj" />

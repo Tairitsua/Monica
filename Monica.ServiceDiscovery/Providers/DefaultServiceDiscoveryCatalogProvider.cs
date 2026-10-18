@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Monica.ApplicationModel.Abstractions;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
 
@@ -7,7 +8,8 @@ namespace Monica.ServiceDiscovery.Providers;
 /// <summary>
 /// Default catalog provider that derives metadata from registered instances.
 /// </summary>
-public class DefaultServiceDiscoveryCatalogProvider(IRegistrationStateManager? stateManager = null) : IServiceDiscoveryCatalogProvider
+public class DefaultServiceDiscoveryCatalogProvider(IRegistrationStateManager? stateManager = null,
+    IApplicationModel? applicationModel = null) : IServiceDiscoveryCatalogProvider
 {
     /// <summary>
     /// Gets all discovery domains by reading registered instance state from the state store.
@@ -15,14 +17,11 @@ public class DefaultServiceDiscoveryCatalogProvider(IRegistrationStateManager? s
     /// </summary>
     public virtual async Task<List<DomainInfo>> GetAllDomainsAsync()
     {
-        if (stateManager == null)
-            return [];
-
-        var instances = await stateManager.GetAllInstancesAsync();
+        var instances = stateManager is null ? [] : await stateManager.GetAllInstancesAsync();
 
         var domainNames = instances
-            .Where(s => !string.IsNullOrWhiteSpace(s.DomainName))
-            .Select(s => s.DomainName!)
+            .SelectMany(instance => instance.GetDomainNames())
+            .Concat(applicationModel?.Domains.Keys ?? [])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -39,7 +38,9 @@ public class DefaultServiceDiscoveryCatalogProvider(IRegistrationStateManager? s
     /// </summary>
     public virtual Task<List<PredefinedServiceInfo>> GetPreloadedServicesAsync()
     {
-        return Task.FromResult<List<PredefinedServiceInfo>>([]);
+        return Task.FromResult(applicationModel is null ? [] : applicationModel.RoleApplications.Values
+            .Append(applicationModel.AppId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
+            .Select(appId => new PredefinedServiceInfo { AppId = appId, AppName = appId }).ToList());
     }
 
     /// <summary>

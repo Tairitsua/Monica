@@ -11,7 +11,7 @@ Use this skill for unit-level application development in Monica-based DDD projec
 
 ## Workflow
 
-Use the project's adopted `$monica-application-microservice` or `$monica-application-modular-monolith` profile to locate the owning subdomain and project. Use [unit overview](references/00-project-unit-overview.md) and [composition map](references/02-project-unit-composition-map.md) when the feature's units are unclear; load only the matching unit reference below. Keep invariants on entities and orchestration in handlers. A DomainService is an optional home for a meaningful domain rule with no natural entity owner, not a required hop for every command.
+Use the [unified architecture](../monica-application/references/03-unified-architecture.md) and project specification to locate the owning domain core or role library. Use [unit overview](references/00-project-unit-overview.md) and [composition map](references/02-project-unit-composition-map.md) when the feature's units are unclear; load only the matching unit reference below. Keep invariants on entities and orchestration in handlers. A DomainService is an optional home for a meaningful domain rule with no natural entity owner, not a required hop for every command.
 
 When adding or refactoring application EventBus events and consumers, including outbox or inbox adoption, load the [event contract](references/12-entity-request-event-template.md) and [handler](references/14-event-handler-template.md) templates before changing their delivery configuration.
 
@@ -26,7 +26,7 @@ When adding or refactoring application EventBus events and consumers, including 
 - If a handler returns `Res<string>`, use `Res.Ok<string>(value)` instead of `Res.Ok(value)` to avoid the non-generic string overload.
 - Make HTTP contracts request-owned. Put `[ApiEndpoint]` on the request type and keep route, verb, and binding off the `ApplicationService` handler.
 - A request is published for generated RPC clients only when it is attributed source in the exact namespace `*.PublishedLanguages.Domain{DomainName}.Requests`. Attributed requests outside that boundary remain local HTTP endpoints.
-- Generate interfaces in Protocol independently of transport. Host `ApplicationApiGenerationConfig` selects Local for monolith internals or Http for cross-service calls. Owned HTTP receivers follow that mode or a host WebApiGenerationConfig opt-in. See [RPC generation](../monica-infra-messaging/references/rpc.md).
+- Generate interfaces in Protocol independently of placement. The complete `[ApplicationHost]` generates per-operation callers and owned receivers; ordinary calls prefer Local and RunOnRole is reserved for a real execution requirement. See [unified architecture](../monica-application/references/03-unified-architecture.md) and [RPC generation](../monica-infra-messaging/references/rpc.md).
 - Do not add MVC `[Http*]`, `[Route]`, or `[From*]` attributes to generated `ApplicationService` endpoints. The request contract is the single endpoint authority.
 - Use transport-independent ApplicationService for use cases. `[ApiEndpoint(ApiHttpMethod, route)]` publishes a domain interface for UI and application callers while retaining HTTP metadata without exposing receivers. Unattributed requests and plain IRequestHandler remain internal mediator operations.
 - For capability setup and runtime behavior, use `$monica-infra-configuration`, `$monica-infra-jobs`, `$monica-infra-messaging`, and `$monica-infra-web` as applicable. This skill owns the application unit's shape and placement.
@@ -50,5 +50,5 @@ When adding or refactoring application EventBus events and consumers, including 
 ## Scope Notes
 
 - This skill is architecture-agnostic. It explains unit design, not solution topology.
-- Use `monica-application-microservice` to decide service splits, published-language layout, and migration project boundaries.
-- Use `monica-application-modular-monolith` to decide module splits, host composition, and cross-module contracts.
+- Use `monica-application-microservice` for split deployment and migration from legacy service hosts.
+- Use `monica-application-modular-monolith` for combined deployment and migration from merged legacy contexts.

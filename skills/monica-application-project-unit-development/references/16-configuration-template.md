@@ -1,6 +1,6 @@
 # Configuration Template
 
-Use `$DomainNamespace$` for the domain project namespace selected by the architecture skill, such as `OrderingService.Domain` or `Domains.Ordering`.
+Use `$DomainNamespace$` for the domain project namespace selected by the architecture skill, such as `Domains.Ordering`.
 
 ## Use When
 

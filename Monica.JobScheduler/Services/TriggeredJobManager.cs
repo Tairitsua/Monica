@@ -9,7 +9,7 @@ using Monica.Modules;
 namespace Monica.JobScheduler.Services;
 
 /// <summary>
-/// Admits local typed triggered jobs directly into the durable queue under this host's owner identity.
+/// Admits local typed triggered jobs directly into the durable queue under each definition's logical owner.
 /// </summary>
 internal sealed class TriggeredJobManager(
     IReadOnlyList<LocalJobDefinition> localDefinitions,
@@ -45,7 +45,7 @@ internal sealed class TriggeredJobManager(
         {
             InstanceId = instanceId,
             SchedulerScopeKey = schedulerOptions.SchedulerScopeKey,
-            OwnerKey = schedulerOptions.GetProjectName(),
+            OwnerKey = localDefinition.OwnerKey ?? schedulerOptions.GetProjectName(),
             JobKey = localDefinition.Declaration.JobKey,
             JobArgs = JsonSerializer.Serialize(args, schedulerOptions.JobArgsSerializerOptions),
             AvailableAtUtc = timeProvider.GetUtcNow().Add(delay ?? TimeSpan.Zero),

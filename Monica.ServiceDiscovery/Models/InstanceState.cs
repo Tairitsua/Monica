@@ -44,6 +44,16 @@ public class InstanceState
     /// </summary>
     public string? DomainName { get; set; }
 
+    /// <summary>Gets or sets the domains owned by this instance's selected roles. Empty for legacy registrations.</summary>
+    public List<string> DomainNames { get; set; } = [];
+
+    /// <summary>Gets or sets the exact application roles selected at host startup. This is observed placement, not a security boundary.</summary>
+    public List<string> RoleIds { get; set; } = [];
+
+    /// <summary>Returns selected domain identities, including the legacy singular registration field.</summary>
+    public IEnumerable<string> GetDomainNames() => DomainNames.Append(DomainName)
+        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Microservice build time stored in UTC.
     /// </summary>

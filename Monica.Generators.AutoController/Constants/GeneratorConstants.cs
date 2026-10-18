@@ -8,6 +8,10 @@ internal static class GeneratorConstants
     public const string HTTP_CONTRACT_ATTRIBUTE = "Monica.Application.Annotations.HttpApiContractAttribute";
     public const string APPLICATION_SERVICE_NAMESPACE = "Monica.Application.Abstractions";
     public const string GENERATED_CONTROLLER_NAMESPACE = "GeneratedControllers";
+    public const string APPLICATION_HOST_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationHostAttribute";
+    public const string APPLICATION_DOMAIN_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationDomainAttribute";
+    public const string APPLICATION_ROLE_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationRoleAttribute";
+    public const string RUN_ON_ROLE_ATTRIBUTE = "Monica.ApplicationModel.Annotations.RunOnRoleAttribute";
 
     public const int BINDING_AUTO = 0;
     public const int BINDING_QUERY = 1;

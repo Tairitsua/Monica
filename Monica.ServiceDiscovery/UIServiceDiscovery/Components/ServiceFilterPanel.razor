@@ -136,7 +136,7 @@
     protected override void OnParametersSet()
     {
         AllStatuses = Enum.GetValues<ServiceStatus>().ToList();
-        AllDomains = AllServices.Select(s => string.IsNullOrWhiteSpace(s.DomainName) ? L["Shared:Values:Unknown"].Value : s.DomainName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(d => d).ToList();
+        AllDomains = AllServices.SelectMany(s => s.GetDomainNames().DefaultIfEmpty(L["Shared:Values:Unknown"].Value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(d => d).ToList();
     }
 
     private async Task OnFilterTextChanged()

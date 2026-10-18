@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Monica.Authority\Monica.Authority.csproj" />
     <ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
+    <ProjectReference Include="..\Monica.ApplicationModel\Monica.ApplicationModel.csproj" />
     <ProjectReference Include="..\Monica.DependencyInjection\Monica.DependencyInjection.csproj" />
     <ProjectReference Include="..\Monica.EventBus\Monica.EventBus.csproj" />
   </ItemGroup>

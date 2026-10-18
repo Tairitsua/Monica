@@ -1,4 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Monica.ApplicationModel.Abstractions;
+using Monica.ApplicationModel.Annotations;
 using Monica.Core;
 using Monica.Core.Execution;
 using Monica.Core.Modularity;
@@ -28,6 +31,8 @@ public class ModuleUnitOfWork : MonicaModule<ModuleUnitOfWorkOption>
     /// <inheritdoc />
     public override void ConfigureServices(ModuleContext<ModuleUnitOfWorkOption> context)
     {
+        context.Services.AddSingleton(new ApplicationTransactionContexts(
+            Application.TypeActivation as IApplicationModel, Option.DomainDbContexts));
         context.Services.AddScoped<UnitOfWorkManager>();
         context.Services.AddScoped<IUnitOfWorkManager>(sp => sp.GetRequiredService<UnitOfWorkManager>());
         context.Services.AddScoped<DomainEventQueue>();
@@ -37,6 +42,7 @@ public class ModuleUnitOfWork : MonicaModule<ModuleUnitOfWorkOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
+        module.AfterIfPresent<ModuleApplicationModel, ModuleApplicationModelOption>();
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(UnitOfWorkExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork,
@@ -63,4 +69,20 @@ public class ModuleUnitOfWorkOption : ModuleOptions<ModuleUnitOfWork>
 {
     /// <summary>Maximum queued domain events per operation; defaults to 1024. Exceeding it aborts possible handler cycles.</summary>
     public int MaximumDomainEvents { get; set; } = 1024;
+
+    /// <summary>Maps persisted domains to their default write context. Empty retains standalone single-context selection.</summary>
+    /// <remarks>In a complete application, an unmapped domain has no implicit persistence participant. Explicit operation context selection takes precedence.</remarks>
+    public Dictionary<string, Type> DomainDbContexts { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>Selects a domain's primary transaction context, independently of the current AppId or active roles.</summary>
+    /// <remarks>Use the existing domain enum or its exact name. Register the context through Repository as well. History and multi-context operations select their contexts explicitly.</remarks>
+    public void ForDomain(object domain, Type dbContextType)
+    {
+        ArgumentNullException.ThrowIfNull(dbContextType);
+        if (!typeof(DbContext).IsAssignableFrom(dbContextType) || dbContextType.IsAbstract || dbContextType.ContainsGenericParameters)
+            throw new ArgumentException("A concrete DbContext type is required.", nameof(dbContextType));
+        var id = new ApplicationDomainAttribute(domain).DomainId;
+        if (!DomainDbContexts.TryAdd(id, dbContextType))
+            throw new InvalidOperationException($"Domain '{id}' already has a default transaction context.");
+    }
 }

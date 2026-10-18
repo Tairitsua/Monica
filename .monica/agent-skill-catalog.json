@@ -483,6 +483,7 @@
         ],
         "sourcePaths": [
           "Monica.Core",
+          "Monica.ApplicationModel",
           "Monica.DependencyInjection",
           "Monica.ServiceDiscovery",
           "Monica.StateStore",
@@ -810,7 +811,7 @@
   },
   "profiles": {
     "application": {
-      "description": "Build a Monica-based application without modifying the framework.",
+      "description": "Build a Monica application with the unified domain/role architecture; optionally include business UI.",
       "skills": {
         "required": [
           "monica-guide",

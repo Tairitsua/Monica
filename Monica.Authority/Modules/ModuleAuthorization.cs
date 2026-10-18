@@ -50,8 +50,7 @@ public static class ModuleAuthorizationBuilderExtensions
                 {
                     context.Services.AddSingleton<IPermissionChecker, PermissionChecker<TEnum>>();
                     context.Services.AddSingleton<IAuthorizationHandler, PolicyEnumPermissionRequirementHandler>();
-                })
-                .SatisfyFeature(ModuleAuthorization.DEFAULT_PERMISSION_FEATURE);
+                });
         }
 
         /// <summary>
@@ -91,8 +90,6 @@ public static class ModuleAuthorizationBuilderExtensions
 /// </summary>
 public class ModuleAuthorization : MonicaModule<ModuleAuthorizationOption>, IWebHostRequiredModule
 {
-    internal const string DEFAULT_PERMISSION_FEATURE = "default-permission-bit";
-
     public override void Describe(ModuleDescriptor module)
     {
         module.Require<ModuleLocalization, ModuleLocalizationOption>(

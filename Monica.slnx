@@ -12,11 +12,18 @@
   </Folder>
   <Folder Name="/examples/Monica.ReferenceApplication/">
     <Project Path="examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Monica.Reference.Api.csproj" />
-    <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Domains.Ordering.csproj" />
+    <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Domains.Ordering/Domains.Ordering.csproj" />
+    <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Roles.Ordering/Roles.Ordering.csproj" />
+    <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Roles.Ordering.Reporting/Roles.Ordering.Reporting.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj" />
-    <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Infrastructure/Platform.Infrastructure.csproj" />
+    <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Hosting/Platform.Hosting.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Protocol/Platform.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/tests/Fixtures/">
+    <Project Path="tests/Fixtures/ApplicationModel.Domain/ApplicationModel.Domain.csproj" />
+    <Project Path="tests/Fixtures/ApplicationModel.Role/ApplicationModel.Role.csproj" />
+    <Project Path="tests/Fixtures/ApplicationRpc.Role/ApplicationRpc.Role.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Test.Monica.Utilities/Test.Monica.Utilities.csproj" />
@@ -48,6 +55,8 @@
     <Project Path="tests/Test.Monica.AI/Test.Monica.AI.csproj" />
     <Project Path="tests/Test.Monica.AI.UI/Test.Monica.AI.UI.csproj" />
     <Project Path="tests/Test.Monica.Application/Test.Monica.Application.csproj" />
+    <Project Path="tests/Test.Monica.ApplicationModel/Test.Monica.ApplicationModel.csproj" />
+    <Project Path="tests/Test.Monica.ApplicationRpc/Test.Monica.ApplicationRpc.csproj" />
     <Project Path="tests/Test.Monica.Authority/Test.Monica.Authority.csproj" />
     <Project Path="tests/Test.Monica.Profiling/Test.Monica.Profiling.csproj" />
     <Project Path="tests/Test.Monica.OpenTelemetry/Test.Monica.OpenTelemetry.csproj" />
@@ -62,6 +71,7 @@
   <Project Path="Monica.AI/Monica.AI.csproj" />
   <Project Path="Monica.Application.UI/Monica.Application.UI.csproj" />
   <Project Path="Monica.Application/Monica.Application.csproj" />
+  <Project Path="Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
   <Project Path="Monica.Authority/Monica.Authority.csproj" />
   <Project Path="Monica.AutoModel/Monica.AutoModel.csproj" />
   <Project Path="Monica.Configuration.EfCore/Monica.Configuration.EfCore.csproj" />

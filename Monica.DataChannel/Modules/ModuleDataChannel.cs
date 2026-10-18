@@ -54,11 +54,15 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
     public override void ConfigureApplicationBuilder(WebModuleContext<ModuleDataChannelOption> context)
     {
         var app = context.ApplicationBuilder;
-        var setup = app.ApplicationServices.GetRequiredService<IDataChannelSetup>();
+        var setups = app.ApplicationServices.GetServices<IDataChannelSetup>();
         var registrar = app.ApplicationServices.GetRequiredService<IDataChannelRegistrar>();
         var runtime = app.ApplicationServices.GetRequiredService<DataChannelRuntime>();
 
-        setup.Setup(registrar);
+        foreach (var setup in setups)
+        {
+            setup.Setup(registrar);
+        }
+
         runtime.Materialize(app);
     }
 
@@ -154,15 +158,21 @@ public static class ModuleDataChannelBuilderExtensions
     extension(ModuleRegistration<ModuleDataChannel, ModuleDataChannelOption> registration)
     {
         /// <summary>
-        /// Registers the singleton setup that declares all pipelines owned by the current host.
+        /// Adds a singleton setup that contributes pipelines owned by the current host.
         /// </summary>
         /// <typeparam name="TSetup">The host-owned pipeline setup.</typeparam>
         /// <returns>The same host-bound registration.</returns>
+        /// <remarks>
+        /// Setups run once per implementation type in registration order before any pipeline is materialized.
+        /// Repeated calls for the same setup type have no additional effect. Channel identifiers must be unique
+        /// across every setup contributed to the host.
+        /// </remarks>
         public ModuleRegistration<ModuleDataChannel, ModuleDataChannelOption> UseSetup<TSetup>()
             where TSetup : class, IDataChannelSetup
         {
             return registration
-                .ConfigureServices(context => context.Services.AddSingleton<IDataChannelSetup, TSetup>())
+                .ConfigureServices(context => context.Services.TryAddEnumerable(
+                    ServiceDescriptor.Singleton<IDataChannelSetup, TSetup>()))
                 .SatisfyFeature(ModuleDataChannel.CHANNEL_SETUP_FEATURE);
         }
     }

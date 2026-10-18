@@ -6,6 +6,7 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Services.Support;
 using Monica.Core.TypeDiscovery.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -45,6 +46,7 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
             {
                 foreach (var match in matches)
                 {
+                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.RequestHandler) == false) continue;
                     RegisterRequestHandlers(context.Registrations, match);
                 }
             });

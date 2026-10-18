@@ -305,22 +305,6 @@ else
                             }
                         </div>
                     </div>
-                    <div class="field">
-                        <label>@Session.T("ws-architecture")</label>
-                        <div class="option-grid">
-                            @foreach (var architecture in Architectures)
-                            {
-                                var selected = SelectedArchitecture == architecture;
-                                <label class="option-card @(selected ? "selected" : null)">
-                                    <input type="radio" name="ws-arch" checked="@selected"
-                                           @onchange="() => SelectedArchitecture = architecture"/>
-                                    <span class="option-main">
-                                        <span class="option-title">@architecture</span>
-                                    </span>
-                                </label>
-                            }
-                        </div>
-                    </div>
                 }
                 <div class="actions" style="margin-top:0">
                     <button class="btn btn-primary" disabled="@(Busy || Inspecting || SelectedProfile is null)" @onclick="InitPreviewAsync">
@@ -388,7 +372,6 @@ else
     private IJSRuntime Js { get; set; } = default!;
 
     private static readonly string[] Profiles = ["application", "extension-author", "framework-contributor"];
-    private static readonly string[] Architectures = ["microservice", "modular-monolith"];
     private static readonly GuideIssueReportingMode[] IssueModes =
         [GuideIssueReportingMode.Prepare, GuideIssueReportingMode.Ask, GuideIssueReportingMode.Never];
 
@@ -557,14 +540,10 @@ else
             SelectedProfile = configured;
         }
 
-        SelectedArchitecture = Detection?.ConfiguredCapabilities?
-            .FirstOrDefault(capability => Architectures.Contains(capability));
         ApplicationWithUI = Detection?.ConfiguredCapabilities?.Contains("ui") == true;
     }
 
     private string? SelectedProfile { get; set; }
-
-    private string? SelectedArchitecture { get; set; }
 
     private bool ApplicationWithUI { get; set; }
 
@@ -624,7 +603,6 @@ else
         Detection = null;
         ValidationError = null;
         SelectedProfile = null;
-        SelectedArchitecture = null;
         ApplicationWithUI = false;
         ConfirmingProfile = false;
         Closure = null;
@@ -692,10 +670,6 @@ else
     private void SelectProfile(string profile)
     {
         SelectedProfile = profile;
-        if (profile != "application")
-        {
-            SelectedArchitecture = null;
-        }
     }
 
     private async Task InitPreviewAsync()
@@ -704,12 +678,6 @@ else
         if (SelectedProfile is null)
         {
             ValidationError = Session.T("ws-profile-required");
-            return;
-        }
-
-        if (SelectedProfile == "application" && SelectedArchitecture is null)
-        {
-            ValidationError = Session.T("ws-architecture-required");
             return;
         }
 
@@ -824,13 +792,11 @@ else
     private IReadOnlyList<string> CapabilitiesForInit()
     {
         var capabilities = Detection is { } detection && detection.ConfiguredProfile == SelectedProfile
-            ? detection.ConfiguredCapabilities?.Where(capability => !Architectures.Contains(capability)
-                && (SelectedProfile != "application" || capability != "ui")).ToList() ?? []
+            ? detection.ConfiguredCapabilities?.Where(capability => SelectedProfile != "application" || capability != "ui").ToList() ?? []
             : [];
-        if (SelectedProfile == "application" && SelectedArchitecture is not null)
+        if (SelectedProfile == "application" && ApplicationWithUI)
         {
-            capabilities.Add(SelectedArchitecture);
-            if (ApplicationWithUI) capabilities.Add("ui");
+            capabilities.Add("ui");
         }
 
         return capabilities;

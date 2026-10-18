@@ -274,7 +274,7 @@
             }
 
             _allServices = services ?? [];
-            var currentDomains = _allServices.Select(GetServiceDomainName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var currentDomains = _allServices.SelectMany(GetServiceDomainNames).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (_allDomainsSelected)
             {
                 _selectedDomains = currentDomains;
@@ -329,7 +329,7 @@
                 
             // Domain filter
             var serviceDomain = GetServiceDomainName(service);
-            if (!_selectedDomains.Contains(serviceDomain, StringComparer.OrdinalIgnoreCase))
+            if (!GetServiceDomainNames(service).Any(domain => _selectedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase)))
                 return false;
                 
             // Text filter
@@ -538,7 +538,7 @@
         {
             var domainName = GetServiceDomainName(service);
             _allDomainsSelected = false;
-            _selectedDomains = new HashSet<string> { domainName };
+            _selectedDomains = GetServiceDomainNames(service).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _showFilterPanel = true;
             await ApplyFilters();
             if (!_disposed) Snackbar.Add(L["ServiceGraph:Messages:FilteredDomain", domainName].Value, Severity.Info);
@@ -562,7 +562,7 @@
         _filterText = string.Empty;
         _allDomainsSelected = true;
         _selectedStatuses = new HashSet<ServiceStatus>(Enum.GetValues<ServiceStatus>());
-        var allDomains = _allServices.Select(GetServiceDomainName).Distinct().ToList();
+        var allDomains = _allServices.SelectMany(GetServiceDomainNames).Distinct().ToList();
         _selectedDomains = new HashSet<string>(allDomains);
         _showOnlyWithInstances = false;
         await SynchronizeSearchAndApplyFiltersAsync();
@@ -597,7 +597,10 @@
     }
 
     private string GetServiceDomainName(RegisteredServiceStatus service)
-        => string.IsNullOrWhiteSpace(service.DomainName) ? L["Shared:Values:Unknown"].Value : service.DomainName;
+        => string.Join(", ", GetServiceDomainNames(service));
+
+    private IEnumerable<string> GetServiceDomainNames(RegisteredServiceStatus service)
+        => service.GetDomainNames().DefaultIfEmpty(L["Shared:Values:Unknown"].Value);
 
     private object GetGraphTexts() => new
     {

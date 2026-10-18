@@ -4,7 +4,7 @@ Application UI is the presentation boundary of the existing DDD application. It 
 
 ## Default solution layout
 
-The default profile is Interactive Server Blazor. Extend the selected backend architecture profile with one presentation library per product, not one library per domain:
+The default profile is Interactive Server Blazor. Extend the unified domain/role application with one presentation library per product, not one library per domain:
 
 ```text
 src/
@@ -24,9 +24,9 @@ src/
 │   ├── Components/              # Shared within this product
 │   ├── Localization/
 │   └── wwwroot/
-├── Domains/                     # Or the adopted microservice topology
+├── Domains/                     # Domain cores and domain-owned role libraries
 └── Shared/
-    ├── Platform.Infrastructure/
+    ├── Platform.Hosting/
     ├── Platform.Protocol/
     │   └── PublishedLanguages/DomainDelivery/{Requests,Models}/
     └── Platform.BuildingBlocks/
@@ -38,9 +38,9 @@ Create only useful folders. Host names are illustrative; an existing executable 
 | --- | --- |
 | AppHost | Its adopted backend composition and product presentation |
 | Presentation | Platform.Protocol and selected Monica UI/component packages |
-| Backend projects | The existing architecture profile's dependency chain |
+| Backend projects | The unified domain/role dependency graph |
 
-The explicit new edges are `AppHost -> Presentation` and `Presentation -> Platform.Protocol`. Presentation must not reference `Domains.*`, backend service implementations, or `Platform.Infrastructure`. Backend projects must not reference presentation. Public CLR visibility does not authorize consuming entities, DbContexts, repositories or handler implementations from UI.
+The explicit new edges are `AppHost -> Presentation` and `Presentation -> Platform.Protocol`. Presentation must not reference `Domains.*`, `Roles.*`, backend service implementations, or `Platform.Hosting`. Backend projects must not reference presentation. Public CLR visibility does not authorize consuming entities, DbContexts, repositories or handler implementations from UI.
 
 Backend shared-project closures can include server libraries. This first profile therefore does not claim WebAssembly compatibility. A browser client requires a separate compatible contract closure or generated DTO/client boundary. A separate server UI uses published HTTP APIs; it does not load remote backend implementations. Do not add a BFF, client-abstraction project or independent deployment without an actual consumer need.
 

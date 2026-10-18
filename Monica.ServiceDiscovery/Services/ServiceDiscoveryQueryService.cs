@@ -173,7 +173,7 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
 
         return services
             .Where(service =>
-                string.Equals(service.DomainName, domainName, StringComparison.OrdinalIgnoreCase) ||
+                service.BelongsToDomain(domainName) ||
                 service.DependentSubDomains?.Contains(domainName, StringComparer.OrdinalIgnoreCase) == true)
             .ToList();
     }
@@ -190,6 +190,8 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
                     AppId = firstInstance.AppId,
                     AppName = firstInstance.AppName,
                     DomainName = firstInstance.DomainName,
+                    DomainNames = group.SelectMany(instance => instance.GetDomainNames()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+                    RoleIds = group.SelectMany(instance => instance.RoleIds).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
                     ProjectName = firstInstance.ProjectName,
                     DependentSubDomains = firstInstance.DependentSubDomains?.ToList(),
                     Instances = group.ToDictionary(

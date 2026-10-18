@@ -41,6 +41,7 @@
       "Updating": "Updating"
     },
     "Values": {
+      "Roles": "Observed roles",
       "NotAvailable": "Not available",
       "NotSet": "Not set",
       "NotSpecified": "Not specified",

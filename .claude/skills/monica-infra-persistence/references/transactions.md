@@ -37,6 +37,22 @@ The execution adapters choose these defaults:
 | Seeder or hosted-service work item | `Automatic` |
 | Hosted-service start/stop lifecycle | `None` |
 
+## Domain defaults in a complete application
+
+When `AddApplicationModel` is present, select each persisted domain's primary context through the UnitOfWork options:
+
+```csharp
+monica.AddUnitOfWork(options =>
+{
+    options.ForDomain(ProductDomain.Ordering, typeof(OrderingDbContext));
+    options.ForDomain(ProductDomain.Inventory, typeof(InventoryDbContext));
+});
+```
+
+Each context must be registered with Repository and belong to the declared domain core assembly. The framework freezes this mapping and selects the current operation's domain from the application manifest or its component assembly. It does not use the host's AppId or a global `BelongToDomain`. Domains without a mapping have no implicit persistence participant. Standalone hosts without the application model retain the single registered write-context behavior.
+
+Explicit `ExecutionTransaction.DbContextTypes` and execution-scope options take precedence. History and intentional same-connection multi-context operations use that explicit selection. Nested ordinary calls join the existing operation and do not switch its transaction. Access to another database does not make it an atomic participant; writes outside the selected transaction remain rejected by the existing persistence guard. Use independent operation scopes and explicit coordination when separate databases must commit independently.
+
 ## One declaration for an override
 
 Use `ExecutionTransactionAttribute` from `Monica.Core.Execution` on the **concrete execution method** when its default needs to change. Request types, handler classes, and controller classes do not carry transaction metadata. The execution descriptor resolves the method declaration once; all adapters use that policy.

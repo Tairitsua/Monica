@@ -184,7 +184,7 @@ public sealed class GuideWorkspaceTests
     }
 
     [Fact]
-    public async Task Init_RequiresExplicitProfileAndCapabilities()
+    public async Task Init_RequiresExplicitProfileAndAcceptsUnifiedApplicationWithoutArchitectureChoice()
     {
         using var fixture = new WorkspaceFixture();
         var service = fixture.CreateService();
@@ -202,14 +202,20 @@ public sealed class GuideWorkspaceTests
 
         var withoutArchitecture = await service.InitAsync(
             fixture.InitRequest(profile: "application"), cancellationToken: CancellationToken);
-        Assert.Equal(GuideStatus.Error, withoutArchitecture.Status);
-        Assert.Contains(withoutArchitecture.Checks, check => check.Id == "workspace.capabilities");
+        Assert.NotEqual(GuideStatus.Error, withoutArchitecture.Status);
+        Assert.NotNull(withoutArchitecture.Plan?.PlanDigest);
+        Assert.DoesNotContain(withoutArchitecture.Checks, check => check.Id == "workspace.capabilities");
 
-        var conflicting = await service.InitAsync(
+        var legacyDeploymentHints = await service.InitAsync(
             fixture.InitRequest(profile: "application", capability: "microservice", second: "modular-monolith"),
             cancellationToken: CancellationToken);
-        Assert.Contains(conflicting.Checks, check =>
-            check.Id == "workspace.capabilities" && check.Status == GuideCheckStatus.Error);
+        Assert.NotEqual(GuideStatus.Error, legacyDeploymentHints.Status);
+        Assert.DoesNotContain(legacyDeploymentHints.Checks, check => check.Id == "workspace.capabilities");
+
+        var withUi = await service.InitAsync(
+            fixture.InitRequest(profile: "application", capability: "ui"), cancellationToken: CancellationToken);
+        Assert.NotEqual(GuideStatus.Error, withUi.Status);
+        Assert.NotNull(withUi.Plan?.PlanDigest);
     }
 
     [Fact]

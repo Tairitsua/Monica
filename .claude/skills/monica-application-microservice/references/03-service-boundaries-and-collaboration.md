@@ -1,56 +1,9 @@
-# Service Boundaries and Collaboration
+# Split placement boundaries and consistency
 
-Use these rules to keep the microservice architecture from collapsing into a distributed monolith.
+[Unified architecture](../../monica-application/references/03-unified-architecture.md) defines the same dependency graph in combined and split deployments. A role references its own domain core and shared contracts, never peer domain or role implementations. Business collaboration uses published APIs; same-domain shared invariants stay in the domain core.
 
-## Ownership
+Keep every domain's repositories and contexts domain-owned. Current AppId and role selection do not choose the database. Ordinary local operations need their passive domain dependencies on every business process; role activation is not an isolation boundary for database credentials.
 
-- One subdomain service owns one business capability area and its persistence model.
-- A service may expose contracts, but it does not expose its internal repository or infrastructure code.
-- A service should not read or write another service's tables directly.
+A remote operation has a separate execution scope and transaction. Several physical stores do not become atomic when co-located. Use explicit non-atomic coordination or durable messaging for independent stores. Route before invocation; a failed delivery must not fall back to executing on another process because the first attempt may have changed state.
 
-## Dependency Direction
-
-- `{Subdomain}Service.API` references only `{Subdomain}Service.Domain`.
-- `{Subdomain}Service.Domain` references only `Shared/Platform.Infrastructure/Platform.Infrastructure.csproj` from the shared platform chain.
-- `Shared/Platform.Infrastructure/Platform.Infrastructure.csproj` references only `Shared/Platform.Protocol/Platform.Protocol.csproj`.
-- `Shared/Platform.Protocol/Platform.Protocol.csproj` references only `Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj`.
-- Business code consumes `Platform.Protocol/PublishedLanguages` contracts through the adopted project chain; this does not authorize extra direct project references that bypass it.
-- A service's `Domain` stays private to that service.
-- Cross-service collaboration happens through published requests, models, events, or explicitly chosen service interfaces.
-
-## Library Reference Placement
-
-- Put project-common library references in `Shared/Platform.BuildingBlocks`, such as shared Monica framework bundles or third-party extensions used by multiple services.
-- Put service-only package references in the owning `{Subdomain}Service.Domain` project.
-- Do not move a service-only repository implementation or adapter into shared `Platform` only to host its package references. `Platform.Infrastructure` is for cross-cutting solution wiring, not service ownership transfer.
-- Keep the solution-project chain strict even when the service domain has extra local package references.
-
-```mermaid
-flowchart LR
-    Gateway["AppHost / Gateway<br/>optional composition"] --> Api["{Subdomain}Service.API<br/>delivery adapters"]
-    Api --> Domain["{Subdomain}Service.Domain<br/>business model + repository"]
-    Domain --> PlatformInfra["Platform.Infrastructure<br/>solution wiring layer"]
-    PlatformInfra --> Protocol["Platform.Protocol<br/>PublishedLanguages"]
-    Protocol --> BuildingBlocks["Platform.BuildingBlocks<br/>project-common libraries"]
-
-    Domain -. "service-only packages" .-> DomainOnlyLib["Service-local packages"]
-    OtherService["Other Services"] -. "published contracts only" .-> Protocol
-    BuildingBlocks --> CommonLib["Common libraries<br/>example: Monica.Framework"]
-```
-
-## Practical Boundaries
-
-- Use a new service when the business capability has distinct language, lifecycle, or data ownership.
-- Stay within the existing service when the new feature is just another use case inside the same subdomain.
-- Avoid splitting a service solely by CRUD screens, endpoint count, or team preference.
-
-## Adapter Rule
-
-- The service `API` project and host entry points are delivery mechanisms.
-- AppHost or gateway projects are composition-only. Modules and registration/host adapters may organize that composition; they do not own business behavior.
-- They do not replace `ApplicationService`, `DomainService`, `Entity`, `Repository`, or other ProjectUnits.
-
-## Solution View
-
-- Keep `.slnx` folders aligned with the real `src/AppHost`, `src/Shared`, `src/Services`, and `src/Migrations` layout.
-- Do not flatten services or migrations in the solution view in a way that hides service ownership boundaries.
+Keep real migrations in top-level `Migrations.Domain{Domain}` projects. Preserve current/history migration chains, issued identities and shared-table ownership; do not create migrations per role. Design-time factories and MigrationRunner do not start business workloads. Use [persistence](../../monica-infra-persistence/SKILL.md) and [messaging](../../monica-infra-messaging/SKILL.md) for provider mechanics.

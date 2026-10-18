@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Execution;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.Core.Mediator;
 
@@ -62,6 +63,7 @@ public sealed class Mediator(
     private async Task<TResponse> Execute<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         where TRequest : IRequest<TResponse>
     {
+        serviceProvider.GetService<ITypeActivationPolicy>()?.EnsureCanExecuteRequest(typeof(TRequest));
         var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
         var handlerType = handler.GetType();
         var readOnly = readOnlyConventions.Any(convention => convention.IsReadOnly(typeof(TRequest)));

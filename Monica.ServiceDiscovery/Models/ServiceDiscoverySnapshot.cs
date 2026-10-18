@@ -12,6 +12,8 @@ public static class ServiceDiscoverySnapshot
         AppId = source.AppId,
         AppName = source.AppName,
         DomainName = source.DomainName,
+        DomainNames = source.DomainNames.ToList(),
+        RoleIds = source.RoleIds.ToList(),
         ProjectName = source.ProjectName,
         DependentSubDomains = source.DependentSubDomains?.ToList(),
         Instances = source.Instances.ToDictionary(pair => pair.Key, pair => Copy(pair.Value), source.Instances.Comparer),
@@ -30,6 +32,7 @@ public static class ServiceDiscoverySnapshot
     {
         AppId = source.AppId, InstanceId = source.InstanceId, AppName = source.AppName,
         ProjectName = source.ProjectName, DomainName = source.DomainName,
+        DomainNames = source.DomainNames.ToList(), RoleIds = source.RoleIds.ToList(),
         Status = source.Status, IsLeader = source.IsLeader, BuildTime = source.BuildTime,
         AssemblyVersion = source.AssemblyVersion, ReleaseVersion = source.ReleaseVersion,
         RegistrationTime = source.RegistrationTime, LastHeartbeatTime = source.LastHeartbeatTime,

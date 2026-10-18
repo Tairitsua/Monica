@@ -11,11 +11,11 @@ Use focused direct or raw ProjectUnit tests only when host composition adds no r
 Name the runnable project `Test.` plus the exact production project stem. Keep its folder, project file, assembly, and root namespace identical.
 
 ```text
-Test.UserService.API/
-  Test.UserService.API.csproj
+Test.Roles.User/
+  Test.Roles.User.csproj
   GlobalUsings.cs
   Factories/
-    UserServiceTestApplicationFactory.cs
+    UserRoleTestApplicationFactory.cs
   HandlersCommand/
   HandlersQuery/
   DomainServices/
@@ -27,7 +27,7 @@ Test.UserService.API/
   TestData/
 ```
 
-Do not shorten suffixes such as `.API`, `.Domain`, `.Infrastructure`, `.Adaptor`, or `.WebAPI`.
+Use Test.Roles.User for Roles.User behavior and Test.Domains.User for domain-core behavior; retain the exact production stem for existing projects too.
 
 ## Factory Rules
 
@@ -92,7 +92,7 @@ Two trait keys are reserved for linking test classes into the ProjectUnit chain:
 
 ```csharp
 [Trait("REQ", "FIPS-REQ-FLIGHT-20260920-531942")]
-[Trait("Unit", "src/Services/Flight/FlightService.API/FlightService.API.csproj::Fips.Flight.FlightPlan.FlightPlanAppService")]
+[Trait("Unit", "src/Domains/Flight/Roles.Flight/Roles.Flight.csproj::Roles.Flight.HandlersCommand.CommandHandlerUpdateFlight")]
 public sealed class FlightPlanAppServiceTests
 {
     [Fact]

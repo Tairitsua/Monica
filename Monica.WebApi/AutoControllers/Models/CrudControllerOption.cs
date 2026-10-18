@@ -8,6 +8,11 @@ public class CrudControllerOption
     /// <summary>
     /// Route prefix used for auto-generated CRUD endpoints.
     /// </summary>
+    /// <remarks>
+    /// Defaults to <c>api/v1/[controller]</c>. With AddApplicationModel, <c>{domain}</c> expands to each
+    /// concrete controller's owning domain. For example, <c>api/v1/{domain}</c> yields a distinct prefix per
+    /// domain in a complete application host. An explicit controller Route attribute overrides this prefix.
+    /// </remarks>
     public string RoutePath { get; set; } = "api/v1/[controller]";
     /// <summary>
     /// Class-name suffix stripped from a CRUD application service when deriving its controller (route) name.

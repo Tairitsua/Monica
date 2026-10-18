@@ -2,7 +2,9 @@
 
 Use DataChannel for a named pipeline whose two ends and middleware are owned by one running host. The Web host must call `app.UseMonica()` and `app.MapMonica()` after building the app.
 
-`monica.AddDataChannel().UseSetup<TSetup>()` needs an ASP.NET Core web host and a singleton `IDataChannelSetup`. The setup calls `IDataChannelRegistrar.Add` once per pipeline. Every pipeline has a unique ID and an outer endpoint; the inner endpoint defaults to `DefaultChannelEndpoint`. Registration closes after startup materialization. Runtime callers inject `IDataChannelManager`, fetch a host-owned channel, and call its send method.
+`monica.AddDataChannel().UseSetup<TSetup>()` needs an ASP.NET Core web host and one or more singleton `IDataChannelSetup` contributors. Chain `UseSetup<TSetup>()` calls to compose pipelines from several selected integrations. Each distinct setup type runs once, in registration order, during `app.UseMonica()`; registering the same type again has no additional effect. All setups finish before any pipeline is materialized or initialized. A host selecting role-owned connectors contributes only those roles' setup types through this same API; no combined wrapper setup is required.
+
+Each setup calls `IDataChannelRegistrar.Add` once per pipeline. Pipeline IDs must be unique across all setups in the host; duplicates fail during setup before materialization. Every pipeline needs an outer endpoint; the inner endpoint defaults to `DefaultChannelEndpoint`. Registration closes after startup materialization. Runtime callers inject `IDataChannelManager`, fetch a host-owned channel, and call its send method.
 
 ```csharp
 public sealed class OrderChannelSetup : IDataChannelSetup
@@ -86,4 +88,4 @@ channels.Add("messages", pipeline => pipeline
 
 These transports do not provide a durable queue or a receipt protocol.
 
-Source and behavioral checks: `Monica.DataChannel/Modules/ModuleDataChannel.cs`, `Monica.DataChannel/Abstractions/IDataChannelRegistrar.cs` and `IDataChannelManager.cs`, `Monica.DataChannel/DataChannel.cs`, `Monica.DataChannel/Pipeline/ChannelPipeline.cs`, `Monica.DataChannel/Pipeline/TransientProxy.cs`, `Monica.DataChannel/Facades/DataChannelFacade.cs`, `Monica.DataChannel/Middlewares/MessageDebuggerMiddleware.cs`, `Monica.DataChannel/Providers/Kafka/KafkaOptions.cs`, the `Providers/TCP`, `Providers/UDP`, and `Providers/Serial` implementations, and the real-host scenarios under `tests/Test.Monica.DataChannel/`, including `Pipeline/ChannelPipelineTests.cs` and `Providers/TransportEndpointTests.cs`.
+Source and behavioral checks: `Monica.DataChannel/Modules/ModuleDataChannel.cs`, `Monica.DataChannel/Abstractions/IDataChannelSetup.cs`, `IDataChannelRegistrar.cs` and `IDataChannelManager.cs`, `Monica.DataChannel/DataChannel.cs`, `Monica.DataChannel/Pipeline/ChannelPipeline.cs`, `Monica.DataChannel/Pipeline/TransientProxy.cs`, `Monica.DataChannel/Facades/DataChannelFacade.cs`, `Monica.DataChannel/Middlewares/MessageDebuggerMiddleware.cs`, `Monica.DataChannel/Providers/Kafka/KafkaOptions.cs`, the `Providers/TCP`, `Providers/UDP`, and `Providers/Serial` implementations, and the real-host scenarios under `tests/Test.Monica.DataChannel/`, including `Modules/ModuleDataChannelTests.cs`, `Pipeline/ChannelPipelineTests.cs` and `Providers/TransportEndpointTests.cs`.

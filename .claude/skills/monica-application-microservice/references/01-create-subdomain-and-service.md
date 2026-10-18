@@ -1,84 +1,20 @@
-# Create a New Subdomain Service
+# Migrate an existing service
 
-Use this workflow when adding a new business capability that deserves its own service boundary.
+The target is the [unified domain/role model](../../monica-application/references/03-unified-architecture.md). Do not create another `{Domain}Service.API` recipe for new work.
 
-## Step 1. Name the subdomain
+Map existing responsibilities before moving files:
 
-- Choose a business name first, such as `Ordering`, `Billing`, or `Warehouse`.
-- Use that name consistently for:
-  - `Domain{Subdomain}` in `Platform.Protocol/PublishedLanguages`
-  - `{Subdomain}Service.API`
-  - `{Subdomain}Service.Domain`
-  - `Migrations/{Subdomain}`
+| Existing owner | Target owner |
+| --- | --- |
+| Domain model, repositories, contexts and shared rules | `Domains/{Domain}/Domains.{Domain}` |
+| API handlers and ordinary application behavior | `Domains/{Domain}/Roles.{Domain}` |
+| Connector, Actor, realtime or other independently activated responsibility | A justified `Roles.{Domain}.{Purpose}` library |
+| Product provider/bootstrap defaults | `Shared/Platform.Hosting` |
+| Native composition and generated callers/local receivers | `AppHost/{Product}.Host` or a justified specialized host artifact |
+| Actual domain migrations and context factories | `Migrations/Migrations.Domain{Domain}` |
 
-## Step 2. Create the shared contract area
+Role libraries have no Program.cs. Keep role integrations inside their owning role rather than top-level Adapters. Reuse the existing domain identifier authority and preserve the strict published-language namespace. A specialized role does not create another business domain or database.
 
-Create:
+Preserve HTTP paths, AppIds, topics, hub paths, Actor identities, scheduler keys and durable subscriber identities, or record the explicit migration. Add assembly domain/role declarations and generate the shared ownership catalog where selective artifacts need it, and let each ApplicationHost record its actual local implementation inventory. Preserve stateful integration semantics: co-location does not authorize bypassing an Actor proxy or product primary-node policy.
 
-```text
-src/Shared/Platform.Protocol/PublishedLanguages/Domain{Subdomain}/
-├── Requests/
-├── Models/
-├── Events/
-├── Contracts/        # only if checked-in synchronous service-to-service contracts are required
-└── Implementations/
-    ├── Http/         # only if wrapping or extending the generated HTTP RPC clients
-    └── Local/        # only if local or actor-backed providers are shared intentionally
-```
-
-Rules:
-
-- Put only stable cross-service contracts here.
-- Add `[ApiEndpoint]` only to `Command*` or `Query*` requests that are callable endpoints. Shared DTOs, events, and non-endpoint language stay unattributed.
-- Add the analyzer to Protocol for stable interfaces. Select caller adapters with ApplicationApiGenerationConfig in the host, not Protocol. See [RPC generation](../../monica-infra-messaging/references/rpc.md).
-- Put checked-in synchronous abstractions in `Contracts/`.
-- Put checked-in shared providers in `Implementations/Local/` or deliberate wrappers in `Implementations/Http/`.
-- Do not copy entity types into this area.
-
-## Step 3. Create the service pair
-
-Create:
-
-```text
-src/Services/{Subdomain}/
-├── {Subdomain}Service.API/
-│   ├── Program.cs
-│   ├── HandlersCommand/
-│   ├── HandlersQuery/
-│   ├── HandlersEvent/
-│   └── BackgroundWorkers/
-├── {Subdomain}Service.Domain/
-│   ├── Entities/
-│   ├── ValueObjects/
-│   ├── DomainServices/
-│   ├── Events/
-│   ├── Interfaces/
-│   ├── Configurations/
-│   ├── Utilities/
-│   └── Repository/
-```
-
-Use `monica-application-project-unit-development` to fill the correct ProjectUnits inside those projects.
-
-- Keep pure helpers in `{Subdomain}Service.Domain/Utilities/` and name them `Utils*`.
-- Keep repository implementations, `DbContext`, and EF mapping in `{Subdomain}Service.Domain/Repository/`.
-- Use the strict solution-project reference chain `{Subdomain}Service.API -> {Subdomain}Service.Domain -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`.
-- Keep private HTTP request wire settings in HttpApiContract with the owning DomainName. Configure receiver publication in the host and select referenced handler assemblies explicitly.
-- Co-locate a service-private request and response with its handler by default. Give the request `[ApiEndpoint]`; keep all HTTP verb, route, binding, and XML-summary metadata off the handler.
-
-## Step 4. Add persistence ownership
-
-- If the new service owns data, create or extend its migration project under `src/Migrations/{Subdomain}/`.
-- Keep each service responsible for its own persistence model and migrations.
-
-## Step 5. Wire the host and update the solution
-
-- Register the service in the solution's host or gateway `Program.cs`.
-- Keep the service's local-request generation config in `{Subdomain}Service.API/Program.cs`, even if the solution also has a gateway or AppHost.
-- Register `monica.AddConfiguration()` in the service host's `builder.AddMonica(...)` callback. If later module options need bootstrap values, read them directly from `builder.Configuration`; do not resolve runtime Configuration ProjectUnits during composition.
-- Keep orchestration metadata outside the domain projects.
-- Keep `.slnx` folders aligned with `src/AppHost`, `src/Shared`, `src/Services`, and `src/Migrations`.
-
-## Decision Rule
-
-Create a new service only when the subdomain owns distinct business capability and data. Do not create a service just because a new HTTP endpoint appeared.
+Separate passive registration needed by ordinary local calls from selected active connections/subscriptions. Verify an included ordinary operation from an inactive role, an omitted published operation routed to its known remote owner, selected autonomous activation and required-role routing before switching production placement. Reconcile the project specification with the adopted graph and remaining migration gaps.

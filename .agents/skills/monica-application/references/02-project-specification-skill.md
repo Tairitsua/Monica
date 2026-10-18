@@ -4,12 +4,12 @@ Use a repository-owned `<project>-application-spec` skill for the application ar
 
 ## Required Contract
 
-The entrypoint activates for design, implementation, refactoring, and review of that application. It requires `$monica-application`, states which architecture profile is adopted, and routes directly to the relevant local references. Direct invocation of either skill still loads both. Keep universal guidance in the shared skills instead of reproducing it locally.
+The entrypoint activates for design, implementation, refactoring, and review of that application. It requires `$monica-application`, states the unified architecture and actual deployment placement, and routes directly to the relevant local references. Direct invocation of either skill still loads both. Keep universal guidance in the shared skills instead of reproducing it locally.
 
 Local references own:
 
 - For applications with UI: presentation projects, task features, layout/navigation, invocation profile, caller/tenant context, and contract-only references. The same project specification owns backend and UI.
-- The actual macro view: hosts, domains/services, shared projects, their responsibilities, and dependency direction. Distinguish code facts from approved target intent.
+- The actual macro view: business host artifacts and their local implementation sets, generated ownership catalog where needed, domain cores, role libraries, AppId placement, shared projects, persistence/migration owners and dependency direction. Distinguish code facts from approved target intent.
 - Concrete local conventions: namespaces, placement, metadata language and requirement source, public/internal boundaries, and approved extension families with their consumers and lifecycle.
 - Deliberate deviations: shared rule, precise scope, rationale, human approval evidence, and any conditions.
 - Validation: repository commands and focused behavioral checks for its adopted patterns.

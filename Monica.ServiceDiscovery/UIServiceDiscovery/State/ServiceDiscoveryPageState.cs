@@ -45,7 +45,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
             CapturedAt = DateTime.UtcNow;
             ErrorMessage = null;
             if (_allDomainsSelected)
-                SelectedDomains = Services.Select(GetServiceDomainName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.OrdinalIgnoreCase);
             ApplyFilters();
             return result;
         }
@@ -67,7 +67,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public void SelectAllDomains()
     {
         _allDomainsSelected = true;
-        SelectedDomains = Services.Select(GetServiceDomainName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     public void ApplyFilters()
@@ -75,13 +75,13 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
         var query = FilterText.Trim();
         FilteredServices = Services.Where(service =>
             SelectedStatuses.Contains(service.OverallStatus) &&
-            SelectedDomains.Contains(GetServiceDomainName(service)) &&
+            GetServiceDomainNames(service).Any(SelectedDomains.Contains) &&
             (!ShowOnlyWithInstances || service.TotalInstanceCount > 0) &&
             (query.Length == 0 || service.AppName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
              service.AppId.Contains(query, StringComparison.OrdinalIgnoreCase) ||
              service.ProjectName?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
-             GetServiceDomainName(service).Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
+             GetServiceDomainNames(service).Any(domain => domain.Contains(query, StringComparison.OrdinalIgnoreCase)))).ToList();
     }
 
-    private string GetServiceDomainName(RegisteredServiceStatus service) => string.IsNullOrWhiteSpace(service.DomainName) ? UnknownDomainLabel : service.DomainName;
+    private IEnumerable<string> GetServiceDomainNames(RegisteredServiceStatus service) => service.GetDomainNames().DefaultIfEmpty(UnknownDomainLabel);
 }

@@ -2,7 +2,7 @@
 
 ## Adopted Architecture and Current Macro View
 
-<Name the approved shared profile. Map the actual hosts, domains/services, shared projects, responsibilities, and allowed dependencies. Distinguish current source facts from approved intent. Link to the relevant shared references.>
+<Adopt the unified domain/role architecture. Map the actual complete business Host, domain cores, role libraries, AppId-to-role placement, persistence/migration owners, shared projects, responsibilities, and allowed dependencies. Distinguish current source facts from approved intent and verified migration gaps. Link to shared references.>
 
 ## Local Conventions and Extension Contracts
 

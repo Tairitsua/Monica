@@ -101,6 +101,41 @@ internal static class DiagnosticDescriptors
         "Request-owned API generation failed",
         "Request-owned API generation failed: {0}");
 
+    public static readonly DiagnosticDescriptor InvalidApplicationDeclaration = Create(
+        "AC1021",
+        "Invalid application declaration",
+        "Application ownership declaration for assembly '{0}' is invalid: {1}");
+
+    public static readonly DiagnosticDescriptor DuplicateApplicationHandler = Create(
+        "AC1022",
+        "Application request has multiple handlers",
+        "Application request '{0}' has multiple handler implementations: {1}.");
+
+    public static readonly DiagnosticDescriptor MissingApplicationOwnership = Create(
+        "AC1023",
+        "Application handler has no role owner",
+        "Published application handler '{0}' must belong to an assembly declaring ApplicationRole.");
+
+    public static readonly DiagnosticDescriptor UndefinedApplicationDomain = Create(
+        "AC1024",
+        "Application role refers to an undefined domain",
+        "Application role '{0}' declares domain '{1}', but no referenced assembly declares that ApplicationDomain.");
+
+    public static readonly DiagnosticDescriptor ConflictingExecutionRole = Create(
+        "AC1025",
+        "Application operation requires a different role",
+        "Application request '{0}' requires role '{1}', but its handler belongs to role '{2}'.");
+
+    public static readonly DiagnosticDescriptor MissingApplicationOperation = Create(
+        "AC1026",
+        "Application API operation has no owned handler",
+        "Published application request '{0}' belongs to a generated API but has no handler in a declared role assembly.");
+
+    public static readonly DiagnosticDescriptor InvalidApplicationCatalog = Create(
+        "AC1027",
+        "Invalid application ownership catalog",
+        "Application catalog is invalid: {0}");
+
     public static readonly DiagnosticDescriptor DeleteQueryBindingUnfit = Create(
         "AC1019",
         "DELETE endpoint binds a collection or complex request from the query string",

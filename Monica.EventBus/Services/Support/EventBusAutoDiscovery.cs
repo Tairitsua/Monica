@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
 using Monica.EventBus.Models.Internal;
@@ -21,10 +22,13 @@ internal sealed class EventBusAutoDiscovery
 
     public IReadOnlyList<EventSubscriptionDescriptor> BuildDescriptors(
         IServiceScopeFactory serviceScopeFactory,
-        IServiceProviderIsService? registeredServices)
+        IServiceProviderIsService? registeredServices,
+        ITypeActivationPolicy? activation = null)
     {
         return _registrations
             .Where(static registration => registration.IsAutoRegistered)
+            .Where(registration => !registration.IsDistributed ||
+                activation?.IsEnabled(registration.HandlerType, TypeActivationKind.ExternalSubscription) != false)
             // Type discovery sees handler classes inside shared assemblies that this host references but
             // does not own. Only subscribe handler types this host registered; subscribing a foreign host's
             // handler fails on every delivery and wedges the topic subscription in endless retry.

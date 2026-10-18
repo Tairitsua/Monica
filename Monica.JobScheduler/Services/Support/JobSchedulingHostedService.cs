@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
@@ -16,7 +17,7 @@ using Monica.Modules;
 namespace Monica.JobScheduler.Services.Support;
 
 /// <summary>
-/// Schedules this host's own discovered jobs: it publishes the local owner snapshot, materializes due recurring
+/// Schedules this host's selected jobs: it publishes each logical owner's snapshot, materializes due recurring
 /// occurrences, recovers expired execution leases, and cleans up terminal history. Every operation is an idempotent
 /// database compare-and-swap, so all replicas of one owner may run this loop concurrently, and every host may run it
 /// without any deployment coordination.
@@ -30,14 +31,18 @@ internal sealed class JobSchedulingHostedService(
     IObservableInstanceRegistry observableRegistry,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     IServiceScopeFactory serviceScopeFactory,
-    ILogger<JobSchedulingHostedService> logger)
+    ILogger<JobSchedulingHostedService> logger,
+    ITypeActivationPolicy? activation = null)
     : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
 {
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
-    private readonly bool _hasLocalRecurringJobs = localDefinitions.Any(
-        static definition => definition.Declaration.JobType == JobType.Recurring);
+    private readonly IGrouping<string, LocalJobDefinition>[] _localOwners = localDefinitions
+        .GroupBy(definition => definition.OwnerKey ?? schedulerOptions.Value.GetProjectName(), StringComparer.Ordinal)
+        .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
+        .ToArray();
     private DateTimeOffset _nextSnapshotSyncUtc;
     private DateTimeOffset _nextCleanupUtc;
+    private int _nextMaterializationOwnerIndex;
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
 
@@ -50,10 +55,10 @@ internal sealed class JobSchedulingHostedService(
                 await ScheduleAsync(stoppingToken);
                 if (runtimeState.SetScheduling(
                         true,
-                        $"Scheduling is active for {_options.GetProjectName()} with {localDefinitions.Count} local job(s)."))
+                        $"Scheduling is active for {_localOwners.Length} logical owner(s) with {localDefinitions.Count} local job(s)."))
                 {
                     RecordState(
-                        $"Scheduler active for owner '{_options.GetProjectName()}'",
+                        $"Scheduler active for {_localOwners.Length} logical owner(s)",
                         HostedServiceState.Running);
                 }
             }
@@ -78,8 +83,7 @@ internal sealed class JobSchedulingHostedService(
     internal async Task ScheduleAsync(CancellationToken cancellationToken)
     {
         var scopeKey = _options.SchedulerScopeKey;
-        var ownerKey = _options.GetProjectName();
-        await SyncOwnerStateAsync(scopeKey, ownerKey, cancellationToken);
+        await SyncOwnerStateAsync(scopeKey, cancellationToken);
         await store.RecoverExpiredLeasesAsync(new ExpiredLeaseRecoveryRequest
         {
             SchedulerScopeKey = scopeKey,
@@ -87,11 +91,11 @@ internal sealed class JobSchedulingHostedService(
             RetryDelay = _options.ExecutionRetryDelay,
             MaxLeaseLossesBeforeFailure = _options.MaxLeaseLossesBeforeFailure
         }, cancellationToken);
-        await MaterializeDueOccurrencesAsync(scopeKey, ownerKey, cancellationToken);
+        await MaterializeDueOccurrencesAsync(scopeKey, cancellationToken);
         await CleanupHistoryAsync(scopeKey, cancellationToken);
     }
 
-    private async Task SyncOwnerStateAsync(string scopeKey, string ownerKey, CancellationToken cancellationToken)
+    private async Task SyncOwnerStateAsync(string scopeKey, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         if (now < _nextSnapshotSyncUtc)
@@ -99,19 +103,29 @@ internal sealed class JobSchedulingHostedService(
             return;
         }
 
-        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(
-            scopeKey,
-            ownerKey,
-            localDefinitions.Select(static definition => definition.Declaration).ToArray()), cancellationToken);
+        var ownersWithDefinitions = _localOwners.Select(owner => owner.Key).ToHashSet(StringComparer.Ordinal);
+        var emptyOwners = activation is null
+            ? (_localOwners.Length == 0 ? new[] { _options.GetProjectName() } : [])
+            : activation.ActiveWorkloadOwners.Except(ownersWithDefinitions, StringComparer.Ordinal);
+        foreach (var emptyOwner in emptyOwners)
+        {
+            // A selected role can remove its last job. Inactive roles must never publish retirement snapshots.
+            await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(
+                scopeKey, emptyOwner, []), cancellationToken);
+        }
 
         // Reconcile host-owned suspension reasons with the same cadence as the owner snapshot. Policy edits update
         // their cursor synchronously; this pass is only needed at startup and after a definition snapshot changes.
-        if (_hasLocalRecurringJobs)
+        var hostReasons = _options.RecurringJobDebugMode
+            ? JobRecurringScheduleSuspensionReason.DebugMode
+            : JobRecurringScheduleSuspensionReason.None;
+        foreach (var owner in _localOwners)
         {
-            var hostReasons = _options.RecurringJobDebugMode
-                ? JobRecurringScheduleSuspensionReason.DebugMode
-                : JobRecurringScheduleSuspensionReason.None;
-            foreach (var definition in localDefinitions.Where(static definition =>
+            await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(
+                scopeKey,
+                owner.Key,
+                owner.Select(static definition => definition.Declaration).ToArray()), cancellationToken);
+            foreach (var definition in owner.Where(static definition =>
                          definition.Declaration.JobType == JobType.Recurring))
             {
                 await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
@@ -119,7 +133,7 @@ internal sealed class JobSchedulingHostedService(
                     CursorKey = new RecurringScheduleCursorKey
                     {
                         SchedulerScopeKey = scopeKey,
-                        OwnerKey = ownerKey,
+                        OwnerKey = owner.Key,
                         JobKey = definition.Declaration.JobKey
                     },
                     HostSuspensionReasons = hostReasons
@@ -127,12 +141,12 @@ internal sealed class JobSchedulingHostedService(
             }
         }
 
-        // Advance the cadence only after both the snapshot and every cursor synchronization succeeds. A partial
-        // failure must retry the complete owner synchronization on the next scheduling cycle.
+        // Advance only after all owner snapshots and cursor synchronizations succeed. A partial failure retries
+        // the complete selected catalog on the next scheduling cycle.
         _nextSnapshotSyncUtc = timeProvider.GetUtcNow().Add(_options.SnapshotSyncInterval);
     }
 
-    private async Task MaterializeDueOccurrencesAsync(string scopeKey, string ownerKey, CancellationToken cancellationToken)
+    private async Task MaterializeDueOccurrencesAsync(string scopeKey, CancellationToken cancellationToken)
     {
         if (_options.RecurringJobDebugMode)
         {
@@ -140,6 +154,18 @@ internal sealed class JobSchedulingHostedService(
         }
 
         var remainingBudget = _options.MaxRecurringMaterializationsPerCycle;
+        for (var visited = 0; visited < _localOwners.Length && remainingBudget > 0; visited++)
+        {
+            var owner = _localOwners[_nextMaterializationOwnerIndex];
+            _nextMaterializationOwnerIndex = (_nextMaterializationOwnerIndex + 1) % _localOwners.Length;
+            remainingBudget = await MaterializeOwnerDueOccurrencesAsync(
+                scopeKey, owner.Key, remainingBudget, cancellationToken);
+        }
+    }
+
+    private async Task<int> MaterializeOwnerDueOccurrencesAsync(
+        string scopeKey, string ownerKey, int remainingBudget, CancellationToken cancellationToken)
+    {
         while (remainingBudget > 0)
         {
             var cursors = await store.GetDueRecurringSchedulesAsync(
@@ -149,7 +175,7 @@ internal sealed class JobSchedulingHostedService(
                 cancellationToken);
             if (cursors.Count == 0)
             {
-                return;
+                return remainingBudget;
             }
 
             var materializedThisRound = 0;
@@ -181,7 +207,7 @@ internal sealed class JobSchedulingHostedService(
                 materializedThisRound++;
                 if (remainingBudget == 0)
                 {
-                    return;
+                    return remainingBudget;
                 }
             }
 
@@ -189,9 +215,11 @@ internal sealed class JobSchedulingHostedService(
             // against stale snapshots, so leave the refreshed durable cursors for the next scheduling cycle.
             if (materializedThisRound == 0)
             {
-                return;
+                return remainingBudget;
             }
         }
+
+        return remainingBudget;
     }
 
     private async Task CleanupHistoryAsync(string scopeKey, CancellationToken cancellationToken)
