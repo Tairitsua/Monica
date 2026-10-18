@@ -1,6 +1,6 @@
 # Unified application model
 
-`Monica.ApplicationModel` composes compiled business ownership, each artifact's actual local implementations, and startup placement. It depends on Core and does not require HTTP, persistence, or RPC. Use the shared [application specification](../../monica-application/SKILL.md) for the solution layout; this reference owns registration and runtime behavior.
+`Monica.ApplicationModel` composes compiled business ownership, each artifact's actual local implementations, and startup placement. It depends on Core and does not require HTTP, persistence, or API. Use the shared [application specification](../../monica-application/SKILL.md) for the solution layout; this reference owns registration and runtime behavior.
 
 ## Declare ownership once
 
@@ -62,8 +62,8 @@ builder.AddMonica(monica =>
     monica.ConfigureApplication(options => options.AppId = appId);
     monica.AddApplicationModel(options => options.Deployments = deployments);
     monica.AddApplication();
-    monica.AddApplicationRpc();
-    // Configure the RPC HTTP provider for omitted implementations or remote role/authority destinations.
+    monica.AddApplicationInvocation();
+    // Configure the API HTTP provider for omitted implementations or remote role/authority destinations.
 });
 ```
 
@@ -90,4 +90,4 @@ Multiple selected DataChannel setup contributors run before materialization. Eac
 
 When an operation truly requires an active integration or process-owned state, declare `[RunOnRole("ordering.reporting")]` on its request. That role must be the operation's code owner. Generated invocation uses Local only when the implementation is present and the role is active, and otherwise resolves its remote owner. Direct mediator execution is guarded before constructing the handler. Ordinary calls prefer Local when their implementation is included; omitted published operations use their known catalog owner and placement through HTTP. Receivers require an included implementation and an active role. A receiver never forwards recursively. A role is an execution/composition boundary, not an authorization or database isolation boundary.
 
-See [RPC](../../monica-infra-messaging/references/rpc.md) for transport and authority policy, [transactions](../../monica-infra-persistence/references/transactions.md) for domain-owned persistence, and [service discovery](service-discovery.md) for observed registration metadata.
+See [API](../../monica-infra-messaging/references/invocation.md) for transport and authority policy, [transactions](../../monica-infra-persistence/references/transactions.md) for domain-owned persistence, and [service discovery](service-discovery.md) for observed registration metadata.

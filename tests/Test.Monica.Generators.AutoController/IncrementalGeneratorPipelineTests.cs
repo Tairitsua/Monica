@@ -19,16 +19,16 @@ public sealed class IncrementalGeneratorPipelineTests
             "ControllerCandidateAnalysis",
             "ControllerCandidateCollection");
         AssertUnrelatedEditIsCached(
-            new RpcClientSourceGenerator(),
-            "RpcEndpointAnalysis",
-            "RpcEndpointCollection");
+            new ApiClientSourceGenerator(),
+            "ApiEndpointAnalysis",
+            "ApiEndpointCollection");
     }
 
     [Fact]
     public void Run_WhenOnlyAssemblyConfigurationChanges_ShouldRegenerateRoutes()
     {
         AssertConfigurationEditRegeneratesRoutes(new HttpApiControllerSourceGenerator());
-        AssertConfigurationEditRegeneratesRoutes(new RpcClientSourceGenerator());
+        AssertConfigurationEditRegeneratesRoutes(new ApiClientSourceGenerator());
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class IncrementalGeneratorPipelineTests
     {
         var seed = GeneratorTestHarness.Run(
             ProtocolMetadataScenario,
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
         var parseOptions = new CSharpParseOptions(
             LanguageVersion.Preview,
             documentationMode: DocumentationMode.Diagnose);
@@ -119,12 +119,12 @@ public sealed class IncrementalGeneratorPipelineTests
     {
         var run = GeneratorTestHarness.Run(
             PositionalEnvelopeScenario,
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Should().BeEmpty();
         run.OutputErrors.Should().BeEmpty();
-        run.GeneratedSources.Keys.Should().Contain("HttpOrderingQueryApi.g.cs");
-        run.GeneratedSources["HttpOrderingQueryApi.g.cs"]
+        run.GeneratedSources.Keys.Should().Contain("HttpOrderingQueryApiClient.g.cs");
+        run.GeneratedSources["HttpOrderingQueryApiClient.g.cs"]
             .Should().Contain("global::Scenario.Results.PositionalEnvelope<string>");
     }
 
@@ -133,7 +133,7 @@ public sealed class IncrementalGeneratorPipelineTests
     {
         var run = GeneratorTestHarness.Run(
             InvalidPublishedEnvelopeScenario,
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Select(static diagnostic => diagnostic.Id)
             .Should().Contain("AC1017");
@@ -172,7 +172,7 @@ public sealed class IncrementalGeneratorPipelineTests
             .Replace("$TYPE_MODIFIER$", typeModifier, StringComparison.Ordinal)
             .Replace("$CONSTRUCTOR_PARAMETERS$", constructorParameters, StringComparison.Ordinal);
 
-        var run = GeneratorTestHarness.Run(source, new RpcClientSourceGenerator());
+        var run = GeneratorTestHarness.Run(source, new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Select(static diagnostic => diagnostic.Id)
             .Should().Contain("AC1004");
@@ -183,7 +183,7 @@ public sealed class IncrementalGeneratorPipelineTests
     public void Run_WhenConfiguredHttpBaseCannotBeNamedFromGeneratedCode_ShouldReportConfigurationDiagnostic(
         string source)
     {
-        var run = GeneratorTestHarness.Run(source, new RpcClientSourceGenerator());
+        var run = GeneratorTestHarness.Run(source, new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Select(static diagnostic => diagnostic.Id)
             .Should().Contain("AC1004");
@@ -362,7 +362,7 @@ public sealed class IncrementalGeneratorPipelineTests
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http)]
+            ApiClientTargets = ApiClientGenerationTargets.Http)]
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
         {
@@ -391,7 +391,7 @@ public sealed class IncrementalGeneratorPipelineTests
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http)]
+            ApiClientTargets = ApiClientGenerationTargets.Http)]
         """;
 
     private const string AssemblyConfigurationAfter = """
@@ -401,7 +401,7 @@ public sealed class IncrementalGeneratorPipelineTests
         [assembly: WebApiGenerationConfig(
             "api/v2",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http)]
+            ApiClientTargets = ApiClientGenerationTargets.Http)]
         """;
 
     private const string ConfigurationIndependentEndpointScenario = """
@@ -500,7 +500,7 @@ public sealed class IncrementalGeneratorPipelineTests
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http)]
+            ApiClientTargets = ApiClientGenerationTargets.Http)]
 
         namespace Scenario.Results
         {
@@ -536,7 +536,7 @@ public sealed class IncrementalGeneratorPipelineTests
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
         {
-            /// <summary>Uses an invalid scalar RPC result.</summary>
+            /// <summary>Uses an invalid scalar API result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/count")]
             public sealed record QueryCountOrders : IRequest<int>;
         }
@@ -638,18 +638,18 @@ public sealed class IncrementalGeneratorPipelineTests
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
-        using Monica.Rpc.Abstractions;
+        using Monica.Invocation.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http,
+            ApiClientTargets = ApiClientGenerationTargets.Http,
             HttpClientBaseType = typeof(Scenario.Transport.InvalidHttpApi))]
 
         namespace Scenario.Transport
         {
             public $TYPE_MODIFIER$ class InvalidHttpApi($CONSTRUCTOR_PARAMETERS$)
-                : HttpRpcApi(serviceProvider, httpClient);
+                : HttpApiClient(serviceProvider, httpClient);
         }
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
@@ -667,12 +667,12 @@ public sealed class IncrementalGeneratorPipelineTests
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
-        using Monica.Rpc.Abstractions;
+        using Monica.Invocation.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http,
+            ApiClientTargets = ApiClientGenerationTargets.Http,
             HttpClientBaseType = typeof(Scenario.Transport.GenericHttpApi<>))]
 
         namespace Scenario.Transport
@@ -680,7 +680,7 @@ public sealed class IncrementalGeneratorPipelineTests
             public abstract class GenericHttpApi<T>(
                 ICachedServiceProvider serviceProvider,
                 HttpClient httpClient)
-                : HttpRpcApi(serviceProvider, httpClient);
+                : HttpApiClient(serviceProvider, httpClient);
         }
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
@@ -698,12 +698,12 @@ public sealed class IncrementalGeneratorPipelineTests
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
-        using Monica.Rpc.Abstractions;
+        using Monica.Invocation.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http,
+            ApiClientTargets = ApiClientGenerationTargets.Http,
             HttpClientBaseType = typeof(Scenario.Transport.FileLocalHttpApi))]
 
         namespace Scenario.Transport
@@ -711,7 +711,7 @@ public sealed class IncrementalGeneratorPipelineTests
             file abstract class FileLocalHttpApi(
                 ICachedServiceProvider serviceProvider,
                 HttpClient httpClient)
-                : HttpRpcApi(serviceProvider, httpClient);
+                : HttpApiClient(serviceProvider, httpClient);
         }
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests

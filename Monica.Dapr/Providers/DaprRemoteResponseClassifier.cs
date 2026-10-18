@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Monica.Core.Results;
-using Monica.Rpc.Abstractions;
-using Monica.Rpc.Models;
+using Monica.Invocation.Abstractions;
+using Monica.Invocation.Models;
 
 namespace Monica.Dapr.Providers;
 

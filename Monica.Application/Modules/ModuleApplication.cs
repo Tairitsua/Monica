@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Application.Abstractions;
 using Monica.Application.Invocation;
-using Monica.Rpc.Abstractions;
+using Monica.Invocation.Abstractions;
 using Monica.Application.Validation;
 using Monica.Core;
 using Monica.Core.Execution;
@@ -49,7 +49,7 @@ public class ModuleApplication : MonicaModule<ModuleApplicationOption>
     {
         context.Services.TryAddSingleton<ApplicationOperationContext>();
         context.Services.TryAddScoped<IApplicationCallerContext, ApplicationCallerContext>();
-        context.Services.Replace(ServiceDescriptor.Scoped<ILocalRpcInvoker, ApplicationRpcInvoker>());
+        context.Services.Replace(ServiceDescriptor.Scoped<ILocalApiInvoker, ApplicationLocalApiInvoker>());
         context.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadOnlyRequestConvention, ApplicationQueryConvention>());
     }
 }

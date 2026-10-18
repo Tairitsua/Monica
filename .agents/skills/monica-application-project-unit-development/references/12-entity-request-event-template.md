@@ -38,10 +38,10 @@ Rules:
 - Keep request contracts small and explicit.
 - Place response DTOs near contracts, not near persistence.
 - One ApiEndpoint(method, route) declares the operation together with HTTP method, relative route and optional Binding. Generated method names always remove the request name's Command or Query prefix. Local calls retain this metadata without using HTTP. Handlers never repeat MVC metadata.
-- Requests in the exact PublishedLanguages.Domain{DomainName}.Requests namespace generate domain interfaces without HTTP configuration. Hosts select adapters and owned receivers; requests elsewhere do not enter published RPC contracts.
-- Published RPC result envelopes must implement `IRemoteResultEnvelope<TSelf>`. Built-in `Res`, `Res<T>`, and `ResPaged<T>` already do; custom envelopes must construct remote failures through `CreateRemoteFailure` without bypassing their invariants.
-- Treat moving a request into or out of `PublishedLanguages` as a public compatibility decision because it changes RPC client generation.
-- Use `DateTime` only for a timezone-free wall-clock value. Monica's default wire policy writes it as `yyyy-MM-dd'T'HH:mm:ss.FFFFFFF`; a host may select the built-in space-separated wall-clock policy for its complete RPC contract. Both policies preserve significant fractional ticks and omit `Kind`, and receivers treat the value as `DateTimeKind.Unspecified`.
+- Requests in the exact PublishedLanguages.Domain{DomainName}.Requests namespace generate domain interfaces without HTTP configuration. Hosts select adapters and owned receivers; requests elsewhere do not enter published API contracts.
+- Published API result envelopes must implement `IRemoteResultEnvelope<TSelf>`. Built-in `Res`, `Res<T>`, and `ResPaged<T>` already do; custom envelopes must construct remote failures through `CreateRemoteFailure` without bypassing their invariants.
+- Treat moving a request into or out of `PublishedLanguages` as a public compatibility decision because it changes API client generation.
+- Use `DateTime` only for a timezone-free wall-clock value. Monica's default wire policy writes it as `yyyy-MM-dd'T'HH:mm:ss.FFFFFFF`; a host may select the built-in space-separated wall-clock policy for its complete API contract. Both policies preserve significant fractional ticks and omit `Kind`, and receivers treat the value as `DateTimeKind.Unspecified`.
 - Use `DateTimeOffset` for an instant or explicit offset; its round-trip `"O"` representation preserves both. Do not use `DateTime` plus an assumed machine-local zone for instant semantics.
 - Rely on generated query/route serialization and the owning host's JSON options for body requests. Do not hand-format temporal fields or add endpoint-specific `SpecifyKind`, UTC, or local-time compensation.
 

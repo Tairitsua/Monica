@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 using Monica.Core.JsonSerialization.Models;
-using Monica.Rpc.Extensions;
+using Monica.Invocation.Extensions;
 using Xunit;
 
 namespace Test.Monica.Generators.AutoController;

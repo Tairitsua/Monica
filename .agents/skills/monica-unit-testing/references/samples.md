@@ -15,7 +15,7 @@ Use these projects as structural references:
 - `tests/Test.Monica.JobScheduler.UI`
   - bUnit component and page-shell tests
 - `tests/Test.Monica.Generators.AutoController`
-  - Raw Roslyn `GeneratorDriver` coverage for request-owned controller and RPC-client generation
+  - Raw Roslyn `GeneratorDriver` coverage for request-owned controller and API-client generation
   - Same-compilation binding, diagnostics, incremental determinism, and no-file-write assertions
 
 ## Recommended First Targets

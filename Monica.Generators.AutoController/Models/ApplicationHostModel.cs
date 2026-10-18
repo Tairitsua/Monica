@@ -83,7 +83,7 @@ internal sealed class ApplicationOperationModel(
         : null;
 
     public string? ImplementationTypeName => Published && Endpoint is { } endpoint
-        ? $"global::{endpoint.ContractNamespaceRoot}.Implementations.Application.Application{endpoint.Domain}{endpoint.RequestKind}Api"
+        ? $"global::{endpoint.ContractNamespaceRoot}.Implementations.Application.Application{endpoint.Domain}{endpoint.RequestKind}ApiClient"
         : null;
 
     public bool Equals(ApplicationOperationModel? other) => other is not null &&

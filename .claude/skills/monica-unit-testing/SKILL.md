@@ -65,7 +65,7 @@ Test source generators with raw Roslyn inputs under a dedicated `tests/Test.Moni
 - Assert generator diagnostics, generated hint names and source, and the diagnostics of the updated output compilation.
 - Run the same driver again with identical inputs and assert byte-identical generated sources and diagnostics. This protects incremental determinism.
 - Verify generator execution does not create or mutate files. File export, package imports, and MSBuild target ordering belong in separate integration tests only when those build surfaces are intentionally under test.
-- For request-owned Web API generation, cover the public contract matrix: route, verb, binding, operation naming, cancellation, result shapes, published-RPC namespace selection, local-only HTTP exclusion, duplicate or invalid declarations, and same-compilation client/controller availability.
+- For request-owned Web API generation, cover the public contract matrix: route, verb, binding, operation naming, cancellation, result shapes, published-API namespace selection, local-only HTTP exclusion, duplicate or invalid declarations, and same-compilation client/controller availability.
 - When a published request uses a custom `IRemoteResultEnvelope<TSelf>`, test that `CreateRemoteFailure` returns a valid constructor-initialized envelope and that cancellation is propagated rather than projected as a failure result.
 
 ## Required Conventions

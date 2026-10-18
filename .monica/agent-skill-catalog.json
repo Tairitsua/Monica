@@ -547,8 +547,8 @@
           "Monica.Framework.UI/Pages/UIEventBusChangesPage.razor",
           "Monica.Framework.UI/Pages/UIEventBusTestToolsPage.razor",
           "Monica.Dapr/Modules/ModuleDaprEventBus.cs",
-          "Monica.Rpc",
-          "Monica.WebApi/Annotations/RpcClientGenerationTargets.cs"
+          "Monica.Invocation",
+          "Monica.WebApi/Annotations/ApiClientGenerationTargets.cs"
         ]
       }
     },

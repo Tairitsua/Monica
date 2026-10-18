@@ -15,7 +15,7 @@ public sealed class GeneratorContractValidationTests
         var run = GeneratorTestHarness.Run(
             source,
             new HttpApiControllerSourceGenerator(),
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Select(static diagnostic => diagnostic.Id)
             .Should().Contain(expectedDiagnosticId);

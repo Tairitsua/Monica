@@ -12,7 +12,7 @@ using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Providers.AspNetCore;
 using Monica.Framework.ChainTracing.Providers.Execution;
 using Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
-using Monica.Framework.ChainTracing.Providers.Rpc;
+using Monica.Framework.ChainTracing.Providers.Actor;
 using Monica.Framework.ChainTracing.Services;
 using Monica.Framework.ChainTracing.Services.Support;
 
@@ -115,16 +115,16 @@ public static class ModuleChainTracingRegistrationExtensions
     /// <summary>
     /// Enables actor invocation tracing without buffering or rewriting response bodies.
     /// </summary>
-    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseRpcTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
+    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseActorInvocationTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
         module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
-        module.RequireWebHost("RPC chain-tracing middleware must run in an ASP.NET Core request pipeline.");
+        module.RequireWebHost("Actor invocation tracing middleware must run in an ASP.NET Core request pipeline.");
         module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
 
-        module.ConfigureServices(context => { context.Services.TryAddTransient<RpcChainTracingMiddleware>(); });
+        module.ConfigureServices(context => { context.Services.TryAddTransient<ActorInvocationTracingMiddleware>(); });
         module.ConfigureApplicationBuilder(
-            context => { context.ApplicationBuilder.UseMiddleware<RpcChainTracingMiddleware>(); },
+            context => { context.ApplicationBuilder.UseMiddleware<ActorInvocationTracingMiddleware>(); },
             ModuleWebStage.AfterRouting);
 
         return module;

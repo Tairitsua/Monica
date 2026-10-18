@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Application.Abstractions;
 using Test.Monica.Application.PublishedLanguages.DomainTesting.Contracts;
-using Monica.Rpc.Models;
+using Monica.Invocation.Models;
 using Monica.Authority.Identity.Abstractions;
 using Monica.Authority.Identity.Services;
 using Monica.Core.Execution;
@@ -172,7 +172,7 @@ internal sealed class InvocationFactory : MonicaTestApplicationFactory<CommandHa
     protected override void ConfigureMonica(IMonicaBuilder builder)
     {
         builder.AddApplicationUI();
-        builder.AddRpcClient().ConfigDomainInfoProvider(new TestingRpcDomains()).UseLocalTransport();
+        builder.AddApiClient().ConfigDomainInfoProvider(new TestingRpcDomains()).UseLocalTransport();
         builder.AddWebApi();
         builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
         builder.AddRepository().AddRepositoryDbContext<OperationDbContext>((_, options) => options.UseSqlite("Data Source=unused"));
@@ -275,8 +275,8 @@ internal sealed class TestCallerContext(CircuitAuthentication authentication) : 
 
 [Flags]
 internal enum TestingDomains { None = 0, Testing = 1 }
-internal sealed class TestingRpcDomains : IRpcClientDomainInfoProvider
+internal sealed class TestingRpcDomains : IApiClientDomainInfoProvider
 {
     public object GetDependencyDomains() => TestingDomains.Testing;
-    public RpcServiceDescriptor GetDomain(Enum domain) => throw new NotSupportedException("Local calls need no network destination.");
+    public ApiServiceDescriptor GetDomain(Enum domain) => throw new NotSupportedException("Local calls need no network destination.");
 }

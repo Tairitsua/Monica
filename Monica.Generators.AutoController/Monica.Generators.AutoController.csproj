@@ -13,9 +13,9 @@
 		<DevelopmentDependency>true</DevelopmentDependency>
 		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 		<IncludeSymbols>false</IncludeSymbols>
-		<PackageDescription>Analyzer-only source generator for request-owned HTTP controllers and RPC clients in Monica applications.</PackageDescription>
+		<PackageDescription>Analyzer-only source generator for request-owned HTTP controllers and API clients in Monica applications.</PackageDescription>
 		<PackageReleaseNotes>Generates request-owned API callers and receivers, role ownership exports, and lightweight product catalogs for selective application hosts. Catalog build assets stay under intermediate output directories.</PackageReleaseNotes>
-		<PackageTags>monica;dotnet;roslyn;source-generator;aspnetcore;rpc;api-controller;cqrs</PackageTags>
+		<PackageTags>monica;dotnet;roslyn;source-generator;aspnetcore;invocation;api-controller;cqrs</PackageTags>
 	</PropertyGroup>
 
 	<ItemGroup>

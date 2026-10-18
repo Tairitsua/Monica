@@ -30,7 +30,7 @@ The Host references both roles, their core, Platform.Hosting and UI. Each role r
 
 Each core/role assembly declares ApplicationDomain or ApplicationRole. The Host's `[assembly: ApplicationHost]` generates the full manifest and per-operation callers/HTTP receivers from referenced handlers. Protocol independently generates stable domain interfaces from its ApiEndpoint requests. A role split does not change the published Ordering namespace or create a second query interface.
 
-The native Program.cs configures the existing current AppId, reads Deployment:Applications, then composes AddApplicationModel, AddApplicationRpc, AddWebApi and AddApplicationUI inside AddMonica. It finishes with UseMonica, MapMonica and Run. There is no custom application runner or legacy domain-to-AppId RPC registry.
+The native Program.cs configures the existing current AppId, reads Deployment:Applications, then composes AddApplicationModel, AddApplicationInvocation, AddWebApi and AddApplicationUI inside AddMonica. It finishes with UseMonica, MapMonica and Run. There is no custom application runner or legacy domain-to-AppId RPC registry.
 
 ## Combined and split placement
 

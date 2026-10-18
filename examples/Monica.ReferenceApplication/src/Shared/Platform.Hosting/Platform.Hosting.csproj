@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Platform.Protocol/Platform.Protocol.csproj" />
-    <ProjectReference Include="../../../../../Monica.Rpc/Monica.Rpc.csproj" />
+    <ProjectReference Include="../../../../../Monica.Invocation/Monica.Invocation.csproj" />
   </ItemGroup>
 
 </Project>

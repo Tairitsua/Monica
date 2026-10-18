@@ -4,13 +4,13 @@
 
 ## Published contracts and adapters
 
-`Monica.Application.Annotations.ApiEndpoint(ApiHttpMethod, route)` declares the operation and its HTTP metadata even for Local-only callers. Requests in the exact `*.PublishedLanguages.Domain{Domain}.Requests` namespace generate stable interfaces without HTTP configuration. Unattributed requests remain internal mediator operations. Each `[ApplicationHost]` combines the generated shared catalog where used with its referenced local role assemblies. Ordinary operations prefer Local when their implementation is included, including operations whose role is inactive; otherwise a published call uses its known remote owner. RunOnRole constrains only operations needing that role's runtime resources. See the authoritative [RPC generation and registration contract](../../monica-infra-messaging/references/rpc.md) for configuration, HTTP mapping, legacy migration and unsupported gRPC.
+`Monica.Application.Annotations.ApiEndpoint(ApiHttpMethod, route)` declares the operation and its HTTP metadata even for Local-only clients. Requests in the exact `*.PublishedLanguages.Domain{Domain}.Requests` namespace generate stable interfaces without HTTP configuration. Unattributed requests remain internal mediator operations. Each `[ApplicationHost]` combines the generated shared catalog where used with its referenced local role assemblies. Ordinary operations prefer Local when their implementation is included, including operations whose role is inactive; otherwise a published call uses its known remote owner. RunOnRole constrains only operations needing that role's runtime resources. See the authoritative [API generation and registration contract](../../monica-infra-messaging/references/invocation.md) for configuration, HTTP mapping, legacy migration and unsupported gRPC.
 
 UI injects `IOrderingCommandApi` or `IOrderingQueryApi` and calls the named method with a Protocol request and cancellation token. The generated Local implementation delegates to invocation infrastructure; application handlers use the same interfaces for published cross-domain operations.
 
 ## Same-process Interactive Server
 
-Compose `AddApplicationUI()`, `AddApplicationModel(...)` and `AddApplicationRpc()` in the native business Host. Configure discovery to retain Protocol, the catalog where used, and actual local domain cores and role assemblies. AddWebApi serves the selected role receivers. See [application model composition](../../monica-infra-hosting/references/application-model.md). `AddApplicationUI` requires the application execution and UI hosting modules, without adding the default Shell. Persistence and `AddUnitOfWork()` remain explicit host choices.
+Compose `AddApplicationUI()`, `AddApplicationModel(...)` and `AddApplicationInvocation()` in the native business Host. Configure discovery to retain Protocol, the catalog where used, and actual local domain cores and role assemblies. AddWebApi serves the selected role receivers. See [application model composition](../../monica-infra-hosting/references/application-model.md). `AddApplicationUI` requires the application execution and UI hosting modules, without adding the default Shell. Persistence and `AddUnitOfWork()` remain explicit host choices.
 
 An outer Local call captures the trusted caller, creates an asynchronous DI scope, initializes `IApplicationOperationContributor` instances, and enters Monica's mediator/execution pipeline. Circuit calls read the current `AuthenticationStateProvider`; prerender, HTTP and background callers use their native current principal. An explicit anonymous principal suppresses ambient fallback. Context is restored and the scope disposed after completion. Concurrent outer calls have independent scopes.
 
@@ -28,7 +28,7 @@ Validate request DataAnnotations and `IValidatableObject` at the application bou
 
 The outer Local entry maps failures only after the backend pipeline unwinds, retaining rollback semantics. It constructs the contract's result envelope and preserves structured public errors while removing reserved diagnostics before presentation. Caller cancellation propagates and does not prove a committed write was rolled back. Return materialized DTOs, not entities, deferred queries or scope-owned services.
 
-Do not inject handlers, repositories, DbContexts or UnitOfWork managers into circuit state. Inject generated interfaces rather than concrete LocalRpcApi implementations. Their infrastructure boundary owns operation lifetimes.
+Do not inject handlers, repositories, DbContexts or UnitOfWork managers into circuit state. Inject generated interfaces rather than concrete LocalApiClient implementations. Their infrastructure boundary owns operation lifetimes.
 
 ## Remote presentation
 

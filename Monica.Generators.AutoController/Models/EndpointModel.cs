@@ -3,7 +3,7 @@ using System;
 namespace Monica.Generators.AutoController.Models;
 
 /// <summary>
-/// Immutable semantic model shared by controller and RPC generation.
+/// Immutable semantic model shared by controller and API generation.
 /// </summary>
 internal sealed class EndpointModel : IEquatable<EndpointModel>
 {

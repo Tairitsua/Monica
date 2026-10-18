@@ -25,10 +25,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
             "HttpEndpointQueryOrdering.g.cs",
             "IOrderingCommandApi.g.cs",
             "IOrderingQueryApi.g.cs",
-            "HttpOrderingCommandApi.g.cs",
-            "HttpOrderingQueryApi.g.cs",
-            "LocalOrderingCommandApi.g.cs",
-            "LocalOrderingQueryApi.g.cs");
+            "HttpOrderingCommandApiClient.g.cs",
+            "HttpOrderingQueryApiClient.g.cs",
+            "LocalOrderingCommandApiClient.g.cs",
+            "LocalOrderingQueryApiClient.g.cs");
         run.GeneratedSources["HttpEndpointCommandOrdering.g.cs"]
             .Should().Contain("Monica.Core.Execution.Mvc.MediatedController");
         run.OutputErrors.Should().BeEmpty();
@@ -40,7 +40,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         var run = RunGenerators(PublishedOrderingScenario);
 
         run.OutputErrors.Should().BeEmpty();
-        var httpClient = run.GeneratedSources["HttpOrderingCommandApi.g.cs"];
+        var httpClient = run.GeneratedSources["HttpOrderingCommandApiClient.g.cs"];
         httpClient.Should().Contain("CreateHttpRequest(request,");
         httpClient.Should().Contain("includeBody: true");
         httpClient.Should().NotContain("HttpApiRequestExtensions.BuildApiRequestUri");
@@ -49,18 +49,18 @@ public sealed class RequestOwnedWebApiGeneratorTests
     }
 
     [Fact]
-    public void Run_WhenPublishedAndLocalRequestsShareADomain_ShouldExcludeLocalRequestFromRpcContract()
+    public void Run_WhenPublishedAndLocalRequestsShareADomain_ShouldExcludeLocalRequestFromApiContract()
     {
         var run = RunGenerators(PublishedAndLocalScenario);
 
         run.OutputErrors.Should().BeEmpty();
         var controller = run.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
-        var rpcContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
+        var apiContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
 
         controller.Should().Contain("published-orders");
         controller.Should().Contain("local-health");
-        rpcContract.Should().Contain("GetPublishedOrders");
-        rpcContract.Should().NotContain("GetLocalHealth");
+        apiContract.Should().Contain("GetPublishedOrders");
+        apiContract.Should().NotContain("GetLocalHealth");
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         run.OutputErrors.Should().BeEmpty();
         var controller = run.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
-        var rpcContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
+        var apiContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
 
         controller.Should().Contain("api/v2/Ordering");
         controller.Should().Contain("HttpGet");
@@ -79,8 +79,8 @@ public sealed class RequestOwnedWebApiGeneratorTests
             "ApiEndpointRequestAttribute(global::Monica.Application.Annotations.ApiRequestBinding.Query)");
         controller.Should().Contain("OrderById(");
         controller.Should().Contain("Finds one published order by its identifier.");
-        rpcContract.Should().Contain("OrderById(");
-        rpcContract.Should().Contain("CancellationToken");
+        apiContract.Should().Contain("OrderById(");
+        apiContract.Should().Contain("CancellationToken");
     }
 
     [Fact]
@@ -113,14 +113,14 @@ public sealed class RequestOwnedWebApiGeneratorTests
         var run = RunGenerators(ResultShapeScenario);
 
         run.OutputErrors.Should().BeEmpty();
-        var rpcContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
+        var apiContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
 
-        rpcContract.Should().Contain("global::Monica.Core.Results.Res");
-        rpcContract.Should().Contain("global::Monica.Core.Results.ResPaged");
-        rpcContract.Should().Contain("global::Scenario.Results.CustomEnvelope");
-        rpcContract.Should().Contain("global::Scenario.Alpha.SharedDto");
-        rpcContract.Should().Contain("global::Scenario.Beta.SharedDto");
-        rpcContract.Should().Contain("global::System.Collections.Generic.Dictionary");
+        apiContract.Should().Contain("global::Monica.Core.Results.Res");
+        apiContract.Should().Contain("global::Monica.Core.Results.ResPaged");
+        apiContract.Should().Contain("global::Scenario.Results.CustomEnvelope");
+        apiContract.Should().Contain("global::Scenario.Alpha.SharedDto");
+        apiContract.Should().Contain("global::Scenario.Beta.SharedDto");
+        apiContract.Should().Contain("global::System.Collections.Generic.Dictionary");
     }
 
     [Fact]
@@ -129,14 +129,14 @@ public sealed class RequestOwnedWebApiGeneratorTests
         var run = RunGenerators(CustomTransportBaseScenario);
 
         run.OutputErrors.Should().BeEmpty();
-        run.GeneratedSources["HttpOrderingQueryApi.g.cs"]
+        run.GeneratedSources["HttpOrderingQueryApiClient.g.cs"]
             .Should().Contain("global::Scenario.Transport.OurHttpApi");
-        run.GeneratedSources["LocalOrderingQueryApi.g.cs"]
+        run.GeneratedSources["LocalOrderingQueryApiClient.g.cs"]
             .Should().Contain("global::Scenario.Transport.OurLocalApi");
     }
 
     [Fact]
-    public void Run_WhenLocalEndpointUsesFormBinding_ShouldGenerateFormControllerWithoutPublishingRpcOperation()
+    public void Run_WhenLocalEndpointUsesFormBinding_ShouldGenerateFormControllerWithoutPublishingApiOperation()
     {
         var run = RunGenerators(LocalFormScenario);
 
@@ -218,7 +218,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
                 PublishedOrderingScenario,
                 projectDirectory,
                 new HttpApiControllerSourceGenerator(),
-                new RpcClientSourceGenerator());
+                new ApiClientSourceGenerator());
 
             run.OutputErrors.Should().BeEmpty();
             Directory.EnumerateFileSystemEntries(projectDirectory).Should().BeEmpty();
@@ -258,7 +258,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         return GeneratorTestHarness.Run(
             source,
             new HttpApiControllerSourceGenerator(),
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
     }
 
     private static string ToDiagnosticSnapshot(Diagnostic diagnostic)
@@ -283,7 +283,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http | RpcClientGenerationTargets.Local)]
+            ApiClientTargets = ApiClientGenerationTargets.Http | ApiClientGenerationTargets.Local)]
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Models
         {
@@ -691,12 +691,12 @@ public sealed class RequestOwnedWebApiGeneratorTests
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
-        using Monica.Rpc.Abstractions;
+        using Monica.Invocation.Abstractions;
 
         [assembly: WebApiGenerationConfig(
             "api/v1",
             DomainName = "Ordering",
-            RpcClientTargets = RpcClientGenerationTargets.Http | RpcClientGenerationTargets.Local,
+            ApiClientTargets = ApiClientGenerationTargets.Http | ApiClientGenerationTargets.Local,
             HttpClientBaseType = typeof(Scenario.Transport.OurHttpApi),
             LocalClientBaseType = typeof(Scenario.Transport.OurLocalApi))]
 
@@ -705,10 +705,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public abstract class OurHttpApi(
                 ICachedServiceProvider serviceProvider,
                 HttpClient httpClient)
-                : HttpRpcApi(serviceProvider, httpClient);
+                : HttpApiClient(serviceProvider, httpClient);
 
             public abstract class OurLocalApi(ICachedServiceProvider serviceProvider)
-                : LocalRpcApi(serviceProvider);
+                : LocalApiClient(serviceProvider);
         }
 
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests

@@ -34,7 +34,7 @@ builder.AddMonica(monica =>
         options.Add("Domains.", "Roles.", "Platform.Protocol"));
 
     monica.AddApplicationModel(options => options.Deployments = deployments);
-    monica.AddApplicationRpc();
+    monica.AddApplicationInvocation();
 
     monica.AddHealthCheck();
     monica.AddConfiguration(configurationInputPlan);

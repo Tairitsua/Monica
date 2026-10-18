@@ -10,7 +10,7 @@ namespace Test.Monica.Generators.AutoController;
 public sealed class ApplicationHostSourceGeneratorTests
 {
     [Fact]
-    public void Run_WhenHostReferencesDeclaredReleaseRoles_ShouldEmitOneCallerAndCompleteOwnershipManifest()
+    public void Run_WhenHostReferencesDeclaredReleaseRoles_ShouldEmitOneClientAndCompleteOwnershipManifest()
     {
         var references = CompileApplication();
         var run = RunHost(references);
@@ -18,7 +18,7 @@ public sealed class ApplicationHostSourceGeneratorTests
         run.OutputErrors.Should().BeEmpty();
         run.RunResult.Diagnostics.Should().BeEmpty();
         run.GeneratedSources.Keys.Should().BeEquivalentTo(
-            "GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApi.g.cs", "HttpEndpointQueryOrdering.g.cs");
+            "GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApiClient.g.cs", "HttpEndpointQueryOrdering.g.cs");
         var manifest = run.GeneratedSources["GeneratedApplicationManifest.g.cs"];
         manifest.Should().Contain("ApplicationDomainDefinition(\"Ordering\", \"Scenario.DomainCore\")")
             .And.Contain("ApplicationRoleDefinition(\"ordering\", \"Ordering\", \"Scenario.OrderingRole\")")
@@ -27,14 +27,14 @@ public sealed class ApplicationHostSourceGeneratorTests
             .And.Contain("typeof(global::Scenario.Internal.QueryProbe)")
             .And.Contain("\"ordering.chat\", \"ordering.chat\"")
             .And.NotContain("typeof(global::Scenario.Chat.ChatHandlers.TotalHandler)");
-        var client = run.GeneratedSources["ApplicationOrderingQueryApi.g.cs"];
+        var client = run.GeneratedSources["ApplicationOrderingQueryApiClient.g.cs"];
         client.Should().Contain("IApplicationApiInvoker invoker")
             .And.Contain("Scenario.PublishedLanguages.DomainOrdering.Contracts.IOrderingQueryApi")
             .And.Contain("GetTotal(").And.Contain("GetChatTotal(")
-            .And.Contain("RpcHttpEndpoint(\"POST\", \"api/v2/Ordering/queries/Total\", false, true)")
-            .And.Contain("RpcHttpEndpoint(\"GET\", \"api/v2/Ordering/queries/ChatTotal\", true, false)")
+            .And.Contain("ApiHttpEndpoint(\"POST\", \"api/v2/Ordering/queries/Total\", false, true)")
+            .And.Contain("ApiHttpEndpoint(\"GET\", \"api/v2/Ordering/queries/ChatTotal\", true, false)")
             .And.Contain("cancellationToken);")
-            .And.NotContain("LocalRpcApi").And.NotContain("HttpRpcApi");
+            .And.NotContain("LocalApiClient").And.NotContain("HttpApiClient");
         var receiver = run.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
         receiver.Should().Contain("ApplicationApiReceiver(typeof(global::Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal))")
             .And.Contain("ApplicationApiReceiver(typeof(global::Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal))")
@@ -46,12 +46,12 @@ public sealed class ApplicationHostSourceGeneratorTests
     }
 
     [Fact]
-    public void Run_WhenHostAlsoDeclaresLegacyTransportGeneration_ShouldSuppressLegacyCallersAndDuplicateReceivers()
+    public void Run_WhenHostAlsoDeclaresLegacyTransportGeneration_ShouldSuppressLegacyClientsAndDuplicateReceivers()
     {
         var source = Host + """
 
             [assembly: Monica.Application.Annotations.ApplicationApiGenerationConfig(
-                Monica.Rpc.Models.RpcTransportKind.Local,
+                Monica.Invocation.Models.ApiClientTransportKind.Local,
                 typeof(Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal))]
             [assembly: Monica.WebApi.Annotations.WebApiGenerationConfig]
             """;
@@ -60,7 +60,7 @@ public sealed class ApplicationHostSourceGeneratorTests
         run.OutputErrors.Should().BeEmpty();
         run.RunResult.Diagnostics.Should().BeEmpty();
         run.GeneratedSources.Keys.Should().BeEquivalentTo(
-            "GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApi.g.cs", "HttpEndpointQueryOrdering.g.cs");
+            "GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApiClient.g.cs", "HttpEndpointQueryOrdering.g.cs");
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class ApplicationHostSourceGeneratorTests
         run.RunResult.Diagnostics.Should().BeEmpty();
         run.GeneratedSources["GeneratedApplicationManifest.g.cs"]
             .Should().Contain("ApplicationDomainDefinition(\"DataExchange\", \"Scenario.DomainCore\")");
-        run.GeneratedSources["ApplicationOrderingQueryApi.g.cs"]
+        run.GeneratedSources["ApplicationOrderingQueryApiClient.g.cs"]
             .Should().Contain("api/v2/Ordering/queries/Total");
     }
 
@@ -164,7 +164,7 @@ public sealed class ApplicationHostSourceGeneratorTests
         run.OutputErrors.Should().BeEmpty();
         run.RunResult.Diagnostics.Should().BeEmpty();
         run.GeneratedSources["GeneratedApplicationManifest.g.cs"].Should().NotContain("QuerySupport").And.NotContain("SupportHandler");
-        run.GeneratedSources["ApplicationOrderingQueryApi.g.cs"].Should().NotContain("Support(");
+        run.GeneratedSources["ApplicationOrderingQueryApiClient.g.cs"].Should().NotContain("Support(");
         run.RunAgain().GeneratedSources.Should().BeEquivalentTo(run.GeneratedSources);
     }
 
@@ -172,7 +172,7 @@ public sealed class ApplicationHostSourceGeneratorTests
     public void Run_WhenAssemblyIsNotAnApplicationHost_ShouldLeaveExistingProtocolGenerationUnchanged()
     {
         var run = GeneratorTestHarness.Run(Contracts,
-            new RpcClientSourceGenerator(), new ApplicationHostSourceGenerator());
+            new ApiClientSourceGenerator(), new ApplicationHostSourceGenerator());
 
         run.OutputErrors.Should().BeEmpty();
         run.RunResult.Diagnostics.Should().BeEmpty();
@@ -223,7 +223,7 @@ public sealed class ApplicationHostSourceGeneratorTests
             .And.Contain(chatHost
                 ? "new string[] { \"Scenario.ChatRole\", \"Scenario.DomainCore\" }"
                 : "new string[] { \"Scenario.DomainCore\", \"Scenario.OrderingRole\" }");
-        var client = run.GeneratedSources["ApplicationOrderingQueryApi.g.cs"];
+        var client = run.GeneratedSources["ApplicationOrderingQueryApiClient.g.cs"];
         client.Should().Contain("GetTotal(").And.Contain("GetChatTotal(");
         var receiver = run.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
         receiver.Should().Contain(chatHost ? "QueryGetChatTotal" : "QueryGetTotal")
@@ -242,7 +242,7 @@ public sealed class ApplicationHostSourceGeneratorTests
 
         run.OutputErrors.Should().BeEmpty();
         run.RunResult.Diagnostics.Should().BeEmpty();
-        run.GeneratedSources.Keys.Should().BeEquivalentTo("GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApi.g.cs");
+        run.GeneratedSources.Keys.Should().BeEquivalentTo("GeneratedApplicationManifest.g.cs", "ApplicationOrderingQueryApiClient.g.cs");
         run.GeneratedSources["GeneratedApplicationManifest.g.cs"].Should().Contain("new string[] {  }")
             .And.NotContain("QueryProbe");
     }
@@ -296,7 +296,7 @@ public sealed class ApplicationHostSourceGeneratorTests
     {
         var application = CompileCatalogApplication();
         var changedProtocol = Emit(GeneratorTestHarness.Run(Contracts.Replace("queries/Total", "queries/Changed"),
-            new RpcClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
+            new ApiClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
         var run = RunHost([changedProtocol, application.Catalog]);
 
         run.RunResult.Diagnostics.Should().Contain(diagnostic => diagnostic.Id == "AC1027" &&
@@ -322,7 +322,7 @@ public sealed class ApplicationHostSourceGeneratorTests
     private static (MetadataReference[] References, PortableExecutableReference Catalog, string[] Exports,
         GeneratorTestHarness.GeneratorTestRun Generation) CompileCatalogApplication()
     {
-        var protocol = Emit(GeneratorTestHarness.Run(Contracts, new RpcClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
+        var protocol = Emit(GeneratorTestHarness.Run(Contracts, new ApiClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
         var core = GeneratorTestHarness.RunNamedWithReferences("Scenario.DomainCore",
             "[assembly: Monica.ApplicationModel.Annotations.ApplicationDomain(Scenario.ProductDomain.Ordering)]", [protocol],
             new ApplicationRoleMetadataSourceGenerator());
@@ -349,12 +349,12 @@ public sealed class ApplicationHostSourceGeneratorTests
 
     private static GeneratorTestHarness.GeneratorTestRun RunHost(IReadOnlyCollection<MetadataReference> references, string source = Host)
         => GeneratorTestHarness.RunWithReferences(source, references,
-            new RpcClientSourceGenerator(), new HttpApiControllerSourceGenerator(), new ApplicationHostSourceGenerator());
+            new ApiClientSourceGenerator(), new HttpApiControllerSourceGenerator(), new ApplicationHostSourceGenerator());
 
     private static MetadataReference[] CompileApplication(string contracts = Contracts, string ordinary = OrdinaryRole,
         string chat = ChatRole, string domain = "Scenario.ProductDomain.Ordering")
     {
-        var protocol = Emit(GeneratorTestHarness.Run(contracts, new RpcClientSourceGenerator()).OutputCompilation,
+        var protocol = Emit(GeneratorTestHarness.Run(contracts, new ApiClientSourceGenerator()).OutputCompilation,
             "Scenario.Protocol");
         var core = Emit(GeneratorTestHarness.RunWithReferences(
             $"[assembly: Monica.ApplicationModel.Annotations.ApplicationDomain({domain})]\ninternal sealed class CoreMarker;",

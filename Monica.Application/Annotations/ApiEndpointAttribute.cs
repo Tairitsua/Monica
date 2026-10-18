@@ -8,7 +8,7 @@ namespace Monica.Application.Annotations;
 /// Host generation configuration chooses client adapters and receiver publication independently of this declaration.
 /// Command/query kind and domain follow the existing request-name and namespace conventions.
 /// Generated method names are the request name with the Command or Query prefix removed.
-/// Local callers use the same declaration without HTTP dispatch. HTTP metadata does not publish a receiver
+/// Local clients use the same declaration without HTTP dispatch. HTTP metadata does not publish a receiver
 /// or determine transaction semantics. Future transports use the operation identity rather than its HTTP route.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]

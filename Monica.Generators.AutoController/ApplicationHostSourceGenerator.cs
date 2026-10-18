@@ -7,7 +7,7 @@ using Monica.Generators.AutoController.Models;
 
 namespace Monica.Generators.AutoController;
 
-/// <summary>Generates the declared application inventory, unified callers, and owned HTTP receiver actions.</summary>
+/// <summary>Generates the declared application inventory, unified API clients, and owned HTTP receiver actions.</summary>
 [Generator]
 public sealed class ApplicationHostSourceGenerator : IIncrementalGenerator
 {

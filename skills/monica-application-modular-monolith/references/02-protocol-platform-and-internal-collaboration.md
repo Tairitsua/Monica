@@ -4,6 +4,6 @@ The [unified specification](../../monica-application/references/03-unified-archi
 
 Call published operations through I{Domain}CommandApi / I{Domain}QueryApi even in one process. Ordinary included operations remain locally callable when their role is inactive; omitted published operations route to their known remote owner. Do not substitute a peer domain repository or concrete handler call for that boundary. Shared same-domain invariants can be reused directly from the core.
 
-Compose AddApplicationModel and AddApplicationRpc. Local calls preserve trusted caller/tenant context: independent outer calls create fresh scopes, nested calls reuse the active operation and remote calls create another operation. Never retain scope-owned services or detach nested work.
+Compose AddApplicationModel and AddApplicationInvocation. Local calls preserve trusted caller/tenant context: independent outer calls create fresh scopes, nested calls reuse the active operation and remote calls create another operation. Never retain scope-owned services or detach nested work.
 
-ApiEndpoint preserves HTTP mapping for Local callers. Host publication selects owned receivers in Release; optional diagnostic exposure is separate. See [RPC](../../monica-infra-messaging/references/rpc.md) and [operation scopes](../../monica-application-ui/references/application-invocation.md).
+ApiEndpoint preserves HTTP mapping for Local clients. Host publication selects owned receivers in Release; optional diagnostic exposure is separate. See [API](../../monica-infra-messaging/references/invocation.md) and [operation scopes](../../monica-application-ui/references/application-invocation.md).

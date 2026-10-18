@@ -5,7 +5,7 @@ using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Providers.Execution;
-using Monica.Rpc.Abstractions;
+using Monica.Invocation.Abstractions;
 using Xunit;
 
 namespace Test.Monica.Framework.ChainTracing;
@@ -198,7 +198,7 @@ public sealed class ChainTracingExecutionBehaviorTests
         }
     }
 
-    private sealed class RemoteComponent : IRpcApi
+    private sealed class RemoteComponent : IApplicationApi
     {
         public void Execute()
         {

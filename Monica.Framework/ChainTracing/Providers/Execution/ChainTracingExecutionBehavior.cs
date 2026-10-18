@@ -6,7 +6,7 @@ using Monica.Framework.ChainTracing.Extensions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Services.Support;
 using Monica.Tool.Extensions;
-using Monica.Rpc.Abstractions;
+using Monica.Invocation.Abstractions;
 
 namespace Monica.Framework.ChainTracing.Providers.Execution;
 
@@ -27,9 +27,9 @@ public sealed class ChainTracingExecutionBehavior<TInput, TResult>(IChainTracing
         }
 
         var descriptor = context.Descriptor;
-        var isRemoteCall = typeof(IRpcApi).IsAssignableFrom(descriptor.ComponentType)
+        var isRemoteCall = typeof(IApplicationApi).IsAssignableFrom(descriptor.ComponentType)
                            || (descriptor.EntryMethod?.DeclaringType is { } declaringType
-                               && typeof(IRpcApi).IsAssignableFrom(declaringType));
+                               && typeof(IApplicationApi).IsAssignableFrom(declaringType));
         var traceType = isRemoteCall ? EChainTracingType.RemoteService : EChainTracingType.Unknown;
 
         using var scope = chainTracing.BeginScope(

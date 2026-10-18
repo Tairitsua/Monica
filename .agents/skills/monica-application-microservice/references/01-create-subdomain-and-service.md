@@ -10,7 +10,7 @@ Map existing responsibilities before moving files:
 | API handlers and ordinary application behavior | `Domains/{Domain}/Roles.{Domain}` |
 | Connector, Actor, realtime or other independently activated responsibility | A justified `Roles.{Domain}.{Purpose}` library |
 | Product provider/bootstrap defaults | `Shared/Platform.Hosting` |
-| Native composition and generated callers/local receivers | `AppHost/{Product}.Host` or a justified specialized host artifact |
+| Native composition and generated clients/local receivers | `AppHost/{Product}.Host` or a justified specialized host artifact |
 | Actual domain migrations and context factories | `Migrations/Migrations.Domain{Domain}` |
 
 Role libraries have no Program.cs. Keep role integrations inside their owning role rather than top-level Adapters. Reuse the existing domain identifier authority and preserve the strict published-language namespace. A specialized role does not create another business domain or database.

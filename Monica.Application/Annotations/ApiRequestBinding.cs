@@ -14,6 +14,6 @@ public enum ApiRequestBinding
     /// <summary>Binds the request from a JSON body.</summary>
     Body,
 
-    /// <summary>Binds the request from form data. Published RPC requests cannot use this value.</summary>
+    /// <summary>Binds the request from form data. Published API requests cannot use this value.</summary>
     Form
 }

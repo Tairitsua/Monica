@@ -122,8 +122,8 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 - Keep request, response, and event contracts separate from persistence entities.
 - Keep endpoint metadata on the request contract. the single ApiEndpoint declares the operation and its HTTP mapping; optional shared wire settings stay with its assembly; generated `ApplicationService` handlers do not carry MVC endpoint or binding attributes.
 - Use `DateTime` for timezone-free wall-clock contract values and `DateTimeOffset` for instants or explicit offsets. Do not compensate for transport with ad hoc UTC/local conversions in handlers.
-- Publish a request to RPC clients only through the explicit `*.PublishedLanguages.Domain{DomainName}.Requests` namespace boundary. Local HTTP requests stay outside that namespace even when they reuse published DTOs.
-- Keep adapter code thin. Generated endpoint registration, RPC transports, or background-host wiring should not replace ProjectUnits.
+- Publish a request to API clients only through the explicit `*.PublishedLanguages.Domain{DomainName}.Requests` namespace boundary. Local HTTP requests stay outside that namespace even when they reuse published DTOs.
+- Keep adapter code thin. Generated endpoint registration, API transports, or background-host wiring should not replace ProjectUnits.
 
 ## Practical Heuristics
 

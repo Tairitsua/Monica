@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Published application APIs, in-process invocation, deployment-aware routing, and HTTP client adapters for Monica.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
+    <ProjectReference Include="../Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
+    <ProjectReference Include="../Monica.Authority/Monica.Authority.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+  </ItemGroup>
+</Project>

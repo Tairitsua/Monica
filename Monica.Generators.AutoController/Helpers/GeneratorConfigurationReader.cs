@@ -46,7 +46,7 @@ internal static class GeneratorConfigurationReader
                 case "DomainName":
                     domainName = namedArgument.Value.Value as string;
                     break;
-                case "RpcClientTargets":
+                case "ApiClientTargets":
                     targets = namedArgument.Value.Value is int value ? value : 0;
                     break;
                 case "HttpClientBaseType":
@@ -67,14 +67,14 @@ internal static class GeneratorConfigurationReader
         if ((targets & ~3) != 0)
         {
             return GeneratorConfigReadResult.Invalid(
-                $"RpcClientTargets contains unsupported flag value '{targets}'.");
+                $"ApiClientTargets contains unsupported flag value '{targets}'.");
         }
 
         if (httpClientBaseType is not null &&
             !TryValidateClientBaseType(
                 httpClientBaseType,
                 assembly,
-                "Monica.Rpc.Abstractions.HttpRpcApi",
+                "Monica.Invocation.Abstractions.HttpApiClient",
                 new[] { CACHED_SERVICE_PROVIDER, HTTP_CLIENT },
                 out var httpBaseError))
         {
@@ -86,7 +86,7 @@ internal static class GeneratorConfigurationReader
             !TryValidateClientBaseType(
                 localClientBaseType,
                 assembly,
-                "Monica.Rpc.Abstractions.LocalRpcApi",
+                "Monica.Invocation.Abstractions.LocalApiClient",
                 new[] { CACHED_SERVICE_PROVIDER },
                 out var localBaseError))
         {

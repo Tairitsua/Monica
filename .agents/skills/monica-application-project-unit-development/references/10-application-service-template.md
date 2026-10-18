@@ -37,7 +37,7 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 
 ## Generation and HTTP Mapping
 
-Use [RPC generation and registration](../../monica-infra-messaging/references/rpc.md) for the authoritative contract. Interfaces are stable across Debug/Release and HTTP publication. The complete ApplicationHost generates per-operation callers and owned HTTP receivers in Release too. Ordinary operations prefer Local, independently of active role ownership; only a real execution requirement warrants RunOnRole.
+Use [API generation and registration](../../monica-infra-messaging/references/invocation.md) for the authoritative contract. Interfaces are stable across Debug/Release and HTTP publication. The complete ApplicationHost generates per-operation clients and owned HTTP receivers in Release too. Ordinary operations prefer Local, independently of active role ownership; only a real execution requirement warrants RunOnRole.
 
 ApiEndpoint declares the HTTP method, relative route and binding for every published operation, including Local-only calls. HttpApiContract optionally sets an assembly-wide shared prefix without exposing receivers. Host publication does not change the shared mapping.
 
@@ -134,4 +134,4 @@ public sealed class CommandHandler$FeatureName$(IRepositoryOrder repository)
 
 - If the success payload type is `string`, use `Res.Ok<string>(value)`.
 - If a query becomes complex because of filtering, paging, or policy checks, extract that logic before the handler turns procedural.
-- RPC publication is namespace-driven, not handler-driven. Do not move a local request into `PublishedLanguages` merely to share a DTO.
+- API publication is namespace-driven, not handler-driven. Do not move a local request into `PublishedLanguages` merely to share a DTO.

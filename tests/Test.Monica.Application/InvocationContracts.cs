@@ -3,7 +3,7 @@ using Monica.Application.Abstractions;
 using Monica.WebApi.Annotations;
 using Monica.Application.Annotations;
 
-[assembly: Monica.Application.Annotations.ApplicationApiGenerationConfig(Monica.Rpc.Models.RpcTransportKind.Local)]
+[assembly: Monica.Application.Annotations.ApplicationApiGenerationConfig(Monica.Invocation.Models.ApiClientTransportKind.Local)]
 [assembly: WebApiGenerationConfig("test", DomainName = "Testing")]
 
 namespace Test.Monica.Application.PublishedLanguages.DomainTesting.Requests;

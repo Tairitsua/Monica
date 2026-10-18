@@ -76,9 +76,9 @@ internal static class HostGenerationReader
             return result;
         }
 
-        var httpBase = ReadBase(attribute, "HttpClientBaseType", "Monica.Rpc.Abstractions.HttpRpcApi",
+        var httpBase = ReadBase(attribute, "HttpClientBaseType", "Monica.Invocation.Abstractions.HttpApiClient",
             new[] { "Monica.DependencyInjection.Abstractions.ICachedServiceProvider", "System.Net.Http.HttpClient" });
-        var localBase = ReadBase(attribute, "LocalClientBaseType", "Monica.Rpc.Abstractions.LocalRpcApi",
+        var localBase = ReadBase(attribute, "LocalClientBaseType", "Monica.Invocation.Abstractions.LocalApiClient",
             new[] { "Monica.DependencyInjection.Abstractions.ICachedServiceProvider" });
         result.Configuration = new GeneratorConfig("api/v1", null, transport == 0 ? 1 : 2, httpBase, localBase);
         var assemblies = Assemblies(attribute.ConstructorArguments[1]).Append(compilation.Assembly)

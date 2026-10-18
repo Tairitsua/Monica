@@ -7,13 +7,13 @@ internal sealed class GeneratorConfig : IEquatable<GeneratorConfig>
     public GeneratorConfig(
         string routePrefix,
         string? domainName,
-        int rpcClientTargets,
+        int apiClientTargets,
         string? httpClientBaseTypeName,
         string? localClientBaseTypeName)
     {
         RoutePrefix = routePrefix;
         DomainName = domainName;
-        RpcClientTargets = rpcClientTargets;
+        ApiClientTargets = apiClientTargets;
         HttpClientBaseTypeName = httpClientBaseTypeName;
         LocalClientBaseTypeName = localClientBaseTypeName;
     }
@@ -22,22 +22,22 @@ internal sealed class GeneratorConfig : IEquatable<GeneratorConfig>
 
     public string? DomainName { get; }
 
-    public int RpcClientTargets { get; }
+    public int ApiClientTargets { get; }
 
     public string? HttpClientBaseTypeName { get; }
 
     public string? LocalClientBaseTypeName { get; }
 
-    public bool GenerateHttpClient => (RpcClientTargets & 1) != 0;
+    public bool GenerateHttpClient => (ApiClientTargets & 1) != 0;
 
-    public bool GenerateLocalClient => (RpcClientTargets & 2) != 0;
+    public bool GenerateLocalClient => (ApiClientTargets & 2) != 0;
 
     public bool Equals(GeneratorConfig? other)
     {
         return other is not null &&
                RoutePrefix == other.RoutePrefix &&
                DomainName == other.DomainName &&
-               RpcClientTargets == other.RpcClientTargets &&
+               ApiClientTargets == other.ApiClientTargets &&
                HttpClientBaseTypeName == other.HttpClientBaseTypeName &&
                LocalClientBaseTypeName == other.LocalClientBaseTypeName;
     }
@@ -53,7 +53,7 @@ internal sealed class GeneratorConfig : IEquatable<GeneratorConfig>
         {
             var hashCode = StringComparer.Ordinal.GetHashCode(RoutePrefix);
             hashCode = (hashCode * 397) ^ (DomainName is null ? 0 : StringComparer.Ordinal.GetHashCode(DomainName));
-            hashCode = (hashCode * 397) ^ RpcClientTargets;
+            hashCode = (hashCode * 397) ^ ApiClientTargets;
             hashCode = (hashCode * 397) ^ (HttpClientBaseTypeName is null ? 0 : StringComparer.Ordinal.GetHashCode(HttpClientBaseTypeName));
             hashCode = (hashCode * 397) ^ (LocalClientBaseTypeName is null ? 0 : StringComparer.Ordinal.GetHashCode(LocalClientBaseTypeName));
             return hashCode;

@@ -61,7 +61,7 @@ Replace leaves and adapters:
 - state stores and caches
 - event transports
 - database connection/provider options, retaining production context/session resolution
-- HTTP/RPC clients
+- HTTP/API clients
 - current user or tenant context
 - local configuration adapters
 - clocks, random sources, or ID generators when nondeterminism matters; retain the real audit policy

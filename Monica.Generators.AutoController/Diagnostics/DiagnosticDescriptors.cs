@@ -48,8 +48,8 @@ internal static class DiagnosticDescriptors
 
     public static readonly DiagnosticDescriptor DuplicateOperation = Create(
         "AC1010",
-        "Duplicate RPC operation",
-        "RPC operation '{0}' is declared more than once in domain '{1}' {2} API: {3}.");
+        "Duplicate API operation",
+        "API operation '{0}' is declared more than once in domain '{1}' {2} API: {3}.");
 
     public static readonly DiagnosticDescriptor InvalidRoute = Create(
         "AC1011",
@@ -64,7 +64,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor UnsupportedPublishedBinding = Create(
         "AC1013",
         "Published endpoint binding is not supported",
-        "Published RPC request '{0}' cannot use {1} binding. Move transport-specific endpoints beside their handlers as local HTTP contracts.");
+        "Published API request '{0}' cannot use {1} binding. Move transport-specific endpoints beside their handlers as local HTTP contracts.");
 
     public static readonly DiagnosticDescriptor MissingSummary = Create(
         "AC1014",
@@ -74,17 +74,17 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor UnsupportedPublishedResult = Create(
         "AC1015",
         "Published endpoint result is not supported",
-        "Published RPC request '{0}' returns raw object. Move download or transport-specific endpoints beside their handlers as local HTTP contracts.");
+        "Published API request '{0}' returns raw object. Move download or transport-specific endpoints beside their handlers as local HTTP contracts.");
 
     public static readonly DiagnosticDescriptor InvalidOperationName = Create(
         "AC1016",
-        "Invalid RPC operation name",
-        "Endpoint request '{0}' resolves to invalid RPC operation name '{1}'. Rename the request so the suffix after Command or Query is a valid C# identifier.");
+        "Invalid API operation name",
+        "Endpoint request '{0}' resolves to invalid API operation name '{1}'. Rename the request so the suffix after Command or Query is a valid C# identifier.");
 
     public static readonly DiagnosticDescriptor InvalidPublishedResultEnvelope = Create(
         "AC1017",
         "Published endpoint result envelope is invalid",
-        "Published RPC request '{0}' returns '{1}', which must be a concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
+        "Published API request '{0}' returns '{1}', which must be a concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
 
     public static readonly DiagnosticDescriptor UnbindableRouteProperty = Create(
         "AC1018",

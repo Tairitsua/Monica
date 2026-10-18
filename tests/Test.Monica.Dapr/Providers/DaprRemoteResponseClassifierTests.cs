@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Monica.Core.Results;
 using Monica.Dapr.Providers;
-using Monica.Rpc.Models;
+using Monica.Invocation.Models;
 using Xunit;
 
 namespace Test.Monica.Dapr.Providers;

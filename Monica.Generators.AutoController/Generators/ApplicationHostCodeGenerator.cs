@@ -20,7 +20,7 @@ internal static class ApplicationHostCodeGenerator
         foreach (var client in clients)
         {
             var first = client.First().Endpoint!;
-            context.AddSource($"Application{first.Domain}{first.RequestKind}Api.g.cs", GenerateClient(client));
+            context.AddSource($"Application{first.Domain}{first.RequestKind}ApiClient.g.cs", GenerateClient(client));
         }
 
         ControllerCodeGenerator.Generate(context, model.Operations
@@ -81,8 +81,8 @@ internal static class ApplicationHostCodeGenerator
         builder.Append("namespace ").Append(first.ContractNamespaceRoot).AppendLine(".Implementations.Application;");
         builder.AppendLine();
         builder.AppendLine("/// <summary>Dispatches each application operation through its host-owned placement policy.</summary>");
-        builder.Append("public sealed class Application").Append(first.Domain).Append(first.RequestKind).AppendLine("Api(");
-        builder.Append("    global::Monica.Rpc.Abstractions.IApplicationApiInvoker invoker) : ").Append(client.Key).AppendLine();
+        builder.Append("public sealed class Application").Append(first.Domain).Append(first.RequestKind).AppendLine("ApiClient(");
+        builder.Append("    global::Monica.Invocation.Abstractions.IApplicationApiInvoker invoker) : ").Append(client.Key).AppendLine();
         builder.AppendLine("{");
         foreach (var operation in client.OrderBy(static operation => operation.Endpoint!.OperationName, StringComparer.Ordinal))
         {
@@ -92,7 +92,7 @@ internal static class ApplicationHostCodeGenerator
                 .Append(endpoint.OperationName).Append('(').Append(endpoint.RequestTypeName).AppendLine(" request,");
             builder.AppendLine("        global::System.Threading.CancellationToken cancellationToken = default)");
             builder.Append("        => invoker.InvokeAsync<").Append(endpoint.ResultTypeName).AppendLine(">(request,");
-            builder.Append("            new global::Monica.Rpc.Models.RpcHttpEndpoint(")
+            builder.Append("            new global::Monica.Invocation.Models.ApiHttpEndpoint(")
                 .Append(Literal(endpoint.HttpMethod.ToUpperInvariant())).Append(", ").Append(Literal(endpoint.CompleteRoute))
                 .Append(", ").Append(endpoint.Binding == "Query" ? "true" : "false")
                 .Append(", ").Append(endpoint.Binding == "Body" ? "true" : "false")

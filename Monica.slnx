@@ -23,7 +23,7 @@
   <Folder Name="/tests/Fixtures/">
     <Project Path="tests/Fixtures/ApplicationModel.Domain/ApplicationModel.Domain.csproj" />
     <Project Path="tests/Fixtures/ApplicationModel.Role/ApplicationModel.Role.csproj" />
-    <Project Path="tests/Fixtures/ApplicationRpc.Role/ApplicationRpc.Role.csproj" />
+    <Project Path="tests/Fixtures/ApplicationInvocation.Role/ApplicationInvocation.Role.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Test.Monica.Utilities/Test.Monica.Utilities.csproj" />
@@ -56,7 +56,7 @@
     <Project Path="tests/Test.Monica.AI.UI/Test.Monica.AI.UI.csproj" />
     <Project Path="tests/Test.Monica.Application/Test.Monica.Application.csproj" />
     <Project Path="tests/Test.Monica.ApplicationModel/Test.Monica.ApplicationModel.csproj" />
-    <Project Path="tests/Test.Monica.ApplicationRpc/Test.Monica.ApplicationRpc.csproj" />
+    <Project Path="tests/Test.Monica.ApplicationInvocation/Test.Monica.ApplicationInvocation.csproj" />
     <Project Path="tests/Test.Monica.Authority/Test.Monica.Authority.csproj" />
     <Project Path="tests/Test.Monica.Profiling/Test.Monica.Profiling.csproj" />
     <Project Path="tests/Test.Monica.OpenTelemetry/Test.Monica.OpenTelemetry.csproj" />
@@ -111,7 +111,7 @@
   <Project Path="Monica.ServiceDiscovery/Monica.ServiceDiscovery.csproj" />
   <Project Path="Monica.Repository.UI/Monica.Repository.UI.csproj" />
   <Project Path="Monica.Repository/Monica.Repository.csproj" />
-  <Project Path="Monica.Rpc/Monica.Rpc.csproj" />
+  <Project Path="Monica.Invocation/Monica.Invocation.csproj" />
   <Project Path="Monica.SignalR/Monica.SignalR.csproj" />
   <Project Path="Monica.StateStore.StackExchange/Monica.StateStore.StackExchange.csproj" />
   <Project Path="Monica.StateStore.UI/Monica.StateStore.UI.csproj" />
