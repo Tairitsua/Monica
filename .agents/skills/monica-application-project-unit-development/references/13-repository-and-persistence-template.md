@@ -1,5 +1,7 @@
 # Repository and DbContext Template
 
+For concurrent aggregate modification or Actor migration, apply the [aggregate concurrency contract](19-aggregate-concurrency.md) alongside the rules below.
+
 Use `$DomainNamespace$` for the domain project namespace and `$RepositoryNamespace$` for its infrastructure side. Keep interfaces in domain `Interfaces/` and implementations/mapping in domain `Repository/`; no new shared project or domain `Persistence/` folder is required.
 
 ## Rules

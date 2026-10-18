@@ -18,6 +18,8 @@ Use [startup seeding](../../monica-infra-jobs/references/startup-seeding.md) for
 
 ## Hosted Service
 
+Follow the [hosted-service template](18-hosted-service-template.md) for naming, role placement, scoped work, admission, ordering, cancellation, and verification. A permanent loop must not be started by a Seeder.
+
 Use a hosted service when work owns host start/stop or continuous infrastructure activity. `IHostedService` is discoverable as `HostedService`; Monica's `MoHostedService` and `MoBackgroundService` additionally supply observed lifecycle and finite work-item execution points. Use [hosted-service integration](../../monica-infra-hosting/references/hosted-services.md) for registration and scope/lifecycle semantics.
 
 Register one host-owned instance. Do not retain scoped repositories in a long-lived worker; finite work runs in the native work-item scope. Business behavior stays in its owning entity/service. Choose a scheduler job when the requirement is independent scheduled/triggered execution with history and operator control.

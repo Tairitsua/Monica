@@ -1,5 +1,7 @@
 # Hosted services
 
+For application unit naming, role placement, queue ownership, scoped operations, and migration from Seeder-started loops, use the [hosted-service template](../../monica-application-project-unit-development/references/18-hosted-service-template.md). `HostedService` remains the existing ProjectUnit classification; work items are support types.
+
 In a unified application, the [application model](application-model.md) removes concrete `IHostedService` registrations owned by inactive roles before `AddMonica` completes. Register those services before or during Monica composition. Opaque factories and registrations added later require explicit role selection from the same startup deployment snapshot; the framework never constructs a service just to discover its ownership.
 
 Use `monica.AddHostedService()` inside the host's `AddMonica(...)` callback when workers need Monica runtime observation. It supplies a registry, runtime observers, checkpoints, and metrics. `MoHostedService` and `MoBackgroundService` report transitions through `RecordState(...)`; they do not replace normal `IHostedService` registration. Register the concrete service through DI and expose that same instance through `services.AddHostedService(sp => sp.GetRequiredService<MyWorker>())` when other services also resolve it. Registering separate singleton instances would make observation and application behavior diverge.

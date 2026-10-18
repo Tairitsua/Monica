@@ -478,6 +478,7 @@
           "dependency-injection",
           "dynamic-proxy",
           "hosted-service",
+          "locker",
           "service-discovery",
           "state-store"
         ],
@@ -485,11 +486,15 @@
           "Monica.Core",
           "Monica.ApplicationModel",
           "Monica.DependencyInjection",
+          "Monica.Locker",
           "Monica.ServiceDiscovery",
           "Monica.StateStore",
           "Monica.StateStore.StackExchange",
           "Monica.StateStore.UI",
-          "Monica.Dapr/Modules/ModuleDaprStateStore.cs"
+          "Monica.Dapr/Modules/ModuleDaprStateStore.cs",
+          "Monica.Dapr/Modules/ModuleDaprLocker.cs",
+          "Monica.Dapr/Services/DaprLockProvider.cs",
+          "Monica.Dapr/Services/DaprLockHandle.cs"
         ]
       }
     },

@@ -15,6 +15,7 @@ public static class ModuleDaprLockerBuilderExtensions
     /// <summary>
     /// Registers the Dapr lock provider on top of the Locker module and returns its module registration.
     /// </summary>
+    /// <remarks>The provider and Dapr distributed lock client are host-owned singletons.</remarks>
     /// <param name="module">The Locker registration that should use the Dapr provider.</param>
     /// <param name="action">Optional Dapr locker option configuration.</param>
     /// <returns>The Dapr locker module registration.</returns>
@@ -35,7 +36,7 @@ public class ModuleDaprLocker : MonicaModule<ModuleDaprLockerOption>
     public override void ConfigureServices(ModuleContext<ModuleDaprLockerOption> context)
     {
         var services = context.Services;
-        // Keep client customization here so provider code only focuses on acquisition semantics.
+        // The singleton Locker provider must not capture the SDK's default scoped client.
         services.AddDaprDistributedLock((serviceProvider, clientBuilder) =>
         {
             if (!string.IsNullOrWhiteSpace(Option.DaprHttpEndpoint))
@@ -52,7 +53,7 @@ public class ModuleDaprLocker : MonicaModule<ModuleDaprLockerOption>
             {
                 clientBuilder.UseGrpcChannelOptions(Option.GrpcChannelOptions);
             }
-        });
+        }, lifetime: ServiceLifetime.Singleton);
     }
 
     public override void Describe(ModuleDescriptor module)

@@ -44,6 +44,8 @@ When adding or refactoring application EventBus events and consumers, including 
 - Repository and DbContext templates: [13-repository-and-persistence-template.md](references/13-repository-and-persistence-template.md)
 - Event handler templates: [14-event-handler-template.md](references/14-event-handler-template.md)
 - Job templates: [15-job-template.md](references/15-job-template.md)
+- Continuous consumers, scoped work items, and shutdown: [18-hosted-service-template.md](references/18-hosted-service-template.md)
+- Aggregate concurrency and Actor replacement: [19-aggregate-concurrency.md](references/19-aggregate-concurrency.md)
 - Configuration templates: [16-configuration-template.md](references/16-configuration-template.md)
 - Connected request, handler, entity, and repository example: [17-connected-use-case-example.md](references/17-connected-use-case-example.md)
 

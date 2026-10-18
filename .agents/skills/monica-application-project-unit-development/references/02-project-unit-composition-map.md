@@ -86,10 +86,10 @@ Use [04-adapters-lifecycle-and-support-types.md](04-adapters-lifecycle-and-suppo
 
 - Bounded, persistence-facing generic CRUD: the native CRUD adapter under its explicit exception.
 - Finite startup preparation: a Seeder.
-- Continuous infrastructure or start/stop ownership: a hosted service.
+- Continuous infrastructure or start/stop ownership: a [hosted service](18-hosted-service-template.md) with finite scoped work where required.
 - HTTP-specific transport behavior: a thin controller only when a request-owned endpoint does not express it.
 - Internal mediated operation: the existing `IRequestHandler` contract without HTTP exposure.
-- Public UI/API entry: a Facade in the owning domain.
+- Public business UI/API entry: an ApplicationService reached through the generated domain client.
 
 These choices do not create new business roles. Use the native mechanism and the project's adopted placement; propose a new family or execution model through specification evolution before adopting it.
 

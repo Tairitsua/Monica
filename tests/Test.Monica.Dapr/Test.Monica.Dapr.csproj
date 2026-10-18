@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Monica.Dapr\Monica.Dapr.csproj" />
+    <ProjectReference Include="..\..\Monica.Testing\Monica.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

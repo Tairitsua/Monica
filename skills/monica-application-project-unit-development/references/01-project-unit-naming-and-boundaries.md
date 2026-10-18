@@ -18,6 +18,7 @@ These conventions mirror the current `Monica.ProjectUnits` naming diagnostics. C
 | `Configuration` | Class name ends with `Options` | `*Options` |
 | `RecurringJob` | Class name starts with `Worker` | `Worker*` |
 | `TriggeredJob` | Class name starts with `Job` | `Job*` |
+| `HostedService` | No native naming diagnostic | `{Purpose}HostedService` for resource lifecycle; `{Purpose}BackgroundService` for a continuous loop |
 | `RequestDto` | Implements `IResultRequest<T>` or `IResultRequest` | Prefer `Command*`, `Query*`, or `Request*` |
 
 ## Source File Names
@@ -38,6 +39,7 @@ These names describe support types; they do not create additional discovered rol
 | Internal mediator handler | `CommandHandler*`, `QueryHandler*`, or meaningful `*Handler*` | Internal use-case orchestration through the existing mediator contract |
 | Response/read DTO, value object, mapper, validator | Business meaning plus an existing repository convention | Data shape, invariant value, mapping, or validation without a new role |
 | Composition module | Existing `Module*` convention | Registration and host integration, for product bootstrap and explicit integrations; not one module per business feature |
+| Hosted-service work item and state | `{Purpose}WorkItem`, `{Purpose}State` or `{Purpose}Buffer` | Finite scoped processing and explicitly owned process state beside `HostedServices/`; not new ProjectUnit families |
 
 ## Project-Level Extensions
 
