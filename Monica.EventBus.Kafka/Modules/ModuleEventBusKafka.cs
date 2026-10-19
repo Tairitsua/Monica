@@ -480,9 +480,56 @@ public sealed class ModuleEventBusKafkaOption : MinimalApiModuleOptions<ModuleEv
     public string ClientId { get; set; } = "monica-eventbus-kafka";
 
     /// <summary>
-    /// Gets or sets the Kafka consumer group id used by native EventBus subscriptions.
+    /// Gets or sets the Kafka consumer group prefix used by native EventBus subscriptions,
+    /// monica-eventbus by default. Set a stable deployment scope; workload owner and optional
+    /// keyed-bus segments are appended so replicas compete only for the same logical receiver.
     /// </summary>
     public string ConsumerGroupId { get; set; } = "monica-eventbus";
+
+    /// <summary>
+    /// Gets or sets the maximum native producer protocol request size, 1,000,000 bytes by default.
+    /// Broker and topic limits must also admit the payload and protocol overhead.
+    /// </summary>
+    public int ProducerMessageMaxBytes { get; set; } = 1_000_000;
+
+    /// <summary>
+    /// Gets or sets the native producer delivery deadline including retries, two minutes by default.
+    /// Keep this below the repository Outbox delivery lease. Cancellation may end the caller's wait
+    /// while the queued native produce operation still completes, so durable receivers require Inbox deduplication.
+    /// </summary>
+    public TimeSpan ProducerDeliveryTimeout { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Gets or sets the initial per-partition fetch size for native EventBus consumers, 1 MiB by default.
+    /// librdkafka may increase this limit to retrieve an existing larger batch.
+    /// </summary>
+    public int ConsumerFetchMessageMaxBytes { get; set; } = 1024 * 1024;
+
+    /// <summary>
+    /// Gets or sets the native EventBus consumer fetch response target, 50 MiB by default.
+    /// The first batch can exceed this target so an existing large message does not block progress.
+    /// </summary>
+    public int ConsumerFetchMaxBytes { get; set; } = 50 * 1024 * 1024;
+
+    /// <summary>
+    /// Gets or sets the native consumer maximum interval between polls, five minutes by default.
+    /// Include the complete handler transaction time and use at least <see cref="ConsumerSessionTimeout"/>.
+    /// Exceeding this interval can transfer the partition to another replica and cause redelivery.
+    /// </summary>
+    public TimeSpan ConsumerMaxPollInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Gets or sets the native consumer heartbeat session timeout, 45 seconds by default.
+    /// The broker must allow the configured value through its group session timeout limits.
+    /// </summary>
+    public TimeSpan ConsumerSessionTimeout { get; set; } = TimeSpan.FromSeconds(45);
+
+    /// <summary>
+    /// Gets or sets the policy when a native EventBus partition has no usable committed offset.
+    /// The default Error policy requires explicit offset provisioning during cutover; choose
+    /// Earliest or Latest deliberately for a new environment. Existing valid commits take precedence.
+    /// </summary>
+    public Confluent.Kafka.AutoOffsetReset AutoOffsetReset { get; set; } = Confluent.Kafka.AutoOffsetReset.Error;
 
     /// <summary>
     /// Gets or sets the request timeout used by Kafka admin operations.

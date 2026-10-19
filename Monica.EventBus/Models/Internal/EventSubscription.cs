@@ -15,6 +15,7 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor) : IEven
 
     public EventSubscriptionId Id { get; } = EventSubscriptionId.NewId();
     public string? ServiceKey { get; } = descriptor.ServiceKey;
+    public string? WorkloadOwner { get; } = descriptor.WorkloadOwner;
     public Type EventType { get; } = descriptor.EventType;
     public string TopicName { get; } = descriptor.TopicName;
 

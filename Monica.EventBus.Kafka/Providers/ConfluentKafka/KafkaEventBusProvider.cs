@@ -45,6 +45,24 @@ public sealed class KafkaEventBusProvider(
     });
     private bool _isDisposed;
 
+    internal KafkaEventBusProvider(
+        IServiceScopeFactory serviceScopeFactory,
+        IEventHandlerInvoker eventHandlerInvoker,
+        IEventSubscriptionRegistry subscriptionManager,
+        IKafkaClusterConfigProvider clusterConfigProvider,
+        IEventMessageFactory messageFactory,
+        IOptions<ModuleEventBusKafkaOption> options,
+        ILoggerFactory loggerFactory,
+        Func<ProducerConfig, IProducer<string, string>> producerFactory,
+        string? serviceKey = null)
+        : this(serviceScopeFactory, eventHandlerInvoker, subscriptionManager, clusterConfigProvider,
+            messageFactory, options, loggerFactory, serviceKey)
+    {
+        ArgumentNullException.ThrowIfNull(producerFactory);
+        _producer = new(() => producerFactory(KafkaClientConfigFactory.BuildProducerConfig(
+            clusterConfigProvider.GetDirectEventBusCluster(), options.Value)));
+    }
+
     /// <inheritdoc />
     public async Task SendAsync(EventMessage message, CancellationToken cancellationToken)
     {

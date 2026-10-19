@@ -4,6 +4,10 @@ Register `monica.AddEventBusKafkaUI()` in an ASP.NET Core host with the Monica s
 
 When the backend's Minimal API is enabled, its endpoints use Monica's normal result-envelope serialization and message policy. The Kafka backend declares `ModuleResultEnvelope` as a dependency; a host does not need to add it separately to make these responses work. The browser workspace and HTTP API consume the same facade, while the shell's operational-page access policy still controls page access.
 
+The cluster selected by `UseKafkaProvider(...)` is owned by startup configuration. Its identity takes precedence over configured or persisted console records, and console upsert/delete operations reject that identity. Change its connection through the host's startup configuration and restart the host. Broker administration still targets the actual runtime cluster.
+
+Cluster summaries returned to the UI or HTTP API omit SASL usernames and passwords. Connection probes and broker operations resolve the private configuration on the server; redacted summary configuration must never be used as their credential source. When editing a console-managed cluster, leaving either credential empty preserves its stored value, while a nonempty replacement updates it. Passwords retain their exact characters, including whitespace. Persisted cluster records continue to store the real credentials; redaction applies at the presentation boundary. A saved edit changes `UpdatedAt`, invalidating earlier connection evidence even when only credentials changed; ordinary listing retains that revision.
+
 ## Routes and broker context
 
 | Route | Task |

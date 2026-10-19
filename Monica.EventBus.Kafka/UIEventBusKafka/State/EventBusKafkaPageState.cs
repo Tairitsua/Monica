@@ -803,12 +803,12 @@ public sealed class EventBusKafkaPageState(
 
     private static bool CanPreserveRuntimeState(KafkaClusterConfig previous, KafkaClusterConfig current)
     {
-        return string.Equals(previous.BootstrapServers, current.BootstrapServers, StringComparison.Ordinal) &&
+        // Credentials are redacted from summaries. The stored edit revision invalidates their old probe evidence.
+        return previous.UpdatedAt == current.UpdatedAt &&
+               string.Equals(previous.BootstrapServers, current.BootstrapServers, StringComparison.Ordinal) &&
                string.Equals(previous.ClientId, current.ClientId, StringComparison.Ordinal) &&
                string.Equals(previous.SecurityProtocol, current.SecurityProtocol, StringComparison.Ordinal) &&
                string.Equals(previous.SaslMechanism, current.SaslMechanism, StringComparison.Ordinal) &&
-               string.Equals(previous.SaslUsername, current.SaslUsername, StringComparison.Ordinal) &&
-               string.Equals(previous.SaslPassword, current.SaslPassword, StringComparison.Ordinal) &&
                string.Equals(previous.SslCaLocation, current.SslCaLocation, StringComparison.Ordinal) &&
                previous.CredentialsManagedExternally == current.CredentialsManagedExternally;
     }

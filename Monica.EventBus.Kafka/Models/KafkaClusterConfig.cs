@@ -42,6 +42,7 @@ public sealed class KafkaClusterConfig
 
     /// <summary>
     /// Optional SASL password. Leave empty when credentials are managed outside Monica, such as in Dapr.
+    /// Nonempty passwords retain their exact value, including leading, trailing, or embedded whitespace.
     /// </summary>
     public string? SaslPassword { get; set; }
 
@@ -100,7 +101,7 @@ public sealed class KafkaClusterConfig
         SecurityProtocol = NormalizeOptional(SecurityProtocol);
         SaslMechanism = NormalizeOptional(SaslMechanism);
         SaslUsername = NormalizeOptional(SaslUsername);
-        SaslPassword = NormalizeOptional(SaslPassword);
+        SaslPassword = string.IsNullOrEmpty(SaslPassword) ? null : SaslPassword;
         SslCaLocation = NormalizeOptional(SslCaLocation);
         JmxEndpoint = NormalizeOptional(JmxEndpoint);
         DaprPubSubName = NormalizeOptional(DaprPubSubName);

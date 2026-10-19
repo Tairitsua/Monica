@@ -161,10 +161,11 @@ internal class DaprEventBusSubscriptionHostedService(
     /// Creates a Dapr streaming subscription for the given topic.
     /// </summary>
     protected override Task CreateExternalSubscriptionForTopicAsync(
-        string topicName,
+        SubscriptionGroup group,
         Type eventType,
         CancellationToken cancellationToken)
     {
+        var topicName = group.TopicName;
         lock (_subscriptionLifecycleLock)
         {
             if (Volatile.Read(ref _stopping) == 1 || Volatile.Read(ref _disposed) == 1)
@@ -400,9 +401,10 @@ internal class DaprEventBusSubscriptionHostedService(
     /// Removes a Dapr subscription for the given topic.
     /// </summary>
     protected override async Task RemoveExternalSubscriptionForTopicAsync(
-        string topicName,
+        SubscriptionGroup group,
         CancellationToken cancellationToken)
     {
+        var topicName = group.TopicName;
         _recoveringTopics.TryRemove(topicName, out _);
 
         if (_daprSubscriptionsByTopic.TryRemove(topicName, out var daprSubscription))

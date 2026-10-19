@@ -33,9 +33,26 @@ internal static class EventHandlerDispatcher
                 $"No active {scope} event subscription exists for '{topicName}' on bus '{serviceKey ?? "default"}'.");
         }
 
+        await DispatchSubscriptionsAsync(subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken);
+    }
+
+    internal static async Task DispatchSubscriptionsAsync(
+        IReadOnlyList<IEventSubscription> subscriptions,
+        IEventHandlerInvoker invoker,
+        ILogger logger,
+        Type eventType,
+        object eventData,
+        EventDeliveryMetadata? metadata,
+        CancellationToken cancellationToken)
+    {
         foreach (var subscription in subscriptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (subscription.State != EventSubscriptionState.Active)
+            {
+                throw new InvalidOperationException(
+                    $"Event subscription '{subscription.Id}' stopped before delivery completed.");
+            }
             try
             {
                 await using var handlerScope = await subscription.HandlerFactory
@@ -56,5 +73,6 @@ internal static class EventHandlerDispatcher
                 throw;
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 }

@@ -15,6 +15,19 @@ public sealed class KafkaClusterService(
     KafkaBootstrapEndpointProbe bootstrapEndpointProbe,
     IOptions<ModuleEventBusKafkaOption> options)
 {
+    private readonly Func<KafkaClusterConfig, CancellationToken, Task<KafkaBootstrapEndpointProbeResult>> _probeBootstrap
+        = bootstrapEndpointProbe.ProbeAsync;
+
+    internal KafkaClusterService(IKafkaConsoleRepository repository, IKafkaAdminProvider adminProvider,
+        IOptions<ModuleEventBusKafkaOption> options,
+        Func<KafkaClusterConfig, CancellationToken, Task<KafkaBootstrapEndpointProbeResult>> probeBootstrap)
+        : this(repository, adminProvider, new KafkaBootstrapEndpointProbe(options), options)
+    {
+        ArgumentNullException.ThrowIfNull(probeBootstrap);
+        _probeBootstrap = probeBootstrap;
+    }
+
+    /// <summary>Gets presentation summaries with SASL credentials removed.</summary>
     public async Task<IReadOnlyList<KafkaClusterSummary>> ListClustersAsync(CancellationToken cancellationToken = default)
     {
         var clusters = await GetEffectiveClustersAsync(cancellationToken);
@@ -30,6 +43,8 @@ public sealed class KafkaClusterService(
             .ToList();
     }
 
+    /// <summary>Resolves private server-side broker configuration, including credentials.</summary>
+    /// <remarks>Use presentation summaries when returning cluster information to a UI or HTTP caller.</remarks>
     public async Task<KafkaClusterConfig> GetRequiredClusterAsync(string clusterId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clusterId);
@@ -77,7 +92,7 @@ public sealed class KafkaClusterService(
                 $"Kafka cluster '{cluster.ClusterId}' is visible but direct admin access is not configured.");
         }
 
-        var preflight = await bootstrapEndpointProbe.ProbeAsync(cluster, cancellationToken);
+        var preflight = await _probeBootstrap(cluster, cancellationToken);
         if (!preflight.IsReachable)
         {
             throw new InvalidOperationException(
@@ -85,17 +100,30 @@ public sealed class KafkaClusterService(
         }
     }
 
+    /// <summary>Saves a console-managed cluster, preserving saved credentials when their edit fields are empty.</summary>
+    /// <returns>A presentation summary without SASL credentials.</returns>
+    /// <exception cref="InvalidOperationException">The identity belongs to the native EventBus startup configuration.</exception>
     public async Task<KafkaClusterSummary> UpsertClusterAsync(KafkaClusterConfig cluster, CancellationToken cancellationToken = default)
     {
         var normalized = NormalizeForPersistence(cluster);
+        EnsureClusterCanBeEdited(normalized.ClusterId);
+        var existing = (await GetEffectiveClustersAsync(cancellationToken))
+            .FirstOrDefault(value => value.ClusterId == normalized.ClusterId);
+        // Summary credentials are redacted. Editing another field must not erase the saved secret.
+        normalized.SaslUsername ??= existing?.SaslUsername;
+        normalized.SaslPassword ??= existing?.SaslPassword;
         await repository.UpsertClusterAsync(normalized, cancellationToken);
         return await BuildSummaryAsync(normalized, refreshBrokerMetadata: false, cancellationToken);
     }
 
+    /// <summary>Deletes a console-managed cluster without changing startup-owned runtime configuration.</summary>
+    /// <exception cref="InvalidOperationException">The identity belongs to the native EventBus startup configuration.</exception>
     public Task DeleteClusterAsync(string clusterId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clusterId);
-        return repository.DeleteClusterAsync(clusterId.Trim(), cancellationToken);
+        var normalizedId = clusterId.Trim();
+        EnsureClusterCanBeEdited(normalizedId);
+        return repository.DeleteClusterAsync(normalizedId, cancellationToken);
     }
 
     public async Task<KafkaClusterSummary> TestConnectionAsync(string clusterId, CancellationToken cancellationToken = default)
@@ -120,15 +148,17 @@ public sealed class KafkaClusterService(
             clusters[normalized.ClusterId] = normalized;
         }
 
-        if (options.Value.DirectEventBusCluster is not null)
-        {
-            var directCluster = options.Value.DirectEventBusCluster.Clone().Normalize();
-            clusters[directCluster.ClusterId] = directCluster;
-        }
-
         foreach (var persistedCluster in await repository.GetClustersAsync(cancellationToken))
         {
             var normalized = persistedCluster.Clone().Normalize();
+            clusters[normalized.ClusterId] = normalized;
+        }
+
+        // Runtime configuration owns the actual transport. A persisted console record cannot
+        // redirect its diagnostics to another broker while the producer keeps using this one.
+        if (options.Value.DirectEventBusCluster is { } runtimeCluster)
+        {
+            var normalized = runtimeCluster.Clone().Normalize();
             clusters[normalized.ClusterId] = normalized;
         }
 
@@ -144,7 +174,7 @@ public sealed class KafkaClusterService(
     {
         var summary = new KafkaClusterSummary
         {
-            Config = cluster.Clone().Normalize(),
+            Config = CreateSummaryConfiguration(cluster),
             CapturedAt = DateTimeOffset.UtcNow
         };
 
@@ -161,7 +191,7 @@ public sealed class KafkaClusterService(
             return summary;
         }
 
-        var preflight = await bootstrapEndpointProbe.ProbeAsync(summary.Config, cancellationToken);
+        var preflight = await _probeBootstrap(cluster, cancellationToken);
         if (!preflight.IsReachable)
         {
             summary.IsReachable = false;
@@ -171,10 +201,10 @@ public sealed class KafkaClusterService(
 
         try
         {
-            var connection = await adminProvider.TestConnectionAsync(summary.Config, cancellationToken);
+            var connection = await adminProvider.TestConnectionAsync(cluster, cancellationToken);
             summary.IsReachable = true;
             summary.BrokerCount = connection.Brokers.Count;
-            await TryPopulateInventoryCountsAsync(summary, cancellationToken);
+            await TryPopulateInventoryCountsAsync(summary, cluster, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -191,11 +221,12 @@ public sealed class KafkaClusterService(
 
     private async Task TryPopulateInventoryCountsAsync(
         KafkaClusterSummary summary,
+        KafkaClusterConfig cluster,
         CancellationToken cancellationToken)
     {
         try
         {
-            var topics = await adminProvider.ListTopicMetadataAsync(summary.Config, cancellationToken);
+            var topics = await adminProvider.ListTopicMetadataAsync(cluster, cancellationToken);
             summary.TopicCount = topics.Count;
             summary.HasTopicInventory = true;
         }
@@ -210,7 +241,7 @@ public sealed class KafkaClusterService(
 
         try
         {
-            var groups = await adminProvider.ListConsumerGroupsAsync(summary.Config, cancellationToken);
+            var groups = await adminProvider.ListConsumerGroupsAsync(cluster, cancellationToken);
             summary.ConsumerGroupCount = groups.Count;
             summary.HasConsumerGroupInventory = true;
         }
@@ -254,5 +285,23 @@ public sealed class KafkaClusterService(
 
         normalized.UpdatedAt = DateTimeOffset.UtcNow;
         return normalized;
+    }
+
+    private void EnsureClusterCanBeEdited(string clusterId)
+    {
+        if (options.Value.DirectEventBusCluster is { } runtimeCluster
+            && runtimeCluster.Clone().Normalize().ClusterId == clusterId)
+        {
+            throw new InvalidOperationException(
+                $"Kafka cluster '{clusterId}' is owned by the native EventBus startup configuration and cannot be edited or deleted through the console.");
+        }
+    }
+
+    private static KafkaClusterConfig CreateSummaryConfiguration(KafkaClusterConfig cluster)
+    {
+        var summary = cluster.Clone().Normalize();
+        summary.SaslUsername = null;
+        summary.SaslPassword = null;
+        return summary;
     }
 }

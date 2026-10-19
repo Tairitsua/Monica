@@ -15,26 +15,32 @@ public sealed class EventReceiveDispatcher(
     IJsonSerializerOptionsProvider jsonOptions,
     ILogger<EventReceiveDispatcher> logger) : IEventReceiveDispatcher
 {
-    public async Task DispatchAsync(EventMessage message, CancellationToken cancellationToken)
+    public Task DispatchAsync(EventMessage message, CancellationToken cancellationToken)
+        => DispatchCoreAsync(message, filterWorkloadOwner: false, workloadOwner: null, cancellationToken);
+
+    /// <inheritdoc />
+    public Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken)
+        => DispatchCoreAsync(message, filterWorkloadOwner: true, workloadOwner, cancellationToken);
+
+    private async Task DispatchCoreAsync(
+        EventMessage message, bool filterWorkloadOwner, string? workloadOwner, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
+        cancellationToken.ThrowIfCancellationRequested();
         var metadata = message.Metadata;
-        var eventTypes = registry.GetAll()
+        var subscriptions = registry.GetAll()
             .Where(subscription => subscription.TopicName == metadata.TopicName &&
                                    subscription.ServiceKey == metadata.ServiceKey &&
                                    subscription.Scope == message.Scope &&
-                                   subscription.State == EventSubscriptionState.Active)
-            .Select(subscription => subscription.EventType)
-            .Distinct()
+                                   subscription.State == EventSubscriptionState.Active &&
+                                   (!filterWorkloadOwner || subscription.WorkloadOwner == workloadOwner))
             .ToArray();
+        var eventTypes = subscriptions.Select(subscription => subscription.EventType).Distinct().ToArray();
         if (eventTypes.Length == 0)
         {
-            if (message.Scope == EventSubscriptionScope.Local)
-            {
-                throw new InvalidOperationException(
-                    $"No active local event subscription exists for '{metadata.TopicName}'.");
-            }
-            return;
+            throw new InvalidOperationException(
+                $"No active {message.Scope} event subscription exists for '{metadata.TopicName}'" +
+                (filterWorkloadOwner ? $" and workload owner '{workloadOwner ?? "<unowned>"}'." : "."));
         }
         if (eventTypes.Length != 1)
         {
@@ -59,8 +65,7 @@ public sealed class EventReceiveDispatcher(
             throw new EventMessageDeserializationException(
                 $"Event '{metadata.EventName}' could not be deserialized.", ex);
         }
-        await EventHandlerDispatcher.DispatchAsync(registry, invoker, logger, eventType, eventData,
-            message.Scope, metadata.ServiceKey, metadata.TopicName, metadata,
-            requireSubscription: message.Scope == EventSubscriptionScope.Local, cancellationToken);
+        await EventHandlerDispatcher.DispatchSubscriptionsAsync(
+            subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken);
     }
 }

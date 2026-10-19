@@ -21,6 +21,9 @@ public interface IEventSubscription : IAsyncDisposable
     /// </summary>
     string? ServiceKey { get; }
 
+    /// <summary>Gets the stable logical consumer owner, or null for an unowned subscription.</summary>
+    string? WorkloadOwner { get; }
+
     /// <summary>
     /// Event type this subscription listens to.
     /// </summary>

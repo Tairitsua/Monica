@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
 using Monica.EventBus.Models.Internal;
 
@@ -9,7 +11,9 @@ namespace Monica.EventBus.Services;
 /// <summary>
 /// Manages subscription lifecycle and provides queryable access to all subscriptions.
 /// </summary>
-public class EventSubscriptionRegistry(ILogger<EventSubscriptionRegistry> logger) : IEventSubscriptionRegistry
+public class EventSubscriptionRegistry(
+    ILogger<EventSubscriptionRegistry> logger,
+    ITypeActivationPolicy? activation = null) : IEventSubscriptionRegistry
 {
     private readonly ConcurrentQueue<EventSubscriptionChange> _notificationQueue = new();
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
@@ -24,6 +28,21 @@ public class EventSubscriptionRegistry(ILogger<EventSubscriptionRegistry> logger
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (descriptor.Scope == EventSubscriptionScope.Distributed && descriptor.WorkloadOwner is null
+            && descriptor.HandlerFactory.GetHandlerType() is { } handlerType)
+        {
+            descriptor = descriptor with
+            {
+                WorkloadOwner = handlerType.GetCustomAttributes(inherit: true)
+                    .OfType<EventSubscriptionOwnerAttribute>().FirstOrDefault()?.WorkloadOwner
+                    ?? activation?.GetWorkloadOwner(handlerType)
+            };
+        }
+        if (descriptor.WorkloadOwner is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.WorkloadOwner, nameof(descriptor));
+        }
 
         var subscription = new EventSubscription(descriptor);
  
