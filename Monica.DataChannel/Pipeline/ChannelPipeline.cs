@@ -337,6 +337,7 @@ public class ChannelPipeline : IObservableInstance
             {
                 await OuterEndpoint.ReceiveDataAsync(data);
             }
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {

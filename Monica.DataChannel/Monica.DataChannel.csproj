@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Apache.NMS.ActiveMQ" Version="2.2.0" />
-    <PackageReference Include="Confluent.Kafka" Version="2.13.0" />
+    <PackageReference Include="Confluent.Kafka" Version="2.15.0" />
     <PackageReference Include="System.IO.Ports" Version="10.0.2" />
   </ItemGroup>
 

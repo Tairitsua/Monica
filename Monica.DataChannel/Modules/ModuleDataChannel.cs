@@ -12,6 +12,7 @@ using Monica.DataChannel;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Facades;
 using Monica.DataChannel.Metrics;
+using Monica.DataChannel.Providers.Kafka;
 using Monica.DataChannel.Providers.TCP.Utils;
 using Monica.DataChannel.Services;
 
@@ -46,6 +47,7 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
         services.TryAddSingleton<IDataChannelRegistrar>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<IDataChannelManager>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<TcpConnectionRuntime>();
+        services.TryAddSingleton<IKafkaDataChannelClientFactory, KafkaDataChannelClientFactory>();
         services.TryAddSingleton<MessageMetrics>();
         services.AddScoped<DataChannelFacade>();
         services.AddHostedService<DataChannelInitializerService>();
