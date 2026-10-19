@@ -7,7 +7,6 @@ using Monica.Modules;
 using Monica.StateStore.Abstractions;
 using Monica.StateStore.Models;
 using Monica.StateStore.Queries;
-using Monica.StateStore.StackExchange.Connection;
 using Monica.StateStore.StackExchange.Scripts;
 using StackExchange.Redis;
 
@@ -17,57 +16,25 @@ namespace Monica.StateStore.StackExchange;
 /// Redis state store implementation based on StackExchange.Redis.
 /// Uses Hash storage format with fields: data, version
 /// ETag = version.ToString() (increments on each save)
-/// TTL is set atomically within Lua scripts via EXPIRE command
-/// Reference: Dapr components-contrib/state/redis/redis.go
+/// TTL is set atomically within Lua scripts with millisecond precision.
 /// </summary>
 /// <remarks>
 /// Typed values use the immutable JSON contract owned by the current Monica host. Changing that host contract also
 /// changes the persisted Redis representation and must be coordinated with existing state.
+/// The host owns the injected connection and its disposal. A null TTL uses the configured default; zero makes the
+/// entry permanent, including when replacing an expiring entry. Conditional operations require the exact stored ETag;
+/// an empty ETag or <c>"0"</c> is not an unconditional-write or deletion token.
 /// </remarks>
 public class RedisStateStore(
     IConnectionMultiplexer connection,
     IOptions<ModuleRedisStateStoreOption> options,
     IJsonSerializerOptionsProvider serializerOptionsProvider,
-    IRedisConnectionFactory connectionFactory,
     ILogger<RedisStateStore> logger) : DistributedStateStoreBase(logger), IStateStoreKeyTtlReader
 {
     private readonly IConnectionMultiplexer _connection = connection;
     private readonly ModuleRedisStateStoreOption _option = options.Value;
     private readonly IDatabase _database = connection.GetDatabase(options.Value.DatabaseIndex);
-    private readonly IRedisConnectionFactory _connectionFactory = connectionFactory;
     private readonly JsonSerializerOptions _serializerOptions = serializerOptionsProvider.SerializerOptions;
-
-    // Cached loaded scripts for performance
-    private LoadedLuaScript? _getWithETagScript;
-    private LoadedLuaScript? _saveStateScript;
-    private LoadedLuaScript? _compareAndSwapScript;
-    private LoadedLuaScript? _deleteWithETagScript;
-    private LoadedLuaScript? _saveIfNotExistsScript;
-    private bool _scriptsInitialized;
-    private readonly object _scriptLock = new();
-
-    /// <summary>
-    /// Initialize Lua scripts on first use (lazy initialization).
-    /// Throws exception if scripts cannot be loaded.
-    /// </summary>
-    private void EnsureScriptsLoaded()
-    {
-        if (_scriptsInitialized) return;
-
-        lock (_scriptLock)
-        {
-            if (_scriptsInitialized) return;
-
-            var server = _connectionFactory.GetPrimaryServer(_connection);
-            _getWithETagScript = RedisLuaScripts.GetGetWithETagScript().Load(server);
-            _saveStateScript = RedisLuaScripts.GetSaveStateScript().Load(server);
-            _compareAndSwapScript = RedisLuaScripts.GetCompareAndSwapScript().Load(server);
-            _deleteWithETagScript = RedisLuaScripts.GetDeleteWithETagScript().Load(server);
-            _saveIfNotExistsScript = RedisLuaScripts.GetSaveIfNotExistsScript().Load(server);
-            _scriptsInitialized = true;
-            Logger.LogDebug("Redis Lua scripts loaded successfully");
-        }
-    }
 
     /// <summary>
     /// Get the final Redis key with optional KeyPrefix configuration
@@ -86,7 +53,7 @@ public class RedisStateStore(
             return redisKey;
 
         var prefixWithColon = $"{_option.KeyPrefix}:";
-        return redisKey.StartsWith(prefixWithColon)
+        return redisKey.StartsWith(prefixWithColon, StringComparison.Ordinal)
             ? redisKey[prefixWithColon.Length..]
             : redisKey;
     }
@@ -97,20 +64,32 @@ public class RedisStateStore(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var keys = new List<string>();
-            var server = _connectionFactory.GetPrimaryServer(_connection);
-            var redisPattern = GetRedisKey(pattern);
-
-            await foreach (var key in server.KeysAsync(
-                database: _option.DatabaseIndex,
-                pattern: redisPattern).WithCancellation(cancellationToken))
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            var servers = _connection.GetServers()
+                .Where(server => !server.IsReplica && server.ServerType != ServerType.Sentinel)
+                .ToArray();
+            if (servers.Length == 0 || servers.Any(server => !server.IsConnected))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                keys.Add(StripRedisKeyPrefix(key.ToString()));
+                throw new InvalidOperationException("All Redis primary servers must be connected to scan state keys.");
+            }
+
+            // The namespace is literal; only the caller-supplied pattern contains Redis glob operators.
+            var redisPattern = string.IsNullOrEmpty(_option.KeyPrefix)
+                ? pattern
+                : $"{EscapeGlobPattern(_option.KeyPrefix)}:{pattern}";
+            foreach (var server in servers)
+            {
+                await foreach (var key in server.KeysAsync(
+                    database: _option.DatabaseIndex,
+                    pattern: redisPattern).WithCancellation(cancellationToken))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    keys.Add(StripRedisKeyPrefix(key.ToString()));
+                }
             }
 
             Logger.LogDebug("Found {Count} keys matching pattern: {Pattern}", keys.Count, pattern);
-            return keys;
+            return keys.ToList();
         }
         catch (OperationCanceledException)
         {
@@ -121,6 +100,15 @@ public class RedisStateStore(
         {
             throw ex.CreateException(Logger, "ERROR scanning keys with pattern {0}", pattern);
         }
+    }
+
+    private static string EscapeGlobPattern(string value)
+    {
+        return value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("*", "\\*", StringComparison.Ordinal)
+            .Replace("?", "\\?", StringComparison.Ordinal)
+            .Replace("[", "\\[", StringComparison.Ordinal)
+            .Replace("]", "\\]", StringComparison.Ordinal);
     }
 
     public override Task<Dictionary<string, T?>> QueryStateAsync<T>(
@@ -210,6 +198,10 @@ public class RedisStateStore(
                 {
                     result[keys[i]] = JsonSerializer.Deserialize<T>(value.ToString(), _serializerOptions);
                 }
+                else
+                {
+                    result[keys[i]] = default;
+                }
             }
 
             return result;
@@ -221,6 +213,25 @@ public class RedisStateStore(
         catch (Exception ex)
         {
             throw ex.CreateException(Logger, "ERROR getting bulk state with keys: {0}", string.Join(", ", keys));
+        }
+    }
+
+    /// <inheritdoc />
+    public override async Task<bool> ExistAsync(string key, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return await _database.HashExistsAsync(GetRedisKey(key), "data");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw ex.CreateException(Logger, "ERROR checking state existence with key: {0}", key);
         }
     }
 
@@ -277,18 +288,15 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            var ttl = await _database.KeyTimeToLiveAsync(redisKey);
-            if (ttl.HasValue)
+            var result = await _database.ScriptEvaluateAsync(
+                RedisLuaScripts.GetKeyTtlScript(), new { key = (RedisKey)redisKey });
+            var milliseconds = (long)result;
+            return milliseconds switch
             {
-                return StateStoreKeyTtlSnapshot.FromRemaining(ttl.Value);
-            }
-
-            if (!await _database.KeyExistsAsync(redisKey))
-            {
-                throw new KeyNotFoundException($"Key not found: {key}");
-            }
-
-            return StateStoreKeyTtlSnapshot.Permanent;
+                -2 => throw new KeyNotFoundException($"Key not found: {key}"),
+                -1 => StateStoreKeyTtlSnapshot.Permanent,
+                _ => StateStoreKeyTtlSnapshot.FromRemaining(TimeSpan.FromMilliseconds(milliseconds))
+            };
         }
         catch (OperationCanceledException)
         {
@@ -311,21 +319,17 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            EnsureScriptsLoaded();
-
             var json = JsonSerializer.Serialize(value, _serializerOptions);
-            var expiry = BuildTtl(ttl);
-            var ttlSeconds = (int)(expiry?.TotalSeconds ?? 0);
+            var ttlMilliseconds = BuildTtlMilliseconds(ttl);
 
             // Execute Lua script with TTL included
             await _database.ScriptEvaluateAsync(
-                _saveStateScript!,
+                RedisLuaScripts.GetSaveStateScript(),
                 new
                 {
                     key = (RedisKey)redisKey,
                     data = json,
-                    etag = "0", // Skip ETag check for regular save
-                    ttl = ttlSeconds
+                    ttl = ttlMilliseconds
                 });
         }
         catch (OperationCanceledException)
@@ -360,11 +364,15 @@ public class RedisStateStore(
     public override async Task DeleteBulkStateAsync(IReadOnlyList<string> keys, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (keys.Count == 0) return;
 
-        var redisKeys = keys.Select(k => (RedisKey)GetRedisKey(k)).ToArray();
         try
         {
-            await _database.KeyDeleteAsync(redisKeys);
+            // Individual commands can route to different cluster slots; a multi-key DEL cannot.
+            var batch = _database.CreateBatch();
+            var tasks = keys.Select(key => batch.KeyDeleteAsync(GetRedisKey(key))).ToArray();
+            batch.Execute();
+            await Task.WhenAll(tasks);
         }
         catch (OperationCanceledException)
         {
@@ -383,17 +391,15 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            EnsureScriptsLoaded();
-
             var result = await _database.ScriptEvaluateAsync(
-                _getWithETagScript!,
+                RedisLuaScripts.GetGetWithETagScript(),
                 new { key = (RedisKey)redisKey });
 
             var results = (RedisResult[])result!;
             var dataJson = (string?)results[0];
             var etag = (string)results[1]!;
 
-            if (dataJson == null || etag == "0")
+            if (dataJson == null)
                 return (default, string.Empty);
 
             var deserialized = JsonSerializer.Deserialize<T>(dataJson, _serializerOptions);
@@ -421,21 +427,18 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            EnsureScriptsLoaded();
-
             var json = JsonSerializer.Serialize(value, _serializerOptions);
-            var expiry = BuildTtl(ttl);
-            var ttlSeconds = (int)(expiry?.TotalSeconds ?? 0);
+            var ttlMilliseconds = BuildTtlMilliseconds(ttl);
 
             // Execute CAS script with TTL included
             var result = await _database.ScriptEvaluateAsync(
-                _compareAndSwapScript!,
+                RedisLuaScripts.GetCompareAndSwapScript(),
                 new
                 {
                     key = (RedisKey)redisKey,
                     etag = expectedETag,
                     data = json,
-                    ttl = ttlSeconds
+                    ttl = ttlMilliseconds
                 });
 
             if (result.IsNull)
@@ -468,20 +471,17 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            EnsureScriptsLoaded();
-
             var dataJson = JsonSerializer.Serialize(value, _serializerOptions);
-            var expiry = BuildTtl(ttl);
-            var ttlSeconds = (int)(expiry?.TotalSeconds ?? 0);
+            var ttlMilliseconds = BuildTtlMilliseconds(ttl);
 
             // Use atomic Lua script for first-write with TTL included
             var result = await _database.ScriptEvaluateAsync(
-                _saveIfNotExistsScript!,
+                RedisLuaScripts.GetSaveIfNotExistsScript(),
                 new
                 {
                     key = (RedisKey)redisKey,
                     data = dataJson,
-                    ttl = ttlSeconds
+                    ttl = ttlMilliseconds
                 });
 
             var success = (int)result == 1;
@@ -507,19 +507,22 @@ public class RedisStateStore(
         }
     }
 
-    private TimeSpan? BuildTtl(TimeSpan? ttl)
+    private long BuildTtlMilliseconds(TimeSpan? ttl)
     {
-        if (ttl == null)
-            return _option.DefaultTTL;
+        var expiry = ttl ?? _option.DefaultTTL;
+        if (expiry is null || expiry == TimeSpan.Zero)
+        {
+            return 0;
+        }
 
-        if (ttl.Value.TotalSeconds < 0)
-            throw new InvalidOperationException("TTL cannot be smaller than zero");
+        if (expiry < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ttl), "TTL cannot be smaller than zero.");
+        }
 
-        // TTL of 0 means permanent storage (no expiration)
-        if (ttl.Value.TotalSeconds == 0)
-            return null;
-
-        return ttl;
+        // Round up so a positive duration never becomes permanent or expires earlier through truncation.
+        var ticks = expiry.Value.Ticks;
+        return ticks / TimeSpan.TicksPerMillisecond + (ticks % TimeSpan.TicksPerMillisecond == 0 ? 0 : 1);
     }
 
     public override async Task SaveBulkStateAsync<T>(
@@ -527,16 +530,12 @@ public class RedisStateStore(
         CancellationToken cancellationToken = default,
         TimeSpan? ttl = null)
     {
-        if (items.Count == 0) return;
-
         cancellationToken.ThrowIfCancellationRequested();
+        if (items.Count == 0) return;
 
         try
         {
-            EnsureScriptsLoaded();
-
-            var expiry = BuildTtl(ttl);
-            var ttlSeconds = (int)(expiry?.TotalSeconds ?? 0);
+            var ttlMilliseconds = BuildTtlMilliseconds(ttl);
 
             // Use batch/pipeline for better performance
             var batch = _database.CreateBatch();
@@ -551,14 +550,15 @@ public class RedisStateStore(
                 var json = JsonSerializer.Serialize(value, _serializerOptions);
 
                 var task = batch.ScriptEvaluateAsync(
-                    _saveStateScript!,
+                    RedisLuaScripts.GetSaveStateScript(),
                     new
                     {
                         key = (RedisKey)redisKey,
                         data = json,
-                        etag = "0", // Skip ETag check for regular save
-                        ttl = ttlSeconds
-                    });
+                        ttl = ttlMilliseconds
+                    },
+                    // A batch cannot dispatch a NOSCRIPT retry queued after its Execute call.
+                    CommandFlags.NoScriptCache);
                 saveTasks.Add(task);
             }
 
@@ -587,10 +587,8 @@ public class RedisStateStore(
         var redisKey = GetRedisKey(key);
         try
         {
-            EnsureScriptsLoaded();
-
             var result = await _database.ScriptEvaluateAsync(
-                _deleteWithETagScript!,
+                RedisLuaScripts.GetDeleteWithETagScript(),
                 new
                 {
                     key = (RedisKey)redisKey,

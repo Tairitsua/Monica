@@ -13,12 +13,20 @@ builder.AddMonica(monica =>
         .UseRedisStateStoreProvider(options =>
         {
             options.UseNormalConnection("redis", 6379);
-            options.KeyPrefix = "my-app:";
+            options.KeyPrefix = "my-app";
         });
 });
 ```
 
 `UseDaprStateStoreProvider(options => options.StateStoreName = "app-state")` instead uses the Dapr sidecar and requires a state-store component with the same name. Dapr's client module brings in sidecar readiness monitoring. Redis also supports Sentinel and cluster connection methods. Configure credentials and endpoints from host configuration. Typed distributed values follow the host's canonical JSON contract; changing that contract can make persisted values unreadable.
+
+Redis appends `:` between a nonempty `KeyPrefix` and each logical key; `my-app` therefore stores `my-app:<key>`. The provider does not add an application ID. Use the same connection, database, prefix and JSON contract for every participant that shares state, and an independent namespace for another environment or persistence format. Redis hashes use `data` and `version` fields; selecting this provider does not migrate existing Dapr state.
+
+Redis `DefaultTTL` defaults to `null` (permanent). An omitted per-write TTL uses that default; an explicit `TimeSpan.Zero` makes the new value permanent. Positive durations round up to whole milliseconds, and a successful write replaces the previous expiry, including removing it for a permanent value. Negative durations are rejected. TTL applies to normal, bulk, conditional and create-if-absent writes. Bulk operations pipeline independent keys and do not form a transaction.
+
+Redis existence tests the stored `data` field, so a JSON `null` payload exists even though its typed value is null. Missing reads return default values and an empty ETag. Conditional writes and deletes require an existing matching ETag; empty or `"0"` ETags are not wildcard writes. Use `TrySaveStateIfNotExistsAsync` for atomic creation and the unconditional methods for deliberate overwrites or deletions. Wrong Redis types, authentication and network failures remain errors; incrementing an invalid integer version fails without replacing the payload. Scans enumerate connected primary nodes and return logical keys within the configured prefix; they are not a consistent snapshot. Redis does not implement `QueryStateAsync`.
+
+Connections created by module registration are host-owned singletons. `RedisConnectionConfiguration` supports data-node ACL `User`/`Password`, TLS `Ssl`/`SslHost`, timeouts and additional endpoints. Sentinel's optional `SentinelUser`/`SentinelPassword` independently authenticate its control connection; null selects the default user without a password. The `UseSentinelConnection(..., password: ...)` convenience method explicitly uses that password for both Sentinel and data nodes; set `Connection` properties for independent credentials. Keep the connection factory alive until its data connections are disposed: it owns Sentinel monitoring connections and releases them at host shutdown. If constructing the factory manually, dispose it after all returned connections. Cluster mode requires database zero.
 
 Single-key Dapr reads treat the Redis `nil` response for the requested key and store as missing state, including when the sidecar reports it as an `Internal` gRPC failure. Typed reads return `default(T)`, raw reads return `null`, and ETag reads return an empty ETag. Conditional creation can then proceed through its normal missing-key path. Other failures, including connection, authentication, wrong-type, and cancellation errors, remain failures; write failures are never converted into missing state.
 
