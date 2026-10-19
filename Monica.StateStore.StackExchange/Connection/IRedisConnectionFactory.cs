@@ -22,6 +22,25 @@ public interface IRedisConnectionFactory : IDisposable, IAsyncDisposable
     IConnectionMultiplexer CreateConnection(ModuleRedisStateStoreOption options);
 
     /// <summary>
+    /// Creates a data connection independently of the StateStore module options. The caller owns and must dispose
+    /// the returned multiplexer before disposing this factory, which retains any Sentinel discovery connection.
+    /// </summary>
+    /// <param name="configuration">Data-node and optional Sentinel connection settings.</param>
+    /// <param name="connectionType">Normal, Sentinel, or Cluster connection mode.</param>
+    /// <returns>A caller-owned Redis data connection.</returns>
+    /// <remarks>
+    /// This overload does not select or validate a database. The caller selects a database with
+    /// <see cref="IConnectionMultiplexer.GetDatabase"/> and must validate its own database setting;
+    /// Redis Cluster supports only database zero. Register the factory and returned connection as host-owned
+    /// singletons when sharing them with a singleton infrastructure provider.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="configuration"/> is null.</exception>
+    /// <exception cref="ArgumentException">Connection settings or the selected mode are invalid.</exception>
+    /// <exception cref="ObjectDisposedException">The factory has already been disposed.</exception>
+    IConnectionMultiplexer CreateConnection(
+        RedisConnectionConfiguration configuration, ERedisConnectionType connectionType);
+
+    /// <summary>
     /// Gets a connected primary server. A replica is never returned for a write operation.
     /// </summary>
     /// <param name="connection">Redis connection multiplexer</param>

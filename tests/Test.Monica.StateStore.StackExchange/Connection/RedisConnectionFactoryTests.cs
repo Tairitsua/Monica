@@ -177,6 +177,29 @@ public class RedisConnectionFactoryTests
     }
 
     [Fact]
+    public void CreateConnection_WhenIndependentConfigurationIsNull_ShouldRejectBeforeOpeningSockets()
+    {
+        using IRedisConnectionFactory factory = CreateFactory();
+
+        Assert.Throws<ArgumentNullException>(() => factory.CreateConnection(null!, ERedisConnectionType.Normal));
+    }
+
+    [Theory]
+    [InlineData(ERedisConnectionType.Normal, "Host")]
+    [InlineData(ERedisConnectionType.Sentinel, "ServiceName")]
+    [InlineData((ERedisConnectionType)99, "ConnectionType")]
+    public void CreateConnection_WhenIndependentConfigurationIsInvalid_ShouldRejectBeforeOpeningSockets(
+        ERedisConnectionType connectionType, string invalidSetting)
+    {
+        using IRedisConnectionFactory factory = CreateFactory();
+        var configuration = new RedisConnectionConfiguration();
+        if (invalidSetting == "Host") configuration.Host = " ";
+        if (invalidSetting == "ServiceName") configuration.ServiceName = " ";
+
+        Assert.ThrowsAny<ArgumentException>(() => factory.CreateConnection(configuration, connectionType));
+    }
+
+    [Fact]
     public void GetPrimaryServer_WhenOnlyReplicasOrSentinelsAreConnected_ShouldRejectWriteTarget()
     {
         using var factory = CreateFactory();
@@ -214,6 +237,8 @@ public class RedisConnectionFactoryTests
 
         Assert.Throws<ObjectDisposedException>(() => factory.CreateConnection(
             new ModuleRedisStateStoreOption { Connection = new RedisConnectionConfiguration() }));
+        Assert.Throws<ObjectDisposedException>(() => factory.CreateConnection(
+            new RedisConnectionConfiguration(), ERedisConnectionType.Normal));
         factory.Dispose();
     }
 
@@ -225,6 +250,8 @@ public class RedisConnectionFactoryTests
 
         Assert.Throws<ObjectDisposedException>(() => factory.CreateConnection(
             new ModuleRedisStateStoreOption { Connection = new RedisConnectionConfiguration() }));
+        Assert.Throws<ObjectDisposedException>(() => factory.CreateConnection(
+            new RedisConnectionConfiguration(), ERedisConnectionType.Normal));
         await factory.DisposeAsync();
     }
 

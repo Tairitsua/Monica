@@ -49,6 +49,7 @@
     <Project Path="tests/Test.Monica.HealthCheck/Test.Monica.HealthCheck.csproj" />
     <Project Path="tests/Test.Monica.JobScheduler.UI/Test.Monica.JobScheduler.UI.csproj" />
     <Project Path="tests/Test.Monica.JobScheduler/Test.Monica.JobScheduler.csproj" />
+    <Project Path="tests/Test.Monica.Locker/Test.Monica.Locker.csproj" />
     <Project Path="tests/Test.Monica.Markdown/Test.Monica.Markdown.csproj" />
     <Project Path="tests/Test.Monica.ProjectUnits.CodeAnalysis/Test.Monica.ProjectUnits.CodeAnalysis.csproj" />
     <Project Path="tests/Test.Monica.ProjectUnits/Test.Monica.ProjectUnits.csproj" />

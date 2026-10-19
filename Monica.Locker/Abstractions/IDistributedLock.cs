@@ -14,9 +14,16 @@ public interface IDistributedLock
     /// <param name="options">Optional acquisition settings such as owner, wait timeout, and lease duration.</param>
     /// <param name="cancellationToken">Cancels the acquisition attempt.</param>
     /// <returns>
-    /// A disposable lock handle when the lock is acquired; otherwise <see langword="null"/> when acquisition times out
-    /// or the operation is canceled before a lock is obtained.
+    /// A caller-owned lock handle when acquisition succeeds, or <see langword="null"/> when no lock is obtained
+    /// within the provider's acquisition deadline.
     /// </returns>
+    /// <remarks>
+    /// Acquisition cancellation and backend failures retain the selected provider's behavior. The Medallion adapter
+    /// propagates cancellation as <see cref="OperationCanceledException"/>; Dapr can return <see langword="null"/>
+    /// when its polling is canceled. Do not treat every exception as lock contention. The acquisition token does not
+    /// automatically cancel later protected work: observe the acquired handle's
+    /// <see cref="IDistributedLockHandle.HandleLostToken"/> and supply an operation token explicitly.
+    /// </remarks>
     Task<IDistributedLockHandle?> TryAcquireAsync(
         string resourceName,
         LockAcquisitionOptions? options = null,

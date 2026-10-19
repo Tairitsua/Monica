@@ -20,6 +20,11 @@ public interface ILockProvider
     /// <returns>
     /// A provider-specific lock handle when acquisition succeeds; otherwise <see langword="null"/>.
     /// </returns>
+    /// <remarks>
+    /// A successful result transfers handle ownership to the caller. Acquisition errors and cancellation follow the
+    /// selected provider's behavior; the Medallion adapter forwards native failures instead of turning them into
+    /// contention results. The handle reports ownership loss only when the backend supports observing it.
+    /// </remarks>
     Task<IDistributedLockHandle?> TryAcquireAsync(
         string normalizedKey,
         LockAcquisitionOptions options,

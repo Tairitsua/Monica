@@ -19,30 +19,44 @@ public class RedisConnectionFactory(ILogger<RedisConnectionFactory> logger) : IR
     public IConnectionMultiplexer CreateConnection(ModuleRedisStateStoreOption options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        lock (_lifetimeLock)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-        }
+        ThrowIfDisposed();
 
         var config = options.Connection
             ?? throw new InvalidOperationException("Redis connection configuration is required.");
         ValidateStoreOptions(options);
-        var connectionOptions = BuildConnectionOptions(config, options.ConnectionType);
+        return CreateConnection(config, options.ConnectionType);
+    }
+
+    /// <inheritdoc />
+    public IConnectionMultiplexer CreateConnection(
+        RedisConnectionConfiguration configuration, ERedisConnectionType connectionType)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ThrowIfDisposed();
+        var connectionOptions = BuildConnectionOptions(configuration, connectionType);
 
         logger.LogInformation("Creating Redis [{Mode}] connection to {Host}:{Port}",
-            options.ConnectionType, config.Host, config.Port);
+            connectionType, configuration.Host, configuration.Port);
 
         try
         {
-            return options.ConnectionType == ERedisConnectionType.Sentinel
-                ? CreateSentinelConnection(config, connectionOptions)
-                : Connect(connectionOptions, options.ConnectionType.ToString());
+            return connectionType == ERedisConnectionType.Sentinel
+                ? CreateSentinelConnection(configuration, connectionOptions)
+                : Connect(connectionOptions, connectionType.ToString());
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Redis [{Mode}] connection failed for {Host}:{Port}",
-                options.ConnectionType, config.Host, config.Port);
+                connectionType, configuration.Host, configuration.Port);
             throw;
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        lock (_lifetimeLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
     }
 
