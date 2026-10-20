@@ -114,7 +114,7 @@ setup 只在第 3 步持有 registrar；运行期代码不得缓存 registrar �
 
 ## 5. Provider 边界
 
-当前 Labs 包提供 Kafka、ActiveMQ、Dapr Binding、TCP、UDP 与 default endpoint。
+当前 Labs 核心包提供 Kafka、ActiveMQ、TCP、UDP 与 default endpoint。Dapr Binding 位于独立的 `Monica.DataChannel.Dapr` 包；仅由显式引用该包并调用 `AddDataChannel().UseDaprBindings()` 的宿主启用，核心包不再传递引用 Dapr SDK。
 
 Provider 负责：
 
@@ -127,7 +127,7 @@ DataChannel 不替外部系统提供 durability、broker 配置、secret 管理�
 
 ### Dapr route
 
-同一宿主中，一个 input binding route 只能归属于一个 `DaprBindingEndpoint`。route claim 存在当前 `IApplicationBuilder.Properties` 中，不会污染同一进程内的其他宿主。
+显式启用 Dapr 集成后，同一宿主中，一个 input binding route 只能归属于一个 `Monica.DataChannel.Dapr.Providers.DaprBindingEndpoint`。route claim 存在当前 `IApplicationBuilder.Properties` 中，不会污染同一进程内的其他宿主。迁移方式见[绑定集成契约](../skills/monica-infra-messaging/references/data-channels.md#optional-dapr-binding-integration)。
 
 ### TCP runtime
 

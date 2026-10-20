@@ -12,6 +12,9 @@
       "name": "Stable",
       "promise": "The supported Monica 1.0 application path.",
       "packages": [
+        "Monica.Application",
+        "Monica.Application.UI",
+        "Monica.ApplicationModel",
         "Monica.Authority",
         "Monica.AutoModel",
         "Monica.Configuration",
@@ -25,6 +28,7 @@
         "Monica.Generators.AutoController",
         "Monica.HealthCheck",
         "Monica.HealthCheck.UI",
+        "Monica.Invocation",
         "Monica.JobScheduler",
         "Monica.JobScheduler.UI",
         "Monica.Locker",
@@ -70,6 +74,7 @@
         "Monica.AI",
         "Monica.AI.UI",
         "Monica.DataChannel",
+        "Monica.DataChannel.Dapr",
         "Monica.DevOps",
         "Monica.Office",
         "Monica.Profiling"

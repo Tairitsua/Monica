@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Opt-in Dapr input and output binding integration for Monica DataChannel pipelines.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monica.DataChannel\Monica.DataChannel.csproj" />
+    <ProjectReference Include="..\Monica.Dapr\Monica.Dapr.csproj" />
+  </ItemGroup>
+</Project>

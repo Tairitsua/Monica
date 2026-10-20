@@ -20,6 +20,27 @@ namespace Test.Monica.DataChannel.Modules;
 public sealed class ModuleDataChannelTests
 {
     [Fact]
+    public async Task AddDataChannel_WhenDaprIsNotSelected_ShouldRunWithoutDaprModulesOrRuntimeDependencies()
+    {
+        await using var application = await new DataChannelTestApplicationFactory(new DataChannelScenario())
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(application.ModuleSnapshots,
+            module => module.ModuleType.Assembly.GetName().Name is "Monica.Dapr" or "Monica.DataChannel.Dapr");
+        var channel = application.Services.GetRequiredService<IDataChannelManager>().FetchAll().Single();
+        await channel.SendDataFromInnerAsync("native", TestContext.Current.CancellationToken);
+        Assert.True(channel.Pipe.IsInitialized);
+
+        using var dependencyManifest = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Test.Monica.DataChannel.deps.json"),
+            TestContext.Current.CancellationToken));
+        Assert.DoesNotContain(dependencyManifest.RootElement.GetProperty("libraries").EnumerateObject(),
+            dependency => dependency.Name.StartsWith("Dapr.", StringComparison.OrdinalIgnoreCase)
+                          || dependency.Name.StartsWith("Monica.Dapr/", StringComparison.OrdinalIgnoreCase)
+                          || dependency.Name.StartsWith("Monica.DataChannel.Dapr/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task UseSetup_WhenSeveralContributorsAreRegistered_ShouldRunEachTypeOnceInOrderBeforeMaterialization()
     {
         var scenario = new SetupCompositionScenario();

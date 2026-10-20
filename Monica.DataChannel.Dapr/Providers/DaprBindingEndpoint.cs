@@ -7,11 +7,12 @@ using Monica.Core.Modularity.Extensions;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Abstractions.Communication;
 using Monica.DataChannel.Abstractions.Partitioning;
+using Monica.DataChannel.Dapr.Abstractions;
 using Monica.DataChannel.Middlewares;
 using Monica.DataChannel.Models;
 using Monica.DataChannel.Pipeline;
 
-namespace Monica.DataChannel.Providers.DaprBinding;
+namespace Monica.DataChannel.Dapr.Providers;
 
 /// <summary>
 /// Connects a data-channel pipeline to Dapr input and output bindings.
@@ -44,7 +45,8 @@ public class DaprBindingEndpoint(
             metadata.OutputBindingName,
             "create",
             data.Data,
-            await ResolveOutputMetadataAsync(data));
+            await ResolveOutputMetadataAsync(data),
+            data.CancellationToken);
     }
 
     /// <inheritdoc />
@@ -78,13 +80,20 @@ public class DaprBindingEndpoint(
             {
                 // Dapr can invoke multiple partitions, replicas, or sidecars concurrently. Each callback
                 // awaits the pipeline so the HTTP response still represents completion of that message.
-                var dataContext = new ChannelDataContext(ChannelSide.Outer, body);
+                var dataContext = new ChannelDataContext(ChannelSide.Outer, body)
+                {
+                    CancellationToken = context.RequestAborted
+                };
                 DecorateInputMetadata(dataContext, MessageReceiveDiagnosticsMiddleware.GetSnapshot(context));
                 if (metadata.EnableInputDispatcher && inputDispatcher != null)
                 {
                     var dispatched = await inputDispatcher.TryDispatchAsync(
                         dataContext,
-                        async (message, _) => await SendDataAsync(message),
+                        async (message, cancellationToken) =>
+                        {
+                            message.CancellationToken = cancellationToken;
+                            await SendDataAsync(message);
+                        },
                         context.RequestAborted);
 
                     if (dispatched)
@@ -160,7 +169,7 @@ public class DaprBindingEndpoint(
             return null;
         }
 
-        var partitionKey = await partitionKeyResolver.ResolvePartitionKeyAsync(data);
+        var partitionKey = await partitionKeyResolver.ResolvePartitionKeyAsync(data, data.CancellationToken);
         if (string.IsNullOrWhiteSpace(partitionKey))
         {
             return null;

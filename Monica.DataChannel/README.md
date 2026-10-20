@@ -105,12 +105,13 @@ The Labs package currently contains:
 
 - Kafka
 - ActiveMQ
-- Dapr input/output bindings
 - TCP client and listener endpoints
 - UDP
 - the default in-process endpoint
 
-Provider options derive from `CommunicationOptions` and declare a `ConnectionDirection`. External brokers, Dapr components, addresses, credentials, and durability remain deployment responsibilities.
+Provider options derive from `CommunicationOptions` and declare a `ConnectionDirection`. External brokers, addresses, credentials, and durability remain deployment responsibilities.
+
+Dapr input/output bindings are an explicit companion package, `Monica.DataChannel.Dapr`. Reference it and select `AddDataChannel().UseDaprBindings().UseSetup<TSetup>()`; the core package has no Dapr SDK dependency. See the [binding registration and namespace migration contract](../skills/monica-infra-messaging/references/data-channels.md#optional-dapr-binding-integration).
 
 ## Middleware
 

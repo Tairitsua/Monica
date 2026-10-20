@@ -12,7 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
-    <ProjectReference Include="..\Monica.Dapr\Monica.Dapr.csproj" />
     <ProjectReference Include="..\Monica.UI\Monica.UI.csproj" />
   </ItemGroup>
 

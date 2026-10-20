@@ -47,6 +47,43 @@ Reinitialization cancels and drains the old runtime before creating new clients,
 
 `IKafkaDataChannelClientFactory` is the external-client test seam registered by the module. An override must return distinct endpoint-owned clients, apply raw-byte serializers/deserializers, and invoke `KafkaConsumerCallbacks` synchronously on the consumer owner during native calls. Keep the production endpoint, pipeline, host lifecycle and application transaction in tests; replace only the network boundary.
 
+## Optional Dapr binding integration
+
+`Monica.DataChannel` does not reference Dapr SDK packages or activate a Dapr module. Native Kafka, raw transports, the management UI, and the generic `IDataChannelPartitionKeyResolver` remain in this core package. Applications that still use Dapr bindings must reference **`Monica.DataChannel.Dapr`** and explicitly select its integration:
+
+```csharp
+using Monica.DataChannel.Dapr.Providers;
+
+public sealed class DaprOrderChannelSetup : IDataChannelSetup
+{
+    public void Setup(IDataChannelRegistrar channels) => channels.Add(
+        "orders", pipeline => pipeline.SetOuterEndpoint(
+            new DaprBindingOptions(EDaprBindingType.Kafka, ConnectionDirection.Input)
+            {
+                InputListenerRoute = "/bindings/orders"
+            }));
+}
+
+builder.AddMonica(monica => monica.AddDataChannel()
+    .UseDaprBindings()
+    .UseSetup<DaprOrderChannelSetup>());
+
+var app = builder.Build();
+app.UseMonica();
+app.MapMonica();
+app.Run();
+```
+
+The example also needs `Monica.Modules`, `Monica.Core.Modularity.Extensions`, `Monica.DataChannel.Abstractions`, and `Monica.DataChannel.Abstractions.Communication`. The default inner endpoint ignores received messages; configure a real inner endpoint for application processing. `UseDaprBindings()` includes `ModuleDataChannelDapr`, the existing Dapr SDK client module, and its sidecar health monitoring. It does not create a sidecar or provision components. Configure the host's SDK/health policy with `AddDaprClient(...)` when needed. Core DataChannel setup and UI do not load this integration through reflection or automatic assembly discovery.
+
+MQTT and Kafka options accept one input or output direction. Input requires `InputListenerRoute` matching the Dapr component's route, and output requires `OutputBindingName` matching its component name. A binding callback awaits the pipeline before returning success, preserving Dapr acknowledgment behavior; a failed pipeline must be retried or handled according to the component's delivery policy. Callback request cancellation reaches the pipeline, and output sends pass delivery cancellation to the SDK. Cancellation can follow an external write, so retries still require stable message identity.
+
+Each input route belongs to one binding endpoint in a host. Reusing the endpoint during mapping is idempotent; another pipeline claiming the same route fails composition. Separate hosts may use the same route. Receive diagnostics reuse the core DataChannel snapshot/filter and decorate `Message.Receive.*` metadata without duplicating diagnostic state or partition strategy.
+
+For output, `EnableOutputPartitionMetadata` defaults to `true`: when the core `IDataChannelPartitionKeyResolver` returns a nonempty key, the SDK call carries the existing `mo-partition-key`, `partitionKey`, and `key` metadata keys defined by `DataChannelPartitionConstants`. Without a resolver or key, no partition metadata is emitted. `EnableInputDispatcher` defaults to `false`. Enabling it offers callbacks to an optional host-owned, concurrency-safe `Monica.DataChannel.Dapr.Abstractions.IDaprBindingInputDispatcher`; returning `true` must mean processing finished or durable acceptance completed, because the HTTP success acknowledges that callback. The token passed to its `next(context, cancellationToken)` continuation becomes that pipeline delivery's token, including when the dispatcher supplies a replacement context. Returning `false`, or omitting the service, continues through the ordinary pipeline.
+
+This extraction changes the assembly and public namespaces. Replace `Monica.DataChannel.Providers.DaprBinding` with `Monica.DataChannel.Dapr.Providers` for `DaprBindingEndpoint`, `DaprBindingOptions`, and `EDaprBindingType`. Move dispatcher imports from `Monica.DataChannel.Abstractions.Partitioning` to `Monica.DataChannel.Dapr.Abstractions`. Add the new package reference and `UseDaprBindings()` selection; update any persisted assembly-qualified component identities. Core contains no compatibility forwarder that restores a Dapr dependency. Applications using `Monica.Dapr` directly retain its existing explicit providers independently of DataChannel.
+
 ## Initialization and management evidence
 
 `DataChannel.ReInitialize(cancellationToken)` runs the real communication endpoint initialization. Only one attempt can be active per pipeline; concurrent calls throw `InvalidOperationException` rather than reporting early success. An admitted attempt clears `IsInitialized` while `IsInitializing` is true. Success retires the attempt as initialized and clears `IsNotAvailable`; failure or cancellation retires it as uninitialized and unavailable. Caller cancellation propagates after rollback stops the outer endpoint before releasing the inner endpoint, without reusing the cancelled initialization token. Cleanup failures are recorded while the original initialization failure remains the caller's result. A failed transient endpoint initialization can be retried, because the proxy marks initialization complete only after success and resets its disposal latch after recovery.

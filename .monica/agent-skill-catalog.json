@@ -543,6 +543,7 @@
           "Monica.EventBus",
           "Monica.EventBus.Kafka",
           "Monica.DataChannel",
+          "Monica.DataChannel.Dapr",
           "Monica.SignalR",
           "Monica.Framework.UI/UIEventBus",
           "Monica.Framework.UI/Modules/ModuleEventBusUI.cs",
