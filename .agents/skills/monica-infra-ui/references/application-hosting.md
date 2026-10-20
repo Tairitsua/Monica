@@ -7,7 +7,21 @@
 | `AddUIShell()` | Requires UI host; adds default navigation, operational access and Shell state |
 | `AddApplicationUI()` from Monica.Application.UI | Requires UI host and application execution; adds trusted circuit identity for generated Local API invocation |
 
-Use a Web SDK host and a Razor presentation library. When the executable contains no `.razor` file, set `<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>` in its `.csproj`; otherwise the Blazor startup script is absent even though server prerendering works. This is an [ASP.NET Core host requirement](https://learn.microsoft.com/aspnet/core/blazor/project-structure?view=aspnetcore-10.0#location-of-the-blazor-script). Ordinary pages need no `Module{Name}UI` class. For a product UI:
+Use a Web SDK host and a Razor presentation library. For a .NET 10 executable whose components all come from referenced Razor class libraries, including Monica's shared document, set `RequiresAspNetWebAssets` in the executable's `.csproj`. This includes the Blazor startup script during publish even when the executable has no `.razor` file. See the [ASP.NET Core host requirement](https://learn.microsoft.com/aspnet/core/blazor/project-structure?view=aspnetcore-10.0#location-of-the-blazor-script).
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Product.UI/Product.UI.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+Here `Product.UI` is the referenced Razor presentation library containing the product components. A host using only Monica diagnostic pages applies the same property to its existing Web executable. Ordinary pages need no `Module{Name}UI` class. For a product UI:
 
 ```csharp
 builder.AddMonica(monica =>
@@ -24,6 +38,8 @@ builder.AddMonica(monica =>
 ```
 
 Import `Monica.Modules`, the modularity extensions, `Monica.UI.Theming`, and the product types. Keep the existing `UseMonica()` / `MapMonica()` lifecycle. Configure the actual authentication, policies, persistence and application type discovery in that host. `AddApplicationUI` is an Interactive Server profile, not a WASM registration.
+
+Verify the published host includes its `_framework/blazor.web*.js` assets and corresponding entries in `<HostAssembly>.staticwebassets.endpoints.json`. In a deployed browser, check that the script URL rendered by `Assets["_framework/blazor.web.js"]` loads successfully, including its fingerprinted URL when present, and that a UI action works after the Interactive Server circuit connects. Server prerendering can display populated pages while a missing boot script leaves their controls inactive.
 
 `AddPageAssembly` contributes routes to both the Blazor router and server endpoint mapping; direct refresh works without menu registration. Add `AddUIShell()` or a diagnostic UI module only when operational navigation is wanted. Host-configured `DefaultLayout` applies to product pages; Shell catalog destinations use its layout. Native `@layout` always wins. Catalog page policies are separate from handler authorization.
 
