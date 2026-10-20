@@ -419,6 +419,11 @@
         "Title": "Current host",
         "Label": "Current host",
         "Description": "Inspect this instance’s registration and election evidence in the context of its application and selected store."
+      },
+      "Endpoints": {
+        "Title": "Endpoint discovery",
+        "Label": "Endpoints",
+        "Description": "Resolve logical destinations and inspect actual HTTP evidence."
       }
     },
     "RegistryScope": "Selected store / current snapshot",
@@ -566,6 +571,45 @@
       "UnassignedDeclarations": "Declarations from this unassigned service",
       "NoUnassignedDeclarations": "No dependency targets declared.",
       "NoUnassignedServices": "No unassigned services in this snapshot."
+    }
+  },
+  "Endpoints": {
+    "KnownTargets": "Declared destinations",
+    "Scope": "Evidence from {0} · process {1}",
+    "Retention": "Last {0} minutes · up to {1} HTTP observations per target",
+    "Captured": "Captured",
+    "Refresh": "Refresh resolution",
+    "EvidenceBoundary": "Registration, resolution, HTTP response and business success are separate evidence. This page shows this process only. Refresh resolves known targets; it sends no business requests. DNS destinations do not identify the serving Pod.",
+    "Filter": "Filter scope, AppId or logical service",
+    "FailuresOnly": "Failures or empty resolution",
+    "Empty": "No destinations declared. Configure ModuleServiceEndpointDiscoveryOption.Targets to inspect them.",
+    "NoMatch": "No destinations match these filters.",
+    "CallCount": "{0} HTTP observations",
+    "Resolution": "Resolution evidence",
+    "LastAttempt": "Last attempt",
+    "LastSuccess": "Last successful capture",
+    "Providers": "Provider order",
+    "Candidates": "Candidate endpoints",
+    "CandidateLimit": "Up to 128 candidates. Addresses omit paths, credentials and query strings. Prior successful candidates remain visible after a failed refresh.",
+    "Calls": "Observed HTTP exchanges",
+    "NoCalls": "No retained HTTP observations. Reachability and business success are unknown.",
+    "Percentile": "Retained-sample p95 to response headers: {0} ms",
+    "NoSelection": "No endpoint selected",
+    "Trace": "Trace",
+    "NotObserved": "Not observed",
+    "States": {
+      "Unknown": "Not observed",
+      "Resolved": "Resolved",
+      "Empty": "No endpoints",
+      "Failed": "Resolution failed",
+      "Timeout": "Resolution timed out",
+      "Stale": "Stale evidence"
+    },
+    "Outcomes": {
+      "HttpSuccess": "HTTP 2xx",
+      "HttpFailure": "HTTP error",
+      "Failure": "Transport / resolution failure",
+      "Canceled": "Canceled"
     }
   }
 }

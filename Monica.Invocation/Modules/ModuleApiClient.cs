@@ -122,6 +122,8 @@ public class ModuleApiClient : MonicaModule<ModuleApiClientOption>
             Option.MaxResponseBodyBytes <= 0)
             throw new InvalidOperationException("API timeout and response size must be positive and within supported limits.");
         services.TryAddSingleton(TimeProvider.System);
+        services.AddMetrics();
+        services.AddSingleton<Monica.Invocation.Metrics.InvocationMetrics>();
         services.AddSingleton<RemoteResponseDecoder>();
         services.AddSingleton<IRemoteCallClient, RemoteCallFacade>();
         if (Option.ResponseClassifierType is { } classifierType)

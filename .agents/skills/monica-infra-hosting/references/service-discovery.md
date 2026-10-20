@@ -1,5 +1,7 @@
 # Service discovery
 
+Instance registration and outbound endpoint resolution are independent modules in the same `Monica.ServiceDiscovery` project, which also contains their UI. Membership requires a store; endpoint resolution does not. Invocation can also run Local or ordinary HTTP without enabling either module.
+
 Select the role and storage mode inside the host's `AddMonica(...)` callback:
 
 ```csharp
@@ -42,3 +44,32 @@ The independent `leader:{AppId}` lease identifies the stored application leader.
 Force-delete removes the selected application's leader key; it does not remove registrations or stop a process, and a host may acquire a new lease on a later heartbeat. The existing UI and optional Minimal API authorization remain host-owned. Lease-generation fencing and qualified graceful release are separate backend concerns; a captured UI inspection does not guarantee that leadership remains unchanged when a mutation executes.
 
 The service and domain graphs retain the exact selected service/domain for each cursor-menu opening. Each admitted right-click has its own opening revision, even at the same coordinates; completing an older action cannot dismiss a newer menu or update a retired graph. The native roster Actions remain an equivalent entry point. Domain inspection and navigation to a catalogued subdomain are separate actions: an unlisted domain still supports inspection, but does not gain a catalog route. Integrations use the shared [cursor-menu contract](../../monica-infra-ui/references/shell-and-access.md), including document/page coordinates and native menu ownership; these UI lifetimes do not change discovery capture or provider lifetimes.
+
+## Outbound endpoint discovery
+
+Register `monica.AddServiceEndpointDiscovery(...)` to compose `Microsoft.Extensions.ServiceDiscovery` (10.11.0). It uses the native configuration provider against the host `IConfiguration` section `Services`. Call `AddMonicaServiceDiscovery()` once on each participating `IHttpClientBuilder`; this adds native resolution with observation handlers, not another resolver, cache or load-balancing algorithm. Avoid also adding discovery through global HTTP defaults. The registration does not enable state stores, registration, heartbeats, leader election, UI or retry policies.
+
+```csharp
+builder.AddMonica(monica =>
+{
+    monica.AddServiceEndpointDiscovery(options =>
+        options.Targets.Add(new("primary", "orders", new Uri("https://orders-primary"))));
+    monica.AddServiceEndpointDiscoveryUI(); // Endpoint page only; no membership store.
+});
+builder.Services.AddHttpClient("orders", client =>
+    client.BaseAddress = new Uri("https://orders-primary"))
+    .AddMonicaServiceDiscovery()
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+```
+
+Supply addresses through native host configuration, for example `Services:orders-primary:https:0=https://orders.example/gateway`. The library prepends the configured `/gateway` to the request path; the logical URI contains only scheme, service name and optional port. Named endpoint syntax such as `https://_grpc.orders` is supported by Microsoft discovery, but does not implement a gRPC invocation adapter. Hosts own authentication, TLS and optional HTTP policies. Do not replay commands implicitly.
+
+The default `EnablePassThrough=false` requires configured endpoints; absent services produce empty resolution and sends fail. Opt into pass-through for explicit DNS destinations when intended. It returns a DNS endpoint without querying DNS or proving reachability. Configure Microsoft provider options or additional native providers directly through their public extensions, once per host; the facade and HTTP handler use that same provider chain. Refresh reflects the native cache and change tokens, not a forced cache reset. Configuration reload works only if the actual host provider emits reload notifications; environment variables require restart. Role/AppId placement and authority scope remain the application's responsibility. Registered listening addresses are not automatically callable endpoints.
+
+Targets are startup declarations (maximum 256, unique logical URI) used only for diagnostics and safe UI resolution; they do not change application routing. Unknown HTTP destinations can resolve but are not retained. `ServiceEndpointDiscoveryFacade.Capture()` returns detached process-local evidence in `Res<ServiceEndpointDiagnosticsSnapshot>`; check `IsOk()` and `Data`. `RefreshAsync` returns `Res` for the capture operation, with per-target failures represented in the retained snapshot. `RefreshAsync` only resolves declared targets, with a five-second per-target deadline and a thirty-second total budget; it never sends a business or health request. Caller cancellation propagates. The page is `/service-discovery-manage/endpoints`. `AddServiceDiscoveryUI()` includes it alongside membership views; `AddServiceEndpointDiscoveryUI()` can be used independently.
+
+The inspector distinguishes unknown, resolved, empty, failed, timed-out and stale evidence. Failed refresh retains the last successful candidates and their capture time. At most 128 candidates are displayed. Actual selected HTTP destinations are captured inside the native handler, before it restores the logical URI; this does not identify a serving Pod behind a Service. Disable automatic redirects to keep the selected destination meaningful. Address evidence strips user information, paths, queries and fragments; headers and bodies are never retained.
+
+HTTP observations end at response headers. A 2xx observation does not prove successful decoding or business execution. The default history retains at most 200 observations per target for 15 minutes (configurable maximums: 1000 observations and one day). The page reports host/process, capture time, bounded samples and sample p95; missing observations remain unknown. This is not cluster-wide aggregation. Full Invocation results remain owned by [Invocation telemetry](../../monica-infra-messaging/references/invocation.md).
+
+Meter `Monica.ServiceDiscovery` emits `monica.discovery.resolve.duration` and `monica.discovery.http.duration` in seconds, with only declared service names, scopes and bounded outcomes as tags. Hosts enable exporters and storage. Explicit UI resolution contributes to the resolution instrument only, never the HTTP sample count.

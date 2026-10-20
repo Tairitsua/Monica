@@ -1,0 +1,161 @@
+@namespace Monica.ServiceDiscovery.Pages
+@attribute [Route(PAGE_URL)]
+@implements IAsyncDisposable
+@using Monica.Core.Results
+@using Monica.ServiceDiscovery.Abstractions
+@using Monica.ServiceDiscovery.Facades
+@using Monica.ServiceDiscovery.Localization
+@using Monica.ServiceDiscovery.Models
+@using Monica.ServiceDiscovery.UIServiceDiscovery.Components
+@inject ServiceEndpointDiscoveryFacade Facade
+@inject IEnumerable<IServiceRegistrationCoordinator> Registrations
+@inject IStringLocalizer<ServiceDiscoveryResource> L
+
+<PageTitle>@L["Workbench:Views:Endpoints:Title"]</PageTitle>
+<DiscoveryWorkbench View="Endpoints" ShowRegistry="@Registrations.Any()">
+    @if (_snapshot is { } snapshot)
+    {
+        <section class="endpoint-signature">
+            <div class="endpoint-count">@snapshot.Targets.Count</div>
+            <div class="endpoint-identity">
+                <h2>@L["Endpoints:KnownTargets"]</h2>
+                <p>@L["Endpoints:Scope", snapshot.Host, snapshot.ProcessId]</p>
+                <p>@L["Endpoints:Retention", snapshot.Retention.TotalMinutes, snapshot.MaxCallsPerTarget]</p>
+                <small>@L["Endpoints:Captured"] @snapshot.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</small>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="RefreshAsync">
+                @L["Endpoints:Refresh"]
+            </MudButton>
+        </section>
+        <div class="endpoint-notice">
+            <MudAlert Severity="Severity.Info" Dense="true">@L["Endpoints:EvidenceBoundary"]</MudAlert>
+        </div>
+        <div class="endpoint-filters">
+            <MudTextField T="string" @bind-Value="_filter" Immediate="true" Label="@L["Endpoints:Filter"]" />
+            <MudCheckBox T="bool" @bind-Value="_failures" Label="@L["Endpoints:FailuresOnly"]" />
+        </div>
+        @if (snapshot.Targets.Count == 0)
+        {
+            <MudAlert Severity="Severity.Normal">@L["Endpoints:Empty"]</MudAlert>
+        }
+        else if (!VisibleTargets.Any())
+        {
+            <MudAlert Severity="Severity.Normal">@L["Endpoints:NoMatch"]</MudAlert>
+        }
+        <div class="endpoint-layout">
+            <div class="endpoint-ledger">
+                @foreach (var item in VisibleTargets)
+                {
+                    <button class="endpoint-row @(_selected == item.Target.Address ? "selected" : "")"
+                            @onclick="() => _selected = item.Target.Address">
+                        <span class="endpoint-route">
+                            <strong>@item.Target.Scope / @item.Target.AppId</strong>
+                            <span>@item.Target.Address</span>
+                        </span>
+                        <span class="endpoint-state" data-state="@State(item)">@L[$"Endpoints:States:{State(item)}"]</span>
+                        <span>@L["Endpoints:CallCount", item.Calls.Count]</span>
+                    </button>
+                }
+            </div>
+            @if (Selected is { } selected)
+            {
+                <section class="endpoint-inspector">
+                    <h2>@selected.Target.Scope / @selected.Target.AppId</h2>
+                    <code>@selected.Target.Address</code>
+                    <h3>@L["Endpoints:Resolution"]</h3>
+                    <p>@L[$"Endpoints:States:{State(selected)}"]</p>
+                    <p>@L["Endpoints:LastAttempt"] @Time(selected.AttemptedAt)</p>
+                    <p>@L["Endpoints:LastSuccess"] @Time(selected.ResolvedAt)</p>
+                    <h3>@L["Endpoints:Providers"]</h3>
+                    <ol>@foreach (var provider in snapshot.Providers) { <li><code>@provider</code></li> }</ol>
+                    <h3>@L["Endpoints:Candidates"]</h3>
+                    <p>@L["Endpoints:CandidateLimit"]</p>
+                    @foreach (var candidate in selected.Candidates)
+                    {
+                        <div class="endpoint-candidate"><code>@candidate.Address</code><small>@candidate.Provider</small></div>
+                    }
+                    <h3>@L["Endpoints:Calls"]</h3>
+                    @if (selected.Calls.Count == 0)
+                    {
+                        <p>@L["Endpoints:NoCalls"]</p>
+                    }
+                    else
+                    {
+                        var sorted = selected.Calls.Select(c => c.DurationMs).Order().ToArray();
+                        <p>@L["Endpoints:Percentile", sorted[(int)Math.Ceiling(sorted.Length * .95) - 1].ToString("F1")]</p>
+                        <div class="endpoint-calls">
+                            @foreach (var call in selected.Calls.Reverse())
+                            {
+                                <article>
+                                    <strong>@L[$"Endpoints:Outcomes:{call.Outcome}"] · @call.StatusCode</strong>
+                                    <span>@Time(call.At) · @call.DurationMs.ToString("F1") ms</span>
+                                    <code>@(call.Endpoint ?? L["Endpoints:NoSelection"].Value)</code>
+                                    @if (call.TraceId is not null) { <small>@L["Endpoints:Trace"] @call.TraceId</small> }
+                                </article>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+        </div>
+    }
+</DiscoveryWorkbench>
+
+@code {
+    public const string PAGE_URL = "/service-discovery-manage/endpoints";
+    private readonly CancellationTokenSource _lifetime = new();
+    private ServiceEndpointDiagnosticsSnapshot? _snapshot;
+    private Uri? _selected;
+    private string? _filter;
+    private bool _failures;
+    private bool _busy;
+    private bool _disposed;
+    private Task? _refresh;
+    private IEnumerable<ServiceEndpointSnapshot> VisibleTargets => (_snapshot?.Targets ?? [])
+        .Where(t => (string.IsNullOrWhiteSpace(_filter) ||
+            $"{t.Target.Scope} {t.Target.AppId} {t.Target.Address}".Contains(_filter, StringComparison.OrdinalIgnoreCase)) &&
+            (!_failures || t.Resolution is "Failed" or "Timeout" or "Empty" ||
+                t.Calls.LastOrDefault()?.Outcome is "Failure" or "HttpFailure"));
+    private ServiceEndpointSnapshot? Selected => VisibleTargets.FirstOrDefault(t => t.Target.Address == _selected);
+    private string State(ServiceEndpointSnapshot target) =>
+        target.AttemptedAt is { } at && _snapshot!.CapturedAt - at > _snapshot.Retention ? "Stale" : target.Resolution;
+    private string Time(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz") ?? L["Endpoints:NotObserved"];
+
+    protected override void OnInitialized()
+    {
+        Capture();
+        _selected = _snapshot?.Targets.FirstOrDefault()?.Target.Address;
+    }
+
+    private Task RefreshAsync()
+    {
+        if (_busy || _disposed) return Task.CompletedTask;
+        return _refresh = RefreshCoreAsync();
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Facade.RefreshAsync(_lifetime.Token);
+            if (!_disposed) Capture();
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _busy = false; }
+    }
+
+    private void Capture()
+    {
+        var result = Facade.Capture();
+        if (result.IsOk() && result.Data is { } snapshot) _snapshot = snapshot;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await _lifetime.CancelAsync();
+        if (_refresh is not null) await _refresh;
+        _lifetime.Dispose();
+    }
+}

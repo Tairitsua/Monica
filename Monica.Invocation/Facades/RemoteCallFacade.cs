@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Monica.Invocation.Metrics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ internal sealed class RemoteCallFacade(
     IOptions<ModuleApiClientOption> options,
     IOptions<ModuleResultEnvelopeOption> envelopeOptions,
     TimeProvider timeProvider,
+    InvocationMetrics metrics,
     ILogger<RemoteCallFacade> logger) : IRemoteCallClient
 {
     public async Task<TResponse> InvokeAsync<TResponse>(HttpClient client,
@@ -35,11 +37,15 @@ internal sealed class RemoteCallFacade(
 
         // ActivitySource.StartActivity can return null without listeners. This activity always owns a trace.
         using var activity = new Activity("Monica.RemoteCall").SetIdFormat(ActivityIdFormat.W3C).Start();
+        activity.SetTag("rpc.system", context.Transport);
+        activity.SetTag("rpc.service", context.Service.Name);
+        activity.SetTag("rpc.method", context.Operation);
         var traceId = ResultTraceId.Capture();
         var started = timeProvider.GetTimestamp();
         using var deadline = new CancellationTokenSource(options.Value.CallTimeout, timeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         var stage = "request";
+        var outcome = "exception";
         try
         {
             using var request = await createRequest(linked.Token);
@@ -57,9 +63,14 @@ internal sealed class RemoteCallFacade(
             result.PrepareForPresentation(serializer.SerializerOptions, messages, traceId, context.Service.Name,
                 context.Operation, exposeReservedDiagnostics: envelopeOptions.Value.ExposeDiagnosticDetails);
             activity.SetStatus(result.IsOk() ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
+            outcome = result.IsOk() ? "success" : "business_failure";
             return result;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            outcome = "canceled";
+            throw;
+        }
         catch (OperationCanceledException exception) when (deadline.IsCancellationRequested ||
             stage == "send" && exception.InnerException is TimeoutException)
         {
@@ -75,11 +86,16 @@ internal sealed class RemoteCallFacade(
             return Failure<TResponse>(new RemoteCallFailure(ResStatus.ServiceUnavailable,
                 ResultErrorCodes.DependencyUnavailable, stage, exception.StatusCode), exception);
         }
+        finally
+        {
+            metrics.Record(timeProvider.GetElapsedTime(started).TotalSeconds, context.Transport, outcome);
+        }
 
         TEnvelope Failure<TEnvelope>(RemoteCallFailure failure, Exception? exception)
             where TEnvelope : class, IRemoteResultEnvelope<TEnvelope>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            outcome = failure.Code == ResultErrorCodes.DependencyTimeout ? "timeout" : "boundary_failure";
             activity.SetStatus(ActivityStatusCode.Error);
             activity.SetTag("error.type", failure.Code);
             var error = new ResultError(failure.Code, traceId, context.Service.Name, context.Operation);

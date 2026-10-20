@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <GenerateStaticWebAssetsManifest>true</GenerateStaticWebAssetsManifest>
-    <PackageDescription>Service registration and discovery for Monica framework, providing service registry capabilities for microservices architecture with health checking and load balancing.</PackageDescription>
+    <PackageDescription>Service registration, leader election, Microsoft endpoint discovery and operational diagnostics for Monica.</PackageDescription>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
     <EmbeddedResource Include="Localization\**\*.json" />
   </ItemGroup>
 </Project>
