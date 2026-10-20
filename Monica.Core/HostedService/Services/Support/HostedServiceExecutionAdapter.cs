@@ -55,7 +55,7 @@ internal static class HostedServiceExecutionAdapter
         var workItem = scope.ServiceProvider.GetRequiredService<TWorkItem>();
         var descriptor = ExecutionDescriptor.ForInterface<ExecutionUnit, ExecutionUnit>(
             HostedServiceExecutionPoints.WorkItem,
-            typeof(TWorkItem),
+            workItem.GetType(),
             typeof(IHostedServiceWorkItem),
             isBusinessOperation: true,
             transactionMode: ExecutionTransactionMode.Automatic);
@@ -87,7 +87,7 @@ internal static class HostedServiceExecutionAdapter
         var workItem = scope.ServiceProvider.GetRequiredService<TWorkItem>();
         var descriptor = ExecutionDescriptor.ForInterface<TInput, TResult>(
             HostedServiceExecutionPoints.WorkItem,
-            typeof(TWorkItem),
+            workItem.GetType(),
             typeof(IHostedServiceWorkItem<TInput, TResult>),
             isBusinessOperation: true,
             transactionMode: ExecutionTransactionMode.Automatic);

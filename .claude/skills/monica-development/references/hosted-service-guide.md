@@ -79,6 +79,8 @@ before disposing the service.
 
 Do not create an unmanaged scope around the permanent background loop. For finite business work that should run through Monica's execution pipeline, register an `IHostedServiceWorkItem` and invoke `ExecuteWorkItemAsync<TWorkItem>(...)` or its typed input/result overload.
 
+`TWorkItem` may be a concrete class or a registered interface deriving from the matching work-item contract. Each invocation resolves it and the real execution pipeline from one fresh asynchronous scope, then disposes that scope after execution. The descriptor uses the resolved implementation type and its mapped entry method, so concrete method attributes such as `ExecutionTransaction` apply even when the service requests an interface.
+
 Register the service normally:
 
 ```csharp
