@@ -4,7 +4,7 @@
 
 ## Declare ownership once
 
-The existing product domain enum remains authoritative. A domain core declares its domain, and each role library declares one exact role and its owning domain:
+The existing product domain enum remains authoritative. Configure its display metadata once through the Core [domain catalog](domain-catalog.md); ApplicationModel contributes the compiled IDs without duplicating labels. A domain core declares its domain, and each role library declares one exact role and its owning domain:
 
 ```csharp
 // Domains.Ordering
@@ -41,6 +41,14 @@ The build target reads metadata exports from referenced outputs and supplies det
 `IApplicationManifest.LocalAssemblies` identifies the annotated implementation assemblies actually included in that executable. Its logical `Domains`, `Roles` and published `Operations` may also describe remote implementations from the catalog. Every listed local assembly must be present in discovery; omitting an implementation from discovery is not a way to declare it remote. Each host adds its local private operations to this manifest.
 
 Build-only input projects may still be restored and built. They must not become compiler or runtime references of the catalog or copy native assets into a host that omits them. Check the normal host's publish output and `.deps.json` when separating OCR/GPU dependencies. Do not solve missing metadata by restoring a runtime reference to the heavy role. Native hosting, provider defaults and role-specific imperative registration remain owned by the concrete host composition.
+
+## Compiled API dependency evidence
+
+Annotated domain and role compilations export statically resolved calls to published `IApplicationApi` methods. Each `ApplicationDependencyDefinition` retains the calling assembly, calling type, and published request type; the model resolves those to source domain/role and target operation ownership. An unused injected API, a project reference, or a generated client alone does not create a dependency. The product catalog carries this evidence as metadata, so selective hosts can inspect callers whose implementation assemblies they do not load. Invalid source ownership or missing target operations fail catalog validation. Rebuild producer assemblies, the catalog, and consuming hosts after changing calls.
+
+`IApplicationManifest.Dependencies` and `IApplicationModel.Dependencies` describe collected static API usages. They are independent of selected roles, Local/HTTP routing, AppIds, instance counts, and observed traffic. Source roles may execute passive calls locally while not active as autonomous workloads. Do not convert these records into presumed HTTP edges between owning applications. Manual manifests must supply their own evidence; an empty list means no collected evidence.
+
+Coverage is deliberately limited to direct calls resolved by the compiler in annotated domain/role source. Reflection, dynamic dispatch, method-group indirection, unowned shared helpers, EventBus relationships, and external integrations are not a complete runtime call graph and are not inferred. The service-discovery cross-domain view groups these records by domain pair, omits same-domain edges, and retains calling types and operations for inspection.
 
 ## Compose placement
 

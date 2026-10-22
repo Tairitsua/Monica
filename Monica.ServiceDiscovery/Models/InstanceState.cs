@@ -52,7 +52,7 @@ public class InstanceState
 
     /// <summary>Returns selected domain identities, including the legacy singular registration field.</summary>
     public IEnumerable<string> GetDomainNames() => DomainNames.Append(DomainName)
-        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase);
+        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.Ordinal);
 
     /// <summary>
     /// Microservice build time stored in UTC.
@@ -68,11 +68,6 @@ public class InstanceState
     /// Microservice release version number
     /// </summary>
     public string? ReleaseVersion { get; set; }
-
-    /// <summary>
-    /// Dependent subdomain list
-    /// </summary>
-    public List<string>? DependentSubDomains { get; set; }
 
     /// <summary>
     /// Registration time

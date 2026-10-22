@@ -29,7 +29,6 @@
                 <section class="inspector-section">
                     <dl class="inspector-facts"><div><dt>@L["ServiceDetail:Overview:Fields:AppId"]</dt><dd><code>@service.AppId</code></dd></div><div><dt>@L["ServiceDetail:Overview:Fields:ServiceName"]</dt><dd>@service.AppName</dd></div><div><dt>@L["ServiceDetail:Overview:Fields:ProjectName"]</dt><dd>@Value(service.ProjectName)</dd></div><div><dt>@L["ServiceDetail:Overview:Fields:DomainName"]</dt><dd>@Value(string.Join(", ", service.GetDomainNames()))</dd></div><div><dt>@L["Shared:Values:Roles"]</dt><dd>@Value(string.Join(", ", service.RoleIds))</dd></div></dl>
                     <div class="inspector-registration-summary"><h4>@L["ServiceDetail:Status:Title"]</h4><span>@L["ServiceDetail:Status:RunningInstances", service.RunningInstanceCount]</span><span>@L["ServiceDetail:Status:TotalInstances", service.TotalInstanceCount]</span></div>
-                    <section class="inspector-dependencies"><h4>@L["Workbench:DeclaredDependencies"]</h4>@if (service.DependentSubDomains is { Count: > 0 } dependencies) { <div class="inspector-tags">@foreach (var domain in dependencies) { <span>@domain</span> }</div> } else { <p>@L["Workbench:NoDeclaredDependencies"]</p> }</section>
                 </section>
             </MudTabPanel>
             <MudTabPanel Text="@L["ServiceDetail:Tabs:Instances", _instances.Count]">

@@ -26,6 +26,9 @@ public static class ModuleApplicationModelBuilderExtensions
 public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModelOption>
 {
     /// <inheritdoc />
+    public override void Describe(ModuleDescriptor module) => module.Require<ModuleDomainCatalog, ModuleDomainCatalogOption>();
+
+    /// <inheritdoc />
     public override void ConfigureServices(ModuleContext<ModuleApplicationModelOption> context)
     {
         var providers = Application.TypeFinder.GetAssemblies()
@@ -40,6 +43,7 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
         var model = new CompiledApplicationModel(manifest, deployment, Application.TypeFinder);
         Application.SetTypeActivationPolicy(model);
         context.Services.AddSingleton<IApplicationModel>(model);
+        context.Services.AddSingleton<Monica.Core.Domains.Abstractions.IDomainCatalogSource, ApplicationDomainCatalogSource>();
         context.Services.AddSingleton<ITypeActivationPolicy>(model);
         context.Services.AddSingleton(deployment);
         var registered = new HashSet<Type>();

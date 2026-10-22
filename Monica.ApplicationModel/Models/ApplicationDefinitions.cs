@@ -19,6 +19,12 @@ public sealed record ApplicationOperationDefinition(
 /// <summary>Registers a generated caller against the interface compiled into its contract assembly.</summary>
 public sealed record ApplicationApiClientDefinition(Type InterfaceType, Type ImplementationType);
 
+/// <summary>One statically resolved published API usage, independent of deployment and observed traffic.</summary>
+/// <param name="SourceAssemblyName">The domain core or role assembly containing the call.</param>
+/// <param name="SourceTypeName">The calling type retained as navigable architecture evidence.</param>
+/// <param name="RequestType">The published request identifying the target operation and its owner.</param>
+public sealed record ApplicationDependencyDefinition(string SourceAssemblyName, string SourceTypeName, Type RequestType);
+
 /// <summary>Assigns logical roles to one application; replicas share this placement.</summary>
 public sealed class ApplicationPlacement
 {

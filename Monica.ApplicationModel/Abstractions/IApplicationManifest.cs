@@ -17,4 +17,7 @@ public interface IApplicationManifest
     IReadOnlyList<ApplicationOperationDefinition> Operations { get; }
     /// <summary>Gets generated API interface-to-caller bindings.</summary>
     IReadOnlyList<ApplicationApiClientDefinition> ApiClients { get; }
+    /// <summary>Gets statically resolved published API calls made by owned domain and role source code.</summary>
+    /// <remarks>Reflection, shared unowned helpers, events and external protocols are outside this evidence scope.</remarks>
+    IReadOnlyList<ApplicationDependencyDefinition> Dependencies => [];
 }

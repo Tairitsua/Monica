@@ -42,7 +42,8 @@ public sealed class ApplicationModelTests
         Assert.Single(info.GetServiceStatus().DomainNames);
         var catalog = new DefaultServiceDiscoveryCatalogProvider(applicationModel: model);
         Assert.Equal(new[] { "api", "worker" }, (await catalog.GetPreloadedServicesAsync()).Select(service => service.AppId));
-        Assert.Equal("Ordering", Assert.Single(await catalog.GetAllDomainsAsync()).Name);
+        Assert.Equal("Ordering", Assert.Single(app.Services.GetRequiredService<global::Monica.Core.Domains.Abstractions.IDomainCatalog>().Domains).Key);
+        Assert.Equal("api", registration.AppName);
     }
 
     [Fact]

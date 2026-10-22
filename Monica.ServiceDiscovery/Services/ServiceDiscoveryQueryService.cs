@@ -1,3 +1,5 @@
+using Monica.Core.Domains.Abstractions;
+using Monica.ApplicationModel.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Monica.Modules;
@@ -43,12 +45,26 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
         return mergedServices;
     }
 
-    public async Task<List<DomainInfo>> GetDomainsAsync(CancellationToken cancellationToken = default)
+    public Task<List<DomainInfo>> GetDomainsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var domains = await GetCatalogProvider().GetAllDomainsAsync();
-        cancellationToken.ThrowIfCancellationRequested();
-        return domains;
+        return Task.FromResult(serviceProvider.GetRequiredService<IDomainCatalog>().Domains.Values.OrderBy(domain => domain.Id, StringComparer.Ordinal).ToList());
+    }
+
+    /// <summary>Reads static API usage evidence without requiring online instances or inspecting current traffic.</summary>
+    public ApplicationTopologySnapshot GetApplicationTopology()
+    {
+        var model = serviceProvider.GetService<IApplicationModel>();
+        if (model is null) return new(false, []);
+        var dependencies = model.Dependencies.Select(dependency =>
+        {
+            var role = model.Roles.Values.SingleOrDefault(role => role.AssemblyName == dependency.SourceAssemblyName);
+            var domain = role?.DomainId ?? model.Domains.Values.Single(domain => domain.AssemblyName == dependency.SourceAssemblyName).Id;
+            var target = model.GetOperation(dependency.RequestType);
+            return new DomainDependencyInfo(domain, role?.Id, target.DomainId, target.RoleId,
+                dependency.RequestType.FullName ?? dependency.RequestType.Name, dependency.SourceTypeName);
+        }).ToArray();
+        return new(true, Array.AsReadOnly(dependencies));
     }
 
     public async Task<DomainDetailInfo> GetDomainDetailAsync(string domainName)
@@ -60,17 +76,21 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
 
         var domains = await GetDomainsAsync();
         var domain = domains.FirstOrDefault(item =>
-            string.Equals(item.Name, domainName, StringComparison.OrdinalIgnoreCase));
+            string.Equals(item.Id, domainName, StringComparison.Ordinal));
 
         if (domain is null)
         {
             throw new KeyNotFoundException($"Domain not found: {domainName}");
         }
 
+        var topology = GetApplicationTopology();
+        var dependencies = topology.Dependencies.Where(dependency => dependency.TargetDomainId == domain.Id).ToArray();
         return new DomainDetailInfo
         {
             Domain = domain,
-            RelatedServices = await GetDomainRelatedServicesAsync(domainName)
+            HasDependencyEvidence = topology.IsAvailable,
+            Dependencies = dependencies,
+            RelatedServices = await GetDomainRelatedServicesAsync(domain.Id, dependencies)
         };
     }
 
@@ -167,14 +187,14 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
         return GetStateManager().GetAllInstancesAsync(cancellationToken);
     }
 
-    private async Task<List<RegisteredServiceStatus>> GetDomainRelatedServicesAsync(string domainName)
+    private async Task<List<RegisteredServiceStatus>> GetDomainRelatedServicesAsync(string domainName, IReadOnlyList<DomainDependencyInfo> dependencies)
     {
         var services = await GetMergedServicesStatusAsync();
 
         return services
             .Where(service =>
                 service.BelongsToDomain(domainName) ||
-                service.DependentSubDomains?.Contains(domainName, StringComparer.OrdinalIgnoreCase) == true)
+                dependencies.Any(dependency => dependency.IsOwnedBy(service)))
             .ToList();
     }
 
@@ -193,7 +213,6 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
                     DomainNames = group.SelectMany(instance => instance.GetDomainNames()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
                     RoleIds = group.SelectMany(instance => instance.RoleIds).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
                     ProjectName = firstInstance.ProjectName,
-                    DependentSubDomains = firstInstance.DependentSubDomains?.ToList(),
                     Instances = group.ToDictionary(
                         instance => instance.InstanceId,
                         instance =>

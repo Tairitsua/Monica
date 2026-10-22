@@ -274,13 +274,13 @@
             }
 
             _allServices = services ?? [];
-            var currentDomains = _allServices.SelectMany(GetServiceDomainNames).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var currentDomains = _allServices.SelectMany(GetServiceDomainNames).Distinct(StringComparer.Ordinal).ToList();
             if (_allDomainsSelected)
             {
                 _selectedDomains = currentDomains;
             }
 
-            DomainColorResolver.AssignColors(currentDomains.Select(name => new DomainInfo { Name = name }));
+            DomainColorResolver.AssignColors(currentDomains.Select(name => new DomainInfo { Id = name }));
             _hasSnapshot = true;
             _capturedAt = DateTimeOffset.UtcNow;
             await ApplyFilters();
@@ -329,7 +329,7 @@
                 
             // Domain filter
             var serviceDomain = GetServiceDomainName(service);
-            if (!GetServiceDomainNames(service).Any(domain => _selectedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase)))
+            if (!GetServiceDomainNames(service).Any(domain => _selectedDomains.Contains(domain, StringComparer.Ordinal)))
                 return false;
                 
             // Text filter
@@ -538,7 +538,7 @@
         {
             var domainName = GetServiceDomainName(service);
             _allDomainsSelected = false;
-            _selectedDomains = GetServiceDomainNames(service).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _selectedDomains = GetServiceDomainNames(service).ToHashSet(StringComparer.Ordinal);
             _showFilterPanel = true;
             await ApplyFilters();
             if (!_disposed) Snackbar.Add(L["ServiceGraph:Messages:FilteredDomain", domainName].Value, Severity.Info);

@@ -107,7 +107,9 @@ public class DefaultServiceDiscoveryClientInfo(
         {
             AppId = appId,
             InstanceId = options.FromInstance ?? GenerateFromInstance(),
-            AppName = application.ResolveAppName(options.AppName, assemblyName),
+            AppName = MonicaApplicationOptions.Normalize(options.AppName)
+                      ?? MonicaApplicationOptions.Normalize(application.AppName)
+                      ?? appId,
             ProjectName = application.ResolveProjectName(options.ProjectName, assemblyName),
             DomainName = model is null ? application.ResolveDomainName(options.DomainName) : domains.Count == 1 ? domains[0] : null,
             DomainNames = domains,
@@ -115,7 +117,6 @@ public class DefaultServiceDiscoveryClientInfo(
             BuildTime = ResolveBuildTimeUtc(options.BuildTime, entryAssembly),
             AssemblyVersion = options.AssemblyVersion ?? GetAssemblyVersion(entryAssembly),
             ReleaseVersion = application.ResolveAppVersion(options.ReleaseVersion),
-            DependentSubDomains = options.DependentSubDomains,
             RegistrationTime = DateTime.MinValue,  // 将在 CloneInstanceState 中使用本地状态覆盖
             LastHeartbeatTime = DateTime.MinValue   // 将在 CloneInstanceState 中使用本地状态覆盖
         };
@@ -214,7 +215,6 @@ public class DefaultServiceDiscoveryClientInfo(
             BuildTime = original.BuildTime,
             AssemblyVersion = original.AssemblyVersion,
             ReleaseVersion = original.ReleaseVersion,
-            DependentSubDomains = original.DependentSubDomains?.ToList(),
             RegistrationTime = RegistrationTime ?? DateTime.MinValue,  // 使用本地状态
             LastHeartbeatTime = LastHeartbeatTime ?? DateTime.MinValue,  // 使用本地状态
             Metadata = new Dictionary<string, string>() // 从空元数据开始

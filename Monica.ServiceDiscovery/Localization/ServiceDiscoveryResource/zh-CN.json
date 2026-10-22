@@ -142,7 +142,6 @@
       "BasicInfo": "域基本信息"
     },
     "ServiceCard": {
-      "DependentSubDomains": "依赖子域:",
       "Domain": "所属域: {0}",
       "ExternalDependency": "外部依赖",
       "Id": "ID: {0}",
@@ -153,7 +152,7 @@
       "LoadFailed": "加载域详情失败",
       "LoadingDetail": "正在加载域详情...",
       "LoadingServices": "正在加载服务信息...",
-      "NoDependentServices": "暂无其他服务依赖此域",
+      "NoDependentServices": "未发现承载此领域 API 调用方的外部服务。",
       "NoOwnedServices": "该域暂无归属微服务"
     },
     "Tabs": {
@@ -174,7 +173,7 @@
       "Labels": {
         "AndMore": "等 {0} 个",
         "ClickToViewDetails": "点击查看详情",
-        "DependencyServiceCount": "服务数",
+        "DependencyServiceCount": "API 使用证据",
         "NoRelatedServices": "暂无相关微服务",
         "RelatedServices": "相关微服务 ({0})",
         "ServiceCount": "服务数",
@@ -408,12 +407,12 @@
       "Dependencies": {
         "Title": "子域依赖",
         "Label": "依赖声明",
-        "Description": "追踪子域之间声明的依赖关系；这些关系表示依赖声明，而非观测到的流量。"
+        "Description": "查看编译期跨领域 API 调用及其来源类型。此图不表示实时调用流量。"
       },
       "Domains": {
         "Title": "子域目录",
         "Label": "子域目录",
-        "Description": "浏览目录中的子域身份、归属服务，以及声明依赖这些子域的外部服务。"
+        "Description": "查看统一领域信息、实际承载服务，以及 API 调用方所属的服务。"
       },
       "Host": {
         "Title": "当前主机",
@@ -450,7 +449,7 @@
     "InspectService": "检查服务 {0}",
     "CatalogScope": "目录 / 只读",
     "DomainCatalog": "子域目录",
-    "CatalogHelp": "从选定提供程序分别读取目录定义和注册记录。",
+    "CatalogHelp": "领域信息来自统一领域目录，服务归属来自注册快照。",
     "CatalogReadFailed": "目录读取失败",
     "FindDomain": "查找子域",
     "CatalogEntries": "目录条目",
@@ -464,10 +463,10 @@
     "OwnedServicesHelp": "将此子域上报为自身归属的注册服务。",
     "InstancesCount": "{0} 个已注册实例",
     "NoOwnedServices": "快照中没有服务将此子域上报为归属。",
-    "Declarations": "依赖声明",
-    "DependentServices": "外部依赖方",
-    "DependentServicesHelp": "归属于其他子域、但声明依赖此子域的服务。",
-    "NoDependentServices": "快照中没有外部服务声明此依赖。",
+    "Declarations": "编译期 API 调用",
+    "DependentServices": "外部调用方服务",
+    "DependentServicesHelp": "按观测到的角色或领域归属，列出包含此领域 API 调用的服务；不代表调用已经发生。",
+    "NoDependentServices": "未发现承载此领域 API 调用方的外部服务。",
     "ChooseDomain": "选择子域",
     "ChooseDomainHelp": "选择目录条目以检查其身份与服务关系。",
     "DomainUnlisted": "此端点不在目录中",
@@ -483,8 +482,6 @@
     "HeartbeatAgeAtCapture": "快照时的心跳年龄",
     "HeartbeatAgeSeconds": "{0:N0} 秒",
     "BuildIdentity": "构建身份",
-    "DeclaredDependencies": "声明的子域依赖",
-    "NoDeclaredDependencies": "未声明子域依赖。",
     "LocalElectionScope": "本地选举状态属于查询主机，与提供程序中应用当前的领导租约分别记录。",
     "LeaseScope": "快照时提供程序中的应用租约；续约可能更新其报告的领导时间。",
     "NoLeaderLease": "成功读取提供程序时未发现领导租约。",
@@ -541,36 +538,37 @@
       "EmptyHint": "提供程序返回已注册服务或预加载目录条目后，将显示在此处。"
     },
     "Domains": {
-      "Eyebrow": "已声明依赖图谱",
-      "Description": "沿注册表中的领域依赖声明追踪方向，区分目录领域与未解析端点。",
+      "Eyebrow": "静态 API 依赖图谱",
+      "Description": "追踪编译应用目录中的发布 API 使用关系；部署位置与实例注册分别提供证据。",
       "MapLabel": "领域有向图",
-      "MapSummary": "{0}/{1} 个端点 · {2}/{3} 条依赖声明",
+      "MapSummary": "{0}/{1} 个领域 · {2}/{3} 条关系",
       "Evidence": "依赖证据",
-      "Ledger": "依赖声明",
+      "Ledger": "API 调用",
       "Roster": "领域",
-      "LedgerHint": "每行表示一条已声明的源领域 → 目标领域关系；数量为声明该关系的服务数。",
-      "RosterHint": "筛选图谱中的目录领域与声明端点，包括没有依赖关系的领域。",
+      "LedgerHint": "每行表示源领域 → 目标领域关系；展开证据可查看调用来源类型和目标操作。",
+      "RosterHint": "当前视图中的目录领域和观测领域，包含未采集到 API 依赖的领域。",
       "ServiceCount": "此领域中有 {0} 个服务",
-      "Declarations": "由 {0} 个服务声明",
+      "Declarations": "{0} 条 API 使用证据",
       "Unlisted": "未列入目录的端点",
       "UnlistedEdge": "包含未列入领域目录的端点",
-      "UnlistedDescription": "此名称出现在注册表证据中，但未列入领域目录。",
-      "UnlistedSummary": "{0} 是已声明端点，并非当前目录中的领域。",
-      "FocusRelationship": "显示相关声明",
-      "EdgeHint": "箭头沿已声明的依赖方向展示；表示依赖声明，不表示观测到的流量或运行时调用。",
+      "UnlistedDescription": "此标识出现在观测归属或依赖信息中，但不在领域目录中。",
+      "UnlistedSummary": "{0} 未登记在统一领域目录中。",
+      "FocusRelationship": "查看相关 API 调用",
+      "EdgeHint": "箭头表示编译期 API 使用关系，不表示观测到的流量；本视图省略同一领域内部的调用。",
       "CatalogNode": "目录领域",
-      "SnapshotHint": "依赖声明来源于一次注册表快照；此处不保存依赖历史。",
-      "Empty": "没有领域或已声明端点",
-      "EmptyHint": "提供程序返回领域目录条目与注册表声明后，将显示在此处。",
+      "SnapshotHint": "依赖来自当前宿主的编译产品目录；服务数量与成员状态来自注册快照。",
+      "Empty": "没有可显示的领域",
+      "EmptyHint": "配置共享领域元数据或引入生成应用目录后，可在此查看。",
       "EmptyRoster": "当前视图中没有端点",
-      "EmptyLedger": "当前视图中没有有向依赖声明",
+      "EmptyLedger": "当前视图未采集到跨领域 API 调用",
       "Unassigned": "未归属",
-      "UnassignedScope": "{0} 个服务没有归属领域，因此不会作为领域节点显示；可在“未归属”证据中查看其真实服务身份与目标声明。",
-      "UnassignedHint": "快照中所有未归属领域的服务，不受领域筛选条件影响。AppId → 目标的行保留其真实声明，不会虚构源领域。",
+      "UnassignedScope": "{0} 个服务没有观测到所属领域，可在“未归属”中查看；不会根据应用名称推断依赖归属。",
+      "UnassignedHint": "列出尚未观测到领域归属的应用，不根据应用身份推断静态调用来源。",
       "NoOwner": "没有归属领域",
-      "UnassignedDeclarations": "此未归属服务的依赖声明",
-      "NoUnassignedDeclarations": "未声明依赖目标。",
-      "NoUnassignedServices": "当前快照中没有未归属服务。"
+      "UnassignedDeclarations": "按观测来源角色确定的 API 目标",
+      "NoUnassignedDeclarations": "没有与此服务关联的已采集 API 调用方。",
+      "NoUnassignedServices": "当前快照中没有未归属服务。",
+      "Unavailable": "当前宿主没有可用的编译期应用依赖信息。"
     }
   },
   "Endpoints": {

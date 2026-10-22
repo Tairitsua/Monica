@@ -13,6 +13,10 @@
 @implements IAsyncDisposable
 
 <section class="domain-discovery-visual discovery-atlas" aria-busy="@(_loading ? "true" : "false")">
+    @if (_hasSnapshot && !_topology.IsAvailable)
+    {
+        <MudAlert Severity="Severity.Info">@L["Atlas:Domains:Unavailable"]</MudAlert>
+    }
     <header class="atlas-heading">
         <div class="atlas-heading__identity"><span class="atlas-kicker">@L["Atlas:Domains:Eyebrow"]</span><h2>@L["DomainGraph:Title"]</h2><p>@L["Atlas:Domains:Description"]</p></div>
         <div class="atlas-actions">
@@ -78,22 +82,22 @@
             @if (_nativeView == NativeEvidenceView.Domains)
             {
                 <ul class="atlas-roster">
-                    @foreach (var domain in _filteredDomains.OrderBy(d => d.DisplayName ?? d.Name, StringComparer.CurrentCultureIgnoreCase))
+                    @foreach (var domain in _filteredDomains.OrderBy(d => d.DisplayName ?? d.Id, StringComparer.CurrentCultureIgnoreCase))
                     {
-                        <li @key="domain.Name" class="atlas-roster__row">
-                            <button type="button" class="atlas-record" @onclick="@(() => ViewDomainDetailsAsync(domain.Name))">
-                                <span class="atlas-record__name">@(domain.DisplayName ?? domain.Name)</span><code>@domain.Name</code>
-                                <span class="atlas-record__meta">@L["Atlas:Domains:ServiceCount", _domainServicesMap.GetValueOrDefault(domain.Name)?.Count ?? 0]</span>
-                                @if (_unlistedDomains.Contains(domain.Name)) { <span class="atlas-unlisted">@L["Atlas:Domains:Unlisted"]</span> }
+                        <li @key="domain.Id" class="atlas-roster__row">
+                            <button type="button" class="atlas-record" @onclick="@(() => ViewDomainDetailsAsync(domain.Id))">
+                                <span class="atlas-record__name">@(domain.DisplayName ?? domain.Id)</span><code>@domain.Id</code>
+                                <span class="atlas-record__meta">@L["Atlas:Domains:ServiceCount", _domainServicesMap.GetValueOrDefault(domain.Id)?.Count ?? 0]</span>
+                                @if (_unlistedDomains.Contains(domain.Id)) { <span class="atlas-unlisted">@L["Atlas:Domains:Unlisted"]</span> }
                             </button>
                             <div class="atlas-record__actions">
-                                <MudTooltip Text="@L["DomainGraph:ContextMenu:FocusDomain"]"><MudIconButton Icon="@MoIcons.Focus" Size="Size.Small" aria-label="@L["DomainGraph:ContextMenu:FocusDomain"]" Disabled="@(!_graphAvailable)" OnClick="@(() => FocusOnDomainAsync(domain.Name))" /></MudTooltip>
-                                <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Atlas:Shared:RecordActions", domain.Name]">
-                                    <MudMenuItem OnClick="@(() => ViewDomainDetailsAsync(domain.Name))">@L["DomainGraph:ContextMenu:ViewDomainDetails"]</MudMenuItem>
-                                    <MudMenuItem OnClick="@(() => FilterByDomainAsync(domain.Name))">@L["DomainGraph:ContextMenu:FilterDomainServices"]</MudMenuItem>
-                                    <MudMenuItem OnClick="@(() => ShowDependenciesAsync(domain.Name))">@L["DomainGraph:ContextMenu:ShowDependencies"]</MudMenuItem>
-                                    <MudMenuItem OnClick="@(() => ClearAllFiltersAsync(domain.Name))">@L["DomainGraph:ContextMenu:ClearFilters"]</MudMenuItem>
-                                    <MudMenuItem OnClick="@(() => CopyDomainNameAsync(domain.Name))">@L["DomainGraph:ContextMenu:CopyDomainName"]</MudMenuItem>
+                                <MudTooltip Text="@L["DomainGraph:ContextMenu:FocusDomain"]"><MudIconButton Icon="@MoIcons.Focus" Size="Size.Small" aria-label="@L["DomainGraph:ContextMenu:FocusDomain"]" Disabled="@(!_graphAvailable)" OnClick="@(() => FocusOnDomainAsync(domain.Id))" /></MudTooltip>
+                                <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Atlas:Shared:RecordActions", domain.Id]">
+                                    <MudMenuItem OnClick="@(() => ViewDomainDetailsAsync(domain.Id))">@L["DomainGraph:ContextMenu:ViewDomainDetails"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => FilterByDomainAsync(domain.Id))">@L["DomainGraph:ContextMenu:FilterDomainServices"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => ShowDependenciesAsync(domain.Id))">@L["DomainGraph:ContextMenu:ShowDependencies"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => ClearAllFiltersAsync(domain.Id))">@L["DomainGraph:ContextMenu:ClearFilters"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => CopyDomainNameAsync(domain.Id))">@L["DomainGraph:ContextMenu:CopyDomainName"]</MudMenuItem>
                                 </MudMenu>
                             </div>
                         </li>
@@ -103,11 +107,17 @@
             else if (_nativeView == NativeEvidenceView.Declarations)
             {
                 <ol class="atlas-ledger">
-                    @foreach (var dependency in _filteredDependencies.OrderBy(d => d.SourceDomain, StringComparer.OrdinalIgnoreCase).ThenBy(d => d.TargetDomain, StringComparer.OrdinalIgnoreCase))
+                    @foreach (var dependency in _filteredDependencies.OrderBy(d => d.SourceDomain, StringComparer.Ordinal).ThenBy(d => d.TargetDomain, StringComparer.Ordinal))
                     {
                         <li class="atlas-ledger__row">
                             <div class="atlas-ledger__direction"><button type="button" @onclick="@(() => ViewDomainDetailsAsync(dependency.SourceDomain))">@dependency.SourceDomain</button><span aria-hidden="true">→</span><button type="button" @onclick="@(() => ViewDomainDetailsAsync(dependency.TargetDomain))">@dependency.TargetDomain</button></div>
-                            <span class="atlas-record__meta">@L["Atlas:Domains:Declarations", dependency.ServiceCount]</span>
+                            <details>
+                                <summary>@L["Atlas:Domains:Declarations", dependency.Evidence.Count]</summary>
+                                <ul>@foreach (var evidence in dependency.Evidence)
+                                {
+                                    <li><span>@(evidence.SourceRoleId ?? evidence.SourceDomainId) → @evidence.TargetRoleId</span><code>@evidence.SourceType</code><span aria-hidden="true">→</span><code>@evidence.Operation</code></li>
+                                }</ul>
+                            </details>
                             @if (_unlistedDomains.Contains(dependency.SourceDomain) || _unlistedDomains.Contains(dependency.TargetDomain)) { <span class="atlas-unlisted">@L["Atlas:Domains:UnlistedEdge"]</span> }
                             <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => ShowDependenciesAsync(dependency.SourceDomain))">@L["Atlas:Domains:FocusRelationship"]</MudButton>
                         </li>
@@ -176,9 +186,10 @@
     private List<DomainInfo> _filteredDomains = [];
     private List<DomainDependency> _dependencies = [];
     private List<DomainDependency> _filteredDependencies = [];
-    private Dictionary<string, List<RegisteredServiceStatus>> _domainServicesMap = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<RegisteredServiceStatus>> _domainServicesMap = new(StringComparer.Ordinal);
     private bool _loading = true;
     private bool _hasSnapshot;
+    private ApplicationTopologySnapshot _topology = new(false, []);
     private bool _graphAvailable;
     private NativeEvidenceView _nativeView;
     private List<RegisteredServiceStatus> _unassignedServices = [];
@@ -186,7 +197,7 @@
     private string? _captureError;
     private string? _graphError;
     private DateTimeOffset? _capturedAt;
-    private readonly HashSet<string> _unlistedDomains = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _unlistedDomains = new(StringComparer.Ordinal);
     
     // Filter-related fields
     private bool _showFilterPanel = false;
@@ -316,15 +327,23 @@
                 return;
             }
 
-            _domains = (domains ?? []).GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
+            var topologyResult = await ServiceDiscoveryFacade.CaptureTopologyAsync(_lifetimeCancellation.Token);
+            if (_disposed) return;
+            if (topologyResult.IsFailed(out var topologyError, out var topology))
+            {
+                _captureError = topologyError.Message ?? L["Atlas:Shared:CaptureFailed"].Value;
+                return;
+            }
+            _domains = (domains ?? []).GroupBy(d => d.Id, StringComparer.Ordinal).Select(g => g.First()).ToList();
             _unassignedServices = (services ?? []).Where(service => !service.GetDomainNames().Any()).ToList();
             BuildDomainServicesMap(services ?? []);
-            BuildDomainDependencies(services ?? []);
+            _topology = topology!;
+            BuildDomainDependencies();
             AddUnlistedEndpoints();
             DomainColorResolver.AssignColors(_domains);
             if (_allDomainsSelected)
             {
-                _selectedDomainsFilter = _domains.Select(d => d.Name).ToList();
+                _selectedDomainsFilter = _domains.Select(d => d.Id).ToList();
             }
             _hasSnapshot = true;
             _capturedAt = DateTimeOffset.UtcNow;
@@ -346,37 +365,34 @@
         }
     }
 
-    private void BuildDomainDependencies(List<RegisteredServiceStatus> services)
+    private void BuildDomainDependencies()
     {
-        _dependencies.Clear();
-        foreach (var source in services.SelectMany(service => service.GetDomainNames().Select(domain => (domain, service)))
-                     .GroupBy(item => item.domain, item => item.service, StringComparer.OrdinalIgnoreCase))
-        {
-            var targets = source.SelectMany(service => (service.DependentSubDomains ?? [])
-                .Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase))
-                .GroupBy(name => name, StringComparer.OrdinalIgnoreCase);
-            foreach (var target in targets)
+        _dependencies = _topology.Dependencies
+            .Where(dependency => dependency.SourceDomainId != dependency.TargetDomainId)
+            .GroupBy(dependency => (dependency.SourceDomainId, dependency.TargetDomainId))
+            .Select(group => new DomainDependency
             {
-                _dependencies.Add(new DomainDependency { SourceDomain = source.Key, TargetDomain = target.Key, ServiceCount = target.Count() });
-            }
-        }
+                SourceDomain = group.Key.SourceDomainId,
+                TargetDomain = group.Key.TargetDomainId,
+                Evidence = group.ToList()
+            }).ToList();
     }
 
     private void AddUnlistedEndpoints()
     {
         _unlistedDomains.Clear();
-        var known = _domains.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var known = _domains.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
         var endpoints = _domainServicesMap.Keys.Concat(_dependencies.SelectMany(d => new[] { d.SourceDomain, d.TargetDomain }))
             .Concat(_unassignedServices.SelectMany(GetDeclaredTargets));
-        foreach (var name in endpoints.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var name in endpoints.Distinct(StringComparer.Ordinal))
         {
             if (known.Add(name))
             {
                 _unlistedDomains.Add(name);
-                _domains.Add(new DomainInfo { Name = name, DisplayName = name, Description = L["Atlas:Domains:UnlistedDescription"].Value });
+                _domains.Add(new DomainInfo { Id = name, DisplayName = name, Description = L["Atlas:Domains:UnlistedDescription"].Value });
             }
         }
-        var canonical = _domains.ToDictionary(d => d.Name, d => d.Name, StringComparer.OrdinalIgnoreCase);
+        var canonical = _domains.ToDictionary(d => d.Id, d => d.Id, StringComparer.Ordinal);
         foreach (var dependency in _dependencies)
         {
             dependency.SourceDomain = canonical[dependency.SourceDomain];
@@ -459,7 +475,7 @@
     
     private List<ContextMenuItem<string>> BuildContextMenuItems(string domainName)
     {
-        var domain = _domains.FirstOrDefault(d => d.Name == domainName);
+        var domain = _domains.FirstOrDefault(d => d.Id == domainName);
         var hasServices = _domainServicesMap.ContainsKey(domainName) && _domainServicesMap[domainName].Any();
         var hasDependencies = _dependencies.Any(d => d.SourceDomain == domainName || d.TargetDomain == domainName);
         
@@ -487,15 +503,15 @@
     private async Task ViewDomainDetailsAsync(string? domainName)
     {
         if (_disposed) return;
-        var domain = _domains.FirstOrDefault(d => string.Equals(d.Name, domainName, StringComparison.OrdinalIgnoreCase));
+        var domain = _domains.FirstOrDefault(d => string.Equals(d.Id, domainName, StringComparison.Ordinal));
         if (domain is null) return;
-        if (!_unlistedDomains.Contains(domain.Name) && OnDomainClick.HasDelegate)
+        if (!_unlistedDomains.Contains(domain.Id) && OnDomainClick.HasDelegate)
         {
-            await OnDomainClick.InvokeAsync(domain.Name);
+            await OnDomainClick.InvokeAsync(domain.Id);
             return;
         }
-        await FocusOnDomainAsync(domain.Name);
-        if (!_disposed) Snackbar.Add(L["Atlas:Domains:UnlistedSummary", domain.Name].Value, Severity.Info);
+        await FocusOnDomainAsync(domain.Id);
+        if (!_disposed) Snackbar.Add(L["Atlas:Domains:UnlistedSummary", domain.Id].Value, Severity.Info);
     }
 
     private async Task FocusOnDomainAsync(string? domainName)
@@ -545,7 +561,7 @@
         if (_disposed) return;
         _filterText = string.Empty;
         _allDomainsSelected = true;
-        _selectedDomainsFilter = new HashSet<string>(_domains.Select(d => d.Name));
+        _selectedDomainsFilter = new HashSet<string>(_domains.Select(d => d.Id));
         _showOnlyWithServices = false;
         _showOnlyWithDependencies = false;
         if (_showFilterPanel && _filterPanel is not null)
@@ -581,9 +597,9 @@
         }
     }
 
-    private static List<string> GetDeclaredTargets(RegisteredServiceStatus service)
-        => (service.DependentSubDomains ?? []).Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+    private List<string> GetDeclaredTargets(RegisteredServiceStatus service)
+        => _topology.Dependencies.Where(dependency => dependency.IsOwnedBy(service)).Select(dependency => dependency.TargetDomainId)
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 
     private int NativeEvidenceCount => _nativeView switch
     {
@@ -612,13 +628,13 @@
         _filteredDomains = _domains.Where(domain =>
         {
             // Domain-name filter
-            if (!_selectedDomainsFilter.Contains(domain.Name, StringComparer.OrdinalIgnoreCase))
+            if (!_selectedDomainsFilter.Contains(domain.Id, StringComparer.Ordinal))
                 return false;
                 
             // Text filter
             if (!string.IsNullOrWhiteSpace(_filterText))
             {
-                var matchesText = domain.Name.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                var matchesText = domain.Id.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
                                   (!string.IsNullOrEmpty(domain.DisplayName) && domain.DisplayName.Contains(_filterText, StringComparison.OrdinalIgnoreCase)) ||
                                   (!string.IsNullOrEmpty(domain.Description) && domain.Description.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
                 
@@ -629,7 +645,7 @@
             // Show only domains that have services
             if (_showOnlyWithServices)
             {
-                var hasServices = _domainServicesMap.ContainsKey(domain.Name) && _domainServicesMap[domain.Name].Any();
+                var hasServices = _domainServicesMap.ContainsKey(domain.Id) && _domainServicesMap[domain.Id].Any();
                 if (!hasServices)
                     return false;
             }
@@ -640,8 +656,8 @@
         // Filter dependencies: keep only dependencies whose source and target both exist in the filtered domain list.
         _filteredDependencies = _dependencies.Where(dep =>
         {
-            var hasSource = _filteredDomains.Any(d => d.Name == dep.SourceDomain);
-            var hasTarget = _filteredDomains.Any(d => d.Name == dep.TargetDomain);
+            var hasSource = _filteredDomains.Any(d => d.Id == dep.SourceDomain);
+            var hasTarget = _filteredDomains.Any(d => d.Id == dep.TargetDomain);
             
             // If showing only domains with dependencies, both ends of the dependency must exist.
             if (_showOnlyWithDependencies)
@@ -662,7 +678,7 @@
                 domainsWithDependencies.Add(dep.TargetDomain);
             }
             
-            _filteredDomains = _filteredDomains.Where(d => domainsWithDependencies.Contains(d.Name)).ToList();
+            _filteredDomains = _filteredDomains.Where(d => domainsWithDependencies.Contains(d.Id)).ToList();
         }
         
         await UpdateGraph();
@@ -708,16 +724,18 @@
     {
         var nodes = _filteredDomains.Select(domain => new
         {
-            id = domain.Name,
-            name = domain.DisplayName ?? domain.Name,
+            id = domain.Id,
+            name = domain.DisplayName ?? domain.Id,
             description = domain.Description,
-            isCatalogDomain = !_unlistedDomains.Contains(domain.Name),
-            colorRole = DomainColorResolver.GetDomainColorRole(domain.Name),
-            services = _domainServicesMap.GetValueOrDefault(domain.Name, new List<RegisteredServiceStatus>())
+            isCatalogDomain = !_unlistedDomains.Contains(domain.Id),
+            colorRole = DomainColorResolver.GetDomainColorRole(domain.Id),
+            services = _domainServicesMap.GetValueOrDefault(domain.Id, new List<RegisteredServiceStatus>())
                 .Select(s => new
                 {
                     name = s.AppName,
                     appName = s.AppName,
+                    appId = s.AppId,
+                    roles = s.RoleIds,
                     status = s.OverallStatus.ToString(),
                     overallStatus = s.OverallStatus.ToString()
                 }).ToList()
@@ -727,7 +745,7 @@
         {
             source = dep.SourceDomain,
             target = dep.TargetDomain,
-            serviceCount = dep.ServiceCount,
+            evidenceCount = dep.Evidence.Count,
             colorRole = DomainColorResolver.GetDomainColorRole(dep.SourceDomain)
         }).ToList();
 
@@ -896,7 +914,7 @@
     {
         public required string SourceDomain { get; set; }
         public required string TargetDomain { get; set; }
-        public int ServiceCount { get; set; }
+        public List<DomainDependencyInfo> Evidence { get; set; } = [];
     }
 
     private enum NativeEvidenceView { Declarations, Domains, Unassigned }
@@ -912,6 +930,8 @@
             noRelatedServices = L["DomainGraph:Graph:Labels:NoRelatedServices"].Value,
             clickToViewDetails = L["DomainGraph:Graph:Labels:ClickToViewDetails"].Value,
             dependencyServiceCount = L["DomainGraph:Graph:Labels:DependencyServiceCount"].Value,
+            appId = L["ServiceDetail:Overview:Fields:AppId"].Value,
+            roles = L["Shared:Values:Roles"].Value,
             unlisted = L["Atlas:Domains:Unlisted"].Value
         },
         statuses = new

@@ -19,7 +19,7 @@
             <nav aria-label="@L["Workbench:DomainCatalog"]">
                 @foreach (var domain in VisibleDomains)
                 {
-                    <button type="button" aria-pressed="@(Selected?.Name.Equals(domain.Name,StringComparison.OrdinalIgnoreCase) == true ? "true" : "false")" @onclick="() => Select(domain.Name)"><span>@(domain.DisplayName ?? domain.Name)</span><code>@domain.Name</code><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button>
+                    <button type="button" aria-pressed="@(Selected?.Id.Equals(domain.Id,StringComparison.Ordinal) == true ? "true" : "false")" @onclick="() => Select(domain.Id)"><span>@(domain.DisplayName ?? domain.Id)</span><code>@domain.Id</code><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button>
                 }
             </nav>
             @if (_hasCatalog && _domains.Count == 0) { <p class="domain-index-empty">@L["Workbench:CatalogEmpty"]</p> }
@@ -28,13 +28,14 @@
         <div class="domain-detail-workspace">
             @if (Selected is { } selected)
             {
-                <header class="domain-identity"><span>@L["Workbench:SelectedDomain"]</span><h3>@(selected.DisplayName ?? selected.Name)</h3><code>@selected.Name</code><p>@(selected.Description ?? L["Workbench:NoCatalogDescription"].Value)</p>@if (_catalogCapturedAt is { } stamp) { <small>@L["Workbench:CapturedUTC"] · <time>@stamp.ToString("HH:mm:ss")</time></small> }</header>
+                <header class="domain-identity"><span>@L["Workbench:SelectedDomain"]</span><h3>@(selected.DisplayName ?? selected.Id)</h3><code>@selected.Id</code><p>@(selected.Description ?? L["Workbench:NoCatalogDescription"].Value)</p>@if (_catalogCapturedAt is { } stamp) { <small>@L["Workbench:CapturedUTC"] · <time>@stamp.ToString("HH:mm:ss")</time></small> }</header>
                 @if (_servicesError is not null) { <div class="domain-notice" role="alert"><strong>@L["Workbench:DomainServicesFailed"]</strong><p>@_servicesError</p><p>@L["Workbench:DomainServicesUnavailable"]</p></div> }
                 else if (_hasServices)
                 {
+                    @if (!_topology.IsAvailable) { <MudAlert Severity="Severity.Info">@L["Atlas:Domains:Unavailable"]</MudAlert> }
                     <div class="domain-service-columns">
                         <section><header><span>@L["Workbench:Ownership"]</span><h4>@L["Workbench:OwnedServices"]<em>@OwnedServices.Count</em></h4><p>@L["Workbench:OwnedServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in OwnedServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@L["Workbench:InstancesCount",service.TotalInstanceCount]</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (OwnedServices.Count == 0) { <p>@L["Workbench:NoOwnedServices"]</p> }</div></section>
-                        <section><header><span>@L["Workbench:Declarations"]</span><h4>@L["Workbench:DependentServices"]<em>@DependentServices.Count</em></h4><p>@L["Workbench:DependentServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in DependentServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@(string.Join(", ", service.GetDomainNames().DefaultIfEmpty(L["Shared:Values:Unknown"].Value)))</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (DependentServices.Count == 0) { <p>@L["Workbench:NoDependentServices"]</p> }</div></section>
+                        <section><header><span>@L["Workbench:Declarations"]</span><h4>@L["Workbench:DependentServices"]<em>@(_topology.IsAvailable ? DependentServices.Count.ToString() : L["Shared:Values:NotAvailable"].Value)</em></h4><p>@L["Workbench:DependentServicesHelp"]</p></header><div class="domain-service-ledger">@foreach (var service in DependentServices) { <button type="button" @onclick="() => InspectAsync(service)"><span>@service.AppName</span><code>@service.AppId</code><small>@(string.Join(", ", service.GetDomainNames().DefaultIfEmpty(L["Shared:Values:Unknown"].Value)))</small><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button> } @if (DependentServices.Count == 0) { <p>@L[_topology.IsAvailable ? "Workbench:NoDependentServices" : "Atlas:Domains:Unavailable"]</p> }</div></section>
                     </div>
                 }
             }
@@ -62,11 +63,12 @@
     private DateTime? _catalogCapturedAt, _servicesCapturedAt;
     private List<DomainInfo> _domains = [];
     private List<RegisteredServiceStatus> _services = [];
+    private ApplicationTopologySnapshot _topology = new(false, []);
     private DiscoveryInspectorHost? _inspector;
-    private DomainInfo? Selected => string.IsNullOrWhiteSpace(SelectedDomainName) ? _domains.FirstOrDefault() : _domains.FirstOrDefault(d => d.Name.Equals(SelectedDomainName,StringComparison.OrdinalIgnoreCase));
-    private IEnumerable<DomainInfo> VisibleDomains => _domains.Where(d => (d.DisplayName ?? d.Name).Contains(_search,StringComparison.OrdinalIgnoreCase) || d.Name.Contains(_search,StringComparison.OrdinalIgnoreCase));
-    private List<RegisteredServiceStatus> OwnedServices => _services.Where(s => s.BelongsToDomain(Selected?.Name)).OrderBy(s=>s.AppName).ToList();
-    private List<RegisteredServiceStatus> DependentServices => _services.Where(s => !s.BelongsToDomain(Selected?.Name) && s.DependentSubDomains?.Contains(Selected?.Name ?? string.Empty,StringComparer.OrdinalIgnoreCase) == true).OrderBy(s=>s.AppName).ToList();
+    private DomainInfo? Selected => string.IsNullOrWhiteSpace(SelectedDomainName) ? _domains.FirstOrDefault() : _domains.FirstOrDefault(d => d.Id.Equals(SelectedDomainName,StringComparison.Ordinal));
+    private IEnumerable<DomainInfo> VisibleDomains => _domains.Where(d => (d.DisplayName ?? d.Id).Contains(_search,StringComparison.OrdinalIgnoreCase) || d.Id.Contains(_search,StringComparison.OrdinalIgnoreCase));
+    private List<RegisteredServiceStatus> OwnedServices => _services.Where(s => s.BelongsToDomain(Selected?.Id)).OrderBy(s=>s.AppName).ToList();
+    private List<RegisteredServiceStatus> DependentServices => _services.Where(s => !s.BelongsToDomain(Selected?.Id) && _topology.Dependencies.Any(dependency => dependency.TargetDomainId == Selected?.Id && dependency.IsOwnedBy(s))).OrderBy(s=>s.AppName).ToList();
     protected override async Task OnInitializedAsync() { _token=_lifetime.Token; await RefreshAsync(); }
     private async Task RefreshAsync()
     {
@@ -78,13 +80,15 @@
             {
                 _loading=true;
                 // Catalog identity and registration evidence have independent success/failure boundaries.
+                var topology = await Facade.CaptureTopologyAsync(_token);
+                _topology = topology.IsFailed(out _, out var snapshot) ? new(false, []) : snapshot!;
                 var catalogTask=Facade.CaptureDomainsAsync(_token);
                 var servicesTask=Facade.CaptureServicesAsync(_token);
                 await Task.WhenAll(catalogTask,servicesTask);
                 _token.ThrowIfCancellationRequested();
                 var catalog=await catalogTask;
                 if(catalog.IsFailed(out var catalogError,out var domains)) _catalogError=catalogError.Message;
-                else { _domains=domains.OrderBy(d=>d.DisplayName ?? d.Name).ToList();_hasCatalog=true;_catalogCapturedAt=DateTime.UtcNow;_catalogError=null; }
+                else { _domains=domains.OrderBy(d=>d.DisplayName ?? d.Id).ToList();_hasCatalog=true;_catalogCapturedAt=DateTime.UtcNow;_catalogError=null; }
                 var registry=await servicesTask;
                 if(registry.IsFailed(out var registryError,out var services)) _servicesError=registryError.Message;
                 else { _services=services;_hasServices=true;_servicesCapturedAt=DateTime.UtcNow;_servicesError=null; }

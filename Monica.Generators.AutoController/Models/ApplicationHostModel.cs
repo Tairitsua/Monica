@@ -8,8 +8,10 @@ namespace Monica.Generators.AutoController.Models;
 internal sealed class ApplicationHostModel(
     ImmutableArray<ApplicationAssemblyModel> assemblies,
     ImmutableArray<ApplicationOperationModel> operations,
-    ImmutableArray<string> localAssemblies = default) : IEquatable<ApplicationHostModel>
+    ImmutableArray<string> localAssemblies = default,
+    ImmutableArray<ApplicationDependencyModel> dependencies = default) : IEquatable<ApplicationHostModel>
 {
+    public ImmutableArray<ApplicationDependencyModel> Dependencies { get; } = dependencies.IsDefault ? [] : dependencies;
     public ImmutableArray<ApplicationAssemblyModel> Assemblies { get; } = assemblies;
     public ImmutableArray<ApplicationOperationModel> Operations { get; } = operations;
     public ImmutableArray<string> LocalAssemblies { get; } = localAssemblies.IsDefault
@@ -17,7 +19,7 @@ internal sealed class ApplicationHostModel(
 
     public bool Equals(ApplicationHostModel? other) => other is not null &&
         Assemblies.SequenceEqual(other.Assemblies) && Operations.SequenceEqual(other.Operations) &&
-        LocalAssemblies.SequenceEqual(other.LocalAssemblies, StringComparer.Ordinal);
+        LocalAssemblies.SequenceEqual(other.LocalAssemblies, StringComparer.Ordinal) && Dependencies.SequenceEqual(other.Dependencies);
 
     public override bool Equals(object? obj) => obj is ApplicationHostModel other && Equals(other);
 
@@ -28,10 +30,23 @@ internal sealed class ApplicationHostModel(
             var hash = 17;
             foreach (var assembly in Assemblies) hash = (hash * 397) ^ assembly.GetHashCode();
             foreach (var operation in Operations) hash = (hash * 397) ^ operation.GetHashCode();
+            foreach (var dependency in Dependencies) hash = (hash * 397) ^ dependency.GetHashCode();
             foreach (var assembly in LocalAssemblies) hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(assembly);
             return hash;
         }
     }
+}
+
+internal sealed class ApplicationDependencyModel(string sourceAssembly, string sourceType, string requestType)
+    : IEquatable<ApplicationDependencyModel>
+{
+    public string SourceAssembly { get; } = sourceAssembly;
+    public string SourceType { get; } = sourceType;
+    public string RequestType { get; } = requestType;
+    public bool Equals(ApplicationDependencyModel? other) => other is not null &&
+        SourceAssembly == other.SourceAssembly && SourceType == other.SourceType && RequestType == other.RequestType;
+    public override bool Equals(object? obj) => obj is ApplicationDependencyModel other && Equals(other);
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(SourceAssembly + "|" + SourceType + "|" + RequestType);
 }
 
 internal sealed class ApplicationAssemblyModel(string assemblyName, string domainId, string? roleId, string? workloadOwner = null)

@@ -58,7 +58,7 @@
 
     protected override void OnParametersSet()
     {
-        AllDomainNames = AllDomains.Select(d => d.Name).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+        AllDomainNames = AllDomains.Select(d => d.Id).Distinct(StringComparer.Ordinal).OrderBy(n => n).ToList();
 
     }
 

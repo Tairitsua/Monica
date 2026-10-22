@@ -48,7 +48,28 @@ internal static class ApplicationCatalogMetadata
                 new XAttribute("Method", operation.Endpoint.HttpMethod),
                 new XAttribute("Route", operation.Endpoint.CompleteRoute),
                 new XAttribute("Binding", operation.Endpoint.Binding),
-                operation.Tags.Select(static tag => new XElement("Tag", tag)))))).ToString(SaveOptions.DisableFormatting);
+                operation.Tags.Select(static tag => new XElement("Tag", tag))))),
+        new XElement("Dependencies", model.Dependencies.Select(static dependency => new XElement("Dependency",
+            new XAttribute("SourceAssembly", dependency.SourceAssembly), new XAttribute("SourceType", dependency.SourceType),
+            new XAttribute("Request", dependency.RequestType))))).ToString(SaveOptions.DisableFormatting);
+
+    internal static IReadOnlyList<ApplicationDependencyModel> ReadDependencies(IEnumerable<string> payloads, List<DiagnosticSnapshot> diagnostics)
+    {
+        var dependencies = new List<ApplicationDependencyModel>();
+        foreach (var payload in payloads)
+        {
+            try { dependencies.AddRange(ReadDependencies(XElement.Parse(payload))); }
+            catch (Exception exception) when (exception is InvalidOperationException or System.Xml.XmlException or ArgumentException)
+            {
+                diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.InvalidApplicationCatalog, Location.None, exception.Message));
+            }
+        }
+        return dependencies;
+    }
+
+    private static IEnumerable<ApplicationDependencyModel> ReadDependencies(XElement document) =>
+        (document.Element("Dependencies")?.Elements("Dependency") ?? []).Select(static item =>
+            new ApplicationDependencyModel(Required(item, "SourceAssembly"), Required(item, "SourceType"), Required(item, "Request")));
 
     internal static AnalysisSnapshot<ApplicationHostModel> Read(Compilation compilation, IEnumerable<string> payloads,
         bool validateCompleteness)
@@ -56,6 +77,7 @@ internal static class ApplicationCatalogMetadata
         var diagnostics = new List<DiagnosticSnapshot>();
         var assemblies = new List<ApplicationAssemblyModel>();
         var operations = new List<ApplicationOperationModel>();
+        var dependencies = new List<ApplicationDependencyModel>();
         Dictionary<string, INamedTypeSymbol>? requestTypes = null;
         foreach (var payload in payloads)
         {
@@ -64,6 +86,7 @@ internal static class ApplicationCatalogMetadata
                 var document = XElement.Parse(payload);
                 if (document.Name != "ApplicationCatalog" || (string?)document.Attribute("Schema") != "1")
                     throw new InvalidOperationException("Unsupported application catalog schema.");
+                dependencies.AddRange(ReadDependencies(document));
                 foreach (var item in document.Element("Assemblies")?.Elements("Assembly") ?? [])
                     assemblies.Add(new ApplicationAssemblyModel(Required(item, "Name"), Required(item, "Domain"),
                         Optional(item, "Role"), Optional(item, "WorkloadOwner")));
@@ -116,6 +139,13 @@ internal static class ApplicationCatalogMetadata
         foreach (var operation in operations)
             if (!assemblies.Any(assembly => assembly.AssemblyName == operation.HandlerAssemblyName && assembly.RoleId == operation.RoleId && assembly.DomainId == operation.DomainId))
                 Invalid($"Operation '{operation.RequestTypeName}' does not match an exported role assembly.");
+        foreach (var dependency in dependencies)
+        {
+            if (!assemblies.Any(assembly => assembly.AssemblyName == dependency.SourceAssembly))
+                Invalid($"Dependency source '{dependency.SourceAssembly}' is not an exported domain or role assembly.");
+            if (!operations.Any(operation => operation.RequestTypeName == dependency.RequestType))
+                Invalid($"Dependency target '{dependency.RequestType}' is not an exported operation.");
+        }
         foreach (var duplicate in operations.GroupBy(static operation => operation.RequestTypeName, StringComparer.Ordinal).Where(static group => group.Count() > 1))
             diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.DuplicateApplicationHandler, Location.None, duplicate.Key,
                 string.Join(", ", duplicate.Select(static operation => operation.HandlerTypeName))));
@@ -124,7 +154,8 @@ internal static class ApplicationCatalogMetadata
         ApplicationHostModelReader.ValidateDuplicates(operations, diagnostics, Location.None);
         return new AnalysisSnapshot<ApplicationHostModel>(diagnostics.Any(static diagnostic => diagnostic.ToDiagnostic().Severity == DiagnosticSeverity.Error)
             ? null : new ApplicationHostModel(assemblies.OrderBy(static assembly => assembly.AssemblyName, StringComparer.Ordinal).ToImmutableArray(),
-                operations.OrderBy(static operation => operation.RequestTypeName, StringComparer.Ordinal).ToImmutableArray(), []), diagnostics);
+                operations.OrderBy(static operation => operation.RequestTypeName, StringComparer.Ordinal).ToImmutableArray(), [],
+                ApplicationDependencyReader.Order(dependencies)), diagnostics);
 
         void Invalid(string message) => diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.InvalidApplicationCatalog, Location.None, message));
     }

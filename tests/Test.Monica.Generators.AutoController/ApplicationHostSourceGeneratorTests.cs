@@ -10,6 +10,50 @@ namespace Test.Monica.Generators.AutoController;
 public sealed class ApplicationHostSourceGeneratorTests
 {
     [Fact]
+    public void Catalog_PreservesActualCrossDomainApiUsageWithoutRequiringSourceImplementationsInHost()
+    {
+        var application = CompileCatalogApplication();
+        const string source = """
+            [assembly: Monica.ApplicationModel.Annotations.ApplicationDomain("Statistics")]
+            namespace Scenario.Statistics;
+            public sealed class Consumer
+            {
+                public async System.Threading.Tasks.Task Read(Scenario.PublishedLanguages.DomainOrdering.Contracts.IOrderingQueryApi api)
+                {
+                    await api.GetTotal(new Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal());
+                }
+            }
+            public sealed class Unused(Scenario.PublishedLanguages.DomainOrdering.Contracts.IOrderingQueryApi api)
+            {
+                public object Client => api;
+            }
+            """;
+        var producer = GeneratorTestHarness.RunNamedWithReferences("Scenario.Statistics", source,
+            [application.References[0]], new ApplicationRoleMetadataSourceGenerator());
+        producer.OutputErrors.Should().BeEmpty();
+        producer.RunResult.Diagnostics.Should().BeEmpty();
+        producer.RunAgain().GeneratedSources.Should().BeEquivalentTo(producer.GeneratedSources);
+        var export = (string)producer.OutputCompilation.Assembly.GetAttributes().Single(attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "System.Reflection.AssemblyMetadataAttribute" &&
+            (string?)attribute.ConstructorArguments[0].Value == "Monica.ApplicationModel.Export.v1").ConstructorArguments[1].Value!;
+        export.Should().Contain("Scenario.Statistics.Consumer").And.NotContain("Scenario.Statistics.Unused");
+        var catalog = GeneratorTestHarness.RunCatalog("Scenario.UsageCatalog", [application.References[0]], [.. application.Exports, export]);
+        catalog.OutputErrors.Should().BeEmpty();
+        catalog.RunResult.Diagnostics.Should().BeEmpty();
+        var catalogReference = Emit(catalog.OutputCompilation, "Scenario.UsageCatalog");
+        var remote = RunHost([application.References[0], catalogReference]);
+        var local = RunHost([.. application.References, catalogReference, Emit(producer.OutputCompilation, "Scenario.Statistics")]);
+        foreach (var run in new[] { local, remote })
+        {
+            run.OutputErrors.Should().BeEmpty();
+            run.RunResult.Diagnostics.Should().BeEmpty();
+            run.GeneratedSources["GeneratedApplicationManifest.g.cs"].Should().Contain(
+                "ApplicationDependencyDefinition(\"Scenario.Statistics\", \"Scenario.Statistics.Consumer\", typeof(global::Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal))");
+            run.RunAgain().GeneratedSources.Should().BeEquivalentTo(run.GeneratedSources);
+        }
+    }
+
+    [Fact]
     public void Run_WhenHostReferencesDeclaredReleaseRoles_ShouldEmitOneClientAndCompleteOwnershipManifest()
     {
         var references = CompileApplication();

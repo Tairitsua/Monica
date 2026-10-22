@@ -30,6 +30,13 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void ValidateOptions(ModuleServiceDiscoveryOption options, string? profileName)
     {
+        var applicationIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in options.PredefinedServices)
+        {
+            if (string.IsNullOrWhiteSpace(service.AppId) || service.AppId != service.AppId.Trim() || !applicationIds.Add(service.AppId))
+                throw new InvalidOperationException("Predefined services require unique, nonempty AppIds without surrounding whitespace.");
+        }
+
         if (!Enum.IsDefined(options.Role))
         {
             throw new InvalidOperationException(
@@ -72,6 +79,7 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
 
     public override void Describe(ModuleDescriptor module)
     {
+        module.Require<ModuleDomainCatalog, ModuleDomainCatalogOption>();
         module.RequireFeature(STATE_STORE_FEATURE);
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static localization => localization.AddResource<ServiceDiscoveryResource>());
@@ -289,21 +297,7 @@ public static class ModuleServiceDiscoveryBuilderExtensions
                 context.Services.AddSingleton<IServiceDiscoveryCatalogProvider, TProvider>());
         }
 
-        public ModuleRegistration<ModuleServiceDiscovery, ModuleServiceDiscoveryOption> SetDependentSubDomains<TEnum>(
-            TEnum domainFlags)
-            where TEnum : struct, Enum
-        {
-            if (!typeof(TEnum).IsDefined(typeof(FlagsAttribute), false))
-            {
-                throw new ArgumentException("The enum type must be marked with FlagsAttribute.", nameof(domainFlags));
-            }
 
-            var domains = Enum.GetValues<TEnum>()
-                .Where(flag => Convert.ToInt32(flag) != 0 && domainFlags.HasFlag(flag))
-                .Select(static flag => flag.ToString())
-                .ToList();
-            return registration.Configure(options => options.DependentSubDomains = domains);
-        }
 
         /// <summary>
         /// Uses a keyed state store that the host has registered explicitly. The supplied key is the sole external
@@ -404,9 +398,10 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
     public string? FromInstance { get; set; }
 
     /// <summary>
-    /// List of dependent subdomains.
+    /// Expected applications and optional display names, including applications without online registrations.
+    /// Defaults to empty. The application model's deployment AppIds are included automatically when available.
     /// </summary>
-    public List<string>? DependentSubDomains { get; set; }
+    public List<PredefinedServiceInfo> PredefinedServices { get; set; } = [];
 
     /// <summary>
     /// Leader election configuration.

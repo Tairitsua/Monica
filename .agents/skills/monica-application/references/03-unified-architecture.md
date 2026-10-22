@@ -60,6 +60,8 @@ A domain is a business and data owner. A role is one domain-owned application re
 
 Reuse the product's existing domain identifiers; do not add a second independently maintained domain registry. Declare stable role constants in Protocol. Dotted role names are exact identifiers: `ordering` does not enable `ordering.reporting`. Project, artifact or class renames do not rename these identifiers.
 
+Configure domain display names and descriptions once through Core's [shared domain catalog](../../monica-infra-hosting/references/domain-catalog.md). ApplicationModel contributes compiled identities; infrastructure, UI, and diagnostic consumers share `IDomainCatalog`. Keep domain metadata separate from assembly ownership, deployment placement, and observed instances. Generated [API usage evidence](../../monica-infra-hosting/references/application-model.md#compiled-api-dependency-evidence) describes source-to-target dependencies independently of host placement; a host's loaded assemblies or available API clients do not imply dependencies on every domain.
+
 Declare ownership once in each implementation assembly:
 
 ```csharp

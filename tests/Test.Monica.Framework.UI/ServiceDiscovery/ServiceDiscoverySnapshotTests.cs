@@ -32,7 +32,6 @@ public sealed class ServiceDiscoverySnapshotTests
             AppName = registration.AppName,
             ProjectName = registration.ProjectName,
             DomainName = registration.DomainName,
-            DependentSubDomains = ["Messaging"],
             Instances = new Dictionary<string, InstanceState>(StringComparer.OrdinalIgnoreCase)
             {
                 [registration.InstanceId] = registration
@@ -41,9 +40,7 @@ public sealed class ServiceDiscoverySnapshotTests
         };
 
         var captured = ServiceDiscoverySnapshot.Copy(source);
-        source.DependentSubDomains.Clear();
         registration.Metadata["TRACE"] = "new provider evidence";
-        registration.DependentSubDomains!.Add("Weather");
         registration.Status = ServiceStatus.Running;
         registration.BuildTime = registration.BuildTime.AddHours(1);
         registration.AssemblyVersion = "2.0.0";
@@ -53,12 +50,10 @@ public sealed class ServiceDiscoverySnapshotTests
         source.Instances.Clear();
         source.EvictedInstances.Clear();
 
-        captured.DependentSubDomains.Should().Equal("Messaging");
         captured.ProjectName.Should().Be("Operations");
         captured.DomainName.Should().Be("Dispatch");
         var member = captured.Instances["REMOTE-INSTANCE"];
         member.Metadata["TRACE"].Should().Be("original evidence");
-        member.DependentSubDomains.Should().Equal("Messaging");
         member.Status.Should().Be(ServiceStatus.Error);
         member.IsLeader.Should().BeTrue();
         member.BuildTime.Should().Be(new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc));
@@ -78,8 +73,6 @@ public sealed class ServiceDiscoverySnapshotTests
         retained.LastHeartbeatTime.Should().Be(member.LastHeartbeatTime);
 
         member.Metadata["trace"] = "inspector-local evidence";
-        member.DependentSubDomains!.Clear();
         registration.Metadata["trace"].Should().Be("new provider evidence");
-        registration.DependentSubDomains.Should().Equal("Messaging", "Weather");
     }
 }

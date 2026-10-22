@@ -115,15 +115,11 @@ internal sealed class ReadFailureMemoryStore(IMemoryCache memoryCache, ILogger<M
 
 internal sealed class ControlledDiscoveryCatalog : IServiceDiscoveryCatalogProvider
 {
-    internal List<DomainInfo> Domains { get; } = [];
-    internal Func<Task<List<DomainInfo>>>? ReadDomains { get; set; }
     internal List<PredefinedServiceInfo> PreloadedServices { get; } = [];
     internal Func<Task<List<PredefinedServiceInfo>>>? ReadPreloadedServices { get; set; }
     internal bool FailPreloadRead { get; set; }
     internal const string PreloadFailure = "Predefined service provider read failed.";
 
-    public Task<List<DomainInfo>> GetAllDomainsAsync()
-        => ReadDomains?.Invoke() ?? Task.FromResult(Domains);
 
     public Task<List<PredefinedServiceInfo>> GetPreloadedServicesAsync()
     {

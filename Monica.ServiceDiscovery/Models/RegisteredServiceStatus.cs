@@ -19,18 +19,14 @@ public class RegisteredServiceStatus
 
     /// <summary>Returns observed domain identities, including the legacy singular registration field.</summary>
     public IEnumerable<string> GetDomainNames() => DomainNames.Append(DomainName)
-        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase);
+        .OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.Ordinal);
 
     /// <summary>Whether any observed instance declares the domain; this does not establish process readiness.</summary>
     public bool BelongsToDomain(string? domainName) => domainName is not null &&
-        GetDomainNames().Contains(domainName, StringComparer.OrdinalIgnoreCase);
+        GetDomainNames().Contains(domainName, StringComparer.Ordinal);
     
     /// <summary>Project name</summary>
     public string? ProjectName { get; set; }
-    /// <summary>
-    /// Dependent subdomain list
-    /// </summary>
-    public List<string>? DependentSubDomains { get; set; }
     /// <summary>Service instance dictionary (Key: FromClient, Value: InstanceState)</summary>
     public Dictionary<string, InstanceState> Instances { get; set; } = new();
 

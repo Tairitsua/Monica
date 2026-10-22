@@ -39,7 +39,7 @@
         <MudGrid>
             @foreach (var domain in _domains)
             {
-                var colorRole = GetDomainColorRole(domain.Name);
+                var colorRole = GetDomainColorRole(domain.Id);
                 <MudItem xs="12" sm="6" md="4" lg="3">
                     <MudCard Elevation="0"
                              Class="@($"cursor-pointer domain-card domain-card--{colorRole}")"
@@ -55,14 +55,14 @@
                                             <MoIcon Icon="@MoIcons.Building" Size="1.5rem" />
                                         </span>
                                         <MudText Typo="Typo.h6" Class="domain-card__title">
-                                            @(domain.DisplayName ?? domain.Name)
+                                            @(domain.DisplayName ?? domain.Id)
                                         </MudText>
                                     </div>
                                     <div class="domain-card__counts">
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Text="@L["DomainList:Counts:OwnedServices", GetOwnedServiceCount(domain.Name)]" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
-                                        @if (GetRelatedServiceCount(domain.Name) > 0)
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Text="@L["DomainList:Counts:OwnedServices", GetOwnedServiceCount(domain.Id)]" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
+                                        @if (GetRelatedServiceCount(domain.Id) > 0)
                                         {
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Text="@L["DomainList:Counts:RelatedDependencies", GetRelatedServiceCount(domain.Name)]" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Text="@L["DomainList:Counts:RelatedDependencies", GetRelatedServiceCount(domain.Id)]" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
                                         }
                                     </div>
                                 </div>
@@ -76,11 +76,11 @@
 
                                 <MudStack Spacing="1">
                                     <MudText Typo="Typo.caption" Class="domain-card__meta">
-                                        @L["DomainList:Summary:DomainName", domain.Name]
+                                        @L["DomainList:Summary:DomainName", domain.Id]
                                     </MudText>
                                     @{
-                                        var ownedCount = GetOwnedServiceCount(domain.Name);
-                                        var relatedCount = GetRelatedServiceCount(domain.Name);
+                                        var ownedCount = GetOwnedServiceCount(domain.Id);
+                                        var relatedCount = GetRelatedServiceCount(domain.Id);
                                     }
                                     <MudText Typo="Typo.caption" Class="domain-card__meta domain-card__meta--strong">
                                         @L["DomainList:Summary:OwnedServices", ownedCount]
@@ -105,6 +105,7 @@
     private bool _isLoading = false;
     private List<DomainInfo> _domains = [];
     private List<RegisteredServiceStatus> _allServices = [];
+    private ApplicationTopologySnapshot _topology = new(false, []);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -133,6 +134,8 @@
                 DomainColorResolver.AssignColors(_domains);
             }
 
+            var topologyResult = await ServiceDiscoveryFacade.CaptureTopologyAsync();
+            _topology = topologyResult.IsFailed(out _, out var topology) ? new(false, []) : topology!;
             var servicesResult = await ServiceDiscoveryFacade.GetMergedServicesStatusAsync();
             if (!servicesResult.IsFailed(out _, out var services))
             {
@@ -160,7 +163,7 @@
     {
         return _allServices.Count(s =>
             !s.BelongsToDomain(domainName) &&
-            (s.DependentSubDomains?.Contains(domainName, StringComparer.OrdinalIgnoreCase) == true));
+            _topology.Dependencies.Any(dependency => dependency.TargetDomainId == domainName && dependency.IsOwnedBy(s)));
     }
 
     private async Task HandleDomainClick(DomainInfo domain)

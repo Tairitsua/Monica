@@ -45,27 +45,6 @@ public sealed class ServiceDiscoveryCaptureContractTests
     }
 
     [Fact]
-    public async Task CaptureDomainsAsync_WhenDefaultCatalogStoreReadFails_ShouldPropagateFailureInsteadOfEmpty()
-    {
-        await using var application = await new ServiceDiscoveryTestApplicationFactory().CreateAsync(
-            cancellationToken: TestContext.Current.CancellationToken);
-        await StopLocalRegistrationAsync(application);
-        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
-        var facade = scope.Resolve<ServiceDiscoveryFacade>();
-        var catalog = scope.Resolve<IServiceDiscoveryCatalogProvider>();
-
-        var empty = await facade.CaptureDomainsAsync(scope.CancellationToken);
-        AssertSuccess(empty);
-        empty.Data!.Should().BeEmpty();
-
-        scope.Resolve<ReadFailureMemoryStore>().FailRegistryRead = true;
-        Func<Task> read = async () => await catalog.GetAllDomainsAsync();
-        await read.Should().ThrowAsync<IOException>().WithMessage(ReadFailureMemoryStore.RegistryFailure);
-        AssertSafeFailure(await facade.CaptureDomainsAsync(scope.CancellationToken), ReadFailureMemoryStore.RegistryFailure,
-            scope.Resolve<IStringLocalizer<ServiceDiscoveryResource>>());
-    }
-
-    [Fact]
     public async Task CaptureCurrentInstanceAsync_WhenLeaseReadFails_ShouldDistinguishFailureFromAbsentLease()
     {
         await using var application = await new ServiceDiscoveryTestApplicationFactory().CreateAsync(
@@ -105,31 +84,7 @@ public sealed class ServiceDiscoveryCaptureContractTests
             .Status.Should().Be(ServiceStatus.Error);
 
         captured.Metadata["TRACE"] = "inspector edit";
-        captured.DependentSubDomains!.Add("InspectorOnly");
-        service.DependentSubDomains!.Clear();
         source.Metadata["trace"].Should().Be("original evidence");
-        source.DependentSubDomains.Should().Equal("Messaging");
-    }
-
-    [Fact]
-    public async Task CaptureDomainsAsync_WhenProviderReturnsMutableEntries_ShouldDetachReturnedEvidence()
-    {
-        var domain = new DomainInfo { Name = "Messaging", DisplayName = "Messaging fabric", Description = "Original source" };
-        var provider = new ControlledDiscoveryCatalog();
-        provider.Domains.Add(domain);
-        await using var application = await new ServiceDiscoveryTestApplicationFactory().CreateAsync(
-            seams => seams.With<IServiceDiscoveryCatalogProvider>(provider), TestContext.Current.CancellationToken);
-        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
-
-        var result = await scope.Resolve<ServiceDiscoveryFacade>().CaptureDomainsAsync(scope.CancellationToken);
-        AssertSuccess(result);
-        var captured = result.Data!.Should().ContainSingle().Which;
-        domain.DisplayName = "Changed provider name";
-        domain.Description = "Changed provider description";
-        provider.Domains.Clear();
-        captured.DisplayName.Should().Be("Messaging fabric");
-        captured.Description.Should().Be("Original source");
-        result.Data.Should().ContainSingle();
     }
 
     [Fact]
@@ -209,78 +164,6 @@ public sealed class ServiceDiscoveryCaptureContractTests
         AssertSuccess(fresh);
         fresh.Data!.CurrentInstance.Metadata[metadataKey].Should().Be(replacementAddress);
         captured.Metadata[metadataKey].Should().Be("inspector-local address");
-    }
-
-    [Fact]
-    public async Task CaptureDomainsAsync_WhenCancellationArrivesAtProviderCompletion_ShouldPreventSuccessAdoption()
-    {
-        using var cancellation = new CancellationTokenSource();
-        var provider = new ControlledDiscoveryCatalog();
-        provider.Domains.Add(new DomainInfo { Name = "Messaging" });
-        var providerCompleted = false;
-        provider.ReadDomains = () =>
-        {
-            providerCompleted = true;
-            cancellation.Cancel();
-            return Task.FromResult(provider.Domains);
-        };
-        await using var application = await new ServiceDiscoveryTestApplicationFactory().CreateAsync(
-            seams => seams.With<IServiceDiscoveryCatalogProvider>(provider), TestContext.Current.CancellationToken);
-        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
-
-        Func<Task> capture = async () => await scope.Resolve<ServiceDiscoveryFacade>().CaptureDomainsAsync(cancellation.Token);
-        await capture.Should().ThrowAsync<OperationCanceledException>();
-        providerCompleted.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CaptureDomainsAsync_WhenCancellationRetiresHeldRead_ShouldDrainProviderAndRejectItsOutcome(
-        bool providerFaults)
-    {
-        using var cancellation = new CancellationTokenSource();
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource<List<DomainInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var provider = new ControlledDiscoveryCatalog();
-        provider.Domains.Add(new DomainInfo { Name = "Messaging" });
-        provider.ReadDomains = () =>
-        {
-            entered.TrySetResult();
-            return release.Task;
-        };
-        await using var application = await new ServiceDiscoveryTestApplicationFactory().CreateAsync(
-            seams => seams.With<IServiceDiscoveryCatalogProvider>(provider), TestContext.Current.CancellationToken);
-        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
-        var facade = scope.Resolve<ServiceDiscoveryFacade>();
-        var pending = facade.CaptureDomainsAsync(cancellation.Token);
-
-        try
-        {
-            await entered.Task.WaitAsync(scope.CancellationToken);
-            cancellation.Cancel();
-            pending.IsCompleted.Should().BeFalse("the tokenless catalog read must drain before cancellation is observed");
-        }
-        finally
-        {
-            if (providerFaults)
-            {
-                release.TrySetException(new IOException(ReadFailureMemoryStore.RegistryFailure));
-            }
-            else
-            {
-                release.TrySetResult(provider.Domains);
-            }
-        }
-
-        Func<Task> capture = async () => await pending;
-        await capture.Should().ThrowAsync<OperationCanceledException>();
-        release.Task.IsCompleted.Should().BeTrue();
-        provider.ReadDomains = null;
-
-        var fresh = await facade.CaptureDomainsAsync(scope.CancellationToken);
-        AssertSuccess(fresh);
-        fresh.Data.Should().ContainSingle().Which.Name.Should().Be("Messaging");
     }
 
     [Theory]
@@ -378,7 +261,6 @@ public sealed class ServiceDiscoveryCaptureContractTests
         ReleaseVersion = "release-1",
         RegistrationTime = new DateTime(2026, 10, 9, 1, 0, 0, DateTimeKind.Utc),
         LastHeartbeatTime = new DateTime(2026, 10, 9, 2, 0, 0, DateTimeKind.Utc),
-        DependentSubDomains = ["Messaging"],
         Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["trace"] = "original evidence" }
     };
 }

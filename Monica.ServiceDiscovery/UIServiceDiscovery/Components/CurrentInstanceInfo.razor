@@ -33,7 +33,6 @@
             <section class="host-evidence">
                 <div class="host-section-heading"><h3>@L["Workbench:BuildIdentity"]</h3></div>
                 <dl class="host-facts"><div><dt>@L["CurrentInstance:Fields:AssemblyVersion"]</dt><dd>@Value(instance.AssemblyVersion)</dd></div><div><dt>@L["CurrentInstance:Fields:ReleaseVersion"]</dt><dd>@Value(instance.ReleaseVersion)</dd></div><div><dt>@L["CurrentInstance:Fields:BuildTime"]</dt><dd>@Time(instance.BuildTime)</dd></div></dl>
-                <div class="host-dependencies"><h4>@L["Workbench:DeclaredDependencies"]</h4>@if (instance.DependentSubDomains is { Count: > 0 } dependencies) { <div class="host-tags">@foreach (var domain in dependencies) { <span>@domain</span> }</div> } else { <p>@L["Workbench:NoDeclaredDependencies"]</p> }</div>
             </section>
 
             <section class="host-evidence host-election">

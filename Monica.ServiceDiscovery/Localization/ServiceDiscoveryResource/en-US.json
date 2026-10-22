@@ -142,7 +142,6 @@
       "BasicInfo": "Domain information"
     },
     "ServiceCard": {
-      "DependentSubDomains": "Dependent subdomains:",
       "Domain": "Domain: {0}",
       "ExternalDependency": "External dependency",
       "Id": "ID: {0}",
@@ -153,7 +152,7 @@
       "LoadFailed": "Failed to load domain details.",
       "LoadingDetail": "Loading domain details...",
       "LoadingServices": "Loading services...",
-      "NoDependentServices": "No other services depend on this domain.",
+      "NoDependentServices": "No observed external service owns a collected caller to this domain.",
       "NoOwnedServices": "No services belong to this domain."
     },
     "Tabs": {
@@ -174,7 +173,7 @@
       "Labels": {
         "AndMore": "and {0} more",
         "ClickToViewDetails": "Click to view details",
-        "DependencyServiceCount": "Service count",
+        "DependencyServiceCount": "API usage records",
         "NoRelatedServices": "No related services",
         "RelatedServices": "Related services ({0})",
         "ServiceCount": "Service count",
@@ -408,12 +407,12 @@
       "Dependencies": {
         "Title": "Subdomain dependencies",
         "Label": "Dependencies",
-        "Description": "Trace declared dependencies between subdomains. These relationships describe declarations, rather than observed traffic."
+        "Description": "Inspect compiled cross-domain API usages and their calling types. This map does not measure live traffic."
       },
       "Domains": {
         "Title": "Subdomain directory",
         "Label": "Subdomains",
-        "Description": "Explore catalog identities, their owning services, and external services that declare a dependency on them."
+        "Description": "Explore shared domain metadata, observed owning services, and services that own API callers."
       },
       "Host": {
         "Title": "Current host",
@@ -450,7 +449,7 @@
     "InspectService": "Inspect service {0}",
     "CatalogScope": "Catalog / read-only",
     "DomainCatalog": "Subdomain catalog",
-    "CatalogHelp": "Catalog definitions and registrations are read independently from the selected providers.",
+    "CatalogHelp": "Domain metadata comes from the shared domain catalog; service membership comes from registration snapshots.",
     "CatalogReadFailed": "Catalog capture failed",
     "FindDomain": "Find a subdomain",
     "CatalogEntries": "Catalog entries",
@@ -464,10 +463,10 @@
     "OwnedServicesHelp": "Registrations that report this subdomain as their owner.",
     "InstancesCount": "{0} registered instances",
     "NoOwnedServices": "No captured service reports this subdomain as its owner.",
-    "Declarations": "Dependency declarations",
-    "DependentServices": "External dependants",
-    "DependentServicesHelp": "Services owned elsewhere that declare a dependency on this subdomain.",
-    "NoDependentServices": "No captured external service declares this dependency.",
+    "Declarations": "Compiled API usages",
+    "DependentServices": "External caller services",
+    "DependentServicesHelp": "Observed services whose roles or domains own collected API calls to this domain. This does not prove execution.",
+    "NoDependentServices": "No observed external service owns a collected caller to this domain.",
     "ChooseDomain": "Choose a subdomain",
     "ChooseDomainHelp": "Select a catalog entry to inspect its identity and service relationships.",
     "DomainUnlisted": "This endpoint is outside the catalog",
@@ -483,8 +482,6 @@
     "HeartbeatAgeAtCapture": "Heartbeat age at capture",
     "HeartbeatAgeSeconds": "{0:N0} seconds",
     "BuildIdentity": "Build identity",
-    "DeclaredDependencies": "Declared subdomain dependencies",
-    "NoDeclaredDependencies": "No subdomain dependencies declared.",
     "LocalElectionScope": "Local election state belongs to the querying host. It is independent of the provider’s current application leader lease.",
     "LeaseScope": "Provider lease for this application at capture time. Its reported leader time can advance during renewal.",
     "NoLeaderLease": "No leader lease was present in the successful provider read.",
@@ -541,36 +538,37 @@
       "EmptyHint": "Registered services and preloaded catalog entries will appear when the provider returns them."
     },
     "Domains": {
-      "Eyebrow": "Declared dependency atlas",
-      "Description": "Follow directed domain declarations from the registry and distinguish catalog domains from unresolved endpoints.",
+      "Eyebrow": "Static API dependency map",
+      "Description": "Follow published API uses in the compiled application catalog. Placement and live registrations are separate evidence.",
       "MapLabel": "Directed domain map",
-      "MapSummary": "{0}/{1} endpoints · {2}/{3} declarations",
+      "MapSummary": "{0}/{1} domains · {2}/{3} relationships",
       "Evidence": "Dependency evidence",
-      "Ledger": "Declarations",
+      "Ledger": "API usages",
       "Roster": "Domains",
-      "LedgerHint": "Each row is a declared source → target relationship. The count is the number of services declaring it.",
-      "RosterHint": "Catalog domains and declared endpoints in the filtered map, including domains without dependencies.",
+      "LedgerHint": "Each row is a source domain → target domain relationship. Expand the evidence to inspect calling types and operations.",
+      "RosterHint": "Catalog and observed domains in this view, including those without collected API dependencies.",
       "ServiceCount": "{0} services in this domain",
-      "Declarations": "Declared by {0} services",
+      "Declarations": "{0} API usage records",
       "Unlisted": "Unlisted endpoint",
       "UnlistedEdge": "Includes an endpoint absent from the domain catalog",
-      "UnlistedDescription": "This name appears in registry evidence but is absent from the domain catalog.",
-      "UnlistedSummary": "{0} is a declared endpoint, not a domain in the current catalog.",
-      "FocusRelationship": "Show related declarations",
-      "EdgeHint": "Arrows follow declared dependencies. They describe dependency declarations, not observed traffic or runtime calls.",
+      "UnlistedDescription": "This identity appears in observed membership or dependency evidence but is absent from the domain catalog.",
+      "UnlistedSummary": "{0} is not registered in the shared domain catalog.",
+      "FocusRelationship": "Show related API usages",
+      "EdgeHint": "Arrows show compiled API usage, not observed traffic. Same-domain calls are omitted from this cross-domain view.",
       "CatalogNode": "Catalog domain",
-      "SnapshotHint": "Declarations are derived from one captured registry snapshot; no dependency history is stored here.",
-      "Empty": "No domains or declared endpoints",
-      "EmptyHint": "Domain catalog entries and registry declarations will appear when the provider returns them.",
+      "SnapshotHint": "Dependencies come from this host’s compiled product catalog; counts and membership come from the registry snapshot.",
+      "Empty": "No domains to display",
+      "EmptyHint": "Configure shared domain metadata or include a generated application catalog.",
       "EmptyRoster": "No endpoints in the current view",
-      "EmptyLedger": "No directed declarations in the current view",
+      "EmptyLedger": "No collected cross-domain API usages in this view",
       "Unassigned": "Unassigned",
-      "UnassignedScope": "{0} services have no owning domain. They are excluded as domain nodes; their real service identities and target declarations are available in Unassigned evidence.",
-      "UnassignedHint": "All services without an owning domain in the captured snapshot, independent of domain filters. AppId → target rows retain their real declarations without inventing a source domain.",
+      "UnassignedScope": "{0} services have no observed owning domain. Inspect their identities in Unassigned; dependency ownership is not inferred from application names.",
+      "UnassignedHint": "Applications without observed domain ownership. Static source ownership is never inferred from their identity.",
       "NoOwner": "No owning domain",
-      "UnassignedDeclarations": "Declarations from this unassigned service",
-      "NoUnassignedDeclarations": "No dependency targets declared.",
-      "NoUnassignedServices": "No unassigned services in this snapshot."
+      "UnassignedDeclarations": "API targets identified by observed source roles",
+      "NoUnassignedDeclarations": "No collected API caller is associated with this service.",
+      "NoUnassignedServices": "No unassigned services in this snapshot.",
+      "Unavailable": "Compiled application dependency evidence is unavailable on this host."
     }
   },
   "Endpoints": {

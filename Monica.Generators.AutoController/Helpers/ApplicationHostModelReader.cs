@@ -158,6 +158,12 @@ internal static class ApplicationHostModelReader
         var localAssemblies = declarations.Values.Select(static declaration => declaration.AssemblyName)
             .OrderBy(static name => name, StringComparer.Ordinal).ToImmutableArray();
         var logicalAssemblies = declarations.Values.ToList();
+        var dependencies = exportOwnAssembly
+            ? ApplicationDependencyReader.Read(compilation, cancellationToken).ToList()
+            : ApplicationCatalogMetadata.ReadDependencies(assemblies.SelectMany(static assembly =>
+                ApplicationCatalogMetadata.ReadAttributes(assembly, ApplicationCatalogMetadata.EXPORT_KEY)), diagnostics).ToList();
+        if (!exportOwnAssembly && declarations.ContainsKey(compilation.Assembly))
+            dependencies.AddRange(ApplicationDependencyReader.Read(compilation, cancellationToken));
         if (!exportOwnAssembly)
         {
             var catalogPayloads = assemblies.SelectMany(static assembly => ApplicationCatalogMetadata.ReadAttributes(assembly,
@@ -197,6 +203,7 @@ internal static class ApplicationHostModelReader
                         }
                     }
                     logicalAssemblies = catalog.Assemblies.ToList();
+                    dependencies = catalog.Dependencies.ToList();
                 }
             }
         }
@@ -216,7 +223,8 @@ internal static class ApplicationHostModelReader
         var model = diagnostics.Any(static diagnostic => diagnostic.ToDiagnostic().Severity == DiagnosticSeverity.Error)
             ? null : new ApplicationHostModel(
                 logicalAssemblies.OrderBy(static declaration => declaration.AssemblyName, StringComparer.Ordinal).ToImmutableArray(),
-                operations.OrderBy(static operation => operation.RequestTypeName, StringComparer.Ordinal).ToImmutableArray(), localAssemblies);
+                operations.OrderBy(static operation => operation.RequestTypeName, StringComparer.Ordinal).ToImmutableArray(), localAssemblies,
+                ApplicationDependencyReader.Order(dependencies));
         return new AnalysisSnapshot<ApplicationHostModel>(model, diagnostics);
 
         void InvalidDeclaration(IAssemblySymbol assembly, string message) => diagnostics.Add(DiagnosticSnapshot.Create(

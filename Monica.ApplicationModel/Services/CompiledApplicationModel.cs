@@ -113,6 +113,12 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
             localHandlers.Add(operation.RequestType, handler);
         }
         Operations = operations.ToFrozenDictionary();
+        Dependencies = Array.AsReadOnly(manifest.Dependencies.Distinct().ToArray());
+        foreach (var dependency in Dependencies)
+        {
+            if (!ownedAssemblies.Contains(dependency.SourceAssemblyName) || !Operations.ContainsKey(dependency.RequestType))
+                throw new InvalidOperationException($"Application dependency from '{dependency.SourceTypeName}' has unknown source or operation ownership.");
+        }
         LocalHandlers = localHandlers.ToFrozenDictionary();
         _handlerOperations = handlers.ToFrozenDictionary(pair => pair.Key, pair => pair.Value.ToArray());
 
@@ -126,6 +132,7 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
     public IReadOnlyDictionary<string, ApplicationRoleDefinition> Roles { get; }
     public IReadOnlyDictionary<Type, ApplicationOperationDefinition> Operations { get; }
     public IReadOnlyDictionary<Type, Type> LocalHandlers { get; }
+    public IReadOnlyList<ApplicationDependencyDefinition> Dependencies { get; }
     public IReadOnlyDictionary<string, string> RoleApplications => _deployment.RoleApplications;
     public bool IsRoleActive(string roleId) => _deployment.IsRoleActive(roleId);
     public bool IsRoleAvailable(string roleId) => _localRoles.Contains(roleId);

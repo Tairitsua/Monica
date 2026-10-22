@@ -17,6 +17,8 @@ public interface IApplicationModel
     /// <summary>Gets request-to-handler bindings verified against this executable's discovery inventory.</summary>
     /// <remarks>Remote-only operations have no entry. A local binding does not override a request's required active role.</remarks>
     IReadOnlyDictionary<Type, Type> LocalHandlers { get; }
+    /// <summary>Gets compiled API dependency evidence, independently of role placement, replicas, or transport.</summary>
+    IReadOnlyList<ApplicationDependencyDefinition> Dependencies { get; }
     /// <summary>Gets role-to-AppId ownership in this deployment scope.</summary>
     IReadOnlyDictionary<string, string> RoleApplications { get; }
     /// <summary>Whether the current executable includes the exact role's implementation.</summary>

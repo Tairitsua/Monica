@@ -23,7 +23,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public int RefreshInterval { get; set; } = 3;
     public string FilterText { get; set; } = string.Empty;
     public HashSet<ServiceStatus> SelectedStatuses { get; set; } = Enum.GetValues<ServiceStatus>().ToHashSet();
-    public HashSet<string> SelectedDomains { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SelectedDomains { get; set; } = new(StringComparer.Ordinal);
     public bool ShowOnlyWithInstances { get; set; }
 
     /// <summary>Captures one complete registry, retaining prior evidence on failure and rejecting canceled work.</summary>
@@ -45,7 +45,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
             CapturedAt = DateTime.UtcNow;
             ErrorMessage = null;
             if (_allDomainsSelected)
-                SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.Ordinal);
             ApplyFilters();
             return result;
         }
@@ -59,7 +59,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     /// <summary>Updates a deliberate domain selection, including an empty selection that means none.</summary>
     public void SetSelectedDomains(IEnumerable<string> domains, bool selectAll = false)
     {
-        SelectedDomains = domains.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelectedDomains = domains.ToHashSet(StringComparer.Ordinal);
         _allDomainsSelected = selectAll;
     }
 
@@ -67,7 +67,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public void SelectAllDomains()
     {
         _allDomainsSelected = true;
-        SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.Ordinal);
     }
 
     public void ApplyFilters()

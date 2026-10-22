@@ -56,6 +56,8 @@ internal static class ApplicationHostCodeGenerator
                 (operation.RequiredRole is null ? "null" : Literal(operation.RequiredRole))));
         AppendList(builder, "ApplicationApiClientDefinition", "ApiClients", clients
             .Select(static group => $"typeof({group.Key}), typeof({group.First().ImplementationTypeName})"));
+        AppendList(builder, "ApplicationDependencyDefinition", "Dependencies", model.Dependencies
+            .Select(static dependency => $"{Literal(dependency.SourceAssembly)}, {Literal(dependency.SourceType)}, typeof({dependency.RequestType})"));
         builder.AppendLine("}");
         return builder.ToString();
     }

@@ -52,7 +52,7 @@ public interface IMonicaApplicationOptions
     string ResolveAppId(string? configuredValue = null, string? fallback = null);
 
     /// <summary>
-    /// Resolves an application display name using module configuration, global configuration, and project-name fallback.
+    /// Resolves an application display name using module configuration, global configuration, and application-identity fallback.
     /// </summary>
     /// <param name="configuredValue">The module-specific value, when explicitly configured.</param>
     /// <param name="fallback">The local fallback used when no display name is configured.</param>
@@ -140,7 +140,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     }
 
     /// <summary>
-    /// Resolves an application display name using module configuration, global configuration, and project-name fallback.
+    /// Resolves an application display name using module configuration, global configuration, and application-identity fallback.
     /// </summary>
     /// <param name="configuredValue">The module-specific value, when explicitly configured.</param>
     /// <param name="fallback">The local fallback used when no display name is configured.</param>
@@ -149,7 +149,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     {
         return Normalize(configuredValue)
                ?? Normalize(AppName)
-               ?? ResolveProjectName(fallback: fallback);
+               ?? ResolveAppId(fallback: fallback);
     }
 
     /// <summary>
