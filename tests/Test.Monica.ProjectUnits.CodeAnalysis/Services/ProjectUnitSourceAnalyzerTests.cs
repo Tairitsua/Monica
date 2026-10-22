@@ -160,7 +160,7 @@ public sealed class ProjectUnitSourceAnalyzerTests
         File.WriteAllText(Path.Combine(consumerDirectory, "DependentUnit.cs"), """
             namespace Consumer;
             [Monica.ProjectUnits.Annotations.ProjectUnitMetadata(Sample.AnalysisGeneration.Title)]
-            public sealed class DependentUnit : Monica.WebApi.Abstractions.DomainService { }
+            public sealed class DependentUnit : Monica.Application.Abstractions.DomainService { }
             """);
         await fixture.RestoreAsync(TestContext.Current.CancellationToken, consumerProject);
         var solutionPath = useSolution ? fixture.AddSolution("Sample.csproj", "ZConsumer/ZConsumer.csproj") : null;
@@ -227,7 +227,7 @@ public sealed class ProjectUnitSourceAnalyzerTests
             #if SOLUTION_CONTEXT
             namespace Sample
             {
-                public sealed class SolutionUnit : Monica.WebApi.Abstractions.DomainService { }
+                public sealed class SolutionUnit : Monica.Application.Abstractions.DomainService { }
             }
             #endif
             """);
