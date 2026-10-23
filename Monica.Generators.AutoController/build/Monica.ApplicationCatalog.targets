@@ -86,7 +86,7 @@
 
   <Target Name="MonicaCollectApplicationCatalog" BeforeTargets="CoreCompile"
           DependsOnTargets="ResolveProjectReferences"
-          Condition="'$(MonicaApplicationCatalog)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(MonicaApplicationCatalog)' == 'true'">
     <!-- These projects establish build ordering only; no implementation reference is added to the compiler or runtime closure. -->
     <ItemGroup>
       <_MonicaCatalogProducer Include="@(ProjectReference)"
@@ -97,6 +97,12 @@
              Condition="'@(_MonicaCatalogProducer)' != ''">
       <Output TaskParameter="TargetOutputs" ItemName="_MonicaCatalogProducerAssembly" />
     </MSBuild>
+    <!-- IDE compilations need the same exports as ordinary builds. GetTargetPath does not build
+         producers; on a clean checkout, wait for their first build instead of opening absent DLLs. -->
+    <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
+      <_MonicaCatalogProducerAssembly Remove="@(_MonicaCatalogProducerAssembly)"
+                                     Condition="!Exists('%(_MonicaCatalogProducerAssembly.Identity)')" />
+    </ItemGroup>
     <MonicaExtractApplicationMetadata Assemblies="@(_MonicaCatalogProducerAssembly)"
                                      OutputDirectory="$(IntermediateOutputPath)monica-application-catalog">
       <Output TaskParameter="MetadataFiles" ItemName="_MonicaCatalogMetadata" />

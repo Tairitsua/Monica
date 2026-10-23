@@ -1,6 +1,6 @@
 ---
 name: monica-application-unit-testing
-description: Apply Monica application testing rules when creating, refactoring, or reviewing behavior tests, host scenarios, persistence isolation, and provider seams. Load monica-application and the repository's project specification first.
+description: Apply Monica application testing rules when naming or migrating test projects, creating or reviewing behavior tests, host scenarios, persistence isolation, and provider seams. Load monica-application and the repository's project specification first.
 ---
 
 # Monica Application Unit Testing
@@ -9,14 +9,16 @@ Load `$monica-application` and the repository-designated project specification b
 
 Test business behavior through a complete Monica host when composition matters. Each scenario owns its host and database; registrations are finalized before build. Arrange, act and assert use independent scopes.
 
+For domain, role, shared-library, host, and test-support naming or migration, read [test project ownership and naming](references/project-naming.md). The project specification owns the concrete migration map.
+
 ## Repository Test Infrastructure First
 
-Search the repository's shared test layer (for example Platform.UnitTests or PlatformTestApplicationFactory) before writing a factory. Extend existing project infrastructure when it covers the scenario. Do not introduce another framework with different transaction semantics.
+Search the repository's shared test layer (for example Platform.Testing or PlatformTestApplicationFactory, including an existing library awaiting rename) before writing a factory. Extend existing project infrastructure when it covers the scenario. Do not introduce another framework with different transaction semantics.
 
 ## Workflow
 
 1. Inspect production startup, module registration, discovery assemblies, contexts, external adapters and existing test factories.
-2. Use a runnable project named Test. plus the exact production project stem.
+2. Select the behavior's production owner and use its runnable test project according to the naming reference.
 3. Derive a stateless project recipe from MonicaTestApplicationFactory<TDiscoveryAnchor>:
    - ConfigureMonica composes the relevant production module graph.
    - TypeDiscoveryAssemblies includes all production assemblies needed by the scenario.
@@ -65,8 +67,8 @@ Default seams retain the real audit policy. Replace ICurrentUser, TimeProvider a
 
 ## Ownership and Naming
 
-- Project, folder, assembly and root namespace: Test.{ProductionProjectName}.
-- Factory: {Service}TestApplicationFactory; field: _factory.
+- Project identity and cross-project scenario placement follow the [naming reference](references/project-naming.md).
+- Factory: {Boundary}TestApplicationFactory; field: _factory.
 - Classes: {TypeUnderTest}Tests; methods: Method_WhenCondition_ShouldExpectation.
 - Mirror production folders such as HandlersCommand, HandlersQuery, DomainServices, Repositories, Entities and Modules.
 - Keep Builders, TestDoubles, TestData and Factories test-only.

@@ -1,6 +1,6 @@
 # Sociable Application Test Templates
 
-These examples use Roles.User and its Domains.User core within its selected production Host composition. Keep the runnable project name equal to Test. plus the exact production project stem.
+These examples belong to `Test.Roles.User`: they protect `Roles.User` behavior while loading its `Domains.User` core and selected production Host composition. The execution host does not change the test owner; see [project ownership and naming](project-naming.md).
 
 ## Project Factory
 

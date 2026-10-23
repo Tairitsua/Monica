@@ -18,6 +18,8 @@ Recommendations and defaults guide selection among allowed choices. When a proje
 
 Shared skills own the unified domain/role architecture, role vocabulary, dependency direction, lifecycle boundaries, native extension mechanisms, and test patterns. The repository-owned `<project>-application-spec` owns the adopted layout and deployment placement, actual domains/roles/hosts, dependency map, local naming and placement, adopted specializations, explicit deviations, validation commands, and known migration gaps. Locate it through `AGENTS.md` or the repository's equivalent instructions. Use its references as the current application architecture source; do not maintain a parallel `docs/architecture.md` or Workflow architecture topic.
 
+[Application test project naming](../../monica-application-unit-testing/references/project-naming.md) follows the production behavior owner across domain cores, roles, shared libraries, and executable hosts. The project specification records its test root, shared support library, concrete migration mappings, and remaining mixed-owner projects.
+
 The project specification links to shared rules instead of copying their catalog. A local specialization remains in its native role and preserves the role's ownership and execution contracts. Existing code is evidence of current facts, including drift; it is not implicit approval for a new pattern. A known migration gap describes that drift without making it the target convention for new work.
 
 ## Apply Rules to a Change

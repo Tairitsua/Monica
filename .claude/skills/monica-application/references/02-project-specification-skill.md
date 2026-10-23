@@ -13,6 +13,7 @@ Local references own:
 - Concrete local conventions: namespaces, placement, metadata language and requirement source, public/internal boundaries, and approved extension families with their consumers and lifecycle.
 - Deliberate deviations: shared rule, precise scope, rationale, human approval evidence, and any conditions.
 - Validation: repository commands and focused behavioral checks for its adopted patterns.
+- Test organization: the test root, shared support library, and concrete adoption or migration gaps for the [shared test naming rules](../../monica-application-unit-testing/references/project-naming.md).
 - Known migration gaps: actual drift, expected target, evidence, and boundaries for new work.
 
 Use one reference when that is enough. Split only when tasks need independent subsets, such as the macro view versus extension contracts. Preserve the language of existing repository artifacts. Do not reproduce the shared ProjectUnit catalog or add an approval workflow to the skill.

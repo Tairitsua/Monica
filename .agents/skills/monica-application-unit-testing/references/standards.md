@@ -8,26 +8,7 @@ Use focused direct or raw ProjectUnit tests only when host composition adds no r
 
 ## Project Layout
 
-Name the runnable project `Test.` plus the exact production project stem. Keep its folder, project file, assembly, and root namespace identical.
-
-```text
-Test.Roles.User/
-  Test.Roles.User.csproj
-  GlobalUsings.cs
-  Factories/
-    UserRoleTestApplicationFactory.cs
-  HandlersCommand/
-  HandlersQuery/
-  DomainServices/
-  Repositories/
-  Entities/
-  Modules/
-  Builders/
-  TestDoubles/
-  TestData/
-```
-
-Use Test.Roles.User for Roles.User behavior and Test.Domains.User for domain-core behavior; retain the exact production stem for existing projects too.
+Use [test project ownership and naming](project-naming.md) to select the production owner, project identity, cross-domain scenario placement, and shared support boundary. Keep role behavior in its role's test project and domain-core behavior in its core's test project even when both use a complete scenario host.
 
 ## Factory Rules
 
