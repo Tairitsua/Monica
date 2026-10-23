@@ -80,13 +80,18 @@ public static class ModuleApiClientBuilderExtensions
         }
 
         /// <summary>
-        /// Applies additional HTTP-client customization to every HTTP API registration.
+        /// Adds HTTP-client customization to every HTTP API registration, including authority providers.
         /// </summary>
+        /// <remarks>
+        /// Repeated calls append contributions in declaration order. Each contribution runs once per named-client
+        /// registration; handlers follow that order, while later assignments to the same client property take precedence.
+        /// Use factory-created handlers without capturing request-scoped services in a pooled handler.
+        /// </remarks>
         public ModuleRegistration<ModuleApiClient, ModuleApiClientOption> ConfigHttpClientBuilder(
             Action<IHttpClientBuilder> configure)
         {
             ArgumentNullException.ThrowIfNull(configure);
-            return registration.Configure(options => options.CustomHttpClientBuilder = configure);
+            return registration.Configure(options => options.CustomHttpClientBuilder += configure);
         }
 
         /// <summary>Binds provider-error classification to an explicitly selected transport.</summary>
@@ -446,8 +451,9 @@ public class ModuleApiClientOption : ModuleOptions<ModuleApiClient>
     public ApiClientTransportKind Transport { get; set; } = ApiClientTransportKind.Http;
 
     /// <summary>
-    /// Applies additional customization to HTTP client registrations when <see cref="Transport"/> is <see cref="ApiClientTransportKind.Http"/>.
+    /// Gets the ordered customization contributions applied to HTTP API registrations.
     /// </summary>
+    /// <remarks>ConfigHttpClientBuilder appends contributions; this delegate also configures application authority clients.</remarks>
     public Action<IHttpClientBuilder>? CustomHttpClientBuilder { get; internal set; }
 
     internal Type? HttpClientRegisterProviderType { get; set; }

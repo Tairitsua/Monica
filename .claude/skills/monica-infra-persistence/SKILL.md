@@ -1,6 +1,6 @@
 ---
 name: monica-infra-persistence
-description: Use when integrating Monica Repository, UnitOfWork, transactional domain events, outbox, or inbox in an application, diagnosing save and commit behavior, or inspecting DbContext connections, activity, and migrations.
+description: Use when integrating Monica repositories, transactions, object storage, transactional domain events, outbox, or inbox in an application, diagnosing save and commit behavior, or inspecting DbContext connections, activity, and migrations.
 ---
 
 # Monica persistence
@@ -12,6 +12,7 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 | Register a context, choose its provider mode, or use repositories | [Repositories](references/repositories.md) |
 | Inspect registered contexts, provider sessions, migration history, or migration updates | [Repository diagnostics](references/repository-diagnostics.md) |
 | Set a write boundary, select participants, or understand save and rollback | [Transactions](references/transactions.md) |
+| Store binary objects or select a Minio provider | [Blob storage](references/blob-storage.md) |
 | Choose before-commit effects or committed delivery; configure outbox, inbox, and projections | [Transactional events](references/transactional-events.md) |
 | Diagnose a failed save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |
 

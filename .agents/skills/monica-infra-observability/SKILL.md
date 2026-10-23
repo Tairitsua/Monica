@@ -1,6 +1,6 @@
 ---
 name: monica-infra-observability
-description: Configure and consume Monica health probes, logging, execution timing, metrics exporters, and runtime diagnostics in an application. Use monica-opentelemetry for authoring new module instruments.
+description: Configure and consume Monica health probes, logging, execution timing, OpenTelemetry signals and exporters, and runtime diagnostics in an application. Use monica-opentelemetry for authoring new module instruments.
 ---
 
 # Monica observability
@@ -14,7 +14,7 @@ Health, logging, execution timing, tracing, and metrics have independent registr
 | Measure slow or running business operations | [Execution timing](references/execution-timing.md) |
 | Follow a controller, execution, database, or remote call chain | [Tracing](references/tracing.md) |
 | Inspect bounded local process and runtime-counter history | [Runtime metrics](references/metrics.md) |
-| Export instrument measurements or inspect exact local OpenTelemetry series | [OpenTelemetry metrics](references/opentelemetry-metrics.md) |
+| Export metrics, traces or logs, or inspect exact local OpenTelemetry series | [OpenTelemetry](references/opentelemetry-metrics.md) |
 | Inspect current memory, GC evidence, allocation sources, or explicit host diagnostics | [Memory analysis](references/memory-analysis.md) |
 
 For module-graph and worker-state diagnostics, use [hosting](../monica-infra-hosting/SKILL.md); for authoring module instruments, use `$monica-opentelemetry`.

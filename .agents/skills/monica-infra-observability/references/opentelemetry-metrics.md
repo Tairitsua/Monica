@@ -1,4 +1,4 @@
-# OpenTelemetry metrics
+# OpenTelemetry signals and local metrics
 
 Use SDK exporters for measurements leaving the process. Use Monica's in-process collector and `/opentelemetry-dashboard` to inspect exact instruments, normalized tag sets and their retained observations in the current host. These are separate consumers of published .NET instruments: SDK aggregation/export intervals and the local retained window do not share an aggregation contract. They can coexist. Neither the local page nor the snapshot endpoint provides durable or cross-instance storage.
 
@@ -16,7 +16,26 @@ builder.AddMonica(monica =>
 });
 ```
 
-`AddOpenTelemetry()` wires metrics and ASP.NET Core, HttpClient and runtime instrumentation. Its custom meter patterns default to `Monica.*`; no exporter is enabled by default. `UseOtlpExporter(endpoint?)` enables OTLP, using the SDK's environment configuration when no endpoint is supplied; its default transport is gRPC. `UseConsoleExporter()` enables console output. `UsePrometheusEndpoint(path: "/metrics")` enables the SDK Web scrape exporter. `AddMeter(pattern)` adds a custom meter name or wildcard pattern. A generic host can collect and use configured non-Web exporters without mapping Web endpoints.
+`AddOpenTelemetry()` wires metrics and ASP.NET Core, HttpClient and runtime instrumentation. Its custom meter patterns default to `Monica.*`; no exporter is enabled by default. `UseOtlpExporter(endpoint?)` enables OTLP for metrics and any explicitly enabled traces/logs, using the SDK's endpoint configuration when no endpoint is supplied; its transport defaults explicitly to gRPC. `UseConsoleExporter()` enables console output for those same enabled signals. `UsePrometheusEndpoint(path: "/metrics")` enables only the SDK Web metrics scrape exporter. `AddMeter(pattern)` adds a custom meter name or wildcard pattern. A generic host can collect and use configured non-Web exporters without mapping Web endpoints.
+
+Traces and logs are opt-in. `UseTracing("Orders.Application")` subscribes to the supplied `ActivitySource` names and, by default, ASP.NET Core and HttpClient spans. It does not invent a source name or alter application retry policy. `UseLogging()` includes formatted log messages and scopes by default; the shared resource name, version and deployment environment apply to all signals. Host-owned SDK providers own shutdown and exporter lifetime.
+
+For a host configured entirely through the SDK's `OTEL_EXPORTER_OTLP_*` configuration, select `UseOtlpExporterFromEnvironment()` instead. It enables all three signals and uses the SDK's cross-signal exporter registration, including its own protocol and per-signal configuration defaults. It is mutually exclusive with `UseOtlpExporter`; do not separately register signal-specific OTLP exporters. Add custom trace sources through `UseTracing(...)` as needed. The host decides whether the environment calls for this exporter; an endpoint value alone does not make Monica enable it.
+
+When combined with Monica Logging, opt into `ForwardToProviders` so Serilog delivers filtered events to the OpenTelemetry logging provider. Registering a provider alone does not enable Serilog forwarding. For example:
+
+```csharp
+builder.AddMonica(monica =>
+{
+    monica.AddLogging(options => options.ForwardToProviders = true);
+    monica.AddOpenTelemetry()
+        .UseTracing("Orders.Application")
+        .UseLogging()
+        .UseOtlpExporterFromEnvironment();
+});
+```
+
+Console Serilog output and an OpenTelemetry console log exporter are separate destinations; choose them deliberately to avoid duplicate console output. Sensitive query-path filtering is owned by [Logging](logging.md).
 
 OpenTelemetry automatically requires Monica's localization and result envelope modules; the latter also requires JSON serialization. The optional snapshot endpoint uses this host-owned JSON/result contract, so a minimal host does not need to add these dependencies separately. Hosts can configure those modules explicitly to customize their shared wire and error-presentation contracts.
 

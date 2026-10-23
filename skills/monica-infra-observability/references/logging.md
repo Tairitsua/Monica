@@ -1,6 +1,6 @@
 # Logging and local inspection
 
-Add `monica.AddLogging()` inside the host's `AddMonica(...)` callback to install Monica's Serilog provider during builder composition. It clears existing logging providers, so decide at composition time whether this host should use it. Console and file sinks are enabled by default; set `EnableFileSink = false` for a console-only deployment. `CustomLoggerFactory` replaces the default Serilog setup. Keep endpoint, sink, and credential settings in host configuration.
+Add `monica.AddLogging()` inside the host's `AddMonica(...)` callback to install Monica's Serilog provider during builder composition. It clears existing logging providers, so decide at composition time whether this host should use it. Console and file sinks are enabled by default; set `EnableFileSink = false` for a console-only deployment. `ConfigureLogger` adds filters, enrichers or sinks after the native setup without owning logger creation or disposal. `CustomLoggerFactory` replaces the default Serilog setup and bypasses `ConfigureLogger`. Keep endpoint, sink, and credential settings in host configuration.
 
 ```csharp
 monica.AddLogging(options =>
@@ -13,6 +13,12 @@ monica.AddLogging(options =>
 `AddRequestResponseLoggingMiddleware()` is an opt-in Web feature on the logging registration. It runs before routing and can log request and response bodies; decide whether those bodies should be captured before enabling it. Its `disableRequest` and `disableResponse` parameters allow one side to be excluded. Operator exception logs receive the full exception independently of [response diagnostic visibility](../../monica-infra-hosting/references/exception-diagnostics.md).
 
 ## File location and host composition
+
+Use native file options instead of rebuilding the async sinks. `FileSizeLimitBytes` defaults to one GiB, `RollOnFileSizeLimit` to `false`, `RollingInterval` to `Infinite`, `RetainedFileCountLimit` to `31`, and `RetainedFileTimeLimit` to `null`. Nullable limits can disable the corresponding constraint. Retention is enforced by the file sink when opening or rolling files, not by a background age-based cleanup task.
+
+`SensitiveQueryStringPathPrefixes` defaults to empty. Explicit prefixes exclude ASP.NET Core hosting diagnostic events that contain a non-empty query string and match the path exactly or below a slash boundary, case-insensitively. This supports transports carrying credentials in queries, including encoded parameter names; it drops the whole matching hosting event, not arbitrary application logs or ordinary requests without queries. Keep the sensitive path list aligned with authentication configuration.
+
+`ForwardToProviders` defaults to `false`. Enable it to forward filtered Serilog events to other host-owned `ILoggerProvider` instances, such as `AddOpenTelemetry().UseLogging()`. Register those providers after Logging's builder phase; Monica OpenTelemetry does this during service composition. The host owns their disposal. Avoid a second sink exporting the same events to the same destination.
 
 `LogFileLocation.Resolve(ModuleLoggingOption)` owns the default writer path. A nonblank `LogFilePath` wins over `LogDirectory` and `LogFileName`. Otherwise the absolute path is `<LogDirectory>/Logs/<LogFileName>`, using `AppContext.BaseDirectory` when the directory is blank. `LogDirectory` is the base of the `Logs` child, not the final sink directory. The file name defaults to the entry assembly name with a `.log` extension. The default Serilog writer, UI catalog, and UI reader use this same resolution contract.
 

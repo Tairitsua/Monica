@@ -29,6 +29,8 @@
     <Project Path="tests/Test.Monica.Utilities/Test.Monica.Utilities.csproj" />
     <Project Path="tests/Test.Monica.WebApi/Test.Monica.WebApi.csproj" />
     <Project Path="tests/Test.Monica.AutoModel/Test.Monica.AutoModel.csproj" />
+    <Project Path="tests/Test.Monica.BlobStorage/Test.Monica.BlobStorage.csproj" />
+    <Project Path="tests/Test.Monica.BlobStorage.Minio/Test.Monica.BlobStorage.Minio.csproj" />
     <Project Path="tests/Test.Monica.Configuration.EventBus/Test.Monica.Configuration.EventBus.csproj" />
     <Project Path="tests/Test.Monica.Configuration.EfCore/Test.Monica.Configuration.EfCore.csproj" />
     <Project Path="tests/Test.Monica.Configuration.UI/Test.Monica.Configuration.UI.csproj" />
@@ -77,6 +79,8 @@
   <Project Path="Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
   <Project Path="Monica.Authority/Monica.Authority.csproj" />
   <Project Path="Monica.AutoModel/Monica.AutoModel.csproj" />
+  <Project Path="Monica.BlobStorage/Monica.BlobStorage.csproj" />
+  <Project Path="Monica.BlobStorage.Minio/Monica.BlobStorage.Minio.csproj" />
   <Project Path="Monica.Configuration.EfCore/Monica.Configuration.EfCore.csproj" />
   <Project Path="Monica.Configuration.EventBus/Monica.Configuration.EventBus.csproj" />
   <Project Path="Monica.Configuration.UI/Monica.Configuration.UI.csproj" />

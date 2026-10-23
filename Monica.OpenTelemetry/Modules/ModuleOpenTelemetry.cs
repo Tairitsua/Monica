@@ -12,9 +12,12 @@ using Monica.Core.Results;
 using Monica.OpenTelemetry.InProcessCollector.Facades;
 using Monica.OpenTelemetry.InProcessCollector.Services;
 using Monica.OpenTelemetry.Localization;
+using OpenTelemetry;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -61,9 +64,28 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
     public override void ConfigureServices(ModuleContext<ModuleOpenTelemetryOption> context)
     {
         var services = context.Services;
-        services.AddOpenTelemetry()
+        var telemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => ConfigureResource(resource, Option))
             .WithMetrics(metrics => ConfigureMetrics(metrics, Option));
+
+        if (Option.EnableTracing)
+            telemetry.WithTracing(tracing => ConfigureTracing(tracing, Option));
+        if (Option.EnableLogging)
+        {
+            telemetry.WithLogging(logging =>
+            {
+                if (Option.UseOtlpExporter && !Option.UseOtlpEnvironmentDefaults)
+                    logging.AddOtlpExporter(exporter => ConfigureOtlp(exporter, Option));
+                if (Option.UseConsoleExporter)
+                    logging.AddConsoleExporter();
+            }, logging =>
+            {
+                logging.IncludeFormattedMessage = Option.IncludeFormattedLogMessages;
+                logging.IncludeScopes = Option.IncludeLogScopes;
+            });
+        }
+        if (Option.UseOtlpExporter && Option.UseOtlpEnvironmentDefaults)
+            telemetry.UseOtlpExporter();
 
         if (!Option.EnableInProcessCollector)
         {
@@ -138,17 +160,9 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
             metrics.AddRuntimeInstrumentation();
         }
 
-        if (option.UseOtlpExporter)
+        if (option.UseOtlpExporter && !option.UseOtlpEnvironmentDefaults)
         {
-            metrics.AddOtlpExporter(exporter =>
-            {
-                if (!string.IsNullOrWhiteSpace(option.OtlpEndpoint))
-                {
-                    exporter.Endpoint = new Uri(option.OtlpEndpoint, UriKind.Absolute);
-                }
-
-                exporter.Protocol = option.OtlpProtocol;
-            });
+            metrics.AddOtlpExporter(exporter => ConfigureOtlp(exporter, option));
         }
 
         if (option.UsePrometheusEndpoint)
@@ -161,6 +175,29 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
             metrics.AddConsoleExporter();
         }
     }
+
+    private static void ConfigureTracing(TracerProviderBuilder tracing, ModuleOpenTelemetryOption option)
+    {
+        var sources = option.ActivitySourceNames.Where(static source => !string.IsNullOrWhiteSpace(source))
+            .Select(static source => source.Trim()).Distinct(StringComparer.Ordinal).ToArray();
+        if (sources.Length > 0)
+            tracing.AddSource(sources);
+        if (option.IncludeAspNetCoreInstrumentation)
+            tracing.AddAspNetCoreInstrumentation();
+        if (option.IncludeHttpClientInstrumentation)
+            tracing.AddHttpClientInstrumentation();
+        if (option.UseOtlpExporter && !option.UseOtlpEnvironmentDefaults)
+            tracing.AddOtlpExporter(exporter => ConfigureOtlp(exporter, option));
+        if (option.UseConsoleExporter)
+            tracing.AddConsoleExporter();
+    }
+
+    private static void ConfigureOtlp(OtlpExporterOptions exporter, ModuleOpenTelemetryOption option)
+    {
+        if (!string.IsNullOrWhiteSpace(option.OtlpEndpoint))
+            exporter.Endpoint = new Uri(option.OtlpEndpoint, UriKind.Absolute);
+        exporter.Protocol = option.OtlpProtocol;
+    }
 }
 
 /// <summary>
@@ -169,7 +206,63 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
 public static class ModuleOpenTelemetryRegistrationExtensions
 {
     /// <summary>
-    /// Enables the OTLP metrics exporter. Environment variables are honored by the OpenTelemetry SDK when no endpoint is supplied.
+    /// Enables the SDK's cross-signal OTLP exporter and its endpoint, protocol, header, and signal-specific
+    /// environment defaults. Also enables tracing and logging. Cannot be combined with UseOtlpExporter
+    /// or separately registered SDK OTLP exporters for this host.
+    /// </summary>
+    /// <param name="module">The OpenTelemetry registration being configured.</param>
+    /// <returns>The current registration.</returns>
+    public static ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> UseOtlpExporterFromEnvironment(
+        this ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> module) => module.Configure(options =>
+        {
+            if (options.UseOtlpExporter && !options.UseOtlpEnvironmentDefaults)
+                throw new InvalidOperationException("Select either explicit OTLP options or SDK environment defaults, not both.");
+            options.UseOtlpExporter = true;
+            options.UseOtlpEnvironmentDefaults = true;
+            options.EnableTracing = true;
+            options.EnableLogging = true;
+        });
+
+    /// <summary>
+    /// Enables host-owned tracing with the selected ASP.NET Core and HttpClient instrumentations.
+    /// Additional source names are cumulative; no custom application source is inferred. Does not enable an exporter.
+    /// </summary>
+    /// <param name="module">The OpenTelemetry registration being configured.</param>
+    /// <param name="activitySourceNames">Optional application ActivitySource names or SDK-supported wildcard patterns.</param>
+    /// <returns>The current registration.</returns>
+    public static ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> UseTracing(
+        this ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> module,
+        params string[] activitySourceNames)
+    {
+        ArgumentNullException.ThrowIfNull(activitySourceNames);
+        return module.Configure(options =>
+        {
+            options.EnableTracing = true;
+            options.ActivitySourceNames.AddRange(activitySourceNames);
+        });
+    }
+
+    /// <summary>
+    /// Adds the host-owned OpenTelemetry logging provider with formatted messages and scopes by default.
+    /// Does not clear other providers or enable an exporter. When Monica.Logging owns the logger factory,
+    /// enable its ForwardToProviders option so filtered Serilog events reach this provider.
+    /// </summary>
+    /// <param name="module">The OpenTelemetry registration being configured.</param>
+    /// <param name="includeFormattedMessages">Whether to retain formatted log messages.</param>
+    /// <param name="includeScopes">Whether to retain logging scopes.</param>
+    /// <returns>The current registration.</returns>
+    public static ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> UseLogging(
+        this ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> module,
+        bool includeFormattedMessages = true, bool includeScopes = true) => module.Configure(options =>
+        {
+            options.EnableLogging = true;
+            options.IncludeFormattedLogMessages = includeFormattedMessages;
+            options.IncludeLogScopes = includeScopes;
+        });
+
+    /// <summary>
+    /// Enables one OTLP exporter per enabled signal: metrics, plus explicitly enabled tracing and logging.
+    /// Endpoint environment variables are honored by the OpenTelemetry SDK when no endpoint is supplied.
     /// </summary>
     /// <param name="module">The OpenTelemetry registration being configured.</param>
     /// <param name="endpoint">Optional absolute OTLP endpoint URI.</param>
@@ -179,7 +272,10 @@ public static class ModuleOpenTelemetryRegistrationExtensions
     {
         module.Configure(options =>
         {
+            if (options.UseOtlpEnvironmentDefaults)
+                throw new InvalidOperationException("Select either explicit OTLP options or SDK environment defaults, not both.");
             options.UseOtlpExporter = true;
+            options.UseOtlpEnvironmentDefaults = false;
             options.OtlpEndpoint = endpoint;
             options.OtlpProtocol = protocol;
         });
@@ -203,7 +299,7 @@ public static class ModuleOpenTelemetryRegistrationExtensions
     }
 
     /// <summary>
-    /// Adds the console metrics exporter for local debugging.
+    /// Adds one console exporter per enabled signal for local debugging.
     /// </summary>
     /// <returns>The current registration.</returns>
     public static ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> UseConsoleExporter(this ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption> module)
@@ -300,6 +396,21 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     /// </summary>
     public string? DeploymentEnvironment { get; set; }
 
+    /// <summary>Whether to register a tracing provider. Defaults to false; metrics remain enabled independently.</summary>
+    public bool EnableTracing { get; set; }
+
+    /// <summary>Whether to register the OpenTelemetry logging provider. Defaults to false; does not replace the host logger factory.</summary>
+    public bool EnableLogging { get; set; }
+
+    /// <summary>Additional ActivitySource names or SDK-supported patterns observed when tracing is enabled. Defaults to empty.</summary>
+    public List<string> ActivitySourceNames { get; set; } = [];
+
+    /// <summary>Whether OpenTelemetry log records include formatted messages. Defaults to true; only applies when logging is enabled.</summary>
+    public bool IncludeFormattedLogMessages { get; set; } = true;
+
+    /// <summary>Whether OpenTelemetry log records include scopes. Defaults to true; only applies when logging is enabled.</summary>
+    public bool IncludeLogScopes { get; set; } = true;
+
     /// <summary>
     /// Gets custom meter names or wildcard patterns subscribed by the OpenTelemetry SDK and Monica's in-process collector.
     /// Defaults to <c>Monica.*</c>, which captures every first-party Monica meter. Built-in instrumentation meters are
@@ -308,12 +419,12 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     public List<string> MeterPatterns { get; set; } = ["Monica.*"];
 
     /// <summary>
-    /// Gets or sets whether ASP.NET Core server metrics instrumentation is enabled. Defaults to <see langword="true"/>.
+    /// Gets or sets whether ASP.NET Core metrics and, when enabled, tracing instrumentation is selected. Defaults to true.
     /// </summary>
     public bool IncludeAspNetCoreInstrumentation { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets whether outbound <see cref="HttpClient"/> metrics instrumentation is enabled. Defaults to <see langword="true"/>.
+    /// Gets or sets whether outbound HttpClient metrics and, when enabled, tracing instrumentation is selected. Defaults to true.
     /// </summary>
     public bool IncludeHttpClientInstrumentation { get; set; } = true;
 
@@ -331,10 +442,13 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     public bool IncludeInstrumentationMetersInProcessCollector { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets whether the OTLP metrics exporter is enabled.
-    /// The OpenTelemetry SDK honors <c>OTEL_EXPORTER_OTLP_*</c> environment variables unless an option overrides them.
+    /// Gets or sets whether OTLP export is enabled for metrics and any explicitly enabled tracing or logging.
+    /// The OpenTelemetry SDK honors OTLP endpoint environment variables unless OtlpEndpoint overrides them.
+    /// Protocol is explicitly selected by OtlpProtocol. Defaults to false.
     /// </summary>
     public bool UseOtlpExporter { get; set; }
+
+    internal bool UseOtlpEnvironmentDefaults { get; set; }
 
     /// <summary>
     /// Gets or sets an optional absolute OTLP endpoint URI that overrides SDK environment configuration.
@@ -357,7 +471,7 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     public string PrometheusEndpointPath { get; set; } = "/metrics";
 
     /// <summary>
-    /// Gets or sets whether to enable the console metrics exporter for local debugging.
+    /// Gets or sets whether to enable console export for metrics and any explicitly enabled tracing or logging.
     /// </summary>
     public bool UseConsoleExporter { get; set; }
 

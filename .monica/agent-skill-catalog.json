@@ -513,11 +513,14 @@
         "title": "Persistence and transactions",
         "modules": [
           "repository",
-          "unit-of-work"
+          "unit-of-work",
+          "blob-storage"
         ],
         "sourcePaths": [
           "Monica.Repository",
-          "Monica.Repository.UI"
+          "Monica.Repository.UI",
+          "Monica.BlobStorage",
+          "Monica.BlobStorage.Minio"
         ]
       }
     },

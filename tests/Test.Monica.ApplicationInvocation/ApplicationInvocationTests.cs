@@ -34,6 +34,30 @@ public sealed class ApplicationInvocationTests
     private static readonly ApiHttpEndpoint OrdinaryEndpoint = new("POST", "api/v1/Ordering/invocation/ordinary", false, true);
     private static readonly ApiHttpEndpoint RequiredEndpoint = new("POST", "api/v1/Ordering/invocation/constrained", false, true);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Invoke_WhenSeveralFeaturesCustomizeHttpClients_ShouldKeepEveryHandlerInDeclarationOrder(bool authority)
+    {
+        await using var host = await new InvocationApplicationFactory(authority: authority, multipleHttpContributions: true)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        PrepareCaller(host);
+        if (authority)
+            host.Services.GetRequiredService<AuthorityChoice>().Destination = new ApplicationInvocationDestination("remote", "primary");
+        await using var scope = host.CreateScope(TestContext.Current.CancellationToken);
+
+        var result = await scope.Resolve<IApplicationApiInvoker>()
+            .InvokeAsync(new CommandConstrained(88), RequiredEndpoint, scope.CancellationToken);
+
+        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(501, result.Data);
+        var transport = host.Services.GetRequiredService<RecordingTransport>();
+        Assert.Equal(["first:request", "second:request", "second:response", "first:response"], transport.HandlerSteps.ToArray());
+        var sent = Assert.Single(transport.Calls);
+        Assert.StartsWith(authority ? "https://primary.test/remote/" : "https://invocation.test/remote/", sent.Uri);
+        Assert.Equal("Bearer scenario-token", sent.Authorization);
+    }
+
     [Fact]
     public async Task Invoke_WhenAnOrdinaryImplementationIsOmitted_ShouldReachItsOwnerWithoutLoadingTheHandler()
     {
@@ -248,7 +272,8 @@ public sealed class ApplicationInvocationTests
     }
 
     private sealed class InvocationApplicationFactory(string appId = "local", bool colocated = false, bool httpProvider = true,
-        bool authority = false, bool receivers = false, bool remoteOnly = false) : MonicaTestApplicationFactory<ApplicationInvocationTests>
+        bool authority = false, bool receivers = false, bool remoteOnly = false, bool multipleHttpContributions = false)
+        : MonicaTestApplicationFactory<ApplicationInvocationTests>
     {
         protected override IEnumerable<Assembly> TypeDiscoveryAssemblies =>
             [typeof(ApplicationInvocationTests).Assembly, typeof(DomainDeclaration).Assembly, typeof(OrdinaryHandler).Assembly, typeof(OrdinaryApiHandler).Assembly];
@@ -270,8 +295,15 @@ public sealed class ApplicationInvocationTests
             builder.AddApplication();
             builder.AddResultEnvelope().UseResultFieldNames(names => names.Status = "code");
             var applicationInvocation = builder.AddApplicationInvocation();
+            if (multipleHttpContributions)
+                builder.AddApiClient().ConfigHttpClientBuilder(client =>
+                    client.AddHttpMessageHandler(provider => new OrderedHandler("first", provider.GetRequiredService<RecordingTransport>())));
             var apiClients = builder.AddApiClient().ConfigHttpClientBuilder(client =>
-                client.ConfigurePrimaryHttpMessageHandler(provider => new RecordingHandler(provider.GetRequiredService<RecordingTransport>())));
+            {
+                if (multipleHttpContributions)
+                    client.AddHttpMessageHandler(provider => new OrderedHandler("second", provider.GetRequiredService<RecordingTransport>()));
+                client.ConfigurePrimaryHttpMessageHandler(provider => new RecordingHandler(provider.GetRequiredService<RecordingTransport>()));
+            });
             if (httpProvider) apiClients.ConfigHttpClientRegisterProvider<OrdinaryHttpProvider>();
             if (authority)
                 applicationInvocation.UseAuthorityPolicy<FixedAuthorityPolicy>().ConfigAuthorityHttpClientProvider<PrimaryHttpProvider>("primary");
@@ -321,9 +353,21 @@ public sealed class ApplicationInvocationTests
     private sealed class RecordingTransport
     {
         public ConcurrentQueue<SentRequest> Calls { get; } = new();
+        public ConcurrentQueue<string> HandlerSteps { get; } = new();
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Fail { get; set; }
         public bool WaitForCancellation { get; set; }
+    }
+
+    private sealed class OrderedHandler(string name, RecordingTransport transport) : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            transport.HandlerSteps.Enqueue($"{name}:request");
+            var response = await base.SendAsync(request, cancellationToken);
+            transport.HandlerSteps.Enqueue($"{name}:response");
+            return response;
+        }
     }
 
     private sealed class RecordingHandler(RecordingTransport transport) : HttpMessageHandler
