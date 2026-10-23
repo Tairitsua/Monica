@@ -19,6 +19,7 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
     : ConfigurationProvider, IConfigurationValueShapeProvider
 {
     private readonly Lock _projectionLock = new();
+    private readonly ConfigurationChildKeyIndex _childKeys = new();
     private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedKeysByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long?> _loadedVersionsByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedShapesByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
@@ -210,6 +211,12 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
             stateTracker.RecordFailure(effectiveValueStore.Descriptor.StoreKey, ex);
             throw;
         }
+    }
+
+    /// <inheritdoc />
+    public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
+    {
+        lock (_projectionLock) return _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
     }
 
     public bool TryGetShape(string path, out ConfigurationValueShape shape)

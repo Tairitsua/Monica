@@ -111,7 +111,10 @@ internal sealed class ConfigurationValueProjectionSource(ConfigurationValueProje
 internal sealed class ConfigurationValueProjectionProvider(ConfigurationValueProjection projection)
     : ConfigurationProvider, IConfigurationValueShapeProvider
 {
+    private readonly ConfigurationChildKeyIndex _childKeys = new();
     private IReadOnlyDictionary<string, ConfigurationValueShape> _shapes = projection.Shapes;
+    public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
+        => _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
     public override void Load()
     {
         _shapes = projection.Shapes;
@@ -139,7 +142,11 @@ internal sealed class ShapeAwareJsonConfigurationSource : JsonConfigurationSourc
 internal sealed class ShapeAwareJsonConfigurationProvider(JsonConfigurationSource source)
     : JsonConfigurationProvider(source), IConfigurationValueShapeProvider
 {
+    private readonly ConfigurationChildKeyIndex _childKeys = new();
     private IReadOnlyDictionary<string, ConfigurationValueShape> _shapes = new Dictionary<string, ConfigurationValueShape>();
+
+    public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
+        => _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
 
     public override void Load(Stream stream)
     {

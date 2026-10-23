@@ -58,12 +58,40 @@ public sealed class ConfigurationDocumentProjectionTests
         using var document = JsonDocument.Parse("""{"Settings":{"Values":["original"]}}""");
         var provider = new ConfigurationValueProjectionProvider(ConfigurationValueProjectionFactory.CreateDocument(document.RootElement));
         provider.Load();
+        provider.GetChildKeys([], "Settings:Values").Should().Equal("0");
         provider.Set("Settings:Values", null);
+        provider.GetChildKeys([], "Settings:Values").Should().BeEmpty();
         provider.Load();
+        provider.GetChildKeys([], "Settings:Values").Should().Equal("0");
         provider.TryGetShape("Settings:Values", out var shape).Should().BeTrue();
         shape.Should().Be(ConfigurationValueShape.List);
         provider.TryGet("Settings:Values:0", out var value).Should().BeTrue();
         value.Should().Be("original");
+    }
+
+    [Fact]
+    public void JsonProvider_WhenLoadedOrSetWithoutReloadNotification_ShouldRefreshIndexedChildKeys()
+    {
+        using var provider = new ShapeAwareJsonConfigurationProvider(new JsonConfigurationSource());
+        using var first = new MemoryStream(Encoding.UTF8.GetBytes("""{"Settings":{"Values":["old"]}}"""));
+        provider.Load(first);
+        provider.GetChildKeys([], "Settings:Values").Should().Equal("0");
+
+        provider.Set("Settings:Values", null);
+        provider.GetChildKeys([], "Settings:Values").Should().BeEmpty();
+        provider.Set("Settings:Values:2", "new");
+        provider.GetChildKeys([], "Settings:Values").Should().Equal("2");
+
+        using var replacement = new MemoryStream(Encoding.UTF8.GetBytes("""{"Settings":{"Values":[]}}"""));
+        provider.Load(replacement);
+        provider.GetChildKeys([], "Settings:Values").Should().BeEmpty();
+        provider.TryGetShape("Settings:Values", out var shape).Should().BeTrue();
+        shape.Should().Be(ConfigurationValueShape.List);
+
+        using var empty = new MemoryStream(Encoding.UTF8.GetBytes("{}"));
+        provider.Load(empty);
+        provider.GetChildKeys([], null).Should().BeEmpty();
+        provider.TryGetShape("Settings:Values", out _).Should().BeFalse();
     }
 
     [Theory]

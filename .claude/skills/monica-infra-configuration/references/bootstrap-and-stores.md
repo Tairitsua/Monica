@@ -31,6 +31,10 @@ An initial `Created` event exposes `PreviousSchemaVersion`, `PreviousSchemaHash`
 
 Runtime activation is a separate boundary. A missing document is seeded from the actual declared defaults and source-faithful binder, then checked before creation. DiagnosticOnly permits ordinary invalid values with diagnostics; FailFast refuses an invalid first seed before persistence, and operational validation faults are fatal in both modes. Existing documents are not rewritten as a startup repair. See the [policy and observed-options contract](options-and-validation.md) before selecting runtime enforcement.
 
+For slow startup, measure `monica.configuration.startup.stage.duration` from the `Monica.Configuration` meter. Values are milliseconds with bounded `stage` and `result` tags. `provider-activation` contains `metadata-publication` and `projection-reload`; `runtime-validation` is separate. Web activation emits these during `UseMonica`, so a listener must already be active to receive them; a later exporter cannot recover an earlier histogram measurement. Preserve both source validation and materialized-object rules when investigating validation cost.
+
+Built-in JSON and managed providers index child-key traversal per data snapshot to avoid repeatedly scanning the whole configuration tree. Full reload, partial managed reload, and flat `Set` replace that snapshot. Reusing a configuration view must therefore see changed child keys, nulls, and empty containers even when `Set` does not raise a reload notification. This indexing does not refresh Microsoft options caches or change provider precedence, validation policy, or reload ownership.
+
 Input plans and typed snapshots: `Monica.Configuration/Bootstrap/MonicaConfigurationInputPlan.cs`, `Monica.Configuration/Bootstrap/MonicaConfigurationInputPlanBuilder.cs`, `Monica.Configuration/Bootstrap/MonicaEffectiveOptionsSnapshot.cs`, and `Monica.Configuration/Bootstrap/MonicaEffectiveOptionsSnapshotLoader.cs`; EF Core plan: `Monica.Configuration.EfCore/Bootstrap/MonicaConfigurationInputPlanEfCoreBuilderExtensions.cs`. Basic composition: `examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Program.cs`.
 
 Behavioral checks:
@@ -38,6 +42,8 @@ Behavioral checks:
 - `tests/Test.Monica.Configuration/Bootstrap/MonicaConfigurationInputPlanTests.cs`: read-only input-plan snapshots and store overlays.
 - `tests/Test.Monica.Configuration/Binding/MonicaConfigurationCollectionBindingTests.cs`: shared collection binding in bootstrap and runtime.
 - `tests/Test.Monica.Configuration/Binding/ConfigurationObjectMaterializerTests.cs`: aliases, defaults, explicit shape, and precedence.
+- `tests/Test.Monica.Configuration/Binding/ConfigurationChildKeyIndexTests.cs`: Microsoft child-key ordering, duplicates, case-insensitive paths, and data replacement without notifications.
+- `tests/Test.Monica.Configuration/Binding/ConfigurationDocumentProjectionTests.cs` and `tests/Test.Monica.Configuration/Projection/MonicaConfigurationProviderPartialReloadTests.cs`: JSON, projection, and managed-provider index invalidation across full reload, partial reload, and flat writes.
 - `tests/Test.Monica.Configuration/Modules/ManagedConfigurationObjectValidationTests.cs`: runtime seed validation and policy boundaries.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationInputPlanTests.cs`: relational-store input plans.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationStorePublishTests.InitialPublication.cs`: migrated-store initial null prior snapshots, narrowly gated legacy empty-value projection without stored-row changes, and preservation of nonempty and later-schema history.
