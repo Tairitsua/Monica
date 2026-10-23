@@ -201,7 +201,23 @@
     "CopyHint": "Click to copy",
     "CopyCode": "Copy {0}",
     "Copied": "Copied",
-    "CopyFailed": "Could not copy. Select the code and copy it manually."
+    "CopyFailed": "Could not copy. Select the code and copy it manually.",
+    "Mermaid": {
+      "Rendering": "Rendering diagram…",
+      "Open": "Open diagram in immersive reader",
+      "Expand": "Expand",
+      "Title": "Diagram reader",
+      "Controls": "Diagram view controls",
+      "ZoomOut": "Zoom out (−)",
+      "ZoomLevel": "Zoom",
+      "ZoomIn": "Zoom in (+)",
+      "Reset": "Actual size: 100% (0)",
+      "FitHint": "Fit diagram to window (F)",
+      "Fit": "Fit to window",
+      "Close": "Close diagram reader (Escape)",
+      "Canvas": "Diagram canvas; drag to pan",
+      "Hint": "Scroll to zoom · Drag to pan · Arrow keys to move · F to fit · 0 for 100% · Esc to close"
+    }
   },
   "StackTrace": {
     "Caption": "Diagnostic text",

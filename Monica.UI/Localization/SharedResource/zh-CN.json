@@ -201,7 +201,23 @@
     "CopyHint": "点击复制",
     "CopyCode": "复制 {0}",
     "Copied": "已复制",
-    "CopyFailed": "复制失败，请选中代码手动复制。"
+    "CopyFailed": "复制失败，请选中代码手动复制。",
+    "Mermaid": {
+      "Rendering": "正在绘制图表…",
+      "Open": "沉浸式阅读图表",
+      "Expand": "放大阅读",
+      "Title": "图表阅读",
+      "Controls": "图表视图控制",
+      "ZoomOut": "缩小（−）",
+      "ZoomLevel": "缩放",
+      "ZoomIn": "放大（+）",
+      "Reset": "原始大小：100%（0）",
+      "FitHint": "适应窗口（F）",
+      "Fit": "适应窗口",
+      "Close": "关闭图表阅读（Esc）",
+      "Canvas": "图表画布，可拖动平移",
+      "Hint": "滚轮缩放 · 拖动平移 · 方向键移动 · F 适应窗口 · 0 原始大小 · Esc 关闭"
+    }
   },
   "StackTrace": {
     "Caption": "诊断文本",

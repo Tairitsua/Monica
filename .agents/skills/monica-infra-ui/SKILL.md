@@ -14,7 +14,7 @@ UI foundation, hosting, and the optional Shell compose independently; Markdown a
 | Render local SVG icons or supply icons to controls and navigation | [MoIcon and icon catalog](references/icons.md) |
 | Inspect host identity, process evidence, timing, or operational links | [System information](references/system-information.md) |
 | Inspect registered DbContexts, provider sessions, or migration outcomes | [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md) |
-| Publish searchable documents, use the viewer, or serve local images | [Markdown](references/markdown.md) |
+| Render Markdown and diagrams, search documents, or serve local images | [Markdown](references/markdown.md) |
 | Probe connectivity from a host or transform escaped text and JSON | [Utilities workspaces](references/utilities.md) |
 | Inspect registered object-mapping pairs and generated expressions | [Mapper workspace](references/mapper.md) |
 | Inspect Git working copies and credentials | [Git workspace](references/git-workspace.md) |
