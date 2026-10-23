@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Filters;
 using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
+using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Services.Support;
 
 namespace Monica.Framework.ChainTracing.Providers.AspNetCore;
@@ -38,7 +39,12 @@ public class ChainTracingResultMetadataActionFilter(
     /// <param name="context">The action executed context.</param>
     public void OnActionExecuted(ActionExecutedContext context)
     {
-        if (chainTracing.GetCurrentChain() is not { } chain ||
+        // Async MVC filters can unwind past the flow that created the chain; the request-owned
+        // reference published by controller tracing survives that boundary.
+        var chain = (context.HttpContext.Items.TryGetValue(ChainTraceContext.HTTP_ITEM_KEY, out var published)
+            ? published as ChainTraceContext
+            : null) ?? chainTracing.GetCurrentChain();
+        if (chain is null ||
             ChainTracingResultHelper.ExtractResult(context.Result) is not IResultEnvelope serviceResponse)
         {
             return;
