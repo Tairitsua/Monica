@@ -47,7 +47,7 @@ The reader fills the available viewport and supports:
 | Reset | 100% control or 0; restores the SVG's intrinsic size and centers it. |
 | Close | Close control, Escape, or the backdrop; restores focus to the connected opener. |
 
-The reader reuses the existing strict-rendered SVG; opening, panning and zooming do not rerun Mermaid or change the Markdown source. Theme changes refresh its diagram from the newly rendered themed SVG. Invalid or empty definitions retain the inline renderer's existing error/empty behavior and provide no diagram to inspect. The reader works in embedded Markdown, document pages and reference drawers without a consumer-owned dialog, zoom controller or additional provider registration. Keep the page or document owner responsible for loading Markdown; the diagram component owns its browser listeners and observers and retires them when removed.
+The reader reuses the existing strict-rendered SVG; opening, panning and zooming do not rerun Mermaid or change the Markdown source. Generated reader controls and the cloned diagram stay outside the document outline and search-highlight text. Theme changes refresh its diagram from the newly rendered themed SVG. Invalid or empty definitions retain the inline renderer's existing error/empty behavior and provide no diagram to inspect. The reader works in embedded Markdown, document pages and reference drawers without a consumer-owned dialog, zoom controller or additional provider registration. Keep the page or document owner responsible for loading Markdown; the diagram component owns its browser listeners and observers and retires them when removed.
 
 ## Viewer navigation and panes
 

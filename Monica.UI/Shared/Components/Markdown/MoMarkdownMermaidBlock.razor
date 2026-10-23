@@ -14,7 +14,7 @@
     }
     @if (!_diagramReady && _renderError is null && !string.IsNullOrWhiteSpace(Definition))
     {
-        <div class="mo-markdown-mermaid-loading" role="status">@L["Markdown:Mermaid:Rendering"]</div>
+        <div class="mo-markdown-mermaid-loading" role="status" data-markdown-search-ignore="true">@L["Markdown:Mermaid:Rendering"]</div>
     }
     <div class="mo-markdown-mermaid-frame">
         <div @ref="_containerRef"
@@ -24,16 +24,16 @@
              aria-label="@L["Markdown:Mermaid:Open"]" aria-haspopup="dialog"></div>
         @if (_diagramReady)
         {
-            <button type="button" class="mo-markdown-mermaid-expand" data-mo-mermaid-action="open"
+            <button type="button" class="mo-markdown-mermaid-expand" data-mo-mermaid-action="open" data-markdown-search-ignore="true"
                     title="@L["Markdown:Mermaid:Open"]" aria-label="@L["Markdown:Mermaid:Open"]">
                 <MoIcon Icon="@MoIcons.Maximize" Size="16px" /><span>@L["Markdown:Mermaid:Expand"]</span>
             </button>
         }
     </div>
 
-    <dialog @ref="_dialogRef" class="mo-mermaid-reader" aria-labelledby="@_titleId" aria-describedby="@_hintId">
+    <dialog @ref="_dialogRef" class="mo-mermaid-reader" aria-labelledby="@_titleId" aria-describedby="@_hintId" data-markdown-search-ignore="true">
         <header class="mo-mermaid-reader__header">
-            <div class="mo-mermaid-reader__identity"><MoIcon Icon="@MoIcons.Maximize" Size="19px" /><h2 id="@_titleId">@L["Markdown:Mermaid:Title"]</h2></div>
+            <div class="mo-mermaid-reader__identity"><MoIcon Icon="@MoIcons.Maximize" Size="19px" /><span class="mo-mermaid-reader__title" id="@_titleId">@L["Markdown:Mermaid:Title"]</span></div>
             <div class="mo-mermaid-reader__tools" role="group" aria-label="@L["Markdown:Mermaid:Controls"]">
                 <button type="button" data-mo-mermaid-action="out" title="@L["Markdown:Mermaid:ZoomOut"]" aria-label="@L["Markdown:Mermaid:ZoomOut"]"><MoIcon Icon="@MoIcons.ZoomOut" Size="18px" /></button>
                 <output data-mo-mermaid-zoom aria-label="@L["Markdown:Mermaid:ZoomLevel"]" aria-live="polite">100%</output>
@@ -195,7 +195,7 @@
                 }
             }
         }
-        catch (Exception exception) when (exception is JSException or TaskCanceledException) { }
+        catch (Exception exception) when (exception is JSDisconnectedException or JSException or TaskCanceledException) { }
         try
         {
             await _themeChangeTask;
@@ -214,7 +214,7 @@
         {
             if (_moduleImport is not null) await (await _moduleImport).DisposeAsync();
         }
-        catch (Exception exception) when (exception is JSException or TaskCanceledException) { }
+        catch (Exception exception) when (exception is JSDisconnectedException or JSException or TaskCanceledException) { }
     }
 
     private sealed record MermaidThemePayload(

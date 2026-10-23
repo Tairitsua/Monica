@@ -390,7 +390,7 @@ function buildNormalizedTextMap(root, searchableRoots) {
             }
 
             const parentElement = node.parentElement;
-            if (!parentElement) {
+            if (!parentElement || parentElement.closest('[data-markdown-search-ignore="true"]')) {
                 return NodeFilter.FILTER_REJECT;
             }
 

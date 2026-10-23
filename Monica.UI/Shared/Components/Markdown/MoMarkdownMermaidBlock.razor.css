@@ -15,7 +15,7 @@
 .mo-mermaid-reader__header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding: 12px 16px; border-bottom: 1px solid var(--mud-palette-lines-default); background: var(--mud-palette-surface); }
 .mo-mermaid-reader__identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .mo-mermaid-reader__identity > ::deep .mo-icon { color: var(--mud-palette-primary); }
-.mo-mermaid-reader__identity h2 { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
+.mo-mermaid-reader__title { font-size: 17px; line-height: 1.5; font-weight: 600; }
 .mo-mermaid-reader__tools { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
 .mo-mermaid-reader button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 34px; min-height: 34px; padding: 6px 8px; border: 1px solid var(--mud-palette-lines-default); border-radius: 6px; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); font: inherit; font-size: 12.5px; line-height: 1.4; cursor: pointer; }
 .mo-mermaid-reader button:not(:disabled):hover { background: var(--mud-palette-action-default-hover); border-color: var(--mud-palette-primary); color: var(--mud-palette-primary); }
@@ -37,6 +37,6 @@
     .mo-mermaid-reader__tools { width: 100%; gap: 4px; }
     .mo-mermaid-reader__tools .mo-mermaid-reader__close { margin-left: auto; }
     .mo-mermaid-reader__tools > .mo-mermaid-reader__separator:last-of-type { display: none; }
-    .mo-mermaid-reader__identity h2 { font-size: 15px; }
+    .mo-mermaid-reader__title { font-size: 15px; }
     .mo-mermaid-reader__footer { padding: 8px 10px; font-size: 12px; }
 }
