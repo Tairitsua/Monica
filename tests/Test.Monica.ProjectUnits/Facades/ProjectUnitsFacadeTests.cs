@@ -120,6 +120,37 @@ public sealed class ProjectUnitsFacadeTests
             .Should().ContainSingle(item => item.Type == typeof(EventFriendlyDispatch));
     }
 
+    [Fact]
+    public async Task PublishDomainEvent_WhenShortKeyIsAmbiguous_ShouldRejectWithoutDispatch()
+    {
+        await using var application = await new FacadeScenarioFactory(false)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
+
+        var result = await scope.Resolve<ProjectUnitsFacade>()
+            .PublishDomainEventAsync(nameof(FirstContext.EventCollision), JsonNode.Parse("{}")!);
+
+        result.IsOk().Should().BeFalse();
+        result.Message.Should().Contain("short name is ambiguous").And.Contain("full CLR event key");
+        application.Services.GetRequiredService<RecordingDistributedProvider>().Deliveries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetDomainEvents_WhenRecordRequiresConstructorArguments_ShouldRetainDescriptorWithoutSample()
+    {
+        await using var application = await new FacadeScenarioFactory(false)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
+
+        var result = await scope.Resolve<ProjectUnitsFacade>().GetDomainEventsAsync();
+
+        result.Status.Should().Be(ResStatus.Ok);
+        result.Data!.Single(item => item.EventKey == typeof(EventParameterized).FullName).Structure.Should().BeNull();
+        result.Data!.Single(item => item.EventKey == typeof(EventFriendlyDispatch).FullName).Structure.Should().NotBeNull();
+    }
+
+    public sealed record EventParameterized(string Value) : IDomainEvent;
+
     [ProjectUnitMetadata("Friendly dispatch label")]
     public sealed class EventFriendlyDispatch : IDomainEvent
     {

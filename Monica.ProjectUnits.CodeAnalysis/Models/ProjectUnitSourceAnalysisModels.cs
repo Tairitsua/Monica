@@ -7,9 +7,9 @@ namespace Monica.ProjectUnits.CodeAnalysis.Models;
 public static class ProjectUnitSourceAnalysisContract
 {
     /// <summary>
-    /// Version 6 includes request associations for response-less and custom-result application services.
+    /// Version 7 discovers native IRequest&lt;TResponse&gt; payloads used by custom-result application services.
     /// </summary>
-    public const string Version = "monica-project-units-source/v6";
+    public const string Version = "monica-project-units-source/v7";
 
     /// <summary>Architectural roles the current source classifier can produce.</summary>
     public static IReadOnlySet<ProjectUnitSourceType> DiscoverableUnitTypes { get; } = new[]

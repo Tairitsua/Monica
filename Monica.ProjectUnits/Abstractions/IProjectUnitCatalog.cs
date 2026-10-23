@@ -40,7 +40,7 @@ public interface IProjectUnitCatalog
     /// Finds a project unit by its short CLR type name.
     /// </summary>
     /// <param name="typeName">The short name of the represented CLR type.</param>
-    /// <returns>The matching unit, or <see langword="null"/> when no unit was discovered.</returns>
+    /// <returns>The matching unit, or <see langword="null"/> when the name is absent or ambiguous across units.</returns>
     ProjectUnit? FindByName(string? typeName);
 
     /// <summary>
@@ -56,7 +56,9 @@ public interface IProjectUnitCatalog
     /// </summary>
     /// <typeparam name="TProjectUnit">The required project-unit model type.</typeparam>
     /// <param name="typeName">The short name of the represented CLR type.</param>
-    /// <returns>The matching typed unit, or <see langword="null"/> when no compatible unit was discovered.</returns>
+    /// <returns>
+    /// The matching typed unit, or <see langword="null"/> when the name is absent, ambiguous, or incompatible.
+    /// </returns>
     TProjectUnit? FindByName<TProjectUnit>(string? typeName) where TProjectUnit : ProjectUnit;
 
 }

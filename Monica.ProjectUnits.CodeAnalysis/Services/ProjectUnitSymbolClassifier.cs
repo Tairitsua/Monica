@@ -39,6 +39,7 @@ internal sealed class ProjectUnitSymbolClassifier
     private const string RECURRING_JOB = "Monica.JobScheduler.Abstractions.RecurringJob";
     private const string REPOSITORY = "Monica.Repository.Persistence.Abstractions.IRepository`1";
     private const string REQUEST = "Monica.Application.Abstractions.IResultRequestBase";
+    private const string NATIVE_REQUEST = "Monica.Core.Mediator.IRequest`1";
     private const string REQUIREMENT_ATTRIBUTE = "Monica.ProjectUnits.Annotations.ProjectUnitRequirementAttribute";
     private const string TRIGGERED_JOB = "Monica.JobScheduler.Abstractions.TriggeredJob`1";
     private const string TRIGGERED_JOB_EXECUTION_POINT = "jobs.triggered-attempt";
@@ -253,7 +254,7 @@ internal sealed class ProjectUnitSymbolClassifier
             return new(ProjectUnitSourceType.HostedService, executionPoints, AnalyzeConstructorDependencies: true);
         }
 
-        if (symbol.FindInterface(REQUEST) is not null)
+        if (symbol.FindInterface(REQUEST) is not null || symbol.FindInterface(NATIVE_REQUEST) is not null)
         {
             return new(ProjectUnitSourceType.RequestDto, [], AnalyzeConstructorDependencies: false);
         }

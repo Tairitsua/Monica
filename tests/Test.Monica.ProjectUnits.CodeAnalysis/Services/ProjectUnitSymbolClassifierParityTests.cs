@@ -101,6 +101,8 @@ public sealed class ProjectUnitSymbolClassifierParityTests
             .Be(ProjectUnitSourceType.DomainService);
         sourceUnits["Samples.SampleConfigurationBase"].UnitType.Should()
             .Be(ProjectUnitSourceType.Configuration);
+        sourceUnits["Samples.SampleNativeRequest"].UnitType.Should()
+            .Be(ProjectUnitSourceType.RequestDto);
         sourceUnits.Should().NotContainKey("Samples.SampleInheritedConfiguration");
         sourceUnits.Values.Select(static unit => unit.UnitType).Distinct().Should()
             .BeEquivalentTo(ProjectUnitSourceAnalysisContract.DiscoverableUnitTypes);
@@ -242,6 +244,7 @@ public sealed class ProjectUnitSymbolClassifierParityTests
         using Microsoft.Extensions.Options;
         using Monica.Configuration.Annotations;
         using Monica.Core.Execution.Mvc;
+        using Monica.Core.Mediator;
         using Monica.Core.HostedService.Abstractions;
         using Monica.Core.Modularity.Annotations;
         using Monica.Core.ObservableInstance.Abstractions;
@@ -263,6 +266,12 @@ public sealed class ProjectUnitSymbolClassifierParityTests
 
         public sealed class SampleRequest : IResultRequest { }
         public sealed class SampleTypedRequest : IResultRequest<string> { }
+        public sealed class SampleNativeRequest : IRequest<byte[]> { }
+        public sealed class QueryHandlerDownload : CustomApplicationService<SampleNativeRequest, byte[]>
+        {
+            public override Task<byte[]> Handle(SampleNativeRequest request, CancellationToken cancellationToken)
+                => Task.FromResult(Array.Empty<byte>());
+        }
 
         public abstract class OurApplicationService<TRequest, TResponse> : ApplicationService<TRequest, TResponse>
             where TRequest : IResultRequest<TResponse> { }

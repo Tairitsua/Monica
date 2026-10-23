@@ -11,9 +11,12 @@ using Monica.Configuration.Models;
 using Monica.Core;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
+using Monica.Core.Mediator;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.Core.XmlDocumentation.Abstractions;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Abstractions.Handlers;
+using Monica.EventBus.Events;
 using Monica.Framework.Seeder.Abstractions;
 using Monica.Modules;
 using Monica.ProjectUnits.Abstractions;
@@ -32,6 +35,68 @@ namespace Test.Monica.ProjectUnits;
 
 public sealed class ProjectUnitCatalogTests
 {
+    [Fact]
+    public void Discovery_WhenHandlersCloseDiscoveredGenericEvents_ShouldLinkEachExactPayloadOnce()
+    {
+        var catalog = CreateCatalog(
+            typeof(EventChanged<>), typeof(DomainEventHandlerTextChanged),
+            typeof(LocalEventHandlerTextChanged), typeof(DomainEventHandlerNumberChanged));
+
+        var textEvent = catalog.FindByFullName<UnitDomainEvent>(typeof(EventChanged<string>).FullName)!;
+        var numberEvent = catalog.FindByFullName<UnitDomainEvent>(typeof(EventChanged<int>).FullName)!;
+        catalog.GetUnits<UnitDomainEvent>().Should().HaveCount(2);
+        catalog.FindByFullName(typeof(EventChanged<>).FullName).Should().BeNull();
+        textEvent.Type.Should().Be(typeof(EventChanged<string>));
+        textEvent.MetadataTitle.Should().Be("Changed payload");
+        numberEvent.Type.Should().Be(typeof(EventChanged<int>));
+        catalog.FindByName(typeof(EventChanged<>).Name).Should().BeNull();
+
+        foreach (var handlerType in new[] { typeof(DomainEventHandlerTextChanged), typeof(LocalEventHandlerTextChanged) })
+        {
+            var handler = catalog.FindByFullName(handlerType.FullName)!;
+            handler.DependencyUnits.Should().Contain(textEvent);
+            handler.Alerts.Should().NotContain(alert => alert.Source == "EventTypeAssociation");
+        }
+
+        catalog.FindByFullName(typeof(DomainEventHandlerNumberChanged).FullName)!
+            .DependencyUnits.Should().Contain(numberEvent);
+    }
+
+    [Fact]
+    public void Discovery_WhenGenericEventDefinitionIsOutsideDiscovery_ShouldRetainAssociationWarning()
+    {
+        var catalog = CreateCatalog(typeof(DomainEventHandlerTextChanged));
+
+        catalog.GetUnits<UnitDomainEvent>().Should().BeEmpty();
+        catalog.FindByFullName(typeof(DomainEventHandlerTextChanged).FullName)!
+            .Alerts.Should().ContainSingle(alert => alert.Source == "EventTypeAssociation");
+    }
+
+    [Fact]
+    public void Discovery_WhenCustomServiceUsesNativeRequest_ShouldLinkItsRequestContract()
+    {
+        var catalog = CreateCatalog(typeof(QueryDownload), typeof(QueryHandlerDownload));
+        var request = catalog.FindByFullName<UnitRequestDto>(typeof(QueryDownload).FullName);
+        var service = catalog.FindByFullName<UnitApplicationService>(typeof(QueryHandlerDownload).FullName)!;
+
+        request.Should().NotBeNull();
+        service.DependencyUnits.Should().Contain(request!);
+        service.Alerts.Should().NotContain(alert => alert.Source == "RequestTypeAssociation");
+        service.ResponseType.Should().Be(typeof(byte[]));
+    }
+
+    [Fact]
+    public void GetDomainEvents_WhenClosedPayloadHasRecursiveProperties_ShouldTerminateItsSampleGraph()
+    {
+        var catalog = CreateCatalog(typeof(EventChanged<>), typeof(DomainEventHandlerNodeChanged));
+
+        var descriptor = CreateService(catalog).GetDomainEvents().Should().ContainSingle().Which;
+
+        var payload = descriptor.Structure.Should().BeOfType<EventChanged<HierarchyNode>>().Which;
+        payload.Value.Should().NotBeNull();
+        payload.Value!.Parent.Should().BeNull();
+    }
+
     [Fact]
     public void Discovery_normalizes_explicit_metadata_and_requirement_identifiers()
     {
@@ -430,6 +495,44 @@ public sealed class ProjectUnitCatalogTests
     }
 
     public sealed class PriorityCrudApplicationService : ApplicationService, ICrudApplicationService;
+
+    [ProjectUnitMetadata("Changed payload")]
+    public sealed class EventChanged<T> : DomainEvent
+    {
+        public T? Value { get; set; }
+    }
+
+    public sealed class HierarchyNode
+    {
+        public HierarchyNode? Parent { get; set; }
+    }
+
+    public sealed class DomainEventHandlerNodeChanged : IDistributedEventHandler<EventChanged<HierarchyNode>>
+    {
+        public Task HandleEventAsync(EventChanged<HierarchyNode> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    public sealed class DomainEventHandlerTextChanged : IDistributedEventHandler<EventChanged<string>>
+    {
+        public Task HandleEventAsync(EventChanged<string> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    public sealed class LocalEventHandlerTextChanged : ILocalEventHandler<EventChanged<string>>
+    {
+        public Task HandleEventAsync(EventChanged<string> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    public sealed class DomainEventHandlerNumberChanged : IDistributedEventHandler<EventChanged<int>>
+    {
+        public Task HandleEventAsync(EventChanged<int> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    public sealed class QueryDownload : IRequest<byte[]>;
+
+    public sealed class QueryHandlerDownload : CustomApplicationService<QueryDownload, byte[]>
+    {
+        public override Task<byte[]> Handle(QueryDownload request, CancellationToken cancellationToken) => Task.FromResult(Array.Empty<byte>());
+    }
 
     public sealed class PrioritySeederHostedService : ISeeder, IHostedService
     {

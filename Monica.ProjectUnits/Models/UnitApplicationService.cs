@@ -90,7 +90,7 @@ public class UnitApplicationService : ProjectUnit
                 var alertMessage =
                     $"Application-service project unit {this} could not associate request type " +
                     $"{RequestType.GetCleanFullName()} because no request project unit was discovered. Ensure the " +
-                    $"request implements a supported {nameof(IResultRequest)} contract and is included in the host's " +
+                    $"request implements a supported {nameof(IResultRequest)} or IRequest<TResponse> contract and is included in the host's " +
                     "business-type discovery.";
                 Alerts.Add(new ProjectUnitAlert
                 {

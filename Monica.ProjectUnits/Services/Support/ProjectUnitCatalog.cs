@@ -17,7 +17,7 @@ namespace Monica.ProjectUnits.Services.Support;
 internal sealed class ProjectUnitCatalog : IProjectUnitCatalog, IRequestFilter
 {
     private readonly Dictionary<string, ProjectUnit> _unitsByFullName = [];
-    private readonly Dictionary<string, ProjectUnit> _unitsByName = [];
+    private readonly Dictionary<string, ProjectUnit?> _unitsByName = [];
     private readonly Dictionary<string, Type> _enumTypes = [];
     private readonly ConcurrentDictionary<string, byte> _disabledRequestUrls = new(StringComparer.Ordinal);
     private readonly ProjectUnitFactory _unitFactory;
@@ -75,10 +75,32 @@ internal sealed class ProjectUnitCatalog : IProjectUnitCatalog, IRequestFilter
     /// </summary>
     internal void Discover(IEnumerable<BusinessTypeShape> shapes)
     {
-        foreach (var shape in shapes)
+        var shapesByType = shapes.DistinctBy(static shape => shape.Type)
+            .ToDictionary(static shape => shape.Type);
+        foreach (var shape in shapesByType.Values)
         {
             DiscoverProjectUnit(shape);
             DiscoverEnum(shape.Type);
+        }
+
+        // Assembly scans contain generic definitions, while handler contracts name closed payloads. Materialize
+        // only constructions of definitions already in this host's discovery scope; excluded contracts stay absent.
+        var referencedTypes = _unitsByFullName.Values.Select(static unit => unit switch
+        {
+            UnitDomainEventHandler handler => handler.EventType,
+            UnitLocalEventHandler handler => handler.EventType,
+            UnitApplicationService service => service.RequestType,
+            _ => null
+        }).OfType<Type>().Distinct().ToArray();
+        foreach (var type in referencedTypes)
+        {
+            if (type.IsConstructedGenericType
+                && !type.ContainsGenericParameters
+                && !_unitsByFullName.ContainsKey(type.FullName!)
+                && shapesByType.TryGetValue(type.GetGenericTypeDefinition(), out var definition))
+            {
+                DiscoverProjectUnit(definition.MakeGenericType(type.GetGenericArguments()));
+            }
         }
     }
 
@@ -203,11 +225,8 @@ internal sealed class ProjectUnitCatalog : IProjectUnitCatalog, IRequestFilter
 
         if (!_unitsByName.TryAdd(unit.Type.Name, unit))
         {
-            Logger.LogError(
-                "Duplicate project-unit name {UnitName}: {NewUnitType} conflicts with {ExistingUnitType}.",
-                unit.Type.Name,
-                unit.Key,
-                _unitsByName[unit.Type.Name].Type.FullName);
+            // Equal short names are valid across domains. Never let a legacy alias select an arbitrary owner.
+            _unitsByName[unit.Type.Name] = null;
         }
     }
 

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monica.Configuration.Annotations;
 using Monica.Core.TypeDiscovery.Models;
+using Monica.Core.Mediator;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Events;
 using Monica.Framework.Seeder.Abstractions;
@@ -117,7 +118,7 @@ internal sealed class ProjectUnitFactory(ProjectUnitCatalog catalog)
             return UnitHostedService.Create(shape, catalog);
         }
 
-        return shape.IsAssignableTo(typeof(IResultRequestBase))
+        return shape.IsAssignableTo(typeof(IResultRequestBase)) || FindInterface(shape, typeof(IRequest<>)) is not null
             ? UnitRequestDto.Create(shape, catalog)
             : null;
     }
@@ -126,7 +127,7 @@ internal sealed class ProjectUnitFactory(ProjectUnitCatalog catalog)
     {
         return shape.IsConcreteClass
                && shape.Type.FullName is not null
-               && !shape.Type.IsGenericType;
+               && shape.IsClosedType;
     }
 
     private static OpenGenericInterfaceMatch? FindInterface(

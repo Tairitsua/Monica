@@ -98,7 +98,7 @@ public sealed class ProjectUnitsFacade(
     /// </summary>
     /// <param name="eventKey">
     /// The exact full CLR identity supplied by <see cref="ProjectUnitDomainEventInfo.EventKey"/>.
-    /// Legacy short type names remain supported using the catalog's first matching name.
+    /// Legacy short type names remain supported only when they identify exactly one catalog unit.
     /// </param>
     /// <param name="eventContent">The JSON payload to deserialize as the selected event type.</param>
     /// <returns>A result envelope describing whether the event was published.</returns>

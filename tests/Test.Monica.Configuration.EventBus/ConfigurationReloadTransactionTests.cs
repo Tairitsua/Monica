@@ -19,6 +19,7 @@ using Monica.EventBus.Models;
 using Monica.EventBus.Services;
 using Monica.EventBus.Services.Support;
 using Monica.Modules;
+using Monica.ProjectUnits.Abstractions;
 using Monica.Repository.Persistence.Models;
 using Monica.Repository.Persistence.Services;
 using Monica.Repository.UnitOfWork.Abstractions;
@@ -54,6 +55,8 @@ public sealed class ConfigurationReloadTransactionTests
             Assert.Equal(EventSubscriptionState.Active, subscription.State);
             Assert.False(subscription.IsAutoDiscovered);
             Assert.NotNull(subscription.HandlerType);
+            Assert.Null(application.Services.GetRequiredService<IProjectUnitCatalog>()
+                .FindByFullName(subscription.HandlerType!.FullName));
             Assert.False(application.Services.GetRequiredService<IServiceProviderIsService>()
                 .IsService(subscription.HandlerType!));
             var recorder = application.Services.GetRequiredService<ReloadRecorder>();
@@ -142,6 +145,7 @@ public sealed class ConfigurationReloadTransactionTests
                             services.GetRequiredService<IEventMessageFactory>(), services, SERVICE_KEY));
                 }
             });
+            monica.AddProjectUnits();
             monica.AddRepository()
                 .AddRepositoryDbContext<FirstWriteContext>((_, options) => options.UseSqlite("Data Source=:memory:"))
                 .AddRepositoryDbContext<SecondWriteContext>((_, options) => options.UseSqlite("Data Source=:memory:"));

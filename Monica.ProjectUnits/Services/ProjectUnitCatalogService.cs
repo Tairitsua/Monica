@@ -42,7 +42,9 @@ internal sealed class ProjectUnitCatalogService(
         if ((catalog.FindByFullName<UnitDomainEvent>(eventKey)
              ?? catalog.FindByName<UnitDomainEvent>(eventKey)) is not { } unitEvent)
         {
-            throw new KeyNotFoundException($"Project-unit metadata for domain event '{eventKey}' was not found.");
+            throw new KeyNotFoundException(
+                $"Project-unit metadata for domain event '{eventKey}' was not found or its short name is ambiguous. " +
+                "Use the exact full CLR event key from the domain-event catalog.");
         }
 
         var json = eventContent.ToString();

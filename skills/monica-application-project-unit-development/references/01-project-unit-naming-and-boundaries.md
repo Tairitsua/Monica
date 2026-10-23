@@ -101,7 +101,7 @@ Use one domain-core/role layout in combined and split deployments. Keep leaf fol
 | Pure helper | The owning core or role's `Utilities/` |
 | Real migrations and snapshots | Top-level `Migrations/Migrations.Domain{Domain}/` |
 
-Application EventBus contracts, including shared technical envelopes, use `Event*` names and inherit `Monica.EventBus.Events.DomainEvent`. Place them in the owning published language's `Events/` folder, separate from domain implementation and persistence entities. Generic synchronization envelopes belong to the solution's shared system published language; business-specific facts belong to their business subdomain. Open generic contract types are excluded from ProjectUnit discovery.
+Application EventBus contracts, including shared technical envelopes, use `Event*` names and inherit `Monica.EventBus.Events.DomainEvent`. Place them in the owning published language's `Events/` folder, separate from domain implementation and persistence entities. Generic synchronization envelopes belong to the solution's shared system published language; business-specific facts belong to their business subdomain. Open generic contract types are excluded from ProjectUnit discovery; closed payloads referenced by discovered handlers become separate units when their generic definition is in the host's discovery scope. Include the contract assembly as well as the handler assembly.
 
 Use an unversioned CLR name for the initial event contract. Add a version suffix only when introducing an incompatible contract revision; delivery configuration or relocation alone does not require one.
 
