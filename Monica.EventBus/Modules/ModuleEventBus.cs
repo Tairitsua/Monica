@@ -59,7 +59,10 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
             services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(EventBusAutoDiscoveryLifecycle)),
             typeof(EventBusAutoDiscoveryLifecycle));
         context.Composition.OnServicesFinalized(static _ => { }, descriptors =>
-            _autoDiscovery.CaptureRegistrationOwners(descriptors, context.Composition.GetServiceRegistrationOwner));
+        {
+            if (!Option.DisableAutoDiscovery) _autoDiscovery.CollectRegisteredHandlers(descriptors);
+            _autoDiscovery.CaptureRegistrationOwners(descriptors, context.Composition.GetServiceRegistrationOwner);
+        });
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -211,6 +214,8 @@ public class ModuleEventBusOption : ModuleOptions<ModuleEventBus>
     /// not require the inspector. Construction and asynchronous scope disposal occur during delivery.
     /// Distributed handlers retain the application registration owner captured from their finalized service
     /// descriptors. Conflicting owners, including mixed owned and unowned registrations, stop composition.
+    /// Concrete closed generic handler types explicitly exposed in DI participate in the same discovery;
+    /// open generic templates and interface-only registrations do not identify a concrete subscription.
     /// </remarks>
     public bool DisableAutoDiscovery { get; set; }
 }

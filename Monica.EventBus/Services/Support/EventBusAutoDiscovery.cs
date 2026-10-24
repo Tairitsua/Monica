@@ -9,7 +9,17 @@ namespace Monica.EventBus.Services.Support;
 internal sealed class EventBusAutoDiscovery
 {
     private readonly List<EventHandlerRegistration> _registrations = [];
+    private readonly HashSet<Type> _collectedTypes = [];
     private readonly Dictionary<Type, Type?> _registrationOwners = [];
+
+    internal void CollectRegisteredHandlers(IReadOnlyList<ServiceDescriptor> descriptors)
+    {
+        // Assembly scanning contains generic templates, not the concrete closures selected by composition.
+        // Inspect exposed concrete service types only; do not construct factories or infer interface targets.
+        foreach (var type in descriptors.Where(descriptor => !descriptor.IsKeyedService)
+                     .Select(descriptor => descriptor.ServiceType).Where(type => type.IsConstructedGenericType).Distinct())
+            Collect(type);
+    }
 
     internal void CaptureRegistrationOwners(IReadOnlyList<ServiceDescriptor> descriptors,
         Func<ServiceDescriptor, Type?> getOwner)
@@ -28,7 +38,8 @@ internal sealed class EventBusAutoDiscovery
 
     public void Collect(Type type)
     {
-        if (type is not { IsClass: true, IsAbstract: false } || !typeof(IEventHandler).IsAssignableFrom(type))
+        if (type is not { IsClass: true, IsAbstract: false } || type.ContainsGenericParameters
+            || !typeof(IEventHandler).IsAssignableFrom(type) || !_collectedTypes.Add(type))
         {
             return;
         }

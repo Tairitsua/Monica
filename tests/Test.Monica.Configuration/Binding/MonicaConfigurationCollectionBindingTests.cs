@@ -2,11 +2,12 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Monica.Configuration.Annotations;
 using Monica.Configuration.Binding;
 using Monica.Configuration.Bootstrap;
+using Monica.Configuration.Models;
+using Monica.Core.Modularity.Extensions;
 using Xunit;
 
 namespace Test.Monica.Configuration.Binding;
@@ -14,67 +15,67 @@ namespace Test.Monica.Configuration.Binding;
 public class MonicaConfigurationCollectionBindingTests
 {
     [Fact]
-    public void BootstrapBinding_WhenConfiguredListHasDefaults_ShouldReplaceDefaultItems()
+    public void StartupBinding_WhenConfiguredListHasDefaults_ShouldReplaceDefaultItems()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Bootstrap:Items:0"] = "configured"
         });
 
-        var options = configuration.GetMonicaBootstrapConfiguration<BootstrapListOptions>(NullLogger.Instance);
+        var options = ReadStartupOptions<BootstrapListOptions>(configuration);
 
         options.Items.Should().Equal("configured");
     }
 
     [Fact]
-    public void BootstrapBinding_WhenListSectionIsMissing_ShouldPreserveDefaultItems()
+    public void StartupBinding_WhenListSectionIsMissing_ShouldPreserveDefaultItems()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["MissingList:Name"] = "configured"
         });
 
-        var options = configuration.GetMonicaBootstrapConfiguration<MissingListOptions>(NullLogger.Instance);
+        var options = ReadStartupOptions<MissingListOptions>(configuration);
 
         options.Items.Should().Equal("default");
     }
 
     [Fact]
-    public void BootstrapBinding_WhenNestedListHasDefaults_ShouldReplaceNestedDefaultItems()
+    public void StartupBinding_WhenNestedListHasDefaults_ShouldReplaceNestedDefaultItems()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Nested:Nested:Items:0"] = "configured"
         });
 
-        var options = configuration.GetMonicaBootstrapConfiguration<NestedCollectionOptions>(NullLogger.Instance);
+        var options = ReadStartupOptions<NestedCollectionOptions>(configuration);
 
         options.Nested.Items.Should().Equal("configured");
     }
 
     [Fact]
-    public void BootstrapBinding_WhenConfiguredDictionaryHasDefaults_ShouldReplaceDefaultEntries()
+    public void StartupBinding_WhenConfiguredDictionaryHasDefaults_ShouldReplaceDefaultEntries()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Dictionary:Map:configured"] = "value"
         });
 
-        var options = configuration.GetMonicaBootstrapConfiguration<DictionaryOptions>(NullLogger.Instance);
+        var options = ReadStartupOptions<DictionaryOptions>(configuration);
 
         options.Map.Should().ContainSingle()
             .Which.Should().Be(new KeyValuePair<string, string>("configured", "value"));
     }
 
     [Fact]
-    public void BootstrapBinding_WhenCollectionUsesConfigurationKeyName_ShouldReplaceDefaultItems()
+    public void StartupBinding_WhenCollectionUsesConfigurationKeyName_ShouldReplaceDefaultItems()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Alias:ConfiguredItems:0"] = "configured"
         });
 
-        var options = configuration.GetMonicaBootstrapConfiguration<AliasOptions>(NullLogger.Instance);
+        var options = ReadStartupOptions<AliasOptions>(configuration);
 
         options.Items.Should().Equal("configured");
     }
@@ -118,6 +119,21 @@ public class MonicaConfigurationCollectionBindingTests
         monitor.CurrentValue.Items.Should().Equal("updated");
     }
 
+    private static TOptions ReadStartupOptions<TOptions>(IConfiguration configuration) where TOptions : class, new()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddConfiguration(configuration);
+        TOptions? actual = null;
+        builder.AddMonica(monica =>
+        {
+            monica.ConfigureTypeDiscovery(options => options.ExcludeDefault());
+            actual = monica.GetStartupOptions<TOptions>();
+        });
+        using var host = builder.Build();
+        host.Services.GetRequiredService<IOptions<TOptions>>().Value.Should().BeSameAs(actual);
+        return actual!;
+    }
+
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
     {
         return new ConfigurationBuilder()
@@ -125,13 +141,13 @@ public class MonicaConfigurationCollectionBindingTests
             .Build();
     }
 
-    [Configuration("Bootstrap")]
+    [Configuration("Bootstrap", Kind = ConfigurationKind.Startup)]
     private sealed class BootstrapListOptions
     {
         public List<string> Items { get; set; } = ["default"];
     }
 
-    [Configuration("MissingList")]
+    [Configuration("MissingList", Kind = ConfigurationKind.Startup)]
     private sealed class MissingListOptions
     {
         public string? Name { get; set; }
@@ -139,7 +155,7 @@ public class MonicaConfigurationCollectionBindingTests
         public List<string> Items { get; set; } = ["default"];
     }
 
-    [Configuration("Nested")]
+    [Configuration("Nested", Kind = ConfigurationKind.Startup)]
     private sealed class NestedCollectionOptions
     {
         public NestedOptions Nested { get; set; } = new();
@@ -150,7 +166,7 @@ public class MonicaConfigurationCollectionBindingTests
         public List<string> Items { get; set; } = ["default"];
     }
 
-    [Configuration("Dictionary")]
+    [Configuration("Dictionary", Kind = ConfigurationKind.Startup)]
     private sealed class DictionaryOptions
     {
         public Dictionary<string, string> Map { get; set; } = new(StringComparer.OrdinalIgnoreCase)
@@ -159,7 +175,7 @@ public class MonicaConfigurationCollectionBindingTests
         };
     }
 
-    [Configuration("Alias")]
+    [Configuration("Alias", Kind = ConfigurationKind.Startup)]
     private sealed class AliasOptions
     {
         [ConfigurationKeyName("ConfiguredItems")]

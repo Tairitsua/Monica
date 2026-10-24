@@ -6,6 +6,8 @@ For application EventBus contracts and consumers, including outbox or inbox refa
 
 Automatic subscriptions include only concrete handler types registered in the host container. When automatic handlers are discovered, the container must expose `IServiceProviderIsService`, as Microsoft DI does, so discovery can inspect registrations without constructing handlers. Disabled or empty discovery does not require this inspector; a discovered automatic handler without it causes a clear startup error. Each delivery activates its handler in a fresh asynchronously disposed DI scope; constructor failures remain delivery failures rather than removing the subscription during discovery.
 
+Composition may expose a concrete closed generic handler, such as `services.AddScoped<ForwardingHandler<OrderApproved>>()`. The finalized DI descriptor participates in the same native discovery, registration ownership, activation and scoped delivery as assembly-discovered handlers. Open generic templates and interface-only registrations do not identify a concrete subscription. Factories are not invoked to infer a handler type; `DisableAutoDiscovery` also disables this descriptor-based discovery. Do not add an application-owned subscription bootstrap service just to close a generic adapter.
+
 EventBus execution defaults to an automatic UnitOfWork when that behavior is registered. Put any `ExecutionTransactionAttribute` override or context selection on the concrete `HandleEventAsync` method, following the persistence [transaction contract](../../monica-infra-persistence/references/transactions.md).
 
 For example, a discovered handler for `OrderApproved` uses the exact event type named by the publisher:
