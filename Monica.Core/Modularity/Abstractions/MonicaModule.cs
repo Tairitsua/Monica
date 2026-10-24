@@ -36,7 +36,7 @@ public abstract class MonicaModule : IModule
 
     /// <summary>
     /// Declares intrinsic hard dependencies and optional ordering relationships.
-    /// This callback executes once before any option is materialized.
+    /// This callback executes once before this module's options are materialized.
     /// </summary>
     /// <param name="module">The declaration surface for the current module.</param>
     public virtual void Describe(ModuleDescriptor module)

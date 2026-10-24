@@ -16,10 +16,30 @@ public sealed class MonicaCompositionState
     private readonly Dictionary<Type, object> _states = [];
     private readonly HashSet<Type> _creatingStates = [];
     private readonly List<ServiceFinalization> _finalizers = [];
+    private readonly Dictionary<int, Type?> _registrationOwners = [];
+    private readonly Dictionary<ServiceDescriptor, Type?> _serviceOwners = new(ReferenceEqualityComparer.Instance);
     private readonly EnvironmentFileConfiguration _environmentFiles = new();
     private bool _servicesFinalized;
     private bool _finalizingServices;
     private ConfigurationSnapshot? _startup;
+    private IServiceCollection? _services;
+    private IList<IConfigurationSource>? _sources;
+    private bool _applicationRegistrationsOpen;
+    private bool _runningApplicationRegistration;
+    private int _applicationRegistrationThread;
+
+    /// <summary>Gets the declaring application type for the current framework contribution, or null for unowned composition.</summary>
+    /// <remarks>
+    /// Framework registration APIs capture this origin per resource or deferred contribution. It is host-owned and
+    /// restored explicitly for synchronous callbacks; it must not become a shared module's single owner.
+    /// </remarks>
+    public Type? RegistrationOwner
+    {
+        get
+        {
+            lock (_gate) return _registrationOwners.GetValueOrDefault(Environment.CurrentManagedThreadId);
+        }
+    }
 
     internal MonicaCompositionState(IConfiguration configuration) => LiveConfiguration = configuration;
 
@@ -37,12 +57,98 @@ public sealed class MonicaCompositionState
 
     internal void Initialize(IHostApplicationBuilder builder, Action<string> reportError)
     {
+        _services = builder.Services;
+        _sources = builder.Configuration.Sources;
         if (builder.Configuration is not IConfigurationRoot root)
             throw new InvalidOperationException("Monica startup inputs require a host configuration manager exposing IConfigurationRoot provider provenance.");
         ShapeAwareJsonConfigurationExtensions.PreserveJsonShapes(builder.Configuration);
         _environmentFiles.Load(builder, () => HasMutatedHost = true, reportError);
         _environmentFiles.CaptureOrigins(root);
         _startup = ConfigurationSnapshot.Capture(root);
+    }
+
+    /// <summary>Executes one domain or role registration with its declaring type as the contribution owner.</summary>
+    /// <remarks>
+    /// Only the application authority may call this during its pre-seal registration pass. The callback is
+    /// synchronous, cannot recursively run another owner, and cannot change configuration source selection.
+    /// Service descriptors and deferred framework contributions retain this origin without resolving factories.
+    /// </remarks>
+    public void RunRegistration(Type owner, Action callback)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(callback);
+        lock (_gate)
+        {
+            if (!_applicationRegistrationsOpen || _runningApplicationRegistration
+                || _applicationRegistrationThread != Environment.CurrentManagedThreadId)
+                throw new InvalidOperationException("Owned registration is valid only in the application's single, nonrecursive registration pass.");
+            _runningApplicationRegistration = true;
+        }
+        try { RunOwned(owner, callback); }
+        finally
+        {
+            lock (_gate) _runningApplicationRegistration = false;
+        }
+    }
+
+    internal void RegisterApplication(Action callback)
+    {
+        var sources = CaptureSourceSelection();
+        lock (_gate)
+        {
+            if (_applicationRegistrationsOpen)
+                throw new InvalidOperationException("Application registration cannot execute recursively.");
+            _applicationRegistrationsOpen = true;
+            _applicationRegistrationThread = Environment.CurrentManagedThreadId;
+        }
+        try
+        {
+            callback();
+            if (!sources.SequenceEqual(CaptureSourceSelection()))
+                throw new InvalidOperationException("Application registrations cannot change frozen configuration source selection.");
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _applicationRegistrationsOpen = false;
+                _applicationRegistrationThread = 0;
+            }
+        }
+    }
+
+    private SourceSelection[] CaptureSourceSelection() => _sources?.Select(source => new SourceSelection(source,
+        (source as FileConfigurationSource)?.Path, (source as FileConfigurationSource)?.FileProvider)).ToArray() ?? [];
+
+    internal void RunOwned(Type? owner, Action callback, bool captureServices = true)
+    {
+        var thread = Environment.CurrentManagedThreadId;
+        Type? previous;
+        bool hadPrevious;
+        lock (_gate)
+        {
+            hadPrevious = _registrationOwners.TryGetValue(thread, out previous);
+            _registrationOwners[thread] = owner;
+        }
+        var services = captureServices ? _services : null;
+        var before = services is null ? null : new HashSet<ServiceDescriptor>(services, ReferenceEqualityComparer.Instance);
+        try { callback(); }
+        finally
+        {
+            lock (_gate)
+            {
+                if (before is not null)
+                    foreach (var descriptor in services!)
+                        if (!before.Contains(descriptor)) _serviceOwners.TryAdd(descriptor, owner);
+                if (hadPrevious) _registrationOwners[thread] = previous;
+                else _registrationOwners.Remove(thread);
+            }
+        }
+    }
+
+    internal Type? GetServiceRegistrationOwner(ServiceDescriptor descriptor)
+    {
+        lock (_gate) return _serviceOwners.GetValueOrDefault(descriptor);
     }
 
     /// <summary>Returns the one framework state of this type, creating it once for this host.</summary>
@@ -86,7 +192,7 @@ public sealed class MonicaCompositionState
         lock (_gate)
         {
             EnsureOpen();
-            _finalizers.Add(new ServiceFinalization(complete, validate));
+            _finalizers.Add(new ServiceFinalization(complete, validate, RegistrationOwner));
         }
     }
 
@@ -107,7 +213,7 @@ public sealed class MonicaCompositionState
         }
     }
 
-    internal void FinalizeServices(IServiceCollection services)
+    internal void FinalizeServices(IServiceCollection services, Action applyActivation)
     {
         ServiceFinalization[] callbacks;
         lock (_gate)
@@ -119,9 +225,11 @@ public sealed class MonicaCompositionState
         }
         try
         {
-            foreach (var callback in callbacks) callback.Complete(services);
+            foreach (var callback in callbacks) RunOwned(callback.Owner, () => callback.Complete(services));
+            applyActivation();
             var descriptors = Array.AsReadOnly(services.ToArray());
-            foreach (var callback in callbacks) callback.Validate?.Invoke(descriptors);
+            foreach (var callback in callbacks)
+                if (callback.Validate is { } validate) RunOwned(callback.Owner, () => validate(descriptors), captureServices: false);
         }
         finally
         {
@@ -140,5 +248,8 @@ public sealed class MonicaCompositionState
     }
 
     private sealed record ServiceFinalization(Action<IServiceCollection> Complete,
-        Action<IReadOnlyList<ServiceDescriptor>>? Validate);
+        Action<IReadOnlyList<ServiceDescriptor>>? Validate, Type? Owner);
+
+    private sealed record SourceSelection(IConfigurationSource Source, string? Path,
+        Microsoft.Extensions.FileProviders.IFileProvider? FileProvider);
 }

@@ -22,6 +22,8 @@ The existing product domain enum remains authoritative. Configure its display me
 
 These attributes are in `Monica.ApplicationModel.Annotations`. Domain values normalize to the named enum member or exact string. Identifiers are ordinal; dots do not imply role inheritance. No public marker type or repeated handler-assembly list is required. The protocol project owns published API interfaces; each host emits an `IApplicationManifest`, caller implementations and its local receivers. Actual local annotated implementation assemblies must remain in Monica's discovery inventory. Remote ownership metadata does not require loading those implementations. Startup rejects duplicate ownership, invalid local handlers, incomplete placement and selection of a role the current artifact does not contain.
 
+Domain and role IDs must also remain distinct under case-insensitive configuration lookup. Exact role matching still applies: `ordering` does not select `ordering.reporting`, and `Ordering` does not match `ordering`.
+
 The host generator validates known published operations against the shared catalog and local implementation inventory. A missing implementation for a locally included role, or multiple local handlers including a conflicting plain `IRequestHandler`, fails generation. A plain internal mediator request does not become a generated application API. These compile-time checks keep the manifest's operation owner aligned with the actual executor.
 
 `WorkloadOwner` is an optional named argument on `ApplicationRole`. It defaults to the role ID and remains independent of AppId. Use an explicit value only to preserve an existing durable scheduler namespace, such as an old executable project name. Different roles cannot share that namespace: their snapshots would retire each other's jobs. Moving a role between deployments does not rename its job keys or owner.
@@ -42,7 +44,7 @@ Design-time builds supply the same metadata inputs to the IDE from existing prod
 
 `IApplicationManifest.LocalAssemblies` identifies the annotated implementation assemblies actually included in that executable. Its logical `Domains`, `Roles` and published `Operations` may also describe remote implementations from the catalog. Every listed local assembly must be present in discovery; omitting an implementation from discovery is not a way to declare it remote. Each host adds its local private operations to this manifest.
 
-Build-only input projects may still be restored and built. They must not become compiler or runtime references of the catalog or copy native assets into a host that omits them. Check the normal host's publish output and `.deps.json` when separating OCR/GPU dependencies. Do not solve missing metadata by restoring a runtime reference to the heavy role. Native hosting, provider defaults and role-specific imperative registration remain owned by the concrete host composition.
+Build-only input projects may still be restored and built. They must not become compiler or runtime references of the catalog or copy native assets into a host that omits them. Check the normal host's publish output and `.deps.json` when separating OCR/GPU dependencies. Do not solve missing metadata by restoring a runtime reference to the heavy role. Host-wide middleware and product provider defaults remain in the host; included implementations declare their own registrations through the assembly attributes below.
 
 ## Compiled API dependency evidence
 
@@ -54,32 +56,68 @@ Coverage is deliberately limited to direct calls resolved by the compiler in ann
 
 ## Compose placement
 
-```csharp
-var deployments = new Dictionary<string, ApplicationPlacement>
-{
-    ["orders-api"] = new() { Roles = ["ordering"] },
-    ["orders-reports"] = new() { Roles = ["ordering.reporting"] }
-};
-var placement = ApplicationDeployment.Create(appId, deployments);
+Supply one complete application map in startup configuration:
 
-if (placement.IsRoleActive("ordering.reporting"))
+```json
 {
-    // Register this role's imperative integration or factory-owned background service before AddMonica.
+  "Application": {
+    "AppId": "orders-api",
+    "Deployments": {
+      "orders-api": { "AppName": "Order API", "Roles": ["ordering"] },
+      "orders-reports": { "AppName": "Order reports", "Roles": ["ordering.reporting"] },
+      "orders-tools": { "Roles": [] }
+    }
+  }
 }
+```
 
+```csharp
 builder.AddMonica(monica =>
 {
-    monica.ConfigureApplication(options => options.AppId = appId);
-    monica.AddApplicationModel(options => options.Deployments = deployments);
+    monica.AddApplicationModel();
     monica.AddApplication();
     monica.AddApplicationInvocation();
     // Configure the API HTTP provider for omitted implementations or remote role/authority destinations.
 });
 ```
 
-Import `Monica.ApplicationModel.Models` and `Monica.Modules`. The same configuration supplies early imperative selection and the registered model; do not maintain a second current-role list. Every known product role has exactly one logical owning AppId in the deployment scope; every role assigned to the current AppId must have a local implementation in this artifact. The current AppId must have an entry, which may select no roles. Replicas share the same AppId and selected roles. A combined deployment places several included roles in one entry; there is no synthetic `all` role. A normal artifact can run under several AppIds, and a justified specialized host can omit other implementations. Project references select available code; deployment values select active roles and workload images. Configuration cannot activate an omitted implementation. Configuration is copied and frozen before discovery commits; changing placement requires restarting the host.
+Import `Monica.Modules`. `Application:Deployments` selects the highest-priority provider that supplies this structural value and reads that provider alone. Entries and indexed role arrays never merge with lower providers. Explicit null, an empty map, or an incomplete higher-priority map does not request fallback. An entry must explicitly supply `Roles`; `[]` is valid. Unknown fields, roles, missing owners, duplicate assignments, and case-ambiguous AppIds or role IDs fail composition. AppName defaults to the map key when omitted. The selected entry supplies Core identity and service discovery; a contradictory direct AppName fails.
+
+For code-defined topology, assign `ModuleApplicationModelOption.Deployments` using `ApplicationPlacement` from `Monica.ApplicationModel.Models`. Its null default selects configuration; even an explicitly empty code map conflicts with a configured map. Use one authority. `ApplicationDeployment.Create` remains available for standalone validation, but host composition prepares and publishes its own single immutable snapshot. `IApplicationModel.Deployment` and the DI-registered `ApplicationDeployment` are that same instance; `Deployments` includes all entries with copied, read-only role lists, while `RoleApplications` is the derived reverse index.
+
+Every known product role has exactly one logical owning AppId in the deployment scope; every role assigned to the current AppId must have a local implementation in this artifact. The current AppId must have an entry, which may select no roles. Replicas share the same AppId and selected roles. A combined deployment places several included roles in one entry; there is no synthetic `all` role. A normal artifact can run under several AppIds, and a justified specialized host can omit other implementations. Project references select available code; deployment values select active roles and workload images. Configuration cannot activate an omitted implementation. Changing the map or its input collections after preparation cannot change the running model; restart to select a new topology.
 
 `ManifestType` on `ModuleApplicationModelOption` overrides generated-provider discovery for an explicitly supplied compiled manifest. Its concrete type must implement `IApplicationManifest` and have a parameterless constructor. It is instantiated once during composition, not resolved from a temporary service provider. It does not infer missing ownership, install implementation code or bypass catalog/local-inventory validation. Prefer the generated catalog and host manifest for selective artifacts.
+
+## Register included implementations
+
+Name an optional registration type on the owning assembly attribute:
+
+```csharp
+[assembly: ApplicationRole("ordering.reporting", ProductDomain.Ordering,
+    Registration = typeof(ReportingRegistration))]
+
+public sealed class ReportingRegistration : ApplicationRegistration
+{
+    public override void ConfigurePassive(ApplicationRegistrationContext context)
+    {
+        context.Services.AddScoped<ReportReader>();
+    }
+
+    public override void ConfigureActive(ApplicationRegistrationContext context)
+    {
+        context.Monica.AddJobScheduler().UseInMemoryStore();
+    }
+}
+```
+
+`ApplicationRegistration` and `ApplicationRegistrationContext` are in `Monica.ApplicationModel.Abstractions`. The type must belong to the declaring assembly, be concrete and closed, derive from `ApplicationRegistration`, and expose a public parameterless constructor. A role without explicit registration needs no placeholder class. Remote catalog entries contain ownership metadata and never execute registration code.
+
+For a domain core, use `ApplicationDomain(..., BackgroundRole = "ordering.reporting", Registration = typeof(OrderingRegistration))` when it has an active registration. BackgroundRole must name a declared role in the same domain. Overriding `ConfigureActive` without it fails because the callback has no execution owner. A passive-only registration needs no BackgroundRole. This does not suppress passive business behavior. Resource-specific ownership validation remains the responsibility of the framework integration that admits each autonomous resource.
+
+`AddApplicationModel` records intent. After the host's AddMonica callback, Core discovers the initial dependency graph and finalizes ApplicationModel options once, retaining normal dependency-default-before-host precedence. ApplicationModel validates and freezes its inventory and topology and projects identity. Core then freezes identity and discovery. All included registrations run `ConfigurePassive`, followed by selected registrations' `ConfigureActive`, sorted deterministically by owner ID. Each registration is constructed once and receives both callbacks on that same instance when active. Newly declared modules enter the normal lifecycle afterward.
+
+The context exposes `Monica`, `Services`, frozen `Configuration`, `Environment`, `IsActive`, and `IsAutonomous`. The `GetStartupOptions<T>()` extension from `Monica.Configuration.Bootstrap` also accepts this context without making ApplicationModel depend on Configuration. Callbacks register descriptors and modules; they must not resolve services, open connections, start tasks, or rely on another owner's callback order. They cannot change identity, topology, discovery, configuration-source selection, or recursively run another owner's registration. Deferred module contributions and service descriptors retain their declaring registration owner.
 
 ## Activation boundaries
 
@@ -93,7 +131,7 @@ Import `Monica.ApplicationModel.Models` and `Monica.Modules`. The same configura
 | Job definitions, recurring materialization, triggered admission, worker claims | Selected role only, grouped by stable workload owner |
 | Concrete `IHostedService` registrations | Inactive role implementations are removed before composition completes |
 | Startup seeders | Selected role only; a selected seeder's inactive prerequisite fails dependency validation |
-| Opaque hosted-service factories, DataChannel setup, hubs, actor runtime integrations | Gate their explicit registration using the startup placement |
+| Opaque hosted-service factories, DataChannel setup, hubs, actor runtime integrations | Declare selected integrations in their owner's `ConfigureActive` callback |
 | Generated HTTP receivers | Selected per operation, including mixed-role interfaces/controllers |
 
 Multiple selected DataChannel setup contributors run before materialization. Each setup type is registered once, and channel IDs must remain unique. A selected role with no remaining jobs publishes an empty owner snapshot to retire removed definitions; an inactive role never retires another deployment's jobs.

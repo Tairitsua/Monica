@@ -8,6 +8,8 @@ public interface IApplicationModel
 {
     /// <summary>Gets the current application's identity, shared by its replicas.</summary>
     string AppId { get; }
+    /// <summary>Gets the complete immutable deployment map and canonical identity used by this host.</summary>
+    ApplicationDeployment Deployment { get; }
     /// <summary>Gets all declared domains.</summary>
     IReadOnlyDictionary<string, ApplicationDomainDefinition> Domains { get; }
     /// <summary>Gets all declared roles.</summary>

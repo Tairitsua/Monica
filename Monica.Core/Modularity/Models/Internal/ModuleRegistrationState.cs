@@ -11,7 +11,7 @@ namespace Monica.Core.Modularity.Models.Internal;
 internal sealed class ModuleRegistrationState
 {
     private readonly List<OptionContribution> _optionContributions = [];
-    private readonly Dictionary<string, List<Action<object>>> _profileContributions =
+    private readonly Dictionary<string, List<OwnedOptionContribution>> _profileContributions =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, object> _profiles = new(StringComparer.Ordinal);
     private readonly HashSet<string> _requiredFeatures = new(StringComparer.Ordinal);
@@ -23,6 +23,7 @@ internal sealed class ModuleRegistrationState
     private IModuleOptions? _moduleOption;
     private long _requestOrdinal;
     private Func<object>? _optionFactory;
+    private bool _finalizingOptions;
 
     internal ModuleRegistrationState(MonicaApplication application, Type moduleType)
     {
@@ -123,7 +124,7 @@ internal sealed class ModuleRegistrationState
         _optionFactory = static () => new TOptions();
     }
 
-    internal void AddOptionContribution<TOptions>(Type? configuredBy, Action<TOptions> configure)
+    internal void AddOptionContribution<TOptions>(Type? configuredBy, Action<TOptions> configure, Type? owner = null)
         where TOptions : class, IModuleOptions, new()
     {
         ArgumentNullException.ThrowIfNull(configure);
@@ -131,10 +132,10 @@ internal sealed class ModuleRegistrationState
         _optionContributions.Add(new OptionContribution(
             IsHostContribution: configuredBy is null,
             Ordinal: _optionContributions.Count,
-            Apply: option => configure((TOptions)option)));
+            Apply: option => configure((TOptions)option), Owner: owner));
     }
 
-    internal void AddProfileContribution<TOptions>(string name, Action<TOptions> configure)
+    internal void AddProfileContribution<TOptions>(string name, Action<TOptions> configure, Type? owner)
         where TOptions : class, IModuleOptions, new()
     {
         EnsureNotFinalized();
@@ -144,7 +145,7 @@ internal sealed class ModuleRegistrationState
             _profileContributions.Add(name, contributions);
         }
 
-        contributions.Add(option => configure((TOptions)option));
+        contributions.Add(new OwnedOptionContribution(option => configure((TOptions)option), owner));
     }
 
     internal TOptions GetProfile<TOptions>(string name)
@@ -264,17 +265,18 @@ internal sealed class ModuleRegistrationState
             throw new InvalidOperationException($"Module {ModuleType.Name} has no option factory.");
         }
 
-        if (IsFinalized)
+        if (IsFinalized || _finalizingOptions)
         {
             throw new InvalidOperationException($"Module {ModuleType.Name} was already finalized.");
         }
 
+        _finalizingOptions = true;
         var option = CreateBoundOption();
         foreach (var contribution in _optionContributions
                      .OrderBy(static contribution => contribution.IsHostContribution)
                      .ThenBy(static contribution => contribution.Ordinal))
         {
-            contribution.Apply(option);
+            Application.Composition.RunOwned(contribution.Owner, () => contribution.Apply(option));
         }
 
         _moduleOption = (IModuleOptions)option;
@@ -283,7 +285,7 @@ internal sealed class ModuleRegistrationState
             var profile = CreateBoundOption();
             foreach (var contribution in contributions)
             {
-                contribution(profile);
+                Application.Composition.RunOwned(contribution.Owner, () => contribution.Apply(profile));
             }
 
             _profiles.Add(name, profile);
@@ -297,6 +299,7 @@ internal sealed class ModuleRegistrationState
         }
 
         ModuleSingleton.AttachLifecycle(this);
+        _finalizingOptions = false;
     }
 
     internal void AddLifecycleRequest(
@@ -318,27 +321,31 @@ internal sealed class ModuleRegistrationState
     internal void AddContributionRequest(
         ModulePhase phase,
         int order,
-        Action<ModuleConfigurationContext> configure)
+        Action<ModuleConfigurationContext> configure,
+        Type? owner)
     {
-        AddRequest(phase, ModuleCallbackKind.RegistrationContribution, order, configure);
+        AddRequest(phase, ModuleCallbackKind.RegistrationContribution, order, configure, owner: owner);
     }
 
     internal void AddApplicationBuilderContributionRequest(
         ModuleWebStage stage,
-        Action<ModuleConfigurationContext> configure)
+        Action<ModuleConfigurationContext> configure,
+        Type? owner)
     {
         AddApplicationBuilderRequest(
             stage,
             ModuleCallbackKind.RegistrationContribution,
             order: 0,
-            configure);
+            configure,
+            owner);
     }
 
     private void AddApplicationBuilderRequest(
         ModuleWebStage stage,
         ModuleCallbackKind kind,
         int order,
-        Action<ModuleConfigurationContext> configure)
+        Action<ModuleConfigurationContext> configure,
+        Type? owner = null)
     {
         if (!Enum.IsDefined(stage))
         {
@@ -350,7 +357,8 @@ internal sealed class ModuleRegistrationState
             kind,
             order,
             configure,
-            stage);
+            stage,
+            owner);
     }
 
     private void AddRequest(
@@ -358,7 +366,8 @@ internal sealed class ModuleRegistrationState
         ModuleCallbackKind kind,
         int order,
         Action<ModuleConfigurationContext> configure,
-        ModuleWebStage? webStage = null)
+        ModuleWebStage? webStage = null,
+        Type? owner = null)
     {
         ArgumentNullException.ThrowIfNull(configure);
         var ordinal = _requestOrdinal++;
@@ -368,7 +377,8 @@ internal sealed class ModuleRegistrationState
             order,
             ordinal,
             configure,
-            webStage));
+            webStage,
+            owner));
     }
 
     internal IReadOnlyList<string> GetMissingRequiredFeatures()
@@ -429,7 +439,7 @@ internal sealed class ModuleRegistrationState
 
     private void EnsureNotFinalized()
     {
-        if (IsFinalized)
+        if (IsFinalized || _finalizingOptions)
         {
             throw new InvalidOperationException(
                 $"Module {ModuleType.Name} is already compiled and cannot be changed.");
@@ -445,5 +455,8 @@ internal sealed class ModuleRegistrationState
     private sealed record OptionContribution(
         bool IsHostContribution,
         int Ordinal,
-        Action<object> Apply);
+        Action<object> Apply,
+        Type? Owner);
+
+    private sealed record OwnedOptionContribution(Action<object> Apply, Type? Owner);
 }

@@ -7,6 +7,13 @@ public sealed class ApplicationDomainAttribute(object domain) : Attribute
 {
     /// <summary>Gets the stable domain key, preserving the product's identifier spelling.</summary>
     public string DomainId { get; } = DomainIdentifier.Normalize(domain);
+
+    /// <summary>Names the same-domain role that owns this core's autonomous resources, or null for a passive-only core.</summary>
+    /// <remarks>This does not restrict passive services or business operations. The named role must exist in the compiled inventory.</remarks>
+    public string? BackgroundRole { get; set; }
+
+    /// <summary>Names this assembly's optional concrete application registration with a public parameterless constructor.</summary>
+    public Type? Registration { get; set; }
 }
 
 internal static class DomainIdentifier

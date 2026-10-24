@@ -192,7 +192,10 @@ public sealed class ModuleRegistry(MonicaApplication application)
         where TOptions : ModuleOptions<TModule>, new()
     {
         EnsureCompositionIsOpen();
-        return GetOrAddRegistrationCore<TModule, TOptions>();
+        var registration = GetOrAddRegistrationCore<TModule, TOptions>();
+        if (registration.IsFinalized && registration.ModuleSingleton is IApplicationCompositionModule)
+            throw new InvalidOperationException("The application authority is finalized and cannot be declared or configured again.");
+        return registration;
     }
 
     private ModuleRegistrationState GetOrAddRegistrationCore<TModule, TOptions>()
@@ -216,28 +219,29 @@ public sealed class ModuleRegistry(MonicaApplication application)
         return registration;
     }
 
-    internal void AddOptionContribution<TModule, TOptions>(Type? configuredBy, Action<TOptions> configure)
+    internal void AddOptionContribution<TModule, TOptions>(Type? configuredBy, Action<TOptions> configure, Type? owner)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        GetOrAddRegistration<TModule, TOptions>().AddOptionContribution(configuredBy, configure);
+        GetOrAddRegistration<TModule, TOptions>().AddOptionContribution(configuredBy, configure, owner);
     }
 
     internal ModuleRegistration<TModule, TOptions> Require<TModule, TOptions>(
         Type ownerModuleType,
-        Action<TOptions>? configure)
+        Action<TOptions>? configure,
+        Type? registrationOwner)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        EnsureCompositionIsOpen();
+        EnsureRegistrationIsMutable(ownerModuleType);
         var dependency = GetOrAddRegistrationCore<TModule, TOptions>();
         AddEdge(_hardDependencies, ownerModuleType, typeof(TModule));
         if (configure is not null)
         {
-            dependency.AddOptionContribution(ownerModuleType, configure);
+            dependency.AddOptionContribution(ownerModuleType, configure, registrationOwner);
         }
 
-        return new ModuleRegistration<TModule, TOptions>(application, ownerModuleType);
+        return new ModuleRegistration<TModule, TOptions>(application, ownerModuleType, registrationOwner);
     }
 
     internal void DescribeRequire<TModule, TOptions>(
@@ -257,7 +261,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
 
     internal void AfterIfPresent(Type ownerModuleType, Type dependencyModuleType)
     {
-        EnsureCompositionIsOpen();
+        EnsureRegistrationIsMutable(ownerModuleType);
         AddEdge(_optionalOrderings, ownerModuleType, dependencyModuleType);
     }
 
@@ -309,11 +313,11 @@ public sealed class ModuleRegistry(MonicaApplication application)
         GetRegistration(moduleType).MarkDisabled(reason);
     }
 
-    internal void AddProfileContribution<TModule, TOptions>(string name, Action<TOptions> configure)
+    internal void AddProfileContribution<TModule, TOptions>(string name, Action<TOptions> configure, Type? owner)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        GetOrAddRegistration<TModule, TOptions>().AddProfileContribution(name, configure);
+        GetOrAddRegistration<TModule, TOptions>().AddProfileContribution(name, configure, owner);
     }
 
     internal TOptions GetProfile<TModule, TOptions>(string name)
@@ -417,8 +421,9 @@ public sealed class ModuleRegistry(MonicaApplication application)
     /// This method must run before `builder.Build()`.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
+    /// <param name="monica">The Monica builder kept open through the application authority's registration pass.</param>
     [SuppressMessage("ReSharper", "PossibleMultipleEnumeration")]
-    internal void RegisterServices(IHostApplicationBuilder builder)
+    internal void RegisterServices(IHostApplicationBuilder builder, IMonicaBuilder monica)
     {
         ArgumentNullException.ThrowIfNull(builder);
         if (_hasStarted)
@@ -447,8 +452,9 @@ public sealed class ModuleRegistry(MonicaApplication application)
                 _state.ClearRegistrationErrors();
                 RecordDiagnosticsMutationUnderLock();
             }
-            _isSealed = true;
             DescribeModules();
+            PrepareApplicationComposition(builder, monica);
+            _isSealed = true;
             CompileGraph();
             ValidateFeatures();
             ValidateWebModuleCompatibility(builder);
@@ -476,10 +482,9 @@ public sealed class ModuleRegistry(MonicaApplication application)
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforePostConfigureServices);
 
             ExecutePostConfigureServices(builder, services, snapshots);
-            ApplyHostedServiceActivation(services);
             _startupWork.CloseSubmissions();
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforeServiceRegistrationCompletion);
-            application.Composition.FinalizeServices(services);
+            application.Composition.FinalizeServices(services, () => ApplyHostedServiceActivation(services));
             ValidateServiceRequirements(services, registrations);
 
             lock (_diagnosticsGate)
@@ -504,6 +509,34 @@ public sealed class ModuleRegistry(MonicaApplication application)
             _registrationWriter = null;
             typeDiscovery?.Release();
         }
+    }
+
+    private void PrepareApplicationComposition(IHostApplicationBuilder builder, IMonicaBuilder monica)
+    {
+        PropagateDisabledModules();
+        var authorities = Registrations.Values.Where(registration => registration.DisabledReason is null
+            && registration.ModuleSingleton is IApplicationCompositionModule).ToArray();
+        if (authorities.Length > 1)
+            throw new InvalidOperationException("A host may declare only one application composition authority.");
+        application.ResolveApplicationInputs();
+        if (authorities.Length == 0)
+        {
+            application.FreezeApplicationInputs();
+            return;
+        }
+        var registration = authorities[0];
+        registration.StartModulePhase(ModulePhase.FinalizeOptions);
+        try { registration.FinalizeOptions(); }
+        finally { registration.EndModulePhase(ModulePhase.FinalizeOptions); }
+        var authority = (IApplicationCompositionModule)registration.ModuleSingleton;
+        application.PrepareApplication(() => authority.PrepareApplication(monica, builder));
+        application.FreezeApplicationInputs();
+        _hasMutatedHost = true;
+        application.Composition.RegisterApplication(() => authority.RegisterApplication(monica, builder));
+        DescribeModules();
+        if (Registrations.Values.Any(candidate => candidate.ModuleSingleton is IApplicationCompositionModule
+            && !ReferenceEquals(candidate, registration) && candidate.DisabledReason is null))
+            throw new InvalidOperationException("Application registration cannot introduce another application composition authority.");
     }
 
     private void DescribeModules()
@@ -547,9 +580,10 @@ public sealed class ModuleRegistry(MonicaApplication application)
         {
             var descriptor = services[index];
             if (descriptor.IsKeyedService || descriptor.ServiceType != typeof(IHostedService)) continue;
-            var implementation = descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
-            // Factories are intentionally opaque; their role-owned composition must gate registration explicitly.
-            if (implementation is not null && !activation.IsEnabled(implementation,
+            var owner = application.Composition.GetServiceRegistrationOwner(descriptor)
+                ?? descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
+            // Factory descriptors use their declaring owner without constructing their implementation.
+            if (owner is not null && !activation.IsEnabled(owner,
                     Monica.Core.TypeDiscovery.Abstractions.TypeActivationKind.HostedService))
                 services.RemoveAt(index);
         }
@@ -647,7 +681,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
     private IReadOnlyList<ModuleRegistrationState> MaterializeModules()
     {
         var registrations = Registrations.Values
-            .Where(static info => info.ModulePhase == ModulePhase.Describe
+            .Where(static info => (info.ModulePhase == ModulePhase.Describe || info.IsFinalized)
                                   && info.DisabledReason is null)
             .OrderBy(static info => info.Order)
             .ToArray();
@@ -657,6 +691,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
         {
             foreach (var info in registrations)
             {
+                if (info.IsFinalized) continue;
                 info.StartModulePhase(ModulePhase.FinalizeOptions);
                 try
                 {
@@ -803,8 +838,8 @@ public sealed class ModuleRegistry(MonicaApplication application)
                 BeginCompositionCallback(registration);
                 try
                 {
-                    request.Configure(
-                        new ModuleConfigurationContext(services, null, builder, registration));
+                    application.Composition.RunOwned(request.RegistrationOwner, () => request.Configure(
+                        new ModuleConfigurationContext(services, null, builder, registration, request.RegistrationOwner)));
                 }
                 finally
                 {
@@ -1046,7 +1081,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
     }
 
     /// <summary>
-    /// Rejects registration mutations after the application composition callback has returned.
+    /// Rejects registration mutations after the owned application registration pass has completed.
     /// </summary>
     internal void EnsureCompositionIsOpen()
     {
@@ -1055,6 +1090,14 @@ public sealed class ModuleRegistry(MonicaApplication application)
             throw new InvalidOperationException(
                 "The Monica module graph is sealed. Register and configure modules only inside AddMonica(...).");
         }
+    }
+
+    internal void EnsureRegistrationIsMutable(Type moduleType)
+    {
+        EnsureCompositionIsOpen();
+        var registration = GetRegistration(moduleType);
+        if (registration.IsFinalized && registration.ModuleSingleton is IApplicationCompositionModule)
+            throw new InvalidOperationException("The prepared application authority cannot be changed by owned registration.");
     }
 
     private void EnsureActiveDescriptor(Type ownerModuleType)
@@ -1142,6 +1185,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
 
         var scheduler = _startupWork
             ?? throw new InvalidOperationException("Module startup work is no longer available for this host.");
+        var registrationOwner = application.Composition.RegistrationOwner;
         scheduler.Schedule(
             moduleType,
             application.Dependencies.ResolveModuleKey(moduleType),
@@ -1149,8 +1193,8 @@ public sealed class ModuleRegistry(MonicaApplication application)
             name,
             info.ModulePhase,
             barrier,
-            work,
-            commit);
+            () => application.Composition.RunOwned(registrationOwner, work, captureServices: false),
+            commit is null ? null : () => application.Composition.RunOwned(registrationOwner, commit));
     }
 
     private static void ValidateSynchronousCompositionDelegate(
@@ -1522,8 +1566,9 @@ public sealed class ModuleRegistry(MonicaApplication application)
                         BeginCompositionCallback(module.RegisterInfo);
                         try
                         {
-                            request.Configure(
-                                new ModuleConfigurationContext(null, app, null, module.RegisterInfo));
+                            application.Composition.RunOwned(request.RegistrationOwner, () => request.Configure(
+                                new ModuleConfigurationContext(null, app, null, module.RegisterInfo, request.RegistrationOwner)),
+                                captureServices: false);
                         }
                         finally
                         {
@@ -1572,8 +1617,9 @@ public sealed class ModuleRegistry(MonicaApplication application)
                         BeginCompositionCallback(module.RegisterInfo);
                         try
                         {
-                            request.Configure(
-                                new ModuleConfigurationContext(null, app, null, module.RegisterInfo));
+                            application.Composition.RunOwned(request.RegistrationOwner, () => request.Configure(
+                                new ModuleConfigurationContext(null, app, null, module.RegisterInfo, request.RegistrationOwner)),
+                                captureServices: false);
                         }
                         finally
                         {

@@ -37,9 +37,18 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
             ApplicationDeployment.RequireIdentifier(domain.AssemblyName, "Domain assembly");
             if (!ownedAssemblies.Add(domain.AssemblyName))
                 throw new InvalidOperationException($"Domain '{domain.Id}' does not own a unique assembly.");
-            if (localAssemblies.Contains(domain.AssemblyName) &&
-                RequireAssembly(domain.AssemblyName).GetCustomAttribute<ApplicationDomainAttribute>()?.DomainId != domain.Id)
-                throw new InvalidOperationException($"Domain '{domain.Id}' does not match its compiled assembly declaration.");
+            if (localAssemblies.Contains(domain.AssemblyName))
+            {
+                var declaration = RequireAssembly(domain.AssemblyName).GetCustomAttribute<ApplicationDomainAttribute>();
+                if (declaration?.DomainId != domain.Id || declaration.BackgroundRole != domain.BackgroundRole)
+                    throw new InvalidOperationException($"Domain '{domain.Id}' does not match its compiled assembly declaration.");
+            }
+            if (domain.BackgroundRole is { } backgroundRole)
+            {
+                ApplicationDeployment.RequireIdentifier(backgroundRole, "BackgroundRole");
+                if (!Roles.TryGetValue(backgroundRole, out var owner) || owner.DomainId != domain.Id)
+                    throw new InvalidOperationException($"BackgroundRole '{backgroundRole}' must name a declared role in domain '{domain.Id}'.");
+            }
         }
         foreach (var role in Roles.Values)
         {
@@ -127,6 +136,7 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
     }
 
     public string AppId => _deployment.AppId;
+    public ApplicationDeployment Deployment => _deployment;
     public IReadOnlyCollection<string> ActiveWorkloadOwners { get; }
     public IReadOnlyDictionary<string, ApplicationDomainDefinition> Domains { get; }
     public IReadOnlyDictionary<string, ApplicationRoleDefinition> Roles { get; }
@@ -172,11 +182,14 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
     private static FrozenDictionary<string, T> Unique<T>(IEnumerable<T> definitions, Func<T, string> key, string kind)
     {
         var result = new Dictionary<string, T>(StringComparer.Ordinal);
+        var identifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var definition in definitions)
         {
             var id = key(definition);
             ApplicationDeployment.RequireIdentifier(id, kind);
             if (!result.TryAdd(id, definition)) throw new InvalidOperationException($"Duplicate application {kind} '{id}'.");
+            if (!identifiers.Add(id))
+                throw new InvalidOperationException($"Application {kind} '{id}' is ambiguous under case-insensitive configuration lookup.");
         }
         return result.ToFrozenDictionary(StringComparer.Ordinal);
     }

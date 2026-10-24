@@ -14,4 +14,7 @@ public sealed class ApplicationRoleAttribute(string roleId, object domain) : Att
     /// <summary>Overrides stable durable-work ownership when preserving an existing scheduler namespace.</summary>
     /// <remarks>Null uses RoleId. This value does not change when a role moves between logical applications.</remarks>
     public string? WorkloadOwner { get; set; }
+
+    /// <summary>Names this assembly's optional concrete application registration with a public parameterless constructor.</summary>
+    public Type? Registration { get; set; }
 }

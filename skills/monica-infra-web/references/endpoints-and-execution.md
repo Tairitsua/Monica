@@ -8,6 +8,8 @@
 
 Unattributed requests remain internal mediator operations. Local outer calls create operation scopes; nested Local calls join the active operation. Query read-only defaults follow Query semantics, including POST queries; explicit handler transaction metadata wins. MVC binding remains separate from application validation. See [application invocation](../../monica-application-ui/references/application-invocation.md) for UI identity and lifecycle rules.
 
+For role-local request contracts outside `PublishedLanguages`, the generator derives the wire domain from the declaring assembly's `ApplicationRole`. An explicit `HttpApiContract.DomainName` takes precedence when retaining an existing wire name. An assembly without role metadata still needs the explicit name; a non-identifier domain also needs a valid explicit generated name. This inference changes no declared HTTP method or route.
+
 
 Inside the host's `builder.AddMonica(monica => { ... })` callback, `AddAutoControllers(configure?, configureCrud?)` discovers `ControllerBase` types and `ICrudApplicationService` implementations from the configured type-discovery scope, validates CRUD options, registers generated MVC conventions, and maps controllers. It depends on AutoModel, the core controller module, and exception handling; `AddWebApi()` already requires it. Application request contracts own their `[ApiEndpoint]` method, route, and binding metadata. The reference app puts those attributed requests in `Platform.Protocol/PublishedLanguages` and adds that assembly to type discovery. For request naming, controller placement, and endpoint ownership, read `$monica-application-project-unit-development`.
 

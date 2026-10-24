@@ -81,21 +81,28 @@ For selective hosts, generate a lightweight `Platform.ApplicationCatalog` from t
 
 Each host references the catalog normally and only the implementations it can execute. Its generated manifest combines catalog ownership with `LocalAssemblies` from actual annotated implementation references. Published clients can describe remote operations without referencing their handler types; receivers and private operations come only from local implementations. The catalog contains no runtime role/core type references. Build-only metadata inputs may still require those projects to build; they must not copy their runtime or native assets into a host that omits them. Do not hand-edit metadata snapshots or introduce runtime assembly loading to satisfy missing implementations.
 
-Compose the native `WebApplication` lifecycle with `builder.AddMonica(...)`, `app.UseMonica()`, and `app.MapMonica()`. Register `AddApplicationModel(options => options.Deployments = deployments)` and `AddApplicationInvocation()` in the callback, plus `AddWebApi()` where receivers are served. Set the existing current-host AppId through `ConfigureApplication`. A custom callback runner is not another application lifecycle.
+Compose the native `WebApplication` lifecycle with `builder.AddMonica(...)`, `app.UseMonica()`, and `app.MapMonica()`. Register `AddApplicationModel()` and `AddApplicationInvocation()` in the callback, plus `AddWebApi()` where receivers are served. The canonical `Application` section owns current AppId and deployment placement. Keep product/assembly information such as ProjectName and AppVersion in `ConfigureApplication`. A complete typed `ModuleApplicationModelOption.Deployments` value is an alternative to file topology; supplying both fails instead of merging authorities. A custom callback runner is not another application lifecycle.
 
 ## Deployment and active resources
 
 The deployment map assigns each known product role to exactly one logical application in the selected scope. Replicas share that placement. For example:
 
-```csharp
-var deployments = new Dictionary<string, Monica.ApplicationModel.Models.ApplicationPlacement>
+```json
 {
-    ["product-api"] = new() { Roles = [ProductRoles.Ordering] },
-    ["product-reporting"] = new() { Roles = [ProductRoles.OrderingReporting] }
-};
+  "Application": {
+    "AppId": "product-api",
+    "DeploymentScope": "product-uat",
+    "Deployments": {
+      "product-api": { "AppName": "Ordering API", "Roles": ["ordering"] },
+      "product-reporting": { "AppName": "Ordering reports", "Roles": ["ordering.reporting"] }
+    }
+  }
+}
 ```
 
-A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list or synthetic `all` role. Startup validates ownership, unique placement, the current AppId, and local availability of every role assigned to that AppId. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration.
+A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list, default role owner or synthetic `all` role. Every compiled role has exactly one explicit owner. Startup rejects missing/unknown/duplicate roles, case-ambiguous identities, an absent current AppId and missing local implementations for roles assigned to that AppId. Every application entry declares Roles; an explicit empty array is valid, omission or null is not. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration.
+
+AppName belongs to the same deployment entry and defaults to its AppId. Core identity, discovery and diagnostics use that name; conflicting direct identity or discovery overrides fail. The framework derives the reverse role-to-AppId index. `Deployments` is selected as one complete subtree from the highest-priority provider that explicitly supplies it. A higher source replaces all lower applications, names and role arrays. Partial environment-variable/command-line maps fail when incomplete; they do not inherit missing roles. Use JSON for complete topology and scalar environment variables for current AppId. Private environment JSON selection follows the [host input contract](../../monica-infra-hosting/references/host-composition.md); selected inputs and placement remain frozen until restart.
 
 Project references own artifact composition; deployment values own AppId/role placement and the image used for each workload. Preserve this distinction instead of adding arbitrary profile manifests or another artifact identity registry. A fully combined process must use an artifact that actually contains all selected implementations and their dependencies. Do not create an additional combined executable unless that deployment is needed. Role placement is frozen until restart. Runtime discovery adds live instances and addresses; it does not redefine ownership or install code.
 
@@ -104,6 +111,30 @@ Included ordinary handlers, passive services, repositories and in-operation loca
 Autonomous jobs, externally consumed subscriptions, hosted services and process-owned resources run only for selected, locally implemented roles. They inherit their role assembly's ownership. Explicit hubs, channels, Actors and connections must use the same validated selection before imperative registration. A local invariant event handler must remain distinct from an external subscriber. Do not register a resource everywhere and rely on an early return after it has started.
 
 Durable workload ownership defaults to the stable role ID, independently of AppId. The optional `ApplicationRole.WorkloadOwner` preserves an already issued scheduler namespace during migration; it is not a new current-host identity. Role moves require controlled deployment takeover, compatible code/schema versions and preservation of durable job/subscriber identities. Provider leases and retries do not supply exactly-once business side effects.
+
+## Native domain and role registration
+
+An included implementation can name one concrete `ApplicationRegistration` on its existing assembly declaration:
+
+```csharp
+// Roles.Ordering.Reporting/Registration/RoleMetadata.cs
+[assembly: ApplicationRole(ProductRoles.OrderingReporting, ProductDomains.Ordering,
+    Registration = typeof(RoleRegistration))]
+
+public sealed class RoleRegistration : ApplicationRegistration
+{
+    public override void ConfigureActive(ApplicationRegistrationContext context)
+    {
+        context.Monica.AddJobScheduler().UseInMemoryStore();
+    }
+}
+```
+
+The registration and context are in `Monica.ApplicationModel.Abstractions`; the assembly annotation is in `Monica.ApplicationModel.Annotations`. The registration belongs to its declaring assembly, is concrete and has a public parameterless constructor. A domain uses `ApplicationDomain.Registration` the same way. Its optional BackgroundRole must name a declared role in that domain; a domain overriding ConfigureActive must supply that owner. A passive-only domain needs no BackgroundRole.
+
+After the host's AddMonica callback finishes, Monica finalizes application-model contributions once, validates the complete model and projects identity. It freezes identity, discovery and topology before running registrations. All included registrations run ConfigurePassive first, followed by eligible ConfigureActive callbacks in deterministic owner-ID order. Passive registration is independent of role placement. Active registration requires local placement of the role or the domain's BackgroundRole. Catalog-only remote owners never execute registration code.
+
+Callbacks can add modules, service descriptors and startup options; they cannot change frozen inputs, resolve services, open connections, start tasks or depend on another owner's callback order. `context.Configuration` is the immutable startup snapshot, and `context.GetStartupOptions<T>()` uses the configuration module's shared early reader when imported from `Monica.Configuration.Bootstrap`. ConfigureActive declares eligible integrations, with `context.IsAutonomous` available to guard imperative shared participation. Module declarations then close and the normal module lifecycle proceeds. The framework retains registration ownership across deferred module contributions and service descriptors; products maintain no additional owner table.
 
 ## Calls and required execution location
 

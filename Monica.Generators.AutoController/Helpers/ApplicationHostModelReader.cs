@@ -51,6 +51,7 @@ internal static class ApplicationHostModelReader
                 ? NormalizeDomain(attribute.ConstructorArguments[domainIndex]) : null;
             var roleId = role?.ConstructorArguments.FirstOrDefault().Value as string;
             var workloadOwner = role?.NamedArguments.FirstOrDefault(static argument => argument.Key == "WorkloadOwner").Value.Value as string;
+            var backgroundRole = domain?.NamedArguments.FirstOrDefault(static argument => argument.Key == "BackgroundRole").Value.Value as string;
             if (string.IsNullOrWhiteSpace(domainId) || domainId != domainId!.Trim() ||
                 (role is not null && (string.IsNullOrWhiteSpace(roleId) || roleId != roleId!.Trim())))
             {
@@ -63,7 +64,17 @@ internal static class ApplicationHostModelReader
                 InvalidDeclaration(assembly, "WorkloadOwner must be a non-empty identifier without surrounding whitespace when supplied.");
                 continue;
             }
-            declarations.Add(assembly, new ApplicationAssemblyModel(assembly.Name, domainId!, roleId, workloadOwner));
+            if (backgroundRole is not null && (string.IsNullOrWhiteSpace(backgroundRole) || backgroundRole != backgroundRole.Trim()))
+            {
+                InvalidDeclaration(assembly, "BackgroundRole must be a non-empty identifier without surrounding whitespace when supplied.");
+                continue;
+            }
+            if (ValidateRegistration(attribute, assembly, domain is not null && backgroundRole is null) is { } registrationError)
+            {
+                InvalidDeclaration(assembly, registrationError);
+                continue;
+            }
+            declarations.Add(assembly, new ApplicationAssemblyModel(assembly.Name, domainId!, roleId, workloadOwner, backgroundRole));
         }
 
         foreach (var duplicate in declarations.Values.GroupBy(static declaration =>
@@ -212,7 +223,11 @@ internal static class ApplicationHostModelReader
                 SourceLocation(pair.Key, hostLocation), pair.Key.ToDisplayString(),
                 string.Join(", ", pair.Value.Select(static handler => handler.ToDisplayString()).OrderBy(static name => name, StringComparer.Ordinal))));
 
-        if (!exportOwnAssembly) ValidateApiCompleteness(assemblies, operations, diagnostics, hostLocation);
+        if (!exportOwnAssembly)
+        {
+            ValidateApiCompleteness(assemblies, operations, diagnostics, hostLocation);
+            ValidateBackgroundRoles(logicalAssemblies, message => InvalidDeclaration(compilation.Assembly, message));
+        }
         ValidateDuplicates(operations, diagnostics, hostLocation);
         if (exportOwnAssembly)
         {
@@ -244,6 +259,63 @@ internal static class ApplicationHostModelReader
                 diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.MissingApplicationOperation,
                     location, request.ToDisplayString()));
         }
+    }
+
+    internal static void ValidateBackgroundRoles(IReadOnlyCollection<ApplicationAssemblyModel> assemblies, Action<string> invalid)
+    {
+        // Core producers cannot reference their role implementations. Resolve ownership only once the complete
+        // product inventory is available from catalog inputs or the application host.
+        foreach (var domain in assemblies.Where(static assembly => assembly.RoleId is null && assembly.BackgroundRole is not null))
+        {
+            if (!assemblies.Any(role => role.RoleId == domain.BackgroundRole && role.DomainId == domain.DomainId))
+                invalid($"Domain '{domain.DomainId}' BackgroundRole '{domain.BackgroundRole}' must name a declared role in the same domain.");
+        }
+    }
+
+    internal static string? GetDeclaredRoleDomain(IAssemblySymbol assembly)
+    {
+        var role = Find(assembly, GeneratorConstants.APPLICATION_ROLE_ATTRIBUTE);
+        return role is { ConstructorArguments.Length: > 1 } ? NormalizeDomain(role.ConstructorArguments[1]) : null;
+    }
+
+    private static string? ValidateRegistration(AttributeData attribute, IAssemblySymbol assembly, bool domainWithoutBackgroundRole)
+    {
+        var argument = attribute.NamedArguments.FirstOrDefault(static argument => argument.Key == "Registration");
+        var registration = argument.Value;
+        if (argument.Key != "Registration" || registration.IsNull) return null;
+        if (registration.Value is not INamedTypeSymbol type || type.TypeKind != TypeKind.Class || type.IsAbstract ||
+            ContainsTypeParameters(type) || !InheritsApplicationRegistration(type) ||
+            !type.InstanceConstructors.Any(static constructor => constructor.DeclaredAccessibility == Accessibility.Public &&
+                constructor.Parameters.Length == 0))
+            return "Registration must name a concrete closed ApplicationRegistration with a public parameterless constructor.";
+        if (!SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, assembly))
+            return "Registration must be declared in the same assembly as its ApplicationDomain or ApplicationRole attribute.";
+        return domainWithoutBackgroundRole && OverridesActiveRegistration(type)
+            ? "A domain registration overriding ConfigureActive must declare BackgroundRole to own that work."
+            : null;
+    }
+
+    private static bool InheritsApplicationRegistration(INamedTypeSymbol type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+            if (current.ToDisplayString() == GeneratorConstants.APPLICATION_REGISTRATION) return true;
+        return false;
+    }
+
+    private static bool ContainsTypeParameters(ITypeSymbol type) => type is ITypeParameterSymbol ||
+        type is IArrayTypeSymbol array && ContainsTypeParameters(array.ElementType) ||
+        type is INamedTypeSymbol named && (named.IsUnboundGenericType || named.TypeArguments.Any(ContainsTypeParameters) ||
+            named.ContainingType is { } parent && ContainsTypeParameters(parent));
+
+    private static bool OverridesActiveRegistration(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        foreach (var method in current.GetMembers("ConfigureActive").OfType<IMethodSymbol>())
+        {
+            for (var overridden = method.OverriddenMethod; overridden is not null; overridden = overridden.OverriddenMethod)
+                if (overridden.ContainingType.ToDisplayString() == GeneratorConstants.APPLICATION_REGISTRATION) return true;
+        }
+        return false;
     }
 
     internal static void ValidateDuplicates(IEnumerable<ApplicationOperationModel> operations,

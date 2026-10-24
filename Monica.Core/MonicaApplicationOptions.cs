@@ -34,6 +34,9 @@ public interface IMonicaApplicationOptions
     /// </summary>
     string? DomainName { get; }
 
+    /// <summary>Gets the deployment environment identity shared by participating applications, or null when unset.</summary>
+    string? DeploymentScope { get; }
+
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.
     /// </summary>
@@ -79,37 +82,61 @@ public interface IMonicaApplicationOptions
 /// Mutable configuration model for shared Monica application identity defaults.
 /// Configure it through <see cref="IMonicaBuilder.ConfigureApplication"/>.
 /// </summary>
+/// <remarks>Identity freezes before owned application registrations; retained references reject subsequent mutation.</remarks>
 public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
 {
+    private bool _frozen;
+    private string? _projectName = Assembly.GetEntryAssembly()?.GetName().Name;
+    private string? _appId;
+    private string? _appName;
+    private string? _appVersion = ResolveEntryAssemblyAppVersion();
+    private string? _domainName;
+    private string? _deploymentScope;
+
     /// <summary>
     /// Gets or sets the application project name.
     /// Defaults to the entry assembly name and is the root fallback for application identity values.
     /// </summary>
-    public string? ProjectName { get; set; } = Assembly.GetEntryAssembly()?.GetName().Name;
+    public string? ProjectName { get => _projectName; set => Set(ref _projectName, value); }
 
     /// <summary>
     /// Gets or sets the application identifier.
-    /// When not configured, modules fall back to <see cref="ProjectName"/>.
+    /// Application:AppId is the canonical startup input; contradictory code configuration fails composition.
+    /// Without that input, this code value is used, falling back to <see cref="ProjectName"/> when unset.
     /// </summary>
-    public string? AppId { get; set; }
+    public string? AppId { get => _appId; set => Set(ref _appId, value); }
 
     /// <summary>
     /// Gets or sets the display name of the application.
     /// When not configured, modules fall back to <see cref="ProjectName"/>.
     /// </summary>
-    public string? AppName { get; set; }
+    public string? AppName { get => _appName; set => Set(ref _appName, value); }
 
     /// <summary>
     /// Gets or sets the display or release version of the application.
     /// Defaults to the entry assembly informational or product version when available.
     /// </summary>
-    public string? AppVersion { get; set; } = ResolveEntryAssemblyAppVersion();
+    public string? AppVersion { get => _appVersion; set => Set(ref _appVersion, value); }
 
     /// <summary>
     /// Gets or sets the application domain or subdomain name.
     /// Modules treat this as unset when it is <see langword="null"/> or whitespace.
     /// </summary>
-    public string? DomainName { get; set; }
+    public string? DomainName { get => _domainName; set => Set(ref _domainName, value); }
+
+    /// <summary>
+    /// Gets or sets the shared deployment environment identity. Defaults to null; Application:DeploymentScope
+    /// supplies the canonical startup input. Conflicting code configuration fails composition.
+    /// </summary>
+    public string? DeploymentScope { get => _deploymentScope; set => Set(ref _deploymentScope, value); }
+
+    internal void Freeze() => _frozen = true;
+
+    private void Set(ref string? field, string? value)
+    {
+        if (_frozen) throw new InvalidOperationException("Application identity is frozen before owned registration begins.");
+        field = value;
+    }
 
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.

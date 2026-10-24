@@ -1,4 +1,3 @@
-using Monica.ApplicationModel.Models;
 using Monica.Configuration.Bootstrap;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
@@ -7,11 +6,6 @@ using Monica.Reference.UI.Layout;
 using Monica.Reference.UI.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
-var appId = builder.Configuration["ReferenceAppId"] ?? "monica-ordering-reference";
-var deployments = builder.Configuration.GetSection("Deployment:Applications")
-    .Get<Dictionary<string, ApplicationPlacement>>()
-    ?? throw new InvalidOperationException("Configure Deployment:Applications before starting the reference host.");
-
 var configurationInputPlan = MonicaConfigurationInputPlan.Create(inputs => inputs
     .UseFileConfigurationStore());
 
@@ -22,8 +16,6 @@ builder.AddMonica(monica =>
     monica.ConfigureApplication(options =>
     {
         options.ProjectName = "Monica.Reference.Api";
-        options.AppName = "Monica Ordering Reference";
-        options.AppId = appId;
         options.DomainName = "Ordering";
     });
 
@@ -36,7 +28,7 @@ builder.AddMonica(monica =>
     monica.ConfigureTypeDiscovery(options =>
         options.Add("Domains.", "Roles.", "Platform.Protocol"));
 
-    monica.AddApplicationModel(options => options.Deployments = deployments);
+    monica.AddApplicationModel();
     monica.AddApplicationInvocation();
 
     monica.AddHealthCheck();
@@ -70,12 +62,6 @@ builder.AddMonica(monica =>
         options.ConventionOptions.EnableNameConvention = true;
         options.ConventionOptions.NameConventionMode = ENameConventionMode.Strict;
     });
-    monica.AddJobScheduler(options =>
-        {
-            options.MaxWorkerExecutionThreads = 1;
-        })
-        .UseInMemoryStore()
-        .UseSchedulerScope("monica-reference-ordering");
     monica.AddOpenTelemetry()
         .UsePrometheusEndpoint();
 });

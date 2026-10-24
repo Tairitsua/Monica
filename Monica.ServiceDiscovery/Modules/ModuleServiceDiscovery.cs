@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
@@ -30,6 +31,7 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void ValidateOptions(ModuleServiceDiscoveryOption options, string? profileName)
     {
+
         var applicationIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var service in options.PredefinedServices)
         {
@@ -98,6 +100,8 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void DeclareContracts(ModuleContractDescriptor<ModuleServiceDiscoveryOption> contracts)
     {
+        if (Application.TypeActivation is IApplicationModel model)
+            ServiceDiscoveryApplicationIdentity.Validate(contracts.Options, model.Deployment);
         switch (contracts.Options.StorageMode)
         {
             case ServiceDiscoveryStorageMode.Memory:
@@ -354,12 +358,14 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
     /// <summary>
     /// Unique application identifier.
     /// When not configured, ServiceDiscovery uses the application defaults configured through <see cref="IMonicaBuilder.ConfigureApplication"/>.
+    /// With an application model, an explicit value must match its canonical AppId.
     /// </summary>
     public string? AppId { get; set; }
 
     /// <summary>
     /// Display name of the application.
     /// When not configured, ServiceDiscovery uses the application defaults configured through <see cref="IMonicaBuilder.ConfigureApplication"/>.
+    /// With an application model, the deployment entry owns this value and conflicting overrides fail composition.
     /// </summary>
     public string? AppName { get; set; }
 
@@ -399,7 +405,8 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
 
     /// <summary>
     /// Expected applications and optional display names, including applications without online registrations.
-    /// Defaults to empty. The application model's deployment AppIds are included automatically when available.
+    /// Defaults to empty. Every application-model deployment entry is included automatically, including empty-role entries.
+    /// Names for known deployment applications must agree with their canonical entries; additional external applications are allowed.
     /// </summary>
     public List<PredefinedServiceInfo> PredefinedServices { get; set; } = [];
 

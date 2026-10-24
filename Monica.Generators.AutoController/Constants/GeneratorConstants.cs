@@ -11,6 +11,7 @@ internal static class GeneratorConstants
     public const string APPLICATION_HOST_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationHostAttribute";
     public const string APPLICATION_DOMAIN_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationDomainAttribute";
     public const string APPLICATION_ROLE_ATTRIBUTE = "Monica.ApplicationModel.Annotations.ApplicationRoleAttribute";
+    public const string APPLICATION_REGISTRATION = "Monica.ApplicationModel.Abstractions.ApplicationRegistration";
     public const string RUN_ON_ROLE_ATTRIBUTE = "Monica.ApplicationModel.Annotations.RunOnRoleAttribute";
 
     public const int BINDING_AUTO = 0;

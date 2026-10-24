@@ -11,6 +11,7 @@ internal sealed class MonicaBuilder(IHostApplicationBuilder hostBuilder, MonicaA
     : IMonicaBuilder
 {
     private bool _isCompleted;
+    private bool _isCompleting;
 
     /// <inheritdoc />
     public MonicaCompositionState Composition => application.Composition;
@@ -58,11 +59,19 @@ internal sealed class MonicaBuilder(IHostApplicationBuilder hostBuilder, MonicaA
     internal void Complete()
     {
         EnsureCompositionIsOpen();
-        _isCompleted = true;
-
-        application.ModuleSystemConfiguration.Validate();
-        application.ModuleSystemConfiguration.ValidateEnvironment(hostBuilder.Environment);
-        application.Modules.RegisterServices(hostBuilder);
+        if (_isCompleting) throw new InvalidOperationException("Application composition cannot execute recursively.");
+        _isCompleting = true;
+        try
+        {
+            application.ModuleSystemConfiguration.Validate();
+            application.ModuleSystemConfiguration.ValidateEnvironment(hostBuilder.Environment);
+            application.Modules.RegisterServices(hostBuilder, this);
+        }
+        finally
+        {
+            _isCompleted = true;
+            _isCompleting = false;
+        }
     }
 
     private void EnsureCompositionIsOpen()

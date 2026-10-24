@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Monica.Core.Logging;
+using Monica.Core.Configuration;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.Modularity.Services;
@@ -30,6 +31,8 @@ public sealed class MonicaApplication : IDisposable
     private ITypeFinder? _typeFinder;
     private bool _typeActivationFrozen;
     private MonicaCompositionState? _composition;
+    private bool _applicationInputsFrozen;
+    private bool _preparingApplication;
 
     internal MonicaApplication(MonicaStartupOrigin? startupOrigin = null)
     {
@@ -84,6 +87,64 @@ public sealed class MonicaApplication : IDisposable
 
     internal MonicaApplicationOptions ApplicationConfiguration => _applicationOptions;
 
+    /// <summary>Projects the selected deployment identity during the application authority's preparation callback.</summary>
+    /// <remarks>
+    /// The AppId must match the canonical startup identity. An explicitly configured AppName must agree with the
+    /// selected deployment entry. This method cannot be called by owned registrations or after preparation.
+    /// </remarks>
+    public void ProjectApplicationIdentity(string appId, string appName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appName);
+        if (!_preparingApplication)
+            throw new InvalidOperationException("Deployment identity can only be projected while preparing the application authority.");
+        ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
+        if (!string.Equals(Application.ResolveAppId(), appId, StringComparison.Ordinal))
+            throw new InvalidOperationException("The selected deployment AppId conflicts with the canonical application identity.");
+        if (MonicaApplicationOptions.Normalize(Application.AppName) is { } configuredName
+            && !string.Equals(configuredName, appName, StringComparison.Ordinal))
+            throw new InvalidOperationException("The selected deployment AppName conflicts with explicitly configured application identity.");
+        _applicationOptions.AppId = appId;
+        _applicationOptions.AppName = appName;
+    }
+
+    internal void ResolveApplicationInputs()
+    {
+        _applicationOptions.AppId = ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
+        _applicationOptions.DeploymentScope = ResolveStartupIdentity("Application:DeploymentScope", _applicationOptions.DeploymentScope);
+    }
+
+    private string? ResolveStartupIdentity(string path, string? configured)
+    {
+        var selected = Composition.StartupConfiguration.SelectCompleteSection(path);
+        if (selected is null) return MonicaApplicationOptions.Normalize(configured);
+        var section = selected.GetSection(path);
+        if (!selected.TryGetShape(path, out var shape) || shape != ConfigurationValueShape.Scalar
+            || section.GetChildren().Any() || MonicaApplicationOptions.Normalize(section.Value) is not { } value)
+            throw new InvalidOperationException($"'{path}' must be a nonempty scalar startup value.");
+        if (MonicaApplicationOptions.Normalize(configured) is { } explicitValue
+            && !string.Equals(explicitValue, value, StringComparison.Ordinal))
+            throw new InvalidOperationException($"'{path}' conflicts with explicitly configured application identity.");
+        return value;
+    }
+
+    internal void PrepareApplication(Action prepare)
+    {
+        if (_preparingApplication || _applicationInputsFrozen)
+            throw new InvalidOperationException("Application preparation can run only once before inputs are frozen.");
+        _preparingApplication = true;
+        try { prepare(); }
+        finally { _preparingApplication = false; }
+    }
+
+    internal void FreezeApplicationInputs()
+    {
+        ResolveApplicationInputs();
+        _applicationOptions.Freeze();
+        _typeFinderOptions.Freeze();
+        _applicationInputsFrozen = true;
+    }
+
     internal MonicaModuleSystemOptions ModuleSystemConfiguration => _moduleSystemOptions;
 
     /// <summary>
@@ -129,6 +190,8 @@ public sealed class MonicaApplication : IDisposable
     /// <param name="configure">An optional callback that customizes discovery.</param>
     internal void ConfigureTypeDiscovery(Action<TypeFinderOptions>? configure = null)
     {
+        if (_applicationInputsFrozen)
+            throw new InvalidOperationException("Type discovery is frozen before owned registration begins.");
         var options = new TypeFinderOptions();
         configure?.Invoke(options);
         _typeFinderOptions = options;

@@ -7,6 +7,7 @@ using Monica.ApplicationModel.Abstractions;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
+using Monica.ServiceDiscovery.Services.Support;
 
 namespace Monica.ServiceDiscovery.Providers;
 
@@ -97,6 +98,7 @@ public class DefaultServiceDiscoveryClientInfo(
     {
         var entryAssembly = Assembly.GetEntryAssembly();
         var assemblyName = entryAssembly?.GetName().Name ?? "Unknown";
+        if (model is not null) ServiceDiscoveryApplicationIdentity.Validate(options, model.Deployment);
         var appId = application.ResolveAppId(options.AppId, assemblyName);
         if (model is not null && model.AppId != appId)
             throw new InvalidOperationException("Service discovery AppId must match the unified application model.");
@@ -107,7 +109,8 @@ public class DefaultServiceDiscoveryClientInfo(
         {
             AppId = appId,
             InstanceId = options.FromInstance ?? GenerateFromInstance(),
-            AppName = MonicaApplicationOptions.Normalize(options.AppName)
+            AppName = model?.Deployment.AppName
+                      ?? MonicaApplicationOptions.Normalize(options.AppName)
                       ?? MonicaApplicationOptions.Normalize(application.AppName)
                       ?? appId,
             ProjectName = application.ResolveProjectName(options.ProjectName, assemblyName),

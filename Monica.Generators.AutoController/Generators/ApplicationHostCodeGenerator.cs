@@ -45,7 +45,8 @@ internal static class ApplicationHostCodeGenerator
             .Append(string.Join(", ", model.LocalAssemblies.Select(Literal))).AppendLine(" });");
         AppendList(builder, "ApplicationDomainDefinition", "Domains", model.Assemblies
             .Where(static assembly => assembly.RoleId is null)
-            .Select(static assembly => $"{Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}"));
+            .Select(static assembly => $"{Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +
+                (assembly.BackgroundRole is null ? string.Empty : $", {Literal(assembly.BackgroundRole)}")));
         AppendList(builder, "ApplicationRoleDefinition", "Roles", model.Assemblies
             .Where(static assembly => assembly.RoleId is not null)
             .Select(static assembly => $"{Literal(assembly.RoleId!)}, {Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +

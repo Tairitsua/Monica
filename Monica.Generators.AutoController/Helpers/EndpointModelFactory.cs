@@ -71,15 +71,19 @@ internal static class EndpointModelFactory
         var config = configResult.Config;
         var domain = namespaceInfo.IsValidPublishedNamespace
             ? namespaceInfo.Domain
-            : config.DomainName;
+            : config.DomainName ?? ApplicationHostModelReader.GetDeclaredRoleDomain(request.ContainingAssembly);
         if (string.IsNullOrWhiteSpace(domain))
         {
             return Failure(
                 DiagnosticDescriptors.InvalidConfiguration,
                 location,
                 request.ContainingAssembly.Name,
-                "DomainName is required for service-local endpoint requests.");
+                "Service-local endpoint requests require a declaring ApplicationRole domain or an explicit DomainName.");
         }
+
+        if (!SyntaxFacts.IsValidIdentifier(domain))
+            return Failure(DiagnosticDescriptors.InvalidConfiguration, location, request.ContainingAssembly.Name,
+                $"Inferred domain '{domain}' must be a valid C# identifier; supply an explicit DomainName for the HTTP contract.");
 
         if (namespaceInfo.IsValidPublishedNamespace &&
             !string.IsNullOrWhiteSpace(config.DomainName) &&

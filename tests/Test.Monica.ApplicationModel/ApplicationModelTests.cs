@@ -80,7 +80,7 @@ public sealed class ApplicationModelTests
     {
         var placements = Placements();
         await using var app = await new ModelFactory("api", placements).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        placements["api"].Roles[0] = "ordering.worker";
+        placements["api"].Roles![0] = "ordering.worker";
         placements.Remove("worker");
         var model = app.Services.GetRequiredService<IApplicationModel>();
         Assert.True(model.IsRoleActive("ordering.api"));

@@ -20,7 +20,8 @@ public static class MonicaHostBuilderExtensions
     /// <param name="configure">A synchronous callback that configures application defaults and modules.</param>
     /// <returns>The same host builder instance.</returns>
     /// <remarks>
-    /// Call this exactly once before <c>Build()</c>. The module graph is sealed when the callback returns;
+    /// Call this exactly once before <c>Build()</c>. The module graph is sealed after the callback and the subsequent
+    /// framework-owned application registration pass, before this method returns;
     /// retained module registrations reject later mutation. This overload does not track application startup; pass a
     /// <see cref="MonicaStartup"/> to the startup-aware overload when that observation is required.
     /// </remarks>

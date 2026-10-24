@@ -6,7 +6,7 @@ namespace Monica.Core.Modularity.Abstractions;
 
 /// <summary>
 /// Represents a host-bound module declaration. Registrations collect configuration and lifecycle contributions
-/// until the enclosing <c>AddMonica</c> callback completes, then become permanently sealed.
+/// until the enclosing <c>AddMonica</c> owned-registration pass completes, then become permanently sealed.
 /// </summary>
 /// <typeparam name="TModule">The module strategy type.</typeparam>
 /// <typeparam name="TOptions">The module's primary option type.</typeparam>
@@ -16,11 +16,18 @@ public sealed class ModuleRegistration<TModule, TOptions>
 {
     private readonly MonicaApplication _application;
     private readonly Type? _configuredBy;
+    private readonly Type? _registrationOwner;
 
     internal ModuleRegistration(MonicaApplication application, Type? configuredBy)
+        : this(application, configuredBy, application.Composition.RegistrationOwner)
+    {
+    }
+
+    internal ModuleRegistration(MonicaApplication application, Type? configuredBy, Type? registrationOwner)
     {
         _application = application;
         _configuredBy = configuredBy;
+        _registrationOwner = registrationOwner;
         _application.Modules.GetOrAddRegistration<TModule, TOptions>();
     }
 
@@ -32,7 +39,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
     {
         if (configure is not null)
         {
-            _application.Modules.AddOptionContribution<TModule, TOptions>(_configuredBy, configure);
+            _application.Modules.AddOptionContribution<TModule, TOptions>(_configuredBy, configure, _registrationOwner);
         }
 
         return this;
@@ -46,9 +53,10 @@ public sealed class ModuleRegistration<TModule, TOptions>
         where TCompanion : MonicaModule<TCompanionOptions>, new()
         where TCompanionOptions : ModuleOptions<TCompanion>, new()
     {
+        _application.Modules.EnsureRegistrationIsMutable(typeof(TModule));
         var registration = new ModuleRegistration<TCompanion, TCompanionOptions>(
             _application,
-            configuredBy: typeof(TModule));
+            configuredBy: typeof(TModule), _registrationOwner);
         return registration.Configure(configure);
     }
 
@@ -60,7 +68,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
         where TDependency : MonicaModule<TDependencyOptions>, new()
         where TDependencyOptions : ModuleOptions<TDependency>, new()
     {
-        return _application.Modules.Require<TDependency, TDependencyOptions>(typeof(TModule), configure);
+        return _application.Modules.Require<TDependency, TDependencyOptions>(typeof(TModule), configure, _registrationOwner);
     }
 
     /// <summary>
@@ -135,7 +143,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
             .GetOrAddRegistration<TModule, TOptions>()
             .AddApplicationBuilderContributionRequest(
                 stage,
-                context => configure(new WebModuleContext<TOptions>(context)));
+                context => configure(new WebModuleContext<TOptions>(context)), _registrationOwner);
         return this;
     }
 
@@ -227,7 +235,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(configure);
-        _application.Modules.AddProfileContribution<TModule, TOptions>(name, configure);
+        _application.Modules.AddProfileContribution<TModule, TOptions>(name, configure, _registrationOwner);
         return this;
     }
 
@@ -247,7 +255,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
     {
         _application.Modules
             .GetOrAddRegistration<TModule, TOptions>()
-            .AddContributionRequest(phase, order, configure);
+            .AddContributionRequest(phase, order, configure, _registrationOwner);
     }
 
     private static void EnsureWebCapability()

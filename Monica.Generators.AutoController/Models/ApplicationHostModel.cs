@@ -49,16 +49,19 @@ internal sealed class ApplicationDependencyModel(string sourceAssembly, string s
     public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(SourceAssembly + "|" + SourceType + "|" + RequestType);
 }
 
-internal sealed class ApplicationAssemblyModel(string assemblyName, string domainId, string? roleId, string? workloadOwner = null)
+internal sealed class ApplicationAssemblyModel(string assemblyName, string domainId, string? roleId, string? workloadOwner = null,
+    string? backgroundRole = null)
     : IEquatable<ApplicationAssemblyModel>
 {
     public string AssemblyName { get; } = assemblyName;
     public string DomainId { get; } = domainId;
     public string? RoleId { get; } = roleId;
     public string? WorkloadOwner { get; } = workloadOwner;
+    public string? BackgroundRole { get; } = backgroundRole;
 
     public bool Equals(ApplicationAssemblyModel? other) => other is not null &&
-        AssemblyName == other.AssemblyName && DomainId == other.DomainId && RoleId == other.RoleId && WorkloadOwner == other.WorkloadOwner;
+        AssemblyName == other.AssemblyName && DomainId == other.DomainId && RoleId == other.RoleId &&
+        WorkloadOwner == other.WorkloadOwner && BackgroundRole == other.BackgroundRole;
 
     public override bool Equals(object? obj) => obj is ApplicationAssemblyModel other && Equals(other);
 
@@ -67,7 +70,8 @@ internal sealed class ApplicationAssemblyModel(string assemblyName, string domai
         unchecked
         {
             return ((StringComparer.Ordinal.GetHashCode(AssemblyName) * 397) ^
-                    StringComparer.Ordinal.GetHashCode(DomainId)) * 397 ^ (RoleId?.GetHashCode() ?? 0) ^ (WorkloadOwner?.GetHashCode() ?? 0);
+                    StringComparer.Ordinal.GetHashCode(DomainId)) * 397 ^ (RoleId?.GetHashCode() ?? 0) ^
+                   (WorkloadOwner?.GetHashCode() ?? 0) ^ (BackgroundRole?.GetHashCode() ?? 0);
         }
     }
 }

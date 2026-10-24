@@ -6,8 +6,9 @@ namespace Monica.Core.Modularity.Abstractions;
 /// Composes the Monica module graph for one host application.
 /// </summary>
 /// <remarks>
-/// A builder instance is valid only inside the callback passed to <c>AddMonica</c>.
-/// Module registration and configuration are recorded first, then validated and applied to the owning host.
+/// A builder instance is valid inside the callback passed to <c>AddMonica</c> and the framework's subsequent owned
+/// registration pass. Identity and discovery freeze before that pass; module declarations remain open until it ends.
+/// Module registration and configuration are then validated and applied to the owning host.
 /// </remarks>
 public interface IMonicaBuilder : IMonicaCompositionContext
 {

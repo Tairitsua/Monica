@@ -35,7 +35,8 @@ internal static class ApplicationCatalogMetadata
             .Select(static assembly => new XElement("Assembly", new XAttribute("Name", assembly.AssemblyName),
                 new XAttribute("Domain", assembly.DomainId),
                 assembly.RoleId is null ? null : new XAttribute("Role", assembly.RoleId),
-                assembly.WorkloadOwner is null ? null : new XAttribute("WorkloadOwner", assembly.WorkloadOwner)))),
+                assembly.WorkloadOwner is null ? null : new XAttribute("WorkloadOwner", assembly.WorkloadOwner),
+                assembly.BackgroundRole is null ? null : new XAttribute("BackgroundRole", assembly.BackgroundRole)))),
         new XElement("Operations", model.Operations.Where(static operation => operation.Published)
             .OrderBy(static operation => operation.RequestTypeName, StringComparer.Ordinal)
             .Select(static operation => new XElement("Operation",
@@ -89,7 +90,7 @@ internal static class ApplicationCatalogMetadata
                 dependencies.AddRange(ReadDependencies(document));
                 foreach (var item in document.Element("Assemblies")?.Elements("Assembly") ?? [])
                     assemblies.Add(new ApplicationAssemblyModel(Required(item, "Name"), Required(item, "Domain"),
-                        Optional(item, "Role"), Optional(item, "WorkloadOwner")));
+                        Optional(item, "Role"), Optional(item, "WorkloadOwner"), Optional(item, "BackgroundRole")));
                 foreach (var item in document.Element("Operations")?.Elements("Operation") ?? [])
                 {
                     var requestName = Required(item, "Request");
@@ -134,8 +135,13 @@ internal static class ApplicationCatalogMetadata
             Invalid($"Ownership '{group.Key}' is declared by multiple catalog inputs.");
         var domains = new HashSet<string>(assemblies.Where(static assembly => assembly.RoleId is null).Select(static assembly => assembly.DomainId), StringComparer.Ordinal);
         foreach (var role in assemblies.Where(static assembly => assembly.RoleId is not null))
+        {
+            if (role.BackgroundRole is not null)
+                Invalid($"Role assembly '{role.AssemblyName}' cannot declare BackgroundRole; it already owns its work.");
             if (!domains.Contains(role.DomainId))
                 diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.UndefinedApplicationDomain, Location.None, role.RoleId, role.DomainId));
+        }
+        ApplicationHostModelReader.ValidateBackgroundRoles(assemblies, Invalid);
         foreach (var operation in operations)
             if (!assemblies.Any(assembly => assembly.AssemblyName == operation.HandlerAssemblyName && assembly.RoleId == operation.RoleId && assembly.DomainId == operation.DomainId))
                 Invalid($"Operation '{operation.RequestTypeName}' does not match an exported role assembly.");

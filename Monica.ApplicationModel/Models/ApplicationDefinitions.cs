@@ -1,7 +1,7 @@
 namespace Monica.ApplicationModel.Models;
 
 /// <summary>Describes a domain core without requiring a public assembly-marker type.</summary>
-public sealed record ApplicationDomainDefinition(string Id, string AssemblyName);
+public sealed record ApplicationDomainDefinition(string Id, string AssemblyName, string? BackgroundRole = null);
 
 /// <summary>Describes one role's stable identity, business ownership, and implementation assembly.</summary>
 public sealed record ApplicationRoleDefinition(string Id, string DomainId, string AssemblyName, string? WorkloadOwner = null);
@@ -28,6 +28,15 @@ public sealed record ApplicationDependencyDefinition(string SourceAssemblyName, 
 /// <summary>Assigns logical roles to one application; replicas share this placement.</summary>
 public sealed class ApplicationPlacement
 {
+    /// <summary>Gets or sets the application's display name. Null defaults to its AppId map key.</summary>
+    public string? AppName { get; set; }
+
     /// <summary>Gets or sets the explicitly selected roles. Prefixes do not imply sibling or child roles.</summary>
-    public string[] Roles { get; set; } = [];
+    /// <remarks>Null is invalid; explicitly use an empty array for an application with no active roles.</remarks>
+    public string[]? Roles { get; set; }
 }
+
+/// <summary>Describes one immutable application entry in a validated deployment snapshot.</summary>
+/// <param name="AppName">The display name, defaulted to the entry's AppId when omitted.</param>
+/// <param name="Roles">The copied, read-only collection of exact role identifiers assigned to the application.</param>
+public sealed record ApplicationDeploymentEntry(string AppName, IReadOnlyList<string> Roles);

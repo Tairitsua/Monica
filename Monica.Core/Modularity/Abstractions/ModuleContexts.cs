@@ -36,6 +36,7 @@ public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionCon
     internal ModuleCompositionContext(ModuleConfigurationContext context)
     {
         Composition = context.Registration.Application.Composition;
+        RegistrationOwner = context.RegistrationOwner;
         Options = (TOptions)context.Registration.ModuleOption;
         Modules = new ModuleOptionReader(
             context.Registration.Application,
@@ -49,6 +50,10 @@ public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionCon
 
     /// <inheritdoc />
     public MonicaCompositionState Composition { get; }
+
+    /// <summary>Gets the declaring application type captured by this contribution, or null for module-wide lifecycle callbacks.</summary>
+    /// <remarks>Resource registrations retain their own owner; a framework module may contain contributions from several owners.</remarks>
+    public Type? RegistrationOwner { get; }
 
     /// <summary>
     /// Gets the relationship-checked option reader for the current module.
