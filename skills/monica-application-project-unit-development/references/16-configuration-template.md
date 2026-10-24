@@ -7,6 +7,7 @@ Use a Configuration ProjectUnit for actual configurable behavior. Name the appli
 - Use `ConfigurationKind.Startup` for values read during composition or selecting connections, providers, endpoints and process/site identity. Declare an explicit section path. Values come from standard host configuration and remain frozen until restart.
 - Managed is the default for business settings consumed after DI. Its store and declared reload behavior control changes. A business setting can remain Managed even when applying a change requires restart.
 - Runtime consumers use the appropriate `IOptions<T>`, `IOptionsSnapshot<T>` or `IOptionsMonitor<T>`. Those default-name interfaces all return the same frozen object for Startup; the accessor does not determine configuration ownership.
+- ProjectUnit diagnostics report Startup values as requiring restart even with snapshot/monitor consumers or no discovered consumer. Accessor-based reload inference applies only to Managed definitions.
 - Composition reads only Startup options through `GetStartupOptions<T>()` on its Monica builder or registration context. Do not resolve options from a temporary service provider or use a managed store as startup authority.
 
 Use the shared [startup and local execution contract](../../monica-application/references/04-startup-and-local-execution.md) for environment files and local profiles. The infrastructure [options reference](../../monica-infra-configuration/references/options-and-validation.md) owns binding, validation, sensitive values and reload semantics.

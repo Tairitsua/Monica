@@ -148,9 +148,9 @@
       "Unknown": "Unknown mode"
     },
     "ConfigurationUsageTypes": {
-      "Offline": "IOptions (Offline)",
-      "OnlineSnapshot": "IOptionsSnapshot (Online)",
-      "OnlineMonitor": "IOptionsMonitor (Online)",
+      "Offline": "IOptions",
+      "OnlineSnapshot": "IOptionsSnapshot",
+      "OnlineMonitor": "IOptionsMonitor",
       "Unknown": "Unknown usage"
     },
     "MethodModifiers": {

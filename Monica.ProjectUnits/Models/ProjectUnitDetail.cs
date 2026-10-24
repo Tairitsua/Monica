@@ -55,7 +55,7 @@ public sealed class ProjectUnitConfigurationUsage
     public required ProjectUnitReference Unit { get; init; }
 
     /// <summary>
-    /// Gets the options access pattern discovered for the consumer.
+    /// Gets the options accessor discovered for the consumer. The accessor alone does not determine reload behavior.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public EConfigurationUsageType UsageType { get; init; }
@@ -72,12 +72,12 @@ public sealed class ProjectUnitConfigurationDetail
     public required string DefinitionKey { get; init; }
 
     /// <summary>
-    /// Gets whether all discovered consumers require restart-only options access.
+    /// Gets whether values require restart. Startup values always require restart; Managed values use discovered access patterns.
     /// </summary>
     public bool? IsOffline { get; init; }
 
     /// <summary>
-    /// Gets the reload behavior inferred from consumer access patterns.
+    /// Gets the reload behavior determined by Startup ownership or inferred from Managed consumer access patterns.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ConfigurationReloadBehavior? ReloadBehavior { get; init; }

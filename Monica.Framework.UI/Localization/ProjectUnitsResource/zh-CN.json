@@ -148,9 +148,9 @@
       "Unknown": "未知模式"
     },
     "ConfigurationUsageTypes": {
-      "Offline": "IOptions（离线）",
-      "OnlineSnapshot": "IOptionsSnapshot（在线）",
-      "OnlineMonitor": "IOptionsMonitor（在线）",
+      "Offline": "IOptions",
+      "OnlineSnapshot": "IOptionsSnapshot",
+      "OnlineMonitor": "IOptionsMonitor",
       "Unknown": "未知方式"
     },
     "MethodModifiers": {

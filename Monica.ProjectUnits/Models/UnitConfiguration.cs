@@ -8,24 +8,24 @@ using Monica.ProjectUnits.Services.Support;
 namespace Monica.ProjectUnits.Models;
 
 /// <summary>
-/// Configure usage enumeration
+/// Classifies the options accessor used by a consumer. Accessor choice alone does not determine reload behavior.
 /// </summary>
 public enum EConfigurationUsageType
 {
     /// <summary>
-    /// Unknown usage
+    /// The accessor could not be identified.
     /// </summary>
     Unknown,
     /// <summary>
-    /// Offline configuration - use <see cref="IOptions{T}"/>
+    /// Uses <see cref="IOptions{T}"/>.
     /// </summary>
     Offline,
     /// <summary>
-    /// Online configuration - use <see cref="IOptionsSnapshot{T}"/>
+    /// Uses <see cref="IOptionsSnapshot{T}"/>.
     /// </summary>
     OnlineSnapshot,
     /// <summary>
-    /// Online configuration - use <see cref="IOptionsMonitor{T}"/>
+    /// Uses <see cref="IOptionsMonitor{T}"/>.
     /// </summary>
     OnlineMonitor
 }
@@ -35,6 +35,8 @@ public enum EConfigurationUsageType
 /// </summary>
 public class UnitConfiguration : ProjectUnit
 {
+    private ConfigurationKind _kind;
+
     internal UnitConfiguration(BusinessTypeShape shape, ProjectUnitCatalog catalog)
         : base(shape, EProjectUnitType.Configuration, catalog)
     {
@@ -52,14 +54,25 @@ public class UnitConfiguration : ProjectUnit
     public Dictionary<ProjectUnit, EConfigurationUsageType> ConfigurationDependencies { get; private set; } = new();
 
     /// <summary>
-    /// Automatically identify whether the configuration class is an offline configuration (according to the dependency relationship, if one uses <see cref="IOptions{T}"/>, it is an offline parameter, if they are both online types, it is an online parameter, otherwise it is unknown)
+    /// Gets whether values require restart. Startup values are always frozen, including snapshot and monitor access.
+    /// For Managed values, any <see cref="IOptions{T}"/> consumer requires restart; exclusively snapshot or monitor
+    /// consumers permit reload, and absent or unknown usage returns <see langword="null"/>.
     /// </summary>
-    public bool? IsOffline => ConfigurationDependencies.Values.Any(v => v == EConfigurationUsageType.Offline) ? true : 
-                              ConfigurationDependencies.Values.All(v => v is EConfigurationUsageType.OnlineSnapshot or EConfigurationUsageType.OnlineMonitor) && ConfigurationDependencies.Any() ? false : 
-                              null;
+    public bool? IsOffline
+    {
+        get
+        {
+            if (_kind == ConfigurationKind.Startup || ConfigurationDependencies.Values.Contains(EConfigurationUsageType.Offline))
+                return true;
+            if (ConfigurationDependencies.Count > 0 && ConfigurationDependencies.Values.All(
+                    usage => usage is EConfigurationUsageType.OnlineSnapshot or EConfigurationUsageType.OnlineMonitor))
+                return false;
+            return null;
+        }
+    }
 
     /// <summary>
-    /// Gets the reload behavior inferred from discovered options access patterns.
+    /// Gets the frozen Startup behavior or the Managed behavior inferred from discovered options access patterns.
     /// </summary>
     public ConfigurationReloadBehavior? InferredReloadBehavior => IsOffline switch
     {
@@ -86,6 +99,7 @@ public class UnitConfiguration : ProjectUnit
         ConfigurationAttribute configuration)
     {
         var unit = new UnitConfiguration(shape, catalog);
+        unit._kind = configuration.Kind;
         unit.CheckNameConventionMode();
         unit.DefinitionKey = configuration.DefinitionKey ?? shape.Type.FullName ?? shape.Type.Name;
         unit.Title = configuration.DisplayName ?? unit.Title;

@@ -302,6 +302,46 @@ public sealed class ProjectUnitCatalogTests
             && registered.ReloadBehaviorObservationKind == ConfigurationReloadBehaviorObservationKind.Inferred));
     }
 
+    [Theory]
+    [InlineData(null, EConfigurationUsageType.Unknown)]
+    [InlineData(typeof(FrozenOptionsConsumer), EConfigurationUsageType.Offline)]
+    [InlineData(typeof(FrozenSnapshotConsumer), EConfigurationUsageType.OnlineSnapshot)]
+    [InlineData(typeof(FrozenMonitorConsumer), EConfigurationUsageType.OnlineMonitor)]
+    public void StartupConfiguration_ShouldKeepRestartSemanticsRegardlessOfConsumerAccessor(
+        Type? consumerType, EConfigurationUsageType usage)
+    {
+        const string definitionKey = "Test.FrozenOptions";
+        var definition = CreateDefinition(definitionKey) with
+        {
+            Kind = ConfigurationKind.Startup,
+            ReloadBehavior = ConfigurationReloadBehavior.RequiresRestart,
+            ReloadBehaviorObservationKind = ConfigurationReloadBehaviorObservationKind.Declared
+        };
+        var registry = Substitute.For<IConfigurationDefinitionRegistry>();
+        registry.TryGet(definitionKey, out Arg.Any<ConfigurationDefinition?>()).Returns(call =>
+        {
+            call[1] = definition;
+            return true;
+        });
+        var types = consumerType is null ? new[] { typeof(OptionsFrozen) } : [typeof(OptionsFrozen), consumerType];
+        var options = new ModuleProjectUnitsOption();
+        var catalog = ProjectUnitCatalog.CreateAnalyzed(options, options.ConventionOptions,
+            NullLogger<ProjectUnitCatalog>.Instance, types.Select(CreateShape).ToArray(), registry);
+
+        var unit = catalog.FindByFullName<UnitConfiguration>(typeof(OptionsFrozen).FullName)!;
+        if (consumerType is null) Assert.Empty(unit.ConfigurationDependencies);
+        else
+        {
+            var dependency = Assert.Single(unit.ConfigurationDependencies);
+            Assert.Equal(consumerType, dependency.Key.Type);
+            Assert.Equal(usage, dependency.Value);
+        }
+        Assert.True(unit.IsOffline);
+        Assert.Equal(ConfigurationReloadBehavior.RequiresRestart, unit.InferredReloadBehavior);
+        Assert.DoesNotContain(unit.Alerts, alert => alert.Source == "ConfigurationReloadBehaviorInference");
+        registry.DidNotReceive().Register(Arg.Any<ConfigurationDefinition>());
+    }
+
     [Fact]
     public void AttachDocumentation_applies_once_and_keeps_analysis_results_observable()
     {
@@ -634,6 +674,24 @@ public sealed class ProjectUnitCatalogTests
 
     [Configuration(DefinitionKey = "Test.ReloadableOptions")]
     public sealed class ReloadableOptions;
+
+    [Configuration("Test:Frozen", DefinitionKey = "Test.FrozenOptions", Kind = ConfigurationKind.Startup)]
+    public sealed class OptionsFrozen;
+
+    public sealed class FrozenOptionsConsumer(IOptions<OptionsFrozen> options) : DomainService
+    {
+        public IOptions<OptionsFrozen> Options { get; } = options;
+    }
+
+    public sealed class FrozenSnapshotConsumer(IOptionsSnapshot<OptionsFrozen> options) : DomainService
+    {
+        public IOptionsSnapshot<OptionsFrozen> Options { get; } = options;
+    }
+
+    public sealed class FrozenMonitorConsumer(IOptionsMonitor<OptionsFrozen> options) : DomainService
+    {
+        public IOptionsMonitor<OptionsFrozen> Options { get; } = options;
+    }
 
     public sealed class ReloadableOptionsConsumer(IOptionsMonitor<ReloadableOptions> options) : DomainService
     {

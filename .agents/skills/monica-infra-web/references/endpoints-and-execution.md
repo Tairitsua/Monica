@@ -35,6 +35,8 @@ For a Web host with a Monica shell, `AddProjectUnitsUI()` exposes the discovered
 
 `AddProjectUnitsUI()` registers six independently routed pages in the shell's Monitor → Project Units branch. The original `/project-units` address remains the Overview destination.
 
+Configuration details report Startup values as requiring restart even when their consumers use `IOptionsSnapshot<T>` or `IOptionsMonitor<T>`, or no consumer is discovered. These accessors all return the same frozen Startup object. Managed configuration alone uses accessor-based reload inference; see the [configuration unit contract](../../monica-application-project-unit-development/references/16-configuration-template.md).
+
 | Route | Task |
 | --- | --- |
 | `/project-units` | Catalog composition, context completeness, and units needing attention |
