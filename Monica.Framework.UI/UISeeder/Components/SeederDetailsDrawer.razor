@@ -39,6 +39,24 @@
                          role="region"
                          aria-labelledby="seeder-detail-title"
                          tabindex="0">
+                        <section class="seeder-detail-section" aria-labelledby="seeder-execution-title">
+                            <header class="seeder-detail-section-heading">
+                                <h3 id="seeder-execution-title">@L["Manual:Title"]</h3>
+                            </header>
+                            <p>@L["Manual:Effects"]</p>
+                            @if (!string.IsNullOrWhiteSpace(seeder.ActivationReason))
+                            {
+                                <MudAlert Severity="Severity.Info">@seeder.ActivationReason</MudAlert>
+                            }
+                            @if (Session.ExecutionError is { } executionError)
+                            {
+                                <MudAlert Severity="Severity.Error">@L["Manual:Failed", executionError]</MudAlert>
+                            }
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       Disabled="@(!Session.CanRunSelected)" OnClick="@RunSelectedAsync">
+                                @(Session.IsExecuting ? L["Manual:Running"] : L["Manual:Run"])
+                            </MudButton>
+                        </section>
                         <section class="seeder-detail-section seeder-timing-field" aria-labelledby="seeder-timing-title">
                             <header class="seeder-detail-section-heading">
                                 <h3 id="seeder-timing-title"><MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />@L["Details:Timing:Title"]</h3>
@@ -215,6 +233,7 @@
 </MudDrawer>
 
 @code {
+    private async Task RunSelectedAsync() => await Session.RunSelectedAsync();
     [Parameter, EditorRequired] public SeederPageSession Session { get; set; } = default!;
 
     private SeederExecutionSnapshot? FindDependency(string seederTypeName)

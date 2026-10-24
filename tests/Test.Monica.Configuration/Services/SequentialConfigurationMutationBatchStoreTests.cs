@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Configuration.Abstractions;
+using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services;
 using NSubstitute;
@@ -10,6 +11,47 @@ namespace Test.Monica.Configuration.Services;
 
 public sealed class SequentialConfigurationMutationBatchStoreTests
 {
+    [Fact]
+    public async Task CommitAsync_WhenCustomStoreDoesNotSupportPublicationGuards_ShouldRejectBeforeAnyWrite()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var values = Substitute.For<IConfigurationEffectiveValueStore>();
+        var histories = Substitute.For<IConfigurationHistoryStore>();
+        var item = CreateItem("test.manual", 1, "edit");
+        item = item with { SaveRequest = item.SaveRequest with
+        {
+            PublishedDefinitionExpectation = new ConfigurationPublishedDefinitionExpectation { Definition = item.SaveRequest.Definition }
+        } };
+
+        var commit = () => CreateStore(values, histories).CommitAsync(CreateRequest(item), token);
+
+        await commit.Should().ThrowAsync<NotSupportedException>();
+        await values.DidNotReceive().SaveAsync(Arg.Any<ConfigurationEffectiveValueSaveRequest>(), token);
+        histories.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenAtomicAuthorityCheckFails_ShouldNotCreateAnAuditGroup()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var values = Substitute.For<IConfigurationEffectiveValueStore>();
+        values.SupportsPublishedDefinitionGuard.Returns(true);
+        var histories = Substitute.For<IConfigurationHistoryStore>();
+        var item = CreateItem("test.manual", 1, "edit");
+        item = item with { SaveRequest = item.SaveRequest with
+        {
+            PublishedDefinitionExpectation = new ConfigurationPublishedDefinitionExpectation { Definition = item.SaveRequest.Definition }
+        } };
+        values.SaveAsync(item.SaveRequest, token).Returns(Task.FromException<ConfigurationEffectiveValueDocument>(
+            new ConfigurationConcurrencyConflictException("Authority changed.")));
+
+        var result = await CreateStore(values, histories).CommitAsync(CreateRequest(item), token);
+
+        result.Failure.Should().NotBeNull();
+        result.AppliedRequestIds.Should().BeEmpty();
+        histories.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task CommitAsync_WhenDefinitionContainsTwoCommands_ShouldSaveFinalDocumentOnceAndAppendBothHistories()
     {

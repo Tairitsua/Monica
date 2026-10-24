@@ -448,7 +448,11 @@ internal sealed class ConfigurationSourceInspector(
                 continue;
             }
 
-            hits.Add(value);
+            hits.Add(value with
+            {
+                IsUnpersisted = source.Provider is MonicaConfigurationProvider monica
+                    && monica.IsUnpersisted(definition.DefinitionKey)
+            });
         }
 
         var effectiveIndex = hits.Count == 0 ? -1 : hits.Max(hit => hit.Source.PriorityIndex);
@@ -697,7 +701,7 @@ internal sealed class ConfigurationSourceInspector(
             .ToArray();
     }
 
-    private static ConfigurationSourceDescriptor BuildDescriptor(
+    private ConfigurationSourceDescriptor BuildDescriptor(
         IConfigurationProvider provider,
         int index,
         IReadOnlyList<ManagedJsonConfigurationSourceRegistration> managedSources)
@@ -765,7 +769,7 @@ internal sealed class ConfigurationSourceInspector(
         };
     }
 
-    private static ConfigurationSourceDescriptor BuildJsonDescriptor(
+    private ConfigurationSourceDescriptor BuildJsonDescriptor(
         JsonConfigurationProvider provider,
         int index,
         IReadOnlyList<ManagedJsonConfigurationSourceRegistration> managedSources)
@@ -778,7 +782,7 @@ internal sealed class ConfigurationSourceInspector(
         var normalizedPhysicalPath = string.IsNullOrWhiteSpace(physicalPath) ? null : Path.GetFullPath(physicalPath);
         var managed = FindManagedRegistration(sourcePath, normalizedPhysicalPath, managedSources);
         var deploymentOwned = provider is IDeploymentConfigurationProvider;
-        var canWrite = !deploymentOwned && !string.IsNullOrWhiteSpace(normalizedPhysicalPath)
+        var canWrite = runtimeContext.AutonomousWork && !deploymentOwned && !string.IsNullOrWhiteSpace(normalizedPhysicalPath)
                        && CanWriteJsonFile(normalizedPhysicalPath)
                        && (managed?.IsWritable ?? true);
 
@@ -791,7 +795,9 @@ internal sealed class ConfigurationSourceInspector(
             Kind = ConfigurationSourceKind.JsonFile,
             IsManagedByMonica = managed is not null,
             IsWritable = canWrite,
-            ReadOnlyReason = deploymentOwned ? "Deployment configuration sources are read-only. Change the deployment input outside this process."
+            ReadOnlyReason = !runtimeContext.AutonomousWork
+                ? "External JSON sources are read-only in Manual mode. Use the guarded Monica effective-store target."
+                : deploymentOwned ? "Deployment configuration sources are read-only. Change the deployment input outside this process."
                 : canWrite ? null : ResolveJsonReadOnlyReason(normalizedPhysicalPath, managed),
             SourcePath = sourcePath,
             PhysicalPath = normalizedPhysicalPath,

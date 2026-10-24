@@ -47,6 +47,11 @@ public sealed class ModuleDiagnosticsFacade
             "Failed to load the type-discovery assembly inventory.");
     }
 
+    /// <summary>Gets current per-resource activation observations independently of the immutable startup snapshot.</summary>
+    /// <remarks>Held factories remain opaque. Native prerequisite updates can change later observations; reading never starts work.</remarks>
+    public Res<IReadOnlyList<ResourceActivationObservation>> GetResourceActivations() => Execute(
+        _diagnostics.GetResourceActivations, "Failed to load resource activation observations.");
+
     /// <summary>
     /// Gets a complete public-property catalog with bounded values for one module's finalized default options.
     /// </summary>

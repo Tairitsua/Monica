@@ -37,6 +37,9 @@ public interface IMonicaApplicationOptions
     /// <summary>Gets the deployment environment identity shared by participating applications, or null when unset.</summary>
     string? DeploymentScope { get; }
 
+    /// <summary>Gets whether this host may initiate shared or environmental work without an explicit request. Defaults to true.</summary>
+    bool AutonomousWork { get; }
+
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.
     /// </summary>
@@ -92,6 +95,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     private string? _appVersion = ResolveEntryAssemblyAppVersion();
     private string? _domainName;
     private string? _deploymentScope;
+    private bool? _autonomousWork;
 
     /// <summary>
     /// Gets or sets the application project name.
@@ -129,6 +133,20 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     /// supplies the canonical startup input. Conflicting code configuration fails composition.
     /// </summary>
     public string? DeploymentScope { get => _deploymentScope; set => Set(ref _deploymentScope, value); }
+
+    /// <summary>Gets or sets whether this process initiates autonomous work. Defaults to true.</summary>
+    /// <remarks>Application:AutonomousWork is the canonical frozen input. False retains eligible explicit operations and passive behavior.</remarks>
+    public bool AutonomousWork
+    {
+        get => _autonomousWork ?? true;
+        set
+        {
+            if (_frozen) throw new InvalidOperationException("Application execution policy is frozen before owned registration begins.");
+            _autonomousWork = value;
+        }
+    }
+
+    internal bool? ConfiguredAutonomousWork => _autonomousWork;
 
     internal void Freeze() => _frozen = true;
 

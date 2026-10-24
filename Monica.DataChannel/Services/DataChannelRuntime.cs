@@ -1,24 +1,41 @@
 using Microsoft.AspNetCore.Builder;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Pipeline;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 
 namespace Monica.DataChannel.Services;
 
 /// <summary>
 /// Owns pipeline definitions and materialized channels for one application host.
 /// </summary>
-internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelManager
+internal sealed class DataChannelRuntime(MonicaApplication? application = null) : IDataChannelRegistrar, IDataChannelManager
 {
     private readonly object _syncRoot = new();
     private readonly Dictionary<string, ChannelPipelineBuilder> _builders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DataChannel> _channels = new(StringComparer.Ordinal);
     private bool _isRegistrationClosed;
+    private Type? _setupType;
+    private Type? _registrationOwner;
+
+    internal void ApplySetup(IDataChannelSetup setup, Type? registrationOwner, IDataChannelRegistrar registrar)
+    {
+        _setupType = setup.GetType();
+        _registrationOwner = registrationOwner;
+        try { setup.Setup(registrar); }
+        finally { _setupType = null; _registrationOwner = null; }
+    }
 
     /// <inheritdoc />
     public void Add(string id, Action<ChannelPipelineBuilder> configure, string? groupId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(configure);
+
+        if (application?.TypeActivation?.GetActivation(_setupType ?? typeof(DataChannelRuntime), TypeActivationKind.DataChannel, _registrationOwner)
+            is ActivationMode.Manual or ActivationMode.Disabled)
+            throw new InvalidOperationException("Data channels are held in this process and cannot be materialized by an explicit request.");
 
         var builder = new ChannelPipelineBuilder();
         configure(builder);
@@ -36,6 +53,15 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
             {
                 throw new InvalidOperationException($"Data channel '{id}' is already registered in the current host.");
             }
+            application?.RecordActivation(new ResourceActivation
+            {
+                Key = $"DataChannel:channel:{id}",
+                ImplementationType = _setupType,
+                RegistrationOwner = _registrationOwner,
+                Kind = TypeActivationKind.DataChannel,
+                Mode = ActivationMode.Automatic,
+                Reason = "Declared by an admitted setup; initialization readiness is reported by the channel."
+            });
         }
     }
 

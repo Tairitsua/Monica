@@ -34,7 +34,7 @@ internal sealed class MonicaConfigurationProviderActivationCoordinator(
     private bool _activated;
 
     /// <summary>
-    /// Publishes local configuration metadata and then activates the projection provider.
+    /// Activates the projection provider, publishing local metadata first only in Automatic mode.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task ActivateAsync(CancellationToken cancellationToken)
@@ -60,11 +60,13 @@ internal sealed class MonicaConfigurationProviderActivationCoordinator(
 
     private async Task ActivateProviderAsync(CancellationToken cancellationToken)
     {
+        var autonomous = serviceProvider.GetRequiredService<ConfigurationRuntimeContext>().AutonomousWork;
         try
         {
-            await metricsRecorder.MeasureStartupStageAsync(
-                ConfigurationStartupStage.MetadataPublication,
-                () => PublishMetadataAsync(cancellationToken));
+            if (autonomous)
+                await metricsRecorder.MeasureStartupStageAsync(
+                    ConfigurationStartupStage.MetadataPublication,
+                    () => PublishMetadataAsync(cancellationToken));
         }
         catch (Exception exception)
         {
@@ -76,20 +78,19 @@ internal sealed class MonicaConfigurationProviderActivationCoordinator(
             metadataStore.Descriptor.StoreKey,
             effectiveValueStore.Descriptor.StoreKey,
             StringComparison.Ordinal);
-        if (!storesShareHealth)
+        if (autonomous && !storesShareHealth)
         {
             stateTracker.RecordSuccess(metadataStore.Descriptor.StoreKey);
         }
 
-        // Publication establishes the publisher-state guard before the provider can seed an effective-value document.
-        // Exposing the service provider earlier would allow a concurrent projection reload to recreate a retired key
-        // while another process is still permitted to purge it.
+        // Automatic activation publishes before enabling seed writes. Manual activation only reads existing
+        // documents or validates temporary inputs, so it never establishes or changes publication authority.
         accessor.ServiceProvider = serviceProvider;
         await metricsRecorder.MeasureStartupStageAsync(
             ConfigurationStartupStage.ProjectionReload,
             () => reloadCoordinator.ReloadMonicaProjectionAsync(cancellationToken));
 
-        if (storesShareHealth)
+        if (autonomous && storesShareHealth)
         {
             stateTracker.RecordSuccess(metadataStore.Descriptor.StoreKey);
         }

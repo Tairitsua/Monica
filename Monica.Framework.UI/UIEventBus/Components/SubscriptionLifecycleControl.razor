@@ -14,7 +14,7 @@
                 aria-label="@L["SubscriptionLifecycle:Actions:Deactivate"]" title="@L["SubscriptionLifecycle:Actions:Deactivate"]" aria-disabled="@(IsBusy ? "true" : "false")"
                 OnClick="() => DispatchAsync(OnDeactivate)" />
         }
-        else
+        else if (Subscription.CanActivate)
         {
             <MudIconButton Icon="@MoIcons.PlayCircle" Color="Color.Success" Size="Size.Small"
                 aria-label="@L["SubscriptionLifecycle:Actions:Activate"]" title="@L["SubscriptionLifecycle:Actions:Activate"]" aria-disabled="@(IsBusy ? "true" : "false")"

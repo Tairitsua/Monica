@@ -7,6 +7,10 @@ namespace Monica.Configuration.Abstractions;
 /// </summary>
 public interface IConfigurationEffectiveValueStore : IConfigurationEffectiveValueReader
 {
+    /// <summary>Whether saves atomically enforce supplied publication evidence and require an existing document.</summary>
+    /// <remarks>Custom stores default to false and cannot receive Manual mutation requests until this contract is implemented.</remarks>
+    bool SupportsPublishedDefinitionGuard => false;
+
     /// <summary>
     /// Ensures that a definition has an effective value document.
     /// </summary>

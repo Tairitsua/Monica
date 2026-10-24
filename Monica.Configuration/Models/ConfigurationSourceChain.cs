@@ -40,6 +40,9 @@ public sealed record ConfigurationSourceChain
 /// </summary>
 public sealed record ConfigurationSourceValue
 {
+    /// <summary>Whether this contribution is a validated temporary seed with no persisted managed document.</summary>
+    public bool IsUnpersisted { get; init; }
+
     /// <summary>
     /// Gets the source descriptor.
     /// </summary>

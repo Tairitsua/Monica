@@ -1,0 +1,95 @@
+@using Microsoft.Extensions.Localization
+@using Monica.Core.Modularity.Diagnostics.Models
+@using Monica.Core.TypeDiscovery.Abstractions
+@using Monica.UI.Localization
+@using Monica.UI.UIModuleSystem.State
+@using Monica.UI.UIModuleSystem.Support
+@inject IStringLocalizer<ModuleSystemResource> L
+
+<section class="mo-vl-panel resource-activations" aria-labelledby="resource-activations-title">
+    <header class="mo-vl-panel-head resource-heading">
+        <div>
+            <h2 id="resource-activations-title" class="mo-vl-panel-title">@L["ResourceActivations:Title"]</h2>
+            <p class="mo-vl-panel-sub">@L["ResourceActivations:Description"]</p>
+        </div>
+        <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Refresh"
+                   Disabled="@(Session.ResourceActivationsState == ModuleSystemLazyLoadState.Loading)"
+                   OnClick="@Session.RefreshResourceActivationsAsync">@L["Actions:Refresh"]</MudButton>
+    </header>
+    <div class="resource-body">
+        @if (Session.ResourceActivationsState == ModuleSystemLazyLoadState.Failed)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">
+                @(Session.ResourceActivations is null ? L["ResourceActivations:LoadFailed"] : L["ResourceActivations:RefreshFailed"])
+            </MudAlert>
+        }
+        @if (Session.ResourceActivations is { } resources)
+        {
+            <div class="resource-tools">
+                <div class="mo-vl-chips" role="group" aria-label="@L["ResourceActivations:Filter"]">
+                    <MoFilterChip Label="@L["ResourceActivations:Held"]" Selected="@_heldOnly"
+                                  SelectedChanged="@(() => _heldOnly = true)" Role="MoVisualRole.Warning" />
+                    <MoFilterChip Label="@L["Common:All"]" Selected="@(!_heldOnly)"
+                                  SelectedChanged="@(() => _heldOnly = false)" />
+                </div>
+                <span class="resource-count">@L["ResourceActivations:Count", resources.Count(resource => resource.Mode != ActivationMode.Automatic), resources.Count]</span>
+            </div>
+            @if (Rows.Count != 0)
+            {
+                <MudTable T="ResourceActivationObservation" Items="@Rows" Dense="true" Hover="true" RowsPerPage="10" Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>@L["ResourceActivations:Resource"]</MudTh>
+                        <MudTh>@L["ResourceActivations:Owner"]</MudTh>
+                        <MudTh>@L["ResourceActivations:Mode"]</MudTh>
+                        <MudTh>@L["ResourceActivations:Reason"]</MudTh>
+                    </HeaderContent>
+                    <RowTemplate Context="resource">
+                        <MudTd DataLabel="@L["ResourceActivations:Resource"]">
+                            <div class="resource-identity"><code>@resource.Key</code><span>@(resource.ImplementationTypeName ?? L["ResourceActivations:OpaqueFactory"])</span></div>
+                        </MudTd>
+                        <MudTd DataLabel="@L["ResourceActivations:Owner"]"><span class="resource-value">@(resource.RegistrationOwnerTypeName ?? L["ResourceActivations:NoExplicitOwner"])</span></MudTd>
+                        <MudTd DataLabel="@L["ResourceActivations:Mode"]"><MudChip T="string" Size="Size.Small" Color="@ModeColor(resource.Mode)">@ModeText(resource.Mode)</MudChip></MudTd>
+                        <MudTd DataLabel="@L["ResourceActivations:Reason"]"><span class="resource-value">@resource.Reason</span></MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Common:RowsPerPage"]"
+                                       InfoFormat="@L["Common:PagerInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft"
+                                       NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" />
+                    </PagerContent>
+                </MudTable>
+            }
+            else if (Session.ResourceActivationsState == ModuleSystemLazyLoadState.Ready)
+            {
+                <p class="resource-empty" role="status">@(_heldOnly && resources.Count != 0 ? L["ResourceActivations:NoHeld"] : L["ResourceActivations:Empty"])</p>
+            }
+        }
+        else if (Session.ResourceActivationsState != ModuleSystemLazyLoadState.Failed)
+        {
+            <p class="resource-empty" role="status">@L["ResourceActivations:Loading"]</p>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ModuleSystemWorkbenchSession Session { get; set; } = default!;
+    private bool _heldOnly = true;
+    private IReadOnlyList<ResourceActivationObservation> Rows => (Session.ResourceActivations ?? [])
+        .Where(resource => !_heldOnly || resource.Mode != ActivationMode.Automatic).ToArray();
+
+    protected override Task OnInitializedAsync() => Session.RefreshResourceActivationsAsync();
+
+    private string ModeText(ActivationMode mode) => mode switch
+    {
+        ActivationMode.Disabled => L["ResourceActivations:Disabled"],
+        ActivationMode.Manual => L["ResourceActivations:Manual"],
+        ActivationMode.Automatic => L["ResourceActivations:Automatic"],
+        _ => L["Common:Unknown"]
+    };
+
+    private static Color ModeColor(ActivationMode mode) => mode switch
+    {
+        ActivationMode.Manual => Color.Warning,
+        ActivationMode.Automatic => Color.Success,
+        _ => Color.Default
+    };
+}

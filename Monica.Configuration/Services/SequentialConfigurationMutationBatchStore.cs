@@ -13,10 +13,15 @@ internal sealed class SequentialConfigurationMutationBatchStore(
     ILogger<SequentialConfigurationMutationBatchStore> logger)
     : IConfigurationMutationBatchStore
 {
+    public bool SupportsPublishedDefinitionGuard => effectiveValueStore.SupportsPublishedDefinitionGuard;
+
     public async Task<ConfigurationMutationBatchCommitResult> CommitAsync(
         ConfigurationMutationBatchCommitRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.Items.Any(item => item.SaveRequest.PublishedDefinitionExpectation is not null)
+            && !SupportsPublishedDefinitionGuard)
+            throw new NotSupportedException("This store cannot enforce active-publication write guards.");
         var documents = new Dictionary<string, ConfigurationEffectiveValueDocument>(StringComparer.OrdinalIgnoreCase);
         var appliedRequestIds = new List<string>(request.Items.Count);
         var issues = new List<ConfigurationPostCommitIssue>();
@@ -72,7 +77,8 @@ internal sealed class SequentialConfigurationMutationBatchStore(
         };
         try
         {
-            await historyStore.UpsertGroupAsync(persistedGroup, cancellationToken);
+            if (appliedRequestIds.Count > 0)
+                await historyStore.UpsertGroupAsync(persistedGroup, cancellationToken);
         }
         catch (Exception ex)
         {

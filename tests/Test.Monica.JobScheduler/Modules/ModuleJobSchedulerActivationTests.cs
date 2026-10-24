@@ -152,10 +152,11 @@ public sealed class ModuleJobSchedulerActivationTests
         }
     }
 
-    public sealed class ActivationModule : MonicaModule<ActivationModuleOptions>
+    public sealed class ActivationModule : MonicaModule<ActivationModuleOptions>, IApplicationCompositionModule
     {
-        public override void ConfigureBuilder(ModuleBuilderContext<ActivationModuleOptions> context) =>
+        public void PrepareApplication(IMonicaBuilder builder, Microsoft.Extensions.Hosting.IHostApplicationBuilder hostBuilder) =>
             Application.SetTypeActivationPolicy(Option.Policy);
+        public void RegisterApplication(IMonicaBuilder builder, Microsoft.Extensions.Hosting.IHostApplicationBuilder hostBuilder) { }
     }
 
     public sealed class ActivationModuleOptions : ModuleOptions<ActivationModule>
@@ -172,10 +173,10 @@ public sealed class ModuleJobSchedulerActivationTests
             [typeof(StandaloneJob)] = null
         };
 
-        public bool IsEnabled(Type implementationType, TypeActivationKind kind) =>
-            kind != TypeActivationKind.Job || _owners.ContainsKey(implementationType);
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null) =>
+            kind != TypeActivationKind.Job || _owners.ContainsKey(implementationType) ? ActivationMode.Automatic : ActivationMode.Disabled;
         public void EnsureCanExecuteRequest(Type requestType) { }
-        public string? GetWorkloadOwner(Type implementationType) => _owners.GetValueOrDefault(implementationType);
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => _owners.GetValueOrDefault(implementationType);
     }
 
     private sealed class ExecutionProbe

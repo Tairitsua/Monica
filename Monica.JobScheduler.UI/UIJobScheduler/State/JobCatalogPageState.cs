@@ -90,8 +90,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal JobDefinitionSortField SortField { get; private set; } = JobDefinitionSortField.JobName;
     internal bool SortDescending { get; private set; }
     internal bool HasSelection => _selectedJobIds.Count > 0;
-    internal bool HasDebugOnlySuppressedSelection =>
-        SelectedRecurringSummaries.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed);
+    internal bool HasManualOnlySuppressedSelection =>
+        SelectedRecurringSummaries.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed);
     internal bool IsDisposed => _lifetime.IsRetired;
 
     /// <summary>
@@ -298,8 +298,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
                 return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
-            if (disabled && JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary))
-                return Res.Fail(_localizer["Catalog:Messages:PauseUnavailableDebug"]);
+            if (disabled && JobSchedulerUiPresentation.IsManualOnlySuppressed(summary))
+                return Res.Fail(_localizer["Catalog:Messages:PauseUnavailableManual"]);
 
             var definition = summary.Definition;
             var result = await _facade.UpdatePolicyAsync(
@@ -387,8 +387,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             if (selected.Count == 0) return _localizer["Catalog:Batch:Empty"].Value;
             if (selected.Any(static summary => summary.Definition.Declaration.JobType != JobType.Recurring))
                 throw new ArgumentException("A catalog policy batch accepts only confirmed recurring definitions.", nameof(selected));
-            if (disabled && selected.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed))
-                return _localizer["Catalog:Batch:PauseUnavailableDebug"].Value;
+            if (disabled && selected.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed))
+                return _localizer["Catalog:Batch:PauseUnavailableManual"].Value;
 
             var result = await _facade.UpdatePoliciesAsync(new JobPolicyBatchUpdateRequest
             {

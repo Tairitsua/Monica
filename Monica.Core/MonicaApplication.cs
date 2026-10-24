@@ -33,6 +33,8 @@ public sealed class MonicaApplication : IDisposable
     private MonicaCompositionState? _composition;
     private bool _applicationInputsFrozen;
     private bool _preparingApplication;
+    private readonly Lock _activationGate = new();
+    private readonly Dictionary<string, ResourceActivation> _activationResources = new(StringComparer.Ordinal);
 
     internal MonicaApplication(MonicaStartupOrigin? startupOrigin = null)
     {
@@ -63,16 +65,32 @@ public sealed class MonicaApplication : IDisposable
         _composition.Initialize(builder, error => logger.LogWarning("{EnvironmentFileDiagnostic}", error));
     }
 
-    /// <summary>Gets the optional immutable business activation policy installed during composition.</summary>
+    /// <summary>Gets the immutable activation policy, or null before pre-seal application preparation.</summary>
     public ITypeActivationPolicy? TypeActivation { get; private set; }
 
-    /// <summary>Installs the activation policy before business discovery commits.</summary>
-    /// <remarks>The application-model module owns the policy; replacing it would invalidate committed registrations.</remarks>
+    /// <summary>Gets a detached, key-ordered snapshot of native resource activation decisions for this host.</summary>
+    public IReadOnlyList<ResourceActivation> ActivationResources
+    {
+        get { lock (_activationGate) return Array.AsReadOnly(_activationResources.Values.OrderBy(resource => resource.Key, StringComparer.Ordinal).ToArray()); }
+    }
+
+    /// <summary>Records or updates one native resource's admission observation without constructing it.</summary>
+    /// <remarks>Modules own stable keys and safe reason text. Runtime prerequisite changes may update the same key; this does not execute or change the resource itself.</remarks>
+    public void RecordActivation(ResourceActivation resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource.Key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource.Reason);
+        lock (_activationGate) _activationResources[resource.Key] = resource;
+    }
+
+    /// <summary>Installs the activation policy during application preparation, before owned registrations run.</summary>
+    /// <remarks>The authority installs one policy; Core supplies a standalone default when absent. Replacing a frozen policy would invalidate resource ownership.</remarks>
     public void SetTypeActivationPolicy(ITypeActivationPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
         if (_typeActivationFrozen)
-            throw new InvalidOperationException("Business activation is frozen after service configuration.");
+            throw new InvalidOperationException("Business activation is frozen before application registration.");
         if (TypeActivation is not null)
             throw new InvalidOperationException("The business activation policy has already been installed.");
         TypeActivation = policy;
@@ -112,6 +130,17 @@ public sealed class MonicaApplication : IDisposable
     {
         _applicationOptions.AppId = ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
         _applicationOptions.DeploymentScope = ResolveStartupIdentity("Application:DeploymentScope", _applicationOptions.DeploymentScope);
+        var selected = Composition.StartupConfiguration.SelectCompleteSection("Application:AutonomousWork");
+        if (selected is not null)
+        {
+            var section = selected.GetSection("Application:AutonomousWork");
+            if (!selected.TryGetShape(section.Path, out var shape) || shape != ConfigurationValueShape.Scalar
+                || section.GetChildren().Any() || !bool.TryParse(section.Value, out var value))
+                throw new InvalidOperationException("'Application:AutonomousWork' must be a boolean startup value.");
+            if (_applicationOptions.ConfiguredAutonomousWork is { } configured && configured != value)
+                throw new InvalidOperationException("'Application:AutonomousWork' conflicts with explicitly configured execution policy.");
+            _applicationOptions.AutonomousWork = value;
+        }
     }
 
     private string? ResolveStartupIdentity(string path, string? configured)
@@ -142,6 +171,8 @@ public sealed class MonicaApplication : IDisposable
         ResolveApplicationInputs();
         _applicationOptions.Freeze();
         _typeFinderOptions.Freeze();
+        TypeActivation ??= new StandaloneTypeActivationPolicy(_applicationOptions.AutonomousWork);
+        _typeActivationFrozen = true;
         _applicationInputsFrozen = true;
     }
 

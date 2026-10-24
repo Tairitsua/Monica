@@ -61,6 +61,9 @@ public sealed class ModuleDaprClient : MonicaModule<ModuleDaprClientOption>, IWe
             sp.GetRequiredService<DaprSidecarHealthCoordinator>());
         services.AddHostedService(sp =>
             sp.GetRequiredService<DaprSidecarHealthCoordinator>());
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(DaprSidecarHealthCoordinator));
 
         services.AddHealthChecks()
             .AddMonicaReadinessCheck<DaprSidecarHealthCheck>(

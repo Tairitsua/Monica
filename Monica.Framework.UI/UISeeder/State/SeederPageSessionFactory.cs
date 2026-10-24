@@ -11,6 +11,7 @@ namespace Monica.Framework.UI.UISeeder.State;
 public sealed class SeederPageSessionFactory
 {
     private readonly Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
+    private readonly Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? _runAsync;
     private readonly string _hostName;
 
     /// <summary>Creates a factory backed by the host-local Seeder diagnostics facade.</summary>
@@ -19,17 +20,19 @@ public sealed class SeederPageSessionFactory
     public SeederPageSessionFactory(SeederFacade facade, IHostEnvironment environment)
         : this(
             facade.GetSnapshotAsync,
-            $"{environment.ApplicationName} · {Environment.MachineName}")
+            $"{environment.ApplicationName} · {Environment.MachineName}", facade.RunAsync)
     {
     }
 
     internal SeederPageSessionFactory(
         Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> getSnapshotAsync,
-        string hostName)
+        string hostName,
+        Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? runAsync = null)
     {
         _getSnapshotAsync = getSnapshotAsync ?? throw new ArgumentNullException(nameof(getSnapshotAsync));
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);
         _hostName = hostName;
+        _runAsync = runAsync;
     }
 
     /// <summary>Creates a fresh session owned by one rendered page instance.</summary>
@@ -40,6 +43,6 @@ public sealed class SeederPageSessionFactory
     public SeederPageSession Create(Func<CancellationToken, Task<bool>> authorize)
     {
         ArgumentNullException.ThrowIfNull(authorize);
-        return new SeederPageSession(_getSnapshotAsync, authorize, _hostName);
+        return new SeederPageSession(_getSnapshotAsync, authorize, _hostName, runAsync: _runAsync);
     }
 }

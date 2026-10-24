@@ -17,6 +17,8 @@ using Monica.Core.Modularity.Models.Internal;
 using Monica.Core.Modularity.Services.Support;
 using Monica.Core.Modularity.State;
 using Monica.Core.TypeDiscovery.Services;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.Tool.Extensions;
 
 namespace Monica.Core.Modularity.Services;
@@ -576,16 +578,33 @@ public sealed class ModuleRegistry(MonicaApplication application)
     private void ApplyHostedServiceActivation(IServiceCollection services)
     {
         if (application.TypeActivation is not { } activation) return;
-        for (var index = services.Count - 1; index >= 0; index--)
+        var hostedDescriptors = services.Where(descriptor => !descriptor.IsKeyedService
+            && descriptor.ServiceType == typeof(IHostedService)).ToArray();
+        for (var index = 0; index < hostedDescriptors.Length; index++)
         {
-            var descriptor = services[index];
-            if (descriptor.IsKeyedService || descriptor.ServiceType != typeof(IHostedService)) continue;
-            var owner = application.Composition.GetServiceRegistrationOwner(descriptor)
-                ?? descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
-            // Factory descriptors use their declaring owner without constructing their implementation.
-            if (owner is not null && !activation.IsEnabled(owner,
-                    Monica.Core.TypeDiscovery.Abstractions.TypeActivationKind.HostedService))
-                services.RemoveAt(index);
+            var descriptor = hostedDescriptors[index];
+            var admitted = application.Composition.GetAdmittedHostedLifecycle(descriptor);
+            var implementation = admitted ?? descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
+            var owner = application.Composition.GetServiceRegistrationOwner(descriptor);
+            // Opaque factories have no inspectable initializer attributes; never execute them for metadata.
+            var mode = admitted is not null ? ActivationMode.Automatic
+                : activation.GetActivation(implementation ?? typeof(IHostedService), TypeActivationKind.HostedService, owner);
+            application.RecordActivation(new ResourceActivation
+            {
+                Key = $"hosted:{index}:{implementation?.FullName ?? "factory"}",
+                ImplementationType = implementation,
+                RegistrationOwner = owner,
+                Kind = TypeActivationKind.HostedService,
+                Mode = mode,
+                Reason = admitted is not null ? "Module lifecycle and explicit execution infrastructure."
+                    : mode switch
+                    {
+                        ActivationMode.Manual => "Automatic hosted execution is held by the host policy.",
+                        ActivationMode.Disabled => "The owning resource is not eligible in this application.",
+                        _ => "Automatic hosted execution is admitted."
+                    }
+            });
+            if (mode != ActivationMode.Automatic) services.Remove(descriptor);
         }
     }
 
@@ -1226,10 +1245,22 @@ public sealed class ModuleRegistry(MonicaApplication application)
 
     private void RegisterStartupValidation(IServiceCollection services)
     {
+        var activationDescriptor = ServiceDescriptor.Singleton<ITypeActivationPolicy>(application.TypeActivation!);
+        services.Add(activationDescriptor);
+        application.Composition.OnServicesFinalized(static _ => { }, descriptors =>
+        {
+            var policies = descriptors.Where(descriptor => !descriptor.IsKeyedService
+                && descriptor.ServiceType == typeof(ITypeActivationPolicy)).ToArray();
+            if (policies.Length != 1 || !ReferenceEquals(policies[0], activationDescriptor))
+                throw new InvalidOperationException(
+                    "Runtime activation must retain exactly the frozen ITypeActivationPolicy singleton registered by Monica.");
+        });
         services.AddSingleton<IValidateOptions<ModuleStartupValidationOptions>>(
             new ModuleStartupValidator(application));
         services.AddOptions<ModuleStartupValidationOptions>().ValidateOnStart();
         services.AddHostedService<MonicaApplicationLifecycle>();
+        application.Composition.AdmitHostedLifecycle(services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationType == typeof(MonicaApplicationLifecycle)), typeof(MonicaApplicationLifecycle));
     }
 
     private void ExecutePostConfigureServices(

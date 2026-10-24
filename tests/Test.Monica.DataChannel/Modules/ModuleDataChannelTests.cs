@@ -3,6 +3,9 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Builder;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Modularity.Abstractions;
@@ -19,6 +22,38 @@ namespace Test.Monica.DataChannel.Modules;
 
 public sealed class ModuleDataChannelTests
 {
+    [Fact]
+    public async Task ManualHost_DoesNotConstructSetupsAndKeepsHttpAvailable()
+    {
+        await using var app = await new ManualChannelFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Empty(app.Services.GetRequiredService<IDataChannelManager>().FetchAll());
+        Assert.Contains(app.Services.GetRequiredService<MonicaApplication>().ActivationResources,
+            resource => resource.ImplementationType == typeof(ForbiddenSetup) && resource.Mode == ActivationMode.Manual);
+        using var client = ((TestServer)app.Services.GetRequiredService<IServer>()).CreateClient();
+        using var response = await client.GetAsync("/channels", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private sealed class ManualChannelFactory : MonicaTestApplicationFactory<ModuleDataChannelTests>
+    {
+        protected override void ConfigureHost(WebApplicationBuilder builder)
+        {
+            base.ConfigureHost(builder);
+            builder.Configuration["Application:AutonomousWork"] = "false";
+        }
+        protected override void ConfigureMonica(IMonicaBuilder builder)
+        {
+            builder.ConfigureModuleSystem(options => { options.AutoAddMonicaHttpListener = false; options.EnableMinimalApiByDefault = true; });
+            builder.AddDataChannel().UseSetup<ForbiddenSetup>();
+        }
+    }
+
+    private sealed class ForbiddenSetup : IDataChannelSetup
+    {
+        public ForbiddenSetup() => throw new InvalidOperationException("A held channel setup must not be constructed.");
+        public void Setup(IDataChannelRegistrar channels) => throw new InvalidOperationException("A held channel setup must not execute.");
+    }
+
     [Fact]
     public async Task AddDataChannel_WhenDaprIsNotSelected_ShouldRunWithoutDaprModulesOrRuntimeDependencies()
     {

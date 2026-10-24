@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Models;
+using Monica.Configuration.Projection;
+using Monica.Core.Configuration;
 
 namespace Monica.Configuration.Services.Support;
 
@@ -24,7 +27,21 @@ public sealed class ConfigurationEffectiveValueSeedFactory
     /// <param name="definition">The locally discovered owner.</param>
     /// <returns>The full bound value, including constructor defaults and explicit empty or null values.</returns>
     public string CreateSeedJson(ConfigurationDefinition definition)
-        => CreateEffectiveJson(definition);
+    {
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Startup configuration '{definition.DefinitionKey}' cannot be captured as managed effective state.");
+        if (_runtimeContext.Root is not { } root) return CreateEffectiveJson(definition);
+        // Seed inputs never include our previous projection. A removed document must not seed itself
+        // from a stale persisted or temporary value retained by this provider during reload.
+        var sources = ConfigurationSnapshot.Capture(root).Contributions
+            .Where(source => source.Origin.ProviderType != typeof(MonicaConfigurationProvider));
+        var builder = new ConfigurationBuilder();
+        foreach (var source in sources)
+            builder.Add(new ConfigurationValueProjectionSource(new ConfigurationValueProjection(source.Values, source.Shapes)));
+        using var inputs = (ConfigurationRoot)builder.Build();
+        _localRegistry.GetRequired(definition);
+        return _materializer.Snapshot(definition, _materializer.Materialize(definition, inputs));
+    }
 
     /// <summary>Captures a complete local value through the production binder and declared configuration aliases.</summary>
     /// <param name="definition">The locally discovered owner with matching executable schema authority.</param>

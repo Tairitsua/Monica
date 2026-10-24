@@ -203,6 +203,8 @@
         if (_session is not null)
         {
             await _session.RefreshAsync();
+            if (!_disposed && !_session.IsAccessDenied)
+                await _session.RefreshResourceActivationsAsync();
         }
     }
 

@@ -10,7 +10,8 @@ internal sealed record ModuleDiagnosticsCalls(
     Func<Res<ModuleDiagnosticsSnapshot>> GetSnapshot,
     Func<Res<TypeDiscoveryAssemblyInventory>> GetAssemblyInventory,
     Func<ModuleKey, Res<ModuleOptionDiagnostics>> GetModuleOptions,
-    Func<Res<ModuleDiagnosticsExport>> CreateExport);
+    Func<Res<ModuleDiagnosticsExport>> CreateExport,
+    Func<Res<IReadOnlyList<ResourceActivationObservation>>>? GetResourceActivations = null);
 
 /// <summary>
 /// Owns the immutable snapshot, filters, selection, lazy requests, comparison, and polling lifetime of one page.
@@ -39,6 +40,7 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
     private int _inventoryRequestVersion;
     private int _baselineRequestVersion;
     private int _optionRequestVersion;
+    private int _activationRequestVersion;
     private bool _disposed;
 
     internal ModuleSystemWorkbenchSession(
@@ -66,6 +68,12 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
 
     /// <summary>Gets the most recent refresh failure while older data remains visible.</summary>
     public string? RefreshError { get; private set; }
+
+    /// <summary>Gets the last successful live resource admission view, separate from the startup snapshot.</summary>
+    public IReadOnlyList<ResourceActivationObservation>? ResourceActivations { get; private set; }
+
+    /// <summary>Gets the live resource view's read state; a failed refresh retains the previous successful view.</summary>
+    public ModuleSystemLazyLoadState ResourceActivationsState { get; private set; }
 
     /// <summary>Gets whether the most recent facade boundary denied the current circuit.</summary>
     public bool IsAccessDenied { get; private set; }
@@ -425,6 +433,28 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         InvalidateOptionDiagnosticsRequests();
         return RequestSnapshotAsync(isInitial: Snapshot is null);
+    }
+
+    /// <summary>Reads current native resource admission after rechecking the page's access policy.</summary>
+    public async Task RefreshResourceActivationsAsync()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var version = Interlocked.Increment(ref _activationRequestVersion);
+        ResourceActivationsState = ModuleSystemLazyLoadState.Loading;
+        NotifyChanged();
+        if (!await EnsureAuthorizedAsync(() => version == Volatile.Read(ref _activationRequestVersion))) return;
+        var result = _calls.GetResourceActivations?.Invoke();
+        if (_disposed || version != Volatile.Read(ref _activationRequestVersion)) return;
+        if (result is not null && result.IsOk(out var resources))
+        {
+            ResourceActivations = resources;
+            ResourceActivationsState = ModuleSystemLazyLoadState.Ready;
+        }
+        else
+        {
+            ResourceActivationsState = ModuleSystemLazyLoadState.Failed;
+        }
+        NotifyChanged();
     }
 
     /// <summary>Updates the deep-linkable workbench section.</summary>

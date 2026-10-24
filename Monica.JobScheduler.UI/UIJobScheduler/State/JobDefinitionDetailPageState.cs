@@ -311,9 +311,9 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 return _localizer["JobDetail:NotFound", JobKey].Value;
             }
 
-            if (disabled && JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary))
+            if (disabled && JobSchedulerUiPresentation.IsManualOnlySuppressed(summary))
             {
-                return _localizer["Catalog:Messages:PauseUnavailableDebug"].Value;
+                return _localizer["Catalog:Messages:PauseUnavailableManual"].Value;
             }
 
             var definition = summary.Definition;

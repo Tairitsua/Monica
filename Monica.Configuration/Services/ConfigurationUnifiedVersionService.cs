@@ -9,7 +9,8 @@ internal sealed class ConfigurationUnifiedVersionService(
     IConfigurationUnifiedVersionStore versionStore,
     IConfigurationMutationGroupApplyService mutationGroupApplyService,
     ConfigurationUnifiedVersionRollbackPreviewFactory rollbackPreviewFactory,
-    ConfigurationRuntimeSnapshotLock runtimeSnapshotLock)
+    ConfigurationRuntimeSnapshotLock runtimeSnapshotLock,
+    ConfigurationRuntimeContext? runtimeContext = null)
     : IConfigurationUnifiedVersionService
 {
     public Task<IReadOnlyList<ConfigurationUnifiedVersionSummary>> ListVersionsAsync(
@@ -29,6 +30,8 @@ internal sealed class ConfigurationUnifiedVersionService(
 
     public Task DeleteVersionAsync(long version, CancellationToken cancellationToken)
     {
+        if (runtimeContext?.MaintenanceReadOnlyReason is { } reason)
+            throw new ConfigurationValidationFailedException(reason);
         return versionStore.DeleteVersionAsync(version, cancellationToken);
     }
 

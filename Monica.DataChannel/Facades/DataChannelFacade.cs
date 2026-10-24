@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Monica.Core.Extensions;
 using Monica.Core.ObservableInstance.Models;
 using Monica.Core.Results;
+using Monica.Core;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Models;
 using Monica.DataChannel.Pipeline;
@@ -12,7 +13,8 @@ namespace Monica.DataChannel.Facades;
 /// <summary>Provides host-facing detached management evidence and real DataChannel operations.</summary>
 /// <param name="manager">Manager exposing channels owned by this host.</param>
 /// <param name="logger">Host-owned logger for management failures.</param>
-public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelFacade> logger)
+/// <param name="application">The host's frozen participation policy, when composed through Monica.</param>
+public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelFacade> logger, MonicaApplication? application = null)
 {
     /// <summary>
     /// Captures directory and exception summary from one tracker read per channel. Component values and
@@ -60,6 +62,8 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (application?.Application.AutonomousWork == false)
+                return Res.Fail("Data channels are held while Application:AutonomousWork is false.");
             var channel = manager.Fetch(id);
             if (channel is null) return Res.Fail($"DataChannel '{id}' was not found.");
             await channel.ReInitialize(cancellationToken);

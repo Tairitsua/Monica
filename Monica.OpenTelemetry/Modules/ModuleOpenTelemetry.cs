@@ -9,6 +9,8 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Extensions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.OpenTelemetry.InProcessCollector.Facades;
 using Monica.OpenTelemetry.InProcessCollector.Services;
 using Monica.OpenTelemetry.Localization;
@@ -64,6 +66,19 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
     public override void ConfigureServices(ModuleContext<ModuleOpenTelemetryOption> context)
     {
         var services = context.Services;
+        Option.DeploymentEnvironment ??= Application.Application.DeploymentScope;
+        if (!Application.Application.AutonomousWork && Option.UseOtlpExporter)
+        {
+            Option.UseOtlpExporter = false;
+            Application.RecordActivation(new ResourceActivation
+            {
+                Key = "OpenTelemetry:otlp-export",
+                Kind = TypeActivationKind.HostedService,
+                Mode = ActivationMode.Manual,
+                Reason = "External telemetry export is held; in-process observations and local console output remain available."
+            });
+        }
+        var existingHostedServices = services.Where(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToHashSet();
         var telemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => ConfigureResource(resource, Option))
             .WithMetrics(metrics => ConfigureMetrics(metrics, Option));
@@ -87,6 +102,14 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
         if (Option.UseOtlpExporter && Option.UseOtlpEnvironmentDefaults)
             telemetry.UseOtlpExporter();
 
+        // The SDK owns configured telemetry, not product background work. Preserve its native lifecycle.
+        foreach (var descriptor in services.Where(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+                     && !existingHostedServices.Contains(descriptor)))
+        {
+            if (descriptor.ImplementationType is { } implementationType)
+                context.Composition.AdmitHostedLifecycle(descriptor, implementationType);
+        }
+
         if (!Option.EnableInProcessCollector)
         {
             return;
@@ -94,6 +117,9 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
 
         services.TryAddSingleton<InProcessMetricsCollector>();
         services.AddHostedService(sp => sp.GetRequiredService<InProcessMetricsCollector>());
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(InProcessMetricsCollector));
         services.AddScoped<OpenTelemetryFacade>();
     }
 
@@ -394,6 +420,7 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     /// <summary>
     /// Gets or sets the optional deployment environment resource attribute, such as <c>Development</c> or <c>Production</c>.
     /// </summary>
+    /// <remarks>When omitted, defaults to Application:DeploymentScope.</remarks>
     public string? DeploymentEnvironment { get; set; }
 
     /// <summary>Whether to register a tracing provider. Defaults to false; metrics remain enabled independently.</summary>

@@ -10,6 +10,8 @@ using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Facades;
 using Monica.ServiceDiscovery.Localization;
@@ -167,12 +169,27 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
         services.TryAddSingleton<IRegistrationStateManager, RegistrationStateManager>();
         services.TryAddSingleton<ILeaderElectionService, LeaderElectionService>();
 
-        // Register ServiceDiscoveryClientHostedService as a singleton and expose it as both HostedService and Coordinator.
-        services.AddSingleton<ServiceDiscoveryClientHostedService>();
-        services.AddSingleton<IServiceRegistrationCoordinator>(provider =>
-            provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
-        services.AddHostedService(provider =>
-            provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+        var autonomous = Application.Application.AutonomousWork;
+        Application.RecordActivation(new ResourceActivation
+        {
+            Key = "ServiceDiscovery:registration",
+            ImplementationType = typeof(ServiceDiscoveryClientHostedService),
+            Kind = TypeActivationKind.HostedService,
+            Mode = autonomous ? ActivationMode.Automatic : ActivationMode.Manual,
+            Reason = autonomous ? "Registration, heartbeat and election permitted."
+                : "Registry queries remain available; registration, heartbeat, election and deletion are held."
+        });
+        if (autonomous)
+        {
+            services.AddSingleton<ServiceDiscoveryClientHostedService>();
+            services.AddSingleton<IServiceRegistrationCoordinator>(provider =>
+                provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+            services.AddHostedService(provider => provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+        }
+        else
+        {
+            services.AddSingleton<IServiceRegistrationCoordinator, HeldServiceRegistrationCoordinator>();
+        }
 
         // Register the default information provider implementation.
         services.TryAddSingleton<IServiceDiscoveryCatalogProvider, DefaultServiceDiscoveryCatalogProvider>();

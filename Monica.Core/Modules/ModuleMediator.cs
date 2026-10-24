@@ -46,7 +46,7 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
             {
                 foreach (var match in matches)
                 {
-                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.RequestHandler) == false) continue;
+                    if (Application.TypeActivation?.GetActivation(match.Type, TypeActivationKind.RequestHandler) == ActivationMode.Disabled) continue;
                     RegisterRequestHandlers(context.Registrations, match);
                 }
             });

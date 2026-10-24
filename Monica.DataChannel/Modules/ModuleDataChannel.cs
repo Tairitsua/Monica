@@ -8,6 +8,8 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.DataChannel;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Facades;
@@ -51,18 +53,22 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
         services.TryAddSingleton<MessageMetrics>();
         services.AddScoped<DataChannelFacade>();
         services.AddHostedService<DataChannelInitializerService>();
+        // Every setup is admitted independently before construction. This coordinator only sees admitted channels.
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(DataChannelInitializerService)), typeof(DataChannelInitializerService));
     }
 
     public override void ConfigureApplicationBuilder(WebModuleContext<ModuleDataChannelOption> context)
     {
         var app = context.ApplicationBuilder;
-        var setups = app.ApplicationServices.GetServices<IDataChannelSetup>();
+        var setups = app.ApplicationServices.GetServices<DataChannelSetupRegistration>();
         var registrar = app.ApplicationServices.GetRequiredService<IDataChannelRegistrar>();
         var runtime = app.ApplicationServices.GetRequiredService<DataChannelRuntime>();
 
-        foreach (var setup in setups)
+        foreach (var setup in setups.Where(setup => setup.Mode == ActivationMode.Automatic))
         {
-            setup.Setup(registrar);
+            runtime.ApplySetup((IDataChannelSetup)app.ApplicationServices.GetRequiredService(setup.ImplementationType),
+                setup.RegistrationOwner, registrar);
         }
 
         runtime.Materialize(app);
@@ -173,8 +179,36 @@ public static class ModuleDataChannelBuilderExtensions
             where TSetup : class, IDataChannelSetup
         {
             return registration
-                .ConfigureServices(context => context.Services.TryAddEnumerable(
-                    ServiceDescriptor.Singleton<IDataChannelSetup, TSetup>()))
+                .ConfigureServices(context =>
+                {
+                    var existing = context.Services.Where(descriptor => descriptor.ServiceType == typeof(DataChannelSetupRegistration))
+                        .Select(descriptor => (DataChannelSetupRegistration)descriptor.ImplementationInstance!)
+                        .SingleOrDefault(setup => setup.ImplementationType == typeof(TSetup));
+                    if (existing is not null)
+                    {
+                        if (existing.RegistrationOwner != context.RegistrationOwner)
+                            throw new InvalidOperationException($"Data-channel setup '{typeof(TSetup).FullName}' has conflicting registration owners.");
+                        return;
+                    }
+                    var mode = context.Application.TypeActivation!.GetActivation(
+                        typeof(TSetup), TypeActivationKind.DataChannel, context.RegistrationOwner);
+                    context.Services.AddSingleton(new DataChannelSetupRegistration(typeof(TSetup), context.RegistrationOwner, mode));
+                    context.Application.RecordActivation(new ResourceActivation
+                    {
+                        Key = $"DataChannel:setup:{typeof(TSetup).FullName}",
+                        ImplementationType = typeof(TSetup),
+                        RegistrationOwner = context.RegistrationOwner,
+                        Kind = TypeActivationKind.DataChannel,
+                        Mode = mode,
+                        Reason = mode == ActivationMode.Automatic ? "Setup may declare and materialize channels."
+                            : "Setup is held before construction; its channel factories and endpoints are not materialized."
+                    });
+                    if (mode == ActivationMode.Automatic)
+                    {
+                        context.Services.TryAddSingleton<TSetup>();
+                        context.Services.AddSingleton<IDataChannelSetup>(provider => provider.GetRequiredService<TSetup>());
+                    }
+                })
                 .SatisfyFeature(ModuleDataChannel.CHANNEL_SETUP_FEATURE);
         }
     }

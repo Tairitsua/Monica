@@ -275,6 +275,8 @@ public sealed class EventBusMonitorService(
                 InactiveSubscriptions = viewModels.Count(s => s.State == EventSubscriptionState.Inactive),
                 PendingSubscriptions = viewModels.Count(s => s.State == EventSubscriptionState.Pending),
                 DisposedSubscriptions = viewModels.Count(s => s.State == EventSubscriptionState.Disposed),
+                HeldSubscriptions = viewModels.Count(s => s.State == EventSubscriptionState.Held),
+                DisabledSubscriptions = viewModels.Count(s => s.State == EventSubscriptionState.Disabled),
                 UnhealthySubscriptions = viewModels.Count(s => s.IsUnhealthy),
                 LocalSubscriptions = viewModels.Count(s => s.Scope == EventSubscriptionScope.Local),
                 DistributedSubscriptions = viewModels.Count(s => s.Scope == EventSubscriptionScope.Distributed),
@@ -347,6 +349,9 @@ public sealed class EventBusMonitorService(
             {
                 return Res.Fail(localizer["Services:Monitor:CannotActivateDisposed"]);
             }
+
+            if (subscription.Activation != Monica.Core.TypeDiscovery.Abstractions.ActivationMode.Automatic)
+                return Res.Fail(localizer["Services:Monitor:ActivationHeld"]);
 
             if (subscription.State == EventSubscriptionState.Inactive)
             {
@@ -524,6 +529,7 @@ public sealed class EventBusMonitorService(
             HandlerFactoryType = subscription.HandlerFactory.GetType().Name,
             Scope = subscription.Scope,
             State = subscription.State,
+            Activation = subscription.Activation,
             CreatedAt = subscription.CreatedAt,
             ActivatedAt = subscription.ActivatedAt,
             DeactivatedAt = subscription.DeactivatedAt,

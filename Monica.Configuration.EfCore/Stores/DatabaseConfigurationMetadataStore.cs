@@ -568,7 +568,7 @@ internal sealed class DatabaseConfigurationMetadataStore(ConfigurationDatabase d
         };
     }
 
-    private static ConfigurationPublishedDefinitionEntry ToPublishedDefinitionEntry(
+    internal static ConfigurationPublishedDefinitionEntry ToPublishedDefinitionEntry(
         ConfigurationDefinitionEntity entity,
         ConfigurationDefinitionLifecycleState lifecycleState)
     {

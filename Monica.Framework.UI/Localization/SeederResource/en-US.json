@@ -105,8 +105,8 @@
   "Details": {
     "Eyebrow": "SEEDER EVIDENCE",
     "AttemptsSummary": {
-      "Singular": "{0} of {1} attempt started",
-      "Plural": "{0} of {1} attempts started"
+      "Singular": "{0} recorded attempt · up to {1} per run",
+      "Plural": "{0} recorded attempts · up to {1} per run"
     },
     "Policy": {
       "Title": "Effective policy",
@@ -148,7 +148,8 @@
     "Succeeded": "Seeder run succeeded",
     "CompletedWithFailures": "Completed with failures",
     "Aborted": "Seeder run aborted",
-    "Cancelled": "Seeder run cancelled"
+    "Cancelled": "Seeder run cancelled",
+    "Held": "Idle · held work remains"
   },
   "ReadinessStatus": {
     "Healthy": "Ready",
@@ -161,7 +162,9 @@
     "Succeeded": "Succeeded",
     "Failed": "Failed",
     "Blocked": "Blocked",
-    "Cancelled": "Cancelled"
+    "Cancelled": "Cancelled",
+    "Held": "Held",
+    "Disabled": "Disabled in this host"
   },
   "AttemptStatus": {
     "Running": "Running",
@@ -197,5 +200,12 @@
     "DurationSeconds": "{0:0.0} s",
     "DurationMinutesSeconds": "{0} min {1} s",
     "DurationHoursMinutes": "{0} hr {1} min"
+  },
+  "Manual": {
+    "Title": "Explicit execution",
+    "Effects": "Runs this seeder and its unsatisfied eligible prerequisites. This may write to shared databases or publish events. Other held seeders remain untouched.",
+    "Run": "Run with prerequisites",
+    "Running": "Executing…",
+    "Failed": "Execution could not complete: {0}"
   }
 }

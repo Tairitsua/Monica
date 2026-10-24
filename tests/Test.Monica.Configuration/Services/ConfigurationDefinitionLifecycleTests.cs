@@ -4,6 +4,7 @@ using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Serialization;
 using Monica.Configuration.Services;
+using Monica.Configuration.Services.Support;
 using NSubstitute;
 using Xunit;
 
@@ -11,6 +12,38 @@ namespace Test.Monica.Configuration.Services;
 
 public sealed class ConfigurationDefinitionLifecycleTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ManualMaintenance_ShouldPreservePersistedLifecycleAndRejectPurgeBeforeWriting(bool locallyRegistered)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var definition = TestConfigurationFactory.Definition();
+        var registry = new ConfigurationDefinitionRegistry();
+        if (locallyRegistered) registry.Register(definition);
+        var maintenance = Substitute.For<IConfigurationDefinitionMaintenanceStore>();
+        maintenance.PreviewDefinitionPurgeAsync(definition.DefinitionKey, token).Returns(CreateRetiredPreview(definition));
+        var service = new ConfigurationDefinitionLifecycleService(registry, maintenance,
+            new ConfigurationDefinitionResolver(registry), new ConfigurationRuntimeContext { AutonomousWork = false });
+        var overview = service.EnrichWithLocalRegistration(new ConfigurationDefinitionPublicationOverview
+        {
+            DefinitionKey = definition.DefinitionKey, LifecycleState = ConfigurationDefinitionLifecycleState.Retired,
+            PublisherStates = [], RevisionHistories = []
+        });
+
+        overview.LifecycleState.Should().Be(ConfigurationDefinitionLifecycleState.Retired);
+        var preview = await service.PreviewPurgeAsync(definition.DefinitionKey, token);
+        preview.LifecycleState.Should().Be(ConfigurationDefinitionLifecycleState.Retired);
+        preview.CanPurge.Should().BeFalse();
+        preview.ReadOnlyReason.Should().Contain("read-only in Manual mode");
+        var purge = () => service.PurgeAsync(new ConfigurationDefinitionPurgeRequest
+        {
+            DefinitionKey = definition.DefinitionKey, ExpectedDefinitionRevision = 3
+        }, token);
+        await purge.Should().ThrowAsync<ConfigurationValidationFailedException>().WithMessage("*read-only in Manual mode*");
+        await maintenance.DidNotReceive().PurgeDefinitionAsync(Arg.Any<ConfigurationDefinitionPurgeRequest>(), token);
+    }
+
     [Fact]
     public async Task Resolver_WhenStartupSharesLegacyManagedKey_ShouldIgnoreItsMetadataAndKeepRemoteManagedCatalog()
     {

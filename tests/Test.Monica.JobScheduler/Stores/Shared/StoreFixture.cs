@@ -93,7 +93,7 @@ internal abstract class StoreFixture : IAsyncDisposable
                 JobKey = jobKey
             },
             HostSuspensionReasons = debugMode
-                ? JobRecurringScheduleSuspensionReason.DebugMode
+                ? JobRecurringScheduleSuspensionReason.Manual
                 : JobRecurringScheduleSuspensionReason.None
         });
         return result.Cursor

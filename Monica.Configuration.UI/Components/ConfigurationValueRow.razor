@@ -25,6 +25,7 @@
                 <p class="configuration-value-description">@Node.Description</p>
             }
             <div class="configuration-value-flags">
+                @if (EffectiveValue?.IsUnpersisted is true) { <span class="configuration-value-flag configuration-value-flag--info">@L["Manual:Unpersisted"]</span> }
                 @if (Node.IsSensitive) { <span class="configuration-value-flag configuration-value-flag--warning">@L["State:Value:Sensitive"]</span> }
                 @if (Node.ValidationRules.OfType<RequiredRule>().Any()) { <span class="configuration-value-flag configuration-value-flag--required">@L["State:Value:Required"]</span> }
                 @if (Definition.Kind != ConfigurationKind.Startup && EffectiveReloadBehavior.RequiresProcessRestart()) { <span class="configuration-value-flag configuration-value-flag--warning">@L["State:Value:RestartNeeded"]</span> }

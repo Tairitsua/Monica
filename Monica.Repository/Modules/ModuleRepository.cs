@@ -15,6 +15,8 @@ using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.Repository;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Services;
@@ -157,6 +159,11 @@ public static class ModuleRepositoryRegistrationExtensions
     /// Generate an EF migration before deployment. Event names, payload serialization and transport routing
     /// come from the configured EventBus; the primary context in an operation must enable this capability.
     /// </summary>
+    /// <remarks>
+    /// Register each context once. Its declared domain or role owns delivery; a registration callback cannot
+    /// transfer that ownership. Manual or disabled activation holds its worker contribution while retaining
+    /// transactional staging and passive dispatch services.
+    /// </remarks>
     public static ModuleRegistration<ModuleRepository, ModuleRepositoryOption> AddOutbox<TDbContext>(
         this ModuleRegistration<ModuleRepository, ModuleRepositoryOption> module,
         Action<RepositoryOutboxOptions>? configure = null)
@@ -176,13 +183,30 @@ public static class ModuleRepositoryRegistrationExtensions
         module.Require<ModuleHostedService, ModuleHostedServiceOption>();
         module.ConfigureServices(context =>
         {
+            if (context.Services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistration<TDbContext>)))
+                throw new InvalidOperationException($"Outbox context '{typeof(TDbContext).FullName}' must be registered once with one declaring owner.");
             context.Services.AddSingleton(new OutboxRegistration<TDbContext>(options));
             context.Services.TryAddScoped<ITransactionalEventSink, TransactionalEventSink>();
             context.Services.AddSingleton<OutboxDispatcher<TDbContext>>();
-            if (options.EnableWorker)
+            var mode = options.EnableWorker
+                ? context.Application.TypeActivation!.GetActivation(typeof(TDbContext), TypeActivationKind.Outbox)
+                : ActivationMode.Disabled;
+            context.Application.RecordActivation(new ResourceActivation
+            {
+                Key = $"Outbox:{typeof(TDbContext).FullName}",
+                ImplementationType = typeof(TDbContext),
+                RegistrationOwner = context.RegistrationOwner,
+                Kind = TypeActivationKind.Outbox,
+                Mode = mode,
+                Reason = mode == ActivationMode.Automatic ? "Automatic dispatch permitted for this context."
+                    : "Background dispatch is held; transactional staging remains available."
+            });
+            if (mode == ActivationMode.Automatic)
             {
                 context.Services.AddSingleton<IOutboxStore>(sp => sp.GetRequiredService<OutboxDispatcher<TDbContext>>());
                 context.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, OutboxWorker>());
+                context.Composition.AdmitHostedLifecycle(
+                    context.Services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(OutboxWorker)), typeof(OutboxWorker));
             }
         });
         return module;

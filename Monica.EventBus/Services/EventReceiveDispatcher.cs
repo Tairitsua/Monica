@@ -22,6 +22,31 @@ public sealed class EventReceiveDispatcher(
     public Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken)
         => DispatchCoreAsync(message, filterWorkloadOwner: true, workloadOwner, cancellationToken);
 
+    /// <inheritdoc />
+    public async Task DispatchTestAsync(EventMessage message,
+        IReadOnlyCollection<EventSubscriptionId> subscriptionIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(subscriptionIds);
+        cancellationToken.ThrowIfCancellationRequested();
+        var ids = subscriptionIds.ToArray();
+        if (ids.Length == 0 || ids.Distinct().Count() != ids.Length)
+            throw new ArgumentException("Select a nonempty set of distinct local subscriptions.", nameof(subscriptionIds));
+        if (string.IsNullOrWhiteSpace(message.Metadata.MessageId) || string.IsNullOrWhiteSpace(message.Metadata.Source))
+            throw new ArgumentException("A test delivery requires a stable message ID and producer source.", nameof(message));
+        var subscriptions = ids.Select(id => registry.GetById(id)
+            ?? throw new InvalidOperationException($"Event subscription '{id}' no longer exists.")).ToArray();
+        foreach (var subscription in subscriptions)
+        {
+            if (subscription.State is not (EventSubscriptionState.Active or EventSubscriptionState.Held)
+                || subscription.Scope != message.Scope
+                || subscription.TopicName != message.Metadata.TopicName
+                || subscription.ServiceKey != message.Metadata.ServiceKey)
+                throw new InvalidOperationException($"Event subscription '{subscription.Id}' is not eligible for this test delivery.");
+        }
+        await DispatchSelectedAsync(message, subscriptions, cancellationToken, allowHeld: true).ConfigureAwait(false);
+    }
+
     private async Task DispatchCoreAsync(
         EventMessage message, bool filterWorkloadOwner, string? workloadOwner, CancellationToken cancellationToken)
     {
@@ -35,12 +60,18 @@ public sealed class EventReceiveDispatcher(
                                    subscription.State == EventSubscriptionState.Active &&
                                    (!filterWorkloadOwner || subscription.WorkloadOwner == workloadOwner))
             .ToArray();
+        await DispatchSelectedAsync(message, subscriptions, cancellationToken, allowHeld: false).ConfigureAwait(false);
+    }
+
+    private async Task DispatchSelectedAsync(EventMessage message, IEventSubscription[] subscriptions,
+        CancellationToken cancellationToken, bool allowHeld)
+    {
+        var metadata = message.Metadata;
         var eventTypes = subscriptions.Select(subscription => subscription.EventType).Distinct().ToArray();
         if (eventTypes.Length == 0)
         {
             throw new InvalidOperationException(
-                $"No active {message.Scope} event subscription exists for '{metadata.TopicName}'" +
-                (filterWorkloadOwner ? $" and workload owner '{workloadOwner ?? "<unowned>"}'." : "."));
+                $"No eligible {message.Scope} event subscription exists for '{metadata.TopicName}'.");
         }
         if (eventTypes.Length != 1)
         {
@@ -66,6 +97,6 @@ public sealed class EventReceiveDispatcher(
                 $"Event '{metadata.EventName}' could not be deserialized.", ex);
         }
         await EventHandlerDispatcher.DispatchSubscriptionsAsync(
-            subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken);
+            subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken, allowHeld);
     }
 }

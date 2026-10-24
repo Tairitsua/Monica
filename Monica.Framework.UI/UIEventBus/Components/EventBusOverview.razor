@@ -24,6 +24,8 @@
                     <div data-state="Inactive"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Inactive)</span><strong>@stats.InactiveSubscriptions</strong></div>
                     <div data-state="Pending"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Pending)</span><strong>@stats.PendingSubscriptions</strong></div>
                     <div data-state="Disposed"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Disposed)</span><strong>@stats.DisposedSubscriptions</strong></div>
+                    <div data-state="Held"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Held)</span><strong>@stats.HeldSubscriptions</strong></div>
+                    <div data-state="Disabled"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Disabled)</span><strong>@stats.DisabledSubscriptions</strong></div>
                 </div>
                 <div class="eventbus-registration-footer"><span>@L["Overview:DiscoveryCounts", stats.AutoDiscoveredCount, stats.ManualSubscriptionCount]</span><MudButton Href="@UIEventBusSubscriptionsPage.PAGE_URL" EndIcon="@MoIcons.ArrowRight">@L["Overview:ExploreRegistry"]</MudButton></div>
             </section>

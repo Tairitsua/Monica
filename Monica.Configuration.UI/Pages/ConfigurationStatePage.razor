@@ -402,6 +402,15 @@
                                         </MudAlert>
                                     }
 
+                                    @if (_isUnpersisted)
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">@L["Manual:UnpersistedDescription"]</MudAlert>
+                                    }
+                                    @if (_selectedSummary?.MutationReadOnlyReason is { } mutationReadOnlyReason)
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">@mutationReadOnlyReason</MudAlert>
+                                    }
+
                                     @if (_loadingDefinition)
                                     {
                                         <MudProgressLinear Indeterminate="true" />

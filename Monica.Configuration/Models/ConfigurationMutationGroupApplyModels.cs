@@ -31,7 +31,7 @@ public sealed record ConfigurationMutationGroupApplyRequest
     /// <remarks>
     /// This opaque token is scoped to the validating host process. Preview and apply must reach the same owner
     /// process; obtain a fresh preview after a restart or replica change. Apply performs complete validation even
-    /// when this optional reviewed-baseline token is omitted.
+    /// when this reviewed-baseline token is omitted in Automatic mode. Manual mode requires the token.
     /// </remarks>
     public string? ExpectedValidationFingerprint { get; init; }
 

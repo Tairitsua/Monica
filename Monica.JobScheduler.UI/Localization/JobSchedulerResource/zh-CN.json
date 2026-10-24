@@ -190,8 +190,8 @@
       "Details": "打开作业详情",
       "Pause": "暂停周期实例物化",
       "Resume": "继续周期实例物化",
-      "PauseUnavailableDebug": "调试模式已抑制自动物化，无法再次快速暂停；仍可通过“立即执行作业”显式运行。",
-      "RunDuringDebug": "立即执行仍然可用，因为显式准入不会推进周期游标。",
+      "PauseUnavailableManual": "手动模式已抑制自动物化，无法再次快速暂停；仍可通过“立即执行作业”显式运行。",
+      "RunDuringManual": "立即执行仍然可用，因为显式准入不会推进周期游标。",
       "PauseSelected": "暂停所选",
       "ResumeSelected": "继续所选",
       "Reset": "重置筛选",
@@ -213,12 +213,12 @@
     "Lifecycle": {
       "Automatic": "自动调度",
       "OperatorPaused": "已由策略暂停",
-      "DebugSuppressed": "仅手动执行",
-      "OperatorAndDebug": "策略暂停 · 调试模式",
+      "ManualSuppressed": "仅手动执行",
+      "OperatorAndManual": "策略暂停 · 手动模式",
       "AutomaticDescription": "周期实例自动物化已启用。",
       "OperatorPausedDescription": "运维策略阻止周期实例自动物化。",
-      "DebugSuppressedDescription": "调试模式抑制自动物化；仍可显式立即执行作业。",
-      "OperatorAndDebugDescription": "运维策略与调试模式都在抑制周期实例自动物化。",
+      "ManualSuppressedDescription": "手动模式抑制自动物化；仍可显式立即执行作业。",
+      "OperatorAndManualDescription": "运维策略与手动模式都在抑制周期实例自动物化。",
       "AwaitingDescription": "周期游标正在等待活动声明完成同步。",
       "ExhaustedDescription": "声明的调度边界内已没有可自动物化的执行时点。",
       "TriggeredEnabledDescription": "该触发作业已允许运维人员准入执行。",
@@ -245,14 +245,14 @@
       "ToolbarLabel": "所选周期作业操作",
       "Count": "已选择 {0} 个周期作业",
       "Description": "批量变更会保留每个作业独立的历史保留策略和乐观并发栅栏。",
-      "DebugPauseUnavailable": "所选作业中存在已处于调试手动模式的作业，因此不能对该选择执行快速暂停。",
+      "ManualPauseUnavailable": "所选作业中存在已处于手动模式的作业，因此不能对该选择执行快速暂停。",
       "Clear": "清除选择"
     },
     "Messages": {
       "Paused": "周期实例物化已暂停。",
       "Resumed": "周期实例物化将从下一个未来时点继续。",
-      "PauseUnavailableDebug": "调试模式已抑制自动物化；仍可立即执行作业。",
-      "ResumedDebugRemains": "运维暂停已解除；调试模式仍在抑制自动物化，立即执行仍然可用。",
+      "PauseUnavailableManual": "手动模式已抑制自动物化；仍可立即执行作业。",
+      "ResumedManualRemains": "运维暂停已解除；手动模式仍在抑制自动物化，立即执行仍然可用。",
       "UpdateFailed": "策略更新失败。",
       "RunFailed": "作业无法入队。",
       "Queued": "执行 {0} 已入队。"
@@ -263,9 +263,9 @@
       "ResumeTitle": "继续所选周期作业？",
       "PauseMessage": "暂停 {0} 个所选作业的新周期实例？现有排队及运行中的执行不受影响。",
       "ResumeMessage": "从下一个未来时点继续 {0} 个所选作业？暂停期间的执行时点不会补跑。",
-      "PauseUnavailableDebug": "所选作业中至少有一个仅由调试模式抑制且没有运维暂停，因此不能快速暂停。",
+      "PauseUnavailableManual": "所选作业中至少有一个仅由手动模式抑制且没有运维暂停，因此不能快速暂停。",
       "Result": "{0} 项策略更新成功，{1} 项失败。",
-      "ResultDebugRemains": "{0} 项运维暂停更新成功，{1} 项失败；已配置调试模式的作业仍会抑制自动物化。"
+      "ResultManualRemains": "{0} 项运维暂停更新成功，{1} 项失败；已配置手动模式的作业仍会抑制自动物化。"
     },
     "RegistryEyebrow": "作业定义目录",
     "NoDefinitions": "已加载的发布快照中没有作业定义。",
@@ -515,7 +515,7 @@
       "EndBoundary": "结束边界",
       "TriggeredTitle": "按需准入",
       "TriggeredDescription": "该作业没有周期游标，运维人员需通过活动作业定义显式准入执行。",
-      "DebugManualOnly": "调试模式正在抑制自动周期实例；立即执行仍然可用，并且不会推进周期游标。",
+      "ManualOnly": "手动模式正在抑制自动周期实例；立即执行仍然可用，并且不会推进周期游标。",
       "StatusDescriptions": {
         "NotRecurring": "按需作业不使用周期游标。",
         "AwaitingSynchronization": "活动 owner 声明正在等待调度器创建持久化游标。",
@@ -525,8 +525,8 @@
       },
       "SuspensionDescriptions": {
         "OperatorPolicy": "运维策略已暂停周期实例自动物化。",
-        "DebugMode": "调试模式抑制周期实例自动物化，同时保留显式立即执行能力。",
-        "OperatorAndDebug": "运维策略与调试模式都在抑制自动物化；解除运维暂停后，调试抑制仍会生效。"
+        "ManualMode": "手动模式停止自动产生周期实例，显式任务在当前进程独立的内存存储中执行。",
+        "OperatorAndManual": "运维策略与手动模式都在抑制自动物化；解除运维暂停后，手动模式仍会生效。"
       },
       "NoNextOccurrence": "尚未记录下次计划触发"
     },
@@ -859,12 +859,12 @@
     "Identity": {
       "Title": "当前服务宿主",
       "Description": "采集此运行时快照的宿主所报告的确切身份与存储。",
-      "DebugMode": "周期调试模式",
+      "ManualMode": "手动执行",
       "Scope": "调度范围",
       "Owner": "当前作业归属",
       "WorkerInstanceId": "Worker 实例",
       "CronTimeZone": "Cron 时区",
-      "DebugModeHelp": "此宿主已停止自动物化周期执行记录。"
+      "ManualModeHelp": "此宿主仅执行显式请求的任务，定义、执行记录和重试均使用独立的本地内存存储。"
     },
     "Store": {
       "Title": "存储",

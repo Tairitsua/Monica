@@ -25,6 +25,39 @@ namespace Test.Monica.ApplicationModel;
 public sealed class ApplicationModelTests
 {
     [Fact]
+    public async Task ManualPolicy_ShouldKeepPassiveAndPlacedRequestsWhileHoldingAutonomousWork()
+    {
+        await using var app = await new ModelFactory("worker", autonomousWork: false).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var policy = app.Services.GetRequiredService<ITypeActivationPolicy>();
+        Assert.Equal(ActivationMode.Manual, policy.GetActivation(typeof(Worker), TypeActivationKind.Job));
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(typeof(Worker), TypeActivationKind.Service));
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(typeof(Worker), TypeActivationKind.Endpoint));
+        Assert.Equal(ActivationMode.Manual, policy.GetActivation(typeof(object), TypeActivationKind.Outbox, typeof(Worker)));
+        Assert.Equal("ordering.worker", policy.GetWorkloadOwner(typeof(object), typeof(Worker)));
+        Assert.Throws<InvalidOperationException>(() => policy.GetActivation(typeof(Worker), TypeActivationKind.HostedService, typeof(ApiQuery)));
+        Assert.Throws<InvalidOperationException>(() => policy.GetWorkloadOwner(typeof(Worker), typeof(ApiQuery)));
+        Assert.DoesNotContain(app.Services.GetServices<IHostedService>(), service => service is Worker);
+        await using var scope = app.CreateScope(TestContext.Current.CancellationToken);
+        Assert.Equal("required", await scope.Resolve<IMediator>().Send(new RoleQuery(), TestContext.Current.CancellationToken));
+        Assert.Contains(app.Services.GetRequiredService<MonicaApplication>().ActivationResources,
+            resource => resource.ImplementationType == typeof(Worker) && resource.Mode == ActivationMode.Manual);
+    }
+
+    [Fact]
+    public async Task ProcessLocal_ShouldIgnorePlacementOnlyForActualBoundedInitializer()
+    {
+        await using var app = await new ModelFactory("api", autonomousWork: false).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var policy = app.Services.GetRequiredService<ITypeActivationPolicy>();
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(typeof(WorkerLocalInitialization), TypeActivationKind.Seeder));
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(typeof(DomainLocalInitialization), TypeActivationKind.Seeder));
+        Assert.Equal(ActivationMode.Disabled, policy.GetActivation(typeof(WorkerLocalInitialization), TypeActivationKind.Job));
+        Assert.Equal(ActivationMode.Disabled, policy.GetActivation(typeof(object), TypeActivationKind.HostedService, typeof(WorkerLocalInitialization)));
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(typeof(DomainDeclaration), TypeActivationKind.Service));
+        Assert.Contains("BackgroundRole", Assert.Throws<InvalidOperationException>(() =>
+            policy.GetActivation(typeof(DomainDeclaration), TypeActivationKind.Outbox)).Message);
+    }
+
+    [Fact]
     public async Task ServiceDiscovery_ReusesSelectedRolesAndDetachesRegistrationEvidence()
     {
         await using var app = await new ModelFactory("api").CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
@@ -71,7 +104,7 @@ public sealed class ApplicationModelTests
         Assert.Equal("required", await scope.Resolve<IMediator>().Send(new RoleQuery(), TestContext.Current.CancellationToken));
         var activation = app.Services.GetRequiredService<ITypeActivationPolicy>();
         Assert.Equal("ordering.worker", activation.GetWorkloadOwner(typeof(Worker)));
-        Assert.True(activation.IsEnabled(typeof(Worker), TypeActivationKind.Job));
+        Assert.Equal(ActivationMode.Automatic, activation.GetActivation(typeof(Worker), TypeActivationKind.Job));
         Assert.Contains(app.Services.GetServices<IHostedService>(), service => service is Worker);
     }
 
@@ -134,7 +167,7 @@ public sealed class ApplicationModelTests
         ["worker"] = new() { Roles = ["ordering.worker"] }
     };
 
-    private sealed class ModelFactory(string appId, Dictionary<string, ApplicationPlacement>? placements = null, bool excludeWorker = false)
+    private sealed class ModelFactory(string appId, Dictionary<string, ApplicationPlacement>? placements = null, bool excludeWorker = false, bool autonomousWork = true)
         : MonicaTestApplicationFactory<ApiQuery>
     {
         protected override IEnumerable<Assembly> TypeDiscoveryAssemblies => excludeWorker
@@ -143,7 +176,7 @@ public sealed class ApplicationModelTests
         protected override void ConfigureHost(WebApplicationBuilder builder) => builder.Services.AddHostedService<Worker>();
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
-            builder.ConfigureApplication(options => options.AppId = appId);
+            builder.ConfigureApplication(options => { options.AppId = appId; options.AutonomousWork = autonomousWork; });
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = typeof(ScenarioManifest);

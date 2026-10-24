@@ -20,6 +20,21 @@ namespace Test.Monica.Configuration.Services.Support;
 public sealed class MonicaConfigurationProviderActivationCoordinatorTests
 {
     [Fact]
+    public async Task ActivateAsync_WhenManual_ShouldExposeAndReloadWithoutPublishingOrReportingAWrite()
+    {
+        using var fixture = CreateFixture(_ => throw new InvalidOperationException("Manual publication is forbidden."),
+            _ => Task.CompletedTask, autonomousWork: false);
+
+        await fixture.Coordinator.ActivateAsync(TestContext.Current.CancellationToken);
+
+        await fixture.MetadataStore.DidNotReceive().PublishAsync(
+            Arg.Any<ConfigurationDefinitionPublicationBatch>(), Arg.Any<CancellationToken>());
+        fixture.Accessor.ServiceProvider.Should().BeSameAs(fixture.ServiceProvider);
+        fixture.ReloadCoordinator.InvocationCount.Should().Be(1);
+        fixture.StateTracker.Operations.Should().BeEmpty();
+    }
+
+    [Fact]
     public void ShouldActivate_WhenManagedCatalogBecomesEmpty_ShouldPublishWithdrawalWhileStartupOnlyStaysIndependent()
     {
         var registry = new ConfigurationDefinitionRegistry();
@@ -294,9 +309,11 @@ public sealed class MonicaConfigurationProviderActivationCoordinatorTests
         Func<CancellationToken, Task> publish,
         Func<CancellationToken, Task> reload,
         string effectiveStoreKey = METADATA_STORE_KEY,
-        IReadOnlyList<ConfigurationDefinition>? definitions = null)
+        IReadOnlyList<ConfigurationDefinition>? definitions = null,
+        bool autonomousWork = true)
     {
         var services = new ServiceCollection()
+            .AddSingleton(new ConfigurationRuntimeContext { AutonomousWork = autonomousWork })
             .AddMetrics()
             .BuildServiceProvider();
         var accessor = new MonicaConfigurationProviderAccessor();

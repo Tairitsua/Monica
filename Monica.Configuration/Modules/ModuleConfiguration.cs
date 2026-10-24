@@ -24,6 +24,7 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.TypeDiscovery.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -144,6 +145,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         }
 
         _services = services;
+        _runtimeContext.AutonomousWork = Application.Application.AutonomousWork;
         services.TryAddSingleton<IConfigurationDefinitionRegistry>(_definitionRegistry);
         services.TryAddSingleton(_localDefinitionRegistry);
         services.TryAddSingleton(new ConfigurationValidationPolicy(Option.RuntimeValidationBehavior));
@@ -185,6 +187,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton<ConfigurationValidationCoordinator>();
         services.TryAddSingleton<IConfigurationCandidateValidationService, ConfigurationCandidateValidationService>();
         services.TryAddSingleton<ConfigurationMutationPlanner>();
+        services.TryAddSingleton<ConfigurationWriteAuthority>();
         services.TryAddSingleton<ConfigurationPathProjector>();
         services.TryAddSingleton<ConfigurationEffectiveValuePatchEngine>();
         services.TryAddSingleton<ConfigurationEffectiveValueDocumentEditor>();
@@ -200,6 +203,19 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton<ConfigurationPublisherIdentityProvider>();
         services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<MonicaConfigurationProviderActivationCoordinator>(provider));
         services.AddHostedService<MonicaConfigurationProviderActivationHostedService>();
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor =>
+            descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationType == typeof(MonicaConfigurationProviderActivationHostedService)),
+            typeof(MonicaConfigurationProviderActivationHostedService));
+        Application.RecordActivation(new ResourceActivation
+        {
+            Key = "configuration:managed-participation",
+            ImplementationType = typeof(MonicaConfigurationProviderActivationHostedService),
+            Kind = TypeActivationKind.HostedService,
+            Mode = _runtimeContext.AutonomousWork ? ActivationMode.Automatic : ActivationMode.Manual,
+            Reason = _runtimeContext.AutonomousWork ? "Managed configuration may publish and initialize its store."
+                : "Managed configuration reads existing values; publication and initialization are disabled."
+        });
         services.TryAddSingleton<ConfigurationFacade>();
     }
 

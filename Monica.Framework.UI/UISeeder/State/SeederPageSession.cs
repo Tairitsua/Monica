@@ -27,6 +27,7 @@ public sealed class SeederPageSession : IAsyncDisposable
     private static readonly TimeSpan DEFAULT_REFRESH_INTERVAL = TimeSpan.FromSeconds(1);
 
     private readonly Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
+    private readonly Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? _runAsync;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _refreshInterval;
@@ -36,6 +37,7 @@ public sealed class SeederPageSession : IAsyncDisposable
     private PeriodicTimer? _refreshTimer;
     private Task? _refreshLoopTask;
     private Task<bool>? _refreshTask;
+    private Task<bool>? _executionTask;
     private bool _disposed;
 
     internal SeederPageSession(
@@ -43,11 +45,13 @@ public sealed class SeederPageSession : IAsyncDisposable
         Func<CancellationToken, Task<bool>> authorize,
         string hostName,
         TimeProvider? timeProvider = null,
-        TimeSpan? refreshInterval = null)
+        TimeSpan? refreshInterval = null,
+        Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? runAsync = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);
         _getSnapshotAsync = getSnapshotAsync ?? throw new ArgumentNullException(nameof(getSnapshotAsync));
         _authorize = authorize ?? throw new ArgumentNullException(nameof(authorize));
+        _runAsync = runAsync;
         HostName = hostName;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _refreshInterval = refreshInterval ?? DEFAULT_REFRESH_INTERVAL;
@@ -80,6 +84,75 @@ public sealed class SeederPageSession : IAsyncDisposable
 
     /// <summary>Gets whether a snapshot request currently owns the facade boundary.</summary>
     public bool IsRefreshing => _state.IsRefreshing;
+
+    /// <summary>Gets whether this page owns an explicit execution request.</summary>
+    public bool IsExecuting => _state.IsExecuting;
+
+    /// <summary>Gets the last explicit execution admission or transport failure.</summary>
+    public string? ExecutionError => _state.ExecutionError;
+
+    /// <summary>Gets whether the selected local seeder can be submitted to the native executor.</summary>
+    public bool CanRunSelected => _runAsync is not null && !_state.IsExecuting && !_state.IsAccessDenied &&
+        SelectedSeeder is { Status: not SeederStatus.Disabled } &&
+        Snapshot is { } snapshot && !SeederDisplay.IsActive(snapshot.Run.Status);
+
+    /// <summary>Rechecks authorization and executes the selected seeder's dependency closure on this host.</summary>
+    public Task<bool> RunSelectedAsync()
+    {
+        lock (_stateGate)
+        {
+            ThrowIfDisposed();
+            if (_executionTask is { IsCompleted: false } || !CanRunSelected) return Task.FromResult(false);
+            var typeName = SelectedSeeder!.SeederTypeName;
+            _executionTask = ExecuteSelectedAsync(typeName, _lifetimeCancellation.Token);
+            return _executionTask;
+        }
+    }
+
+    private async Task<bool> ExecuteSelectedAsync(string typeName, CancellationToken cancellationToken)
+    {
+        lock (_stateGate) _state = _state with { IsExecuting = true, ExecutionError = null };
+        await NotifyChangedAsync();
+        try
+        {
+            if (!await _authorize(cancellationToken))
+            {
+                TryCompleteAccessDenied();
+                StopRefreshLoop();
+                return false;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureRefreshLoop();
+            var result = await _runAsync!(typeName, cancellationToken);
+            if (IsDisposed()) return false;
+            if (result.IsFailed(out var error, out _))
+            {
+                lock (_stateGate) _state = _state with { ExecutionError = error.Message };
+                return false;
+            }
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception exception)
+        {
+            lock (_stateGate)
+                if (!_disposed) _state = _state with { ExecutionError = exception.Message };
+            return false;
+        }
+        finally
+        {
+            lock (_stateGate) _state = _state with { IsExecuting = false };
+            if (!IsDisposed())
+            {
+                if (_refreshTask is { IsCompleted: false } pendingRefresh) await pendingRefresh;
+                await RefreshAsync();
+                await NotifyChangedAsync();
+            }
+        }
+    }
 
     /// <summary>Gets the current name, dependency, or diagnostic search.</summary>
     public string SearchText => _state.SearchText;
@@ -257,6 +330,7 @@ public sealed class SeederPageSession : IAsyncDisposable
         PeriodicTimer? refreshTimer;
         Task? refreshLoopTask;
         Task? refreshTask;
+        Task? executionTask;
         lock (_stateGate)
         {
             if (_disposed)
@@ -269,6 +343,7 @@ public sealed class SeederPageSession : IAsyncDisposable
             refreshTimer = _refreshTimer;
             refreshLoopTask = _refreshLoopTask;
             refreshTask = _refreshTask;
+            executionTask = _executionTask;
             _refreshTimer = null;
             _refreshLoopTask = null;
         }
@@ -291,6 +366,7 @@ public sealed class SeederPageSession : IAsyncDisposable
                 {
                     await refreshTask;
                 }
+                if (executionTask is not null) await executionTask;
             }
             finally
             {
@@ -448,7 +524,7 @@ public sealed class SeederPageSession : IAsyncDisposable
 
     private void UpdateRefreshLoop(SeederRunStatus status)
     {
-        if (SeederDisplay.IsActive(status))
+        if (IsExecuting || SeederDisplay.IsActive(status))
         {
             EnsureRefreshLoop();
             return;
@@ -566,8 +642,9 @@ public sealed class SeederPageSession : IAsyncDisposable
         SeederStatus.Cancelled => 2,
         SeederStatus.Running => 3,
         SeederStatus.Pending => 4,
-        SeederStatus.Succeeded => 5,
-        _ => 6
+        SeederStatus.Held => 5,
+        SeederStatus.Succeeded => 6,
+        _ => 7
     };
 
     private sealed record PageState(
@@ -582,7 +659,9 @@ public sealed class SeederPageSession : IAsyncDisposable
         SeederCriticality? CriticalityFilter,
         SeederFailureBehavior? FailureBehaviorFilter,
         string? SelectedSeederTypeName,
-        bool IsDetailsOpen)
+        bool IsDetailsOpen,
+        bool IsExecuting = false,
+        string? ExecutionError = null)
     {
         public static PageState Initial { get; } = new(
             Snapshot: null,

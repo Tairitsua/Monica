@@ -30,6 +30,7 @@ public partial class ConfigurationStatePage
     private ConfigurationDefinitionSummary? _selectedSummary;
     private ConfigurationDefinition? _selectedDefinition;
     private ConfigurationStartupCandidate? _startupCandidate;
+    private bool _isUnpersisted;
     private ConfigurationNodeDefinition? _selectedNode;
     private string _searchText = string.Empty;
     private ConfigurationDefinitionLifecycleFilter _lifecycleFilter = ConfigurationDefinitionLifecycleFilter.Active;
@@ -451,6 +452,7 @@ public partial class ConfigurationStatePage
         _selectedSummary = null;
         _selectedDefinition = null;
         _startupCandidate = null;
+        _isUnpersisted = false;
         _selectedNode = null;
         _highlightedPath = null;
         _effectiveValues.Clear();
@@ -676,6 +678,7 @@ public partial class ConfigurationStatePage
         var selectedPath = resetSelection ? LogicalPath.Root : _selectedNode?.RelativePath ?? LogicalPath.Root;
         _selectedDefinition = state.Definition;
         _startupCandidate = state.StartupCandidate;
+        _isUnpersisted = state.IsUnpersisted;
         _definitionDetails[state.Definition.DefinitionKey] = state.Definition;
         _selectedNode = ResolveNodeByPath(state.Definition.Root, selectedPath) ?? state.Definition.Root;
         _effectiveValues.Clear();

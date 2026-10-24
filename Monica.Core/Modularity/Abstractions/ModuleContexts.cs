@@ -35,7 +35,8 @@ public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionCon
 {
     internal ModuleCompositionContext(ModuleConfigurationContext context)
     {
-        Composition = context.Registration.Application.Composition;
+        Application = context.Registration.Application;
+        Composition = Application.Composition;
         RegistrationOwner = context.RegistrationOwner;
         Options = (TOptions)context.Registration.ModuleOption;
         Modules = new ModuleOptionReader(
@@ -50,6 +51,10 @@ public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionCon
 
     /// <inheritdoc />
     public MonicaCompositionState Composition { get; }
+
+    /// <summary>Gets this host's frozen application policy and native resource diagnostics without resolving services.</summary>
+    /// <remarks>Resource extensions evaluate their actual implementation and captured RegistrationOwner independently; a shared module does not have one business owner.</remarks>
+    public MonicaApplication Application { get; }
 
     /// <summary>Gets the declaring application type captured by this contribution, or null for module-wide lifecycle callbacks.</summary>
     /// <remarks>Resource registrations retain their own owner; a framework module may contain contributions from several owners.</remarks>

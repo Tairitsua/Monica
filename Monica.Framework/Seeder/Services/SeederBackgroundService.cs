@@ -86,7 +86,8 @@ internal sealed class SeederBackgroundService(
         else
         {
             RecordState(
-                $"Seeder run completed successfully for {snapshot.Seeders.Length} seeders.",
+                $"Seeder startup batch completed: {snapshot.SucceededCount} succeeded, " +
+                $"{snapshot.HeldCount} held for explicit execution, {snapshot.DisabledCount} disabled by placement.",
                 HostedServiceState.Running);
         }
     }

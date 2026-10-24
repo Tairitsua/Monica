@@ -34,6 +34,8 @@ public static class EventBusLocalizationExtensions
             EventSubscriptionState.Active => localizer["Shared:SubscriptionStates:Active"].Value,
             EventSubscriptionState.Inactive => localizer["Shared:SubscriptionStates:Inactive"].Value,
             EventSubscriptionState.Disposed => localizer["Shared:SubscriptionStates:Disposed"].Value,
+            EventSubscriptionState.Held => localizer["Shared:SubscriptionStates:Held"].Value,
+            EventSubscriptionState.Disabled => localizer["Shared:SubscriptionStates:Disabled"].Value,
             _ => localizer["Shared:Labels:Unknown"].Value
         };
     }

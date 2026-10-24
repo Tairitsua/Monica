@@ -1,5 +1,6 @@
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.EventBus.Abstractions;
 
@@ -9,6 +10,9 @@ namespace Monica.EventBus.Abstractions;
 /// </summary>
 public interface IEventSubscription : IAsyncDisposable
 {
+    /// <summary>Gets the frozen permission for automatic and explicit local delivery.</summary>
+    ActivationMode Activation { get; }
+
     #region Identity
 
     /// <summary>

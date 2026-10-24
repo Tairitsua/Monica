@@ -39,6 +39,14 @@ Implement `IDistributedEventHandler<TEvent>` for distributed receives and make s
 
 For a database write that must publish only after commit, mark the event `[Outbox]`, enable outbox on the primary UnitOfWork context, and publish through the scoped gateway inside that operation. A successful outbox `PublishAsync` means the prepared payload was staged, not committed or transported. Worker delivery can retry, so consumers need idempotency; `[Inbox]` supplies durable handler deduplication when configured. Follow the persistence skill's [transactional-events reference](../../monica-infra-persistence/references/transactional-events.md) for migration and transaction ownership.
 
+## Manual delivery and held subscriptions
+
+`Application:AutonomousWork=false` retains eligible distributed subscriptions as `Held`. Ineligible owners remain visible as `Disabled`; passive local subscriptions remain active. Both discovery and explicit subscription registration use the frozen activation policy. Neither direct subscription activation nor the registry activation methods can attach a held or disabled subscription to a transport. Kafka and Dapr subscription workers do not start in Manual mode.
+
+For a bounded local test, select exact registry IDs and call `IEventReceiveDispatcher.DispatchTestAsync(message, selectedIds, cancellationToken)`. Create a fresh message with `IEventMessageFactory.Prepare` for each new delivery; reuse the original message only for intentional replay. The complete nonempty, distinct selection must exist, be Active or Held, and match the message's topic, key, scope and event type before any handler runs. This dispatch uses the ordinary scoped invoker, transaction and Inbox pipeline. It neither publishes its input to a broker nor activates subscriptions or advances offsets. Handler business writes and outgoing events remain real; Inbox deduplication still applies to replayed message IDs.
+
+Native resource registrations can supply `EventSubscriptionDescriptor.RegistrationOwner` for shared implementations. Automatic discovery preserves the finalized handler service-registration owner without constructing the handler; conflicting owners, including mixed owned and unowned registrations, fail composition. The policy validates this against concrete handler ownership and uses the same owner precedence for activation and durable workload identity. Explicit `WorkloadOwner` and `EventSubscriptionOwnerAttribute` retain their migration-identity precedence; neither grants activation permission.
+
 ## Native Kafka setup and consumer ownership
 
 Select the native provider in the host registration. This example deliberately reads a new development namespace from its earliest retained record; production cutover provisions exact offsets instead.

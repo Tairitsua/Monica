@@ -156,10 +156,10 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
     {
         if (state.Summary is not { } summary) return;
         var operatorPaused = JobSchedulerUiPresentation.IsOperatorPaused(summary);
-        var debugSuppressed = JobSchedulerUiPresentation.IsDebugSuppressed(summary);
-        if (!operatorPaused && debugSuppressed)
+        var manualSuppressed = JobSchedulerUiPresentation.IsManualSuppressed(summary);
+        if (!operatorPaused && manualSuppressed)
         {
-            Snackbar.Add(L["Catalog:Messages:PauseUnavailableDebug"], Severity.Info);
+            Snackbar.Add(L["Catalog:Messages:PauseUnavailableManual"], Severity.Info);
             return;
         }
         var disabled = !operatorPaused;
@@ -170,9 +170,9 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
             Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
             return;
         }
-        var message = !disabled && debugSuppressed ? L["Catalog:Messages:ResumedDebugRemains"]
+        var message = !disabled && manualSuppressed ? L["Catalog:Messages:ResumedManualRemains"]
             : disabled ? L["Catalog:Messages:Paused"] : L["Catalog:Messages:Resumed"];
-        Snackbar.Add(message, !disabled && debugSuppressed ? Severity.Info : Severity.Success);
+        Snackbar.Add(message, !disabled && manualSuppressed ? Severity.Info : Severity.Success);
     });
 
     private Task RunRecurringNowAsync() => RunCommandAsync(async state =>

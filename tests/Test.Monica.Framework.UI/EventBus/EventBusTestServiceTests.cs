@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
@@ -15,6 +16,7 @@ using Monica.EventBus.Models;
 using Monica.EventBus.Services;
 using Monica.EventBus.Services.Support;
 using Monica.Framework.UI.UIEventBus.State;
+using Monica.Framework.UI.UIEventBus.Support;
 using Monica.Modules;
 using Monica.Testing.Doubles;
 using Monica.Testing.Hosting;
@@ -28,6 +30,73 @@ public sealed class EventBusTestServiceTests
     private const string TEST_TOPIC = "runtime-test-topic";
     private const string EVENT_NAME = "test.eventbus-ui.durable.v1";
     private const string JSON_PAYLOAD = """{"value":"diagnostic payload"}""";
+
+    [Fact]
+    public async Task DeliverLocalTestMessageAsync_WhenHeld_ShouldTargetOnlySelectedHandlerWithoutConstructingTransport()
+    {
+        var factory = new EventBusUITestApplicationFactory(autonomousWork: false, rejectProviderResolution: true);
+        await using var app = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        await using var scope = app.Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var target = await SubscribeAsync(services, EventSubscriptionScope.Distributed);
+        var other = await SubscribeAsync(services, EventSubscriptionScope.Distributed);
+        target.State.Should().Be(EventSubscriptionState.Held);
+        var service = services.GetRequiredService<EventBusTestService>();
+
+        var providers = services.GetRequiredService<EventBusProviderDiscoveryService>().GetRegisteredProviders();
+        providers.Status.Should().Be(ResStatus.Ok);
+        providers.Data.Should().Contain(provider => provider.IsDistributed && provider.ServiceKey == null);
+        var workbench = services.GetRequiredService<EventBusWorkbenchState>();
+        await workbench.RefreshAsync(TestContext.Current.CancellationToken);
+        workbench.RefreshError.Should().BeNull();
+        workbench.Statistics!.HeldSubscriptions.Should().Be(2);
+        workbench.Subscriptions.Should().OnlyContain(row => !row.CanActivate && row.CanDeliverLocally);
+
+        var prepared = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
+        prepared.Status.Should().Be(ResStatus.Ok);
+        prepared.Message.Should().BeNull();
+        prepared.Data.Should().NotBeNull();
+        var result = await service.DeliverLocalTestMessageAsync(target.Id, prepared.Data!, TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(ResStatus.Ok);
+        result.Message.Should().BeEmpty();
+        factory.HandlerState.Deliveries.Should().ContainSingle();
+        target.State.Should().Be(EventSubscriptionState.Held);
+        other.State.Should().Be(EventSubscriptionState.Held);
+        (await services.GetRequiredService<EventBusMonitorService>().ActivateSubscriptionAsync(target.Id))
+            .Status.Should().Be(ResStatus.BadRequest);
+        (await service.StartRuntimeListenerAsync(target.Id)).Status.Should().Be(ResStatus.BadRequest);
+        factory.DefaultTransport.Messages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PrepareLocalTestMessage_WhenPreparedAgain_ShouldUseFreshIdentityAndRetainFailedMessageForExplicitReplay()
+    {
+        var factory = new EventBusUITestApplicationFactory(autonomousWork: false);
+        await using var app = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        await using var scope = app.Services.CreateAsyncScope();
+        var target = await SubscribeAsync(scope.ServiceProvider, EventSubscriptionScope.Distributed);
+        var service = scope.ServiceProvider.GetRequiredService<EventBusTestService>();
+        var first = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
+        var second = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
+        first.Status.Should().Be(ResStatus.Ok);
+        second.Status.Should().Be(ResStatus.Ok);
+        first.Data!.Metadata.MessageId.Should().NotBe(second.Data!.Metadata.MessageId);
+        factory.HandlerState.Failure = new InvalidOperationException("local handler rejected");
+        var failed = await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken);
+        failed.Status.Should().Be(ResStatus.BadRequest);
+        failed.Message.Should().Contain("local handler rejected");
+
+        factory.HandlerState.Failure = null;
+        var replay = await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken);
+        replay.Status.Should().Be(ResStatus.Ok);
+        factory.HandlerState.Deliveries.Should().ContainSingle().Which.Metadata.MessageId.Should().Be(first.Data.Metadata.MessageId);
+        await scope.ServiceProvider.GetRequiredService<IEventSubscriptionRegistry>()
+            .UnsubscribeAsync(target.Id, TestContext.Current.CancellationToken);
+        service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD).Status.Should().Be(ResStatus.BadRequest);
+        (await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken))
+            .Status.Should().Be(ResStatus.BadRequest);
+    }
 
     [Theory]
     [InlineData(false, "1970-01-01", "00:00:00")]
@@ -276,7 +345,8 @@ public sealed class EventBusTestServiceTests
         DateOnly? PlanDate, DateOnly RequiredDate, TimeOnly? OptionalTime, TimeOnly RequiredTime);
 
     private sealed class EventBusUITestApplicationFactory(
-        bool registerKeyedTransport = true, bool useCustomDateTimeConverters = false)
+        bool registerKeyedTransport = true, bool useCustomDateTimeConverters = false,
+        bool autonomousWork = true, bool rejectProviderResolution = false)
         : MonicaTestApplicationFactory<EventBusTestService>
     {
         public TransportProbe DefaultTransport { get; } = new();
@@ -286,6 +356,7 @@ public sealed class EventBusTestServiceTests
         protected override void ConfigureHost(WebApplicationBuilder builder)
         {
             builder.Environment.ApplicationName = typeof(ModuleEventBusUI).Assembly.GetName().Name!;
+            builder.Configuration["Application:AutonomousWork"] = autonomousWork.ToString();
         }
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
@@ -320,6 +391,17 @@ public sealed class EventBusTestServiceTests
             services.AddSingleton(HandlerState);
             services.AddTransient<RuntimePayloadHandler>();
             services.AddTransient<RuntimeFlightPlanHandler>();
+            if (rejectProviderResolution)
+            {
+                services.Replace(ServiceDescriptor.Singleton<IEventTransport>(_ =>
+                    throw new InvalidOperationException("Diagnostics must not construct a transport.")));
+                services.Replace(ServiceDescriptor.Scoped<IDistributedEventBus>(_ =>
+                    throw new InvalidOperationException("Local delivery must not construct a distributed gateway.")));
+                services.AddKeyedSingleton<IEventTransport>(TEST_BUS, (_, _) =>
+                    throw new InvalidOperationException("Diagnostics must not construct a keyed transport."));
+                services.AddKeyedScoped<IDistributedEventBus>(TEST_BUS, (_, _) =>
+                    throw new InvalidOperationException("Diagnostics must not construct a keyed gateway."));
+            }
         }
     }
 

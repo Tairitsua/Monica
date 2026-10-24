@@ -9,6 +9,22 @@ namespace Monica.EventBus.Services.Support;
 internal sealed class EventBusAutoDiscovery
 {
     private readonly List<EventHandlerRegistration> _registrations = [];
+    private readonly Dictionary<Type, Type?> _registrationOwners = [];
+
+    internal void CaptureRegistrationOwners(IReadOnlyList<ServiceDescriptor> descriptors,
+        Func<ServiceDescriptor, Type?> getOwner)
+    {
+        foreach (var handler in _registrations.Where(registration => registration.IsAutoRegistered && registration.IsDistributed)
+                     .Select(registration => registration.HandlerType).Distinct())
+        {
+            var owners = descriptors.Where(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == handler)
+                .Select(getOwner).Distinct().ToArray();
+            if (owners.Length > 1)
+                throw new InvalidOperationException(
+                    $"Distributed event handler '{handler.FullName}' has conflicting registration owners. Register the shared handler under one application declaration.");
+            if (owners.Length == 1) _registrationOwners.Add(handler, owners[0]);
+        }
+    }
 
     public void Collect(Type type)
     {
@@ -27,8 +43,6 @@ internal sealed class EventBusAutoDiscovery
     {
         return _registrations
             .Where(static registration => registration.IsAutoRegistered)
-            .Where(registration => !registration.IsDistributed ||
-                activation?.IsEnabled(registration.HandlerType, TypeActivationKind.ExternalSubscription) != false)
             // Type discovery sees handler classes inside shared assemblies that this host references but
             // does not own. Only subscribe handler types this host registered; subscribing a foreign host's
             // handler fails on every delivery and wedges the topic subscription in endless retry.
@@ -44,7 +58,8 @@ internal sealed class EventBusAutoDiscovery
                 TopicName = registration.TopicName,
                 HandlerFactory = new IocEventHandlerFactory(serviceScopeFactory, registration.HandlerType),
                 Scope = registration.IsDistributed ? EventSubscriptionScope.Distributed : EventSubscriptionScope.Local,
-                IsAutoDiscovered = true
+                IsAutoDiscovered = true,
+                RegistrationOwner = registration.IsDistributed ? _registrationOwners.GetValueOrDefault(registration.HandlerType) : null
             })
             .ToList();
     }

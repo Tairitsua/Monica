@@ -124,6 +124,9 @@ public sealed class ModuleMcp : MonicaModule<ModuleMcpOption>, IWebModule
                 };
             });
             services.AddHostedService<MonicaStdioMcpHostedService>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(MonicaStdioMcpHostedService));
         }
 
         services.TryAddSingleton<IExternalMcpClientProfileStore, FileExternalMcpClientProfileStore>();

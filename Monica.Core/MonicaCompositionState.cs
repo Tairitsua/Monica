@@ -18,6 +18,7 @@ public sealed class MonicaCompositionState
     private readonly List<ServiceFinalization> _finalizers = [];
     private readonly Dictionary<int, Type?> _registrationOwners = [];
     private readonly Dictionary<ServiceDescriptor, Type?> _serviceOwners = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ServiceDescriptor, Type> _hostedLifecycles = new(ReferenceEqualityComparer.Instance);
     private readonly EnvironmentFileConfiguration _environmentFiles = new();
     private bool _servicesFinalized;
     private bool _finalizingServices;
@@ -146,9 +147,46 @@ public sealed class MonicaCompositionState
         }
     }
 
-    internal Type? GetServiceRegistrationOwner(ServiceDescriptor descriptor)
+    /// <summary>Gets the application declaration that contributed an exact service descriptor.</summary>
+    /// <remarks>
+    /// This is captured registration provenance, not implementation ownership. Null means the descriptor was
+    /// unowned or was not observed during application composition. Framework resource discovery should read
+    /// descriptors from the final validation snapshot and retain its own immutable resource metadata. This
+    /// operation never resolves services or invokes implementation factories.
+    /// </remarks>
+    public Type? GetServiceRegistrationOwner(ServiceDescriptor descriptor)
     {
+        ArgumentNullException.ThrowIfNull(descriptor);
         lock (_gate) return _serviceOwners.GetValueOrDefault(descriptor);
+    }
+
+    /// <summary>Admits an existing module-owned hosted coordinator that implements native lifecycle or explicit execution infrastructure.</summary>
+    /// <remarks>
+    /// The descriptor must already belong to this host. The coordinator must independently gate each autonomous
+    /// resource it manages. This does not admit product background work or provide a generic manual executor.
+    /// The actual implementation type is metadata only; factories are never invoked during admission.
+    /// </remarks>
+    public void AdmitHostedLifecycle(ServiceDescriptor descriptor, Type implementationType)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(implementationType);
+        lock (_gate)
+        {
+            if (_servicesFinalized) throw new InvalidOperationException("Hosted lifecycle admission is closed after service finalization.");
+            if (descriptor.IsKeyedService || descriptor.ServiceType != typeof(IHostedService)
+                || !typeof(IHostedService).IsAssignableFrom(implementationType)
+                || _services?.Contains(descriptor) != true)
+                throw new ArgumentException("Admission requires an existing unkeyed hosted-service descriptor and its implementation type.", nameof(descriptor));
+            var declaredType = descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType();
+            if (declaredType is not null && declaredType != implementationType)
+                throw new ArgumentException("The lifecycle implementation does not match its service descriptor.", nameof(implementationType));
+            _hostedLifecycles[descriptor] = implementationType;
+        }
+    }
+
+    internal Type? GetAdmittedHostedLifecycle(ServiceDescriptor descriptor)
+    {
+        lock (_gate) return _hostedLifecycles.GetValueOrDefault(descriptor);
     }
 
     /// <summary>Returns the one framework state of this type, creating it once for this host.</summary>

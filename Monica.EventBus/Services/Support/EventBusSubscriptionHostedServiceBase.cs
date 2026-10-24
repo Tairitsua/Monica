@@ -165,6 +165,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
             {
                 case EventSubscriptionChangeType.Added:
                 case EventSubscriptionChangeType.Activated:
+                    if (change.Subscription.State != EventSubscriptionState.Active) break;
                     HandleSubscriptionAddedAsync(change.Subscription, CancellationToken.None)
                         .GetAwaiter().GetResult();
                     break;

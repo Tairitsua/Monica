@@ -8,6 +8,10 @@ namespace Monica.EventBus.Models;
 /// </summary>
 public sealed record EventSubscriptionDescriptor
 {
+    /// <summary>Gets the declaring domain or role for a shared handler implementation, when known.</summary>
+    /// <remarks>This cannot override a concrete handler's declared role ownership.</remarks>
+    public Type? RegistrationOwner { get; init; }
+
     /// <summary>
     /// Service key for keyed EventBus instances. Null for default EventBus.
     /// </summary>

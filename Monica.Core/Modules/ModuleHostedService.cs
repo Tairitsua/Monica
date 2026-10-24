@@ -56,6 +56,7 @@ public class ModuleHostedService : MonicaModule<ModuleHostedServiceOption>
         services.TryAddSingleton<HostedServiceMetrics>();
         services.AddSingleton<IHostedServiceRuntimeObserver>(provider => provider.GetRequiredService<HostedServiceMetrics>());
         services.AddHostedService<HostedServiceRegistryLifecycle>();
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(HostedServiceRegistryLifecycle)), typeof(HostedServiceRegistryLifecycle));
     }
 }
 

@@ -1,15 +1,23 @@
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.EventBus.Models.Internal;
 
 /// <summary>
 /// Concrete subscription implementation with lifecycle management.
 /// </summary>
-internal class EventSubscription(EventSubscriptionDescriptor descriptor) : IEventSubscription
+internal class EventSubscription(EventSubscriptionDescriptor descriptor, ActivationMode activation = ActivationMode.Automatic) : IEventSubscription
 {
     private readonly SemaphoreSlim _mutationGate = new(1, 1);
-    private volatile EventSubscriptionState _state = EventSubscriptionState.Pending;
+    private volatile EventSubscriptionState _state = activation switch
+    {
+        ActivationMode.Manual => EventSubscriptionState.Held,
+        ActivationMode.Disabled => EventSubscriptionState.Disabled,
+        _ => EventSubscriptionState.Pending
+    };
+
+    public ActivationMode Activation { get; } = activation;
 
     #region Identity
 
@@ -69,6 +77,8 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor) : IEven
         await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (Activation != ActivationMode.Automatic)
+                throw new InvalidOperationException("Held or disabled subscriptions cannot attach to a transport. Use explicit test delivery for eligible held subscriptions.");
             if (_state != EventSubscriptionState.Pending && _state != EventSubscriptionState.Inactive)
             {
                 throw new InvalidOperationException($"Cannot activate subscription in state {_state}");

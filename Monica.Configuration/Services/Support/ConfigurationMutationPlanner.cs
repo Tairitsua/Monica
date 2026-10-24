@@ -10,7 +10,8 @@ internal sealed class ConfigurationMutationPlanner(
     ConfigurationDefinitionResolver definitionResolver,
     ConfigurationValidationCoordinator validationCoordinator,
     ConfigurationPathProjector pathProjector,
-    IConfigurationSourceInspector sourceInspector)
+    IConfigurationSourceInspector sourceInspector,
+    ConfigurationWriteAuthority? writeAuthority = null)
 {
     public async Task<PreparedConfigurationMutation> PrepareAsync(
         ConfigurationMutationCommand command,
@@ -20,6 +21,8 @@ internal sealed class ConfigurationMutationPlanner(
         var definition = await definitionResolver.GetRequiredAsync(command.DefinitionKey, cancellationToken);
         if (definition.Kind == ConfigurationKind.Startup)
             throw new InvalidOperationException("Startup configuration is deployment-owned. Change deployment inputs and restart the process.");
+        var publication = writeAuthority is null ? null
+            : await writeAuthority.RequireAsync(definition, command.Target, cancellationToken);
         ValidateSourceChainRevision(definition, command);
         var targetNode = ResolveTargetNode(definition, command.LogicalPath);
         var request = new ConfigurationMutationRequest
@@ -44,6 +47,7 @@ internal sealed class ConfigurationMutationPlanner(
         {
             Command = command,
             Definition = definition,
+            PublishedDefinitionExpectation = publication,
             TargetNode = targetNode,
             Request = request,
             ConfigurationPath = pathProjector.Project(definition.SectionPath, command.LogicalPath),
@@ -149,6 +153,8 @@ internal sealed class ConfigurationMutationPlanner(
 
 internal sealed record PreparedConfigurationMutation
 {
+    public ConfigurationPublishedDefinitionExpectation? PublishedDefinitionExpectation { get; init; }
+
     public required ConfigurationMutationCommand Command { get; init; }
 
     public required ConfigurationDefinition Definition { get; init; }

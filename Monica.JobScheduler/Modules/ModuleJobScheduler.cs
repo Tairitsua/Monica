@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
@@ -29,9 +30,10 @@ public static class ModuleJobSchedulerBuilderExtensions
     extension(IMonicaBuilder builder)
     {
         /// <summary>
-        /// Adds the durable JobScheduler runtime. Every host schedules and executes the jobs it discovers under its
-        /// effective logical owners; a store and scope must be selected on the returned registration before the module
-        /// graph is finalized. Application activation selects role-owned jobs before they enter the local catalog.
+        /// Adds the JobScheduler runtime for the host's selected logical owners. Automatic hosts require a store;
+        /// Manual hosts use a fresh isolated memory store and execute only explicit work. The scheduler scope comes
+        /// from Application:DeploymentScope unless UseSchedulerScope overrides it. Application activation selects
+        /// role-owned jobs before they enter the local catalog.
         /// </summary>
         public ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> AddJobScheduler(
             Action<ModuleJobSchedulerOption>? action = null)
@@ -42,17 +44,23 @@ public static class ModuleJobSchedulerBuilderExtensions
 }
 
 /// <summary>
-/// Composes the owner-local scheduling plane and the durable execution plane. Every host runs both.
+/// Composes owner-local scheduling and execution. Manual hosts initialize a local catalog and retain the native
+/// executor while automatic recurring scheduling and shared maintenance remain held.
 /// </summary>
 public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
 {
-    internal const string STORE_FEATURE = "scheduler-store";
-    internal const string SCOPE_FEATURE = "scheduler-scope";
-
     private readonly List<LocalJobDefinition> _localJobDefinitions = [];
 
     /// <inheritdoc />
     public override void ValidateOptions(ModuleJobSchedulerOption options, string? profileName)
+    {
+        options.AutonomousWork = Application.Application.AutonomousWork;
+        if (string.IsNullOrWhiteSpace(options.SchedulerScopeKey))
+            options.SchedulerScopeKey = Application.Application.DeploymentScope ?? string.Empty;
+        ValidateRuntimeOptions(options);
+    }
+
+    internal static void ValidateRuntimeOptions(ModuleJobSchedulerOption options)
     {
         ValidatePositive(options.SchedulingPollInterval, nameof(options.SchedulingPollInterval));
         ValidatePositive(options.WorkerPollInterval, nameof(options.WorkerPollInterval));
@@ -143,7 +151,7 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
 
         if (string.IsNullOrWhiteSpace(options.SchedulerScopeKey))
         {
-            throw new InvalidOperationException("A scheduler scope must be configured with UseSchedulerScope(...).");
+            throw new InvalidOperationException("A scheduler scope requires Application:DeploymentScope or UseSchedulerScope(...).");
         }
 
         if (string.IsNullOrWhiteSpace(options.WorkerInstanceId))
@@ -170,7 +178,19 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             {
                 foreach (var match in matches)
                 {
-                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.Job) == false)
+                    var mode = Application.TypeActivation!.GetActivation(match.Type, TypeActivationKind.Job);
+                    Application.RecordActivation(new ResourceActivation
+                    {
+                        Key = $"job:{match.Type.FullName}", ImplementationType = match.Type,
+                        Kind = TypeActivationKind.Job, Mode = mode,
+                        Reason = mode switch
+                        {
+                            ActivationMode.Manual => "Explicit jobs execute in this process's isolated memory store.",
+                            ActivationMode.Disabled => "This job's owner is not placed in this application.",
+                            _ => "Normal scheduling and execution are admitted."
+                        }
+                    });
+                    if (mode == ActivationMode.Disabled)
                     {
                         continue;
                     }
@@ -215,7 +235,26 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         services.AddSingleton<JobSchedulingHostedService>();
         services.AddSingleton<JobExecutionWorkerHostedService>();
         services.AddHostedService(static provider => provider.GetRequiredService<JobSchedulingHostedService>());
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobSchedulingHostedService));
         services.AddHostedService(static provider => provider.GetRequiredService<JobExecutionWorkerHostedService>());
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobExecutionWorkerHostedService));
+
+        if (!Option.AutonomousWork)
+        {
+            ServiceDescriptor? localStore = null;
+            context.Composition.OnServicesFinalized(finalServices =>
+            {
+                finalServices.RemoveAll<IJobSchedulerStore>();
+                localStore = ServiceDescriptor.Singleton<IJobSchedulerStore>(provider =>
+                    new InMemoryJobSchedulerStore(provider.GetRequiredService<TimeProvider>(),
+                        provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ModuleJobSchedulerOption>>()));
+                finalServices.Add(localStore);
+            }, descriptors =>
+            {
+                if (descriptors.Where(descriptor => descriptor.ServiceType == typeof(IJobSchedulerStore)).Any(descriptor => !ReferenceEquals(descriptor, localStore)))
+                    throw new InvalidOperationException("Manual JobScheduler requires its isolated process-local store.");
+            });
+        }
 
         services.AddHealthChecks().AddMonicaReadinessCheck<JobSchedulerHealthCheck>(
             "monica.job-scheduler",
@@ -227,8 +266,6 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
     {
         module.Require<ModuleHostedService, ModuleHostedServiceOption>();
         module.Require<ModuleHealthCheck, ModuleHealthCheckOption>();
-        module.RequireFeature(STORE_FEATURE);
-        module.RequireFeature(SCOPE_FEATURE);
     }
 
     /// <inheritdoc />
@@ -338,10 +375,8 @@ public static class ModuleJobSchedulerRegistrationExtensions
         this ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> registration)
         where TStore : class, IJobSchedulerStore
     {
-        return registration
-            .PostConfigureServices(static context =>
-                context.Services.TryAddSingleton<IJobSchedulerStore, TStore>())
-            .SatisfyFeature(ModuleJobScheduler.STORE_FEATURE);
+        return registration.PostConfigureServices(static context =>
+            context.Services.TryAddSingleton<IJobSchedulerStore, TStore>());
     }
 
     /// <summary>
@@ -364,9 +399,7 @@ public static class ModuleJobSchedulerRegistrationExtensions
         string scopeKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scopeKey);
-        return registration
-            .Configure(options => options.SchedulerScopeKey = scopeKey)
-            .SatisfyFeature(ModuleJobScheduler.SCOPE_FEATURE);
+        return registration.Configure(options => options.SchedulerScopeKey = scopeKey);
     }
 }
 
@@ -400,11 +433,10 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
         Environment.GetEnvironmentVariable("HOSTNAME") ?? $"{Environment.MachineName}:{Environment.ProcessId}";
 
     /// <summary>
-    /// Gets or sets whether automatic recurring occurrence materialization is suppressed with an explicit debug-mode
-    /// reason. This setting does not change operator policy or prevent an explicit recurring run-now command. Triggered
-    /// work is unaffected. The default is <see langword="false"/>.
+    /// Gets the frozen host's permission to initiate scheduling and maintenance. Derived from Application:AutonomousWork;
+    /// false selects an isolated local store and keeps explicit native execution available.
     /// </summary>
-    public bool RecurringJobDebugMode { get; set; }
+    public bool AutonomousWork { get; internal set; } = true;
 
     /// <summary>
     /// Gets or sets the maximum number of attempts this process executes concurrently. The default is 4.

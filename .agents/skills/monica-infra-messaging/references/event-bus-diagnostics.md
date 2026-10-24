@@ -1,11 +1,11 @@
 # Inspect EventBus diagnostics
 
-`monica.AddEventBusUI()` composes the EventBus monitor, provider discovery, scoped capture state and diagnostic test service, localization, and shell navigation. It requires the EventBus distributed-provider feature even when the host's business subscriptions are local. Select a real distributed provider when testing external delivery, or use `UseNoOpDistributedEventBus()` only to satisfy composition without external transport. The workbench has five independently addressable routes:
+`monica.AddEventBusUI()` composes the EventBus monitor, provider discovery, scoped capture state and diagnostic test service, localization, and shell navigation. Local diagnostics and targeted local delivery require no distributed provider. Configure a distributed provider only when the host needs external publishing or receipt. The workbench has five independently addressable routes:
 
 | Route | Evidence or operations |
 | --- | --- |
 | `/event-bus-monitor` | Overview of captured registration and topic-runtime evidence. |
-| `/event-bus-monitor/providers` | Actual resolved buses, exact keys/scopes, and optional protected option inspection. |
+| `/event-bus-monitor/providers` | Configured buses, exact keys/scopes, and optional protected option inspection. |
 | `/event-bus-monitor/subscriptions` | Registered-handler filtering, frozen inspection, and exact-ID lifecycle actions. |
 | `/event-bus-monitor/changes` | The circuit's bounded observed registry changes and notification-loss evidence. |
 | `/event-bus-monitor/test-tools` | Standalone and selected-subscription diagnostics using real bus boundaries. |
@@ -13,7 +13,6 @@
 ```csharp
 builder.AddMonica(monica =>
 {
-    monica.AddEventBus().UseNoOpDistributedEventBus();
     monica.AddEventBusUI(options => options.TestListenerMessageLimit = 20);
 });
 ```
@@ -30,6 +29,8 @@ The subscription registry is host-wide across local, default distributed, and ke
 | `Inactive` registration | The handler is paused and may be reactivated. |
 | `Pending` registration | The handler has not committed activation yet. Ordinary `SubscribeAsync` creates and activates together. |
 | `Disposed` registration | The handler resources have been released. Ordinary unsubscription removes it from the current registry; a removal notification can still show its detached identity. |
+| `Held` registration | Startup policy holds automatic external receipt. Explicit local delivery may run the handler without activating it. |
+| `Disabled` registration | Placement excludes the handler. Neither activation nor local delivery can run it. |
 | `Healthy` topic | The provider reports an established, stable external subscription. A healthy but idle topic can have an old or absent last-message time. |
 | `Subscribing` topic | External subscription establishment is in progress. |
 | `Recovering` topic | Reconnection is being retried after failures. |
@@ -53,7 +54,7 @@ Runtime snapshots join distributed subscriptions by the exact `(nullable Service
 
 `EventBusProviderInfo.UniqueId` is an opaque selection identifier that distinguishes provider kind, bus scope, null keys, and exact named keys. Do not parse it or replace the key with a localized default-provider label. Display `ServiceKey` separately and preserve it unchanged when resolving a bus.
 
-Provider discovery lists actual resolved local buses and distributed buses with a matching `IEventTransport`; the no-op composition provider is not reported as an external transport. Registered provider-module metadata supplies kind and capability hints. An unrecognized implementation remains `Unknown` with no declared capabilities; do not infer a healthy connection from discovery, a subscription count, or a capability flag.
+Provider discovery inspects local bus registrations and distributed bus registrations with a matching `IEventTransport`, without resolving gateways, transports, producers or external clients. The no-op provider has no transport and is not reported as an external transport. Unambiguous provider-module metadata supplies kind, capability and declared-module hints; absent or ambiguous metadata remains `Unknown`. Discovery does not establish which factory implementation will be constructed or prove connection health. Explicit route publication and listener operations resolve their providers when invoked.
 
 ## Capture current evidence and freeze inspection
 
@@ -86,15 +87,19 @@ Dispose the feed when the component retires. Cancellation supplied to `OpenChang
 
 The reader-only adapter `SubscribeToChanges(cancellationToken)` requires a cancellable consumer-lifetime token and retires its independent lease on cancellation. The former parameterless shared-reader pattern is unsupported: it could distribute changes between unrelated views and had no consumer-owned retirement boundary. Prefer `OpenChangeFeed` when the UI needs notification-loss evidence.
 
-## Diagnostic actions use real buses
+## Distinguish route publication from local delivery
 
-Activation, deactivation, and removal target the exact current subscription ID. Activation of an inactive handler reactivates it; disposed handlers cannot be activated. Deactivation requires an active registration. Unsubscription releases the handler factory and removes the registry entry. These actions change real host handlers; they do not act only on the currently filtered table. Stop any row-level listener owned by the current circuit before removing its source subscription.
+Activation, deactivation, and removal target the exact current subscription ID. An inactive handler with `Automatic` activation policy may be reactivated; held, disabled and disposed handlers cannot be activated. Deactivation requires an active registration. Unsubscription releases the handler factory and removes the registry entry. These actions change real host handlers; they do not act only on the currently filtered table. Stop any row-level listener owned by the current circuit before removing its source subscription.
 
 `EventBusTestService.PublishRuntimePayloadAsync(id, json, cancellationToken)` validates and deserializes JSON using the exact selected event type, then prepares a real message with that subscription's local/distributed scope, exact service key, and topic. It sends immediately through the local receive dispatcher or the exact keyed/default distributed transport, including for Outbox-marked contracts. This diagnostic bypasses Outbox staging and requires no publishing transaction; ordinary application publication retains the [outbox/inbox contract](../../monica-infra-persistence/references/transactional-events.md). Every matching handler can receive the event, not just the selected row. Local success means dispatch completed; distributed success means transport acceptance, without confirming consumer completion or durable delivery. A listener receipt remains separate evidence.
 
+The row dialog's separate **Deliver to this handler locally** action uses `PrepareLocalTestMessage(id, json)` followed by `DeliverLocalTestMessageAsync(id, message, cancellationToken)`. Preparation uses the selected contract, topic, scope and key but invokes no handler or transport. Delivery calls native `IEventReceiveDispatcher.DispatchTestAsync` with that one exact registry ID. Only an `Active` or `Held` target is eligible, and the current registry state is revalidated at execution. The normal scoped handler, transaction and Inbox pipeline runs with real effects; no broker publish, transport acknowledgement, listener creation or activation occurs. A held target stays held, and other matching handlers do not run.
+
+Every new delivery gets a fresh message ID. The dialog retains only its most recently prepared message, including after a failed handler attempt. Explicit **Replay** reuses that message's original ID, source and unchanged body; the payload editor is disabled while replay is selected. Inbox may skip a previously processed message, so pipeline completion does not prove the handler body ran again. Closing the dialog cancels and drains its admitted command and refresh loop. Cancellation is cooperative with the handler pipeline and does not undo effects already committed or release resources before the command finishes.
+
 `CreateRuntimeJsonSample(id)` returns JSON through the host's serializer options. DateOnly and TimeOnly values, including nullable nested values, use actual sample values and configured converters rather than object-shaped placeholders. Validate the generated sample before sending it. `tests/Test.Monica.Framework.UI/EventBus/EventBusTestServiceTests.cs` covers default/keyed local and distributed immediate sends, Outbox bypass, cancellation/failure projection and date/time converters through real host composition without UI rendering.
 
-Row-level `StartRuntimeListenerAsync(id)` adds a real extra listener for the selected type, topic, key, and scope. Its metadata marks it hidden from ordinary subscription lists, subscription totals, provider subscription counts, and registry-change feeds. The listener captures only messages actually delivered to it. `TestListenerMessageLimit` defaults to 20 per active listener and clamps values below one to one; oldest retained messages are discarded as new ones arrive. Listener messages are an in-memory sample, not complete delivery history. The scoped service serializes row starts, stops, and cleanup through one ownership gate: overlapping starts reuse one real registry handle, and a start behind a successful stop creates a new handle only after the old one is removed. A failed stop preserves the exact handle and retained messages for retry. Scope retirement rejects queued or new row starts, drains an admitted registry start through handle adoption, then attempts exact cleanup; repeated disposal can retry a failed removal. Row start and stop APIs have no cancellation argument, so components must drain their admitted operations rather than abandon them.
+Row-level `StartRuntimeListenerAsync(id)` adds a real extra listener for the selected type, topic, key, and scope only when the source's activation policy is `Automatic`. It cannot turn a held or disabled target into automatic receipt. Its metadata marks it hidden from ordinary subscription lists, subscription totals, provider subscription counts, and registry-change feeds. The listener captures only messages actually delivered to it. `TestListenerMessageLimit` defaults to 20 per active listener and clamps values below one to one; oldest retained messages are discarded as new ones arrive. Listener messages are an in-memory sample, not complete delivery history. The scoped service serializes row starts, stops, and cleanup through one ownership gate: overlapping starts reuse one real registry handle, and a start behind a successful stop creates a new handle only after the old one is removed. A failed stop preserves the exact handle and retained messages for retry. Scope retirement rejects queued or new row starts, drains an admitted registry start through handle adoption, then attempts exact cleanup; repeated disposal can retry a failed removal. Row start and stop APIs have no cancellation argument, so components must drain their admitted operations rather than abandon them.
 
 The scoped test service owns these listeners. Closing the row test dialog retires its 500 ms refresh loop while an explicitly started listener continues until stopped, source removal by that circuit, or scope disposal. The standalone test panel differs: it uses the default distributed bus and `TestEventMessage` and retains at most 100 messages. Its component acquires `AcquireStandaloneListenerLeaseAsync(lifetimeToken)`, which waits for the prior mount to release exclusive control, then reads the lease's immutable `Snapshot` to adopt an exact retained handle/topic. Lease `SubscribeAsync(topic)` and `UnsubscribeAsync()` serialize listener operations. A failed stop retains that handle for retry and blocks replacement starts. Retirement cancels/drains a pending acquisition, drains admitted commands, attempts stop, and always disposes the lease. Lease disposal releases control after in-flight service operations finish without discarding a failed-stop handle; the next lease can recover it, and a retired lease cannot stop a later owner's listener.
 

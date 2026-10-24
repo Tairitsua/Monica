@@ -190,8 +190,8 @@
       "Details": "Open job details",
       "Pause": "Pause recurring materialization",
       "Resume": "Resume recurring materialization",
-      "PauseUnavailableDebug": "Automatic materialization is already suppressed by debug mode. Use Run job now for an explicit execution.",
-      "RunDuringDebug": "Run job now remains available because explicit admission does not advance the recurring cursor.",
+      "PauseUnavailableManual": "Automatic materialization is already suppressed by Manual mode. Use Run job now for an explicit execution.",
+      "RunDuringManual": "Run job now remains available because explicit admission does not advance the recurring cursor.",
       "PauseSelected": "Pause selected",
       "ResumeSelected": "Resume selected",
       "Reset": "Reset filters",
@@ -213,12 +213,12 @@
     "Lifecycle": {
       "Automatic": "Automatic schedule",
       "OperatorPaused": "Paused by policy",
-      "DebugSuppressed": "Manual run only",
-      "OperatorAndDebug": "Policy paused · debug mode",
+      "ManualSuppressed": "Manual run only",
+      "OperatorAndManual": "Policy paused · Manual mode",
       "AutomaticDescription": "Automatic recurring materialization is active.",
       "OperatorPausedDescription": "Operator policy prevents automatic recurring materialization.",
-      "DebugSuppressedDescription": "Debug mode suppresses automatic materialization; explicit Run job now remains available.",
-      "OperatorAndDebugDescription": "Operator policy and debug mode both suppress automatic recurring materialization.",
+      "ManualSuppressedDescription": "Manual mode suppresses automatic materialization; explicit Run job now remains available.",
+      "OperatorAndManualDescription": "Operator policy and Manual mode both suppress automatic recurring materialization.",
       "AwaitingDescription": "The recurring cursor is waiting for the active declaration to synchronize.",
       "ExhaustedDescription": "No automatic occurrence remains within the declared schedule boundaries.",
       "TriggeredEnabledDescription": "Operator admission is enabled for this triggered job.",
@@ -245,14 +245,14 @@
       "ToolbarLabel": "Selected recurring job operations",
       "Count": "{0} recurring job(s) selected",
       "Description": "Batch changes retain each job's independent retention policy and optimistic concurrency fence.",
-      "DebugPauseUnavailable": "One or more selected jobs already run in debug manual-only mode; quick Pause is unavailable for that selection.",
+      "ManualPauseUnavailable": "One or more selected jobs already run in Manual mode; quick Pause is unavailable for that selection.",
       "Clear": "Clear selection"
     },
     "Messages": {
       "Paused": "Recurring materialization is paused.",
       "Resumed": "Recurring materialization will resume from the next future occurrence.",
-      "PauseUnavailableDebug": "Automatic materialization is already suppressed by debug mode. Run job now remains available.",
-      "ResumedDebugRemains": "Operator pause was cleared. Debug mode still keeps automatic materialization suppressed; Run job now remains available.",
+      "PauseUnavailableManual": "Automatic materialization is already suppressed by Manual mode. Run job now remains available.",
+      "ResumedManualRemains": "Operator pause was cleared. Manual mode still keeps automatic materialization suppressed; Run job now remains available.",
       "UpdateFailed": "The policy update failed.",
       "RunFailed": "The job could not be queued.",
       "Queued": "Execution {0} was queued."
@@ -263,9 +263,9 @@
       "ResumeTitle": "Resume selected recurring jobs?",
       "PauseMessage": "Pause new recurring occurrences for {0} selected job(s)? Existing queued and running executions are unchanged.",
       "ResumeMessage": "Resume {0} selected job(s) from their next future occurrence? Disabled-period occurrences are not replayed.",
-      "PauseUnavailableDebug": "Quick Pause is unavailable because one or more selected jobs are already suppressed by debug mode without an operator pause.",
+      "PauseUnavailableManual": "Quick Pause is unavailable because one or more selected jobs are already suppressed by Manual mode without an operator pause.",
       "Result": "{0} policy update(s) succeeded; {1} failed.",
-      "ResultDebugRemains": "{0} operator pause update(s) succeeded; {1} failed. Debug mode still suppresses automatic materialization where configured."
+      "ResultManualRemains": "{0} operator pause update(s) succeeded; {1} failed. Manual mode still suppresses automatic materialization where configured."
     },
     "RegistryEyebrow": "DEFINITION REGISTRY",
     "NoDefinitions": "No definitions were found in the loaded presence snapshot.",
@@ -515,7 +515,7 @@
       "EndBoundary": "End boundary",
       "TriggeredTitle": "On-demand admission",
       "TriggeredDescription": "This job has no recurring cursor. Operators admit an execution explicitly through the active job definition.",
-      "DebugManualOnly": "Debug mode is suppressing automatic occurrences. Run job now remains available and does not advance the recurring cursor.",
+      "ManualOnly": "Manual mode is suppressing automatic occurrences. Run job now remains available and does not advance the recurring cursor.",
       "StatusDescriptions": {
         "NotRecurring": "No recurring cursor applies to an on-demand job.",
         "AwaitingSynchronization": "The active owner declaration is waiting for the scheduler to create its durable cursor.",
@@ -525,8 +525,8 @@
       },
       "SuspensionDescriptions": {
         "OperatorPolicy": "Operator policy has paused automatic recurring occurrence materialization.",
-        "DebugMode": "Debug mode suppresses automatic occurrence materialization while preserving explicit Run job now admission.",
-        "OperatorAndDebug": "Operator policy and debug mode both suppress automatic occurrence materialization. Clearing the operator pause leaves debug suppression active."
+        "ManualMode": "Manual mode holds automatic occurrences and runs explicit work in this process’s isolated memory store.",
+        "OperatorAndManual": "Operator policy and Manual mode both suppress automatic occurrence materialization. Clearing the operator pause leaves Manual mode active."
       },
       "NoNextOccurrence": "No next occurrence recorded"
     },
@@ -859,12 +859,12 @@
     "Identity": {
       "Title": "Serving host",
       "Description": "Exact identities and storage reported by the host that captured this runtime snapshot.",
-      "DebugMode": "Recurring debug mode",
+      "ManualMode": "Manual execution",
       "Scope": "Scheduler scope",
       "Owner": "Active workload owners",
       "WorkerInstanceId": "Worker instance",
       "CronTimeZone": "Cron timezone",
-      "DebugModeHelp": "Automatic recurring materialization is suppressed on this host."
+      "ManualModeHelp": "Only explicitly requested work runs here. Definitions, execution history and retries use an isolated local memory store."
     },
     "Store": {
       "Title": "Storage",

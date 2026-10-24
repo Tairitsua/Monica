@@ -382,12 +382,12 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         }
 
         var operatorPaused = IsOperatorPaused(summary);
-        var debugSuppressed = IsDebugSuppressed(summary);
-        return (operatorPaused, debugSuppressed) switch
+        var manualSuppressed = IsManualSuppressed(summary);
+        return (operatorPaused, manualSuppressed) switch
         {
-            (true, true) => L["Catalog:Lifecycle:OperatorAndDebug"],
+            (true, true) => L["Catalog:Lifecycle:OperatorAndManual"],
             (true, false) => L["Catalog:Lifecycle:OperatorPaused"],
-            (false, true) => L["Catalog:Lifecycle:DebugSuppressed"],
+            (false, true) => L["Catalog:Lifecycle:ManualSuppressed"],
             _ => summary.RecurringScheduleStatus switch
             {
                 JobRecurringScheduleStatus.AwaitingSynchronization => L["Catalog:ScheduleStatus:Awaiting"],
@@ -407,12 +407,12 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         }
 
         var operatorPaused = IsOperatorPaused(summary);
-        var debugSuppressed = IsDebugSuppressed(summary);
-        return (operatorPaused, debugSuppressed) switch
+        var manualSuppressed = IsManualSuppressed(summary);
+        return (operatorPaused, manualSuppressed) switch
         {
-            (true, true) => L["Catalog:Lifecycle:OperatorAndDebugDescription"],
+            (true, true) => L["Catalog:Lifecycle:OperatorAndManualDescription"],
             (true, false) => L["Catalog:Lifecycle:OperatorPausedDescription"],
-            (false, true) => L["Catalog:Lifecycle:DebugSuppressedDescription"],
+            (false, true) => L["Catalog:Lifecycle:ManualSuppressedDescription"],
             _ => summary.RecurringScheduleStatus switch
             {
                 JobRecurringScheduleStatus.AwaitingSynchronization =>
@@ -435,7 +435,7 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
             return Color.Warning;
         }
 
-        return IsDebugSuppressed(summary)
+        return IsManualSuppressed(summary)
             ? Color.Info
             : JobSchedulerUiPresentation.GetRecurringScheduleStatusColor(summary.RecurringScheduleStatus);
     }
@@ -454,7 +454,7 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
             return MoIcons.PauseCircle;
         }
 
-        if (IsDebugSuppressed(summary))
+        if (IsManualSuppressed(summary))
         {
             return MoIcons.Bug;
         }
@@ -471,15 +471,15 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         IsOperatorPaused(summary) ? L["Catalog:Actions:Resume"] : L["Catalog:Actions:Pause"];
 
     private string GetToggleDisabledTooltip(JobOperationalSummary summary) =>
-        JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary)
-            ? L["Catalog:Actions:PauseUnavailableDebug"]
+        JobSchedulerUiPresentation.IsManualOnlySuppressed(summary)
+            ? L["Catalog:Actions:PauseUnavailableManual"]
             : GetToggleDisabledLabel(summary);
 
     private static bool IsOperatorPaused(JobOperationalSummary summary) =>
         JobSchedulerUiPresentation.IsOperatorPaused(summary);
 
-    private static bool IsDebugSuppressed(JobOperationalSummary summary) =>
-        JobSchedulerUiPresentation.IsDebugSuppressed(summary);
+    private static bool IsManualSuppressed(JobOperationalSummary summary) =>
+        JobSchedulerUiPresentation.IsManualSuppressed(summary);
 
     private static bool IsRecurring(JobOperationalSummary summary) =>
         summary.Definition.Declaration.JobType == JobType.Recurring;

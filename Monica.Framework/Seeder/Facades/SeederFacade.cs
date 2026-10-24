@@ -14,8 +14,31 @@ namespace Monica.Framework.Seeder.Facades;
 public sealed class SeederFacade(
     ISeederState state,
     IOptions<ModuleSeederOption> options,
-    ILogger<SeederFacade> logger)
+    ILogger<SeederFacade> logger,
+    ISeederExecutor executor)
 {
+    /// <summary>
+    /// Explicitly runs one discovered seeder and its unsatisfied eligible prerequisites through the native executor.
+    /// This can mutate external resources. Disabled dependencies, unknown identities, and overlapping batches are
+    /// rejected before execution. Required failures continue to affect readiness until a successful explicit retry.
+    /// </summary>
+    public async Task<Res<SeederStateSnapshot>> RunAsync(string seederTypeName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return Res.Ok(await executor.RunAsync(seederTypeName, cancellationToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to execute Seeder {SeederTypeName}.", seederTypeName);
+            return Res.Fail($"Failed to execute Seeder: {exception.GetMessageRecursively()}");
+        }
+    }
+
     /// <summary>
     /// Captures the effective module configuration and current host-owned Seeder run.
     /// </summary>

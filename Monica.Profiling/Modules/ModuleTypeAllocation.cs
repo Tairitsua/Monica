@@ -76,6 +76,9 @@ public class ModuleTypeAllocation : MonicaModule<ModuleTypeAllocationOption>
         if (Option.AutoStartCollection)
         {
             services.AddHostedService<TypeAllocationAutoStartHostedService>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(TypeAllocationAutoStartHostedService));
         }
     }
 }

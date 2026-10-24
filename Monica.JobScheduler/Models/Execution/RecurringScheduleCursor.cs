@@ -21,9 +21,9 @@ public enum JobRecurringScheduleSuspensionReason
     OperatorPolicy = 1 << 0,
 
     /// <summary>
-    /// The scheduler host is running in recurring-job debug mode, where occurrences are admitted only explicitly.
+    /// The scheduler host is running in Manual mode, where occurrences are admitted only explicitly.
     /// </summary>
-    DebugMode = 1 << 1
+    Manual = 1 << 1
 }
 
 /// <summary>
@@ -175,12 +175,12 @@ public sealed record RecurringScheduleSynchronization
         ArgumentNullException.ThrowIfNull(CursorKey);
         CursorKey.Validate();
         if ((HostSuspensionReasons
-                & ~(JobRecurringScheduleSuspensionReason.DebugMode)) != JobRecurringScheduleSuspensionReason.None)
+                & ~(JobRecurringScheduleSuspensionReason.Manual)) != JobRecurringScheduleSuspensionReason.None)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(HostSuspensionReasons),
                 HostSuspensionReasons,
-                "Only DebugMode is a host-owned suspension reason.");
+                "Only Manual is a host-owned suspension reason.");
         }
     }
 }

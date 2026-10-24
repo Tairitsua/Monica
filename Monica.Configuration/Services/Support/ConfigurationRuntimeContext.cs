@@ -11,6 +11,12 @@ public sealed class ConfigurationRuntimeContext
 
     internal ConfigurationStartupOptionsReader? StartupOptions { get; set; }
 
+    // Captured only after Core freezes the application's startup policy.
+    internal bool AutonomousWork { get; set; } = true;
+
+    internal string? MaintenanceReadOnlyReason => AutonomousWork ? null
+        : "Configuration maintenance is read-only in Manual mode. Use the deployed owner or an Automatic administration host.";
+
     /// <summary>
     /// Gets the captured host configuration used by Monica.Configuration internals.
     /// </summary>

@@ -74,6 +74,17 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
         var validationPlan = await BuildValidationPlanAsync(request, context, cancellationToken, throwOnExecutionFault: true);
         var prepared = validationPlan.Mutations;
         var validationPreview = validationPlan.Preview;
+        if (!runtimeContext.AutonomousWork && string.IsNullOrWhiteSpace(request.ExpectedValidationFingerprint))
+        {
+            validationPreview = validationPreview with
+            {
+                Problems = [.. validationPreview.Problems, new ConfigurationMutationValidationProblem
+                {
+                    Code = "ManualReviewRequired",
+                    Message = "Manual configuration edits require a complete preview and its validation fingerprint."
+                }]
+            };
+        }
         if (!string.IsNullOrEmpty(request.ExpectedValidationFingerprint)
             && !string.Equals(request.ExpectedValidationFingerprint, validationPreview.ValidationFingerprint, StringComparison.Ordinal))
         {

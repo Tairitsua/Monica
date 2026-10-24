@@ -44,6 +44,9 @@ public class ModuleDependencyInjection : MonicaModule<ModuleDependencyInjectionO
             services.AddSingleton<DependencyInjectionDiagnosticsService>();
             services.AddSingleton<DependencyInjectionDiagnosticsFacade>();
             services.AddHostedService<DependencyInjectionDiagnosticsHostedService>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(DependencyInjectionDiagnosticsHostedService));
         }
 
         services.AddScoped<ICachedServiceProvider, CachedServiceProvider>();
@@ -66,7 +69,7 @@ public class ModuleDependencyInjection : MonicaModule<ModuleDependencyInjectionO
                 var registrar = new ConventionalRegistrar(Option, Logger, _diagnosticsRegistry);
                 foreach (var match in matches)
                 {
-                    if (Application.TypeActivation?.IsEnabled(match.Type, TypeActivationKind.Service) == false) continue;
+                    if (Application.TypeActivation?.GetActivation(match.Type, TypeActivationKind.Service) == ActivationMode.Disabled) continue;
                     registrar.AddType(context.Registrations, match);
                 }
             });

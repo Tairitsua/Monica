@@ -30,8 +30,9 @@ public sealed class EventBusAutoDiscoveryLifecycleTests
 
         var subscriptions = host.Services.GetRequiredService<IEventSubscriptionRegistry>().GetAll()
             .Where(subscription => subscription.HandlerType == typeof(DualScopeRoleHandler)).ToArray();
-        Assert.Single(subscriptions);
-        Assert.Equal(EventSubscriptionScope.Local, subscriptions[0].Scope);
+        Assert.Equal(2, subscriptions.Length);
+        Assert.Equal(EventSubscriptionState.Active, subscriptions.Single(item => item.Scope == EventSubscriptionScope.Local).State);
+        Assert.Equal(EventSubscriptionState.Disabled, subscriptions.Single(item => item.Scope == EventSubscriptionScope.Distributed).State);
         Assert.Equal(0, state.Constructions);
         await PublishAsync(host, new RoleScopedEvent());
         Assert.Equal(1, state.Deliveries);
@@ -40,9 +41,10 @@ public sealed class EventBusAutoDiscoveryLifecycleTests
 
     private sealed class InactiveExternalRole : ITypeActivationPolicy
     {
-        public bool IsEnabled(Type implementationType, TypeActivationKind kind) => kind != TypeActivationKind.ExternalSubscription;
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null)
+            => kind == TypeActivationKind.ExternalSubscription ? ActivationMode.Disabled : ActivationMode.Automatic;
         public void EnsureCanExecuteRequest(Type requestType) { }
-        public string? GetWorkloadOwner(Type implementationType) => null;
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => null;
     }
 
     [Theory]

@@ -5,6 +5,7 @@ using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
 using Monica.StateStore.Abstractions;
+using Monica.Core;
 
 namespace Monica.ServiceDiscovery.Services.Support;
 
@@ -16,7 +17,8 @@ public class RegistrationStateManager(
     IServiceDiscoveryClientInfo clientInfo,
     ILeaderElectionService leaderElectionService,
     IOptions<ModuleServiceDiscoveryOption> options,
-    ILogger<RegistrationStateManager> logger)
+    ILogger<RegistrationStateManager> logger,
+    MonicaApplication? application = null)
     : IRegistrationStateManager
 {
     private readonly ModuleServiceDiscoveryOption _option = options.Value;
@@ -27,6 +29,12 @@ public class RegistrationStateManager(
     // Cached registration time to avoid unnecessary Get operations on every heartbeat
     private DateTime? _cachedRegistrationTime;
     private readonly object _registrationTimeLock = new();
+
+    private void EnsureParticipation()
+    {
+        if (application?.Application.AutonomousWork == false)
+            throw new InvalidOperationException("Service-discovery mutation is unavailable while Application:AutonomousWork is false.");
+    }
 
     /// <summary>
     /// Get registration key
@@ -41,6 +49,7 @@ public class RegistrationStateManager(
 
     public async Task<RegistrationResult> RegisterOrHeartbeatAsync(CancellationToken ct = default)
     {
+        EnsureParticipation();
         try
         {
             var regKey = GetRegistrationKey();
@@ -116,6 +125,7 @@ public class RegistrationStateManager(
 
     public async Task<(bool Success, LeaderState? State, string? ETag)> TryBecomeLeaderAsync(CancellationToken ct = default)
     {
+        EnsureParticipation();
         try
         {
             var leaderKey = GetLeaderKey();
@@ -156,6 +166,7 @@ public class RegistrationStateManager(
 
     public async Task<(bool Success, string? NewETag, LeaderState? ActualState, string? ActualETag)> RenewLeaderLeaseAsync(string expectedETag, CancellationToken ct = default)
     {
+        EnsureParticipation();
         try
         {
             var leaderKey = GetLeaderKey();
@@ -206,6 +217,7 @@ public class RegistrationStateManager(
 
     public async Task DeleteLeaderKeyAsync(CancellationToken ct = default)
     {
+        EnsureParticipation();
         try
         {
             var leaderKey = GetLeaderKey();
@@ -220,6 +232,7 @@ public class RegistrationStateManager(
 
     public async Task ForceDeleteLeaderKeyAsync(string appId, CancellationToken ct = default)
     {
+        EnsureParticipation();
         try
         {
             await stateStore.DeleteStateAsync(LEADER_PREFIX + appId, ct);

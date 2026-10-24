@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
@@ -13,7 +15,8 @@ namespace Monica.EventBus.Services;
 /// </summary>
 public class EventSubscriptionRegistry(
     ILogger<EventSubscriptionRegistry> logger,
-    ITypeActivationPolicy? activation = null) : IEventSubscriptionRegistry
+    ITypeActivationPolicy? activation = null,
+    MonicaApplication? application = null) : IEventSubscriptionRegistry
 {
     private readonly ConcurrentQueue<EventSubscriptionChange> _notificationQueue = new();
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
@@ -36,7 +39,7 @@ public class EventSubscriptionRegistry(
             {
                 WorkloadOwner = handlerType.GetCustomAttributes(inherit: true)
                     .OfType<EventSubscriptionOwnerAttribute>().FirstOrDefault()?.WorkloadOwner
-                    ?? activation?.GetWorkloadOwner(handlerType)
+                    ?? activation?.GetWorkloadOwner(handlerType, descriptor.RegistrationOwner)
             };
         }
         if (descriptor.WorkloadOwner is not null)
@@ -44,7 +47,26 @@ public class EventSubscriptionRegistry(
             ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.WorkloadOwner, nameof(descriptor));
         }
 
-        var subscription = new EventSubscription(descriptor);
+        var handler = descriptor.HandlerFactory.GetHandlerType();
+        var mode = descriptor.Scope == EventSubscriptionScope.Local
+            ? ActivationMode.Automatic
+            : activation?.GetActivation(handler ?? typeof(EventSubscription),
+                TypeActivationKind.ExternalSubscription, descriptor.RegistrationOwner) ?? ActivationMode.Automatic;
+        var subscription = new EventSubscription(descriptor, mode);
+        application?.RecordActivation(new ResourceActivation
+        {
+            Key = $"EventBus:{descriptor.ServiceKey ?? "default"}:{descriptor.TopicName}:{descriptor.WorkloadOwner ?? "unowned"}:{handler?.FullName ?? subscription.Id.ToString()}",
+            ImplementationType = handler,
+            RegistrationOwner = descriptor.RegistrationOwner,
+            Kind = TypeActivationKind.ExternalSubscription,
+            Mode = mode,
+            Reason = mode switch
+            {
+                ActivationMode.Manual => "Held for explicit local test delivery; no transport subscription.",
+                ActivationMode.Disabled => "The subscription owner is not eligible in this process.",
+                _ => descriptor.Scope == EventSubscriptionScope.Local ? "Passive in-process subscription." : "Automatic subscription permitted."
+            }
+        });
  
         if (!_subscriptions.TryAdd(subscription.Id, subscription))
         {
@@ -57,6 +79,13 @@ public class EventSubscriptionRegistry(
 
         try
         {
+            if (mode != ActivationMode.Automatic)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EnqueueNotification(EventSubscriptionChangeType.Added, subscription);
+                DrainNotifications();
+                return subscription;
+            }
             // Creation and activation form one committed mutation. Notifications are queued while
             // the subscription gate is held and dispatched only after it has been released.
             await subscription.ActivateAsync(

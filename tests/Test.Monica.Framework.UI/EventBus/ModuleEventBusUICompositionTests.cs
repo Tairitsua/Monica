@@ -5,9 +5,12 @@ using Monica.Core;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Extensions;
+using Monica.Core.Results;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Providers.NoOp;
 using Monica.EventBus.Services;
+using Monica.Framework.UI.UIEventBus.State;
+using Monica.Framework.UI.UIEventBus.Support;
 using Monica.Modules;
 using Xunit;
 
@@ -15,6 +18,25 @@ namespace Test.Monica.Framework.UI.EventBus;
 
 public sealed class ModuleEventBusUICompositionTests
 {
+    [Fact]
+    public async Task TransitiveComposition_WithoutDistributedProvider_ShouldAllowLocalDiagnostics()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.AddMonica(monica =>
+        {
+            monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
+            monica.AddModule<EventBusUIConsumerModule, EventBusUIConsumerModuleOption>();
+        });
+        await using var app = builder.Build();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<EventBusTestService>().Should().NotBeNull();
+        var providers = scope.ServiceProvider.GetRequiredService<EventBusProviderDiscoveryService>().GetRegisteredProviders();
+        providers.Status.Should().Be(ResStatus.Ok);
+        providers.Message.Should().BeNull();
+        providers.Data.Should().ContainSingle(provider => !provider.IsDistributed);
+        providers.Data.Should().NotContain(provider => provider.IsDistributed);
+    }
+
     [Fact]
     public void Module_ShouldRetainExplicitUiAndWebRuntimeKinds()
     {
@@ -40,7 +62,6 @@ public sealed class ModuleEventBusUICompositionTests
         var dependencies = GetDirectDependencyTypes(application, typeof(ModuleEventBusUI));
 
         dependencies.Should().Contain(typeof(ModuleEventBus));
-        dependencies.Should().Contain(typeof(ModuleJsonSerialization));
         dependencies.Should().Contain(typeof(ModuleLocalization));
         dependencies.Should().Contain(typeof(ModuleShellUI));
         using var scope = app.Services.CreateScope();

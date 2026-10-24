@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.Core.Modularity.Services.Support;
 
@@ -30,7 +32,16 @@ internal sealed class MonicaApplicationLifecycle(
             }
 
             _applicationStartedRegistration = applicationLifetime.ApplicationStarted.UnsafeRegister(
-                static state => ((MonicaApplication)state!).Profiling.MarkApplicationReady(),
+                static state =>
+                {
+                    var app = (MonicaApplication)state!;
+                    app.Profiling.MarkApplicationReady();
+                    var held = app.ActivationResources.Where(resource => resource.Mode != ActivationMode.Automatic)
+                        .Select(resource => $"{resource.Key} [{resource.Kind}, {resource.Mode}]").ToArray();
+                    if (held.Length != 0)
+                        app.CreateLogger<MonicaApplicationLifecycle>().LogInformation(
+                            "Automatic execution is held for {Count} resource(s): {Resources}", held.Length, string.Join("; ", held));
+                },
                 application);
             _isRegistered = true;
         }

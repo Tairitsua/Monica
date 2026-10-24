@@ -119,7 +119,7 @@
         "ProviderType": "Provider Type",
         "ServiceKey": "Service Key",
         "BusMode": "Event Bus Mode",
-        "ImplementationType": "Implementation Type",
+        "ImplementationType": "Declared provider module",
         "Capabilities": "Capabilities"
       },
       "States": {
@@ -186,7 +186,7 @@
     },
     "Actions": {
       "ValidateJson": "Validate JSON",
-      "PublishEvent": "Publish Test Event",
+      "PublishEvent": "Publish through selected route",
       "Publishing": "Publishing...",
       "ResetSample": "Reset Sample",
       "StartListening": "Start Listening",
@@ -276,7 +276,8 @@
       "DeactivateFailed": "Failed to deactivate subscription: {0}",
       "AlreadyRemoved": "Subscription has already been removed.",
       "Removed": "Subscription removed.",
-      "RemoveFailed": "Failed to remove subscription: {0}"
+      "RemoveFailed": "Failed to remove subscription: {0}",
+      "ActivationHeld": "Startup policy does not allow automatic receipt for this handler. Use explicit local delivery for a held handler."
     },
     "Test": {
       "CreateJsonSampleFailed": "Failed to generate JSON sample: {0}",
@@ -288,7 +289,9 @@
       "ActiveSubscriptionExists": "An active subscription already exists. Stop it first.",
       "SubscribeFailed": "Subscribe failed: {0}",
       "UnsubscribeFailed": "Unsubscribe failed: {0}",
-      "JsonDeserializeNull": "JSON deserialization produced a null result."
+      "JsonDeserializeNull": "JSON deserialization produced a null result.",
+      "LocalTargetUnavailable": "Local delivery requires an Active or Held handler. Disabled, inactive and removed handlers cannot run.",
+      "LocalDeliveryFailed": "Local delivery failed: {0}"
     },
     "Providers": {
       "GetRegisteredFailed": "Failed to get registered providers: {0}",
@@ -325,7 +328,9 @@
       "Pending": "Pending",
       "Active": "Active",
       "Inactive": "Inactive",
-      "Disposed": "Disposed"
+      "Disposed": "Disposed",
+      "Held": "Held for manual delivery",
+      "Disabled": "Disabled by placement"
     },
     "RuntimeStates": {
       "Subscribing": "Subscribing",
@@ -514,7 +519,7 @@
   },
   "RuntimeTest": {
     "Target": "Captured test target",
-    "Fanout": "This diagnostic sends immediately to the selected row's exact topic, service key, and bus scope, without Outbox staging. Every matching handler can receive it; it does not invoke only this handler.",
+    "Fanout": "Route publication can reach every active subscriber on this topic, including other processes for a distributed route. The separate local delivery action targets only this handler.",
     "Compose": "Compose a typed event",
     "ValidationHelp": "Validation checks JSON deserialization against the registered event type.",
     "AcceptanceHelp": "Local success means dispatch completed. Distributed success means the transport accepted the event, without confirming consumer completion. Receipts below show only what this listener actually captured.",
@@ -522,7 +527,13 @@
     "ReceiveHelp": "An additional test listener receives events for this exact target.",
     "Started": "Started at {0} (local)",
     "EmptyHelp": "Start listening before publishing. Only payloads actually received by this listener appear here.",
-    "ListenerLifetime": "This listener belongs to the browser circuit and keeps running after this dialog closes. Stop it explicitly here or in the registry. Only a bounded set of recent payloads is retained in memory."
+    "ListenerLifetime": "This listener belongs to the browser circuit and keeps running after this dialog closes. Stop it explicitly here or in the registry. Only a bounded set of recent payloads is retained in memory.",
+    "LocalDeliveryHelp": "Deliver only to this selected handler in this process. This runs real handler, transaction and Inbox effects, without publishing to a broker or enabling automatic receipt. Each delivery gets a new message ID unless replay is selected.",
+    "ReplayMessage": "Replay the previous message with its original ID and unchanged payload",
+    "MessageIdentity": "Previous local message ID: {0}",
+    "DeliveringLocally": "Delivering locally…",
+    "DeliverLocally": "Deliver to this handler locally",
+    "LocalDeliveryCompleted": "Local receive pipeline completed. Inbox may skip an already processed replay."
   },
   "ChangeLedger": {
     "Eyebrow": "Session observations",

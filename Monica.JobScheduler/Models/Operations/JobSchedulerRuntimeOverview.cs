@@ -65,8 +65,8 @@ public sealed record JobSchedulerRuntimeConfiguration
     /// <summary>Gets the serving host's worker instance identity.</summary>
     public required string WorkerInstanceId { get; init; }
 
-    /// <summary>Gets whether automatic recurring materialization is suppressed for manual-only debugging.</summary>
-    public required bool RecurringJobDebugMode { get; init; }
+    /// <summary>Gets whether this host schedules autonomously; false identifies isolated local explicit execution.</summary>
+    public required bool AutonomousWork { get; init; }
 
     /// <summary>Gets the identifier of the time zone cron schedules resolve in.</summary>
     public required string CronTimeZoneId { get; init; }

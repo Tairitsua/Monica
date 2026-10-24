@@ -15,7 +15,8 @@ public sealed class ModuleSystemWorkbenchSessionFactory
             diagnostics.GetSnapshot,
             diagnostics.GetAssemblyInventory,
             diagnostics.GetModuleOptions,
-            diagnostics.CreateExport))
+            diagnostics.CreateExport,
+            diagnostics.GetResourceActivations))
     {
     }
 

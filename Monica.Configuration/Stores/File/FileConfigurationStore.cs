@@ -33,6 +33,9 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
     private bool _layoutValidated;
 
     /// <inheritdoc />
+    public bool SupportsPublishedDefinitionGuard => true;
+
+    /// <inheritdoc />
     public ConfigurationStoreDescriptor Descriptor { get; } = new()
     {
         StoreKey = "file:default",
@@ -69,6 +72,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var documentsByKey = new Dictionary<string, ConfigurationEffectiveValueDocument>(StringComparer.OrdinalIgnoreCase);
             foreach (var seed in seeds)
@@ -162,8 +167,15 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, request.PublishedDefinitionExpectation is not null, cancellationToken);
             var existing = await ReadDocumentAsync(request.Definition.DefinitionKey, cancellationToken);
+            if (request.PublishedDefinitionExpectation is { } expectation)
+            {
+                expectation.Validate(await FindPublishedDefinitionEntryAsync(request.Definition.DefinitionKey, cancellationToken), existing);
+                if (!ConfigurationPublishedDefinitionExpectation.Matches(request.Definition, expectation.Definition))
+                    throw new ConfigurationConcurrencyConflictException("The submitted definition does not match the reviewed publication.");
+            }
             var currentVersion = existing?.Version ?? 0;
             if (request.ExpectedVersion is not null && currentVersion != request.ExpectedVersion)
             {
@@ -171,6 +183,7 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
                     $"Expected version {request.ExpectedVersion} for '{request.Definition.DefinitionKey}', but current version is {currentVersion}.");
             }
 
+            EnsureDirectories();
             var now = DateTimeOffset.UtcNow;
             var document = new ConfigurationEffectiveValueDocument
             {
@@ -199,6 +212,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var line = JsonSerializer.Serialize(HistoryDto.FromHistory(history), JSON_LINE_OPTIONS);
             await IoFile.AppendAllTextAsync(GetHistoryPath(), line + Environment.NewLine, cancellationToken);
@@ -398,6 +413,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var groups = await ReadGroupsAsync(cancellationToken);
             var index = groups.FindIndex(candidate => string.Equals(candidate.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase));
@@ -517,6 +534,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var duplicateDefinition = request.Definitions
                 .GroupBy(static definition => definition.DefinitionKey, StringComparer.OrdinalIgnoreCase)
@@ -529,6 +548,7 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
 
             var definitions = request.Definitions.ToArray();
             var summaries = await ReadUnifiedVersionIndexAsync(cancellationToken);
+            RecoverUnifiedVersionDeletions(summaries);
             var version = summaries.Count == 0 ? 1 : summaries.Max(static summary => summary.Version) + 1;
             var summary = new ConfigurationUnifiedVersionSummary
             {
@@ -658,8 +678,11 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var summaries = await ReadUnifiedVersionIndexAsync(cancellationToken);
+            RecoverUnifiedVersionDeletions(summaries);
             var summaryIndex = summaries.FindIndex(candidate => candidate.Version == version);
             if (summaryIndex < 0)
             {
@@ -732,6 +755,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var definitionPaths = EnumerateDefinitionPaths(cancellationToken);
             var incomingIdentities = publications
@@ -787,6 +812,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             await WithdrawMissingPublisherStatesAsync(
                 EnumerateDefinitionPaths(cancellationToken),
@@ -810,7 +837,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
             var path = GetDefinitionPath(definitionKey);
             if (!IoFile.Exists(path))
             {
@@ -873,7 +899,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
             var result = new Dictionary<string, IReadOnlyList<ConfigurationDefinitionPublisherState>>(
                 StringComparer.OrdinalIgnoreCase);
             foreach (var definitionKey in normalizedDefinitionKeys)
@@ -912,7 +937,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
             var (_, storedDefinitionKey, definition) =
                 await LoadDefinitionForMaintenanceAsync(definitionKey, cancellationToken);
             var effectiveValue = await ReadDocumentAsync(storedDefinitionKey, cancellationToken);
@@ -960,6 +984,8 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
+            await using var writeLease = await ConfigurationFileWriteLease.AcquireAsync(
+                _options.RootDirectory, false, cancellationToken);
             EnsureDirectories();
             var (definitionPath, storedDefinitionKey, definition) = await LoadDefinitionForMaintenanceAsync(
                 request.DefinitionKey,
@@ -1009,7 +1035,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
             return await ReadPublishedDefinitionEntriesAsync(cancellationToken);
         }
         finally
@@ -1027,7 +1052,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         try
         {
             ValidateStorageLayout(cancellationToken);
-            EnsureDirectories();
             return await FindPublishedDefinitionEntryAsync(definitionKey, cancellationToken);
         }
         finally
@@ -1169,7 +1193,6 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
         var summaries = JsonSerializer.Deserialize<List<ConfigurationUnifiedVersionSummary>>(
             await IoFile.ReadAllTextAsync(path, cancellationToken),
             JSON_OPTIONS) ?? [];
-        RecoverUnifiedVersionDeletions(summaries);
         return summaries;
     }
 
@@ -1475,6 +1498,7 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
     private IReadOnlyList<string> EnumerateDefinitionPaths(CancellationToken cancellationToken)
     {
         var paths = new List<string>();
+        if (!IoDirectory.Exists(GetDefinitionsDirectory())) return paths;
         foreach (var path in IoDirectory.EnumerateFiles(GetDefinitionsDirectory(), "*.json"))
         {
             cancellationToken.ThrowIfCancellationRequested();

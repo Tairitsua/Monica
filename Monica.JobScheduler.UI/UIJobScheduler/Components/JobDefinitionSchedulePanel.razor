@@ -45,10 +45,10 @@
             @ScheduleStatusDescription
         </MudText>
 
-        @if (IsDebugSuppressed)
+        @if (IsManualSuppressed)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Info">
-                @L["JobDetail:Schedule:DebugManualOnly"]
+                @L["JobDetail:Schedule:ManualOnly"]
             </MudAlert>
         }
 
@@ -109,33 +109,33 @@
 
     private bool IsOperatorPaused => JobSchedulerUiPresentation.IsOperatorPaused(Summary);
 
-    private bool IsDebugSuppressed => JobSchedulerUiPresentation.IsDebugSuppressed(Summary);
+    private bool IsManualSuppressed => JobSchedulerUiPresentation.IsManualSuppressed(Summary);
 
-    private string ScheduleStatusLabel => (IsOperatorPaused, IsDebugSuppressed) switch
+    private string ScheduleStatusLabel => (IsOperatorPaused, IsManualSuppressed) switch
     {
-        (true, true) => L["Catalog:Lifecycle:OperatorAndDebug"],
+        (true, true) => L["Catalog:Lifecycle:OperatorAndManual"],
         (true, false) => L["Catalog:Lifecycle:OperatorPaused"],
-        (false, true) => L["Catalog:Lifecycle:DebugSuppressed"],
+        (false, true) => L["Catalog:Lifecycle:ManualSuppressed"],
         _ => L[$"RecurringScheduleStatuses:{Summary.RecurringScheduleStatus}"]
     };
 
-    private string ScheduleStatusDescription => (IsOperatorPaused, IsDebugSuppressed) switch
+    private string ScheduleStatusDescription => (IsOperatorPaused, IsManualSuppressed) switch
     {
-        (true, true) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorAndDebug"],
+        (true, true) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorAndManual"],
         (true, false) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorPolicy"],
-        (false, true) => L["JobDetail:Schedule:SuspensionDescriptions:DebugMode"],
+        (false, true) => L["JobDetail:Schedule:SuspensionDescriptions:ManualMode"],
         _ => L[$"JobDetail:Schedule:StatusDescriptions:{Summary.RecurringScheduleStatus}"]
     };
 
     private Color ScheduleStatusColor => IsOperatorPaused
         ? Color.Warning
-        : IsDebugSuppressed
+        : IsManualSuppressed
             ? Color.Info
             : JobSchedulerUiPresentation.GetRecurringScheduleStatusColor(Summary.RecurringScheduleStatus);
 
     private string ScheduleStatusIcon => IsOperatorPaused
         ? MoIcons.PauseCircle
-        : IsDebugSuppressed
+        : IsManualSuppressed
             ? MoIcons.Bug
             : Summary.RecurringScheduleStatus == JobRecurringScheduleStatus.Scheduled
                 ? MoIcons.Clock

@@ -52,7 +52,7 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
         CompiledApplicationModel model;
         try
         {
-            model = new CompiledApplicationModel(manifest, deployment, Application.TypeFinder);
+            model = new CompiledApplicationModel(manifest, deployment, Application.TypeFinder, Application.Application.AutonomousWork);
         }
         catch (InvalidOperationException error)
         {
@@ -82,10 +82,10 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
             Registration: (ApplicationRegistration)Activator.CreateInstance(plan.RegistrationType)!)).ToArray();
         foreach (var (plan, registration) in registrations)
             builder.Composition.RunRegistration(plan.RegistrationType, () => registration.ConfigurePassive(
-                new ApplicationRegistrationContext(builder, hostBuilder, plan.IsActive)));
+                new ApplicationRegistrationContext(builder, hostBuilder, plan.IsActive, Application.Application.AutonomousWork)));
         foreach (var (plan, registration) in registrations.Where(static item => item.Plan.IsActive))
             builder.Composition.RunRegistration(plan.RegistrationType, () => registration.ConfigureActive(
-                new ApplicationRegistrationContext(builder, hostBuilder, isActive: true)));
+                new ApplicationRegistrationContext(builder, hostBuilder, isActive: true, Application.Application.AutonomousWork)));
     }
 
     /// <inheritdoc />
@@ -94,7 +94,6 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
         var model = _model ?? throw new InvalidOperationException("The application model must be prepared before service registration.");
         context.Services.AddSingleton<IApplicationModel>(model);
         context.Services.AddSingleton<Monica.Core.Domains.Abstractions.IDomainCatalogSource, ApplicationDomainCatalogSource>();
-        context.Services.AddSingleton<ITypeActivationPolicy>(model);
         context.Services.AddSingleton(model.Deployment);
         foreach (var client in _clients)
             context.Services.AddScoped(client.InterfaceType, client.ImplementationType);

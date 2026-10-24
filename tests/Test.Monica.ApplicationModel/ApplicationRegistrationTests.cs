@@ -7,6 +7,7 @@ using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
 using Monica.ApplicationModel.Models;
 using Monica.Core.Modularity.Abstractions;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Modules;
 using Monica.Testing.Hosting;
 using Xunit;
@@ -15,6 +16,22 @@ namespace Test.Monica.ApplicationModel;
 
 public sealed class ApplicationRegistrationTests
 {
+    [Theory]
+    [InlineData("api", true, ActivationMode.Disabled)]
+    [InlineData("worker", true, ActivationMode.Automatic)]
+    [InlineData("worker", false, ActivationMode.Manual)]
+    public async Task DomainResources_ShouldUseBackgroundRoleAndKeepActiveDeclarationsInManualMode(string appId, bool autonomous, ActivationMode expected)
+    {
+        var factory = new RegistrationFactory(appId, autonomousWork: autonomous);
+        await using var app = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var policy = app.Services.GetRequiredService<ITypeActivationPolicy>();
+        Assert.Equal(expected, policy.GetActivation(factory.DomainOwner, TypeActivationKind.Outbox));
+        Assert.Equal(expected, policy.GetActivation(typeof(object), TypeActivationKind.DataChannel, factory.DomainOwner));
+        Assert.Equal(ActivationMode.Automatic, policy.GetActivation(factory.DomainOwner, TypeActivationKind.Service));
+        Assert.All(factory.Trace.Events.Where(entry => entry.Name.EndsWith(":active", StringComparison.Ordinal)),
+            entry => Assert.Equal(autonomous, entry.IsAutonomous));
+    }
+
     [Theory]
     [InlineData("api", new[] { "Orders:passive", "orders.api:passive", "orders.worker:passive", "orders.api:active", "module:services" })]
     [InlineData("worker", new[] { "Orders:passive", "orders.api:passive", "orders.worker:passive", "Orders:active", "orders.worker:active", "module:services" })]
@@ -110,14 +127,18 @@ public sealed class ApplicationRegistrationTests
         private readonly string _appId;
         private readonly Assembly[] _assemblies;
         private readonly Type _manifest;
+        private readonly bool _autonomousWork;
+        internal Type DomainOwner => _assemblies.Single(assembly => assembly.GetCustomAttribute<ApplicationDomainAttribute>() is not null)
+            .GetTypes().Single(type => typeof(ApplicationRegistration).IsAssignableFrom(type));
         internal RegistrationTrace Trace { get; } = new();
         internal int OptionContributions { get; private set; }
         internal ModuleApplicationModelOption? FinalOptions { get; private set; }
 
         internal RegistrationFactory(string appId, string? backgroundRole = "orders.worker", bool passiveDomain = false,
-            string? registrationDefect = null)
+            string? registrationDefect = null, bool autonomousWork = true)
         {
             _appId = appId;
+            _autonomousWork = autonomousWork;
             var domain = CreateOwner("Orders", null, backgroundRole,
                 passiveDomain ? typeof(PassiveRegistration) : typeof(RecordingRegistration), registrationDefect);
             var api = CreateOwner("Orders", "orders.api", null, typeof(RecordingRegistration));
@@ -158,7 +179,7 @@ public sealed class ApplicationRegistrationTests
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
-            builder.ConfigureApplication(options => options.AppId = _appId);
+            builder.ConfigureApplication(options => { options.AppId = _appId; options.AutonomousWork = _autonomousWork; });
             builder.AddApplicationModel(options =>
             {
                 OptionContributions++;

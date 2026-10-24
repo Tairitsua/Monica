@@ -50,6 +50,10 @@
                                 <MudStack Spacing="0">
                                     <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
                                         <MudText Typo="Typo.subtitle2">@value.Source.DisplayName</MudText>
+                                        @if (value.IsUnpersisted)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@L["Manual:Unpersisted"]</MudChip>
+                                        }
                                         @if (value.IsEffective)
                                         {
                                             <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="configuration-source-effective">@L["Sources:Effective"]</MudChip>

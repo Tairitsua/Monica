@@ -43,12 +43,14 @@ internal static class EventHandlerDispatcher
         Type eventType,
         object eventData,
         EventDeliveryMetadata? metadata,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowHeld = false)
     {
         foreach (var subscription in subscriptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (subscription.State != EventSubscriptionState.Active)
+            if (subscription.State != EventSubscriptionState.Active
+                && !(allowHeld && subscription.State == EventSubscriptionState.Held))
             {
                 throw new InvalidOperationException(
                     $"Event subscription '{subscription.Id}' stopped before delivery completed.");

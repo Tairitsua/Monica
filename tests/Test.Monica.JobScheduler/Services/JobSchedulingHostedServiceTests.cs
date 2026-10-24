@@ -39,9 +39,32 @@ public sealed class JobSchedulingHostedServiceTests
     private sealed class EmptySelectedRole : ITypeActivationPolicy
     {
         public IReadOnlyCollection<string> ActiveWorkloadOwners => [StoreFixture.OWNER_A];
-        public bool IsEnabled(Type implementationType, TypeActivationKind kind) => true;
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null) => ActivationMode.Automatic;
         public void EnsureCanExecuteRequest(Type requestType) { }
-        public string? GetWorkloadOwner(Type implementationType) => StoreFixture.OWNER_A;
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => StoreFixture.OWNER_A;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EmptyCatalog_ShouldDistinguishStandaloneFallbackFromAnExplicitEmptyOwnerInventory(bool applicationInventory)
+    {
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
+            [StoreFixture.TriggeredDeclaration("previous")]), TestContext.Current.CancellationToken);
+        using var service = CreateService(store, [], time, activation: new EmptyInventory(applicationInventory));
+        await service.ScheduleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(applicationInventory, (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A,
+            "previous", TestContext.Current.CancellationToken))!.IsPresent);
+    }
+
+    private sealed class EmptyInventory(bool applicationInventory) : ITypeActivationPolicy
+    {
+        public IReadOnlyCollection<string>? ActiveWorkloadOwners => applicationInventory ? [] : null;
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null) => ActivationMode.Automatic;
+        public void EnsureCanExecuteRequest(Type requestType) { }
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => null;
     }
 
     [Fact]
@@ -184,15 +207,23 @@ public sealed class JobSchedulingHostedServiceTests
         using var service = CreateService(store, [definition], time, configuredOptions: options);
 
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
-        options.RecurringJobDebugMode = true;
+        await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
+        {
+            CursorKey = new RecurringScheduleCursorKey
+            {
+                SchedulerScopeKey = StoreFixture.SCOPE, OwnerKey = StoreFixture.OWNER_A,
+                JobKey = definition.Declaration.JobKey
+            },
+            HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
+        }, TestContext.Current.CancellationToken);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
 
         var beforeInterval = await store.GetOperationalSummaryAsync(
             StoreFixture.SCOPE,
             new JobId(StoreFixture.OWNER_A, definition.Declaration.JobKey),
             TestContext.Current.CancellationToken);
-        beforeInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Scheduled);
-        beforeInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.None);
+        beforeInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Suspended);
+        beforeInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
 
         time.Advance(options.SnapshotSyncInterval);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
@@ -201,12 +232,12 @@ public sealed class JobSchedulingHostedServiceTests
             StoreFixture.SCOPE,
             new JobId(StoreFixture.OWNER_A, definition.Declaration.JobKey),
             TestContext.Current.CancellationToken);
-        afterInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Suspended);
-        afterInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.DebugMode);
+        afterInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Scheduled);
+        afterInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.None);
     }
 
     [Fact]
-    public async Task ScheduleAsync_InDebugMode_ShouldSuppressAutomaticMaterialization()
+    public async Task ScheduleAsync_InManualMode_ShouldSuppressAutomaticMaterialization()
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
@@ -218,7 +249,7 @@ public sealed class JobSchedulingHostedServiceTests
                 JobClrType = typeof(object)
             }
         };
-        using var service = CreateService(store, definitions, time, debugMode: true);
+        using var service = CreateService(store, definitions, time, manualMode: true);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
         time.Advance(TimeSpan.FromHours(2));
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
@@ -327,7 +358,7 @@ public sealed class JobSchedulingHostedServiceTests
         InMemoryJobSchedulerStore store,
         IReadOnlyList<LocalJobDefinition> definitions,
         StoreFixture.ManualTimeProvider time,
-        bool debugMode = false,
+        bool manualMode = false,
         ModuleJobSchedulerOption? configuredOptions = null,
         ITypeActivationPolicy? activation = null)
     {
@@ -335,7 +366,7 @@ public sealed class JobSchedulingHostedServiceTests
         {
             SchedulerScopeKey = StoreFixture.SCOPE,
             ProjectName = StoreFixture.OWNER_A,
-            RecurringJobDebugMode = debugMode,
+            AutonomousWork = !manualMode,
             EnableHistoryCleanup = false
         };
         var serviceProvider = new ServiceCollection().BuildServiceProvider();

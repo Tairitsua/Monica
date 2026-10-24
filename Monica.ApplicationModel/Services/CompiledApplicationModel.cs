@@ -6,6 +6,7 @@ using Monica.ApplicationModel.Annotations;
 using Monica.ApplicationModel.Models;
 using Monica.Core.Mediator;
 using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Annotations;
 
 namespace Monica.ApplicationModel.Services;
 
@@ -15,9 +16,14 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
     private readonly FrozenDictionary<string, ApplicationRoleDefinition> _assemblyRoles;
     private readonly FrozenDictionary<Type, ApplicationOperationDefinition[]> _handlerOperations;
     private readonly FrozenSet<string> _localRoles;
+    private readonly FrozenDictionary<string, ApplicationRoleDefinition> _allAssemblyRoles;
+    private readonly FrozenDictionary<string, ApplicationDomainDefinition> _assemblyDomains;
+    private readonly FrozenSet<string> _localAssemblies;
+    private readonly bool _autonomousWork;
 
-    public CompiledApplicationModel(IApplicationManifest manifest, ApplicationDeployment deployment, ITypeFinder finder)
+    public CompiledApplicationModel(IApplicationManifest manifest, ApplicationDeployment deployment, ITypeFinder finder, bool autonomousWork = true)
     {
+        _autonomousWork = autonomousWork;
         _deployment = deployment;
         Domains = Unique(manifest.Domains, definition => definition.Id, "domain");
         Roles = Unique(manifest.Roles, definition => definition.Id, "role");
@@ -93,6 +99,9 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
 
         _assemblyRoles = Roles.Values.Where(role => IsRoleAvailable(role.Id))
             .ToFrozenDictionary(role => role.AssemblyName, StringComparer.Ordinal);
+        _allAssemblyRoles = Roles.Values.ToFrozenDictionary(role => role.AssemblyName, StringComparer.Ordinal);
+        _assemblyDomains = Domains.Values.ToFrozenDictionary(domain => domain.AssemblyName, StringComparer.Ordinal);
+        _localAssemblies = localAssemblies.ToFrozenSet(StringComparer.Ordinal);
         ActiveWorkloadOwners = Array.AsReadOnly(Roles.Values.Where(role => IsRoleActive(role.Id))
             .Select(role => role.WorkloadOwner ?? role.Id).Order(StringComparer.Ordinal).ToArray());
         var operations = new Dictionary<Type, ApplicationOperationDefinition>();
@@ -152,17 +161,64 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
         throw new InvalidOperationException($"Role '{roleId}' has no owner in this deployment scope.");
     public ApplicationRoleDefinition? FindRole(Assembly assembly) => _assemblyRoles.GetValueOrDefault(assembly.GetName().Name!);
 
-    public bool IsEnabled(Type implementationType, TypeActivationKind kind)
+    public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null)
     {
-        var role = FindRole(implementationType.Assembly);
-        if (role is null) return true;
-        if (kind is TypeActivationKind.Job or TypeActivationKind.ExternalSubscription or TypeActivationKind.HostedService or TypeActivationKind.Endpoint)
-            return IsRoleActive(role.Id);
-        if (kind == TypeActivationKind.Service && typeof(IHostedService).IsAssignableFrom(implementationType))
-            return IsRoleActive(role.Id);
-        // Ordinary handlers and passive services stay available. A constrained handler can never be constructed remotely.
-        return !_handlerOperations.TryGetValue(implementationType, out var operations) ||
-            operations.Any(operation => operation.RequiredRole is null || IsRoleActive(operation.RequiredRole));
+        ArgumentNullException.ThrowIfNull(implementationType);
+        var implementation = GetOwnership(implementationType);
+        var declared = registrationOwner is null ? default : GetOwnership(registrationOwner);
+        ValidateOwnership(implementation, declared);
+        if (!IsIncluded(implementation) || !IsIncluded(declared)) return ActivationMode.Disabled;
+        if (kind is TypeActivationKind.Service or TypeActivationKind.RequestHandler)
+        {
+            // Held background execution must not remove the same implementation's passive DI surface.
+            return !_handlerOperations.TryGetValue(implementationType, out var operations)
+                || operations.Any(operation => operation.RequiredRole is null || IsRoleActive(operation.RequiredRole))
+                ? ActivationMode.Automatic : ActivationMode.Disabled;
+        }
+        if (kind is TypeActivationKind.Seeder or TypeActivationKind.HostedService
+            && implementationType.IsDefined(typeof(ProcessLocalAttribute), inherit: false))
+            return ActivationMode.Automatic;
+        var role = ResolveOwner(implementation, declared, requireBackgroundRole: kind != TypeActivationKind.Endpoint);
+        if (role is not null && !IsRoleActive(role.Id)) return ActivationMode.Disabled;
+        if (kind == TypeActivationKind.Endpoint) return ActivationMode.Automatic;
+        return _autonomousWork ? ActivationMode.Automatic : ActivationMode.Manual;
+    }
+
+    private (ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) GetOwnership(Type type)
+    {
+        var name = type.Assembly.GetName().Name!;
+        var role = _allAssemblyRoles.GetValueOrDefault(name);
+        var domain = role is not null ? Domains[role.DomainId] : _assemblyDomains.GetValueOrDefault(name);
+        if (role is null && domain is null && (type.Assembly.IsDefined(typeof(ApplicationRoleAttribute))
+            || type.Assembly.IsDefined(typeof(ApplicationDomainAttribute))))
+            throw new InvalidOperationException($"Owned implementation '{type.FullName}' is absent from the compiled application inventory.");
+        return (role, domain, domain is null ? null : name);
+    }
+
+    private bool IsIncluded((ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) owner)
+        => owner.Assembly is null || _localAssemblies.Contains(owner.Assembly);
+
+    private static void ValidateOwnership(
+        (ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) implementation,
+        (ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) declared)
+    {
+        if (implementation.Role is { } implementationRole && declared.Role is { } declaredRole && implementationRole.Id != declaredRole.Id
+            || implementation.Domain is { } implementationDomain && declared.Domain is { } declaredDomain && implementationDomain.Id != declaredDomain.Id)
+            throw new InvalidOperationException("A resource's registration owner conflicts with its declared application implementation ownership.");
+    }
+
+    private ApplicationRoleDefinition? ResolveOwner(
+        (ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) implementation,
+        (ApplicationRoleDefinition? Role, ApplicationDomainDefinition? Domain, string? Assembly) declared,
+        bool requireBackgroundRole)
+    {
+        if (implementation.Role is { } role) return role;
+        if (declared.Role is { } owner) return owner;
+        var domain = declared.Domain ?? implementation.Domain;
+        if (domain is null || !requireBackgroundRole) return null;
+        if (domain.BackgroundRole is null)
+            throw new InvalidOperationException($"Domain '{domain.Id}' declares autonomous work but has no BackgroundRole.");
+        return Roles[domain.BackgroundRole];
     }
 
     public void EnsureCanExecuteRequest(Type requestType)
@@ -176,8 +232,14 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
             throw new InvalidOperationException($"Request '{requestType}' requires role '{requirement}', which is not active in AppId '{AppId}'. Use its generated application API.");
     }
 
-    public string? GetWorkloadOwner(Type implementationType) => FindRole(implementationType.Assembly) is { } role
-        ? role.WorkloadOwner ?? role.Id : null;
+    public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null)
+    {
+        var implementation = GetOwnership(implementationType);
+        var declared = registrationOwner is null ? default : GetOwnership(registrationOwner);
+        ValidateOwnership(implementation, declared);
+        var role = ResolveOwner(implementation, declared, true);
+        return role is null ? null : role.WorkloadOwner ?? role.Id;
+    }
 
     private static FrozenDictionary<string, T> Unique<T>(IEnumerable<T> definitions, Func<T, string> key, string kind)
     {

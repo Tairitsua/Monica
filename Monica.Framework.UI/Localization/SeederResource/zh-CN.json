@@ -105,8 +105,8 @@
   "Details": {
     "Eyebrow": "SEEDER 证据",
     "AttemptsSummary": {
-      "Singular": "已开始 {0} / {1} 次尝试",
-      "Plural": "已开始 {0} / {1} 次尝试"
+      "Singular": "累计 {0} 次尝试 · 每次执行最多 {1} 次",
+      "Plural": "累计 {0} 次尝试 · 每次执行最多 {1} 次"
     },
     "Policy": {
       "Title": "有效策略",
@@ -148,7 +148,8 @@
     "Succeeded": "Seeder 运行成功",
     "CompletedWithFailures": "已完成，但存在失败",
     "Aborted": "Seeder 运行已中止",
-    "Cancelled": "Seeder 运行已取消"
+    "Cancelled": "Seeder 运行已取消",
+    "Held": "空闲 · 仍有暂缓任务"
   },
   "ReadinessStatus": {
     "Healthy": "已就绪",
@@ -161,7 +162,9 @@
     "Succeeded": "成功",
     "Failed": "失败",
     "Blocked": "被阻止",
-    "Cancelled": "已取消"
+    "Cancelled": "已取消",
+    "Held": "暂缓",
+    "Disabled": "当前宿主不可执行"
   },
   "AttemptStatus": {
     "Running": "运行中",
@@ -197,5 +200,12 @@
     "DurationSeconds": "{0:0.0} 秒",
     "DurationMinutesSeconds": "{0} 分 {1} 秒",
     "DurationHoursMinutes": "{0} 小时 {1} 分"
+  },
+  "Manual": {
+    "Title": "手动执行",
+    "Effects": "执行此初始化任务及其尚未成功的可执行前置任务。这可能写入共享数据库或发布事件；其他暂缓任务不会执行。",
+    "Run": "执行任务及前置依赖",
+    "Running": "正在执行…",
+    "Failed": "执行未能完成：{0}"
   }
 }

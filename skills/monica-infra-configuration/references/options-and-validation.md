@@ -77,12 +77,15 @@ Read coverage and scope before interpreting a report:
 
 | Boundary | DiagnosticOnly | FailFast |
 | --- | --- | --- |
-| First seed has ordinary schema/code failures | Persist the faithfully materialized seed and report a warning. | Reject before creating the effective-value document. |
+| Automatic first seed has ordinary schema/code failures | Persist the faithfully materialized seed and report a warning. | Reject before creating the effective-value document. |
+| Manual document is missing | Require complete valid local defaults/inputs; keep the result temporary with no stored version. Reject invalid or incomplete validation. | Same: no persistence and no weaker temporary-value contract. |
 | Existing effective values are invalid | Report the failure; do not rewrite the document or version during startup. | Reject startup; leave the existing document and version untouched. |
 | An actual default-options instance is invalid after Configure/PostConfigure | Record the invalid attempt and allow resolution. | Record the attempt and throw `OptionsValidationException`. |
 | Binding, contract, or validation execution faults | Fatal. | Fatal. |
 
 `ConfigurationValidationExecutionException` identifies the owner, safe logical path, kind, and fixed stage. It discards user exception messages and causes, including exceptions raised while enumerating validation results. It is fatal under both policies. Actual-options diagnostics record a Failed attempt before rethrowing. Facade operations return safe failures; do not parse exception text to recover a report. Duplicate resolved section paths also fail by default; select Warning only for intentional overlap.
+
+Manual mode does not weaken whole-object mutation validation. Current published section/schema/validation identity and an existing document are prerequisites for a complete reviewed edit; local schema or object-code revision drift remains read-only until the deployed owner publishes it. See [Manual managed values](runtime-changes.md#manual-managed-values) for store guards and preview requirements.
 
 ## Distinguish source reports from observed attempts
 
@@ -137,6 +140,7 @@ Behavioral checks:
 - `tests/Test.Monica.Configuration/Services/Support/ConfigurationObjectValidationWalkerTests.cs`: aliases, multiple members, nested ownership, sensitive diagnostics, faults, and remote authority.
 - `tests/Test.Monica.Configuration/Binding/ConfigurationObjectMaterializerTests.cs`: shape and provider precedence.
 - `tests/Test.Monica.Configuration/Modules/ManagedConfigurationObjectValidationTests.cs`: root-owner construction rejection before persistence, first seed, actual PostConfigure, policies, cached options, and reload.
+- `tests/Test.Monica.Configuration/Modules/ManualConfigurationTests.cs`: missing-document complete validation under DiagnosticOnly and guarded aggregate edits without automatic publication.
 - Its `ValidateSuppliedInstance_WhenItDiffersFromSourceAndPostConfigure_ShouldReportWithoutPolicyOrCreationSideEffects` and `ValidateSuppliedInstance_WhenItsClrTypeHasNoLocalOwner_ShouldRejectWithoutExecutingPublishedCode` checks cover explicit instance validation under both policies, observer/source preservation, and refusal of unavailable local authority.
 - `tests/Test.Monica.Configuration/Services/ConfigurationRuntimeValidationServiceCacheTests.cs`: source cache.
 

@@ -1109,6 +1109,10 @@
     "EffectiveAggregate": "最终生效的完整配置",
     "MaskedChange": "此写入被其他来源覆盖，或不会改变生效配置。保存的文档仍必须满足自身的完整契约。"
   },
+  "Manual": {
+    "Unpersisted": "未持久化",
+    "UnpersistedDescription": "托管配置文档尚不存在，当前进程使用经过完整校验的临时值，没有存储版本。需要由部署中的所属服务发布并初始化文档后，才能在此编辑。"
+  },
   "Workbench": {
     "Eyebrow": "MONICA / 配置管理",
     "Navigation": "配置工作区",

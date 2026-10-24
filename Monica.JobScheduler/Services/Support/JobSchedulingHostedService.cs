@@ -43,11 +43,16 @@ internal sealed class JobSchedulingHostedService(
     private DateTimeOffset _nextSnapshotSyncUtc;
     private DateTimeOffset _nextCleanupUtc;
     private int _nextMaterializationOwnerIndex;
+    private bool _manualCatalogInitialized;
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
 
+    protected override Task OnStartingAsync(CancellationToken cancellationToken) =>
+        _options.AutonomousWork ? Task.CompletedTask : ScheduleAsync(cancellationToken);
+
     protected override async Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
     {
+        if (!_options.AutonomousWork) return;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -83,6 +88,27 @@ internal sealed class JobSchedulingHostedService(
     internal async Task ScheduleAsync(CancellationToken cancellationToken)
     {
         var scopeKey = _options.SchedulerScopeKey;
+        if (!_options.AutonomousWork)
+        {
+            if (_manualCatalogInitialized) return;
+            foreach (var owner in _localOwners)
+            {
+                await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(scopeKey, owner.Key,
+                    owner.Select(definition => definition.Declaration).ToArray()), cancellationToken);
+                foreach (var definition in owner.Where(definition => definition.Declaration.JobType == JobType.Recurring))
+                    await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
+                    {
+                        CursorKey = new RecurringScheduleCursorKey
+                        {
+                            SchedulerScopeKey = scopeKey, OwnerKey = owner.Key, JobKey = definition.Declaration.JobKey
+                        },
+                        HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
+                    }, cancellationToken);
+            }
+            _manualCatalogInitialized = true;
+            runtimeState.SetScheduling(true, "The isolated local catalog is ready; automatic scheduling and maintenance are held.");
+            return;
+        }
         await SyncOwnerStateAsync(scopeKey, cancellationToken);
         await store.RecoverExpiredLeasesAsync(new ExpiredLeaseRecoveryRequest
         {
@@ -104,9 +130,9 @@ internal sealed class JobSchedulingHostedService(
         }
 
         var ownersWithDefinitions = _localOwners.Select(owner => owner.Key).ToHashSet(StringComparer.Ordinal);
-        var emptyOwners = activation is null
+        var emptyOwners = activation?.ActiveWorkloadOwners is not { } selectedOwners
             ? (_localOwners.Length == 0 ? new[] { _options.GetProjectName() } : [])
-            : activation.ActiveWorkloadOwners.Except(ownersWithDefinitions, StringComparer.Ordinal);
+            : selectedOwners.Except(ownersWithDefinitions, StringComparer.Ordinal);
         foreach (var emptyOwner in emptyOwners)
         {
             // A selected role can remove its last job. Inactive roles must never publish retirement snapshots.
@@ -116,9 +142,7 @@ internal sealed class JobSchedulingHostedService(
 
         // Reconcile host-owned suspension reasons with the same cadence as the owner snapshot. Policy edits update
         // their cursor synchronously; this pass is only needed at startup and after a definition snapshot changes.
-        var hostReasons = _options.RecurringJobDebugMode
-            ? JobRecurringScheduleSuspensionReason.DebugMode
-            : JobRecurringScheduleSuspensionReason.None;
+        const JobRecurringScheduleSuspensionReason hostReasons = JobRecurringScheduleSuspensionReason.None;
         foreach (var owner in _localOwners)
         {
             await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(
@@ -148,11 +172,6 @@ internal sealed class JobSchedulingHostedService(
 
     private async Task MaterializeDueOccurrencesAsync(string scopeKey, CancellationToken cancellationToken)
     {
-        if (_options.RecurringJobDebugMode)
-        {
-            return;
-        }
-
         var remainingBudget = _options.MaxRecurringMaterializationsPerCycle;
         for (var visited = 0; visited < _localOwners.Length && remainingBudget > 0; visited++)
         {

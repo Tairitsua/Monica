@@ -99,6 +99,27 @@
       "SnapshotUnavailable": "Load a current snapshot before importing a baseline."
     }
   },
+  "ResourceActivations": {
+    "Title": "Resource activation",
+    "Description": "Current admission decisions. Refresh after a manual operation; these records do not indicate execution success.",
+    "Filter": "Resource activation filter",
+    "Held": "Held or disabled",
+    "Count": "{0} held or disabled · {1} resources",
+    "Resource": "Resource",
+    "Owner": "Registration owner",
+    "Mode": "Activation",
+    "Reason": "Reason",
+    "Disabled": "Disabled",
+    "Manual": "Manual",
+    "Automatic": "Automatic",
+    "OpaqueFactory": "Factory implementation not resolved",
+    "NoExplicitOwner": "No explicit registration owner",
+    "Loading": "Loading resource activation…",
+    "LoadFailed": "Resource activation could not be loaded. Retry to read the current decisions.",
+    "RefreshFailed": "Refresh failed. The last successful resource view remains visible.",
+    "NoHeld": "No resources are currently held or disabled.",
+    "Empty": "No resource activation records have been reported."
+  },
   "Overview": {
     "Kpis": {
       "Composition": "Module composition",

@@ -33,7 +33,7 @@
                     <section class="runtime-test-publish">
                         <header class="runtime-test-heading"><span>01</span><div><h3>@L["RuntimeTest:Compose"]</h3><p>@L["RuntimeTest:ValidationHelp"]</p></div></header>
                         <div class="runtime-test-editor">
-                            <MudTextField T="string" @bind-Value="_jsonPayload" Label="@L["SubscriptionTestDialog:Fields:JsonSample"]" Variant="Variant.Outlined" Immediate="true" Lines="12" Class="runtime-test-json" Disabled="@(Inactive || _commandBusy)" />
+                            <MudTextField T="string" @bind-Value="_jsonPayload" Label="@L["SubscriptionTestDialog:Fields:JsonSample"]" Variant="Variant.Outlined" Immediate="true" Lines="12" Class="runtime-test-json" Disabled="@(Inactive || _commandBusy || _replayLocalMessage)" />
                             @if (!string.IsNullOrWhiteSpace(_validationMessage))
                             {
                                 <p class="runtime-test-validation" data-error="@(_hasValidationError ? "true" : "false")" role="status">@_validationMessage</p>
@@ -43,12 +43,24 @@
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Send" OnClick="PublishAsync" Disabled="@Inactive" aria-disabled="@BusyAttribute" aria-busy="@(_publishing ? "true" : "false")">@(_publishing ? L["SubscriptionTestDialog:Actions:Publishing"] : L["SubscriptionTestDialog:Actions:PublishEvent"])</MudButton>
                             </div>
                             <p class="runtime-test-note">@L["RuntimeTest:AcceptanceHelp"]</p>
+                            <MudDivider />
+                            <p class="runtime-test-note">@L["RuntimeTest:LocalDeliveryHelp"]</p>
+                            <MudCheckBox T="bool" Value="_replayLocalMessage" ValueChanged="SetReplayLocalMessage" Label="@L["RuntimeTest:ReplayMessage"]" Disabled="@(Inactive || _commandBusy || _localMessage is null)" />
+                            @if (_localMessage is not null)
+                            {
+                                <p class="runtime-test-note">@L["RuntimeTest:MessageIdentity", _localMessage.Metadata.MessageId ?? string.Empty]</p>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Play" OnClick="DeliverLocallyAsync" Disabled="@(Inactive || _commandBusy || !_subscription.CanDeliverLocally)" aria-busy="@(_deliveringLocally ? "true" : "false")">@(_deliveringLocally ? L["RuntimeTest:DeliveringLocally"] : L["RuntimeTest:DeliverLocally"])</MudButton>
+                            @if (!_subscription.CanDeliverLocally)
+                            {
+                                <p class="runtime-test-note">@L["Services:Test:LocalTargetUnavailable"]</p>
+                            }
                         </div>
                     </section>
                     <section class="runtime-test-receive">
                         <header class="runtime-test-heading"><span>02</span><div><h3>@L["RuntimeTest:Receive"]</h3><p>@L["RuntimeTest:ReceiveHelp"]</p></div><span class="runtime-test-listener-state" data-listening="@(_listenerSnapshot.IsListening ? "true" : "false")">@(_listenerSnapshot.IsListening ? L["TestBench:Listening"] : L["TestBench:Stopped"])</span></header>
                         <div class="runtime-test-listener-actions">
-                            <MudButton Variant="Variant.Outlined" Color="@(_listenerSnapshot.IsListening ? Color.Warning : Color.Primary)" StartIcon="@(_listenerSnapshot.IsListening ? MoIcons.StopCircle : MoIcons.Play)" OnClick="ToggleListeningAsync" Disabled="@Inactive" aria-disabled="@BusyAttribute" aria-busy="@(_listenerBusy ? "true" : "false")">@(_listenerSnapshot.IsListening ? L["SubscriptionTestDialog:Actions:StopListening"] : L["SubscriptionTestDialog:Actions:StartListening"])</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="@(_listenerSnapshot.IsListening ? Color.Warning : Color.Primary)" StartIcon="@(_listenerSnapshot.IsListening ? MoIcons.StopCircle : MoIcons.Play)" OnClick="ToggleListeningAsync" Disabled="@(Inactive || (!_listenerSnapshot.IsListening && _subscription.Activation != Monica.Core.TypeDiscovery.Abstractions.ActivationMode.Automatic))" aria-disabled="@BusyAttribute" aria-busy="@(_listenerBusy ? "true" : "false")">@(_listenerSnapshot.IsListening ? L["SubscriptionTestDialog:Actions:StopListening"] : L["SubscriptionTestDialog:Actions:StartListening"])</MudButton>
                             <MudButton Color="Color.Default" OnClick="ClearMessages" Disabled="@Inactive" aria-disabled="@(_commandBusy || _listenerSnapshot.MessageCount == 0 ? "true" : "false")">@L["SubscriptionTestDialog:Actions:Clear"]</MudButton>
                         </div>
                         <div class="runtime-test-retained"><strong>@L["TestBench:Retained", _listenerSnapshot.MessageCount]</strong>@if (_listenerSnapshot.StartedAt is { } startedAt) { <span>@L["RuntimeTest:Started", startedAt.ToString("HH:mm:ss")]</span> }</div>
@@ -103,6 +115,9 @@
     private bool _hasValidationError;
     private bool _commandBusy;
     private bool _publishing;
+    private bool _deliveringLocally;
+    private bool _replayLocalMessage;
+    private EventMessage? _localMessage;
     private bool _listenerBusy;
     private bool _closed;
     private bool _retired;
@@ -126,7 +141,7 @@
 
     private void LoadSampleJson()
     {
-        if (Inactive || _commandBusy || _subscriptionId is not { } id) return;
+        if (Inactive || _commandBusy || _replayLocalMessage || _subscriptionId is not { } id) return;
         if (TestService.CreateRuntimeJsonSample(id).IsFailed(out var error, out var sample))
         {
             _jsonPayload = "{}";
@@ -177,6 +192,47 @@
     }
 
     private Task ToggleListeningAsync() => _listenerSnapshot.IsListening ? StopListeningAsync() : StartListeningAsync();
+
+    private void SetReplayLocalMessage(bool replay)
+    {
+        if (Inactive || _commandBusy) return;
+        _replayLocalMessage = replay && _localMessage is not null;
+        if (_replayLocalMessage) _jsonPayload = System.Text.Encoding.UTF8.GetString(_localMessage!.Body.Span);
+    }
+
+    private Task DeliverLocallyAsync()
+    {
+        if (Inactive || _commandBusy || _subscription?.CanDeliverLocally != true || _subscriptionId is not { } id)
+            return Task.CompletedTask;
+        if (!_replayLocalMessage)
+        {
+            if (TestService.PrepareLocalTestMessage(id, _jsonPayload).IsFailed(out var error, out var prepared))
+            {
+                _hasValidationError = true;
+                _validationMessage = error.Message;
+                return Task.CompletedTask;
+            }
+            _localMessage = prepared;
+        }
+        if (_localMessage is not { } message) return Task.CompletedTask;
+        _deliveringLocally = true;
+        return AdmitCommandAsync(async () =>
+        {
+            var result = await TestService.DeliverLocalTestMessageAsync(id, message, _lifetimeToken);
+            if (Inactive) return;
+            if (result.IsFailed(out var error))
+            {
+                _hasValidationError = true;
+                _validationMessage = error.Message;
+            }
+            else
+            {
+                _hasValidationError = false;
+                _validationMessage = L["RuntimeTest:LocalDeliveryCompleted"];
+            }
+            Snackbar.Add(_validationMessage ?? string.Empty, _hasValidationError ? Severity.Error : Severity.Success);
+        });
+    }
 
     private Task StartListeningAsync()
     {
@@ -229,6 +285,7 @@
         {
             _commandBusy = false;
             _publishing = false;
+            _deliveringLocally = false;
             _listenerBusy = false;
             if (!Inactive) StateHasChanged();
         }

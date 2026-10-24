@@ -1,5 +1,8 @@
 # Service discovery
 
+With `Application:AutonomousWork=false`, service discovery retains registry queries and the canonical application catalog, but does not construct its registration worker or register, heartbeat, elect, renew or delete shared membership state. `IServiceRegistrationCoordinator.IsRegistered` stays false and its wait returns false immediately for this intentional nonparticipation. The native state manager rejects mutation methods in this mode, including explicit leader deletion. APIs that require real registration must report that unmet prerequisite.
+
+
 Instance registration and outbound endpoint resolution are independent modules in the same `Monica.ServiceDiscovery` project, which also contains their UI. Membership requires a store; endpoint resolution does not. Invocation can also run Local or ordinary HTTP without enabling either module.
 
 Select the role and storage mode inside the host's `AddMonica(...)` callback:

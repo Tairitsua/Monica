@@ -593,7 +593,7 @@ public sealed class SchedulerRuntimePageStateTests
         Configuration = new()
         {
             SchedulerScopeKey = " runtime/上海?scope=one ", OwnerKey = "owner", WorkerInstanceId = "worker",
-            RecurringJobDebugMode = false, CronTimeZoneId = "UTC", SchedulingPollInterval = TimeSpan.FromSeconds(1),
+            AutonomousWork = true, CronTimeZoneId = "UTC", SchedulingPollInterval = TimeSpan.FromSeconds(1),
             WorkerPollInterval = TimeSpan.FromSeconds(1), SnapshotSyncInterval = TimeSpan.FromSeconds(5),
             ExecutionLeaseDuration = TimeSpan.FromSeconds(30), ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(5),
             ExecutionRetryDelay = TimeSpan.FromSeconds(1), ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(2),

@@ -3,6 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
@@ -20,6 +23,30 @@ public sealed class EntityEventPublishingTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    [Fact]
+    public async Task ManualHost_StagesOutboxWithoutStartingConfiguredWorker()
+    {
+        await using var app = await new RepositoryScenarioFactory(manual: true,
+            configureOutbox: options => options.EnableWorker = true).CreateAsync(cancellationToken: Token);
+        Assert.DoesNotContain(app.Services.GetServices<IHostedService>(), service => service.GetType().Name == "OutboxWorker");
+        Assert.Contains(app.Services.GetRequiredService<MonicaApplication>().ActivationResources,
+            resource => resource.ImplementationType == typeof(TestRepositoryDbContext)
+                && resource.Kind == TypeActivationKind.Outbox && resource.Mode == ActivationMode.Manual);
+        await app.ExecuteAsync(async scope =>
+        {
+            scope.Resolve<IRepository<HardDeleteRow>>().Add(new() { Title = "manual business" });
+            await scope.Resolve<IDistributedEventBus>().PublishAsync(new IntegrationNotice("pending"), cancellationToken: Token);
+        }, cancellationToken: Token);
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            Assert.Equal(1, await db.HardDeleteRows.CountAsync(ct));
+            var message = Assert.Single(await db.Set<OutboxMessage>().ToListAsync(ct));
+            Assert.Null(message.DeliveredAtUtc);
+            Assert.Equal(0, message.Attempts);
+            Assert.Null(message.LeaseId);
+        }, Token);
+    }
 
     [Fact]
     public async Task Publish_WhenOperationCommits_ShouldPersistAnImmutableSnapshotWithBusinessRows()

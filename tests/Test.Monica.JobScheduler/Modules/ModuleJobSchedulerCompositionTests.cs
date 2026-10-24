@@ -25,8 +25,20 @@ public sealed class ModuleJobSchedulerCompositionTests
             monica.AddJobScheduler();
         });
 
-        act.Should().Throw<ModuleRegistrationException>()
-            .Which.Message.Should().Contain("scheduler-store").And.Contain("scheduler-scope");
+        act.Should().Throw<Exception>()
+            .Which.ToString().Should().Contain("scheduler scope");
+    }
+
+    [Fact]
+    public void AutomaticScheduler_WithScopeButNoStore_ShouldRejectMissingServiceContract()
+    {
+        var builder = WebApplication.CreateBuilder();
+        var error = Assert.ThrowsAny<Exception>(() => builder.AddMonica(monica =>
+        {
+            monica.ConfigureTypeDiscovery(options => options.ExcludeDefault());
+            monica.AddJobScheduler().UseSchedulerScope("missing-store");
+        }));
+        Assert.Contains("IJobSchedulerStore", error.ToString());
     }
 
     [Fact]
@@ -57,7 +69,7 @@ public sealed class ModuleJobSchedulerCompositionTests
     [Fact]
     public void ValidateOptions_WithDefaultDurations_ShouldSucceed()
     {
-        var act = () => new ModuleJobScheduler().ValidateOptions(CreateValidOptions(), null);
+        var act = () => ModuleJobScheduler.ValidateRuntimeOptions(CreateValidOptions());
 
         act.Should().NotThrow();
     }
@@ -87,7 +99,7 @@ public sealed class ModuleJobSchedulerCompositionTests
         var expectedPropertyName = shutdownGrace
             ? nameof(ModuleJobSchedulerOption.WorkerShutdownGracePeriod)
             : nameof(ModuleJobSchedulerOption.ExecutionCancellationGracePeriod);
-        var act = () => new ModuleJobScheduler().ValidateOptions(options, null);
+        var act = () => ModuleJobScheduler.ValidateRuntimeOptions(options);
 
         act.Should().Throw<InvalidOperationException>()
             .Which.Message.Should().Contain(expectedPropertyName)

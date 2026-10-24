@@ -55,6 +55,11 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
         services.AddSingleton<IEventReceiveDispatcher, EventReceiveDispatcher>();
         services.AddSingleton(_autoDiscovery);
         services.AddHostedService<EventBusAutoDiscoveryLifecycle>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(EventBusAutoDiscoveryLifecycle)),
+            typeof(EventBusAutoDiscoveryLifecycle));
+        context.Composition.OnServicesFinalized(static _ => { }, descriptors =>
+            _autoDiscovery.CaptureRegistrationOwners(descriptors, context.Composition.GetServiceRegistrationOwner));
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -204,6 +209,8 @@ public class ModuleEventBusOption : ModuleOptions<ModuleEventBus>
     /// When automatic handlers are discovered, the container must expose <see cref="IServiceProviderIsService"/>
     /// so discovery can inspect registrations without activating handlers. Disabled or empty discovery does
     /// not require the inspector. Construction and asynchronous scope disposal occur during delivery.
+    /// Distributed handlers retain the application registration owner captured from their finalized service
+    /// descriptors. Conflicting owners, including mixed owned and unowned registrations, stop composition.
     /// </remarks>
     public bool DisableAutoDiscovery { get; set; }
 }

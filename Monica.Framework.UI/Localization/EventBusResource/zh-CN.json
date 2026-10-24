@@ -119,7 +119,7 @@
         "ProviderType": "Provider 类型",
         "ServiceKey": "服务键",
         "BusMode": "事件总线模式",
-        "ImplementationType": "实现类型",
+        "ImplementationType": "声明的提供程序模块",
         "Capabilities": "支持的能力"
       },
       "States": {
@@ -186,7 +186,7 @@
     },
     "Actions": {
       "ValidateJson": "验证 JSON",
-      "PublishEvent": "发布测试事件",
+      "PublishEvent": "通过所选路由发布",
       "Publishing": "发布中...",
       "ResetSample": "重置示例",
       "StartListening": "开启监听",
@@ -276,7 +276,8 @@
       "DeactivateFailed": "停用订阅失败：{0}",
       "AlreadyRemoved": "订阅已经被移除",
       "Removed": "订阅已移除",
-      "RemoveFailed": "移除订阅失败：{0}"
+      "RemoveFailed": "移除订阅失败：{0}",
+      "ActivationHeld": "启动策略不允许此处理器自动接收事件。等待手动执行的处理器可使用本地定向投递。"
     },
     "Test": {
       "CreateJsonSampleFailed": "生成 JSON 示例失败：{0}",
@@ -288,7 +289,9 @@
       "ActiveSubscriptionExists": "已存在活动订阅，请先停止当前订阅",
       "SubscribeFailed": "订阅失败：{0}",
       "UnsubscribeFailed": "取消订阅失败：{0}",
-      "JsonDeserializeNull": "JSON 反序列化结果为空"
+      "JsonDeserializeNull": "JSON 反序列化结果为空",
+      "LocalTargetUnavailable": "本地投递仅允许运行中或等待手动执行的处理器；未启用、已停用或已移除的处理器不可执行。",
+      "LocalDeliveryFailed": "本地投递失败：{0}"
     },
     "Providers": {
       "GetRegisteredFailed": "获取已注册 Provider 失败：{0}",
@@ -325,7 +328,9 @@
       "Pending": "待激活",
       "Active": "活跃",
       "Inactive": "未激活",
-      "Disposed": "已释放"
+      "Disposed": "已释放",
+      "Held": "等待手动投递",
+      "Disabled": "部署未启用"
     },
     "RuntimeStates": {
       "Subscribing": "连接中",
@@ -514,7 +519,7 @@
   },
   "RuntimeTest": {
     "Target": "已固定的测试目标",
-    "Fanout": "此诊断操作会立即向所选行对应的主题、服务键和总线范围发送事件，不经过 Outbox 暂存。所有匹配的处理器都可能收到事件，并非仅调用当前处理器。",
+    "Fanout": "路由发布可能触达该主题上的全部运行中订阅者；分布式路由还会触达其他进程。单独的本地投递操作仅运行此处理器。",
     "Compose": "编辑类型化事件",
     "ValidationHelp": "验证仅检查 JSON 是否可反序列化为已注册的事件类型。",
     "AcceptanceHelp": "本地发送成功表示分发已完成。分布式发送成功表示传输层已接受事件，不代表消费者已完成执行。下方记录仅显示此监听器实际捕获的事件。",
@@ -522,7 +527,13 @@
     "ReceiveHelp": "额外的测试监听器会接收与此目标完全匹配的事件。",
     "Started": "开始于 {0}（本地时间）",
     "EmptyHelp": "请先启动监听再发布事件。此处只显示该监听器实际收到的负载。",
-    "ListenerLifetime": "此监听器属于当前浏览器会话，关闭详情后仍会继续运行。请在此处或订阅注册表中手动停止。内存中仅保留有限数量的最近事件负载。"
+    "ListenerLifetime": "此监听器属于当前浏览器会话，关闭详情后仍会继续运行。请在此处或订阅注册表中手动停止。内存中仅保留有限数量的最近事件负载。",
+    "LocalDeliveryHelp": "仅向本进程中选定的处理器投递。将执行真实处理器、事务及 Inbox 逻辑，不向消息代理发布，也不启用自动接收。默认每次使用新消息 ID，只有明确选择重放时才复用。",
+    "ReplayMessage": "使用上一次消息的原始 ID 和未修改的内容重放",
+    "MessageIdentity": "上一次本地消息 ID：{0}",
+    "DeliveringLocally": "正在本地投递…",
+    "DeliverLocally": "向此处理器本地投递",
+    "LocalDeliveryCompleted": "本地接收管道已完成。Inbox 可能跳过已处理的重放消息。"
   },
   "ChangeLedger": {
     "Eyebrow": "会话观察记录",

@@ -7,6 +7,10 @@
 @inject ILogger<ConfigurationUnifiedVersionHistoryPanel> Logger
 
 <section class="configuration-version-ledger" aria-label="@L["Versions:List:Title"]">
+    @if (Facade.MaintenanceReadOnlyReason is { } reason)
+    {
+        <MudAlert Severity="Severity.Info">@reason</MudAlert>
+    }
     <div class="configuration-version-ledger-heading">
         <div><span class="configuration-version-eyebrow">@L["Versions:Workbench:RetainedEvidence"]</span><h2>@L["Versions:List:Title"]</h2><p>@L["Versions:Workbench:LedgerHelp"]</p></div>
         <span>@L["Versions:Workbench:Loaded", Versions.Count]</span>
@@ -45,7 +49,7 @@
                         <MudTooltip Text="@L["Versions:Workbench:CompareSnapshot"]"><MudIconButton Icon="@MoIcons.ArrowLeftRight" Size="Size.Small" Color="Color.Primary" Disabled="@(DeleteBusy || Loading)" aria-label="@L["Versions:Workbench:CompareSnapshot"]" aria-pressed="@(SelectedVersion == context.Version ? "true" : "false")" OnClick="() => OnVersionSelected.InvokeAsync(context.Version)" /></MudTooltip>
                         <MudTooltip Text="@L["Versions:Actions:ComparePrevious"]"><MudIconButton Icon="@MoIcons.FileDiff" Size="Size.Small" Disabled="@(!HasPreviousVersion(context) || DeleteBusy || Loading)" aria-label="@L["Versions:Actions:ComparePrevious"]" OnClick="() => OnComparePrevious.InvokeAsync(context)" /></MudTooltip>
                         <MudTooltip Text="@L["Rollback:Confirm"]"><MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Color="Color.Warning" Disabled="@(DeleteBusy || Loading)" aria-label="@L["Rollback:Confirm"]" OnClick="() => OnRollback.InvokeAsync(context)" /></MudTooltip>
-                        <MudTooltip Text="@(context.Version == LatestVersion ? L["Versions:Workbench:LatestProtected"] : L["Versions:Actions:Delete"])"><MudIconButton Icon="@(IsDeleting(context) ? MoIcons.Hourglass : MoIcons.Delete)" Size="Size.Small" Color="Color.Error" Disabled="@(context.Version == LatestVersion)" aria-disabled="@(DeleteBusy || Loading ? "true" : "false")" aria-label="@L["Versions:Actions:Delete"]" OnClick="() => DeleteAsync(context)" /></MudTooltip>
+                        <MudTooltip Text="@(context.Version == LatestVersion ? L["Versions:Workbench:LatestProtected"] : L["Versions:Actions:Delete"])"><MudIconButton Icon="@(IsDeleting(context) ? MoIcons.Hourglass : MoIcons.Delete)" Size="Size.Small" Color="Color.Error" Disabled="@(context.Version == LatestVersion || Facade.MaintenanceReadOnlyReason is not null)" aria-disabled="@(DeleteBusy || Loading ? "true" : "false")" aria-label="@L["Versions:Actions:Delete"]" OnClick="() => DeleteAsync(context)" /></MudTooltip>
                     </div>
                 </MudTd>
             </RowTemplate>
@@ -90,7 +94,8 @@
 
     private async Task DeleteAsync(ConfigurationUnifiedVersionSummary version)
     {
-        if (DeleteBusy || Loading || version.Version == LatestVersion || _lifetime.IsRetired) return;
+        if (DeleteBusy || Loading || version.Version == LatestVersion || _lifetime.IsRetired
+            || Facade.MaintenanceReadOnlyReason is not null) return;
         var captured = version with { DefinitionKeys = version.DefinitionKeys.ToArray(), TriggerDefinitionKeys = version.TriggerDefinitionKeys.ToArray() };
         _deletingVersion = captured.Version;
         try

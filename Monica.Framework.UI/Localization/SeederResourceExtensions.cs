@@ -19,6 +19,7 @@ public static class SeederResourceExtensions
         SeederRunStatus.CompletedWithFailures => localizer["RunStatus:CompletedWithFailures"],
         SeederRunStatus.Aborted => localizer["RunStatus:Aborted"],
         SeederRunStatus.Cancelled => localizer["RunStatus:Cancelled"],
+        SeederRunStatus.Held => localizer["RunStatus:Held"],
         _ => localizer["Common:Unknown"]
     };
 
@@ -31,6 +32,8 @@ public static class SeederResourceExtensions
         SeederStatus.Failed => localizer["SeederStatus:Failed"],
         SeederStatus.Blocked => localizer["SeederStatus:Blocked"],
         SeederStatus.Cancelled => localizer["SeederStatus:Cancelled"],
+        SeederStatus.Held => localizer["SeederStatus:Held"],
+        SeederStatus.Disabled => localizer["SeederStatus:Disabled"],
         _ => localizer["Common:Unknown"]
     };
 
@@ -122,7 +125,7 @@ public static class SeederResourceExtensions
         this IStringLocalizer<SeederResource> localizer,
         int startedCount,
         int maximumCount) =>
-        maximumCount == 1
+        startedCount == 1
             ? localizer["Details:AttemptsSummary:Singular", startedCount, maximumCount]
             : localizer["Details:AttemptsSummary:Plural", startedCount, maximumCount];
 

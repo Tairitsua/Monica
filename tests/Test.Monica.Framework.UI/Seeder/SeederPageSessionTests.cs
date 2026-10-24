@@ -9,6 +9,90 @@ namespace Test.Monica.Framework.UI.Seeder;
 public sealed class SeederPageSessionTests
 {
     [Fact]
+    public async Task RunSelectedAsync_WhenAccessChanges_ShouldRejectBeforeExecutorCall()
+    {
+        var allowed = true;
+        var executions = 0;
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Res.Ok(snapshot)), _ => Task.FromResult(allowed), "test-host",
+            runAsync: (_, _) =>
+            {
+                executions++;
+                return Task.FromResult(Res.Ok(snapshot.Run));
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        allowed = false;
+
+        (await session.RunSelectedAsync()).Should().BeFalse();
+
+        executions.Should().Be(0);
+        session.IsAccessDenied.Should().BeTrue();
+        session.IsExecuting.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RunSelectedAsync_WhenBusy_ShouldRejectAnotherSubmissionAndRefreshOutcome()
+    {
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var executions = 0;
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Res.Ok(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: async (identity, cancellationToken) =>
+            {
+                identity.Should().Be(seeder.SeederTypeName);
+                executions++;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+                snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Succeeded,
+                    [seeder with { Status = SeederStatus.Succeeded }]);
+                return Res.Ok(snapshot.Run);
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        var execution = session.RunSelectedAsync();
+        await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        session.IsExecuting.Should().BeTrue();
+        session.CanRunSelected.Should().BeFalse();
+        (await session.RunSelectedAsync()).Should().BeFalse();
+        release.TrySetResult();
+        (await execution).Should().BeTrue();
+        executions.Should().Be(1);
+        session.IsExecuting.Should().BeFalse();
+        session.SelectedSeeder!.Status.Should().Be(SeederStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenExecutionIsPending_ShouldCancelAndObserveIt()
+    {
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var never = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new SeederPageSession(
+            _ => Task.FromResult(Res.Ok(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: async (_, cancellationToken) =>
+            {
+                entered.TrySetResult();
+                await never.Task.WaitAsync(cancellationToken);
+                return Res.Ok(snapshot.Run);
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        var execution = session.RunSelectedAsync();
+        await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        await session.DisposeAsync();
+
+        (await execution).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShouldExposeConfigurationAndComposableFilters()
     {
         var required = SeederUiTestData.CreateSeeder(

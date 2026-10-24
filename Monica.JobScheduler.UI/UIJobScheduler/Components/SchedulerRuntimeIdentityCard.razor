@@ -10,13 +10,13 @@
             <p>@L["Runtime:Identity:Description"]</p>
         </div>
     </header>
-    @if (Overview.Configuration.RecurringJobDebugMode)
+    @if (!Overview.Configuration.AutonomousWork)
     {
         <div class="runtime-identity__debug" role="note">
             <MoIcon Icon="@MoIcons.Bug" aria-hidden="true" Size="1.5rem" />
             <div>
-                <strong>@L["Runtime:Identity:DebugMode"]</strong>
-                <p>@L["Runtime:Identity:DebugModeHelp"]</p>
+                <strong>@L["Runtime:Identity:ManualMode"]</strong>
+                <p>@L["Runtime:Identity:ManualModeHelp"]</p>
             </div>
         </div>
     }

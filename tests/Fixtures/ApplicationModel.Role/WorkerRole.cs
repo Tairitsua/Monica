@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Monica.ApplicationModel.Annotations;
 using Monica.Core.Mediator;
 using Monica.DependencyInjection.Abstractions;
+using Monica.Core.TypeDiscovery.Annotations;
 
 [assembly: ApplicationRole("ordering.worker", DomainId.Ordering)]
 
@@ -24,3 +25,6 @@ public sealed class Worker : IHostedService
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
+
+[ProcessLocal]
+public sealed class WorkerLocalInitialization;

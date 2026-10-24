@@ -10,6 +10,8 @@ namespace Monica.Configuration.EfCore.Stores;
 internal sealed class DatabaseConfigurationEffectiveValueStore(ConfigurationDatabase database)
     : IConfigurationEffectiveValueStore
 {
+    public bool SupportsPublishedDefinitionGuard => true;
+
     private const int MAX_ENSURE_RETRY_COUNT = 5;
 
     /// <inheritdoc />
@@ -150,8 +152,17 @@ internal sealed class DatabaseConfigurationEffectiveValueStore(ConfigurationData
         ConfigurationEffectiveValueSaveRequest request,
         CancellationToken cancellationToken)
     {
-        return await database.ExecuteAsync(async (dbContext, token) =>
+        return await database.ExecuteResilientAsync(async (dbContext, token) =>
         {
+            await using var transaction = request.PublishedDefinitionExpectation is null ? null
+                : await dbContext.Database.BeginTransactionAsync(token);
+            if (transaction is not null)
+            {
+                await ConfigurationDatabaseLock.AcquireAsync(dbContext,
+                    ConfigurationStoreLockEntity.DefinitionPublicationLockKey, token);
+                await ConfigurationDatabaseLock.AcquireAsync(dbContext,
+                    ConfigurationStoreLockEntity.MutationGroupsLockKey, token);
+            }
             var definitionKey = request.Definition.DefinitionKey;
             var definitionIdentity = ConfigurationDefinitionIdentity.Compute(definitionKey);
             var entities = await dbContext.ConfigurationEffectiveValues
@@ -160,6 +171,7 @@ internal sealed class DatabaseConfigurationEffectiveValueStore(ConfigurationData
                 .Take(2)
                 .ToArrayAsync(token);
             var entity = ConfigurationEffectiveValueMapper.GetSingleEntity(entities, definitionKey);
+            await ConfigurationPublishedWriteGuard.ValidateAsync(dbContext, request, entity, token);
             if (request.ExpectedVersion is not null && entity?.Version != request.ExpectedVersion)
             {
                 throw new ConfigurationConcurrencyConflictException(
@@ -180,6 +192,7 @@ internal sealed class DatabaseConfigurationEffectiveValueStore(ConfigurationData
                 request.Context.ModifierName);
 
             await dbContext.SaveChangesAsync(token);
+            if (transaction is not null) await transaction.CommitAsync(token);
             return ConfigurationEffectiveValueMapper.ToDocument(entity);
         }, cancellationToken);
     }

@@ -1109,6 +1109,10 @@
     "EffectiveAggregate": "Final effective aggregate",
     "MaskedChange": "This write is masked by another source or produces no effective change. The stored document must still satisfy its own complete contract."
   },
+  "Manual": {
+    "Unpersisted": "Not persisted",
+    "UnpersistedDescription": "This process uses a validated temporary value because no managed document exists. It has no stored version. Its deployed owner must publish and initialize the document before it can be edited here."
+  },
   "Workbench": {
     "Eyebrow": "MONICA / CONFIGURATION",
     "Navigation": "Configuration workspace",

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
+using Monica.Configuration.Projection;
 using Monica.Configuration.Serialization;
 using Monica.Configuration.Services.Support;
 
@@ -22,6 +23,9 @@ public sealed class ConfigurationEffectiveStateReader(
     IConfigurationSourceInspector sourceInspector)
 {
     private IConfigurationEffectiveValueStore EffectiveValueStore => serviceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
+    private bool IsManual => serviceProvider.GetService<ConfigurationRuntimeContext>()?.AutonomousWork == false;
+    private bool IsUnpersisted(ConfigurationDefinition definition) => IsManual
+        && serviceProvider.GetService<MonicaConfigurationProviderAccessor>()?.Provider?.IsUnpersisted(definition.DefinitionKey) == true;
     /// <summary>
     /// Reads one display-safe effective value.
     /// </summary>
@@ -155,7 +159,8 @@ public sealed class ConfigurationEffectiveStateReader(
         return new ConfigurationDefinitionState
         {
             Definition = definition,
-            EffectiveValueVersion = document?.Version,
+            IsUnpersisted = IsUnpersisted(definition),
+            EffectiveValueVersion = IsUnpersisted(definition) ? null : document?.Version,
             EffectiveValues = values
         };
     }
@@ -194,7 +199,8 @@ public sealed class ConfigurationEffectiveStateReader(
                     ? null
                     : runtimeSourceValue.DisplayValue,
                 IsSensitive = isSensitive || runtimeSourceValue.IsSensitive,
-                Version = runtimeSourceValue.Source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
+                IsUnpersisted = runtimeSourceValue.IsUnpersisted,
+                Version = !runtimeSourceValue.IsUnpersisted && runtimeSourceValue.Source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
                     ? document?.Version
                     : null,
                 EffectiveSource = runtimeSourceValue.Source
@@ -208,7 +214,8 @@ public sealed class ConfigurationEffectiveStateReader(
             ConfigurationPath = configurationPath,
             DisplayValue = isSensitive && !includeSensitive ? null : ToDisplayValue(snapshotStoredValue, targetNode),
             IsSensitive = isSensitive,
-            Version = document?.Version,
+            IsUnpersisted = IsUnpersisted(definition),
+            Version = IsUnpersisted(definition) ? null : document?.Version,
             EffectiveSource = definition.Origin == ConfigurationDefinitionOrigin.PublishedMetadata
                               && targetNode?.NodeKind == ConfigurationNodeKind.Scalar
                 ? BuildEffectiveStoreSource()

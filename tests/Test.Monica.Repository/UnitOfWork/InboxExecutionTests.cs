@@ -19,6 +19,27 @@ public sealed class InboxExecutionTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task ManualTestDelivery_PreservesInboxDeduplicationAndSelectedConsumerBoundary()
+    {
+        await using var app = await new RepositoryScenarioFactory(inbox: true, manual: true).CreateAsync(cancellationToken: Token);
+        var message = await PrepareAsync(app);
+        var registry = app.Services.GetRequiredService<IEventSubscriptionRegistry>();
+        var selected = registry.GetAll().Single(subscription => subscription.HandlerType == typeof(FirstInboxHandler));
+        Assert.Equal(EventSubscriptionState.Held, selected.State);
+        var receiver = app.Services.GetRequiredService<IEventReceiveDispatcher>();
+        await receiver.DispatchTestAsync(message, [selected.Id], Token);
+        await receiver.DispatchTestAsync(message, [selected.Id], Token);
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            Assert.Equal(1, await db.HardDeleteRows.CountAsync(ct));
+            var receipt = Assert.Single(await db.Set<InboxReceipt>().ToListAsync(ct));
+            Assert.Equal("tests.inbox.a", receipt.Consumer);
+            Assert.Equal(message.Metadata.MessageId, receipt.MessageId);
+        }, Token);
+        Assert.Equal(EventSubscriptionState.Held, selected.State);
+    }
+
+    [Fact]
     public async Task Receive_WhenTwoConsumersShareDatabase_ShouldRunEachOnce()
     {
         await using var app = await new RepositoryScenarioFactory(inbox: true).CreateAsync(cancellationToken: Token);

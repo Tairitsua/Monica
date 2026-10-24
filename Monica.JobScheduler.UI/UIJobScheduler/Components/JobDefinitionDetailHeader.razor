@@ -33,11 +33,11 @@
                     <MoIcon Icon="@(IsPolicyDisabled ? MoIcons.PauseCircle : MoIcons.Success)" Size="1.5rem" />
                     @(IsPolicyDisabled ? L["Catalog:Policy:Paused"] : L["Catalog:Policy:Enabled"])
                 </span>
-                @if (IsDebugSuppressed)
+                @if (IsManualSuppressed)
                 {
-                    <MudTooltip Text="@L["Catalog:Lifecycle:DebugSuppressedDescription"]" Placement="Placement.Top" Arrow="true">
+                    <MudTooltip Text="@L["Catalog:Lifecycle:ManualSuppressedDescription"]" Placement="Placement.Top" Arrow="true">
                         <span class="job-detail-header__status" data-tone="info">
-                            <MoIcon Icon="@MoIcons.Bug" Size="1.5rem" />@L["Catalog:Lifecycle:DebugSuppressed"]
+                            <MoIcon Icon="@MoIcons.Bug" Size="1.5rem" />@L["Catalog:Lifecycle:ManualSuppressed"]
                         </span>
                     </MudTooltip>
                 }
@@ -60,7 +60,7 @@
                 }
                 @if (Definition.Declaration.JobType == JobType.Recurring)
                 {
-                    <MudTooltip Text="@(IsDebugSuppressed ? L["Catalog:Actions:RunDuringDebug"] : L["Catalog:Actions:Run"])" Placement="Placement.Top" Arrow="true">
+                    <MudTooltip Text="@(IsManualSuppressed ? L["Catalog:Actions:RunDuringManual"] : L["Catalog:Actions:Run"])" Placement="Placement.Top" Arrow="true">
                         <span class="job-detail-header__primary-action">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Play"
                                        Disabled="@(!Definition.IsPresent || IsMutating)" OnClick="OnRunNow">@L["Catalog:Actions:Run"]</MudButton>
@@ -159,10 +159,10 @@
 
     private bool IsOperatorPaused => JobSchedulerUiPresentation.IsOperatorPaused(Summary);
 
-    private bool IsDebugSuppressed => JobSchedulerUiPresentation.IsDebugSuppressed(Summary);
+    private bool IsManualSuppressed => JobSchedulerUiPresentation.IsManualSuppressed(Summary);
 
-    private string ToggleDisabledTooltip => JobSchedulerUiPresentation.IsDebugOnlySuppressed(Summary)
-        ? L["Catalog:Actions:PauseUnavailableDebug"]
+    private string ToggleDisabledTooltip => JobSchedulerUiPresentation.IsManualOnlySuppressed(Summary)
+        ? L["Catalog:Actions:PauseUnavailableManual"]
         : IsOperatorPaused
             ? L["Catalog:Actions:Resume"]
             : L["Catalog:Actions:Pause"];

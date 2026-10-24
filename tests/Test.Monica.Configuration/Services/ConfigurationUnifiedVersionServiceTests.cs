@@ -13,6 +13,20 @@ namespace Test.Monica.Configuration.Services;
 
 public sealed class ConfigurationUnifiedVersionServiceTests
 {
+    [Fact]
+    public async Task DeleteVersionAsync_WhenManual_ShouldRejectBeforeMaintenanceWrite()
+    {
+        var store = Substitute.For<IConfigurationUnifiedVersionStore>();
+        // This boundary must reject before touching version contents or rollback collaborators.
+        var service = new ConfigurationUnifiedVersionService(store, null!, null!, new ConfigurationRuntimeSnapshotLock(),
+            new ConfigurationRuntimeContext { AutonomousWork = false });
+
+        var delete = () => service.DeleteVersionAsync(1, TestContext.Current.CancellationToken);
+
+        await delete.Should().ThrowAsync<ConfigurationValidationFailedException>().WithMessage("*read-only in Manual mode*");
+        store.ReceivedCalls().Should().BeEmpty();
+    }
+
     private const long TARGET_VERSION = 7;
 
     [Fact]

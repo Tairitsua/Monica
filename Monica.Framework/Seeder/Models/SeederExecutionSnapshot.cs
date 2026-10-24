@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.Framework.Seeder.Models;
 
@@ -34,10 +35,22 @@ public sealed record SeederExecutionSnapshot
     /// <summary>Gets the current execution status.</summary>
     public required SeederStatus Status { get; init; }
 
-    /// <summary>Gets the number of attempts that have started.</summary>
+    /// <summary>Gets the frozen application activation mode for this seeder.</summary>
+    public ActivationMode Activation { get; init; } = ActivationMode.Automatic;
+
+    /// <summary>Gets why automatic execution is held or disabled, independently of the last execution error.</summary>
+    public string? ActivationReason { get; init; }
+
+    /// <summary>
+    /// Gets whether this seeder participates in readiness. Automatic initialization and explicitly admitted runs
+    /// participate; unrequested manual work and disabled definitions do not.
+    /// </summary>
+    public bool ParticipatesInReadiness { get; init; } = true;
+
+    /// <summary>Gets the cumulative number of attempts started in this process, including explicit reruns.</summary>
     public required int Attempts { get; init; }
 
-    /// <summary>Gets the maximum attempts allowed for this seeder.</summary>
+    /// <summary>Gets the maximum attempts allowed per automatic or explicit run of this seeder.</summary>
     public required int MaxAttempts { get; init; }
 
     /// <summary>Gets where the effective maximum attempt count was configured.</summary>

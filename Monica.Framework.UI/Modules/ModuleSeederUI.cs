@@ -15,7 +15,7 @@ using MudBlazor;
 namespace Monica.Modules;
 
 /// <summary>
-/// Provides host-bound registration for the read-only Seeder operations dashboard.
+/// Provides host-bound registration for current-host Seeder diagnostics and explicit execution.
 /// </summary>
 public static class ModuleSeederUIBuilderExtensions
 {

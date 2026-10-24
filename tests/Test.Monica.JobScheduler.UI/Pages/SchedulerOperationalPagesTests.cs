@@ -87,10 +87,10 @@ public sealed class SchedulerOperationalPagesTests
     }
 
     [Fact]
-    public async Task CatalogState_WhenDebugModeAloneSuppressesMaterialization_ShouldRejectQuickPauseAndAllowRunNow()
+    public async Task CatalogState_WhenManualModeAloneSuppressesMaterialization_ShouldRejectQuickPauseAndAllowRunNow()
     {
         await using var context = new JobSchedulerUiTestContext();
-        await SetDebugSuppressionAsync(context);
+        await SetManualSuppressionAsync(context);
         await using var state = context.Services.GetRequiredService<JobCatalogPageStateFactory>().Create(20);
         await state.InitializeAsync();
         await state.LoadTableAsync(new TableState
@@ -100,7 +100,7 @@ public sealed class SchedulerOperationalPagesTests
             SortDirection = SortDirection.Ascending
         }, Xunit.TestContext.Current.CancellationToken);
         var recurring = state.Summaries.Single();
-        recurring.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.DebugMode);
+        recurring.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
 
         var pause = await state.SetDisabledAsync(recurring, true);
         pause.IsFailed(out _).Should().BeTrue();
@@ -120,16 +120,16 @@ public sealed class SchedulerOperationalPagesTests
     }
 
     [Fact]
-    public async Task Catalog_WhenDebugModeSuppressesMaterialization_ShouldShowManualOnlyAndKeepActionsDiscoverable()
+    public async Task Catalog_WhenManualModeSuppressesMaterialization_ShouldShowManualOnlyAndKeepActionsDiscoverable()
     {
         await using var context = new JobSchedulerUiTestContext();
-        await SetDebugSuppressionAsync(context);
+        await SetManualSuppressionAsync(context);
 
         var cut = context.Render<JobCatalogPage>();
 
         cut.WaitForAssertion(() =>
         {
-            cut.Markup.Should().Contain("Catalog:Lifecycle:DebugSuppressed");
+            cut.Markup.Should().Contain("Catalog:Lifecycle:ManualSuppressed");
             var actions = cut.Find(".catalog-table__actions");
             actions.QuerySelector("[aria-label='Catalog:Actions:Pause']")!
                 .HasAttribute("disabled").Should().BeFalse();
@@ -139,7 +139,7 @@ public sealed class SchedulerOperationalPagesTests
     }
 
     [Fact]
-    public async Task CatalogState_WhenPolicyAndDebugBothSuppressMaterialization_ShouldResumeOnlyOperatorPolicy()
+    public async Task CatalogState_WhenPolicyAndManualBothSuppressMaterialization_ShouldResumeOnlyOperatorPolicy()
     {
         await using var context = new JobSchedulerUiTestContext();
         await using var state = context.Services.GetRequiredService<JobCatalogPageStateFactory>().Create(20);
@@ -152,7 +152,7 @@ public sealed class SchedulerOperationalPagesTests
         }, Xunit.TestContext.Current.CancellationToken);
         var recurring = state.Summaries.Single();
         (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResStatus.Ok);
-        await SetDebugSuppressionAsync(context);
+        await SetManualSuppressionAsync(context);
         await state.LoadTableAsync(new TableState
         {
             PageSize = 20,
@@ -161,20 +161,20 @@ public sealed class SchedulerOperationalPagesTests
         }, Xunit.TestContext.Current.CancellationToken);
         recurring = state.Summaries.Single();
         recurring.SuspensionReasons.Should().Be(
-            JobRecurringScheduleSuspensionReason.OperatorPolicy | JobRecurringScheduleSuspensionReason.DebugMode);
+            JobRecurringScheduleSuspensionReason.OperatorPolicy | JobRecurringScheduleSuspensionReason.Manual);
 
         (await state.SetDisabledAsync(recurring, false)).Status.Should().Be(ResStatus.Ok);
 
         var optimistic = state.Summaries.Single();
-        optimistic.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.DebugMode);
+        optimistic.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
         optimistic.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Suspended);
     }
 
     [Fact]
-    public async Task JobDetail_WhenDebugModeSuppressesMaterialization_ShouldExplainManualOnlyLifecycle()
+    public async Task JobDetail_WhenManualModeSuppressesMaterialization_ShouldExplainManualOnlyLifecycle()
     {
         await using var context = new JobSchedulerUiTestContext();
-        await SetDebugSuppressionAsync(context);
+        await SetManualSuppressionAsync(context);
 
         var cut = context.Render<JobDefinitionDetailPage>(parameters => parameters
             .Add(page => page.OwnerKey, JobSchedulerUiTestContext.OWNER)
@@ -183,8 +183,8 @@ public sealed class SchedulerOperationalPagesTests
         cut.WaitForAssertion(() =>
         {
             cut.Markup.Should().Contain("Catalog:Policy:Enabled");
-            cut.Markup.Should().Contain("Catalog:Lifecycle:DebugSuppressed");
-            cut.Markup.Should().Contain("JobDetail:Schedule:DebugManualOnly");
+            cut.Markup.Should().Contain("Catalog:Lifecycle:ManualSuppressed");
+            cut.Markup.Should().Contain("JobDetail:Schedule:ManualOnly");
         });
         var pause = cut.FindAll("button").Single(button =>
             button.TextContent.Contains("Catalog:Actions:Pause", StringComparison.Ordinal));
@@ -614,7 +614,7 @@ public sealed class SchedulerOperationalPagesTests
             item.InstanceId == execution.InstanceId && item.State == JobExecutionState.Cancelled);
     }
 
-    private static async Task SetDebugSuppressionAsync(JobSchedulerUiTestContext context)
+    private static async Task SetManualSuppressionAsync(JobSchedulerUiTestContext context)
     {
         await context.Store.SynchronizeRecurringScheduleAsync(
             new RecurringScheduleSynchronization
@@ -625,7 +625,7 @@ public sealed class SchedulerOperationalPagesTests
                     OwnerKey = JobSchedulerUiTestContext.OWNER,
                     JobKey = context.RecurringDefinition.Declaration.JobKey
                 },
-                HostSuspensionReasons = JobRecurringScheduleSuspensionReason.DebugMode
+                HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
             },
             Xunit.TestContext.Current.CancellationToken);
     }

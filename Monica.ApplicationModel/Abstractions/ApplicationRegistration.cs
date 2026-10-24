@@ -25,12 +25,13 @@ public abstract class ApplicationRegistration
 /// <remarks>Identity, deployment placement, discovery, and configuration-source selection are already frozen.</remarks>
 public sealed class ApplicationRegistrationContext : IMonicaCompositionContext
 {
-    internal ApplicationRegistrationContext(IMonicaBuilder monica, IHostApplicationBuilder hostBuilder, bool isActive)
+    internal ApplicationRegistrationContext(IMonicaBuilder monica, IHostApplicationBuilder hostBuilder, bool isActive, bool autonomousWork = true)
     {
         Monica = monica;
         Services = hostBuilder.Services;
         Environment = hostBuilder.Environment;
         IsActive = isActive;
+        IsAutonomous = isActive && autonomousWork;
     }
 
     /// <summary>Gets the open Monica builder for module declarations owned by this callback.</summary>
@@ -49,7 +50,7 @@ public sealed class ApplicationRegistrationContext : IMonicaCompositionContext
     public bool IsActive { get; }
 
     /// <summary>Gets whether the selected integration may participate autonomously in this host.</summary>
-    public bool IsAutonomous => IsActive;
+    public bool IsAutonomous { get; }
 
     /// <inheritdoc />
     public MonicaCompositionState Composition => Monica.Composition;

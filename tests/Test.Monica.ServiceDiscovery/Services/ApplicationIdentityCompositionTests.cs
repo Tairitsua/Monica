@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder;
 using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Models;
 using Monica.Core.Modularity.Abstractions;
@@ -12,6 +13,24 @@ namespace Test.Monica.ServiceDiscovery.Services;
 
 public sealed class ApplicationIdentityCompositionTests
 {
+    [Fact]
+    public async Task ManualHost_ReadsCatalogWithoutRegistrationAndRejectsRegistryMutations()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var app = await new DiscoveryFactory(manual: true).CreateAsync(cancellationToken: token);
+        var coordinator = app.Services.GetRequiredService<IServiceRegistrationCoordinator>();
+        Assert.False(coordinator.IsRegistered);
+        Assert.False(await coordinator.WaitForRegistrationAsync(Timeout.InfiniteTimeSpan, token));
+        var manager = app.Services.GetRequiredService<IRegistrationStateManager>();
+        Assert.Empty(await manager.GetAllInstancesAsync(token));
+        Assert.Equal(3, (await app.Services.GetRequiredService<IServiceDiscoveryCatalogProvider>().GetPreloadedServicesAsync()).Count);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterOrHeartbeatAsync(token));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.TryBecomeLeaderAsync(token));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RenewLeaderLeaseAsync("etag", token));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DeleteLeaderKeyAsync(token));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.ForceDeleteLeaderKeyAsync("local", token));
+        Assert.Empty(await manager.GetAllInstancesAsync(token));
+    }
     [Fact]
     public async Task Discovery_WithCanonicalDeployment_ShouldRetainNamesAndApplicationsWithoutRoles()
     {
@@ -41,9 +60,15 @@ public sealed class ApplicationIdentityCompositionTests
         Assert.False(factory.ServicesConfigured);
     }
 
-    private sealed class DiscoveryFactory(string? conflict = null) : MonicaTestApplicationFactory<ApplicationIdentityCompositionTests>
+    private sealed class DiscoveryFactory(string? conflict = null, bool manual = false) : MonicaTestApplicationFactory<ApplicationIdentityCompositionTests>
     {
         internal bool ServicesConfigured { get; private set; }
+
+        protected override void ConfigureHost(WebApplicationBuilder builder)
+        {
+            base.ConfigureHost(builder);
+            builder.Configuration["Application:AutonomousWork"] = manual ? "false" : "true";
+        }
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {

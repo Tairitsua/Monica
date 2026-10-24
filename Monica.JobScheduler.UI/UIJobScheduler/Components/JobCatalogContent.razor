@@ -102,9 +102,9 @@
             <div>
                 <p class="catalog-selection__title">@L["Catalog:Selection:Count", state.SelectedRecurringSummaries.Count]</p>
                 <p>@L["Catalog:Selection:Description"]</p>
-                @if (state.HasDebugOnlySuppressedSelection)
+                @if (state.HasManualOnlySuppressedSelection)
                 {
-                    <p class="catalog-selection__notice">@L["Catalog:Selection:DebugPauseUnavailable"]</p>
+                    <p class="catalog-selection__notice">@L["Catalog:Selection:ManualPauseUnavailable"]</p>
                 }
             </div>
         </div>
@@ -172,10 +172,10 @@
         try
         {
             var operatorPaused = JobSchedulerUiPresentation.IsOperatorPaused(summary);
-            var debugSuppressed = JobSchedulerUiPresentation.IsDebugSuppressed(summary);
-            if (!operatorPaused && debugSuppressed)
+            var manualSuppressed = JobSchedulerUiPresentation.IsManualSuppressed(summary);
+            if (!operatorPaused && manualSuppressed)
             {
-                Snackbar.Add(L["Catalog:Messages:PauseUnavailableDebug"], Severity.Info);
+                Snackbar.Add(L["Catalog:Messages:PauseUnavailableManual"], Severity.Info);
                 return;
             }
 
@@ -192,12 +192,12 @@
                 return;
             }
 
-            var message = !disabled && debugSuppressed
-                ? L["Catalog:Messages:ResumedDebugRemains"]
+            var message = !disabled && manualSuppressed
+                ? L["Catalog:Messages:ResumedManualRemains"]
                 : disabled
                     ? L["Catalog:Messages:Paused"]
                     : L["Catalog:Messages:Resumed"];
-            Snackbar.Add(message, !disabled && debugSuppressed ? Severity.Info : Severity.Success);
+            Snackbar.Add(message, !disabled && manualSuppressed ? Severity.Info : Severity.Success);
             await ReloadTableAsync();
         }
         catch (OperationCanceledException) when (_disposed || state.IsDisposed)
@@ -211,9 +211,9 @@
         if (state is null || _disposed || _batchDialogs is null) return;
         var selected = state.SelectedRecurringSummaries.ToArray();
         if (selected.Length == 0) return;
-        if (disabled && selected.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed))
+        if (disabled && selected.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed))
         {
-            Snackbar.Add(L["Catalog:Batch:PauseUnavailableDebug"], Severity.Info);
+            Snackbar.Add(L["Catalog:Batch:PauseUnavailableManual"], Severity.Info);
             return;
         }
         try { await _batchDialogs.OpenAsync(new(state, selected, disabled)); }
@@ -246,10 +246,10 @@
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
                 return;
             }
-            var debugRemains = !request.Disabled && request.Summaries.Any(JobSchedulerUiPresentation.IsDebugSuppressed);
-            var severity = batch.FailedCount > 0 ? Severity.Warning : debugRemains ? Severity.Info : Severity.Success;
-            var message = debugRemains
-                ? L["Catalog:Batch:ResultDebugRemains", batch.SucceededCount, batch.FailedCount]
+            var manualRemains = !request.Disabled && request.Summaries.Any(JobSchedulerUiPresentation.IsManualSuppressed);
+            var severity = batch.FailedCount > 0 ? Severity.Warning : manualRemains ? Severity.Info : Severity.Success;
+            var message = manualRemains
+                ? L["Catalog:Batch:ResultManualRemains", batch.SucceededCount, batch.FailedCount]
                 : L["Catalog:Batch:Result", batch.SucceededCount, batch.FailedCount];
             Snackbar.Add(message, severity);
             await ReloadTableAsync();

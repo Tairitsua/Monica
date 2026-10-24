@@ -5,6 +5,9 @@ using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Builder;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Modules;
 using Monica.Testing.Hosting;
@@ -19,6 +22,21 @@ namespace Test.Monica.OpenTelemetry.Modules;
 
 public sealed class ModuleOpenTelemetrySignalTests
 {
+    [Fact]
+    public async Task ManualHost_KeepsLocalTelemetryWithoutOtlpAndDefaultsDeploymentEnvironment()
+    {
+        await using var app = await new SignalFactory(useEnvironmentOtlp: true, manual: true)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var options = app.Services.GetRequiredService<IOptions<ModuleOpenTelemetryOption>>().Value;
+        Assert.False(options.UseOtlpExporter);
+        Assert.Equal("shared-uat", options.DeploymentEnvironment);
+        var meter = app.Services.GetRequiredService<MeterProvider>();
+        Assert.Contains(meter.GetResource().Attributes,
+            item => item.Key == "deployment.environment" && Equals(item.Value, "shared-uat"));
+        Assert.Contains(app.Services.GetRequiredService<MonicaApplication>().ActivationResources,
+            resource => resource.Key == "OpenTelemetry:otlp-export" && resource.Mode == ActivationMode.Manual);
+    }
+
     [Fact]
     public async Task AddOpenTelemetry_WhenSignalsAreNotSelected_ShouldKeepTheMetricsOnlyDefault()
     {
@@ -102,12 +120,20 @@ public sealed class ModuleOpenTelemetrySignalTests
 
     private sealed class SignalFactory(bool enableSignals = false, bool useSerilog = false,
         bool useEnvironmentOtlp = false,
-        Action<ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption>>? configure = null)
+        Action<ModuleRegistration<ModuleOpenTelemetry, ModuleOpenTelemetryOption>>? configure = null,
+        bool manual = false)
         : MonicaTestApplicationFactory<SignalFactory>
     {
         public string SourceName { get; } = "Monica.SignalTests." + Guid.NewGuid().ToString("N");
         public ActivityExporter Activities { get; } = new();
         public LogExporter Logs { get; } = new();
+
+        protected override void ConfigureHost(WebApplicationBuilder builder)
+        {
+            base.ConfigureHost(builder);
+            builder.Configuration["Application:AutonomousWork"] = manual ? "false" : "true";
+            builder.Configuration["Application:DeploymentScope"] = "shared-uat";
+        }
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {

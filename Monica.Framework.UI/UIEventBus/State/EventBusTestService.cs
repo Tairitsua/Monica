@@ -11,6 +11,7 @@ using Monica.Core.Extensions;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.JsonSerialization.Services.Support;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 using Monica.Framework.UI.Localization;
@@ -31,7 +32,7 @@ namespace Monica.Framework.UI.UIEventBus.State;
 /// </remarks>
 public sealed class EventBusTestService(
     IServiceScopeFactory serviceScopeFactory,
-    IDistributedEventBus distributedEventBus,
+    IServiceProvider serviceProvider,
     IEventSubscriptionRegistry subscriptionRegistry,
     EventBusProviderDiscoveryService providerDiscoveryService,
     IJsonSerializerOptionsProvider jsonSerializerOptionsProvider,
@@ -294,6 +295,63 @@ public sealed class EventBusTestService(
         }
     }
 
+    /// <summary>Prepares a fresh message identity for explicit delivery to one local Active or Held handler.</summary>
+    /// <param name="subscriptionId">Exact registry target; disabled or unavailable targets are rejected.</param>
+    /// <param name="json">Payload deserialized using the target's event contract and host serializer.</param>
+    /// <returns>The prepared message, or a validation failure. No transport or handler is invoked.</returns>
+    /// <remarks>Retain this exact message, including its body, only when an intentional replay is requested.</remarks>
+    public Res<EventMessage> PrepareLocalTestMessage(EventSubscriptionId subscriptionId, string json)
+    {
+        try
+        {
+            var subscription = GetSourceSubscription(subscriptionId);
+            if (!CanDeliverLocally(subscription))
+                return Res.Fail(localizer["Services:Test:LocalTargetUnavailable"]);
+            if (string.IsNullOrWhiteSpace(json))
+                return Res.Fail(localizer["Services:Common:JsonContentRequired"]);
+
+            var payload = DeserializePayload(subscription!.EventType, json);
+            return Res.Ok(serviceProvider.GetRequiredService<IEventMessageFactory>().Prepare(
+                subscription.EventType, payload, subscription.Scope, subscription.TopicName, subscription.ServiceKey));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to prepare local EventBus test message for {SubscriptionId}", subscriptionId);
+            return Res.Fail(localizer["Services:Test:JsonValidationFailed", ex.GetMessageRecursively()]);
+        }
+    }
+
+    /// <summary>Delivers a prepared message only to the selected local registry target through the native receive pipeline.</summary>
+    /// <param name="subscriptionId">Exact Active or Held target, revalidated immediately before dispatch.</param>
+    /// <param name="message">Fresh prepared message, or the unchanged message for an intentional Inbox replay.</param>
+    /// <param name="cancellationToken">Cancels this delivery; it does not activate or stop a subscription.</param>
+    /// <returns>Success after the handler pipeline completes, or a preparation/delivery failure.</returns>
+    /// <remarks>Invokes real handlers, transactions and Inbox behavior. Never publishes to a broker or enables automatic receipt.</remarks>
+    public async Task<Res> DeliverLocalTestMessageAsync(
+        EventSubscriptionId subscriptionId, EventMessage message, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            ArgumentNullException.ThrowIfNull(message);
+            if (!CanDeliverLocally(GetSourceSubscription(subscriptionId)))
+                return Res.Fail(localizer["Services:Test:LocalTargetUnavailable"]);
+
+            await using var scope = serviceScopeFactory.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IEventReceiveDispatcher>()
+                .DispatchTestAsync(message, [subscriptionId], cancellationToken);
+            return Res.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to deliver local EventBus test message for {SubscriptionId}", subscriptionId);
+            return Res.Fail(localizer["Services:Test:LocalDeliveryFailed", ex.GetMessageRecursively()]);
+        }
+    }
+
+    private static bool CanDeliverLocally(IEventSubscription? subscription) =>
+        subscription is { Activation: not ActivationMode.Disabled,
+            State: EventSubscriptionState.Active or EventSubscriptionState.Held };
+
     /// <summary>
     /// Starts a background listener for the selected subscription.
     /// </summary>
@@ -320,6 +378,9 @@ public sealed class EventBusTestService(
             {
                 return existingState.CreateSnapshot();
             }
+
+            if (subscription.Activation != ActivationMode.Automatic)
+                return Res.Fail(localizer["Services:Monitor:ActivationHeld"]);
 
             var state = new RuntimeListenerState(
                 subscriptionId,
@@ -476,7 +537,7 @@ public sealed class EventBusTestService(
                 MessageId = Guid.NewGuid().ToString()
             };
 
-            await distributedEventBus.PublishAsync(testMessage, topicName, cancellationToken);
+            await serviceProvider.GetRequiredService<IDistributedEventBus>().PublishAsync(testMessage, topicName, cancellationToken);
 
             logger.LogInformation("已发布测试消息到主题 {TopicName}: {MessageId}", topicName, testMessage.MessageId);
 
@@ -522,7 +583,7 @@ public sealed class EventBusTestService(
                 }
             }
 
-            var subscription = await distributedEventBus.SubscribeAsync<TestEventMessage>((eventData, cancellationToken) =>
+            var subscription = await serviceProvider.GetRequiredService<IDistributedEventBus>().SubscribeAsync<TestEventMessage>((eventData, cancellationToken) =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var receivedMessage = new ReceivedTestMessage

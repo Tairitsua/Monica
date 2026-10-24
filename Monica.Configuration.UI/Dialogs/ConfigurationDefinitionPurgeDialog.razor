@@ -125,6 +125,7 @@
     {
         get
         {
+            if (Preview.ReadOnlyReason is { } reason) return reason;
             if (Preview.IsLocallyRegistered)
             {
                 return L["DefinitionPurge:Blocked:LocalRegistration"];

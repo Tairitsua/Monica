@@ -64,7 +64,7 @@ public sealed class JobSchedulerFacade(
                     OwnerKey = option.GetProjectName(),
                     OwnerKeys = GetLocalOwnerKeys(),
                     WorkerInstanceId = option.WorkerInstanceId,
-                    RecurringJobDebugMode = option.RecurringJobDebugMode,
+                    AutonomousWork = option.AutonomousWork,
                     CronTimeZoneId = option.CronTimeZone.Id,
                     SchedulingPollInterval = option.SchedulingPollInterval,
                     WorkerPollInterval = option.WorkerPollInterval,
@@ -106,7 +106,7 @@ public sealed class JobSchedulerFacade(
             .Select(definition => definition.OwnerKey ?? options.Value.GetProjectName())
             .Concat(activation?.ActiveWorkloadOwners ?? [])
             .ToHashSet(StringComparer.Ordinal);
-        if (activation is null && owners.Count == 0)
+        if (activation?.ActiveWorkloadOwners is null && owners.Count == 0)
             owners.Add(options.Value.GetProjectName());
         return owners.Order(StringComparer.Ordinal).ToArray();
     }

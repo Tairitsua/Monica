@@ -220,9 +220,10 @@ public sealed class ApplicationCompositionTests
 
     private sealed class OwnerActivationPolicy : ITypeActivationPolicy
     {
-        public bool IsEnabled(Type implementationType, TypeActivationKind kind) => implementationType != typeof(SecondOwner);
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null) =>
+            (registrationOwner ?? implementationType) != typeof(SecondOwner) ? ActivationMode.Automatic : ActivationMode.Disabled;
         public void EnsureCanExecuteRequest(Type requestType) { }
-        public string? GetWorkloadOwner(Type implementationType) => null;
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => null;
     }
 
     private sealed class OpaqueHostedService : IHostedService

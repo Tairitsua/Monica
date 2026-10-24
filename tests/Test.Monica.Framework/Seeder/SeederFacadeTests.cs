@@ -9,6 +9,7 @@ using Monica.Framework.Seeder.Models.Internal;
 using Monica.Framework.Seeder.Services.Support;
 using Monica.Modules;
 using Xunit;
+using NSubstitute;
 
 namespace Test.Monica.Framework.Seeder;
 
@@ -25,7 +26,8 @@ public sealed class SeederFacadeTests
         };
         var graph = SeederGraph.Create([typeof(FacadeSeeder)], options);
         ISeederState state = new SeederState(graph, TimeProvider.System);
-        var facade = new SeederFacade(state, Options.Create(options), NullLogger<SeederFacade>.Instance);
+        var facade = new SeederFacade(state, Options.Create(options), NullLogger<SeederFacade>.Instance,
+            Substitute.For<ISeederExecutor>());
 
         var result = await facade.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
@@ -45,7 +47,8 @@ public sealed class SeederFacadeTests
         var options = new ModuleSeederOption();
         var graph = SeederGraph.Create([typeof(FacadeSeeder)], options);
         ISeederState state = new SeederState(graph, TimeProvider.System);
-        var facade = new SeederFacade(state, Options.Create(options), NullLogger<SeederFacade>.Instance);
+        var facade = new SeederFacade(state, Options.Create(options), NullLogger<SeederFacade>.Instance,
+            Substitute.For<ISeederExecutor>());
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 

@@ -11,7 +11,9 @@
         (Status: SeederStatus.Succeeded, Count: run.SucceededCount),
         (Status: SeederStatus.Failed, Count: run.FailedCount),
         (Status: SeederStatus.Blocked, Count: run.BlockedCount),
-        (Status: SeederStatus.Cancelled, Count: run.CancelledCount)
+        (Status: SeederStatus.Cancelled, Count: run.CancelledCount),
+        (Status: SeederStatus.Held, Count: run.HeldCount),
+        (Status: SeederStatus.Disabled, Count: run.DisabledCount)
     };
 
     <section class="seeder-run-overview" aria-labelledby="seeder-run-status-title">

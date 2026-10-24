@@ -30,8 +30,8 @@ public static class ModuleSeederBuilderExtensions
         /// <remarks>
         /// Seeder execution begins only after the Generic Host publishes <c>ApplicationStarted</c>. Required
         /// seeders keep the <c>monica.seeder</c> readiness check unhealthy until they complete successfully.
-        /// Application activation filters startup entries before dependency validation. A selected seeder cannot
-        /// depend on an inactive seeder; place both prerequisites together or remove that startup dependency.
+        /// Manual seeders remain available for explicit dependency-closed execution. Disabled definitions remain
+        /// visible in diagnostics without service registration. Automatic initializers never start held prerequisites.
         /// </remarks>
         public ModuleRegistration<ModuleSeeder, ModuleSeederOption> AddSeeder(Action<ModuleSeederOption>? action = null)
         {
@@ -68,16 +68,29 @@ public sealed class ModuleSeeder : MonicaModule<ModuleSeederOption>
             TypeQuery.ConcreteClass.AssignableTo<ISeeder>(),
             (context, matches) =>
             {
-                var seederTypes = matches.Select(static match => match.Type)
-                    .Where(type => Application.TypeActivation?.IsEnabled(type, TypeActivationKind.HostedService) != false)
-                    .ToArray();
-                _graph = SeederGraph.Create(seederTypes, Option);
+                var seederTypes = matches.Select(static match => match.Type).ToArray();
+                _graph = SeederGraph.Create(seederTypes, Option, type =>
+                    Application.TypeActivation?.GetActivation(type, TypeActivationKind.Seeder) ?? ActivationMode.Automatic);
 
                 foreach (var descriptor in _graph.Nodes)
                 {
-                    context.Registrations.Add(ServiceDescriptor.Transient(
-                        descriptor.SeederType,
-                        descriptor.SeederType));
+                    if (descriptor.Activation != ActivationMode.Disabled)
+                        context.Registrations.Add(ServiceDescriptor.Transient(descriptor.SeederType, descriptor.SeederType));
+                    var dependencyHold = descriptor.Activation == ActivationMode.Automatic
+                        ? _graph.GetAutomaticBlockReason(descriptor.SeederType) : null;
+                    Application.RecordActivation(new ResourceActivation
+                    {
+                        Key = $"seeder:{descriptor.SeederTypeName}",
+                        ImplementationType = descriptor.SeederType,
+                        Kind = TypeActivationKind.Seeder,
+                        Mode = dependencyHold is null ? descriptor.Activation : ActivationMode.Manual,
+                        Reason = dependencyHold ?? (descriptor.Activation switch
+                        {
+                            ActivationMode.Disabled => "The seeder is unavailable in this application's placement.",
+                            ActivationMode.Manual => "The seeder is held until explicitly requested.",
+                            _ => "The seeder is eligible for automatic dependency-aware initialization."
+                        })
+                    });
                 }
             });
     }
@@ -93,7 +106,10 @@ public sealed class ModuleSeeder : MonicaModule<ModuleSeederOption>
         services.AddSingleton<SeederFacade>();
         services.TryAddSingleton<ISeederRetryDelay, SeederRetryDelay>();
         services.AddSingleton<SeederScheduler>();
-        services.AddHostedService<SeederBackgroundService>();
+        services.AddSingleton<ISeederExecutor>(static provider => provider.GetRequiredService<SeederScheduler>());
+        var scheduler = ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, SeederBackgroundService>();
+        services.Add(scheduler);
+        context.Composition.AdmitHostedLifecycle(scheduler, typeof(SeederBackgroundService));
         services.AddHealthChecks().AddMonicaReadinessCheck<SeederHealthCheck>(
             HEALTH_CHECK_NAME,
             tags: ["seeder"]);

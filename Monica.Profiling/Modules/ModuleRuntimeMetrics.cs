@@ -50,6 +50,9 @@ public class ModuleRuntimeMetrics : MonicaModule<ModuleRuntimeMetricsOption>, IW
         services.TryAddSingleton<RuntimeMetrics>();
         services.AddSingleton<RuntimeMetricsService>();
         services.AddHostedService<RuntimeMetricsActivationService>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(RuntimeMetricsActivationService));
         services.AddScoped(sp => new RuntimeMetricsFacade(
             sp.GetRequiredService<RuntimeMetricsService>(),
             sp.GetRequiredService<ILogger<RuntimeMetricsFacade>>()));

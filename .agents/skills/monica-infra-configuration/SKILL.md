@@ -5,7 +5,7 @@ description: Use when integrating Monica frozen Startup or Managed configuration
 
 # Monica configuration
 
-Choose Startup ownership for deployment inputs needed during host construction, and Managed ownership for store-backed operator changes. Read bootstrap guidance for composition, options guidance for validation and ownership, and runtime changes for reviewed writes and read-only Startup inspection.
+Choose Startup ownership for deployment inputs needed during host construction, and Managed ownership for store-backed operator changes. The application's frozen `AutonomousWork` policy controls automatic managed publication and initialization; Manual hosts can inspect values and perform guarded, reviewed edits without taking over deployment ownership. Read bootstrap guidance for composition, options guidance for validation and ownership, and runtime changes for reviewed writes and read-only Startup inspection.
 
 | Task | Read |
 | --- | --- |

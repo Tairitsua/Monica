@@ -30,6 +30,7 @@ public static class SeederDisplay
         SeederRunStatus.Cancelled => MudBlazor.Severity.Warning,
         SeederRunStatus.Waiting => MudBlazor.Severity.Info,
         SeederRunStatus.Running => MudBlazor.Severity.Info,
+        SeederRunStatus.Held => MudBlazor.Severity.Info,
         _ => MudBlazor.Severity.Normal
     };
 
@@ -43,6 +44,7 @@ public static class SeederDisplay
         SeederRunStatus.CompletedWithFailures => MoIcons.Warning,
         SeederRunStatus.Aborted => MoIcons.Error,
         SeederRunStatus.Cancelled => MoIcons.Error,
+        SeederRunStatus.Held => MoIcons.Clock,
         _ => MoIcons.Help
     };
 
@@ -55,6 +57,8 @@ public static class SeederDisplay
         SeederStatus.Failed => MudBlazor.Color.Error,
         SeederStatus.Blocked => MudBlazor.Color.Warning,
         SeederStatus.Cancelled => MudBlazor.Color.Default,
+        SeederStatus.Held => MudBlazor.Color.Info,
+        SeederStatus.Disabled => MudBlazor.Color.Default,
         _ => MudBlazor.Color.Default
     };
 
@@ -67,6 +71,8 @@ public static class SeederDisplay
         SeederStatus.Failed => MoIcons.Error,
         SeederStatus.Blocked => MoIcons.Ban,
         SeederStatus.Cancelled => MoIcons.Error,
+        SeederStatus.Held => MoIcons.Clock,
+        SeederStatus.Disabled => MoIcons.Ban,
         _ => MoIcons.Help
     };
 

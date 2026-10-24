@@ -99,6 +99,27 @@
       "SnapshotUnavailable": "请先加载当前快照，再导入基线。"
     }
   },
+  "ResourceActivations": {
+    "Title": "资源激活状态",
+    "Description": "展示当前准入决策。手动操作后可刷新；这些记录不代表执行成功。",
+    "Filter": "资源激活状态筛选",
+    "Held": "暂缓或禁用",
+    "Count": "{0} 项暂缓或禁用 · 共 {1} 项资源",
+    "Resource": "资源",
+    "Owner": "注册归属",
+    "Mode": "激活方式",
+    "Reason": "原因",
+    "Disabled": "禁用",
+    "Manual": "手动",
+    "Automatic": "自动",
+    "OpaqueFactory": "未解析工厂实现类型",
+    "NoExplicitOwner": "无显式注册归属",
+    "Loading": "正在读取资源激活状态…",
+    "LoadFailed": "无法读取资源激活状态。请重试以获取当前决策。",
+    "RefreshFailed": "刷新失败，仍显示上次成功读取的资源状态。",
+    "NoHeld": "当前没有暂缓或禁用的资源。",
+    "Empty": "尚未报告资源激活记录。"
+  },
   "Overview": {
     "Kpis": {
       "Composition": "模块组合",

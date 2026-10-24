@@ -205,9 +205,9 @@ public sealed class EventReceiveDispatcherTests
 
     private sealed class OwnershipPolicy : ITypeActivationPolicy
     {
-        public bool IsEnabled(Type implementationType, TypeActivationKind kind) => true;
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null) => ActivationMode.Automatic;
         public void EnsureCanExecuteRequest(Type requestType) { }
-        public string? GetWorkloadOwner(Type implementationType)
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null)
             => implementationType == typeof(UnownedHandler) ? null : "policy-owner";
     }
 

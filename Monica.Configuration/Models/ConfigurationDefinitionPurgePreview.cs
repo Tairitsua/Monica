@@ -5,6 +5,8 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationDefinitionPurgePreview
 {
+    /// <summary>Gets the process-policy restriction that makes definition maintenance read-only.</summary>
+    public string? ReadOnlyReason { get; init; }
     /// <summary>
     /// Gets the stable definition key.
     /// </summary>
@@ -34,7 +36,8 @@ public sealed record ConfigurationDefinitionPurgePreview
     /// Gets whether the definition is registered by the current process.
     /// </summary>
     /// <remarks>
-    /// A locally registered definition is active even before its publication batch reaches the metadata store.
+    /// An Automatic local definition is active before publication. Manual local registration does not imply
+    /// a persisted active publisher and cannot authorize maintenance.
     /// </remarks>
     public bool IsLocallyRegistered { get; init; }
 
@@ -72,7 +75,8 @@ public sealed record ConfigurationDefinitionPurgePreview
     /// Gets whether the definition currently satisfies the lifecycle prerequisites for purging.
     /// </summary>
     public bool CanPurge =>
-        LifecycleState == ConfigurationDefinitionLifecycleState.Retired
+        ReadOnlyReason is null
+        && LifecycleState == ConfigurationDefinitionLifecycleState.Retired
         && !IsLocallyRegistered
         && ActivePublisherKeys.Count == 0;
 }

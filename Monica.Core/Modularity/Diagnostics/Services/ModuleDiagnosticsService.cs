@@ -128,6 +128,14 @@ internal sealed class ModuleDiagnosticsService
     /// <summary>Gets the lazily constructed assembly inventory for this host.</summary>
     internal TypeDiscoveryAssemblyInventory GetAssemblyInventory() => _assemblyInventory.Value;
 
+    internal IReadOnlyList<ResourceActivationObservation> GetResourceActivations() => Array.AsReadOnly(
+        _application.ActivationResources.Select(resource => new ResourceActivationObservation
+        {
+            Key = resource.Key, ImplementationTypeName = resource.ImplementationType?.FullName,
+            RegistrationOwnerTypeName = resource.RegistrationOwner?.FullName,
+            Kind = resource.Kind, Mode = resource.Mode, Reason = resource.Reason
+        }).ToArray());
+
     /// <summary>Gets the public option-property catalog with bounded values for one active module and profile.</summary>
     internal ModuleOptionDiagnostics GetModuleOptions(
         ModuleKey moduleKey,

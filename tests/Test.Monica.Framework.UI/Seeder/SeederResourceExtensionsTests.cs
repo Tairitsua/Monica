@@ -17,19 +17,19 @@ public sealed class SeederResourceExtensionsTests
     [InlineData(
         "en-US", 1,
         "1 of 1 seeder reached a terminal state", "Showing 1 of 1 seeder", "1 dependency",
-        "1 of 1 attempt started", "1 attempt recorded")]
+        "1 recorded attempt · up to 1 per run", "1 attempt recorded")]
     [InlineData(
         "en-US", 3,
         "1 of 3 seeders reached a terminal state", "Showing 1 of 3 seeders", "3 dependencies",
-        "1 of 3 attempts started", "3 attempts recorded")]
+        "1 recorded attempt · up to 3 per run", "3 attempts recorded")]
     [InlineData(
         "zh-CN", 1,
         "1 个 Seeder 中已有 1 个进入终态", "正在显示 1 个 Seeder 中的 1 个", "1 个依赖项",
-        "已开始 1 / 1 次尝试", "已记录 1 次")]
+        "累计 1 次尝试 · 每次执行最多 1 次", "已记录 1 次")]
     [InlineData(
         "zh-CN", 3,
         "3 个 Seeder 中已有 1 个进入终态", "正在显示 3 个 Seeder 中的 1 个", "3 个依赖项",
-        "已开始 1 / 3 次尝试", "已记录 3 次")]
+        "累计 1 次尝试 · 每次执行最多 3 次", "已记录 3 次")]
     public void CountFormatters_WhenCountVaries_ShouldUseBilingualGrammar(
         string cultureName,
         int grammaticalCount,

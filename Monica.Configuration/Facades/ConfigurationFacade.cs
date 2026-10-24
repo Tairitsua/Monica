@@ -44,7 +44,7 @@ public sealed class ConfigurationFacade(IServiceProvider services)
     private IConfigurationReloadBroadcastService reloadBroadcastService => services.GetRequiredService<IConfigurationReloadBroadcastService>();
 
     private ConfigurationDefinitionLifecycleService DefinitionLifecycleService => new(
-        definitionRegistry, definitionMaintenanceStore, definitionResolver);
+        definitionRegistry, definitionMaintenanceStore, definitionResolver, services.GetService<ConfigurationRuntimeContext>());
 
     /// <summary>
     /// Gets active configuration definition summaries for operational consumers.
@@ -54,17 +54,20 @@ public sealed class ConfigurationFacade(IServiceProvider services)
     {
         try
         {
-            IReadOnlyList<ConfigurationDefinitionSummary> summaries = (await definitionResolver.GetMergedDefinitionsAsync(CancellationToken.None))
-                .Select(ToSummary)
-                .ToArray();
+            var summaries = new List<ConfigurationDefinitionSummary>();
+            foreach (var definition in await definitionResolver.GetMergedDefinitionsAsync(CancellationToken.None))
+                summaries.Add(await WithMutationAuthorityAsync(ToSummary(definition), definition));
 
-            return Res.Ok(summaries);
+            return Res.Ok<IReadOnlyList<ConfigurationDefinitionSummary>>(summaries);
         }
         catch (Exception ex)
         {
             return Res.Fail($"Failed to get configuration definitions: {ex.GetMessageRecursively()}");
         }
     }
+
+    /// <summary>Gets the process-policy reason that disables publication and saved-version maintenance.</summary>
+    public string? MaintenanceReadOnlyReason => services.GetService<ConfigurationRuntimeContext>()?.MaintenanceReadOnlyReason;
 
     /// <summary>
     /// Gets a fault-isolated active and retired definition catalog for management UI diagnostics.
@@ -80,9 +83,12 @@ public sealed class ConfigurationFacade(IServiceProvider services)
         try
         {
             var snapshot = await definitionResolver.GetDiagnosticCatalogAsync(CancellationToken.None);
+            var summaries = new List<ConfigurationDefinitionSummary>();
+            foreach (var entry in snapshot.Entries)
+                summaries.Add(await WithMutationAuthorityAsync(ToSummary(entry), entry.Definition));
             return Res.Ok(new ConfigurationDefinitionCatalog
             {
-                Definitions = snapshot.Entries.Select(ToSummary).ToArray(),
+                Definitions = summaries,
                 StoreDiagnostic = snapshot.StoreDiagnostic
             });
         }
@@ -91,6 +97,42 @@ public sealed class ConfigurationFacade(IServiceProvider services)
             return Res.Fail($"Failed to get configuration definition diagnostics: {ex.GetMessageRecursively()}");
         }
     }
+
+    private async Task<ConfigurationDefinitionSummary> WithMutationAuthorityAsync(
+        ConfigurationDefinitionSummary summary, ConfigurationDefinition? definition)
+        => summary with { MutationReadOnlyReason = await GetMutationReadOnlyReasonAsync(definition) };
+
+    private async Task<string?> GetMutationReadOnlyReasonAsync(
+        ConfigurationDefinition? definition, bool mergeReadMetadata = false)
+    {
+        var authority = services.GetService<ConfigurationWriteAuthority>();
+        if (definition is null || authority?.IsManual != true || definition.Kind == ConfigurationKind.Startup) return null;
+        try
+        {
+            if (mergeReadMetadata)
+                definition = await definitionResolver.GetRequiredForReadAsync(definition.DefinitionKey, CancellationToken.None);
+            var (_, reason) = await authority.InspectAsync(definition, CancellationToken.None);
+            return reason;
+        }
+        catch (Exception)
+        {
+            return "The active publication or existing document could not be read. Manual edits are unavailable.";
+        }
+    }
+
+    private static ConfigurationSourceDescriptor WithMutationAuthority(ConfigurationSourceDescriptor source, string? readOnlyReason)
+        => readOnlyReason is not null && source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
+            ? source with { IsWritable = false, ReadOnlyReason = readOnlyReason }
+            : source;
+
+    private static ConfigurationSourceChain WithMutationAuthority(ConfigurationSourceChain chain, string? readOnlyReason)
+        => readOnlyReason is null ? chain : chain with
+        {
+            Values = chain.Values.Select(value => value with
+            {
+                Source = WithMutationAuthority(value.Source, readOnlyReason)
+            }).ToArray()
+        };
 
     /// <summary>
     /// Gets one configuration definition.
@@ -539,61 +581,66 @@ public sealed class ConfigurationFacade(IServiceProvider services)
     /// <summary>
     /// Gets source contribution counts for one definition.
     /// </summary>
+    /// <remarks>Managed-store editability includes the current Manual publication and document authority.</remarks>
     /// <param name="definitionKey">The definition key.</param>
     /// <returns>Source contribution rows.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>> GetDefinitionSourceContributionsAsync(string definitionKey)
+    public async Task<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>> GetDefinitionSourceContributionsAsync(string definitionKey)
     {
         try
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetDefinitionContributions(definition)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Res.Ok<IReadOnlyList<ConfigurationDefinitionSourceContribution>>(
+                sourceInspector.GetDefinitionContributions(definition).Select(contribution => contribution with
+                {
+                    Source = WithMutationAuthority(contribution.Source, reason)
+                }).ToArray());
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>>(
-                Res.Fail($"Failed to get configuration source contributions: {ex.GetMessageRecursively()}"));
+            return Res.Fail($"Failed to get configuration source contributions: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>
     /// Gets the source chain for one configuration path.
     /// </summary>
+    /// <remarks>Managed-store editability includes the current Manual publication and document authority.</remarks>
     /// <param name="definitionKey">The definition key.</param>
     /// <param name="logicalPath">The logical path.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>The source chain.</returns>
-    public Task<Res<ConfigurationSourceChain>> GetSourceChainAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
+    public async Task<Res<ConfigurationSourceChain>> GetSourceChainAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
     {
         try
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<ConfigurationSourceChain>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetSourceChain(definition, logicalPath, includeSensitive)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Res.Ok(WithMutationAuthority(sourceInspector.GetSourceChain(definition, logicalPath, includeSensitive), reason));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<ConfigurationSourceChain>>(
-                Res.Fail($"Failed to get configuration source chain: {ex.GetMessageRecursively()}"));
+            return Res.Fail($"Failed to get configuration source chain: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>
     /// Gets source chains for several configuration paths from one runtime-provider snapshot.
     /// </summary>
+    /// <remarks>Managed-store editability is checked once for the definition against current Manual write authority.</remarks>
     /// <param name="definitionKey">The locally scanned definition key.</param>
     /// <param name="logicalPaths">The logical paths to inspect, in result order.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>One source chain for each requested path.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationSourceChain>>> GetSourceChainsAsync(
+    public async Task<Res<IReadOnlyList<ConfigurationSourceChain>>> GetSourceChainsAsync(
         string definitionKey,
         IReadOnlyList<LogicalPath> logicalPaths, bool includeSensitive = false)
     {
@@ -601,16 +648,16 @@ public sealed class ConfigurationFacade(IServiceProvider services)
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<IReadOnlyList<ConfigurationSourceChain>>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetSourceChains(definition, logicalPaths, includeSensitive)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Res.Ok<IReadOnlyList<ConfigurationSourceChain>>(sourceInspector.GetSourceChains(definition, logicalPaths, includeSensitive)
+                .Select(chain => WithMutationAuthority(chain, reason)).ToArray());
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationSourceChain>>>(
-                Res.Fail($"Failed to get configuration source chains: {ex.GetMessageRecursively()}"));
+            return Res.Fail($"Failed to get configuration source chains: {ex.GetMessageRecursively()}");
         }
     }
 
