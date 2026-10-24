@@ -16,8 +16,6 @@
     <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Roles.Ordering/Roles.Ordering.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Domains/Ordering/Roles.Ordering.Reporting/Roles.Ordering.Reporting.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
-    <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.BuildingBlocks/Platform.BuildingBlocks.csproj" />
-    <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Hosting/Platform.Hosting.csproj" />
     <Project Path="examples/Monica.ReferenceApplication/src/Shared/Platform.Protocol/Platform.Protocol.csproj" />
   </Folder>
   <Folder Name="/tests/Fixtures/">
@@ -64,6 +62,7 @@
     <Project Path="tests/Test.Monica.Authority/Test.Monica.Authority.csproj" />
     <Project Path="tests/Test.Monica.Profiling/Test.Monica.Profiling.csproj" />
     <Project Path="tests/Test.Monica.OpenTelemetry/Test.Monica.OpenTelemetry.csproj" />
+    <Project Path="tests/Test.Monica.Reference.Api/Test.Monica.Reference.Api.csproj" />
     <Project Path="tests/Test.Monica.Repository/Test.Monica.Repository.csproj" />
     <Project Path="tests/Test.Monica.ServiceDiscovery/Test.Monica.ServiceDiscovery.csproj" />
     <Project Path="tests/Test.Monica.SignalR/Test.Monica.SignalR.csproj" />

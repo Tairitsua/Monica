@@ -7,12 +7,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../../../../Monica.Application.UI/Monica.Application.UI.csproj" />
+    <ProjectReference Include="../../../../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
+    <ProjectReference Include="../../../../../Monica.Configuration/Monica.Configuration.csproj" />
     <ProjectReference Include="../../../../../Monica.Configuration.UI/Monica.Configuration.UI.csproj" />
+    <ProjectReference Include="../../../../../Monica.Core/Monica.Core.csproj" />
+    <ProjectReference Include="../../../../../Monica.EventBus/Monica.EventBus.csproj" />
     <ProjectReference Include="../../../../../Monica.Generators.AutoController/Monica.Generators.AutoController.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../Domains/Ordering/Domains.Ordering/Domains.Ordering.csproj" />
     <ProjectReference Include="../../Domains/Ordering/Roles.Ordering/Roles.Ordering.csproj" />
     <ProjectReference Include="../../Domains/Ordering/Roles.Ordering.Reporting/Roles.Ordering.Reporting.csproj" />
-    <ProjectReference Include="../../Shared/Platform.Hosting/Platform.Hosting.csproj" />
+    <ProjectReference Include="../../../../../Monica.HealthCheck/Monica.HealthCheck.csproj" />
+    <ProjectReference Include="../../../../../Monica.Invocation/Monica.Invocation.csproj" />
+    <ProjectReference Include="../../../../../Monica.OpenTelemetry/Monica.OpenTelemetry.csproj" />
+    <ProjectReference Include="../../../../../Monica.ProjectUnits/Monica.ProjectUnits.csproj" />
+    <ProjectReference Include="../../../../../Monica.Repository/Monica.Repository.csproj" />
+    <ProjectReference Include="../../../../../Monica.UI/Monica.UI.csproj" />
+    <ProjectReference Include="../../../../../Monica.WebApi/Monica.WebApi.csproj" />
     <ProjectReference Include="../../Presentation/Monica.Reference.UI/Monica.Reference.UI.csproj" />
   </ItemGroup>
 

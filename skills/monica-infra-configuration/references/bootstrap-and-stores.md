@@ -38,7 +38,7 @@ Global catalog reads include remote Managed definitions when a metadata store is
 
 ## Managed input plans
 
-`MonicaConfigurationInputPlan.Create` declares exactly one store composition, an optional section-path convention, and ordered managed JSON files. Creating the plan performs no store I/O. `AddConfiguration(plan)` applies its runtime half; the plan's path convention cannot be overridden later. For a host that does not need a startup options snapshot, the file store is a simple local choice:
+`MonicaConfigurationInputPlan.Create` declares exactly one store composition, an optional section-path convention, and ordered managed JSON files. Creating the plan performs no store I/O. `AddConfiguration(plan)` applies it to runtime services; the plan's path convention cannot be overridden later. The file store is a simple local choice:
 
 ```csharp
 var plan = MonicaConfigurationInputPlan.Create(inputs => inputs
@@ -48,18 +48,7 @@ var plan = MonicaConfigurationInputPlan.Create(inputs => inputs
 builder.AddMonica(monica => monica.AddConfiguration(plan));
 ```
 
-The existing managed snapshot API remains available for consumers that intentionally read managed state before composition. New deployment topology should use Startup ownership above. A managed snapshot and its runtime module must use the same input plan:
-
-```csharp
-using var bootstrap = plan.BuildBootstrapConfiguration(builder);
-var snapshot = plan.LoadEffectiveOptionsSnapshot(bootstrap, [typeof(OrdersOptions)]);
-var startupOrders = snapshot.Get<OrdersOptions>();
-builder.AddMonica(monica => monica.AddConfiguration(plan));
-```
-
-Use `startupOrders` while composing host services or modules; the async snapshot variant is available for async startup. The bootstrap root is caller-owned and disposed here. The read uses the host's current configuration, then the plan's managed JSON files in declaration order; later files have higher precedence. It overlays effective values from the selected store without writing definitions or values. Treat it as a point-in-time read: runtime activation or another writer may later change the store. Keep topology-driving options static after startup or require restart. See [options and validation](options-and-validation.md) for declaring `OrdersOptions` and its binding path.
-
-Bootstrap snapshots share production managed binding: configuration aliases, constructor defaults, missing versus explicit null, empty containers, and provider array-index precedence are preserved. They do **not** run `IValidatableObject` rules, adopt `RuntimeValidationBehavior`, apply consumer Configure/PostConfigure callbacks, publish runtime diagnostics, or observe actual-options attempts. Successful snapshot binding is not a complete validation report. Validate topology requirements explicitly in the owning startup code when necessary; runtime FailFast is not an earlier bootstrap gate.
+Composition reads Startup owners through `GetStartupOptions<T>()`. Managed owners are consumed after DI is available; they must not select providers, connections or process topology. Existing consumers of the legacy `BuildBootstrapConfiguration` / `LoadEffectiveOptionsSnapshot` APIs must first classify their settings and move every composition input to Startup. Those APIs remain temporarily available during consumer migration; they are not part of the application template. Their point-in-time store overlay does not perform complete object validation and must not be treated as Startup authority.
 
 `AddManagedJsonFile` resolves paths from the host content root and defaults to `optional: true`, `reloadOnChange: true` at runtime. Bootstrap and startup-snapshot reads do not watch files. Avoid adding the same managed JSON path twice.
 

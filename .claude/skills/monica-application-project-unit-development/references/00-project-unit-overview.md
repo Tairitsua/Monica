@@ -14,7 +14,7 @@ The current runtime and source discovery implementations recognize the following
 | `DomainEvent` | `DomainEvent` | `Event*` | An application fact or shared notification contract worth publishing or reacting to |
 | `DomainEventHandler` | `DomainEventHandler<TEvent>` | `DomainEventHandler*` | React to distributed events |
 | `LocalEventHandler` | `LocalEventHandler<TEvent>` | `LocalEventHandler*` | React to in-process events |
-| `Configuration` | `[Configuration]` class | `*Options` | Typed runtime configuration |
+| `Configuration` | `[Configuration]` class | `Options*` | Typed deployment-owned Startup or runtime Managed settings |
 | `RecurringJob` | `RecurringJob` | `Worker*` | Scheduled background work |
 | `TriggeredJob` | `TriggeredJob<TArgs>` | `Job*` | On-demand asynchronous work |
 | `CrudApplicationService` | `ApplicationService` plus `ICrudApplicationService`, normally native `CrudApplicationService<...>` | Project convention; configured CRUD suffix is a route aid | Bounded persistence-facing CRUD adapter |

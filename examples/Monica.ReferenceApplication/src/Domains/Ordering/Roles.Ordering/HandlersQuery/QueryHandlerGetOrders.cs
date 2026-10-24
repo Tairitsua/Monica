@@ -14,7 +14,7 @@ namespace Roles.Ordering.HandlersQuery;
 /// </summary>
 public sealed class QueryHandlerGetOrders(
     IRepositoryOrder repository,
-    IOptions<OrderingOptions> options)
+    IOptions<OptionsOrdering> options)
     : ApplicationService<QueryGetOrders, IReadOnlyList<OrderDto>>
 {
     /// <summary>

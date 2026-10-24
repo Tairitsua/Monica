@@ -5,7 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Platform.BuildingBlocks/Platform.BuildingBlocks.csproj" />
+    <ProjectReference Include="../../../../../Monica.Application/Monica.Application.csproj" />
+    <ProjectReference Include="../../../../../Monica.EventBus/Monica.EventBus.csproj" />
     <ProjectReference Include="../../../../../Monica.Generators.AutoController/Monica.Generators.AutoController.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />

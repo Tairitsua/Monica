@@ -10,7 +10,6 @@ public sealed class RoleRegistration : ApplicationRegistration
     public override void ConfigureActive(ApplicationRegistrationContext context)
     {
         context.Monica.AddJobScheduler(options => options.MaxWorkerExecutionThreads = 1)
-            .UseInMemoryStore()
-            .UseSchedulerScope("monica-reference-ordering");
+            .UseInMemoryStore();
     }
 }

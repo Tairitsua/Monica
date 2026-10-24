@@ -12,7 +12,7 @@ namespace Domains.Ordering.Configurations;
     DisplayName = "Ordering",
     Description = "Runtime limits and reporting thresholds for the ordering bounded context.",
     Category = "Ordering")]
-public sealed class OrderingOptions
+public sealed class OptionsOrdering
 {
     /// <summary>
     /// Gets or sets the maximum number of orders returned by the collection query.

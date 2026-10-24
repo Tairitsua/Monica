@@ -12,10 +12,10 @@ namespace Monica.Reference.Api.Configurations;
     DisplayName = "Reference host diagnostics",
     Description = "Diagnostic module selection is fixed until the host restarts.",
     Category = "Host")]
-public sealed class ReferenceUIOptions
+public sealed class OptionsReferenceUI
 {
     /// <summary>
-    /// Gets or sets whether the host composes the module and configuration diagnostic pages.
+    /// Gets or sets whether the host composes Swagger, module diagnostics and configuration diagnostics.
     /// Defaults to false; changing a source requires restarting the host.
     /// </summary>
     public bool EnableDiagnostics { get; set; }

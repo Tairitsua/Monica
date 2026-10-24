@@ -4,5 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Domains.Ordering/Domains.Ordering.csproj" />
+    <ProjectReference Include="../../../../../../Monica.Application/Monica.Application.csproj" />
+    <ProjectReference Include="../../../../../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
+    <ProjectReference Include="../../../../../../Monica.EventBus/Monica.EventBus.csproj" />
+    <ProjectReference Include="../../../../../../Monica.WebApi/Monica.WebApi.csproj" />
   </ItemGroup>
 </Project>

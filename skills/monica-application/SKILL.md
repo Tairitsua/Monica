@@ -16,6 +16,7 @@ Read [specification evolution](references/01-specification-evolution.md) when a 
 - Exact Monica framework source needed outside the active checkout: use `$monica-guide source resolve --repository monica --json` as a read-only locator.
 - Split role placement or migration from existing service hosts: use `$monica-application-microservice`.
 - Combined role placement or migration from merged monolith projects: use `$monica-application-modular-monolith`.
+- Startup versus managed settings, environment-file selection, or the local Manual profile: read [startup and local execution](references/04-startup-and-local-execution.md).
 - Feature implementation or review of handlers, entities, repositories, events, jobs, seeders, host services, CRUD adapters, controllers, Facades, and other support types: use `$monica-application-project-unit-development`.
 - Sociable application tests, `MonicaTestApplicationFactory`, handler or repository scenarios, database isolation, and migration away from mock-heavy tests: use `$monica-application-unit-testing`.
 - Consumer setup and use of Monica infrastructure: route to `$monica-infra-persistence`, `$monica-infra-messaging`, `$monica-infra-jobs`, `$monica-infra-configuration`, `$monica-infra-hosting`, `$monica-infra-observability`, `$monica-infra-ai`, `$monica-infra-web`, or `$monica-infra-ui` for the capability in use.

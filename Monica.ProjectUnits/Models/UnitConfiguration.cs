@@ -76,7 +76,7 @@ public class UnitConfiguration : ProjectUnit
     {
         return new ProjectUnitNamingRule
         {
-            Postfix = "Options"
+            Prefix = "Options"
         };
     }
 

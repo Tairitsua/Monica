@@ -15,11 +15,13 @@ These conventions mirror the current `Monica.ProjectUnits` naming diagnostics. C
 | `DomainEventHandler` | Class name starts with `DomainEventHandler` | `DomainEventHandler*` |
 | `LocalEventHandler` | Class name starts with `LocalEventHandler` | `LocalEventHandler*` |
 | `Entity` | Namespace contains `Entities` | Place under `Entities/` |
-| `Configuration` | Class name ends with `Options` | `*Options` |
+| `Configuration` | Class name starts with `Options` | `Options{Purpose}` |
 | `RecurringJob` | Class name starts with `Worker` | `Worker*` |
 | `TriggeredJob` | Class name starts with `Job` | `Job*` |
 | `HostedService` | No native naming diagnostic | `{Purpose}HostedService` for resource lifecycle; `{Purpose}BackgroundService` for a continuous loop |
 | `RequestDto` | Implements `IResultRequest<T>` or `IResultRequest` | Prefer `Command*`, `Query*`, or `Request*` |
+
+Naming checks are disabled until the host enables `ConventionOptions.EnableNameConvention`. A rule inherits the global `NameConventionMode` unless it explicitly overrides that mode; Strict rejects violations and Warning retains a diagnostic. The Options prefix applies to application-authored `[Configuration]` ProjectUnits of both Startup and Managed kinds, not Monica/Microsoft option types. Preserve issued section paths and definition keys when renaming a Managed type; see the [configuration template](16-configuration-template.md).
 
 ## Source File Names
 
@@ -70,12 +72,15 @@ Inject the dependencies a concrete unit actually uses. Do not create a common se
 
 | Responsibility | Existing owner |
 | --- | --- |
-| Project-common reusable implementation, including technical extensions | `Platform.BuildingBlocks`, in a folder named for the capability |
+| Product-specific technical code on Monica reused by multiple domain/role owners | `Platform.Infrastructure`, in a folder named for the capability |
+| A standalone product-independent and Monica-independent helper library | Optional `Platform.BuildingBlocks` |
 | Shared business language and published contracts | `Platform.Protocol/PublishedLanguages` |
-| Host composition, registration, and solution integration wiring | `Platform.Hosting` |
+| Whole-host modules/providers, UI shell, middleware and endpoints | The executable's `Composition/` folder |
+| Passive and active registration of one domain or role | Its assembly-owned `ApplicationRegistration` |
+| Shared test factories and doubles, without test cases | Optional `Platform.Testing` |
 | A domain's repository, adapter, or other implementation | The owning domain core or role library |
 
-Preserve the chosen solution's dependency chain. A shared implementation that consumes Protocol contracts must live where that direction allows it; BuildingBlocks cannot reference Protocol or a concrete domain. Technical dependencies do not make BuildingBlocks a pure domain kernel, and do not justify moving a domain-owned repository into Platform. Capability folders for shared extensions do not change the domain's `Repository/` placement.
+Preserve the [shared dependency direction](../../monica-application/references/03-unified-architecture.md#physical-ownership). BuildingBlocks references no Monica or other Platform project. Infrastructure may consume Protocol but not domain cores, roles or hosts. Protocol holds published shapes and identifiers, without options, provider/UI composition or copied environment files. A single-consumer implementation stays with its owner, and broadly reusable Monica mechanisms belong upstream. Capability folders for shared extensions do not change the domain's `Repository/` placement.
 
 An EF specialization such as `{Product}EfRepository` and its wide adapter contract describe infrastructure access. Handlers, jobs, and domain services consume the narrow domain repository interface. Only a persistence-facing CRUD adapter in an approved/adopted adapter pattern may consume the concrete implementation or EF contract under the [repository template](13-repository-and-persistence-template.md). A new concrete endpoint in that family is ordinary implementation; the exception does not authorize a new family or general concrete injection. The same implementation serves both views; do not add a forwarding repository layer.
 
@@ -97,6 +102,7 @@ Use one domain-core/role layout in combined and split deployments. Keep leaf fol
 | Repository implementation, DbContext and EF mapping | `Domains/{Domain}/Domains.{Domain}/Repository/` |
 | Shared domain options | The domain core's `Configurations/` |
 | Role-local integration options | The owning role's `Configurations/` |
+| Whole-host options | The host's `Configurations/`, consumed by its `Composition/` |
 | Published request, DTO and event | `Shared/Platform.Protocol/PublishedLanguages/Domain{Domain}/{Requests,Models,Events}/` |
 | Pure helper | The owning core or role's `Utilities/` |
 | Real migrations and snapshots | Top-level `Migrations/Migrations.Domain{Domain}/` |

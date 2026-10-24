@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
@@ -30,7 +31,8 @@ internal static class SwaggerGenOptionConfigurator
         options.AddEnumDocumentation();
 
         // Pitfall: this API guards the visibility toggle in the Swagger UI's top-right group picker, and if omitted ABP (and our CrudAutoController-generated endpoints) will hide every controller.
-        options.DocInclusionPredicate(documentCatalog.ShouldInclude);
+        Func<string, ApiDescription, bool> routing = documentCatalog.ShouldInclude;
+        options.DocInclusionPredicate(routing);
 
         // https://github.com/swagger-api/swagger-ui/issues/7911
         // https://github.com/microsoftgraph/msgraph-beta-sdk-dotnet/issues/285
@@ -48,6 +50,15 @@ internal static class SwaggerGenOptionConfigurator
         }
 
         option.ExtendSwaggerGenAction?.Invoke(options);
+        SwaggerDocumentCatalog.ValidateDocumentNames(options.SwaggerGeneratorOptions.SwaggerDocs.Keys);
+        var customizedPredicate = options.SwaggerGeneratorOptions.DocInclusionPredicate;
+        if (!ReferenceEquals(customizedPredicate, routing))
+        {
+            // Host filters can narrow native documents, but must not mix role ownership across them. Documents
+            // registered directly by the host remain outside Monica's routing and keep the host predicate.
+            options.DocInclusionPredicate((documentName, description) =>
+                routing(documentName, description) && customizedPredicate(documentName, description));
+        }
     }
 
     private static void ConfigureDocuments(

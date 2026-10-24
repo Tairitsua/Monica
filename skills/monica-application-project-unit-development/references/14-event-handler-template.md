@@ -19,6 +19,7 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 - Place handlers in `HandlersEvent/`.
 - Use the [naming and boundary rules](01-project-unit-naming-and-boundaries.md) for every application consumer, including consumers marked `[Inbox]`; delivery attributes do not replace its ProjectUnit base, prefix, or metadata.
 - Choose the execution boundary using [transactional events](../../monica-infra-persistence/references/transactional-events.md). Repository `IDomainEventHandler<TEvent>` handles before-commit effects in the publisher's scope; it is a different contract from these EventBus handler bases.
+- Put external subscription entry points in their actual owning role and keep reusable domain reactions passive. Manual mode holds distributed consumption while preserving ordinary local reactions; use the native [targeted test-event operation](../../monica-infra-messaging/references/event-bus.md#manual-delivery-and-held-subscriptions) rather than activating a broker subscription for a local test.
 
 ## Distributed Handler Example
 

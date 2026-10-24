@@ -36,6 +36,8 @@ public sealed class LedgerCrudService : ICrudApplicationService
     public Res<int> Get() => Res.Ok(43);
 }
 
+public sealed class InheritedLedgerCrudService : SharedCrudServiceBase, ICrudApplicationService;
+
 [ApiController, Route("role-owned/manual")]
 public sealed class RoleOwnedController : ControllerBase
 {

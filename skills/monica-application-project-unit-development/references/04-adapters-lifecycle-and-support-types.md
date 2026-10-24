@@ -12,7 +12,7 @@ Use the project's adopted CRUD naming convention. `CrudControllerOption.CrudCont
 
 ## Startup Seeder
 
-Use `ISeeder`, normally `SeederBase`, for finite, idempotent startup preparation with dependency/readiness ordering. It is a discovered `Seeder`; the framework imposes no prefix convention. Place domain startup preparation in its owning role and solution-wide preparation in the existing solution infrastructure boundary. The application model selects role-owned seeders before the dependency graph is validated. A selected seeder depending on an inactive seeder fails startup; keep its prerequisites in the same deployment or redesign that dependency. Keep domain writes through their owning repositories and the established execution scope.
+Use `ISeeder`, normally `SeederBase`, for finite, idempotent preparation with dependency/readiness ordering. It is a discovered `Seeder`; the framework imposes no prefix convention. Place work with its domain or role owner; a core's autonomous work uses its declared same-domain BackgroundRole. The graph retains Manual/Held and Disabled definitions for diagnosis. Manual execution runs the selected target and its unsatisfied eligible prerequisites; Disabled prerequisites reject admission. A finite process-memory initializer needed by included passive behavior may use ProcessLocal, but cannot automatically start a held dependency. Keep domain writes through their owning repositories and the established execution scope.
 
 Use [startup seeding](../../monica-infra-jobs/references/startup-seeding.md) for registration, dependencies, policy, retries, and readiness. A repeating task is a recurring job; a perpetual connection or listener is a hosted service. Do not build a second startup coordinator.
 

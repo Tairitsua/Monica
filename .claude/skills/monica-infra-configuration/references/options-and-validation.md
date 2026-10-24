@@ -22,7 +22,7 @@ using Monica.Configuration.Models;
 
 [Configuration("Orders", DefinitionKey = "orders",
     ReloadBehavior = ConfigurationReloadBehavior.RequiresRestart)]
-public sealed class OrdersOptions : IValidatableObject
+public sealed class OptionsOrders : IValidatableObject
 {
     [ConfigurationKeyName("minimum"), Range(1, 1000)]
     public int MinimumBatchSize { get; set; } = 10;
@@ -110,7 +110,7 @@ using Microsoft.Extensions.Options;
 using Monica.Configuration.Abstractions;
 
 public sealed class OrdersStartupGate(
-    IOptions<OrdersOptions> options,
+    IOptions<OptionsOrders> options,
     IConfigurationOptionsInstanceValidationService validation)
 {
     public void EnsureValid()
@@ -120,7 +120,7 @@ public sealed class OrdersStartupGate(
         {
             throw new OptionsValidationException(
                 Options.DefaultName,
-                typeof(OrdersOptions),
+                typeof(OptionsOrders),
                 report.Issues.Select(issue => issue.Problem));
         }
     }

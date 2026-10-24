@@ -1,7 +1,11 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
+using Monica.ApplicationModel.Abstractions;
+using Monica.ApplicationModel.Annotations;
 using Monica.Core;
 using Monica.Core.Modularity.Models;
 using Monica.Modules;
@@ -20,6 +24,8 @@ internal sealed class SwaggerDocumentCatalog
 
     private readonly ModuleSwaggerOption _option;
     private readonly IMonicaApplicationOptions _application;
+    private readonly IApplicationModel? _model;
+    private readonly IReadOnlyDictionary<string, string> _roleDocumentNames;
     private readonly ILogger? _logger;
     private readonly ConcurrentDictionary<string, byte> _unknownResolverDocumentNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly SwaggerDocumentDefinition _businessDocument;
@@ -29,11 +35,17 @@ internal sealed class SwaggerDocumentCatalog
     public SwaggerDocumentCatalog(
         ModuleSwaggerOption option,
         IMonicaApplicationOptions application,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IApplicationModel? model = null)
     {
         _option = option;
         _application = application;
         _logger = logger;
+        _model = model;
+        _roleDocumentNames = model is null ? new Dictionary<string, string>(StringComparer.Ordinal) : model.Roles.Values
+            .Where(role => model.IsRoleAvailable(role.Id) && model.IsRoleActive(role.Id))
+            .OrderBy(role => role.Id, StringComparer.Ordinal)
+            .ToDictionary(role => role.Id, role => $"role.{role.Id}", StringComparer.Ordinal);
         (_businessDocument, _documents) = BuildDocuments();
         _documentsByName = _documents.ToDictionary(document => document.Name, StringComparer.OrdinalIgnoreCase);
     }
@@ -70,14 +82,31 @@ internal sealed class SwaggerDocumentCatalog
             return groupedDocumentName;
         }
 
-        if (_option.Monica.Enabled
-            && IsMonicaEndpoint(description)
-            && TryGetRegisteredDocumentName(_option.Monica.Name, out var monicaDocumentName))
+        if (IsMonicaEndpoint(description))
         {
-            return monicaDocumentName;
+            return _option.Monica.Enabled && TryGetRegisteredDocumentName(_option.Monica.Name, out var monicaDocumentName)
+                ? monicaDocumentName : _businessDocument.Name;
         }
 
+        if (ResolveRole(description) is { } roleId && _roleDocumentNames.TryGetValue(roleId, out var roleDocumentName))
+            return roleDocumentName;
+
         return _businessDocument.Name;
+    }
+
+    private string? ResolveRole(ApiDescription description)
+    {
+        if (_model is null) return null;
+        var controller = description.ActionDescriptor as ControllerActionDescriptor;
+        var receiver = description.ActionDescriptor.EndpointMetadata.OfType<ApplicationApiReceiverAttribute>().SingleOrDefault()
+            ?? controller?.MethodInfo.GetCustomAttribute<ApplicationApiReceiverAttribute>();
+        if (receiver is not null) return _model.GetOperation(receiver.RequestType).RoleId;
+
+        // CRUD actions can inherit framework methods. The concrete controller, not the method's declaring type,
+        // owns their application role. Minimal handlers use their actual method metadata when available.
+        var assembly = controller?.ControllerTypeInfo.Assembly
+            ?? description.ActionDescriptor.EndpointMetadata.OfType<MethodInfo>().LastOrDefault()?.DeclaringType?.Assembly;
+        return assembly is null ? null : _model.FindRole(assembly)?.Id;
     }
 
     public bool ShouldInclude(string docName, ApiDescription description)
@@ -111,6 +140,9 @@ internal sealed class SwaggerDocumentCatalog
                 NormalizeOptional(_option.Monica.Description)));
         }
 
+        foreach (var (roleId, documentName) in _roleDocumentNames)
+            documents.Add(new SwaggerDocumentDefinition(documentName, roleId, null));
+
         foreach (var descriptor in _option.AdditionalDocuments)
         {
             ArgumentNullException.ThrowIfNull(descriptor);
@@ -122,7 +154,7 @@ internal sealed class SwaggerDocumentCatalog
                 NormalizeOptional(descriptor.Description)));
         }
 
-        ValidateDocumentNames(documents);
+        ValidateDocumentNames(documents.Select(document => document.Name));
         return (businessDocument, documents);
     }
 
@@ -208,10 +240,10 @@ internal sealed class SwaggerDocumentCatalog
             metadata is MonicaMinimalApiMetadata or MonicaEndpointMetadata);
     }
 
-    private static void ValidateDocumentNames(IReadOnlyList<SwaggerDocumentDefinition> documents)
+    internal static void ValidateDocumentNames(IEnumerable<string> documentNames)
     {
-        var duplicateNames = documents
-            .GroupBy(document => document.Name, StringComparer.OrdinalIgnoreCase)
+        var duplicateNames = documentNames
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key)
             .ToList();

@@ -11,6 +11,7 @@ src/
 ├── AppHost/Product.Web/
 │   ├── Product.Web.csproj
 │   ├── Program.cs
+│   ├── Composition/              # Host module/provider and UI-shell choices
 │   └── App.razor                 # Optional host-owned document root
 ├── Presentation/Product.UI/
 │   ├── Product.UI.csproj         # Razor class library
@@ -26,10 +27,11 @@ src/
 │   └── wwwroot/
 ├── Domains/                     # Domain cores and domain-owned role libraries
 └── Shared/
-    ├── Platform.Hosting/
+    ├── Platform.Infrastructure/ # Only when product technical code has shared owners
     ├── Platform.Protocol/
     │   └── PublishedLanguages/DomainDelivery/{Requests,Models}/
-    └── Platform.BuildingBlocks/
+    ├── Platform.BuildingBlocks/ # Optional independent helpers
+    └── Platform.Testing/        # Optional shared test support
 ```
 
 Create only useful folders. Host names are illustrative; an existing executable need not be renamed. A thin document/router is host composition. Product layout, navigation, pages and state belong in the presentation library. Modules are optional infrastructure composition mechanisms, never prerequisites for business pages. A host with no `.razor` files must set `RequiresAspNetWebAssets` to `true` to include the Blazor startup script; see [host composition](../../monica-infra-ui/references/application-hosting.md).
@@ -40,9 +42,9 @@ Create only useful folders. Host names are illustrative; an existing executable 
 | Presentation | Platform.Protocol and selected Monica UI/component packages |
 | Backend projects | The unified domain/role dependency graph |
 
-The explicit new edges are `AppHost -> Presentation` and `Presentation -> Platform.Protocol`. Presentation must not reference `Domains.*`, `Roles.*`, backend service implementations, or `Platform.Hosting`. Backend projects must not reference presentation. Public CLR visibility does not authorize consuming entities, DbContexts, repositories or handler implementations from UI.
+The explicit new edges are `AppHost -> Presentation` and `Presentation -> Platform.Protocol`. Presentation must not reference `Domains.*`, `Roles.*`, backend Infrastructure implementations, or host composition. Backend projects must not reference presentation. Public CLR visibility does not authorize consuming entities, DbContexts, repositories or handler implementations from UI. Protocol carries contracts without provider/UI registration or environment files; whole-host UI choices remain in Composition.
 
-Backend shared-project closures can include server libraries. This first profile therefore does not claim WebAssembly compatibility. A browser client requires a separate compatible contract closure or generated DTO/client boundary. A separate server UI uses published HTTP APIs; it does not load remote backend implementations. Do not add a BFF, client-abstraction project or independent deployment without an actual consumer need.
+The Interactive Server profile does not establish WebAssembly compatibility for every published contract dependency. A browser client requires a compatible contract closure or generated DTO/client boundary. A separate server UI uses published HTTP APIs; it does not load remote backend implementations. Do not add a BFF, client-abstraction project or independent deployment without an actual consumer need.
 
 ## Ownership
 

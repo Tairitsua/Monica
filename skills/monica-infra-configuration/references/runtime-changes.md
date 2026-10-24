@@ -10,7 +10,7 @@ The source-chain dialog separates the frozen startup contributors from the curre
 
 ## Find the winning source
 
-Use `GetDefinitionsAsync()` to discover definition keys or `GetDefinitionStateAsync(definitionKey)` for a schema, effective document version, and display-safe values. A definition key is [distinct from its binding section](options-and-validation.md). Source inspection is local to scanned definitions. For the aliased Orders example, `GetSourceChainAsync("orders", LogicalPath.FromProperties("minimum"))` returns contributions in priority order and marks the effective source. Use configuration aliases in paths, not `nameof(OrdersOptions.MinimumBatchSize)`.
+Use `GetDefinitionsAsync()` to discover definition keys or `GetDefinitionStateAsync(definitionKey)` for a schema, effective document version, and display-safe values. A definition key is [distinct from its binding section](options-and-validation.md). Source inspection is local to scanned definitions. For the aliased Orders example, `GetSourceChainAsync("orders", LogicalPath.FromProperties("minimum"))` returns contributions in priority order and marks the effective source. Use configuration aliases in paths, not `nameof(OptionsOrders.MinimumBatchSize)`.
 
 `GetConfigurationSourcesAsync()` and `GetConfigurationSourceInventoriesAsync()` expose the runtime stack; inventory includes unmanaged host values by default. Sensitive display values are redacted. A lower-priority edit may be masked and leave the effective value unchanged. For external JSON targets, read `GetSourceRevisionAsync(sourceKey)` before staging a write.
 

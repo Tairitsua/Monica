@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Domains.Ordering/Domains.Ordering.csproj" />
+    <ProjectReference Include="../../../../../../Monica.Application/Monica.Application.csproj" />
+    <ProjectReference Include="../../../../../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
     <ProjectReference Include="../../../../../../Monica.JobScheduler/Monica.JobScheduler.csproj" />
   </ItemGroup>
 </Project>

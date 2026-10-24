@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Test.Monica.Reference.Api</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Monica.Reference.Api.csproj" />
+    <ProjectReference Include="../../Monica.Testing/Monica.Testing.csproj" />
+    <None Include="../../examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/appsettings.json"
+          Link="reference-appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

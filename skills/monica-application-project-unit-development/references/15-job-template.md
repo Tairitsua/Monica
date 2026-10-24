@@ -15,6 +15,7 @@
 - Inject `ILogger<TConcreteJob>` and pass it to the job base constructor.
 - Use `$ApplicationNamespace$` for the application-layer namespace chosen by the architecture skill.
 - Place jobs in `BackgroundWorkers/`.
+- Use the owning role and the shared [local execution profile](../../monica-application/references/04-startup-and-local-execution.md) for activation. Manual jobs retain native explicit execution in a fresh local store; do not add compile-symbol checks, another debug-mode switch, or a separate local job runner.
 
 ## RecurringJob Example
 

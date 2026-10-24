@@ -9,3 +9,8 @@ public enum DomainId { Ordering }
 public sealed class DomainDeclaration;
 [ProcessLocal]
 public sealed class DomainLocalInitialization;
+
+public abstract class SharedCrudServiceBase
+{
+    public int Get() => 44;
+}

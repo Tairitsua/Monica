@@ -35,6 +35,64 @@ namespace Test.Monica.ProjectUnits;
 
 public sealed class ProjectUnitCatalogTests
 {
+    [Theory]
+    [InlineData(typeof(OptionsManagedNaming), "issued-managed-options")]
+    [InlineData(typeof(OptionsStartupNaming), "issued-startup-options")]
+    public void ConfigurationNaming_WhenPrefixed_ShouldPassGlobalStrictAndPreserveDefinitionIdentity(Type type, string definitionKey)
+    {
+        var catalog = CreateNamingCatalog(type, ENameConventionMode.Strict);
+
+        var unit = Assert.IsType<UnitConfiguration>(catalog.FindByFullName(type.FullName));
+        Assert.Equal(definitionKey, unit.DefinitionKey);
+        Assert.DoesNotContain(unit.Alerts, alert => alert.Source == "NamingConvention");
+    }
+
+    [Theory]
+    [InlineData(typeof(LegacyNamingOptions), "Prefix: Options")]
+    [InlineData(typeof(DependencyDomainService), "Prefix: Domain")]
+    public void DefaultNamingRule_WhenGlobalStrict_ShouldRejectInvalidName(Type type, string expectedRule)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => CreateNamingCatalog(type, ENameConventionMode.Strict));
+
+        Assert.Contains(expectedRule, exception.Message);
+    }
+
+    [Fact]
+    public void ConfigurationNaming_WhenGlobalWarning_ShouldRetainUnitWithPrefixDiagnostic()
+    {
+        var catalog = CreateNamingCatalog(typeof(LegacyNamingOptions), ENameConventionMode.Warning);
+
+        var unit = Assert.IsType<UnitConfiguration>(catalog.FindByFullName(typeof(LegacyNamingOptions).FullName));
+        var alert = Assert.Single(unit.Alerts, item => item.Source == "NamingConvention");
+        Assert.Equal(EAlertLevel.Warning, alert.Level);
+        Assert.Contains("Prefix: Options", alert.Message);
+    }
+
+    [Fact]
+    public void ConfigurationNaming_WhenCategoryOverridesGlobalMode_ShouldUseExplicitRule()
+    {
+        var rule = new ProjectUnitNamingRule { Prefix = "Options", NameConventionMode = ENameConventionMode.Warning };
+        var catalog = CreateNamingCatalog(typeof(LegacyNamingOptions), ENameConventionMode.Strict, rule);
+
+        var unit = Assert.IsType<UnitConfiguration>(catalog.FindByFullName(typeof(LegacyNamingOptions).FullName));
+        Assert.Equal(EAlertLevel.Warning, Assert.Single(unit.Alerts, alert => alert.Source == "NamingConvention").Level);
+
+        rule = new ProjectUnitNamingRule { Postfix = "Options" };
+        var overridden = CreateNamingCatalog(typeof(LegacyNamingOptions), ENameConventionMode.Strict, rule);
+        Assert.DoesNotContain(overridden.GetAllUnits().Single().Alerts, alert => alert.Source == "NamingConvention");
+        Assert.Throws<InvalidOperationException>(() => CreateNamingCatalog(typeof(OptionsManagedNaming), ENameConventionMode.Strict, rule));
+    }
+
+    [Theory]
+    [InlineData(false, ENameConventionMode.Strict)]
+    [InlineData(true, ENameConventionMode.Disable)]
+    public void ConfigurationNaming_WhenValidationDisabled_ShouldRetainLegacyNameWithoutAlert(bool enabled, ENameConventionMode mode)
+    {
+        var catalog = CreateNamingCatalog(typeof(LegacyNamingOptions), mode, enabled: enabled);
+
+        Assert.DoesNotContain(catalog.GetAllUnits().Single().Alerts, alert => alert.Source == "NamingConvention");
+    }
+
     [Fact]
     public void Discovery_WhenHandlersCloseDiscoveredGenericEvents_ShouldLinkEachExactPayloadOnce()
     {
@@ -387,6 +445,18 @@ public sealed class ProjectUnitCatalogTests
         return catalog;
     }
 
+    private static ProjectUnitCatalog CreateNamingCatalog(Type type, ENameConventionMode mode,
+        ProjectUnitNamingRule? configurationRule = null, bool enabled = true)
+    {
+        var options = new ModuleProjectUnitsOption();
+        options.ConventionOptions.EnableNameConvention = enabled;
+        options.ConventionOptions.NameConventionMode = mode;
+        if (configurationRule is not null)
+            options.ConventionOptions.Dict[EProjectUnitType.Configuration] = configurationRule;
+        return ProjectUnitCatalog.CreateAnalyzed(options, options.ConventionOptions,
+            NullLogger<ProjectUnitCatalog>.Instance, [CreateShape(type)], configurationDefinitionRegistry: null);
+    }
+
     private static BusinessTypeShape CreateShape(Type type)
     {
         return (BusinessTypeShape)(Activator.CreateInstance(
@@ -546,6 +616,15 @@ public sealed class ProjectUnitCatalogTests
     [Configuration(Description = "Configuration fallback.")]
     [ProjectUnitMetadata("All description sources", Description = "Metadata wins.")]
     public sealed class AllDescriptionSourcesOptions;
+
+    [Configuration("Naming:Managed", DefinitionKey = "issued-managed-options")]
+    public sealed class OptionsManagedNaming;
+
+    [Configuration("Naming:Startup", Kind = ConfigurationKind.Startup, DefinitionKey = "issued-startup-options")]
+    public sealed class OptionsStartupNaming;
+
+    [Configuration("Naming:Legacy")]
+    public sealed class LegacyNamingOptions;
 
     [Configuration(Description = "Configuration wins.")]
     public sealed class ConfigurationDescriptionOptions;

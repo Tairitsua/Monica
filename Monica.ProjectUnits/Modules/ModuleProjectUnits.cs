@@ -366,9 +366,9 @@ public class ProjectUnitNamingRule
     public string? NamespaceContains { get; set; }
 
     /// <summary>
-    /// Gets or sets the violation behavior for this rule, or <see langword="null"/> to use the global behavior.
+    /// Gets or sets the violation behavior for this rule. The default is <see langword="null"/>, which uses the global behavior.
     /// </summary>
-    public ENameConventionMode? NameConventionMode { get; set; } = ENameConventionMode.Warning;
+    public ENameConventionMode? NameConventionMode { get; set; }
 
     public override string ToString()
     {

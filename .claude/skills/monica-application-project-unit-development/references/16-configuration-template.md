@@ -1,73 +1,81 @@
 # Configuration Template
 
-Use `$DomainNamespace$` for the domain project namespace selected by the architecture skill, such as `Domains.Ordering`.
+Use a Configuration ProjectUnit for actual configurable behavior. Name the application-authored type `Options{Purpose}` and its file `Options{Purpose}.cs`; Monica and Microsoft option types retain their native names. Keep options narrow and beside the consuming domain, role, reusable infrastructure capability or host. Protocol contains no configuration definitions.
 
-## Use When
+## Select ownership before the accessor
 
-- A feature needs host-provided runtime configuration.
-- Consumers should receive typed options through dependency injection.
+- Use `ConfigurationKind.Startup` for values read during composition or selecting connections, providers, endpoints and process/site identity. Declare an explicit section path. Values come from standard host configuration and remain frozen until restart.
+- Managed is the default for business settings consumed after DI. Its store and declared reload behavior control changes. A business setting can remain Managed even when applying a change requires restart.
+- Runtime consumers use the appropriate `IOptions<T>`, `IOptionsSnapshot<T>` or `IOptionsMonitor<T>`. Those default-name interfaces all return the same frozen object for Startup; the accessor does not determine configuration ownership.
+- Composition reads only Startup options through `GetStartupOptions<T>()` on its Monica builder or registration context. Do not resolve options from a temporary service provider or use a managed store as startup authority.
 
-## Rules
+Use the shared [startup and local execution contract](../../monica-application/references/04-startup-and-local-execution.md) for environment files and local profiles. The infrastructure [options reference](../../monica-infra-configuration/references/options-and-validation.md) owns binding, validation, sensitive values and reload semantics.
 
-- Mark the class with `[Configuration]`.
-- End the class name with `Options`.
-- Use `IOptions<T>` for mostly static configuration.
-- Use `IOptionsSnapshot<T>` for per-scope refreshed values.
-- Use `IOptionsMonitor<T>` for long-lived services that react to changes.
-- Use `$monica-infra-configuration` for module registration and bootstrap/runtime boundaries.
+## Managed business settings
 
-## Options Class Example
+This example belongs in `Domains.Ordering/Configurations/OptionsOrderProcessing.cs` and uses stable explicit identities. Add only applicable actual requirement annotations under the [metadata rules](03-project-unit-context-metadata.md).
 
 ```csharp
+using System.ComponentModel.DataAnnotations;
 using Monica.Configuration.Annotations;
+using Monica.Configuration.Models;
 using Monica.ProjectUnits.Annotations;
 
-namespace $DomainNamespace$.Configurations;
+namespace Domains.Ordering.Configurations;
 
-[Configuration]
-[ProjectUnitMetadata(
-    "Order Processing Configuration",
-    Description = "Controls host-specific order processing behavior.",
-    Tags = ["$SubdomainTag$", "$FeatureTag$"])]
-[ProjectUnitRequirement("$RequirementId$")]
-public sealed class OrderProcessingOptions
+[Configuration("Ordering:Processing", DefinitionKey = "ordering.processing",
+    ReloadBehavior = ConfigurationReloadBehavior.OnlineReloadable)]
+[ProjectUnitMetadata("Order processing settings",
+    Description = "Controls order approval behavior and batch size.",
+    Tags = ["ordering", "approval"])]
+public sealed class OptionsOrderProcessing
 {
     public bool AutoApproveEnabled { get; set; }
 
+    [Range(1, 1000)]
     public int ApprovalBatchSize { get; set; } = 100;
 }
 ```
 
-## Consumer Example
+An operation-scoped consumer can use `IOptionsSnapshot<OptionsOrderProcessing>` for a consistent value during its scope. A long-lived consumer that supports live changes uses `IOptionsMonitor<T>`; a fixed-value consumer uses `IOptions<T>` and requires restart for changes to reach that instance. Keep the definition's declared behavior compatible with its consumers. Reading a setting does not justify a forwarding DomainService by itself; consume it where the actual domain rule or orchestration lives.
+
+## Startup persistence settings
+
+The domain owns this connection setting because its passive repository needs it whenever included. An optional provider instead needs a valid unconfigured shape and checks its prerequisites when selected; do not make every possible connection globally required.
 
 ```csharp
-using Microsoft.Extensions.Options;
+using System.ComponentModel.DataAnnotations;
+using Monica.Configuration.Annotations;
+using Monica.Configuration.Models;
 using Monica.ProjectUnits.Annotations;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 
-namespace $DomainNamespace$.DomainServices;
+namespace Domains.Ordering.Configurations;
 
-[ProjectUnitMetadata(
-    "Order Approval Rules",
-    Description = "Evaluates configured order approval behavior.",
-    Tags = ["$SubdomainTag$", "$FeatureTag$"])]
-[ProjectUnitRequirement("$RequirementId$")]
-public sealed class DomainOrderApproval(
-    IOptions<OrderProcessingOptions> options)
-    : DomainService
+[Configuration("Ordering:Database", Kind = ConfigurationKind.Startup)]
+[ProjectUnitMetadata("Ordering database connection",
+    Description = "Selects the database used by Ordering persistence.",
+    Tags = ["ordering", "persistence"])]
+public sealed class OptionsOrderingDatabase
 {
-    private OrderProcessingOptions Options => options.Value;
-
-    public bool IsAutoApproveEnabled()
-    {
-        return Options.AutoApproveEnabled;
-    }
+    [Required, OptionSetting(IsSensitive = true)]
+    public string ConnectionString { get; set; } = "";
 }
 ```
 
-## Notes
+Inside the existing domain's `ConfigurePassive(ApplicationRegistrationContext context)`, use:
 
-- Use configuration for environment- or host-specific behavior, not for domain constants that belong in code.
-- Keep option names explicit and developer-facing.
-- Do not resolve `IOptions<T>` from a temporary service provider during composition. Runtime code uses typed options injection. For host scheduler configuration, read `$monica-infra-jobs`.
+```csharp
+using Monica.Configuration.Bootstrap;
+using Domains.Ordering.Configurations;
+
+var database = context.GetStartupOptions<OptionsOrderingDatabase>();
+// Use database.ConnectionString in this domain's existing provider registration.
+```
+
+The value is validated immediately and shared with later default-name options injection. Consumers must not mutate it. Every discovered Startup definition is validated before composition completes, even when not explicitly read there. File reloads produce candidates for inspection, not a new running connection object. Keep canonical AppId, AppName, DeploymentScope and role placement in `Application` rather than duplicating them in an options class.
+
+## Preserve persisted identity during a rename
+
+Before renaming a Managed type or namespace, determine its previously resolved section path and definition key. Pin both explicitly using `[Configuration("<existing-section>", DefinitionKey = "<existing-key>")]`, then rename the type and file to the Options prefix. If the old key defaulted to the CLR full name, keep that old full name as the explicit key. Do not replace an issued identity with a cleaner new string as part of a naming change.
+
+Converting Managed to Startup is a separate authority migration: move values into deployment inputs, migrate consumers, and preserve old metadata/history until the existing explicit maintenance flow can retire it. An Options rename alone changes neither value ownership nor reload behavior. Validate the same section and definition identity through configuration discovery, not only through a successful compile.

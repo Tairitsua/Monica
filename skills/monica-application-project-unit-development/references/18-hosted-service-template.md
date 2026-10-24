@@ -13,7 +13,9 @@ Place services in `Roles.{Domain}[.{Purpose}]/HostedServices/`. Name a loop `{Pu
 
 ## Lifetime and operations
 
-Register one host-owned instance through normal composition. The application model filters inactive-role hosted services; opaque factories require the same explicit placement check. Constructors must not start work. See [hosted-service integration](../../monica-infra-hosting/references/hosted-services.md).
+Register one host-owned instance through normal composition. Monica derives placement and execution policy from the implementation and captured registration provenance, including factory descriptors without invoking them. Role-owned services start only in Automatic mode; Manual services are held and listed in diagnostics. Constructors must not start work. See [hosted-service integration](../../monica-infra-hosting/references/hosted-services.md).
+
+Use `[ProcessLocal]` only for finite initialization needed by included passive behavior that changes process memory; it never exempts a continuous loop, external mutation, publication or shared claim. Domain-core autonomous initialization needs a same-domain BackgroundRole unless it meets that narrow exception. Held prerequisite resources remain unavailable. Follow the [local execution contract](../../monica-application/references/04-startup-and-local-execution.md) rather than adding a generic manual hosted-service runner or a debug-only registration branch.
 
 A service may retain immutable configuration, thread-safe infrastructure, and process state. It must not retain scoped repositories, application API clients, current-user services, or collaborators capturing them indirectly. Never retain one scope for the permanent loop or resolve scoped dependencies from the root provider.
 
@@ -156,30 +158,34 @@ public sealed class OrderApprovalBackgroundService(
 }
 ```
 
-`BoundedChannelFullMode.Wait` combined with `TryWrite` rejects a full queue immediately; it does not wait or silently drop another item. Admission opens only when the selected consumer starts, so an inactive role's buffer rejects work. Closing is permanent for that host instance, including a failure racing startup. Producers inject only the singleton buffer and handle `false` explicitly. They do not retain the consumer, its work item or an operation scope. A published admission operation that requires this live role follows the existing execution-placement contract. Do not use this queue when the source requires durable acknowledgment or replay; adopt the existing delivery mechanism instead.
+`BoundedChannelFullMode.Wait` combined with `TryWrite` rejects a full queue immediately; it does not wait or silently drop another item. Admission opens only when the consumer starts, so an inactive or Manual role's buffer rejects work. Closing is permanent for that host instance, including a failure racing startup. Producers inject only the singleton buffer and handle `false` explicitly. They do not retain the consumer, its work item or an operation scope. A published admission operation that requires this live role follows the existing execution-placement contract and reports a held resource as unavailable. Do not use this queue when the source requires durable acknowledgment or replay; adopt the existing delivery mechanism instead.
 
-Add these registrations once to the existing role/host composition, before `AddMonica` finishes. The following ordinary composition method is not a new Monica module or business unit:
+Add these contributions to the role's existing `ApplicationRegistration`, named by its `ApplicationRole.Registration` declaration. The passive buffer remains available to report unavailable admission even when the consumer is held:
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
-using Monica.Core.Modularity.Abstractions;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Modules;
 
 namespace Roles.Ordering.HostedServices;
 
-public static class OrderApprovalComposition
+public sealed class RoleRegistration : ApplicationRegistration
 {
-    public static void Register(IMonicaBuilder monica, IServiceCollection services)
+    public override void ConfigurePassive(ApplicationRegistrationContext context)
     {
-        monica.AddHostedService();
-        services.AddSingleton<OrderApprovalBuffer>();
-        services.AddScoped<OrderApprovalWorkItem>();
-        services.AddHostedService<OrderApprovalBackgroundService>();
+        context.Services.AddSingleton<OrderApprovalBuffer>();
+        context.Services.AddScoped<OrderApprovalWorkItem>();
+    }
+
+    public override void ConfigureActive(ApplicationRegistrationContext context)
+    {
+        context.Monica.AddHostedService();
+        context.Services.AddHostedService<OrderApprovalBackgroundService>();
     }
 }
 ```
 
-Call `OrderApprovalComposition.Register(monica, builder.Services)` inside the host's existing `builder.AddMonica(monica => { ... })` callback. Retain that host's application model, annotated role discovery and real persistence composition: `IRepositoryOrder` must resolve against the scoped `OrderingDbContext`, with its provider and `AddUnitOfWork` participation already registered. The example registers neither a second host nor a fake repository. `AddHostedService` supplies the execution pipeline and observability dependencies; the separate DI registration creates the one host-owned consumer. Do not additionally register a second singleton consumer instance.
+Retain the host's native `AddApplicationModel`, annotated role discovery and real persistence composition: `IRepositoryOrder` must resolve against the scoped `OrderingDbContext`, with its provider and `AddUnitOfWork` participation already registered. The host does not call or maintain a list of role registrations. ConfigureActive declares the service in both Manual and Automatic modes; Monica holds its descriptor in Manual without creating the consumer. `AddHostedService` supplies execution and observability dependencies; the DI registration supplies the one host-owned consumer. Do not additionally register a second singleton consumer instance.
 
 Every item resolves a fresh scoped work item and repository. `Automatic` is explicit here and is also the native work-item default; the registered UnitOfWork behavior owns save/commit or rollback before the call completes. The permanent loop and queue wait are outside that transaction. Start/stop lifecycle points default to `None`. A different work item that coordinates independently committed operations selects `[ExecutionTransaction(ExecutionTransactionMode.None)]` on its concrete `ExecuteAsync` and preserves those child operations' scope/commit boundaries; `None` does not suppress an already active transaction. Use the [transaction contract](../../monica-infra-persistence/references/transactions.md), rather than copying a second persistence tutorial here.
 
@@ -199,4 +205,4 @@ Distinguish invalid items, retryable dependencies, and fatal service failures. I
 
 Concrete services declare their own ProjectUnit metadata and applicable real requirement IDs. Work items need no fake unit classification. Preserve the Start, Stop, and WorkItem execution points.
 
-Verify through the actual owning host composition: inactive roles do not start or accept buffered work; only one service instance exists; work gets independent disposable scopes; ordering survives concurrent admission; failed items follow policy; cancellation ends waits and operations; stop awaits owned tasks. Test rules separately and use transaction tests for commit/rollback. Prefer controllable clocks and signals over production-duration sleeps.
+Verify through the actual owning host composition: inactive and Manual roles do not start or accept buffered work; only one service instance exists when admitted; work gets independent disposable scopes; ordering survives concurrent admission; failed items follow policy; cancellation ends waits and operations; stop awaits owned tasks. Test rules separately and use transaction tests for commit/rollback. Prefer controllable clocks and signals over production-duration sleeps.

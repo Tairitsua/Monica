@@ -9,7 +9,8 @@ Map existing responsibilities before moving files:
 | Domain model, repositories, contexts and shared rules | `Domains/{Domain}/Domains.{Domain}` |
 | API handlers and ordinary application behavior | `Domains/{Domain}/Roles.{Domain}` |
 | Connector, Actor, realtime or other independently activated responsibility | A justified `Roles.{Domain}.{Purpose}` library |
-| Product provider/bootstrap defaults | `Shared/Platform.Hosting` |
+| Product technical code reused by several domain/role owners | `Shared/Platform.Infrastructure` |
+| Whole-host provider/module defaults and startup choices | The owning host's `Composition/` |
 | Native composition and generated clients/local receivers | `AppHost/{Product}.Host` or a justified specialized host artifact |
 | Actual domain migrations and context factories | `Migrations/Migrations.Domain{Domain}` |
 
@@ -17,4 +18,4 @@ Role libraries have no Program.cs. Keep role integrations inside their owning ro
 
 Preserve HTTP paths, AppIds, topics, hub paths, Actor identities, scheduler keys and durable subscriber identities, or record the explicit migration. Add assembly domain/role declarations and generate the shared ownership catalog where selective artifacts need it, and let each ApplicationHost record its actual local implementation inventory. Preserve stateful integration semantics: co-location does not authorize bypassing an Actor proxy or product primary-node policy.
 
-Separate passive registration needed by ordinary local calls from selected active connections/subscriptions. Verify an included ordinary operation from an inactive role, an omitted published operation routed to its known remote owner, selected autonomous activation and required-role routing before switching production placement. Reconcile the project specification with the adopted graph and remaining migration gaps.
+Separate passive registration needed by ordinary local calls from selected active connections/subscriptions using native domain/role registrations. Adopt the same [Startup inputs and Manual local profile](../../monica-application/references/04-startup-and-local-execution.md); keep canonical Application placement instead of a second service/role registry. Verify an included ordinary operation from an inactive role, an omitted published operation routed to its known remote owner, selected autonomous activation and required-role routing before switching production placement. Reconcile the project specification with the adopted graph and remaining migration gaps.

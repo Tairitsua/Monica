@@ -10,8 +10,7 @@ A runnable application test project is named `Test.{ProductionProjectName}`, usi
 | Commands, queries, role-owned HTTP adapters, subscriptions, jobs, or workers | Role implementation | `Test.Roles.User`, `Test.Roles.User.Realtime` |
 | Published DTOs, request contracts, or serialization rules owned by shared contracts | Protocol project | `Test.Platform.Protocol` |
 | Shared technical behavior or product infrastructure adapters | Exact shared library | `Test.Platform.BuildingBlocks`, `Test.Platform.Infrastructure` |
-| Reusable product startup defaults, provider composition, or configuration inputs | Hosting library | `Test.Platform.Hosting` |
-| Actual executable composition, generated host manifest, role activation, or executable ingress wiring | Business host | `Test.Product.Host` |
+| Actual executable composition, provider selection, startup inputs, local profile, generated manifest, role activation or ingress wiring | Business host and its Composition folder | `Test.Product.Host` |
 | Presentation behavior, when UI tests are explicitly requested | Actual UI project | `Test.Product.UI` |
 | Migration behavior or a tool's own behavior | Actual migration or tool project | `Test.Migrations.DomainUser`, `Test.MigrationRunner` |
 
@@ -40,7 +39,7 @@ src/Tests/
     Factories/
     TestDoubles/
   Test.Roles.User.Realtime/
-  Test.Platform.Hosting/
+  Test.Platform.Infrastructure/
   Test.Product.Host/
 ```
 

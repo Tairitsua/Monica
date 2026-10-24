@@ -10,9 +10,9 @@ src/
     Platform.Protocol/
       Application/                         # Stable role IDs and existing domain identifiers
       PublishedLanguages/DomainOrdering/{Requests,Models,Events}/
-    Platform.ApplicationCatalog/           # Generated lightweight catalog when hosts select implementations
-    Platform.BuildingBlocks/                # Shared technical mechanisms
-    Platform.Hosting/                      # Product bootstrap and provider defaults
+    Platform.Infrastructure/               # Product technical code reused by multiple domain/role owners
+    Platform.BuildingBlocks/               # Optional product-independent, Monica-independent library
+    Platform.Testing/                      # Optional shared test support; no test cases
   Domains/
     Ordering/
       Domains.Ordering/
@@ -27,7 +27,9 @@ src/
       Roles.File.Ocr/                       # Native implementation remains owned by File
   AppHost/
     Product.Host/                          # Default business runtime composition
+      Composition/                         # Whole-host modules, providers, UI, middleware and endpoints
     Product.Ocr.Host/                      # Only when separate native dependencies are needed
+    Product.ApplicationCatalog/            # Optional generated ownership catalog for selective hosts
   Presentation/
     Product.UI/                            # Optional product presentation
   Migrations/
@@ -42,17 +44,22 @@ Create only projects and folders with actual responsibilities. A role is already
 
 | Project | Responsibility and references |
 | --- | --- |
-| `Platform.Protocol` | Published requests, DTOs, events, stable role IDs, existing domain identifiers, and generated API interfaces. No domain implementations or deployment addresses. |
-| `Platform.ApplicationCatalog` | Generated domain, role and published-operation ownership without runtime implementation dependencies. References Protocol normally and implementation projects as build-only metadata inputs. |
-| `Domains.{Domain}` | Domain rules and owned persistence, including repositories and contexts. May use Protocol and BuildingBlocks; never references role implementations or peer domain implementations. |
+| `Platform.Protocol` | Published requests, DTOs, events, stable role IDs, existing domain identifiers, and generated API interfaces. May use independent BuildingBlocks values and Monica contract/annotation APIs. No implementations, persistence bases, options, provider/UI setup, deployment addresses or environment files. |
+| `Platform.Infrastructure` | Product-specific technical code on Monica reused by multiple domains or roles: adapters, persistence bases and technical policies/contracts. May reference Protocol, BuildingBlocks and the Monica capabilities it uses; never domain cores, roles or hosts. |
+| `Platform.BuildingBlocks` | Optional code that could ship independently of this product and Monica, such as coordinate mathematics. May use third-party libraries; references no Monica or other Platform project. |
+| `Platform.Testing` | Optional shared fixtures, factories and doubles. May reference production projects and Monica.Testing. Contains no test cases and is never referenced by production. |
+| `Domains.{Domain}` | Domain rules and owned persistence, including repositories and contexts. May use Infrastructure, Protocol and BuildingBlocks; never references role implementations or peer domain implementations. |
 | `Roles.{Domain}[.{Purpose}]` | Application handlers and role-owned runtime integrations. References its own domain core and shared contracts; never references peer roles or peer domain implementations. |
-| `Platform.BuildingBlocks` | Shared technical mechanisms beneath Protocol. Does not reference Protocol or aggregate concrete business domains. |
-| `Platform.Hosting` | Product configuration, provider defaults, and authority policies. Does not reference every domain or replace the native host lifecycle. |
-| `Product.Host`, justified specialized hosts | Native composition of their actual local implementations, generated clients and local receivers. May reference the lightweight catalog and optional UI. |
-| `Product.UI` | Layout, pages and presentation state. References Protocol and selected UI capabilities; never repositories, handlers, domain cores, or Platform.Hosting. |
+| `Product.Host`, justified specialized hosts | Native composition of their actual local implementations, generated clients and local receivers. Whole-host module/provider choices, UI shell, middleware and product endpoints stay in the host's Composition folder. May reference an optional generated catalog and UI. |
+| `Product.ApplicationCatalog` | Optional host build artifact containing generated domain, role and operation ownership without runtime implementation dependencies. References Protocol normally and implementations as build-only metadata inputs. It is not a Platform responsibility. |
+| `Product.UI` | Layout, pages and presentation state. References Protocol and selected UI capabilities; never repositories, handlers, domain cores, or host composition. |
 | `Migrations.Domain{Domain}` | The domain's real migrations, snapshots and design-time factories. References its core and migration helpers, never roles or the business host. |
 
 Application collaboration uses generated published APIs. Shared same-domain invariants belong in the core and are directly reusable by its roles. Technical cross-domain coordination uses narrow owned technical contracts where user-command semantics do not fit. Moving foreign repositories behind a service locator does not preserve the boundary.
+
+The four Platform names describe allowed responsibilities, not four mandatory projects. Keep code with its only consumer until it has actual shared owners. Monica-based code useful to unrelated products belongs in Monica rather than in BuildingBlocks. Infrastructure does not select the entire host's modules or become a dependency barrel that makes Protocol transitively import runtime providers and UI. Reusable technical code does not justify moving one domain's repository into Platform.
+
+Production dependency direction is Host → Roles → own Domain → Infrastructure → Protocol → BuildingBlocks; references may skip levels downward. No production library references a host or testing library, and domain cores never reference one another. Enforce those boundaries with focused project-reference checks, including a Protocol dependency allow-list and absence of copied environment files. Shared test support and executable tests follow [the production behavior owner](../../monica-application-unit-testing/references/project-naming.md).
 
 ## Ownership, artifact composition and compiled metadata
 
@@ -77,9 +84,9 @@ Declare ownership once in each implementation assembly:
 
 These are separate source files in separate projects. `ProductDomains` and `ProductRoles` denote product-owned identifiers. One role implementation assembly has one owner; independently activated responsibilities use separate role projects. Protocol generates interfaces first, and role libraries and UI compile against those interfaces. Do not maintain repeated handler-marker lists or handwritten clients per role.
 
-For selective hosts, generate a lightweight `Platform.ApplicationCatalog` from the annotated implementation libraries. Set `MonicaApplicationCatalog` to `true` in that project, reference Protocol normally, and use implementation `ProjectReference` entries with `ReferenceOutputAssembly="false"`, `Private="false"`, and `PrivateAssets="all"`. Add the Monica API generator analyzer to the annotated core and role projects so they export their owned metadata. Import `Monica.Generators.AutoController/build/Monica.ApplicationCatalog.targets` when consuming the generator from source; NuGet imports the packaged `build/Monica.Generators.AutoController.targets` automatically. See [application model composition](../../monica-infra-hosting/references/application-model.md) for the build and runtime boundary.
+When hosts include different implementation sets, generate an optional lightweight catalog under `src/AppHost/{Product}.ApplicationCatalog` from the annotated implementation libraries. A host that already includes every implementation needs no separate catalog project. Set `MonicaApplicationCatalog` to `true` in the catalog, reference Protocol normally, and use implementation `ProjectReference` entries with `ReferenceOutputAssembly="false"`, `Private="false"`, and `PrivateAssets="all"`. Add the Monica API generator analyzer to annotated core and role projects so they export their owned metadata. Import `Monica.Generators.AutoController/build/Monica.ApplicationCatalog.targets` when consuming the generator from source; NuGet imports the packaged `build/Monica.Generators.AutoController.targets` automatically. See [application model composition](../../monica-infra-hosting/references/application-model.md) for the build and runtime boundary.
 
-Each host references the catalog normally and only the implementations it can execute. Its generated manifest combines catalog ownership with `LocalAssemblies` from actual annotated implementation references. Published clients can describe remote operations without referencing their handler types; receivers and private operations come only from local implementations. The catalog contains no runtime role/core type references. Build-only metadata inputs may still require those projects to build; they must not copy their runtime or native assets into a host that omits them. Do not hand-edit metadata snapshots or introduce runtime assembly loading to satisfy missing implementations.
+Each selective host references that catalog normally and only the implementations it can execute. Its generated manifest combines catalog ownership with `LocalAssemblies` from actual annotated implementation references. Published clients can describe remote operations without referencing their handler types; receivers and private operations come only from local implementations. The catalog contains no runtime role/core type references. Build-only metadata inputs may still require those projects to build; they must not copy their runtime or native assets into a host that omits them. Do not hand-edit metadata snapshots or introduce runtime assembly loading to satisfy missing implementations.
 
 Compose the native `WebApplication` lifecycle with `builder.AddMonica(...)`, `app.UseMonica()`, and `app.MapMonica()`. Register `AddApplicationModel()` and `AddApplicationInvocation()` in the callback, plus `AddWebApi()` where receivers are served. The canonical `Application` section owns current AppId and deployment placement. Keep product/assembly information such as ProjectName and AppVersion in `ConfigureApplication`. A complete typed `ModuleApplicationModelOption.Deployments` value is an alternative to file topology; supplying both fails instead of merging authorities. A custom callback runner is not another application lifecycle.
 
@@ -92,6 +99,7 @@ The deployment map assigns each known product role to exactly one logical applic
   "Application": {
     "AppId": "product-api",
     "DeploymentScope": "product-uat",
+    "AutonomousWork": true,
     "Deployments": {
       "product-api": { "AppName": "Ordering API", "Roles": ["ordering"] },
       "product-reporting": { "AppName": "Ordering reports", "Roles": ["ordering.reporting"] }
@@ -100,7 +108,7 @@ The deployment map assigns each known product role to exactly one logical applic
 }
 ```
 
-A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list, default role owner or synthetic `all` role. Every compiled role has exactly one explicit owner. Startup rejects missing/unknown/duplicate roles, case-ambiguous identities, an absent current AppId and missing local implementations for roles assigned to that AppId. Every application entry declares Roles; an explicit empty array is valid, omission or null is not. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration.
+A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list, default role owner or synthetic `all` role. Every compiled role has exactly one explicit owner. Startup rejects missing/unknown/duplicate roles, case-ambiguous identities, an absent current AppId and missing local implementations for roles assigned to that AppId. Every application entry declares Roles; an explicit empty array is valid, omission or null is not. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration. DeploymentScope supplies the default scheduler scope and telemetry deployment environment; preserve already issued resource keys when adopting it.
 
 AppName belongs to the same deployment entry and defaults to its AppId. Core identity, discovery and diagnostics use that name; conflicting direct identity or discovery overrides fail. The framework derives the reverse role-to-AppId index. `Deployments` is selected as one complete subtree from the highest-priority provider that explicitly supplies it. A higher source replaces all lower applications, names and role arrays. Partial environment-variable/command-line maps fail when incomplete; they do not inherit missing roles. Use JSON for complete topology and scalar environment variables for current AppId. Private environment JSON selection follows the [host input contract](../../monica-infra-hosting/references/host-composition.md); selected inputs and placement remain frozen until restart.
 
@@ -108,7 +116,9 @@ Project references own artifact composition; deployment values own AppId/role pl
 
 Included ordinary handlers, passive services, repositories and in-operation local event behavior remain available locally even when their owning role is inactive. Local calls need their actual passive dependencies and database credentials. A selective host need not carry stores or native dependencies solely for an omitted remote implementation. Role selection is not a database access-security boundary.
 
-Autonomous jobs, externally consumed subscriptions, hosted services and process-owned resources run only for selected, locally implemented roles. They inherit their role assembly's ownership. Explicit hubs, channels, Actors and connections must use the same validated selection before imperative registration. A local invariant event handler must remain distinct from an external subscriber. Do not register a resource everywhere and rely on an early return after it has started.
+Role-owned autonomous jobs, external subscriptions, hosted services and shared resources use the same validated placement. `Application:AutonomousWork` defaults to true; false keeps eligible explicit execution available while holding unsolicited participation. Monica derives Disabled, Manual or Automatic for each resource. A domain core declares a same-domain BackgroundRole only when it owns autonomous resources; passive behavior requires no such assignment. Work belonging to several roles keeps its actual role entry points rather than relabeling them with one core default. A local invariant event handler remains distinct from an external subscriber.
+
+Framework modules retain registration provenance across deferred callbacks and factories, and decide activation per resource. A shared framework worker does not own every store it executes. Outbox delivery is anchored to its DbContext's owner; another role's callback cannot claim that context. Narrow process-memory initialization can use `[ProcessLocal]` under the [startup and local execution contract](04-startup-and-local-execution.md). That contract also owns the Manual capability boundaries, readiness and explicit shared-write implications. Applications maintain no second role list or generic manual execution engine.
 
 Durable workload ownership defaults to the stable role ID, independently of AppId. The optional `ApplicationRole.WorkloadOwner` preserves an already issued scheduler namespace during migration; it is not a new current-host identity. Role moves require controlled deployment takeover, compatible code/schema versions and preservation of durable job/subscriber identities. Provider leases and retries do not supply exactly-once business side effects.
 
@@ -134,7 +144,7 @@ The registration and context are in `Monica.ApplicationModel.Abstractions`; the 
 
 After the host's AddMonica callback finishes, Monica finalizes application-model contributions once, validates the complete model and projects identity. It freezes identity, discovery and topology before running registrations. All included registrations run ConfigurePassive first, followed by eligible ConfigureActive callbacks in deterministic owner-ID order. Passive registration is independent of role placement. Active registration requires local placement of the role or the domain's BackgroundRole. Catalog-only remote owners never execute registration code.
 
-Callbacks can add modules, service descriptors and startup options; they cannot change frozen inputs, resolve services, open connections, start tasks or depend on another owner's callback order. `context.Configuration` is the immutable startup snapshot, and `context.GetStartupOptions<T>()` uses the configuration module's shared early reader when imported from `Monica.Configuration.Bootstrap`. ConfigureActive declares eligible integrations, with `context.IsAutonomous` available to guard imperative shared participation. Module declarations then close and the normal module lifecycle proceeds. The framework retains registration ownership across deferred module contributions and service descriptors; products maintain no additional owner table.
+Callbacks can add modules, service descriptors and read Startup options; they cannot change frozen inputs, resolve services, open connections, start tasks or depend on another owner's callback order. `context.Configuration` is the immutable startup snapshot, and `context.GetStartupOptions<T>()` uses the configuration module's shared early reader when imported from `Monica.Configuration.Bootstrap`. ConfigureActive runs for locally placed owners in both Manual and Automatic modes so native modules can retain their definitions. Use `context.IsAutonomous` to guard imperative provider registrations that would otherwise join shared resources. Module declarations then close and the normal module lifecycle proceeds. The framework retains registration ownership across deferred module contributions and service descriptors; products maintain no additional owner table.
 
 ## Calls and required execution location
 
@@ -168,4 +178,4 @@ Design-time factories compose persistence without starting roles, jobs, channels
 
 Co-location does not make independent stores atomic. A shared local transaction requires actual provider participation; current Monica shared-connection participation requires the same DbConnection instance. Nested cross-domain work must not silently switch or independently commit another domain's context. Use an explicitly non-atomic coordination or messaging design where stores cannot participate together.
 
-The [reference application](../../../examples/Monica.ReferenceApplication/README.md) demonstrates a host containing both Ordering roles, ordinary inactive-role local calls, and role-gated reporting with the existing business UI. Its in-memory repository does not demonstrate distributed persistence or transactional rollback.
+The [reference application](../../../examples/Monica.ReferenceApplication/README.md) demonstrates host-owned composition, both Ordering roles, the local Manual profile and native job execution with the existing business UI. Its in-memory repository does not demonstrate distributed persistence or transactional rollback. Use [startup and local execution](04-startup-and-local-execution.md) when adapting its deployment inputs or local profile.

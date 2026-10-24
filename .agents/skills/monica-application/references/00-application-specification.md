@@ -4,6 +4,8 @@ The `monica-application*` skills form the shared specification for Monica applic
 
 Read [unified architecture](03-unified-architecture.md) for the single domain-core/role-project layout, selective host composition, generated ownership catalogs, placement, activation, API and migration ownership. Backend-only and backend-with-UI remain independent skill installation choices.
 
+Use [startup and local execution](04-startup-and-local-execution.md) for configuration authority, environment inputs and the single-host Manual profile. These use the same domain/role placement and native lifecycle; local development adds no separate application model.
+
 ## Rule Strength
 
 | Kind | Meaning |

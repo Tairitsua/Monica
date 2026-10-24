@@ -20,7 +20,7 @@ namespace Roles.Ordering.Reporting.BackgroundWorkers;
     MaxExecutionTimeoutSeconds = 30)]
 public sealed class WorkerOrderBacklogReport(
     IRepositoryOrder repository,
-    IOptions<OrderingOptions> options,
+    IOptions<OptionsOrdering> options,
     ILogger<WorkerOrderBacklogReport> logger)
     : RecurringJob(logger)
 {

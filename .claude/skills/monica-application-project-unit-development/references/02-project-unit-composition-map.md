@@ -93,13 +93,13 @@ Use [04-adapters-lifecycle-and-support-types.md](04-adapters-lifecycle-and-suppo
 
 These choices do not create new business roles. Use the native mechanism and the project's adopted placement; propose a new family or execution model through specification evolution before adopting it.
 
-## 6. New runtime option
+## 6. New configurable behavior
 
 Create:
 
-- `Configuration`
-- Consumers that inject `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>`
-- Host-composition wiring reads bootstrap values from `builder.Configuration` and passes them into module options; Configuration ProjectUnits themselves are consumed through runtime options injection
+- An `Options{Purpose}` Configuration ProjectUnit beside its consumer, with Startup or Managed ownership.
+- Runtime consumers using the appropriate default-name `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>` interface.
+- Composition reads Startup options through `GetStartupOptions<T>()` on its Monica builder or registration context; Managed options are never read before DI. Keep Application identity/placement in its canonical section.
 
 Load:
 

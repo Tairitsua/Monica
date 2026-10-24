@@ -11,6 +11,9 @@
   <ItemGroup>
     <ProjectReference Include="../../../Shared/Platform.Protocol/Platform.Protocol.csproj" />
     <ProjectReference Include="../../../../../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
+    <ProjectReference Include="../../../../../../Monica.Configuration/Monica.Configuration.csproj" />
+    <ProjectReference Include="../../../../../../Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
+    <ProjectReference Include="../../../../../../Monica.Repository/Monica.Repository.csproj" />
   </ItemGroup>
 
 </Project>
