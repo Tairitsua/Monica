@@ -79,6 +79,8 @@ internal sealed class ConfigurationUnifiedVersionRollbackPreviewFactory(
                 definitions[index] = await definitionResolver.GetRequiredAsync(
                     documents[index].DefinitionKey,
                     cancellationToken);
+                if (definitions[index]!.Kind == ConfigurationKind.Startup)
+                    throw new InvalidOperationException($"Startup configuration '{documents[index].DefinitionKey}' cannot be restored from a managed version.");
             }
             catch (KeyNotFoundException)
             {

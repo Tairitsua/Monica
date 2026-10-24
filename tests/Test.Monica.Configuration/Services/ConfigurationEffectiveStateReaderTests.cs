@@ -158,8 +158,10 @@ public sealed class ConfigurationEffectiveStateReaderTests
     {
         var runtimeContext = new ConfigurationRuntimeContext();
         runtimeContext.Capture(configuration);
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IConfigurationEffectiveValueStore)).Returns(store);
         return new ConfigurationEffectiveStateReader(
-            store,
+            provider,
             ConfigurationValidationTestServices.CreateSeedFactory(runtimeContext),
             new ConfigurationEffectiveValueDocumentEditor(
                 new ConfigurationEffectiveValuePatchEngine(),

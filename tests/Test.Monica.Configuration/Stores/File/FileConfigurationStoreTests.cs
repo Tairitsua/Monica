@@ -13,6 +13,33 @@ public class FileConfigurationStoreTests : IDisposable
     private readonly string _rootDirectory = Path.Combine(Path.GetTempPath(), $"monica-config-tests-{Guid.NewGuid():N}");
 
     [Fact]
+    public async Task PublishAsync_WhenLocalDefinitionBecomesStartup_ShouldPreserveLegacyManagedAuditWithoutPublishingStartup()
+    {
+        var store = CreateStore();
+        var publisher = new ConfigurationPublisherIdentity
+        {
+            PublisherKey = "Test.StartupConversion", InstanceId = "test-startup:1", Name = "Startup conversion"
+        };
+        var legacy = TestConfigurationFactory.Definition();
+        await store.PublishAsync(ConfigurationDefinitionPublicationBatch.Create(publisher, [legacy]), CancellationToken.None);
+        await store.EnsureCreatedAsync(legacy, """{"WorkerId":93}""", CancellationToken.None);
+        var before = await store.GetDefinitionPublicationOverviewAsync(legacy.DefinitionKey, 20, CancellationToken.None);
+        var document = await store.GetAsync(legacy.DefinitionKey, CancellationToken.None);
+        var startup = legacy with { Kind = ConfigurationKind.Startup };
+        var fresh = legacy with { DefinitionKey = "Test.NewStartup", SectionPath = "Test:NewStartup", Kind = ConfigurationKind.Startup };
+
+        await store.PublishAsync(ConfigurationDefinitionPublicationBatch.Create(publisher, [startup, fresh]), CancellationToken.None);
+
+        (await store.GetDefinitionPublicationOverviewAsync(legacy.DefinitionKey, 20, CancellationToken.None))
+            .Should().BeEquivalentTo(before);
+        (await store.GetAsync(legacy.DefinitionKey, CancellationToken.None)).Should().BeEquivalentTo(document);
+        (await store.ListPublishedDefinitionEntriesAsync(CancellationToken.None)).Should().ContainSingle();
+        (await store.GetAsync(fresh.DefinitionKey, CancellationToken.None)).Should().BeNull();
+        var seed = () => new ConfigurationEffectiveValueSeed(startup, "{}");
+        seed.Should().Throw<InvalidOperationException>().WithMessage("*Startup*managed store*");
+    }
+
+    [Fact]
     public async Task EnsureCreatedAsync_WhenDocumentIsMissing_ShouldCreateEffectiveValueJson()
     {
         var store = CreateStore();

@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -62,7 +63,7 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         {
             var projected = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             var shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
-            var definitions = definitionRegistry.GetAll();
+            var definitions = definitionRegistry.GetAll().Where(definition => definition.Kind == ConfigurationKind.Managed).ToArray();
             var seeds = definitions
                 .Select(definition => new ConfigurationEffectiveValueSeed(
                     definition,
@@ -149,6 +150,8 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         {
             return;
         }
+        if (definition!.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException("Startup configuration is frozen and cannot be reloaded from the managed store.");
 
         var effectiveValueStore = accessor.ServiceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
         var seedFactory = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueSeedFactory>();

@@ -84,6 +84,7 @@ public static class MonicaHostBuilderExtensions
 
         try
         {
+            application.InitializeComposition(builder);
             application.Profiling.StartStage(ModuleSystemStage.ApplicationConfiguration);
             try
             {
@@ -99,7 +100,7 @@ public static class MonicaHostBuilderExtensions
         }
         catch
         {
-            if (!application.Modules.HasMutatedHost)
+            if (!application.Modules.HasMutatedHost && !application.CompositionHasMutatedHost)
             {
                 builder.Properties.Remove(MONICA_APPLICATION_KEY);
             }

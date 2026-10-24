@@ -27,7 +27,7 @@
             <div class="configuration-value-flags">
                 @if (Node.IsSensitive) { <span class="configuration-value-flag configuration-value-flag--warning">@L["State:Value:Sensitive"]</span> }
                 @if (Node.ValidationRules.OfType<RequiredRule>().Any()) { <span class="configuration-value-flag configuration-value-flag--required">@L["State:Value:Required"]</span> }
-                @if (EffectiveReloadBehavior.RequiresProcessRestart()) { <span class="configuration-value-flag configuration-value-flag--warning">@L["State:Value:RestartNeeded"]</span> }
+                @if (Definition.Kind != ConfigurationKind.Startup && EffectiveReloadBehavior.RequiresProcessRestart()) { <span class="configuration-value-flag configuration-value-flag--warning">@L["State:Value:RestartNeeded"]</span> }
                 @if (NonScalarEditorHint is { } editorHint)
                 {
                     <MudTooltip Text="@L["State:Editor:EditorHintTooltip", editorHint]"><span class="configuration-value-flag configuration-value-flag--info">@editorHint</span></MudTooltip>
@@ -35,7 +35,11 @@
             </div>
         </header>
         <div class="configuration-value-control">
-            @if (Node.NodeKind == ConfigurationNodeKind.Scalar)
+            @if (Definition.Kind == ConfigurationKind.Startup)
+            {
+                <ConfigurationStartupValues Value="@EffectiveValue" />
+            }
+            else if (Node.NodeKind == ConfigurationNodeKind.Scalar)
             {
                 <ConfigurationScalarEditor Node="@Node" EffectiveValue="@EffectiveValue" IsModified="@(PendingChange is not null)" PendingChange="@PendingChange" Disabled="@IsCurrentSourceReadOnly" ValidationIssue="@ValidationIssue" ValueChanged="StageScalar" />
                 @if (ValidationIssue is not null && !ScalarEditorShowsInlineError)
@@ -67,7 +71,10 @@
             {
                 <MudTooltip Text="@L["Sources:Chain:Title"]"><MudIconButton Icon="@MoIcons.Workflow" Size="Size.Small" aria-label="@L["Sources:Chain:Title"]" OnClick="OpenSourceChainAsync" /></MudTooltip>
             }
-            <MudTooltip Text="@L["History:Title"]"><MudIconButton Icon="@MoIcons.History" Size="Size.Small" aria-label="@L["History:Title"]" OnClick="OpenHistoryAsync" /></MudTooltip>
+            @if (Definition.Kind != ConfigurationKind.Startup)
+            {
+                <MudTooltip Text="@L["History:Title"]"><MudIconButton Icon="@MoIcons.History" Size="Size.Small" aria-label="@L["History:Title"]" OnClick="OpenHistoryAsync" /></MudTooltip>
+            }
             @if (HasPendingChanges)
             {
                 <MudTooltip Text="@L["State:Actions:Undo"]"><MudIconButton Icon="@MoIcons.Undo" Size="Size.Small" aria-label="@L["State:Actions:Undo"]" OnClick="Undo" /></MudTooltip>
@@ -136,7 +143,8 @@
     private bool IsExternalEffectiveSource => EffectiveSourceForDisplay is { Kind: not ConfigurationSourceKind.MonicaEffectiveStore };
 
     private bool IsCurrentSourceReadOnly =>
-        _operations.IsRetired || ReadOnly || EffectiveSource is { Kind: not ConfigurationSourceKind.MonicaEffectiveStore, IsWritable: false };
+        _operations.IsRetired || ReadOnly || Definition.Kind == ConfigurationKind.Startup
+        || EffectiveSource is { Kind: not ConfigurationSourceKind.MonicaEffectiveStore, IsWritable: false };
 
     private bool CanInspectSourceChain => Definition.Origin == ConfigurationDefinitionOrigin.LocalScan;
 

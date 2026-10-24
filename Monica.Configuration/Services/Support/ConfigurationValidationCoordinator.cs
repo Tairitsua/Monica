@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Binding;
@@ -116,6 +117,13 @@ internal sealed class ConfigurationValidationCoordinator(
             return Result(definition, complete ? ConfigurationValidationCoverage.Complete : ConfigurationValidationCoverage.SchemaOnly,
                 validationEngine.Validate(definition.Root, LogicalPath.Root, raw.RootElement, options));
         }
+        return MaterializeAndValidate(definition, configuration).Validation;
+    }
+
+    /// <summary>Creates and validates one complete object so early readers cache the exact validated instance.</summary>
+    internal (object Instance, ConfigurationCompleteValidationResult Validation) MaterializeAndValidate(
+        ConfigurationDefinition definition, IConfiguration configuration)
+    {
         var instance = materializer.Materialize(definition, configuration);
         var result = ValidateInstanceCore(definition, instance, ConfigurationValidationScope.CompleteAggregate);
         // Binding may normalize collections (for example, HashSet removes duplicates). Preserve source
@@ -123,7 +131,7 @@ internal sealed class ConfigurationValidationCoordinator(
         using var source = JsonDocument.Parse(materializer.ReadConfigurationJson(definition, configuration));
         var rawIssues = validationEngine.Validate(definition.Root, LogicalPath.Root, source.RootElement,
             new ConfigurationValueValidationOptions()).Where(issue => !issue.IsMissing);
-        return result with { Issues = Array.AsReadOnly(MergeIssues(rawIssues, result.Issues)) };
+        return (instance, result with { Issues = Array.AsReadOnly(MergeIssues(rawIssues, result.Issues)) });
     }
 
     private static ConfigurationValueValidationIssue[] MergeIssues(IEnumerable<ConfigurationValueValidationIssue> raw,

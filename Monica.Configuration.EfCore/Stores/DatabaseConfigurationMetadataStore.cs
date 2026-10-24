@@ -342,6 +342,9 @@ internal sealed class DatabaseConfigurationMetadataStore(ConfigurationDatabase d
         var currentPublisherStates = await dbContext.ConfigurationDefinitionPublisherStates
             .Where(state => state.PublisherIdentity == candidate.PublisherIdentity)
             .ToArrayAsync(cancellationToken);
+        currentPublisherStates = currentPublisherStates
+            .Where(state => !candidate.ExcludedDefinitionIdentities.Contains(state.DefinitionIdentity))
+            .ToArray();
         var affectedIdentities = currentPublisherStates
             .Select(static state => state.DefinitionIdentity)
             .Concat(candidate.DefinitionIdentities)

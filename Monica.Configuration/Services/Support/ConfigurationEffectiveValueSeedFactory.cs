@@ -38,6 +38,8 @@ public sealed class ConfigurationEffectiveValueSeedFactory
     /// </remarks>
     public string CreateEffectiveJson(ConfigurationDefinition definition)
     {
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Startup configuration '{definition.DefinitionKey}' cannot be captured as managed effective state.");
         _localRegistry.GetRequired(definition);
         return _materializer.Snapshot(definition, _materializer.Materialize(definition, _runtimeContext.Configuration));
     }

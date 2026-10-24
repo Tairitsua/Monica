@@ -65,13 +65,20 @@
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@L["State:ReloadStatus:LastReloadDuration"]</MudText>
                             <MudText Typo="Typo.body2">@FormatDuration(_report.Runtime.LastReloadDuration)</MudText>
                         </MudItem>
-                        <MudItem xs="6" sm="3">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L["State:ReloadStatus:EffectiveStore"]</MudText>
-                            <MudText Typo="Typo.body2">@_report.EffectiveValueStore.DisplayName</MudText>
-                        </MudItem>
+                        @if (_report.EffectiveValueStore is { } effectiveStore)
+                        {
+                            <MudItem xs="6" sm="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@L["State:ReloadStatus:EffectiveStore"]</MudText>
+                                <MudText Typo="Typo.body2">@effectiveStore.DisplayName</MudText>
+                            </MudItem>
+                        }
                     </MudGrid>
 
-                    @if (!_report.Runtime.IsProviderActive)
+                    @if (!HasManagedStore)
+                    {
+                        <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info">@L["State:ReloadStatus:NoManagedDefinitions"]</MudAlert>
+                    }
+                    else if (!_report.Runtime.IsProviderActive)
                     {
                         <MudAlert Icon="@MoIcons.Warning" Severity="Severity.Warning">@L["State:ReloadStatus:ProviderInactive"]</MudAlert>
                     }
@@ -137,7 +144,7 @@
                                Color="Color.Primary"
                                Size="Size.Small"
                                StartIcon="@MoIcons.Refresh"
-                               Disabled="@(_loading || _reloading || _broadcasting)"
+                               Disabled="@(_loading || _reloading || _broadcasting || !HasManagedStore)"
                                OnClick="ReloadAsync">
                         @(_reloading ? L["State:ReloadStatus:Reloading"] : L["State:ReloadStatus:ManualReload"])
                     </MudButton>
@@ -145,7 +152,7 @@
                                Color="Color.Secondary"
                                Size="Size.Small"
                                StartIcon="@MoIcons.Megaphone"
-                               Disabled="@(_loading || _reloading || _broadcasting)"
+                               Disabled="@(_loading || _reloading || _broadcasting || !HasManagedStore)"
                                OnClick="BroadcastReloadAllAsync">
                         @(_broadcasting ? L["State:ReloadStatus:Broadcasting"] : L["State:ReloadStatus:BroadcastReloadAll"])
                     </MudButton>
@@ -172,6 +179,8 @@
 
     private int DriftCount => _report?.DriftCount ?? 0;
 
+    private bool HasManagedStore => _report?.EffectiveValueStore is not null;
+
     private IEnumerable<ConfigurationDefinitionReloadStatus> DriftDefinitions =>
         (_report?.Definitions ?? [])
         .Where(static definition => definition.HasVersionDrift)
@@ -180,6 +189,8 @@
     private Color StatusColor =>
         _report is null
             ? Color.Warning
+            : !HasManagedStore
+                ? Color.Info
             : !_report.Runtime.IsProviderActive
                 ? Color.Warning
                 : _report.IsCurrent
@@ -190,12 +201,15 @@
     {
         Color.Success => "color:var(--mud-palette-success)",
         Color.Error => "color:var(--mud-palette-error)",
+        Color.Info => "color:var(--mud-palette-info)",
         _ => "color:var(--mud-palette-warning)"
     };
 
     private string StatusIcon =>
         _report is null
             ? MoIcons.Help
+            : !HasManagedStore
+                ? MoIcons.Info
             : !_report.Runtime.IsProviderActive
                 ? MoIcons.Warning
                 : _report.IsCurrent
@@ -205,6 +219,8 @@
     private string StatusSummary =>
         _report is null
             ? L["State:ReloadStatus:Unavailable"].Value
+            : !HasManagedStore
+                ? L["State:ReloadStatus:NoManagedDefinitions"].Value
             : !_report.Runtime.IsProviderActive
                 ? L["State:ReloadStatus:ProviderInactive"].Value
                 : _report.IsCurrent
@@ -248,6 +264,7 @@
 
     private async Task ReloadAsync()
     {
+        if (!HasManagedStore) return;
         _reloading = true;
         try
         {
@@ -270,6 +287,7 @@
 
     private async Task BroadcastReloadAllAsync()
     {
+        if (!HasManagedStore) return;
         _broadcasting = true;
         try
         {

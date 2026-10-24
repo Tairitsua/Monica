@@ -8,7 +8,7 @@ Run from the repository root:
 dotnet run --project examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api --urls http://localhost:5275
 ```
 
-Open [Ordering](http://localhost:5275/orders). The UI uses generated IOrderingCommandApi and IOrderingQueryApi interfaces, application operation scopes, its own OrderingLayout, Monica themes and localization. Pass `--ReferenceUI:EnableDiagnostics=true` to add the optional module-system cockpit. The root JSON overview is at `/overview`. This demo has public use cases without authorization attributes; production hosts configure real identity and policies.
+Open [Ordering](http://localhost:5275/orders). The UI uses generated IOrderingCommandApi and IOrderingQueryApi interfaces, application operation scopes, its own OrderingLayout, Monica themes and localization. Pass `--ReferenceUI:EnableDiagnostics=true` to add the optional module and configuration diagnostic pages. This switch is a typed Startup configuration read before service registration: its running value is fixed until restart and never copied into the managed store. Configuration diagnostics show that running value separately from any changed source candidate. The root JSON overview is at `/overview`. This demo has public use cases without authorization attributes; production hosts configure real identity and policies.
 
 ## Ownership and project graph
 

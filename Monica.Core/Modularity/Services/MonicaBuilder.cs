@@ -13,6 +13,9 @@ internal sealed class MonicaBuilder(IHostApplicationBuilder hostBuilder, MonicaA
     private bool _isCompleted;
 
     /// <inheritdoc />
+    public MonicaCompositionState Composition => application.Composition;
+
+    /// <inheritdoc />
     public IMonicaBuilder ConfigureApplication(Action<MonicaApplicationOptions> configure)
     {
         EnsureCompositionIsOpen();

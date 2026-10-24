@@ -1,0 +1,24 @@
+@inject ConfigurationValueVisibility Visibility
+@inject IStringLocalizer<ConfigurationUIResource> L
+
+<dl class="configuration-startup-values">
+    <div>
+        <dt>@L["Startup:ActualValue"]</dt>
+        <dd><pre>@DisplayValue(Value?.DisplayValue)</pre></dd>
+    </div>
+    <div>
+        <dt>@L["Startup:CandidateValue"]</dt>
+        <dd><pre>@(Value?.StartupCandidate is { } candidate ? DisplayValue(candidate.DisplayValue) : L["Startup:CandidateUnavailable"])</pre></dd>
+    </div>
+</dl>
+
+@code {
+    /// <summary>Gets the frozen running value with the separately evaluated current candidate, already redacted by the facade.</summary>
+    [Parameter] public ConfigurationEffectiveValue? Value { get; set; }
+
+    private string DisplayValue(string? value) => Value is null
+        ? L["Startup:ActualUnavailable"]
+        : Visibility.ShouldMask(Value.IsSensitive)
+            ? L["State:Value:Sensitive"]
+            : value ?? L["Value:States:Empty"];
+}

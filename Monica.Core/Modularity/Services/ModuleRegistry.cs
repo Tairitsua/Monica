@@ -479,6 +479,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
             ApplyHostedServiceActivation(services);
             _startupWork.CloseSubmissions();
             ReachStartupWorkBarrier(ModuleStartupWorkBarrier.BeforeServiceRegistrationCompletion);
+            application.Composition.FinalizeServices(services);
             ValidateServiceRequirements(services, registrations);
 
             lock (_diagnosticsGate)

@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

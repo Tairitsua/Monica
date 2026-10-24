@@ -1,3 +1,6 @@
+using Monica.Core.Configuration;
+using System.Reflection;
+using Monica.Configuration.Annotations;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -224,6 +227,12 @@ public sealed class MonicaConfigurationInputPlan
         if (optionsTypes.Count == 0)
         {
             throw new ArgumentException("At least one effective options type is required.", nameof(optionsTypes));
+        }
+        foreach (var optionsType in optionsTypes)
+        {
+            ArgumentNullException.ThrowIfNull(optionsType);
+            if (optionsType.GetCustomAttribute<ConfigurationAttribute>()?.Kind == ConfigurationKind.Startup)
+                throw new InvalidOperationException($"Startup options '{optionsType.FullName}' must use GetStartupOptions<T>() and cannot be read from a managed input plan.");
         }
     }
 

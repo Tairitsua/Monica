@@ -217,30 +217,12 @@ public sealed class SaveMutationGroupDialogTests
         IConfigurationDefinitionChangeImpactService impactService,
         IConfigurationMutationGroupApplyService applyService)
     {
-        return new ConfigurationFacade(
-            definitionResolver: null!,
-            definitionRegistry: null!,
-            definitionMaintenanceStore: null!,
-            definitionChangeImpactService: impactService,
-            mutationGroupApplyService: applyService,
-            historyService: null!,
-            mutationGroupService: null!,
-            rollbackService: null!,
-            unifiedVersionService: null!,
-            effectiveValueStore: null!,
-            historyStore: null!,
-            metadataStore: null!,
-            changeNotifiers: [],
-            storeStateTracker: null!,
-            effectiveStateReader: null!,
-            sourceInspector: null!,
-            sourceWriter: null!,
-            runtimeContext: null!,
-            runtimeValidationService: null!,
-            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
-            candidateValidationService: null!,
-            runtimeReloadService: null!,
-            reloadBroadcastService: null!);
+        var services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IConfigurationDefinitionChangeImpactService)).Returns(impactService);
+        services.GetService(typeof(IConfigurationMutationGroupApplyService)).Returns(applyService);
+        services.GetService(typeof(IConfigurationOptionsValidationDiagnostics))
+            .Returns(Substitute.For<IConfigurationOptionsValidationDiagnostics>());
+        return new ConfigurationFacade(services);
     }
 
     private static async Task<(IRenderedComponent<MudDialogProvider> Surface, IDialogReference Dialog)>

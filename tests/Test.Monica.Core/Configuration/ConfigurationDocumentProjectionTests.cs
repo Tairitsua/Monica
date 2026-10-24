@@ -3,10 +3,10 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
-using Monica.Configuration.Binding;
+using Monica.Core.Configuration;
 using Xunit;
 
-namespace Test.Monica.Configuration.Binding;
+namespace Test.Monica.Core.Configuration;
 
 public sealed class ConfigurationDocumentProjectionTests
 {

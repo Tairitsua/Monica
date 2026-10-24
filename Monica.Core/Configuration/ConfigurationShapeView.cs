@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
 
-namespace Monica.Configuration.Binding;
+namespace Monica.Core.Configuration;
 
 /// <summary>
 /// Reads provider precedence while retaining indexed-key overlay semantics. Only explicit null and empty containers
 /// block lower descendants; nonempty collections continue to merge by Microsoft configuration keys.
 /// </summary>
-internal sealed class ConfigurationShapeView(IConfiguration configuration)
+public sealed class ConfigurationShapeView(IConfiguration configuration)
 {
     private readonly IConfigurationProvider[]? _providers = configuration is IConfigurationRoot root
         ? ExpandProviders(root, new HashSet<IConfiguration>(ReferenceEqualityComparer.Instance)).ToArray() : null;
@@ -26,9 +26,11 @@ internal sealed class ConfigurationShapeView(IConfiguration configuration)
         visited.Remove(root);
     }
 
-    internal IConfigurationSection GetSection(string path) => new ShapeSection(this, path);
+    /// <summary>Gets a read-only section that respects explicit null and empty-container barriers.</summary>
+    public IConfigurationSection GetSection(string path) => new ShapeSection(this, path);
 
-    internal bool TryGetShape(string path, out ConfigurationValueShape shape)
+    /// <summary>Reads the winning shape, without interpreting an omitted value as an explicit null.</summary>
+    public bool TryGetShape(string path, out ConfigurationValueShape shape)
     {
         if (_providers is not null)
         {
@@ -97,7 +99,7 @@ internal sealed class ConfigurationShapeView(IConfiguration configuration)
     /// Tests whether an explicit null or empty container hides the requested descendants in one provider.
     /// Source inspection shares this rule with binding rather than treating masked lower values as winners.
     /// </summary>
-    internal static bool HasBarrier(IConfigurationProvider provider, string path, bool includeSelf = false)
+    public static bool HasBarrier(IConfigurationProvider provider, string path, bool includeSelf = false)
     {
         if (provider is not IConfigurationValueShapeProvider shapes) return false;
         var current = includeSelf ? path : Parent(path);

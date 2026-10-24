@@ -737,6 +737,7 @@ public sealed class FileConfigurationStore(IOptions<ConfigurationFileStoreOption
             var incomingIdentities = publications
                 .Select(static publication =>
                     ConfigurationDefinitionIdentity.Compute(publication.Definition.DefinitionKey))
+                .Concat(batch.ExcludedDefinitionKeys.Select(ConfigurationDefinitionIdentity.Compute))
                 .ToHashSet(StringComparer.Ordinal);
             foreach (var publication in publications)
             {

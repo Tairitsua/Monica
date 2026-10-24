@@ -79,29 +79,8 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
     private static ConfigurationFacade CreateFacade(IConfigurationUnifiedVersionService unifiedVersionService)
     {
-        return new ConfigurationFacade(
-            definitionResolver: null!,
-            definitionRegistry: null!,
-            definitionMaintenanceStore: null!,
-            definitionChangeImpactService: null!,
-            mutationGroupApplyService: null!,
-            historyService: null!,
-            mutationGroupService: null!,
-            rollbackService: null!,
-            unifiedVersionService: unifiedVersionService,
-            effectiveValueStore: null!,
-            historyStore: null!,
-            metadataStore: null!,
-            changeNotifiers: [],
-            storeStateTracker: null!,
-            effectiveStateReader: null!,
-            sourceInspector: null!,
-            sourceWriter: null!,
-            runtimeContext: null!,
-            runtimeValidationService: null!,
-            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
-            candidateValidationService: null!,
-            runtimeReloadService: null!,
-            reloadBroadcastService: null!);
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IConfigurationUnifiedVersionService)).Returns(unifiedVersionService);
+        return new ConfigurationFacade(provider);
     }
 }

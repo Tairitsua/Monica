@@ -5,6 +5,9 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationEffectiveValue
 {
+    /// <summary>Gets deployment candidate diagnostics for Startup values; the ordinary value remains frozen actual state.</summary>
+    public ConfigurationStartupCandidate? StartupCandidate { get; init; }
+
     /// <summary>
     /// Gets the definition key.
     /// </summary>

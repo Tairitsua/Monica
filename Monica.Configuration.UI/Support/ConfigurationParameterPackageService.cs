@@ -293,6 +293,7 @@ internal sealed class ConfigurationParameterPackageService(
 
         var definitions = new List<ConfigurationDefinition>();
         var orderedSummaries = summaries
+            .Where(summary => summary.Kind == ConfigurationKind.Managed)
             .OrderBy(summary => summary.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var resolvedTotalProcessDefinitionCount = totalProcessDefinitionCount ?? orderedSummaries.Length;
@@ -335,6 +336,10 @@ internal sealed class ConfigurationParameterPackageService(
             1,
             1);
         var definition = await LoadDefinitionAsync(request.DefinitionKey);
+        if (definition.Kind == ConfigurationKind.Startup)
+        {
+            throw new InvalidOperationException(localizer["Startup:ReadOnly"]);
+        }
         ReportLoadDefinitionsProgress(
             progress,
             ConfigurationPackageProgressOperation.Export,

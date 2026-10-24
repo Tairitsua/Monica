@@ -17,6 +17,20 @@ namespace Test.Monica.Configuration.Services.Support;
 
 public sealed class ConfigurationUnifiedVersionRollbackPreviewFactoryTests
 {
+    [Fact]
+    public async Task CreateAsync_WhenHistoricalManagedTargetIsNowStartup_ShouldFailBeforeReadingCurrentStore()
+    {
+        var definition = CreateDefinition("Definition.NowStartup", "NowStartup") with { Kind = ConfigurationKind.Startup };
+        var fixture = CreateFixture([definition], [CreateEffectiveDocument(definition, workerId: 1, version: 2)],
+            new Dictionary<string, int> { [definition.DefinitionKey] = 1 });
+
+        var preview = () => fixture.Factory.CreateAsync(CreateSnapshot((definition, "{\"WorkerId\":2}")),
+            TestContext.Current.CancellationToken);
+
+        await preview.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Startup*managed version*");
+        fixture.EffectiveValueStore.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData(ConfigurationValidationCapability.Unknown)]
     [InlineData(ConfigurationValidationCapability.ObjectCode)]

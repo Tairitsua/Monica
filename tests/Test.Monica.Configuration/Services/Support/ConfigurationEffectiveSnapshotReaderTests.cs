@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AwesomeAssertions;

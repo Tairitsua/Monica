@@ -30,11 +30,12 @@ public interface IModuleOptionReader
 /// Exposes the finalized option object and host-bound module graph to a composition callback.
 /// </summary>
 /// <typeparam name="TOptions">The current module's option type.</typeparam>
-public abstract class ModuleCompositionContext<TOptions>
+public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionContext
     where TOptions : class, IModuleOptions, new()
 {
     internal ModuleCompositionContext(ModuleConfigurationContext context)
     {
+        Composition = context.Registration.Application.Composition;
         Options = (TOptions)context.Registration.ModuleOption;
         Modules = new ModuleOptionReader(
             context.Registration.Application,
@@ -45,6 +46,9 @@ public abstract class ModuleCompositionContext<TOptions>
     /// Gets the current module's finalized option object.
     /// </summary>
     public TOptions Options { get; }
+
+    /// <inheritdoc />
+    public MonicaCompositionState Composition { get; }
 
     /// <summary>
     /// Gets the relationship-checked option reader for the current module.

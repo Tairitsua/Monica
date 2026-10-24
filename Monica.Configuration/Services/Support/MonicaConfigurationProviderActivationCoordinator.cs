@@ -3,6 +3,7 @@ using Monica.Configuration.Abstractions.Internal;
 using Monica.Configuration.Metrics;
 using Monica.Configuration.Models;
 using Monica.Configuration.Projection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Monica.Configuration.Services.Support;
 
@@ -21,6 +22,14 @@ internal sealed class MonicaConfigurationProviderActivationCoordinator(
     IConfigurationReloadCoordinator reloadCoordinator,
     ConfigurationMetricsRecorder metricsRecorder)
 {
+    internal static bool ShouldActivate(IConfigurationDefinitionRegistry definitions, IServiceProvider services)
+    {
+        var registered = definitions.GetAll();
+        if (registered.Any(definition => definition.Kind == ConfigurationKind.Managed)) return true;
+        return registered.Count == 0
+            && services.GetService<IServiceProviderIsService>()?.IsService(typeof(IConfigurationMetadataStore)) == true;
+    }
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _activated;
 

@@ -279,6 +279,10 @@
                                         <MudStack Spacing="0">
                                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                                                 <h2 class="configuration-definition-name">@_selectedDefinition.DisplayName</h2>
+                                                @if (_selectedDefinition.Kind == ConfigurationKind.Startup)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@L["Startup:Kind"]</MudChip>
+                                                }
                                             </MudStack>
                                             <code class="configuration-definition-key">@_selectedDefinition.DefinitionKey</code>
                                             @if (!string.IsNullOrWhiteSpace(_selectedDefinition.Description))
@@ -315,20 +319,23 @@
                                                     </MudChip>
                                                 </MudTooltip>
                                             }
-                                            <ConfigurationSchemaMetadataChip SchemaVersion="@_selectedDefinition.SchemaVersion"
-                                                                             DefinitionRevision="@_selectedDefinition.DefinitionRevision"
-                                                                             SchemaHash="@_selectedDefinition.SchemaHash"
-                                                                             ValidationContract="@_selectedDefinition.ValidationContract"
-                                                                             OnClick="() => OpenSelectedDefinitionPublicationAsync(ConfigurationDefinitionPublicationTab.RevisionHistory)" />
-                                            <MudTooltip Text="@L["State:Definitions:ReloadContributorsTooltip", ReloadBehaviorLabel(_selectedDefinition.ReloadBehavior)]">
-                                                <MudChip T="string"
-                                                         Size="Size.Small"
-                                                         Color="@ReloadBehaviorColor(_selectedDefinition.ReloadBehavior)"
-                                                         Variant="Variant.Outlined"
-                                                         OnClick="() => OpenSelectedDefinitionPublicationAsync(ConfigurationDefinitionPublicationTab.ReloadContributors)">
-                                                    @ReloadBehaviorLabel(_selectedDefinition.ReloadBehavior)
-                                                </MudChip>
-                                            </MudTooltip>
+                                            @if (_selectedDefinition.Kind != ConfigurationKind.Startup)
+                                            {
+                                                <ConfigurationSchemaMetadataChip SchemaVersion="@_selectedDefinition.SchemaVersion"
+                                                                                 DefinitionRevision="@_selectedDefinition.DefinitionRevision"
+                                                                                 SchemaHash="@_selectedDefinition.SchemaHash"
+                                                                                 ValidationContract="@_selectedDefinition.ValidationContract"
+                                                                                 OnClick="() => OpenSelectedDefinitionPublicationAsync(ConfigurationDefinitionPublicationTab.RevisionHistory)" />
+                                                <MudTooltip Text="@L["State:Definitions:ReloadContributorsTooltip", ReloadBehaviorLabel(_selectedDefinition.ReloadBehavior)]">
+                                                    <MudChip T="string"
+                                                             Size="Size.Small"
+                                                             Color="@ReloadBehaviorColor(_selectedDefinition.ReloadBehavior)"
+                                                             Variant="Variant.Outlined"
+                                                             OnClick="() => OpenSelectedDefinitionPublicationAsync(ConfigurationDefinitionPublicationTab.ReloadContributors)">
+                                                        @ReloadBehaviorLabel(_selectedDefinition.ReloadBehavior)
+                                                    </MudChip>
+                                                </MudTooltip>
+                                            }
                                             @if (CanMutateSelectedDefinition)
                                             {
                                                 <MudTooltip Text="@L["Common:Actions:EditJson"]">
@@ -339,13 +346,16 @@
                                                                    OnClick="OpenSelectedDefinitionJsonEditAsync" />
                                                 </MudTooltip>
                                             }
-                                            <MudTooltip Text="@L["History:Actions:ViewDefinitionHistory"]">
-                                                <MudIconButton Icon="@MoIcons.History"
-                                                               Size="Size.Small"
-                                                               Variant="Variant.Outlined"
-                                                               aria-label="@L["History:Actions:ViewDefinitionHistory"]"
-                                                                   OnClick="OpenSelectedDefinitionHistoryAsync" />
-                                            </MudTooltip>
+                                            @if (_selectedDefinition.Kind != ConfigurationKind.Startup)
+                                            {
+                                                <MudTooltip Text="@L["History:Actions:ViewDefinitionHistory"]">
+                                                    <MudIconButton Icon="@MoIcons.History"
+                                                                   Size="Size.Small"
+                                                                   Variant="Variant.Outlined"
+                                                                   aria-label="@L["History:Actions:ViewDefinitionHistory"]"
+                                                                       OnClick="OpenSelectedDefinitionHistoryAsync" />
+                                                </MudTooltip>
+                                            }
                                             @if (CanMutateSelectedDefinition)
                                             {
                                                 <MudTooltip Text="@L["ImportExport:Export:DefinitionAction"]">
@@ -379,6 +389,11 @@
                                             }
                                         </MudStack>
                                     </MudStack>
+
+                                    @if (_selectedDefinition.Kind == ConfigurationKind.Startup)
+                                    {
+                                        <ConfigurationStartupStatus Candidate="@_startupCandidate" />
+                                    }
 
                                     @if (IsSelectedDefinitionRetired)
                                     {

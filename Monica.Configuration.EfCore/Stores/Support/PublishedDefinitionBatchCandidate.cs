@@ -14,12 +14,14 @@ internal sealed class PublishedDefinitionBatchCandidate
         ConfigurationPublisherIdentity publisher,
         string publisherIdentity,
         IReadOnlyList<PublishedDefinitionPublisherStateCandidate> publisherStates,
-        IReadOnlyDictionary<string, PublishedDefinitionCandidate> definitionsByIdentity)
+        IReadOnlyDictionary<string, PublishedDefinitionCandidate> definitionsByIdentity,
+        IReadOnlySet<string> excludedDefinitionIdentities)
     {
         Publisher = publisher;
         PublisherIdentity = publisherIdentity;
         PublisherStates = publisherStates;
         _definitionsByIdentity = definitionsByIdentity;
+        ExcludedDefinitionIdentities = excludedDefinitionIdentities;
     }
 
     internal ConfigurationPublisherIdentity Publisher { get; }
@@ -27,6 +29,8 @@ internal sealed class PublishedDefinitionBatchCandidate
     internal string PublisherIdentity { get; }
 
     internal IReadOnlyList<PublishedDefinitionPublisherStateCandidate> PublisherStates { get; }
+
+    internal IReadOnlySet<string> ExcludedDefinitionIdentities { get; }
 
     internal IEnumerable<string> DefinitionIdentities => _definitionsByIdentity.Keys;
 
@@ -62,7 +66,8 @@ internal sealed class PublishedDefinitionBatchCandidate
             batch.Publisher,
             publisherIdentity,
             publisherStates,
-            definitionsByIdentity);
+            definitionsByIdentity,
+            batch.ExcludedDefinitionKeys.Select(ConfigurationDefinitionIdentity.Compute).ToHashSet(StringComparer.Ordinal));
     }
 
     internal bool MatchesCurrentPublisherAndCanonicalEnvelope(

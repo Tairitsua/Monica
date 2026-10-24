@@ -16,6 +16,9 @@ public sealed class ConfigurationAttribute : Attribute
 {
     private string? _sectionPath;
 
+    /// <summary>Gets or sets value ownership. Managed is the default; Startup requires an explicit section path.</summary>
+    public ConfigurationKind Kind { get; set; } = ConfigurationKind.Managed;
+
     /// <summary>
     /// Initializes a new configuration attribute without an explicit section path.
     /// The scanner derives the binding section from the module's configured section path convention.

@@ -29,6 +29,7 @@ public partial class ConfigurationStatePage
     private readonly Dictionary<LogicalPath, ConfigurationSourceDescriptor> _externalEffectiveSources = [];
     private ConfigurationDefinitionSummary? _selectedSummary;
     private ConfigurationDefinition? _selectedDefinition;
+    private ConfigurationStartupCandidate? _startupCandidate;
     private ConfigurationNodeDefinition? _selectedNode;
     private string _searchText = string.Empty;
     private ConfigurationDefinitionLifecycleFilter _lifecycleFilter = ConfigurationDefinitionLifecycleFilter.Active;
@@ -449,6 +450,7 @@ public partial class ConfigurationStatePage
         _loadingDefinition = false;
         _selectedSummary = null;
         _selectedDefinition = null;
+        _startupCandidate = null;
         _selectedNode = null;
         _highlightedPath = null;
         _effectiveValues.Clear();
@@ -673,6 +675,7 @@ public partial class ConfigurationStatePage
     {
         var selectedPath = resetSelection ? LogicalPath.Root : _selectedNode?.RelativePath ?? LogicalPath.Root;
         _selectedDefinition = state.Definition;
+        _startupCandidate = state.StartupCandidate;
         _definitionDetails[state.Definition.DefinitionKey] = state.Definition;
         _selectedNode = ResolveNodeByPath(state.Definition.Root, selectedPath) ?? state.Definition.Root;
         _effectiveValues.Clear();
@@ -736,7 +739,7 @@ public partial class ConfigurationStatePage
             .FirstOrDefault();
 
         return descendantSource
-               ?? sourceChain.Values
+               ?? (sourceChain.Kind == ConfigurationKind.Startup ? sourceChain.StartupValues : sourceChain.Values)
                    .Where(value => value.IsEffective)
                    .Select(value => value.Source)
                    .FirstOrDefault(IsExternalSource);

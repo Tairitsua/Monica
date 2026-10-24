@@ -9,6 +9,8 @@ public sealed class ConfigurationRuntimeContext
 {
     private IConfiguration? _configuration;
 
+    internal ConfigurationStartupOptionsReader? StartupOptions { get; set; }
+
     /// <summary>
     /// Gets the captured host configuration used by Monica.Configuration internals.
     /// </summary>

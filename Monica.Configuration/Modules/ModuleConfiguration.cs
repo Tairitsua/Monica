@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -120,6 +121,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
     public override void ConfigureBuilder(ModuleBuilderContext<ModuleConfigurationOption> context)
     {
         var builder = context.HostApplicationBuilder;
+        _runtimeContext.StartupOptions = ConfigurationStartupOptionsReader.For(context.Composition);
         ShapeAwareJsonConfigurationExtensions.PreserveJsonShapes(builder.Configuration);
         _definitionScanner = new ConfigurationDefinitionScanner(
             _schemaHasher,
@@ -153,28 +155,30 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton<IConfigurationOptionsInstanceValidationService, ConfigurationOptionsInstanceValidationService>();
         services.TryAddSingleton<IConfigurationEffectiveValueReader>(serviceProvider =>
             serviceProvider.GetRequiredService<IConfigurationEffectiveValueStore>());
-        services.TryAddSingleton<ConfigurationDefinitionResolver>();
+        services.TryAddSingleton(provider => new ConfigurationDefinitionResolver(
+            provider.GetRequiredService<IConfigurationDefinitionRegistry>(),
+            () => provider.GetService<IConfigurationMetadataStore>()));
         services.TryAddSingleton<ConfigurationEffectiveStateReader>();
         services.TryAddSingleton<IConfigurationStoreStateTracker, ConfigurationStoreStateTracker>();
-        services.TryAddSingleton<IConfigurationHistoryService, ConfigurationHistoryService>();
-        services.TryAddSingleton<
-            IConfigurationDefinitionChangeImpactService,
-            ConfigurationDefinitionChangeImpactService>();
-        services.TryAddSingleton<IConfigurationMutationBatchStore, SequentialConfigurationMutationBatchStore>();
-        services.TryAddSingleton<IConfigurationMutationGroupService, ConfigurationMutationGroupService>();
+        // Store capabilities are resolved on use so Startup-only hosts remain valid with service validation enabled.
+        services.TryAddSingleton<IConfigurationHistoryService>(provider => ActivatorUtilities.CreateInstance<ConfigurationHistoryService>(provider));
+        services.TryAddSingleton<IConfigurationDefinitionChangeImpactService>(provider =>
+            ActivatorUtilities.CreateInstance<ConfigurationDefinitionChangeImpactService>(provider));
+        services.TryAddSingleton<IConfigurationMutationBatchStore>(provider => ActivatorUtilities.CreateInstance<SequentialConfigurationMutationBatchStore>(provider));
+        services.TryAddSingleton<IConfigurationMutationGroupService>(provider => ActivatorUtilities.CreateInstance<ConfigurationMutationGroupService>(provider));
         services.TryAddSingleton<ConfigurationRuntimeSnapshotLock>();
-        services.TryAddSingleton<IConfigurationMutationGroupApplyService, ConfigurationMutationGroupApplyService>();
-        services.TryAddSingleton<IConfigurationRollbackService, ConfigurationRollbackService>();
-        services.TryAddSingleton<IConfigurationUnifiedVersionService, ConfigurationUnifiedVersionService>();
-        services.TryAddSingleton<IConfigurationUnifiedVersionCoordinator, ConfigurationUnifiedVersionCoordinator>();
-        services.TryAddSingleton<ConfigurationEffectiveSnapshotReader>();
+        services.TryAddSingleton<IConfigurationMutationGroupApplyService>(provider => ActivatorUtilities.CreateInstance<ConfigurationMutationGroupApplyService>(provider));
+        services.TryAddSingleton<IConfigurationRollbackService>(provider => ActivatorUtilities.CreateInstance<ConfigurationRollbackService>(provider));
+        services.TryAddSingleton<IConfigurationUnifiedVersionService>(provider => ActivatorUtilities.CreateInstance<ConfigurationUnifiedVersionService>(provider));
+        services.TryAddSingleton<IConfigurationUnifiedVersionCoordinator>(provider => ActivatorUtilities.CreateInstance<ConfigurationUnifiedVersionCoordinator>(provider));
+        services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<ConfigurationEffectiveSnapshotReader>(provider));
         services.TryAddSingleton<ConfigurationUnifiedVersionSnapshotFactory>();
         services.TryAddSingleton<ConfigurationUnifiedVersionRollbackPreviewFactory>();
         services.TryAddSingleton<ConfigurationRollbackPersistencePlanner>();
         services.TryAddSingleton<IConfigurationReloadCoordinator, ConfigurationProviderReloadCoordinator>();
         services.TryAddSingleton<IConfigurationReloadSignalReceiver, ConfigurationReloadSignalReceiver>();
         services.TryAddSingleton<ConfigurationReloadNotificationDispatcher>();
-        services.TryAddSingleton<IConfigurationReloadBroadcastService, ConfigurationReloadBroadcastService>();
+        services.TryAddSingleton<IConfigurationReloadBroadcastService>(provider => ActivatorUtilities.CreateInstance<ConfigurationReloadBroadcastService>(provider));
         services.TryAddSingleton(_schemaHasher);
         services.TryAddSingleton<ConfigurationStoredValueCodec>();
         services.TryAddSingleton<ConfigurationValueValidationEngine>();
@@ -194,7 +198,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton(_providerAccessor);
         services.TryAddSingleton<ConfigurationMetricsRecorder>();
         services.TryAddSingleton<ConfigurationPublisherIdentityProvider>();
-        services.TryAddSingleton<MonicaConfigurationProviderActivationCoordinator>();
+        services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<MonicaConfigurationProviderActivationCoordinator>(provider));
         services.AddHostedService<MonicaConfigurationProviderActivationHostedService>();
         services.TryAddSingleton<ConfigurationFacade>();
     }
@@ -203,8 +207,11 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
     public override void ConfigureApplicationBuilder(WebModuleContext<ModuleConfigurationOption> context)
     {
         var app = context.ApplicationBuilder;
-        var activationCoordinator = app.ApplicationServices.GetRequiredService<MonicaConfigurationProviderActivationCoordinator>();
-        activationCoordinator.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult();
+        if (MonicaConfigurationProviderActivationCoordinator.ShouldActivate(_definitionRegistry, app.ApplicationServices))
+        {
+            var activationCoordinator = app.ApplicationServices.GetRequiredService<MonicaConfigurationProviderActivationCoordinator>();
+            activationCoordinator.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
 
         var validationService = app.ApplicationServices.GetRequiredService<IConfigurationRuntimeValidationService>();
         var metricsRecorder = app.ApplicationServices.GetRequiredService<ConfigurationMetricsRecorder>();
@@ -262,7 +269,9 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
             ?? throw new InvalidOperationException($"{nameof(ModuleConfiguration)} services have not been configured.");
         var analysis = Volatile.Read(ref _definitionAnalysis);
 
-        foreach (var registration in analysis.Registrations)
+        _runtimeContext.StartupOptions!.RegisterDefinitions(analysis.Registrations);
+
+        foreach (var registration in analysis.Registrations.Where(registration => registration.Definition.Kind == ConfigurationKind.Managed))
         {
             RegisterOptionsBinding(
                 services,

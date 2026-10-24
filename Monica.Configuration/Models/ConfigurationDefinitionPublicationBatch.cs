@@ -55,6 +55,8 @@ public sealed record ConfigurationDefinitionPublication
     public static ConfigurationDefinitionPublication FromDefinition(ConfigurationDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException("Startup configuration cannot be published to the managed metadata store.");
         return new ConfigurationDefinitionPublication
         {
             Definition = definition,
@@ -88,6 +90,9 @@ public sealed record ConfigurationDefinitionPublicationBatch
     /// Gets the complete publication snapshot.
     /// </summary>
     public required IReadOnlyList<ConfigurationDefinitionPublication> Publications { get; init; }
+
+    /// <summary>Gets deployment-owned keys excluded from both publication and withdrawal of historical publisher state.</summary>
+    public IReadOnlyList<string> ExcludedDefinitionKeys { get; init; } = [];
 
     /// <summary>
     /// Creates and validates a complete publication batch.
@@ -132,9 +137,10 @@ public sealed record ConfigurationDefinitionPublicationBatch
                 nameof(publisher.Version));
         }
 
-        var publications = definitions.Select(ConfigurationDefinitionPublication.FromDefinition).ToArray();
-        var duplicateKey = publications
-            .GroupBy(static publication => publication.Definition.DefinitionKey, StringComparer.OrdinalIgnoreCase)
+        var publications = definitions.Where(definition => definition.Kind == ConfigurationKind.Managed)
+            .Select(ConfigurationDefinitionPublication.FromDefinition).ToArray();
+        var duplicateKey = definitions
+            .GroupBy(static definition => definition.DefinitionKey, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(static group => group.Skip(1).Any())?.Key;
         if (duplicateKey is not null)
         {
@@ -146,7 +152,9 @@ public sealed record ConfigurationDefinitionPublicationBatch
         return new ConfigurationDefinitionPublicationBatch
         {
             Publisher = normalizedPublisher,
-            Publications = publications
+            Publications = publications,
+            ExcludedDefinitionKeys = definitions.Where(definition => definition.Kind == ConfigurationKind.Startup)
+                .Select(definition => definition.DefinitionKey).ToArray()
         };
     }
 

@@ -9,7 +9,7 @@ namespace Monica.Core.Modularity.Abstractions;
 /// A builder instance is valid only inside the callback passed to <c>AddMonica</c>.
 /// Module registration and configuration are recorded first, then validated and applied to the owning host.
 /// </remarks>
-public interface IMonicaBuilder
+public interface IMonicaBuilder : IMonicaCompositionContext
 {
     /// <summary>
     /// Configures application identity defaults shared by modules in this host.

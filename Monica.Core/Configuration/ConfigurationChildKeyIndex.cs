@@ -1,17 +1,19 @@
 using Microsoft.Extensions.Configuration;
 
-namespace Monica.Configuration.Binding;
+namespace Monica.Core.Configuration;
 
 /// <summary>
 /// Indexes immediate child keys for providers that replace their data dictionary on every write.
 /// The dictionary identity invalidates the index even when Set does not raise a reload notification.
 /// </summary>
-internal sealed class ConfigurationChildKeyIndex
+public sealed class ConfigurationChildKeyIndex
 {
     private readonly Lock _gate = new();
     private Snapshot? _snapshot;
 
-    internal IEnumerable<string> GetChildKeys(IDictionary<string, string?> data,
+    /// <summary>Gets sorted immediate children, preserving the standard provider's duplicate-key semantics.</summary>
+    /// <remarks>Replace the supplied dictionary on every write; mutating it in place cannot invalidate the index.</remarks>
+    public IEnumerable<string> GetChildKeys(IDictionary<string, string?> data,
         IEnumerable<string> earlierKeys, string? parentPath)
     {
         var snapshot = Volatile.Read(ref _snapshot);

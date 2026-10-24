@@ -2,6 +2,7 @@ using Monica.Configuration.Abstractions;
 using Monica.Configuration.Abstractions.Internal;
 using Monica.Configuration.Models;
 using Monica.Configuration.Projection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Monica.Configuration.Services;
 
@@ -10,7 +11,7 @@ namespace Monica.Configuration.Services;
 /// </summary>
 internal sealed class ConfigurationRuntimeReloadService(
     IConfigurationDefinitionRegistry definitionRegistry,
-    IConfigurationEffectiveValueStore effectiveValueStore,
+    IServiceProvider services,
     IConfigurationReloadCoordinator reloadCoordinator,
     MonicaConfigurationProviderAccessor providerAccessor)
     : IConfigurationRuntimeReloadService
@@ -19,10 +20,13 @@ internal sealed class ConfigurationRuntimeReloadService(
     public async Task<ConfigurationReloadStatusReport> GetStatusAsync(CancellationToken cancellationToken)
     {
         var statuses = new List<ConfigurationDefinitionReloadStatus>();
-        foreach (var definition in definitionRegistry.GetAll().OrderBy(static definition => definition.DisplayName, StringComparer.OrdinalIgnoreCase))
+        var definitions = definitionRegistry.GetAll().Where(static definition => definition.Kind == ConfigurationKind.Managed)
+            .OrderBy(static definition => definition.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+        var effectiveValueStore = definitions.Length == 0 ? null : services.GetRequiredService<IConfigurationEffectiveValueStore>();
+        foreach (var definition in definitions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var document = await effectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
+            var document = await effectiveValueStore!.GetAsync(definition.DefinitionKey, cancellationToken);
             var runtimeVersion = providerAccessor.Provider?.GetLoadedVersion(definition.DefinitionKey);
             statuses.Add(new ConfigurationDefinitionReloadStatus
             {
@@ -39,7 +43,7 @@ internal sealed class ConfigurationRuntimeReloadService(
         return new ConfigurationReloadStatusReport
         {
             GeneratedAt = DateTimeOffset.UtcNow,
-            EffectiveValueStore = effectiveValueStore.Descriptor,
+            EffectiveValueStore = effectiveValueStore?.Descriptor,
             Runtime = providerAccessor.Provider?.GetReloadState() ?? new ConfigurationRuntimeReloadState(),
             Definitions = statuses
         };

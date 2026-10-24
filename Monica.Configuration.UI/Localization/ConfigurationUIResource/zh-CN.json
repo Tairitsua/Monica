@@ -16,8 +16,23 @@
       "Title": "配置存储"
     }
   },
+  "Startup": {
+    "Kind": "启动配置",
+    "ReadOnly": "启动配置由部署管理，此处只读。修改启动输入并重启服务后才能生效；当前运行值保持启动时的快照。",
+    "CandidateUnavailable": "当前启动候选配置不可用。",
+    "RestartRequired": "需要重启",
+    "Unchanged": "与启动快照一致",
+    "InvalidCandidate": "候选配置校验未通过。请修正输入后再重启；当前运行值未改变。",
+    "CandidateValidation": "启动候选配置校验",
+    "ActualValue": "运行值 · 启动时冻结",
+    "CandidateValue": "候选值 · 当前启动输入",
+    "ActualUnavailable": "无法获取启动时冻结的运行值。",
+    "ActualSources": "启动时的来源快照",
+    "CandidateSources": "当前候选值的来源",
+    "SourceContributions": "这些贡献数量描述当前候选配置的提供程序。运行值仍保持启动时的快照；查看字段的来源链可检查其启动来源。"
+  },
   "State": {
-    "Subtitle": "查看受管配置定义，暂存修改，并作为一个审计组保存。",
+    "Subtitle": "查看配置值及其来源，并在保存前审阅受管配置修改。",
     "SearchPlaceholder": "搜索配置定义或配置项",
     "Definitions": {
       "Empty": "未找到配置定义。",
@@ -130,6 +145,7 @@
       "Title": "Reload 状态",
       "OpenDetails": "查看 Reload 状态",
       "Unavailable": "Reload 状态不可用。",
+      "NoManagedDefinitions": "本服务没有需要 Reload 的本地 Managed 配置。Startup 配置变更需要重启。",
       "ProviderInactive": "Monica 运行时配置 Provider 尚未激活。",
       "CurrentSummary": "运行时配置版本与有效值存储一致。",
       "DriftSummary": "发现 {0} 个配置定义的运行时版本与有效值存储不一致。",

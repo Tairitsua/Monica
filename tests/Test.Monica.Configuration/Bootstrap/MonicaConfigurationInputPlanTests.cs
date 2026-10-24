@@ -17,6 +17,26 @@ public sealed class MonicaConfigurationInputPlanTests
     private const string DEFINITION_KEY = "test.configuration.input-plan";
 
     [Fact]
+    public void LoadEffectiveOptionsSnapshot_WhenTypeIsStartup_ShouldRejectBeforeOpeningManagedReader()
+    {
+        using var directory = new TemporaryConfigurationDirectory();
+        var composition = new RecordingStoreComposition("Recording");
+        var plan = MonicaConfigurationInputPlan.Create(inputs => inputs.UseConfigurationStore(composition));
+        using var bootstrap = plan.BuildBootstrapConfiguration(directory.CreateHostBuilder());
+
+        var load = () => plan.LoadEffectiveOptionsSnapshot(bootstrap, [typeof(StartupInputOptions)]);
+
+        load.Should().Throw<InvalidOperationException>().WithMessage("*GetStartupOptions*managed input plan*");
+        composition.CreatedReaders.Should().BeEmpty();
+    }
+
+    [Configuration("StartupInput", Kind = ConfigurationKind.Startup)]
+    private sealed class StartupInputOptions
+    {
+        public int WorkerId { get; set; } = 1;
+    }
+
+    [Fact]
     public void Create_WhenStoreIsMissing_ShouldRejectPlan()
     {
         Action create = () => MonicaConfigurationInputPlan.Create(inputs => inputs

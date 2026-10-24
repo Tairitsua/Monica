@@ -19,7 +19,7 @@
         {
             <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_error</MudAlert>
         }
-        else if (_chain is null || _chain.Values.Count == 0)
+        else if (_chain is null || (_chain.Values.Count == 0 && _chain.StartupActualValue is null))
         {
             <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info">@L["Sources:Chain:Empty"]</MudAlert>
         }
@@ -27,46 +27,62 @@
         {
             <MudStack Spacing="2">
                 <code class="configuration-source-chain-path">@_chain.ConfigurationPath</code>
-                @foreach (var value in _chain.Values)
+                @if (_chain.Kind == ConfigurationKind.Startup)
                 {
-                    <div class="@SourceCardClass(value)">
-                    <MudPaper Square="true" Elevation="0" Class="configuration-source-card">
-                        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
-                            <MudStack Spacing="0">
-                                <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudText Typo="Typo.subtitle2">@value.Source.DisplayName</MudText>
-                                    @if (value.IsEffective)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="configuration-source-effective">@L["Sources:Effective"]</MudChip>
-                                    }
-                                    <MudChip T="int" Size="Size.Small" Variant="Variant.Outlined">@value.Source.PriorityIndex</MudChip>
+                    <ConfigurationStartupStatus Candidate="@_chain.StartupActualValue?.StartupCandidate" />
+                    <ConfigurationStartupValues Value="@_chain.StartupActualValue" />
+                }
+                @foreach (var group in SourceGroups)
+                {
+                    @if (group.Label is not null)
+                    {
+                        <MudText Typo="Typo.subtitle2">@group.Label</MudText>
+                    }
+                    @if (group.Values.Count == 0)
+                    {
+                        <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Sources:Chain:Empty"]</MudAlert>
+                    }
+                    @foreach (var value in group.Values)
+                    {
+                        <div class="@SourceCardClass(value)">
+                        <MudPaper Square="true" Elevation="0" Class="configuration-source-card">
+                            <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                                <MudStack Spacing="0">
+                                    <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudText Typo="Typo.subtitle2">@value.Source.DisplayName</MudText>
+                                        @if (value.IsEffective)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="configuration-source-effective">@L["Sources:Effective"]</MudChip>
+                                        }
+                                        <MudChip T="int" Size="Size.Small" Variant="Variant.Outlined">@value.Source.PriorityIndex</MudChip>
+                                    </MudStack>
+                                    <code class="configuration-source-chain-path">@SourcePath(value.Source)</code>
                                 </MudStack>
-                                <code class="configuration-source-chain-path">@SourcePath(value.Source)</code>
+                                <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="@(_chain.Kind != ConfigurationKind.Startup && value.Source.IsWritable ? "configuration-source-writable" : null)">
+                                        @(_chain.Kind != ConfigurationKind.Startup && value.Source.IsWritable ? L["Sources:Writable"] : L["Sources:ReadOnly"])
+                                    </MudChip>
+                                    @if (CanEdit(value))
+                                    {
+                                        <MudTooltip Text="@L["Sources:Actions:EditSource"]">
+                                            <MudIconButton Icon="@MoIcons.Edit"
+                                                           aria-label="@L["Sources:Actions:EditSource"]"
+                                                           Size="Size.Small"
+                                                           Color="Color.Default"
+                                                           OnClick="() => EditSourceAsync(value)" />
+                                        </MudTooltip>
+                                    }
+                                </MudStack>
                             </MudStack>
-                            <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="@(value.Source.IsWritable ? "configuration-source-writable" : null)">
-                                    @(value.Source.IsWritable ? L["Sources:Writable"] : L["Sources:ReadOnly"])
-                                </MudChip>
-                                @if (CanEdit(value))
-                                {
-                                    <MudTooltip Text="@L["Sources:Actions:EditSource"]">
-                                        <MudIconButton Icon="@MoIcons.Edit"
-                                                       aria-label="@L["Sources:Actions:EditSource"]"
-                                                       Size="Size.Small"
-                                                       Color="Color.Default"
-                                                       OnClick="() => EditSourceAsync(value)" />
-                                    </MudTooltip>
-                                }
-                            </MudStack>
-                        </MudStack>
-                        <MudDivider Class="my-2" />
-                        <p class="configuration-source-chain-value">@DisplayValue(value)</p>
-                        @if (!value.Source.IsWritable && !string.IsNullOrWhiteSpace(value.Source.ReadOnlyReason))
-                        {
-                            <p class="configuration-source-chain-reason">@value.Source.ReadOnlyReason</p>
-                        }
-                    </MudPaper>
-                    </div>
+                            <MudDivider Class="my-2" />
+                            <p class="configuration-source-chain-value">@DisplayValue(value)</p>
+                            @if (!value.Source.IsWritable && !string.IsNullOrWhiteSpace(value.Source.ReadOnlyReason))
+                            {
+                                <p class="configuration-source-chain-reason">@value.Source.ReadOnlyReason</p>
+                            }
+                        </MudPaper>
+                        </div>
+                    }
                 }
             </MudStack>
         }
@@ -113,8 +129,26 @@
     }
 
     private bool CanEdit(ConfigurationSourceValue value) => !_operations.IsRetired && _allowSourceEdit
+        && _definition.Kind != ConfigurationKind.Startup
         && _node.RelativePath.Equals(_path) && value.Source.IsWritable
         && value.Source.Kind == ConfigurationSourceKind.JsonFile;
+
+    private IEnumerable<(string? Label, IReadOnlyList<ConfigurationSourceValue> Values)> SourceGroups
+    {
+        get
+        {
+            if (_chain is null) yield break;
+            if (_chain.Kind == ConfigurationKind.Startup)
+            {
+                yield return (L["Startup:ActualSources"], _chain.StartupValues);
+                yield return (L["Startup:CandidateSources"], _chain.Values);
+            }
+            else
+            {
+                yield return (null, _chain.Values);
+            }
+        }
+    }
 
     private async Task LoadAsync()
     {

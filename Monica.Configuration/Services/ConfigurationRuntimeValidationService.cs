@@ -117,8 +117,10 @@ internal sealed class ConfigurationRuntimeValidationService(
             return report;
         }
 
-        report = ConfigurationValidationReportFactory.Create(definition,
-            validationCoordinator.ValidateConfiguration(definition, runtimeContext.Configuration), sourceInspector);
+        report = definition.Kind == ConfigurationKind.Startup
+            ? runtimeContext.StartupOptions!.GetRequired(definition).ValidationReport
+            : ConfigurationValidationReportFactory.Create(definition,
+                validationCoordinator.ValidateConfiguration(definition, runtimeContext.Configuration), sourceInspector);
         _definitionReports[definition.DefinitionKey] = report;
         return report;
     }

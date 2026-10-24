@@ -26,6 +26,8 @@ public sealed class ConfigurationEffectiveValueSeed
     public ConfigurationEffectiveValueSeed(ConfigurationDefinition definition, Func<string> seedJsonFactory)
     {
         Definition = definition ?? throw new ArgumentNullException(nameof(definition));
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Startup configuration '{definition.DefinitionKey}' cannot be seeded into a managed store.");
         ArgumentNullException.ThrowIfNull(seedJsonFactory);
         _seedJson = new Lazy<string>(
             () => seedJsonFactory()

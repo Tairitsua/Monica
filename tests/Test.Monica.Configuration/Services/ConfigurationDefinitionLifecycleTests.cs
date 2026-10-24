@@ -12,6 +12,52 @@ namespace Test.Monica.Configuration.Services;
 public sealed class ConfigurationDefinitionLifecycleTests
 {
     [Fact]
+    public async Task Resolver_WhenStartupSharesLegacyManagedKey_ShouldIgnoreItsMetadataAndKeepRemoteManagedCatalog()
+    {
+        var startup = CreatePersistableDefinition("Test.Startup.Ownership") with { Kind = ConfigurationKind.Startup };
+        var registry = new ConfigurationDefinitionRegistry();
+        registry.Register(startup);
+        var store = Substitute.For<IConfigurationMetadataStore>();
+        var remote = CreatePersistableDefinition("Test.Remote.Managed");
+        store.ListPublishedDefinitionEntriesAsync(Arg.Any<CancellationToken>()).Returns(
+            [CreateEntry(startup with { Kind = ConfigurationKind.Managed, SchemaVersion = 31 }, ConfigurationDefinitionLifecycleState.Retired),
+                CreateEntry(remote, ConfigurationDefinitionLifecycleState.Active)]);
+        var resolver = new ConfigurationDefinitionResolver(registry, store);
+
+        (await resolver.GetRequiredAsync(startup.DefinitionKey, CancellationToken.None)).Should().BeSameAs(startup);
+        await store.DidNotReceiveWithAnyArgs().GetPublishedDefinitionEntryAsync(startup.DefinitionKey, TestContext.Current.CancellationToken);
+        var definitions = await resolver.GetMergedDefinitionsAsync(CancellationToken.None);
+        definitions.Single(definition => definition.Kind == ConfigurationKind.Startup).SchemaVersion.Should().Be(startup.SchemaVersion);
+        definitions.Should().Contain(definition => definition.DefinitionKey == remote.DefinitionKey);
+        var catalog = await resolver.GetDiagnosticCatalogAsync(CancellationToken.None);
+        catalog.Entries.Single(entry => entry.Definition?.Kind == ConfigurationKind.Startup).Availability.Should().Be(ConfigurationDefinitionAvailability.Available);
+        catalog.Entries.Single(entry => entry.Definition?.Kind == ConfigurationKind.Startup).PublishedMetadata.Should().BeNull();
+
+        registry.Register(CreatePersistableDefinition("Test.Managed.Ownership"));
+        var mixed = await resolver.GetMergedDefinitionsAsync(CancellationToken.None);
+        mixed.Single(definition => definition.DefinitionKey == startup.DefinitionKey).SchemaVersion.Should().Be(startup.SchemaVersion);
+        (await resolver.GetDiagnosticCatalogAsync(CancellationToken.None)).Entries
+            .Single(entry => entry.Definition?.Kind == ConfigurationKind.Startup).PublishedMetadata.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetDiagnosticCatalog_WhenConfiguredStoreCannotOpen_ShouldKeepStartupAvailableWithoutDisclosingStoreFailure()
+    {
+        var startup = CreatePersistableDefinition("Test.Startup.UnavailableStore") with { Kind = ConfigurationKind.Startup };
+        var registry = new ConfigurationDefinitionRegistry();
+        registry.Register(startup);
+        var resolver = new ConfigurationDefinitionResolver(registry,
+            () => throw new InvalidOperationException("synthetic-connection-secret"));
+
+        var catalog = await resolver.GetDiagnosticCatalogAsync(TestContext.Current.CancellationToken);
+
+        catalog.Entries.Single().Availability.Should().Be(ConfigurationDefinitionAvailability.Available);
+        catalog.Entries.Single().Definition.Should().BeEquivalentTo(startup);
+        catalog.StoreDiagnostic.Should().NotBeNull();
+        catalog.StoreDiagnostic!.Message.Should().NotContain("synthetic-connection-secret");
+    }
+
+    [Fact]
     public async Task Resolver_WhenPublishedDefinitionIsRetired_ShouldHideItOperationallyButKeepItDiagnostic()
     {
         var active = CreatePersistableDefinition("Test.Lifecycle.Active");

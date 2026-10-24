@@ -6,7 +6,8 @@ namespace Monica.Configuration.Services;
 /// <summary>
 /// Default application-level history service backed by the selected history store.
 /// </summary>
-internal sealed class ConfigurationHistoryService(IConfigurationHistoryStore historyStore) : IConfigurationHistoryService
+internal sealed class ConfigurationHistoryService(IConfigurationHistoryStore historyStore,
+    IConfigurationDefinitionRegistry? definitions = null) : IConfigurationHistoryService
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<ConfigurationValueHistory>> GetHistoryAsync(
@@ -26,6 +27,7 @@ internal sealed class ConfigurationHistoryService(IConfigurationHistoryStore his
         string? mutationGroupId,
         CancellationToken cancellationToken)
     {
+        RequireManagedScope(definitionKey);
         return Sort(await historyStore.QueryHistoryAsync(from, to, definitionKey, logicalPath, mutationGroupId, cancellationToken));
     }
 
@@ -35,8 +37,16 @@ internal sealed class ConfigurationHistoryService(IConfigurationHistoryStore his
         CancellationToken cancellationToken)
     {
         request.Validate();
+        RequireManagedScope(request.DefinitionKey);
         var page = await historyStore.QueryHistoryPageAsync(request, cancellationToken);
         return page with { Items = Sort(page.Items) };
+    }
+
+    private void RequireManagedScope(string? definitionKey)
+    {
+        if (definitionKey is not null && definitions?.TryGet(definitionKey, out var definition) == true
+            && definition?.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Startup configuration '{definitionKey}' has no managed history. Historical managed records remain available in the global audit.");
     }
 
     /// <inheritdoc />

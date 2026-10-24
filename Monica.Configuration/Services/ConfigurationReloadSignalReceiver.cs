@@ -85,7 +85,8 @@ internal sealed class ConfigurationReloadSignalReceiver(
 
     private bool ShouldReloadDefinition(ConfigurationReloadDefinitionVersion definition)
     {
-        if (!definitionRegistry.TryGet(definition.DefinitionKey, out _))
+        if (!definitionRegistry.TryGet(definition.DefinitionKey, out var local)
+            || local?.Kind == ConfigurationKind.Startup)
         {
             return false;
         }

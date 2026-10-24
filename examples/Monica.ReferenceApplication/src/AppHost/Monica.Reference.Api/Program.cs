@@ -2,6 +2,7 @@ using Monica.ApplicationModel.Models;
 using Monica.Configuration.Bootstrap;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
+using Monica.Reference.Api.Configurations;
 using Monica.Reference.UI.Layout;
 using Monica.Reference.UI.Localization;
 
@@ -16,6 +17,8 @@ var configurationInputPlan = MonicaConfigurationInputPlan.Create(inputs => input
 
 builder.AddMonica(monica =>
 {
+    var diagnostics = monica.GetStartupOptions<ReferenceUIOptions>();
+
     monica.ConfigureApplication(options =>
     {
         options.ProjectName = "Monica.Reference.Api";
@@ -49,9 +52,10 @@ builder.AddMonica(monica =>
         options.AddPageAssembly(typeof(OrderingLayout).Assembly);
     });
     monica.AddLocalization(options => options.AddResource<OrderingUIResource>());
-    if (builder.Configuration.GetValue<bool>("ReferenceUI:EnableDiagnostics"))
+    if (diagnostics.EnableDiagnostics)
     {
         monica.AddModuleSystemUI();
+        monica.AddConfigurationUI();
     }
 #if DEBUG || MONICA_HTTP_ENDPOINTS
     monica.AddSwagger(options =>
@@ -99,7 +103,7 @@ app.MapGet("/overview", () => Results.Ok(new
     },
     runtime = new
     {
-        configuration = "Ordering options are projected from the local Monica configuration store.",
+        configuration = "Ordering options use the local Monica store; ReferenceUI startup options remain fixed until restart.",
         consistency = "Requests use operation scopes; the process-local demo repository has no transactional rollback.",
         approvalEvent = "The demo publishes locally after updating its dictionary; durable applications use the transactional outbox.",
         scheduler = "WorkerOrderBacklogReport runs every minute only on the ordering.reporting owner, with in-memory scheduler state."

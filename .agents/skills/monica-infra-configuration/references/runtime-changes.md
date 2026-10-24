@@ -2,6 +2,12 @@
 
 Register `AddConfiguration(plan)` using the [input plan and store](bootstrap-and-stores.md). `ConfigurationFacade` owns inspection, preview, mutation, history, rollback, and reload. Check each returned `Res<T>`; a failed apply can carry a structured rejection in its original `Data`, and a persisted operation can report `PostCommitIssues`.
 
+## Startup configuration
+
+The Values page labels definitions with `ConfigurationKind.Startup` as **Startup** and explains their deployment-owned, read-only boundary. Its field rows show the frozen running value alongside the current startup-input candidate. The candidate's runtime-provided validation and `RequiresRestart` status govern the notice; the UI does not compare masked text, apply candidates, or expose source editing, JSON editing, or managed history for these definitions. Managed import/export packages exclude Startup definitions. Invalid candidates remain inspectable and do not replace the running value. Change the startup input through the deployment or local environment file, fix validation errors, and restart to adopt it.
+
+The source-chain dialog separates the frozen startup contributors from the current candidate providers. Definition-level source contribution counts describe current candidate providers, not adoption by the running service. Running values, candidate values, and both source chains use the same sensitive-value disclosure policy as managed configuration. Refresh reads a new candidate assessment while preserving the process's frozen startup snapshot.
+
 ## Find the winning source
 
 Use `GetDefinitionsAsync()` to discover definition keys or `GetDefinitionStateAsync(definitionKey)` for a schema, effective document version, and display-safe values. A definition key is [distinct from its binding section](options-and-validation.md). Source inspection is local to scanned definitions. For the aliased Orders example, `GetSourceChainAsync("orders", LogicalPath.FromProperties("minimum"))` returns contributions in priority order and marks the effective source. Use configuration aliases in paths, not `nameof(OrdersOptions.MinimumBatchSize)`.

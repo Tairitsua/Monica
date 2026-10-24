@@ -27,6 +27,7 @@ public partial class ConfigurationDefinitionSourcesDialog
     private readonly List<ConfigurationDefinitionSourceContribution> _contributions = [];
     private string _definitionKey = string.Empty;
     private string _definitionDisplayName = string.Empty;
+    private ConfigurationKind _definitionKind;
     private string? _error;
     private string? _fileError;
     private string? _fileOpenerSourceKey;
@@ -37,6 +38,7 @@ public partial class ConfigurationDefinitionSourcesDialog
     {
         _definitionKey = Definition.DefinitionKey;
         _definitionDisplayName = Definition.DisplayName;
+        _definitionKind = Definition.Kind;
         try
         {
             await _operations.RunAsync(async _ =>

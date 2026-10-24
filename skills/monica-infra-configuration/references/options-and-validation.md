@@ -1,4 +1,14 @@
-# Managed options and validation
+# Configuration ownership and validation
+
+`ConfigurationKind.Managed` is the default and retains store-backed binding, operator changes, and ordinary Microsoft options lifetimes. Select `ConfigurationKind.Startup` explicitly for deployment-owned construction inputs. Both use the same definition schema, binder, portable constraints, pure object rules, and sensitivity annotations; ownership changes lifecycle and permitted operations, not the validation language.
+
+Startup owners require an explicit section path and use `RequiresRestart` throughout their schema. Do not declare `OnlineReloadable` or `StaticAfterStartup` node overrides. The early `GetStartupOptions<T>()` read and all later default-name options APIs share one validated frozen object. All discovered Startup definitions are validated before composition finishes; invalid values always fail, regardless of managed diagnostic policy. Configure/PostConfigure, named options, options validators, change tokens, and custom options services are unsupported. Put cross-field rules in `IValidatableObject`; keep resource-dependent enablement prerequisites in their owner. See [startup inputs](bootstrap-and-stores.md) for composition and source capture.
+
+Startup has no managed effective document, publication, mutation, history creation, unified-version capture, or parameter transfer. Its operator UI shows frozen actual values and provenance alongside the current deployment candidate, validation failures, and restart status. The runtime compares unmasked normalized values; a sensitive value change still requires restart even though both displayed values are redacted. An invalid or unavailable candidate never replaces the actual object. Startup actual validation is cached from composition; current candidate validation is separate.
+
+If a local key changes from Managed to Startup, current reads ignore its old managed document and metadata. Publication does not rewrite or retire that key's historical metadata; no new Startup document is seeded. Historical managed audit records and version snapshots remain visible in global audit views. Current Startup history/detail operations cannot treat them as authority, and attempts to apply or roll back a currently Startup target fail. No migration silently deletes history or converts stored values into deployment inputs.
+
+## Managed options
 
 Register `AddConfiguration(plan)` using an [input plan and store](bootstrap-and-stores.md), then declare a concrete options owner with `[Configuration]`. The module discovers annotated types in the host's configured type-discovery scope and registers Microsoft options binding and validation for the default options name.
 
@@ -61,7 +71,7 @@ Read coverage and scope before interpreting a report:
 
 `ConfigurationDefinition.ValidationContract` publishes `Capability` (`Unknown`, `PortableOnly`, or `ObjectCode`) and a validation `Revision` independent of the structural `SchemaHash`. Portable-only revisions derive from stable schema content, so an unchanged options assembly rebuild does not create a metadata revision. Object-code revisions include executable assembly identities to invalidate reviewed operations after code changes. Publication summaries identify validation capability/revision changes explicitly, and metadata-only history exposes the actual schema JSON diff. Local discovery owns executable types. Published `ClrTypeName` metadata never authorizes loading code. A published PortableOnly contract can be complete only with an affirmative revision and complete portable shape. Without a local descriptor, ObjectCode or Unknown metadata remains SchemaOnly and cannot authorize a complete write or rollback. Metadata that impersonates a local descriptor with a mismatched origin, schema, section, or executable contract causes a contract fault. There is no owner-validation transport. Legacy metadata defaults to Unknown with no revision.
 
-## Startup and actual options policy
+## Managed activation and actual options policy
 
 `ModuleConfigurationOption.RuntimeValidationBehavior` defaults to `DiagnosticOnly`:
 
@@ -76,7 +86,7 @@ Read coverage and scope before interpreting a report:
 
 ## Distinguish source reports from observed attempts
 
-`IConfigurationRuntimeValidationService.GetReport()` and `ConfigurationFacade.GetRuntimeValidationReportAsync()` validate the current effective source stack. Source reports are cached until the root reload revision or successful Monica projection changes. A source report does not include consumer Configure/PostConfigure changes and does not create options.
+For Managed definitions, `IConfigurationRuntimeValidationService.GetReport()` and `ConfigurationFacade.GetRuntimeValidationReportAsync()` validate the current effective source stack. Source reports are cached until the root reload revision or successful Monica projection changes. A source report does not include consumer Configure/PostConfigure changes and does not create options. For Startup definitions the same aggregate includes the validated frozen actual report; candidate reports are exposed by read-only definition state and source chains.
 
 `IConfigurationOptionsValidationDiagnostics.GetLatestReport(definitionKey)` and facade `GetOptionsValidationReportAsync(definitionKey)` return the latest observed default-options attempt, or null when none has been observed. `GetReports()` / `GetOptionsValidationReportsAsync()` list the latest attempt per observed local owner. Reads never resolve options to manufacture an observation. The bounded observer retains one immutable report per discovered owner, with `AttemptId`, `AttemptedAt`, revision, coverage, and safe issues; it retains neither the options object nor source JSON. Named options other than the default are not observed by this managed validator.
 

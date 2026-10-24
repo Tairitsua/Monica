@@ -1,9 +1,9 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
-using Monica.Configuration.Binding;
+using Monica.Core.Configuration;
 using Xunit;
 
-namespace Test.Monica.Configuration.Binding;
+namespace Test.Monica.Core.Configuration;
 
 public sealed class ConfigurationChildKeyIndexTests
 {

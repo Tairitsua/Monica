@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Exceptions;
@@ -14,35 +15,36 @@ namespace Monica.Configuration.Facades;
 /// <summary>
 /// Host-facing entry point for configuration management APIs and UI consumers.
 /// </summary>
-public sealed class ConfigurationFacade(
-    ConfigurationDefinitionResolver definitionResolver,
-    IConfigurationDefinitionRegistry definitionRegistry,
-    IConfigurationDefinitionMaintenanceStore definitionMaintenanceStore,
-    IConfigurationDefinitionChangeImpactService definitionChangeImpactService,
-    IConfigurationMutationGroupApplyService mutationGroupApplyService,
-    IConfigurationHistoryService historyService,
-    IConfigurationMutationGroupService mutationGroupService,
-    IConfigurationRollbackService rollbackService,
-    IConfigurationUnifiedVersionService unifiedVersionService,
-    IConfigurationEffectiveValueStore effectiveValueStore,
-    IConfigurationHistoryStore historyStore,
-    IConfigurationMetadataStore metadataStore,
-    IEnumerable<IConfigurationChangeNotifier> changeNotifiers,
-    IConfigurationStoreStateTracker storeStateTracker,
-    ConfigurationEffectiveStateReader effectiveStateReader,
-    IConfigurationSourceInspector sourceInspector,
-    IConfigurationJsonFileSourceWriter sourceWriter,
-    ConfigurationRuntimeContext runtimeContext,
-    IConfigurationRuntimeValidationService runtimeValidationService,
-    IConfigurationOptionsValidationDiagnostics optionsValidationDiagnostics,
-    IConfigurationCandidateValidationService candidateValidationService,
-    IConfigurationRuntimeReloadService runtimeReloadService,
-    IConfigurationReloadBroadcastService reloadBroadcastService)
+/// <param name="services">The host provider; store capabilities are resolved only by operations that need them.</param>
+/// <remarks>Resolve this facade from the configured host. Startup inspection does not require a managed store.</remarks>
+public sealed class ConfigurationFacade(IServiceProvider services)
 {
-    private readonly ConfigurationDefinitionLifecycleService _definitionLifecycleService = new(
-        definitionRegistry,
-        definitionMaintenanceStore,
-        definitionResolver);
+    private ConfigurationDefinitionResolver definitionResolver => services.GetRequiredService<ConfigurationDefinitionResolver>();
+    private IConfigurationDefinitionRegistry definitionRegistry => services.GetRequiredService<IConfigurationDefinitionRegistry>();
+    private IConfigurationDefinitionMaintenanceStore definitionMaintenanceStore => services.GetRequiredService<IConfigurationDefinitionMaintenanceStore>();
+    private IConfigurationDefinitionChangeImpactService definitionChangeImpactService => services.GetRequiredService<IConfigurationDefinitionChangeImpactService>();
+    private IConfigurationMutationGroupApplyService mutationGroupApplyService => services.GetRequiredService<IConfigurationMutationGroupApplyService>();
+    private IConfigurationHistoryService historyService => services.GetRequiredService<IConfigurationHistoryService>();
+    private IConfigurationMutationGroupService mutationGroupService => services.GetRequiredService<IConfigurationMutationGroupService>();
+    private IConfigurationRollbackService rollbackService => services.GetRequiredService<IConfigurationRollbackService>();
+    private IConfigurationUnifiedVersionService unifiedVersionService => services.GetRequiredService<IConfigurationUnifiedVersionService>();
+    private IConfigurationEffectiveValueStore effectiveValueStore => services.GetRequiredService<IConfigurationEffectiveValueStore>();
+    private IConfigurationHistoryStore historyStore => services.GetRequiredService<IConfigurationHistoryStore>();
+    private IConfigurationMetadataStore metadataStore => services.GetRequiredService<IConfigurationMetadataStore>();
+    private IEnumerable<IConfigurationChangeNotifier> changeNotifiers => services.GetRequiredService<IEnumerable<IConfigurationChangeNotifier>>();
+    private IConfigurationStoreStateTracker storeStateTracker => services.GetRequiredService<IConfigurationStoreStateTracker>();
+    private ConfigurationEffectiveStateReader effectiveStateReader => services.GetRequiredService<ConfigurationEffectiveStateReader>();
+    private IConfigurationSourceInspector sourceInspector => services.GetRequiredService<IConfigurationSourceInspector>();
+    private IConfigurationJsonFileSourceWriter sourceWriter => services.GetRequiredService<IConfigurationJsonFileSourceWriter>();
+    private ConfigurationRuntimeContext runtimeContext => services.GetRequiredService<ConfigurationRuntimeContext>();
+    private IConfigurationRuntimeValidationService runtimeValidationService => services.GetRequiredService<IConfigurationRuntimeValidationService>();
+    private IConfigurationOptionsValidationDiagnostics optionsValidationDiagnostics => services.GetRequiredService<IConfigurationOptionsValidationDiagnostics>();
+    private IConfigurationCandidateValidationService candidateValidationService => services.GetRequiredService<IConfigurationCandidateValidationService>();
+    private IConfigurationRuntimeReloadService runtimeReloadService => services.GetRequiredService<IConfigurationRuntimeReloadService>();
+    private IConfigurationReloadBroadcastService reloadBroadcastService => services.GetRequiredService<IConfigurationReloadBroadcastService>();
+
+    private ConfigurationDefinitionLifecycleService DefinitionLifecycleService => new(
+        definitionRegistry, definitionMaintenanceStore, definitionResolver);
 
     /// <summary>
     /// Gets active configuration definition summaries for operational consumers.
@@ -269,6 +271,7 @@ public sealed class ConfigurationFacade(
     {
         return new ConfigurationDefinitionSummary
         {
+            Kind = definition.Kind,
             DefinitionKey = definition.DefinitionKey,
             SectionPath = definition.SectionPath,
             DisplayName = definition.DisplayName,
@@ -392,7 +395,7 @@ public sealed class ConfigurationFacade(
                 definitionKey,
                 limit,
                 CancellationToken.None);
-            return Res.Ok(_definitionLifecycleService.EnrichWithLocalRegistration(overview));
+            return Res.Ok(DefinitionLifecycleService.EnrichWithLocalRegistration(overview));
         }
         catch (Exception ex)
         {
@@ -432,7 +435,7 @@ public sealed class ConfigurationFacade(
     {
         try
         {
-            return Res.Ok(await _definitionLifecycleService.PreviewPurgeAsync(
+            return Res.Ok(await DefinitionLifecycleService.PreviewPurgeAsync(
                 definitionKey,
                 CancellationToken.None));
         }
@@ -461,7 +464,7 @@ public sealed class ConfigurationFacade(
     {
         try
         {
-            await _definitionLifecycleService.PurgeAsync(request, CancellationToken.None);
+            await DefinitionLifecycleService.PurgeAsync(request, CancellationToken.None);
             return Res.Ok();
         }
         catch (ConfigurationConcurrencyConflictException ex)

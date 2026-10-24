@@ -1,4 +1,42 @@
-# Bootstrap input plan and stores
+# Startup inputs and managed stores
+
+## Deployment-owned startup options
+
+Use `[Configuration("Deployment:Resources", Kind = ConfigurationKind.Startup)]` for values that decide host construction, such as provider activation and connection settings. Supply ordinary host configuration before `AddMonica`; Core captures one immutable provider snapshot before invoking its callback. Read that snapshot through `GetStartupOptions<T>()` from `Monica.Configuration.Bootstrap`. The extension is available on the Monica builder and module composition contexts, without constructing a service provider or accessing a managed store.
+
+```csharp
+using Monica.Configuration.Annotations;
+using Monica.Configuration.Bootstrap;
+using Monica.Configuration.Models;
+
+builder.AddMonica(monica =>
+{
+    var resources = monica.GetStartupOptions<OptionsResources>();
+    monica.AddConfiguration();
+    // Compose resource providers from the validated frozen object.
+});
+
+[Configuration("Deployment:Resources", Kind = ConfigurationKind.Startup)]
+public sealed class OptionsResources
+{
+    public bool RedisEnabled { get; set; }
+    public string? RedisConnection { get; set; }
+}
+```
+
+The first read binds and validates the complete owner immediately, using the same aliases, shape-aware materializer, portable constraints, and pure object rules as managed options. Every discovered Startup owner is validated before service registration completes, including owners that no module reads explicitly. A missing section can use valid constructor defaults; included optional providers must have a valid disabled/default shape, and the resource owner checks prerequisites when enabled. Types from omitted discovery assemblies are not eagerly created. Startup requires an explicit section path and rejects overlapping Managed ownership. Invalid values and binding/execution faults always fail composition, independent of managed `RuntimeValidationBehavior`.
+
+Ordinary provider precedence is preserved. Explicit nulls, empty containers, and provider origins are captured with values. Sources appended or changed after the callback begins affect only the deployment candidate; they cannot change the running Startup object. The default-name `IOptions<T>`, `IOptionsSnapshot<T>`, and `IOptionsMonitor<T>` all return the same object across scopes. Consumers must treat it as read-only. Named options, Configure/PostConfigure, options validators, change-token sources, and custom options factories/accessors are rejected for Startup. Monitor subscriptions never fire. The validation boundary ends when `AddMonica` returns; do not mutate these registrations afterward.
+
+`Application:EnvironmentFiles` selects host-owned JSON deployment sources; see [host composition](../../monica-infra-hosting/references/host-composition.md) for source ordering, complete-section selection, path rules, and atomic reload acceptance. Files cannot own Managed sections, even when a higher source hides those values. The operator UI exposes their JSON identity and physical path for inspection; `IDeploymentConfigurationProvider` marks them read-only, so external managed mutations cannot add a Managed section to a deployment file. Accepted reloads update the visible candidate and may require restart; rejected reloads retain the previous accepted source values and shapes. Neither changes the frozen Startup object.
+
+A Startup-only `AddConfiguration()` host needs no store, including in Development with DI validation enabled. Its catalog, definitions, actual/candidate values, validation, and source chains remain inspectable. Store-only administrative actions fail explicitly when no store is configured. Registering the module makes discovered Startup owners visible in the configuration UI; an early read alone provides frozen options without requiring the UI or configuration module.
+
+Resolve `ConfigurationFacade` and `ConfigurationEffectiveStateReader` from the host. Direct callers must now supply `IServiceProvider` rather than the former eagerly supplied store collaborators: the facade resolves each capability on use, and the state reader resolves the effective store only for Managed reads. This constructor change lets Startup-only hosts compose without placeholder stores. A configured managed host with an empty local catalog still publishes its empty inventory so ordinary removal/retirement semantics remain intact.
+
+Global catalog reads include remote Managed definitions when a metadata store is explicitly configured; scoped Startup reads remain independent of it, and a metadata failure does not make local Startup definitions unavailable. Runtime reload-status inspection also works without a store. `ConfigurationReloadStatusReport.EffectiveValueStore` is null when there are no local Managed owners to compare; consumers must handle that absence instead of displaying a fabricated store.
+
+## Managed input plans
 
 `MonicaConfigurationInputPlan.Create` declares exactly one store composition, an optional section-path convention, and ordered managed JSON files. Creating the plan performs no store I/O. `AddConfiguration(plan)` applies its runtime half; the plan's path convention cannot be overridden later. For a host that does not need a startup options snapshot, the file store is a simple local choice:
 
@@ -10,7 +48,7 @@ var plan = MonicaConfigurationInputPlan.Create(inputs => inputs
 builder.AddMonica(monica => monica.AddConfiguration(plan));
 ```
 
-When managed settings choose startup topology, use this sequence instead: load them before `AddMonica` and pass that same plan to runtime registration.
+The existing managed snapshot API remains available for consumers that intentionally read managed state before composition. New deployment topology should use Startup ownership above. A managed snapshot and its runtime module must use the same input plan:
 
 ```csharp
 using var bootstrap = plan.BuildBootstrapConfiguration(builder);
@@ -42,8 +80,11 @@ Behavioral checks:
 - `tests/Test.Monica.Configuration/Bootstrap/MonicaConfigurationInputPlanTests.cs`: read-only input-plan snapshots and store overlays.
 - `tests/Test.Monica.Configuration/Binding/MonicaConfigurationCollectionBindingTests.cs`: shared collection binding in bootstrap and runtime.
 - `tests/Test.Monica.Configuration/Binding/ConfigurationObjectMaterializerTests.cs`: aliases, defaults, explicit shape, and precedence.
-- `tests/Test.Monica.Configuration/Binding/ConfigurationChildKeyIndexTests.cs`: Microsoft child-key ordering, duplicates, case-insensitive paths, and data replacement without notifications.
-- `tests/Test.Monica.Configuration/Binding/ConfigurationDocumentProjectionTests.cs` and `tests/Test.Monica.Configuration/Projection/MonicaConfigurationProviderPartialReloadTests.cs`: JSON, projection, and managed-provider index invalidation across full reload, partial reload, and flat writes.
+- `tests/Test.Monica.Core/Configuration/ConfigurationChildKeyIndexTests.cs`: Microsoft child-key ordering, duplicates, case-insensitive paths, and data replacement without notifications.
+- `tests/Test.Monica.Core/Configuration/ConfigurationDocumentProjectionTests.cs` and `tests/Test.Monica.Configuration/Projection/MonicaConfigurationProviderPartialReloadTests.cs`: JSON, projection, and managed-provider index invalidation across full reload, partial reload, and flat writes.
+- `tests/Test.Monica.Configuration/Bootstrap/StartupOptionsTests.cs`: eager Startup validation, default-name instance identity, unsupported options contributions, and no-store inspection.
+- `tests/Test.Monica.Configuration/Services/ConfigurationStartupSourceTests.cs`: frozen versus candidate provenance and nested secret masking.
+- `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationStorePublishTests.Startup.cs`: conversion to Startup preserves old managed publication audit without publishing Startup metadata.
 - `tests/Test.Monica.Configuration/Modules/ManagedConfigurationObjectValidationTests.cs`: runtime seed validation and policy boundaries.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationInputPlanTests.cs`: relational-store input plans.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationStorePublishTests.InitialPublication.cs`: migrated-store initial null prior snapshots, narrowly gated legacy empty-value projection without stored-row changes, and preservation of nonempty and later-schema history.

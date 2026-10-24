@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -81,12 +82,30 @@ internal sealed class ConfigurationSourceInspector(
         IReadOnlyList<LogicalPath> logicalPaths,
         bool includeSensitive = false)
     {
+        if (definition.Kind != ConfigurationKind.Startup)
+            return GetSourceChainsCore(definition, logicalPaths, includeSensitive, runtimeContext.Root);
+        var startup = runtimeContext.StartupOptions
+            ?? throw new InvalidOperationException("Startup configuration was not initialized during composition.");
+        var candidate = startup.ReadCandidate(definition);
+        var actual = GetSourceChainsCore(definition, logicalPaths, includeSensitive, startup.Snapshot);
+        var current = GetSourceChainsCore(definition, logicalPaths, includeSensitive, candidate.Sources);
+        return logicalPaths.Select((path, index) => current[index] with
+        {
+            Kind = ConfigurationKind.Startup,
+            StartupValues = actual[index].Values,
+            StartupActualValue = startup.ProjectValue(definition, path, candidate, actual[index], current[index], includeSensitive)
+        }).ToArray();
+    }
+
+    private IReadOnlyList<ConfigurationSourceChain> GetSourceChainsCore(ConfigurationDefinition definition,
+        IReadOnlyList<LogicalPath> logicalPaths, bool includeSensitive, IConfigurationRoot? root)
+    {
         if (logicalPaths.Count == 0)
         {
             return [];
         }
 
-        if (runtimeContext.Root is not { } root)
+        if (root is null)
         {
             return logicalPaths
                 .Select(logicalPath => EmptySourceChain(
@@ -96,7 +115,9 @@ internal sealed class ConfigurationSourceInspector(
                 .ToArray();
         }
 
-        var descriptors = GetSources().ToDictionary(source => source.PriorityIndex);
+        var managedSources = ManagedJsonConfigurationSourceRegistry.Get(runtimeContext.Configuration);
+        var descriptors = root.Providers.Select((provider, index) => BuildDescriptor(provider, index, managedSources))
+            .ToDictionary(source => source.PriorityIndex);
         var providers = root.Providers.ToArray();
         var sources = new List<RuntimeConfigurationSource>(descriptors.Count);
         foreach (var (provider, index) in providers.Select((provider, index) => (provider, index)))
@@ -149,7 +170,11 @@ internal sealed class ConfigurationSourceInspector(
             return [];
         }
 
-        var sources = GetSources().ToDictionary(source => source.PriorityIndex);
+        var sources = GetSources().Select(source => definition.Kind == ConfigurationKind.Startup ? source with
+        {
+            IsWritable = false,
+            ReadOnlyReason = "Startup configuration is deployment-owned. Change deployment inputs and restart the process."
+        } : source).ToDictionary(source => source.PriorityIndex);
         var providers = root.Providers.ToArray();
         var counters = new Dictionary<string, ContributionCounter>(StringComparer.OrdinalIgnoreCase);
         var effectivePriorityByPath = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -677,6 +702,29 @@ internal sealed class ConfigurationSourceInspector(
         int index,
         IReadOnlyList<ManagedJsonConfigurationSourceRegistration> managedSources)
     {
+        if (provider is ConfigurationProviderSnapshot snapshot)
+        {
+            var origin = snapshot.Origin;
+            var type = origin.ProviderType;
+            return new ConfigurationSourceDescriptor
+            {
+                SourceKey = $"startup:{origin.ProviderPath}",
+                PriorityIndex = index,
+                DisplayName = origin.SourcePath is { Length: > 0 } path ? Path.GetFileName(path) : type.Name,
+                ProviderType = type.FullName ?? type.Name,
+                Kind = typeof(JsonConfigurationProvider).IsAssignableFrom(type) ? ConfigurationSourceKind.JsonFile
+                    : typeof(EnvironmentVariablesConfigurationProvider).IsAssignableFrom(type) ? ConfigurationSourceKind.EnvironmentVariables
+                    : typeof(CommandLineConfigurationProvider).IsAssignableFrom(type) ? ConfigurationSourceKind.CommandLine
+                    : typeof(MemoryConfigurationProvider).IsAssignableFrom(type) ? ConfigurationSourceKind.Memory
+                    : ConfigurationSourceKind.Unsupported,
+                IsWritable = false,
+                ReadOnlyReason = "Startup configuration is deployment-owned. Change deployment inputs and restart the process.",
+                SourcePath = origin.SourcePath,
+                PhysicalPath = origin.PhysicalPath,
+                Optional = origin.Optional,
+                ReloadOnChange = origin.ReloadOnChange
+            };
+        }
         if (provider is MonicaConfigurationProvider)
         {
             return new ConfigurationSourceDescriptor
@@ -729,7 +777,8 @@ internal sealed class ConfigurationSourceInspector(
             : source.FileProvider?.GetFileInfo(sourcePath)?.PhysicalPath;
         var normalizedPhysicalPath = string.IsNullOrWhiteSpace(physicalPath) ? null : Path.GetFullPath(physicalPath);
         var managed = FindManagedRegistration(sourcePath, normalizedPhysicalPath, managedSources);
-        var canWrite = !string.IsNullOrWhiteSpace(normalizedPhysicalPath)
+        var deploymentOwned = provider is IDeploymentConfigurationProvider;
+        var canWrite = !deploymentOwned && !string.IsNullOrWhiteSpace(normalizedPhysicalPath)
                        && CanWriteJsonFile(normalizedPhysicalPath)
                        && (managed?.IsWritable ?? true);
 
@@ -742,7 +791,8 @@ internal sealed class ConfigurationSourceInspector(
             Kind = ConfigurationSourceKind.JsonFile,
             IsManagedByMonica = managed is not null,
             IsWritable = canWrite,
-            ReadOnlyReason = canWrite ? null : ResolveJsonReadOnlyReason(normalizedPhysicalPath, managed),
+            ReadOnlyReason = deploymentOwned ? "Deployment configuration sources are read-only. Change the deployment input outside this process."
+                : canWrite ? null : ResolveJsonReadOnlyReason(normalizedPhysicalPath, managed),
             SourcePath = sourcePath,
             PhysicalPath = normalizedPhysicalPath,
             Optional = source.Optional,

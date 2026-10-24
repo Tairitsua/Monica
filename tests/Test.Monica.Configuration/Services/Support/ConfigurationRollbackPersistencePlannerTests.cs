@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -67,8 +68,8 @@ public sealed class ConfigurationRollbackPersistencePlannerTests : IDisposable
     private PlannerFixture CreateFixture()
     {
         var configuration = new ConfigurationBuilder().SetBasePath(_directory)
-            .Add(new ShapeAwareJsonConfigurationSource { Path = "lower.json", Optional = false, ReloadOnChange = false })
-            .Add(new ShapeAwareJsonConfigurationSource { Path = "upper.json", Optional = false, ReloadOnChange = false })
+            .AddShapeAwareJsonFile("lower.json", optional: false, reloadOnChange: false)
+            .AddShapeAwareJsonFile("upper.json", optional: false, reloadOnChange: false)
             .Build();
         var definition = new ConfigurationDefinitionScanner(new ConfigurationSchemaHasher()).Scan(typeof(PlannerOptions));
         var context = new ConfigurationRuntimeContext();

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Monica.Core.Logging;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
@@ -28,6 +29,7 @@ public sealed class MonicaApplication : IDisposable
     private ITypeDependencyOrderer? _typeDependencyOrderer;
     private ITypeFinder? _typeFinder;
     private bool _typeActivationFrozen;
+    private MonicaCompositionState? _composition;
 
     internal MonicaApplication(MonicaStartupOrigin? startupOrigin = null)
     {
@@ -43,6 +45,20 @@ public sealed class MonicaApplication : IDisposable
     /// Gets application identity defaults for this host.
     /// </summary>
     public IMonicaApplicationOptions Application => _applicationOptions;
+
+    /// <summary>Gets the frozen startup input and framework state owned by this host's composition.</summary>
+    public MonicaCompositionState Composition => _composition
+        ?? throw new InvalidOperationException("This application has not been attached to a host builder.");
+
+    internal bool CompositionHasMutatedHost => _composition?.HasMutatedHost == true;
+
+    internal void InitializeComposition(IHostApplicationBuilder builder)
+    {
+        if (_composition is not null) throw new InvalidOperationException("Composition inputs have already been initialized.");
+        _composition = new MonicaCompositionState(builder.Configuration);
+        var logger = CreateLogger<MonicaCompositionState>();
+        _composition.Initialize(builder, error => logger.LogWarning("{EnvironmentFileDiagnostic}", error));
+    }
 
     /// <summary>Gets the optional immutable business activation policy installed during composition.</summary>
     public ITypeActivationPolicy? TypeActivation { get; private set; }

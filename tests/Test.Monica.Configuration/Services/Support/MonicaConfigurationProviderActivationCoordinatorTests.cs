@@ -20,6 +20,25 @@ namespace Test.Monica.Configuration.Services.Support;
 public sealed class MonicaConfigurationProviderActivationCoordinatorTests
 {
     [Fact]
+    public void ShouldActivate_WhenManagedCatalogBecomesEmpty_ShouldPublishWithdrawalWhileStartupOnlyStaysIndependent()
+    {
+        var registry = new ConfigurationDefinitionRegistry();
+        MonicaConfigurationProviderActivationCoordinator.ShouldActivate(registry, new StorePresenceProvider(false)).Should().BeFalse();
+        MonicaConfigurationProviderActivationCoordinator.ShouldActivate(registry, new StorePresenceProvider(true)).Should().BeTrue();
+        registry.Register(TestConfigurationFactory.Definition() with { Kind = ConfigurationKind.Startup });
+        MonicaConfigurationProviderActivationCoordinator.ShouldActivate(registry, new StorePresenceProvider(true)).Should().BeFalse();
+        registry.Register(TestConfigurationFactory.Definition());
+        MonicaConfigurationProviderActivationCoordinator.ShouldActivate(registry, new StorePresenceProvider(true)).Should().BeTrue();
+    }
+
+    private sealed class StorePresenceProvider(bool configured) : IServiceProvider, IServiceProviderIsService
+    {
+        public object GetService(Type serviceType) => serviceType == typeof(IServiceProviderIsService)
+            ? this : throw new InvalidOperationException("The activation decision must not resolve a store.");
+        public bool IsService(Type serviceType) => configured && serviceType == typeof(IConfigurationMetadataStore);
+    }
+
+    [Fact]
     public async Task ActivateAsync_ShouldPublishBeforeExposingProviderOrStartingProjection_AndActivateOnce()
     {
         var publicationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

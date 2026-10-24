@@ -5,6 +5,9 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationDefinitionState
 {
+    /// <summary>Gets aggregate deployment candidate validation and restart state for a Startup definition.</summary>
+    public ConfigurationStartupCandidate? StartupCandidate { get; init; }
+
     /// <summary>
     /// Gets the complete definition that describes the returned values.
     /// </summary>

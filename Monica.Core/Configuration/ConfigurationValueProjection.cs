@@ -1,25 +1,62 @@
 using System.Text.Json;
+using System.Collections.ObjectModel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 
-namespace Monica.Configuration.Binding;
+namespace Monica.Core.Configuration;
 
 /// <summary>Preserves container and explicit-null identities lost by flat configuration values.</summary>
-internal enum ConfigurationValueShape { Scalar, Null, Object, List, Container, AmbiguousNull }
-
-internal sealed record ConfigurationValueProjection(
-    IReadOnlyDictionary<string, string?> Values,
-    IReadOnlyDictionary<string, ConfigurationValueShape> Shapes);
-
-internal interface IConfigurationValueShapeProvider
+public enum ConfigurationValueShape
 {
+    /// <summary>A non-null scalar value.</summary>
+    Scalar,
+    /// <summary>An explicit null value.</summary>
+    Null,
+    /// <summary>A JSON object, including an empty object.</summary>
+    Object,
+    /// <summary>A JSON array, including an empty array.</summary>
+    List,
+    /// <summary>A container inferred from descendant configuration keys.</summary>
+    Container,
+    /// <summary>A legacy JSON null whose original null or empty-container shape is unavailable.</summary>
+    AmbiguousNull
+}
+
+/// <summary>An immutable provider contribution, including shape information not represented by flat values.</summary>
+public sealed class ConfigurationValueProjection
+{
+    /// <summary>Copies one provider's values and shapes using case-insensitive configuration paths.</summary>
+    public ConfigurationValueProjection(IReadOnlyDictionary<string, string?> values,
+        IReadOnlyDictionary<string, ConfigurationValueShape> shapes)
+    {
+        Values = new ReadOnlyDictionary<string, string?>(new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase));
+        Shapes = new ReadOnlyDictionary<string, ConfigurationValueShape>(new Dictionary<string, ConfigurationValueShape>(shapes, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Gets explicit values; absent keys remain distinct from keys with a null value.</summary>
+    public IReadOnlyDictionary<string, string?> Values { get; }
+
+    /// <summary>Gets the original container and scalar shapes.</summary>
+    public IReadOnlyDictionary<string, ConfigurationValueShape> Shapes { get; }
+}
+
+/// <summary>Supplies source shapes that the standard flat configuration contract cannot express.</summary>
+public interface IConfigurationValueShapeProvider
+{
+    /// <summary>Returns whether the provider explicitly describes the given path's shape.</summary>
     bool TryGetShape(string path, out ConfigurationValueShape shape);
 }
 
-/// <summary>Projects one JSON document without serializing CLR objects or discarding empty containers.</summary>
-internal static class ConfigurationValueProjectionFactory
+internal interface IConfigurationValueSnapshotProvider
 {
-    internal static ConfigurationValueProjection Create(string path, JsonElement value)
+    ConfigurationValueProjection CaptureProjection();
+}
+
+/// <summary>Projects one JSON document without serializing CLR objects or discarding empty containers.</summary>
+public static class ConfigurationValueProjectionFactory
+{
+    /// <summary>Projects JSON at a configuration path, retaining null and empty containers.</summary>
+    public static ConfigurationValueProjection Create(string path, JsonElement value)
     {
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         var shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
@@ -34,14 +71,16 @@ internal static class ConfigurationValueProjectionFactory
         return new(values, shapes);
     }
 
-    internal static ConfigurationValueProjection CreateDocument(JsonElement document)
+    /// <summary>Projects a JSON configuration document with an object root.</summary>
+    public static ConfigurationValueProjection CreateDocument(JsonElement document)
     {
         if (document.ValueKind != JsonValueKind.Object)
             throw new FormatException("A JSON configuration document must have an object root.");
         return Create(string.Empty, document);
     }
 
-    internal static ConfigurationValueProjection Set(IReadOnlyDictionary<string, string?> values,
+    /// <summary>Replaces one value and its descendants while preserving the remaining provider contribution.</summary>
+    public static ConfigurationValueProjection Set(IReadOnlyDictionary<string, string?> values,
         IReadOnlyDictionary<string, ConfigurationValueShape> shapes, string key, string? value)
     {
         var nextValues = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
@@ -69,13 +108,15 @@ internal static class ConfigurationValueProjectionFactory
     private static void Flatten(string path, JsonElement value, IDictionary<string, string?> values,
         IDictionary<string, ConfigurationValueShape> shapes)
     {
-        shapes[path] = value.ValueKind switch
+        var shape = value.ValueKind switch
         {
             JsonValueKind.Object => ConfigurationValueShape.Object,
             JsonValueKind.Array => ConfigurationValueShape.List,
             JsonValueKind.Null => ConfigurationValueShape.Null,
             _ => ConfigurationValueShape.Scalar
         };
+        if (!shapes.TryAdd(path, shape))
+            throw new FormatException("A JSON configuration document contains duplicate flattened configuration keys.");
         switch (value.ValueKind)
         {
             case JsonValueKind.Object:
@@ -103,29 +144,58 @@ internal static class ConfigurationValueProjectionFactory
 }
 
 /// <summary>Adds a shape-preserving projection at its declared provider priority.</summary>
-internal sealed class ConfigurationValueProjectionSource(ConfigurationValueProjection projection) : IConfigurationSource
+public sealed class ConfigurationValueProjectionSource(ConfigurationValueProjection projection) : IConfigurationSource
 {
+    /// <inheritdoc />
     public IConfigurationProvider Build(IConfigurationBuilder builder) => new ConfigurationValueProjectionProvider(projection);
 }
 
 internal sealed class ConfigurationValueProjectionProvider(ConfigurationValueProjection projection)
-    : ConfigurationProvider, IConfigurationValueShapeProvider
+    : ConfigurationProvider, IConfigurationValueShapeProvider, IConfigurationValueSnapshotProvider
 {
+    private readonly Lock _gate = new();
     private readonly ConfigurationChildKeyIndex _childKeys = new();
     private IReadOnlyDictionary<string, ConfigurationValueShape> _shapes = projection.Shapes;
     public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
-        => _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
+    {
+        lock (_gate) return _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
+    }
+    public override bool TryGet(string key, out string? value)
+    {
+        lock (_gate) return base.TryGet(key, out value);
+    }
     public override void Load()
     {
-        _shapes = projection.Shapes;
-        Data = new Dictionary<string, string?>(projection.Values, StringComparer.OrdinalIgnoreCase);
+        lock (_gate)
+        {
+            _shapes = projection.Shapes;
+            Data = new Dictionary<string, string?>(projection.Values, StringComparer.OrdinalIgnoreCase);
+        }
     }
-    public bool TryGetShape(string path, out ConfigurationValueShape shape) => _shapes.TryGetValue(path, out shape);
+    public bool TryGetShape(string path, out ConfigurationValueShape shape)
+    {
+        lock (_gate) return _shapes.TryGetValue(path, out shape);
+    }
+    public ConfigurationValueProjection CaptureProjection()
+    {
+        lock (_gate) return new(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes);
+    }
+    internal void RestoreProjection(ConfigurationValueProjection values)
+    {
+        lock (_gate)
+        {
+            _shapes = values.Shapes;
+            Data = new Dictionary<string, string?>(values.Values, StringComparer.OrdinalIgnoreCase);
+        }
+    }
     public override void Set(string key, string? value)
     {
-        var next = ConfigurationValueProjectionFactory.Set(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes, key, value);
-        _shapes = next.Shapes;
-        Data = new Dictionary<string, string?>(next.Values, StringComparer.OrdinalIgnoreCase);
+        lock (_gate)
+        {
+            var next = ConfigurationValueProjectionFactory.Set(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes, key, value);
+            _shapes = next.Shapes;
+            Data = new Dictionary<string, string?>(next.Values, StringComparer.OrdinalIgnoreCase);
+        }
     }
 }
 
@@ -140,13 +210,20 @@ internal sealed class ShapeAwareJsonConfigurationSource : JsonConfigurationSourc
 }
 
 internal sealed class ShapeAwareJsonConfigurationProvider(JsonConfigurationSource source)
-    : JsonConfigurationProvider(source), IConfigurationValueShapeProvider
+    : JsonConfigurationProvider(source), IConfigurationValueShapeProvider, IConfigurationValueSnapshotProvider
 {
+    private readonly Lock _gate = new();
     private readonly ConfigurationChildKeyIndex _childKeys = new();
     private IReadOnlyDictionary<string, ConfigurationValueShape> _shapes = new Dictionary<string, ConfigurationValueShape>();
 
     public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
-        => _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
+    {
+        lock (_gate) return _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
+    }
+    public override bool TryGet(string key, out string? value)
+    {
+        lock (_gate) return base.TryGet(key, out value);
+    }
 
     public override void Load(Stream stream)
     {
@@ -160,39 +237,70 @@ internal sealed class ShapeAwareJsonConfigurationProvider(JsonConfigurationSourc
         var shapes = ConfigurationValueProjectionFactory.CreateDocument(document.RootElement).Shapes;
         // JsonConfigurationProvider owns a StreamReader that closes this buffer. Parse our metadata first.
         buffer.Position = 0;
-        base.Load(buffer);
-        _shapes = shapes;
+        lock (_gate)
+        {
+            base.Load(buffer);
+            _shapes = shapes;
+        }
     }
 
     internal void RestoreLoadedContribution(IReadOnlyDictionary<string, string?> values)
     {
-        var shapes = new Dictionary<string, ConfigurationValueShape>(_shapes, StringComparer.OrdinalIgnoreCase);
-        foreach (var (path, value) in values)
+        lock (_gate)
         {
-            if (!TryGet(path, out var loaded) || !string.Equals(value, loaded, StringComparison.Ordinal))
-                shapes[path] = value is null ? ConfigurationValueShape.Null : ConfigurationValueShape.Scalar;
+            var shapes = new Dictionary<string, ConfigurationValueShape>(_shapes, StringComparer.OrdinalIgnoreCase);
+            foreach (var (path, value) in values)
+            {
+                if (!TryGet(path, out var loaded) || !string.Equals(value, loaded, StringComparison.Ordinal))
+                    shapes[path] = value is null ? ConfigurationValueShape.Null : ConfigurationValueShape.Scalar;
+            }
+            _shapes = shapes;
+            Data = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
         }
-        _shapes = shapes;
-        Data = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal void RestoreProjection(ConfigurationValueProjection values)
+    {
+        lock (_gate)
+        {
+            _shapes = values.Shapes;
+            Data = new Dictionary<string, string?>(values.Values, StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     public bool TryGetShape(string path, out ConfigurationValueShape shape)
     {
-        return _shapes.TryGetValue(path, out shape)
+        lock (_gate) return _shapes.TryGetValue(path, out shape)
             && (TryGet(path, out _) || GetChildKeys([], path.Length == 0 ? null : path).Any());
+    }
+
+    public ConfigurationValueProjection CaptureProjection()
+    {
+        lock (_gate)
+        {
+            var shapes = _shapes.Where(pair => TryGetShape(pair.Key, out _))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            return new(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), shapes);
+        }
     }
 
     public override void Set(string key, string? value)
     {
-        var next = ConfigurationValueProjectionFactory.Set(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes, key, value);
-        _shapes = next.Shapes;
-        Data = new Dictionary<string, string?>(next.Values, StringComparer.OrdinalIgnoreCase);
+        lock (_gate)
+        {
+            var next = ConfigurationValueProjectionFactory.Set(new Dictionary<string, string?>(Data, StringComparer.OrdinalIgnoreCase), _shapes, key, value);
+            _shapes = next.Shapes;
+            Data = new Dictionary<string, string?>(next.Values, StringComparer.OrdinalIgnoreCase);
+        }
     }
 }
 
-internal static class ShapeAwareJsonConfigurationExtensions
+/// <summary>Retains JSON shapes while preserving normal file-provider ordering and reload behavior.</summary>
+public static class ShapeAwareJsonConfigurationExtensions
 {
-    internal static void PreserveJsonShapes(IConfigurationBuilder builder)
+    /// <summary>Upgrades ordinary JSON sources without discarding their already loaded contributions.</summary>
+    /// <remarks>Call before capturing startup configuration. Custom JSON-provider implementations remain unchanged.</remarks>
+    public static void PreserveJsonShapes(IConfigurationBuilder builder)
     {
         var replace = Enumerable.Range(0, builder.Sources.Count)
             .Where(index => builder.Sources[index].GetType() == typeof(JsonConfigurationSource)).ToArray();
@@ -240,7 +348,8 @@ internal static class ShapeAwareJsonConfigurationExtensions
         return values;
     }
 
-    internal static IConfigurationBuilder AddShapeAwareJsonFile(this IConfigurationBuilder builder, string path,
+    /// <summary>Adds a JSON file whose explicit null and empty-container shapes survive configuration binding.</summary>
+    public static IConfigurationBuilder AddShapeAwareJsonFile(this IConfigurationBuilder builder, string path,
         bool optional, bool reloadOnChange)
     {
         var source = new ShapeAwareJsonConfigurationSource { Path = path, Optional = optional, ReloadOnChange = reloadOnChange };

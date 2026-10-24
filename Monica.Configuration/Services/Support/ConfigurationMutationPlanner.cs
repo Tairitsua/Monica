@@ -18,6 +18,8 @@ internal sealed class ConfigurationMutationPlanner(
         CancellationToken cancellationToken)
     {
         var definition = await definitionResolver.GetRequiredAsync(command.DefinitionKey, cancellationToken);
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException("Startup configuration is deployment-owned. Change deployment inputs and restart the process.");
         ValidateSourceChainRevision(definition, command);
         var targetNode = ResolveTargetNode(definition, command.LogicalPath);
         var request = new ConfigurationMutationRequest

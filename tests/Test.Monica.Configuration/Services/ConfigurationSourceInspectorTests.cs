@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
