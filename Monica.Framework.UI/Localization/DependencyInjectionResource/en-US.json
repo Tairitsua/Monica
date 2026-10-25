@@ -184,5 +184,8 @@
         }
       }
     }
+  },
+  "Navigation": {
+    "Category": "Dependency injection"
   }
 }

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
@@ -52,7 +53,7 @@
                         <MudTd DataLabel="@L["SubscriptionFilter:Provider"]"><div class="eventbus-cell"><code>@EventBusPresentation.KeyText(context.ServiceKey, L)</code><span class="eventbus-muted">@L.GetProviderKindText(context.Provider)</span></div></MudTd>
                         <MudTd DataLabel="@L["Registry:ReportedRuntime"]"><div class="eventbus-cell"><EventBusStatusBadge Tone="@EventBusPresentation.RuntimeColor(context.State)">@L.GetTopicRuntimeStateText(context.State)</EventBusStatusBadge></div></MudTd>
                         <MudTd DataLabel="@L["Overview:MatchedHandlers"]"><div class="eventbus-cell">@capture.Subscriptions.Count(row => row.Scope == EventSubscriptionScope.Distributed && row.ServiceKey == context.ServiceKey && row.TopicName == context.TopicName)</div></MudTd>
-                        <MudTd DataLabel="@L["Overview:StateChanged"]"><div class="eventbus-cell"><time>@EventBusPresentation.Timestamp(context.StateChangedAt)</time></div></MudTd>
+                        <MudTd DataLabel="@L["Overview:StateChanged"]"><div class="eventbus-cell"><time>@UiTime.Format(context.StateChangedAt)</time></div></MudTd>
                         <MudTd DataLabel="@L["SubscriptionTable:Columns:Actions"]"><div class="eventbus-cell"><MudIconButton Icon="@MoIcons.ExternalLink" Size="Size.Small" Color="Color.Primary" aria-label="@L["Overview:InspectTopic", context.TopicName]" title="@L["Overview:TopicInspector"]" OnClick="() => OnTopicClick.InvokeAsync(context)" /></div></MudTd>
                     </RowTemplate>
                     <NoRecordsContent><div class="eventbus-empty">@L["Overview:NoReportedTopics"]</div></NoRecordsContent>

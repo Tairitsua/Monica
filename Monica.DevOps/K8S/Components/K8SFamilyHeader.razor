@@ -2,21 +2,21 @@
 @using Monica.DevOps.K8S.State
 @using Monica.DevOps.Localization
 @using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<K8SResource> L
 @inject K8SNavigationState Context
 
 <div class="k8s-family-header">
-    <header>
-        <div>
-            <MudText Typo="Typo.h1" HtmlTag="h1" Class="k8s-family-title">@L["Pages:K8S:Title"]</MudText>
-            <p>@L[IsConfig ? "Workbench:Config:Subtitle" : "Workbench:Inventory:Subtitle"]</p>
-        </div>
-        @if (Actions is not null) { <div class="k8s-family-actions">@Actions</div> }
-    </header>
-    <MoWorkbenchNavigation Label="@L["Workbench:Navigation:Label"]">
-        <a href="@Link(UIK8SPage.PAGE_URL)" aria-current="@(!IsConfig ? "page" : null)">@L["Workbench:Navigation:Inventory"]</a>
-        <a href="@Link(UIK8SRuntimeConfigPage.PAGE_URL)" aria-current="@(IsConfig ? "page" : null)">@L["Workbench:Navigation:RuntimeConfig"]</a>
-    </MoWorkbenchNavigation>
+    <MoPageMasthead Title="@L["Pages:K8S:Title"]">
+        <Meta>@if (Meta is not null) { @Meta } else { <span>@L[IsConfig ? "Workbench:Config:Subtitle" : "Workbench:Inventory:Subtitle"]</span> }</Meta>
+        <Actions>
+            <MoWorkbenchNavigation Label="@L["Workbench:Navigation:Label"]">
+                <a href="@Link(UIK8SPage.PAGE_URL)" aria-current="@(!IsConfig ? "page" : null)">@L["Workbench:Navigation:Inventory"]</a>
+                <a href="@Link(UIK8SRuntimeConfigPage.PAGE_URL)" aria-current="@(IsConfig ? "page" : null)">@L["Workbench:Navigation:RuntimeConfig"]</a>
+            </MoWorkbenchNavigation>
+            @if (Actions is not null) { <div class="k8s-family-actions">@Actions</div> }
+        </Actions>
+    </MoPageMasthead>
 </div>
 
 @code {
@@ -24,6 +24,8 @@
     [Parameter] public bool IsConfig { get; set; }
     /// <summary>Gets or sets route-owned native actions.</summary>
     [Parameter] public RenderFragment? Actions { get; set; }
+    /// <summary>Gets or sets route-owned read status and capture provenance.</summary>
+    [Parameter] public RenderFragment? Meta { get; set; }
     private string Link(string route) => !Context.HasContext ? route :
         $"{route}?ns={Uri.EscapeDataString(Context.Namespace)}&kind={Context.ResourceType}&q={Uri.EscapeDataString(Context.Search)}";
 }

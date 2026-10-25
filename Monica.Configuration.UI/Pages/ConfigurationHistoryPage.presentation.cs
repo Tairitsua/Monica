@@ -6,6 +6,8 @@ public partial class ConfigurationHistoryPage
 {
     private int _selectedTab;
 
+    private void NavigateToGroupDefinition(string definitionKey) => NavigateToDefinition(definitionKey, null);
+
     private void SelectTarget(string target) => _targetFilter = target;
 
     private string TargetButtonClass(string target) =>
@@ -50,7 +52,7 @@ public partial class ConfigurationHistoryPage
     {
         yield return string.IsNullOrWhiteSpace(definitionKey) ? L["History:Workbench:AllDefinitions"].Value : DefinitionDisplay(definitionKey);
         yield return from is null && to is null ? L["History:Workbench:AllDates"].Value
-            : L["History:Workbench:DateRange", from?.ToLocalTime().ToString("yyyy-MM-dd") ?? L["History:Workbench:OpenStart"].Value,
-                to?.ToLocalTime().ToString("yyyy-MM-dd") ?? L["History:Workbench:OpenEnd"].Value].Value;
+            : L["History:Workbench:DateRange", from is { } start ? TimeDisplay.FormatDate(start) : L["History:Workbench:OpenStart"].Value,
+                to is { } end ? TimeDisplay.FormatDate(end) : L["History:Workbench:OpenEnd"].Value].Value;
     }
 }

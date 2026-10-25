@@ -90,28 +90,32 @@
     "More": "更多",
     "MoreModules": "更多页面",
     "Categories": {
-      "AI": "AI",
+      "AI": "AI 工作区",
       "KnowledgeRetrieval": "知识与检索",
       "Documentation": "文档",
       "Configuration": "配置",
       "Infrastructure": "基础设施",
-      "Module": "模块",
+      "Module": "模块系统",
       "TaskScheduling": "任务调度",
-      "Monitor": "监控",
-      "Debug": "调试",
-      "Uncategorized": "未分类"
+      "Monitor": "运维",
+      "Debug": "诊断",
+      "Uncategorized": "未分类",
+      "Intelligence": "智能",
+      "Platform": "平台"
     },
     "CategoryDescriptions": {
       "AI": "与模型对话、比较服务提供方，并查看 AI 集成能力。",
       "KnowledgeRetrieval": "组织知识库，追踪文档检索过程。",
       "Documentation": "阅读指南、参考资料与 Markdown 文档。",
       "Configuration": "检查托管配置，审阅配置变更。",
-      "Infrastructure": "检查服务组合、持久化与消息通信。",
+      "Infrastructure": "检查主机基础设施、开发工具与集成。",
       "Module": "探索模块组合、启动耗时与依赖关系。",
       "TaskScheduling": "管理调度任务，查看执行历史。",
-      "Monitor": "跟踪服务健康、运行指标与日志证据。",
+      "Monitor": "跟踪健康、调度任务、运行时证据与服务运行情况。",
       "Debug": "检查执行行为，使用故障排查能力。",
-      "Uncategorized": "访问宿主贡献的其他扩展能力。"
+      "Uncategorized": "访问宿主贡献的其他扩展能力。",
+      "Intelligence": "使用 AI 模型、知识与检索能力。",
+      "Platform": "检查模块组合并管理应用配置。"
     },
     "Navigation": "导航",
     "ExpandSidebar": "展开侧边栏",
@@ -251,5 +255,25 @@
     "DeniedTitle": "访问被拒绝",
     "DeniedDescription": "未获准访问此页面。",
     "DeniedRecovery": "请通过应用导航选择其他页面。"
+  },
+  "Navigation": {
+    "Category": "文本比较"
+  },
+  "Json": {
+    "Caption": "JSON",
+    "Editor": "JSON 编辑器",
+    "Formatted": "格式化",
+    "Raw": "原文",
+    "Format": "格式化",
+    "Minify": "压缩 JSON",
+    "LineNumbers": "行号",
+    "Wrap": "自动换行",
+    "Copy": "复制原文",
+    "Copied": "已复制",
+    "CopyFailed": "复制失败，请选中文本后复制。",
+    "Valid": "JSON 格式正确",
+    "Empty": "暂无内容",
+    "PlainText": "纯文本",
+    "Invalid": "JSON 格式错误 · 第 {0} 行，UTF-8 字节位置 {1}"
   }
 }

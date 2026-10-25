@@ -36,7 +36,6 @@
 .runtime-workers dt { color: var(--registry-muted); font-size: 11px; line-height: 1.5; }
 .runtime-workers dd { min-width: 0; margin: 0; }
 .runtime-workers time { font-size: 12px; line-height: 1.65; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.runtime-workers__utc { margin-block-start: 3px; color: var(--registry-muted); }
 .runtime-workers__leader { display: inline-flex; align-items: center; gap: 5px; color: color-mix(in srgb, var(--mud-palette-primary) 25%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.5; }
 .runtime-workers__leader ::deep :is(.mud-icon-root, .mo-icon) { flex: none; width: 17px; height: 17px; color: color-mix(in srgb, var(--mud-palette-primary) 45%, var(--mud-palette-text-primary)) !important; }
 .runtime-workers__not-leader { color: var(--registry-muted); font-size: 12px; line-height: 1.5; }

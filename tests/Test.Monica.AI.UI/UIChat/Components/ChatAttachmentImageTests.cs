@@ -24,6 +24,9 @@ public sealed class ChatAttachmentImageTests : BunitContext
         var module = JSInterop.SetupModule("./_content/Monica.AI.UI/UIChat/Components/ChatAttachmentImage.razor.js");
         module.SetupModule("observeThumbnail", _ => true);
         Services.AddMudServices();
+        Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton<IStringLocalizer<AIResource>, EchoStringLocalizer<AIResource>>();
         Services.AddSingleton(new ChatAttachmentFacade(_store, new PartitionResolver()));
     }

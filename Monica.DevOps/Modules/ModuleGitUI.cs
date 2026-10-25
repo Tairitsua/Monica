@@ -42,18 +42,23 @@ public class ModuleGitUI : MonicaModule<ModuleGitUIOption>, IUIModule
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<GitResource>(
+                    "Monica.DevOps.Git", "Navigation:Category", 40,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.FileCode);
+
                 registry.RegisterLocalizedPage<UIGitRepositoriesPage, GitResource>(
                     UIGitRepositoriesPage.PAGE_URL,
                     "Pages:GitRepositories:Title",
                     MoIcons.FileCode,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 55);
                 registry.RegisterLocalizedPage<UIGitCredentialsPage, GitResource>(
                     UIGitCredentialsPage.PAGE_URL,
                     "Pages:GitCredentials:Title",
                     MoIcons.Key,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 56);
             }));

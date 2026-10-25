@@ -1,10 +1,13 @@
 .kafka-dialog-context {
-    display: grid;
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
     margin: 0;
     min-width: 0;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--mud-palette-lines-default);
+    padding: 16px 20px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+    background: color-mix(in srgb, var(--mud-palette-primary) 3%, var(--mud-palette-surface));
 }
 
 .kafka-dialog-context:empty {
@@ -12,15 +15,34 @@
 }
 
 .kafka-dialog-context dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: .75rem;
     color: var(--mud-palette-text-secondary);
     line-height: 1.5;
 }
 
 .kafka-dialog-context dd {
-    margin: 4px 0 0;
+    margin: 6px 0 0;
     font-family: var(--mo-font-family-mono);
-    font-size: .8125rem;
+    font-size: .875rem;
     line-height: 1.65;
     overflow-wrap: anywhere;
+}
+
+.kafka-dialog-context__cluster {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
+.kafka-dialog-context__topic {
+    flex: 3 1 260px;
+    min-width: 0;
+}
+
+@media (max-width: 600px) {
+    .kafka-dialog-context {
+        padding: 16px;
+    }
 }

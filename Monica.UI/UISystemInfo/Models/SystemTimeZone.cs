@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Monica.UI.UISystemInfo.Models;
 
 /// <summary>
-/// Represents the server time zone captured for a system information response.
+/// Represents the configured Clock display timezone captured for a system information response.
 /// </summary>
 public sealed record SystemTimeZone
 {
@@ -18,7 +18,7 @@ public sealed record SystemTimeZone
     public required TimeSpan UtcOffset { get; init; }
 
     /// <summary>
-    /// Captures the local server time zone and the offset in effect at the specified instant.
+    /// Captures the local server timezone independently of the Clock display policy.
     /// </summary>
     /// <param name="instant">The instant used to resolve daylight-saving and other offset rules.</param>
     /// <returns>The captured local server time zone.</returns>

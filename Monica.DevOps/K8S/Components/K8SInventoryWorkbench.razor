@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.K8S.Dialogs
 @using Monica.DevOps.K8S.Facades
 @using Monica.DevOps.K8S.Models
@@ -5,6 +6,7 @@
 @using Monica.DevOps.K8S.Support
 @using Monica.DevOps.Localization
 @using Monica.UI.Shell.Support
+@using Monica.UI.Shared.Components.Visual
 @implements IAsyncDisposable
 @inject K8SFacade Facade
 @inject K8SNavigationState NavigationContext
@@ -14,19 +16,21 @@
 
 <div class="k8s-workbench">
     <K8SFamilyHeader>
+        <Meta><span class="k8s-capture-status @(Visit.ContextFailure is not null || Visit.ReadFailure is not null ? "is-error" : Visit.Capture is not null ? "is-success" : null)"></span><span>@ReadStatus</span>@if (Visit.Capture is { } statusCapture) { <span>@L["Redesign:CapturedAt", FormatTime(statusCapture.FetchedAtUtc)]</span> }</Meta>
         <Actions><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@Visit.IsBusy" OnClick="Visit.RefreshAllAsync">@L["Workbench:Inventory:RefreshAll"]</MudButton></Actions>
     </K8SFamilyHeader>
-    <section class="k8s-inventory">
+    <section class="k8s-board">
         <div class="k8s-scope">
             <div class="k8s-scope-identity">
-                <MoIcon Icon="@MoIcons.Server" Size="1.5rem" />
+                <MoIcon Icon="@MoIcons.Cube" Size="1.5rem" />
                 <div class="k8s-namespace-field">
-                    <MudSelect T="string" Label="@L["Forms:Namespace"]" Value="@Visit.Namespace" ValueChanged="ChangeNamespaceAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@Visit.IsBusy" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                    <MudSelect T="string" Label="@L["Forms:Namespace"]" Value="@Visit.Namespace" ValueChanged="ChangeNamespaceAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@Visit.IsBusy" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" SelectionOnEnter="true">
                         @if (!string.IsNullOrEmpty(Visit.Namespace) && Visit.Namespaces?.Any(x => x.Name == Visit.Namespace) != true)
                         { <MudSelectItem T="string" Value="@Visit.Namespace"><span class="k8s-select-option-label">@Visit.Namespace</span></MudSelectItem> }
                         @foreach (var item in Visit.Namespaces ?? [])
                         { <MudSelectItem T="string" Value="@item.Name"><span class="k8s-select-option-label">@(item.Exists ? item.Name : L["Forms:NamespaceMissingDisplay", item.Name].Value)</span></MudSelectItem> }
                     </MudSelect>
+                    @if (Visit.ContextMatchesNamespaceCapture && Visit.NamespaceCapture is { } bandCapture) { <div class="k8s-scope-counts">@L["Redesign:NamespaceCounts", bandCapture.Items.Count(x => x.ResourceType == K8SResourceType.Service), bandCapture.Items.Count(x => x.ResourceType != K8SResourceType.Service)]</div> }
                     <div class="k8s-execution-context">@L["Workbench:Inventory:ExecutionNode"]: <span>@(Visit.ExecutionNode is { Length: > 0 } node ? node : L["Workbench:Inventory:NotConfigured"].Value)</span></div>
                 </div>
             </div>
@@ -36,20 +40,51 @@
                     <MudMenuItem Icon="@MoIcons.ChevronDown" Disabled="@Visit.IsBusy" OnClick="@(() => OperateAsync(K8SInventoryOperation.ScaleDown, K8SOperationScope.Namespace, OperationLaunchKind.NamespaceMenu))">@L["Workbench:Inventory:NamespaceDown"]</MudMenuItem>
                     <MudMenuItem Icon="@MoIcons.ChevronUp" Disabled="@Visit.IsBusy" OnClick="@(() => OperateAsync(K8SInventoryOperation.ScaleUp, K8SOperationScope.Namespace, OperationLaunchKind.NamespaceMenu))">@L["Workbench:Inventory:NamespaceUp"]</MudMenuItem>
                 </MudMenu>
-                <p>@L["Workbench:Inventory:Scope"]</p>
+                <p>@NamespaceOperationScope</p>
             </div>
         </div>
         @if (Visit.LatestOperation is { } outcome)
         { <K8SOperationEvidence Restart="@outcome.Restart" Scale="@outcome.Scale" Failure="@outcome.Failure" Namespace="@outcome.Namespace" Scope="@GetOutcomeScope(outcome)" CompletedAt="@outcome.CompletedAtUtc" /> }
+        @if (Visit.NamespaceCapture is { } overviewCapture)
+        {
+            @if (!Visit.ContextMatchesNamespaceCapture) { <p class="k8s-read-status">@L["Redesign:RetainedOverview", overviewCapture.Namespace, FormatTime(overviewCapture.FetchedAtUtc)]</p> }
+            <fieldset class="k8s-overview-controls" disabled="@(!Visit.ContextMatchesNamespaceCapture || Visit.IsBusy && Visit.Activity != K8SInventoryActivity.Inspecting)"><K8SNamespaceOverview Items="@overviewCapture.Items" SelectedRestartWindow="@_restartWindow" OnInspect="InspectAsync" OnExposureSelected="FilterExposureAsync" OnAttentionSelected="FilterAttentionAsync" OnRestartSelected="FilterRestartAsync" /></fieldset>
+        }
+    </section>
+    <section class="k8s-inventory">
         <div class="k8s-inventory-tools">
-            <div class="k8s-kind-buttons" role="group" aria-label="@L["Workbench:Inventory:Kind"]">
+            <fieldset disabled="@Visit.IsBusy" class="k8s-kind-buttons" role="group" aria-label="@L["Workbench:Inventory:Kind"]">
                 @foreach (var kind in Kinds)
-                { <MudButton Variant="@(Visit.ResourceType == kind ? Variant.Filled : Variant.Text)" Color="@(Visit.ResourceType == kind ? Color.Primary : Color.Default)" aria-pressed="@(Visit.ResourceType == kind ? "true" : "false")" Disabled="@Visit.IsBusy" OnClick="@(() => ChangeKindAsync(kind))">@KindLabel(kind)</MudButton> }
-            </div>
-            <div class="k8s-kind-select"><MudSelect T="K8SResourceType" Label="@L["Workbench:Inventory:Kind"]" Value="@Visit.ResourceType" ValueChanged="ChangeKindAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@Visit.IsBusy" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">@foreach (var kind in Kinds) { <MudSelectItem T="K8SResourceType" Value="@kind"><span class="k8s-select-option-label">@KindLabel(kind)</span></MudSelectItem> }</MudSelect></div>
+                {
+                    <button type="button" class="k8s-kind-button @K8SInventoryPresentation.KindRole(kind).ToCssClass()" aria-pressed="@(Visit.ResourceType == kind ? "true" : "false")" @onclick="() => ChangeKindAsync(kind)">
+                        <i aria-hidden="true"></i><span>@KindLabel(kind)</span>
+                        @if (KindCount(kind) is { } count) { <span class="k8s-kind-count">@count</span> }
+                    </button>
+                }
+            </fieldset>
             <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Refresh" Disabled="@(Visit.IsBusy || !Visit.NamespaceExists)" OnClick="Visit.RefreshListAsync">@L["Workbench:Inventory:RefreshList"]</MudButton>
-            <div class="k8s-search"><MudTextField T="string" Label="@L["Forms:SearchCurrentList"]" Value="@Visit.Search" ValueChanged="SearchAsync" Immediate="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Variant="Variant.Outlined" Margin="Margin.Dense" ClearIcon="@MoIcons.Close" /></div>
+            <div class="k8s-search"><MudTextField T="string" @ref="_searchField" Disabled="@Visit.IsBusy" Placeholder="@L["Redesign:Search"]" aria-label="@L["Forms:SearchCurrentList"]" Value="@Visit.Search" ValueChanged="SearchAsync" Immediate="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Variant="Variant.Outlined" Margin="Margin.Dense" ClearIcon="@MoIcons.Close" /></div>
         </div>
+        @if (Visit.Capture is { } filterCapture)
+        {
+            <fieldset disabled="@Visit.IsBusy" class="k8s-inventory-filters" role="group" aria-label="@L["Redesign:Filters"]">
+                <div class="k8s-filter-chips">
+                @if (filterCapture.ResourceType == K8SResourceType.Service)
+                {
+                    @foreach (var exposure in ExposureKinds)
+                    { <MoFilterChip Label="@L[$"Redesign:{exposure}"]" Count="@filterCapture.Items.Count(x => K8SInventoryPresentation.Exposure(x) == exposure)" Role="@(exposure == "Sidecar" ? MoVisualRole.Neutral : MoVisualRole.Info)" Selected="@(_exposureFilter == exposure)" ShowDot="true" SelectedChanged="@(_ => ToggleExposure(exposure))" /> }
+                }
+                <MoFilterChip Label="@L["Redesign:Attention"]" Count="@filterCapture.Items.Count(K8SInventoryPresentation.NeedsAttention)" Role="@K8SInventoryPresentation.AttentionRole(filterCapture.Items)" ShowDot="true" Selected="@_attentionOnly" SelectedChanged="SetAttention" />
+                @if (filterCapture.ResourceType == K8SResourceType.Service)
+                { <MoFilterChip Label="@L["Redesign:Unbound"]" Count="@filterCapture.Items.Count(x => x.RelatedWorkloads.Count == 0)" ShowDot="true" Selected="@_unboundOnly" SelectedChanged="SetUnbound" /> }
+                @if (_restartWindow is not null) { <MoFilterChip Label="@L["Redesign:RestartFilter"]" Role="MoVisualRole.Warning" Selected="true" SelectedChanged="@(_ => ClearRestartFilter())" /> }
+                <MudButton Class="k8s-clear-filters" Variant="Variant.Text" Color="Color.Primary" aria-disabled="@(!_filterWork.IsCompleted ? "true" : null)" OnClick="@(() => ClearFiltersAsync())">@L["Redesign:ClearFilters"]</MudButton>
+                </div>
+                <span class="k8s-filter-spacer"></span>
+                @if (filterCapture.ResourceType == K8SResourceType.Service && filterCapture.Items.Any(K8SInventoryPresentation.IsSidecar))
+                { <button class="k8s-fold-sidecars" aria-pressed="@(_hideSidecars ? "true" : "false")" @onclick="ToggleSidecars">@L[_hideSidecars ? "Redesign:ShowSidecars" : "Redesign:HideSidecars", filterCapture.Items.Count(K8SInventoryPresentation.IsSidecar)]</button> }
+            </fieldset>
+        }
         @if (Visit.IsBusy && Visit.Activity != K8SInventoryActivity.None)
         { <div class="k8s-read-status" role="status"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /><span>@ActivityLabel()</span> <span>@Visit.ActivityIdentity</span></div> }
         @if (Visit.ContextFailure is { } failure) { <div class="k8s-read-status"><MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@L["Workbench:Inventory:ReadFailure", Visit.Namespace, KindLabel(Visit.ResourceType), failure] @if (Visit.Capture is null) { <p>@L["Workbench:Inventory:FirstReadFailed"]</p> }</MudAlert></div> }
@@ -59,10 +94,10 @@
         {
             @if (!Visit.ContextMatchesCapture) { <div class="k8s-read-status"><MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Workbench:Inventory:Retained", Visit.Namespace, KindLabel(Visit.ResourceType)]</MudAlert></div> }
             @if (capture.Items.Count == 0)
-            { <div class="k8s-empty"><p>@CaptureLabel(capture)</p><p>@L["Workbench:Inventory:Empty", KindLabel(capture.ResourceType)]</p></div> }
+            { <MoContentState Compact="true"><p>@CaptureLabel(capture)</p><p>@L["Workbench:Inventory:Empty", KindLabel(capture.ResourceType)]</p></MoContentState> }
             else
             {
-                <MudDataGrid @key="capture.ResourceType" @ref="_grid" T="K8SResourceSummary" Items="capture.Items" QuickFilter="MatchesSearch" SortMode="SortMode.Multiple" Filterable="true" Dense="true" Hover="true" MultiSelection="true" SelectOnRowClick="@(!Visit.IsBusy && Visit.ContextMatchesCapture)" RowsPerPage="20" Comparer="@K8SResourceIdentity.Comparer" SelectedItems="@Visit.SelectedRows" SelectedItemsChanged="SelectRows" FixedHeader="true" Height="auto" Breakpoint="Breakpoint.Xs" Class="k8s-resource-grid" SortIcon="@MoIcons.ArrowUp" DragIndicatorIcon="@MoIcons.GripVertical" FilterIconEmpty="@MoIcons.Filter" FilterIconFilled="@MoIcons.Filter" FilterIconClear="@MoIcons.FilterOff" ColumnOptionsIcon="@MoIcons.MoreVertical">
+                <MudDataGrid @key="capture.ResourceType" @ref="_grid" T="K8SResourceSummary" Items="capture.Items" QuickFilter="MatchesSearch" SortMode="SortMode.Multiple" Filterable="true" ShowColumnOptions="false" Dense="true" Hover="true" MultiSelection="true" SelectOnRowClick="false" RowsPerPage="20" Comparer="@K8SResourceIdentity.Comparer" SelectedItems="@Visit.SelectedRows" SelectedItemsChanged="SelectRows" FixedHeader="true" Height="auto" Breakpoint="Breakpoint.Xs" Class="k8s-resource-grid" SortIcon="@MoIcons.ArrowUp" DragIndicatorIcon="@MoIcons.GripVertical" FilterIconEmpty="@MoIcons.Filter" FilterIconFilled="@MoIcons.Filter" FilterIconClear="@MoIcons.FilterOff" ColumnOptionsIcon="@MoIcons.MoreVertical">
                     <ToolBarContent>
                         <div class="k8s-list-metadata"><p>@CaptureLabel(capture)</p><span>@L["Workbench:Inventory:TimeExplanation"]</span></div>
                         @if (Visit.SelectedCount > 0)
@@ -90,33 +125,43 @@
                         }
                     </ToolBarContent>
                     <Columns>
-                        <SelectColumn T="K8SResourceSummary" DisabledFunc="@(_ => Visit.IsBusy || !Visit.ContextMatchesCapture)" ShowInHeader="@(!Visit.IsBusy && Visit.ContextMatchesCapture)" />
-                        <PropertyColumn Property="x => x.Name" Title="@L["Columns:Name"]" CellClass="k8s-resource-name" />
+                        <SelectColumn T="K8SResourceSummary" AriaLabelFunc="@(row => L["Workbench:Selection:SelectRow", row.Name].Value)" DisabledFunc="@(_ => Visit.IsBusy || !Visit.ContextMatchesCapture)" ShowInHeader="@(!Visit.IsBusy && Visit.ContextMatchesCapture)" />
+                        <PropertyColumn Property="x => x.Name" Title="@L["Columns:Name"]" HeaderClass="k8s-resource-name" CellClass="k8s-resource-name">
+                            <CellTemplate><div class="k8s-name-cell"><button class="k8s-name-link" disabled="@(Visit.IsBusy && !IsInspectionOrigin(context.Item))" aria-disabled="@(Visit.IsBusy && IsInspectionOrigin(context.Item) ? "true" : null)" @onclick="() => InspectAsync(context.Item)" @onclick:stopPropagation="true">@context.Item.Name</button><div class="k8s-row-meta">@if (K8SInventoryPresentation.IsSidecar(context.Item)) { <span>@L["Redesign:Sidecar"]</span> } else { @foreach (var label in context.Item.Selector.Take(2)) { <span title="@context.Item.SelectorDisplay">@label.Key=@label.Value</span> } }</div></div></CellTemplate>
+                        </PropertyColumn>
                         @if (capture.ResourceType == K8SResourceType.Service)
                         {
-                            <PropertyColumn Property="x => x.Type" Title="@L["Columns:ServiceType"]" />
-                            <PropertyColumn Property="x => x.ClusterIp" Title="@L["Columns:ClusterIp"]" />
-                            <PropertyColumn Property="x => x.PortsDisplay" Title="@L["Columns:Ports"]" />
-                            <PropertyColumn Property="x => x.SelectorDisplay" Title="@L["Columns:Selector"]" />
-                            <PropertyColumn Property="x => x.LastRestartedAtDisplay" Title="@L["Workbench:Inventory:BackingTime"]" />
+                            <PropertyColumn Property="x => x.Type" Title="@L["Redesign:Exposure"]">
+                                <CellTemplate><div class="k8s-exposure-cell"><MoValueMark Role="@(K8SInventoryPresentation.IsSidecar(context.Item) ? MoVisualRole.Neutral : MoVisualRole.Info)">@ExposureLabel(context.Item)</MoValueMark><span>@context.Item.ClusterIp</span></div></CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.PortsDisplay" Title="@L["Columns:Ports"]">
+                                <CellTemplate><div class="k8s-ports-cell">@foreach (var port in context.Item.Ports.Take(2)) { <div class="k8s-port"><span>@(string.IsNullOrEmpty(port.Name) ? port.Protocol : port.Name)</span><b>@port.Port</b>@if (port.NodePort is { } nodePort) { <mark>@L["Redesign:NodePortValue", nodePort]</mark> }</div> } @if (context.Item.Ports.Count > 2) { <button class="k8s-inline-link" @onclick="() => InspectAsync(context.Item)">@L["Redesign:MorePorts", context.Item.Ports.Count - 2]</button> }</div></CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.ReadyReplicas" Title="@L["Redesign:BackingWorkloads"]">
+                                <CellTemplate><div class="k8s-backing-cell">@if (context.Item.RelatedWorkloads.Count == 0) { <span class="k8s-muted">@L["Redesign:Unbound"]</span> } else { @foreach (var workload in context.Item.RelatedWorkloads.Take(2)) { <span class="k8s-workload-ref"><i class="@(workload.Kind == "StatefulSet" ? "is-stateful" : workload.Kind == "DaemonSet" ? "is-daemon" : null)"></i><span title="@workload.DisplayName">@(workload.Name == context.Item.Name ? L["Redesign:SameName", workload.Kind].Value : workload.Name)</span><b class="@(workload.DesiredReplicas > workload.ReadyReplicas ? "is-error" : null)">@workload.ReadyReplicas/@workload.DesiredReplicas</b></span> } }</div></CellTemplate>
+                            </PropertyColumn>
                         }
                         else
                         {
-                            <PropertyColumn Property="x => x.ImagesDisplay" Title="@L["Columns:Images"]" />
-                            <PropertyColumn Property="x => x.SelectorDisplay" Title="@L["Columns:Selector"]" />
-                            <PropertyColumn Property="x => x.ReplicaStatus" Title="@L["Columns:Replicas"]" />
-                            <PropertyColumn Property="x => x.LastRestartedAtDisplay" Title="@L["Workbench:Inventory:WorkloadTime"]" />
+                            <PropertyColumn Property="x => x.ImagesDisplay" Title="@L["Columns:Images"]"><CellTemplate><div class="k8s-images-cell">@foreach (var image in context.Item.Images) { <span title="@image">@image</span> }</div></CellTemplate></PropertyColumn>
+                            <PropertyColumn Property="x => x.ReadyReplicas" Title="@L["Columns:Replicas"]"><CellTemplate><div class="k8s-replica-cell"><MoValueMark Role="@K8SInventoryPresentation.HealthRole(context.Item)">@context.Item.ReadyReplicas/@context.Item.DesiredReplicas</MoValueMark><span>@L[context.Item.DesiredReplicas == 0 ? "Redesign:Stopped" : K8SInventoryPresentation.NeedsAttention(context.Item) ? "Redesign:Attention" : "Redesign:Ready"]</span></div></CellTemplate></PropertyColumn>
                         }
+                        <PropertyColumn Property="x => x.LastRestartedAtUtc" Title="@L[capture.ResourceType == K8SResourceType.Service ? "Workbench:Inventory:BackingTime" : "Workbench:Inventory:WorkloadTime"]">
+                            <HeaderTemplate><span title="@L[capture.ResourceType == K8SResourceType.Service ? "Workbench:Inventory:BackingTime" : "Workbench:Inventory:WorkloadTime"]">@L["Redesign:RestartedAt"]</span></HeaderTemplate>
+                            <CellTemplate><span class="k8s-time-cell">@UiTime.Format(context.Item.LastRestartedAtUtc)</span></CellTemplate>
+                        </PropertyColumn>
                         <TemplateColumn Title="@L["Columns:Actions"]" Sortable="false" Filterable="false">
                             <CellTemplate><div class="k8s-row-actions" @onclick:stopPropagation="true">
-                                <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="@(_retired || Visit.IsRetired || Visit.IsBusy && !IsInspectionOrigin(context.Item))" aria-disabled="@(Visit.IsBusy && IsInspectionOrigin(context.Item) ? "true" : null)" OnClick="@(() => InspectAsync(context.Item))">@L["Actions:Describe"]</MudButton>
-                                <MudMenu Icon="@MoIcons.MoreHorizontal" aria-label="@L["Workbench:Selection:RowActions", context.Item.Name]" Disabled="@IsOperationLaunchDisabled(OperationLaunchKind.RowMenu, context.Item)">
+                                <MudIconButton Icon="@MoIcons.Eye" Size="Size.Small" aria-label="@L["Redesign:InspectResource", context.Item.Name]" Disabled="@(_retired || Visit.IsRetired || Visit.IsBusy && !IsInspectionOrigin(context.Item))" aria-disabled="@(Visit.IsBusy && IsInspectionOrigin(context.Item) ? "true" : null)" OnClick="@(() => InspectAsync(context.Item))" />
+                                <MudMenu Icon="@MoIcons.MoreHorizontal" AriaLabel="@L["Workbench:Selection:RowActions", context.Item.Name]" Disabled="@IsOperationLaunchDisabled(OperationLaunchKind.RowMenu, context.Item)">
                                     <MudMenuItem Icon="@MoIcons.Restart" Disabled="@Visit.IsBusy" OnClick="@(() => OperateAsync(K8SInventoryOperation.Restart, K8SOperationScope.Single, OperationLaunchKind.RowMenu, context.Item))">@L[context.Item.ResourceType == K8SResourceType.Service ? "Actions:RestartBackingWorkloads" : "Actions:Restart"]</MudMenuItem>
+                                    <MudMenuItem Disabled="@Visit.IsBusy" OnClick="@(() => OperateAsync(K8SInventoryOperation.ScaleDown, K8SOperationScope.Single, OperationLaunchKind.RowMenu, context.Item))">@L["Workbench:Operation:ScaleToZero"]</MudMenuItem>
+                                    <MudMenuItem Disabled="@Visit.IsBusy" OnClick="@(() => OperateAsync(K8SInventoryOperation.ScaleUp, K8SOperationScope.Single, OperationLaunchKind.RowMenu, context.Item))">@L["Workbench:Operation:RestoreReplicas"]</MudMenuItem>
                                 </MudMenu>
                             </div></CellTemplate>
                         </TemplateColumn>
                     </Columns>
-                    <NoRecordsContent><div class="k8s-empty">@L["Workbench:Inventory:NoMatches"]</div></NoRecordsContent>
+                    <NoRecordsContent><MoContentState Compact="true"><p>@L["Workbench:Inventory:NoMatches"]</p><MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="@(Visit.IsBusy || !_filterWork.IsCompleted)" OnClick="@(() => ClearFiltersAsync(true))">@L["Redesign:ClearFilters"]</MudButton></MoContentState></NoRecordsContent>
                     <PagerContent><div class="k8s-pager">
                         <MudDataGridPager T="K8SResourceSummary" PageSizeOptions="PageSizes" RowsPerPageString="@L["Workbench:Pager:Rows"]" InfoFormat="@L["Workbench:Pager:Info"]" ShowNavigation="false" />
                         <div class="k8s-pager-buttons">
@@ -130,8 +175,12 @@
             }
         }
         else if (!Visit.IsBusy && Visit.ContextFailure is null && Visit.ReadFailure is null)
-        { <div class="k8s-empty">@L[Visit.Namespaces?.Count == 0 ? "Workbench:Inventory:NoNamespaces" : "Page:SelectNamespace"]</div> }
+        { <MoContentState Compact="true">@L[Visit.Namespaces?.Count == 0 ? "Workbench:Inventory:NoNamespaces" : "Page:SelectNamespace"]</MoContentState> }
     </section>
+    @if (_inspectedDetails is { } details)
+    {
+        <K8SResourceInspector @ref="_inspector" Details="@details" Open="true" OpenChanged="CloseInspectorAsync" CapturedAt="@_inspectedAt" LifetimeToken="@Visit.CancellationToken" CanOperate="@(Visit.CanOperate && details.Summary.Namespace == Visit.Namespace)" IsBusy="@Visit.IsBusy" RelatedServices="@InspectorServices" ShowServiceRelations="@(Visit.NamespaceCapture?.Namespace == details.Summary.Namespace)" OnRestart="@(row => OperateAsync(K8SInventoryOperation.Restart, K8SOperationScope.Single, OperationLaunchKind.Inspector, row))" OnScaleDown="@(row => OperateAsync(K8SInventoryOperation.ScaleDown, K8SOperationScope.Single, OperationLaunchKind.Inspector, row))" OnScaleUp="@(row => OperateAsync(K8SInventoryOperation.ScaleUp, K8SOperationScope.Single, OperationLaunchKind.Inspector, row))" OnInspectRelated="InspectAsync" />
+    }
 </div>
 
 @code {
@@ -146,11 +195,13 @@
     private K8SInventoryVisitController Visit = null!;
     private K8SDialogOwner _dialogs = null!;
     private MudDataGrid<K8SResourceSummary>? _grid;
+    private MudTextField<string>? _searchField;
     private Task _initialization = Task.CompletedTask;
     private Task _browserWork = Task.CompletedTask;
     private Task _parameterWork = Task.CompletedTask;
     private Task _inspectionWork = Task.CompletedTask;
     private Task _operationWork = Task.CompletedTask;
+    private Task _filterWork = Task.CompletedTask;
     private K8SResourceIdentity? _inspectionOrigin;
     private OperationLaunchOrigin? _operationOrigin;
 
@@ -160,10 +211,27 @@
         SelectedReplicaMenu,
         CompactSelectedMenu,
         NamespaceMenu,
-        RowMenu
+        RowMenu,
+        Inspector
     }
 
     private readonly record struct OperationLaunchOrigin(OperationLaunchKind Kind, K8SResourceIdentity? Row = null);
+    private K8SResourceDetails? _inspectedDetails;
+    private DateTimeOffset? _inspectedAt;
+    private K8SResourceInspector? _inspector;
+    private static readonly string[] ExposureKinds = ["NodePort", "ClusterIP", "Headless", "Sidecar", "Other"];
+    private string? _exposureFilter;
+    private bool _attentionOnly, _unboundOnly, _hideSidecars = true;
+    private (DateTimeOffset Start, DateTimeOffset End)? _restartWindow;
+    private IReadOnlyList<K8SResourceSummary> InspectorServices => _inspectedDetails is { } details
+        ? Visit.NamespaceCapture?.Items.Where(x => x.ResourceType == K8SResourceType.Service && x.Namespace == details.Summary.Namespace &&
+            x.RelatedWorkloads.Any(workload => workload.Name == details.Summary.Name && workload.Kind == details.Summary.Kind)).ToArray() ?? [] : [];
+    private string ReadStatus => Visit.IsBusy ? ActivityLabel() : L[Visit.ContextFailure is not null || Visit.ReadFailure is not null ? "Redesign:ReadFailed" : Visit.Capture is not null ? "Redesign:ReadSucceeded" : "Redesign:AwaitingRead"];
+    private int? KindCount(K8SResourceType kind) => Visit.ContextMatchesNamespaceCapture ? Visit.NamespaceCapture?.Items.Count(x => x.ResourceType == kind) : null;
+    private string NamespaceOperationScope => Visit.ContextMatchesNamespaceCapture && Visit.NamespaceCapture is { } capture
+        ? L["Redesign:OperationScope", capture.Items.Count(x => x.ResourceType != K8SResourceType.Service && x.RelatedServices.Count > 0), capture.Items.Count(x => x.ResourceType != K8SResourceType.Service && x.RelatedServices.Count == 0)]
+        : L["Workbench:Inventory:Scope"];
+    private string ExposureLabel(K8SResourceSummary row) => ExposureKinds.Contains(K8SInventoryPresentation.Exposure(row)) ? L[$"Redesign:{K8SInventoryPresentation.Exposure(row)}"] : row.Type;
     private bool _retired;
     private bool _browserReady;
     private Task? _retirement;
@@ -192,6 +260,8 @@
             await Task.WhenAll(_initialization, previous);
             await Visit.WhenIdleAsync();
             if (_retired || hints != _hints) return;
+            await CloseInspectorAsync(false);
+            ResetFilters();
             ApplyHints();
             Visit.SetSearch(NavigationContext.Search);
             await Visit.ChangeContextAsync(NavigationContext.Namespace, NavigationContext.ResourceType);
@@ -217,13 +287,63 @@
     }
 
     private Task PublishAsync() => _retired ? Task.CompletedTask : InvokeAsync(() => { if (!_retired) StateHasChanged(); });
-    private async Task ChangeNamespaceAsync(string value) { await Visit.ChangeContextAsync(value, Visit.ResourceType); await PersistAsync(); }
-    private async Task ChangeKindAsync(K8SResourceType value) { await Visit.ChangeContextAsync(Visit.Namespace, value); await PersistAsync(); }
-    private async Task SearchAsync(string value) { Visit.SetSearch(value); await PersistAsync(); }
+    private async Task ChangeNamespaceAsync(string value) { await CloseInspectorAsync(false); ResetFilters(); await Visit.ChangeContextAsync(value, Visit.ResourceType); await PersistAsync(); }
+    private async Task ChangeKindAsync(K8SResourceType value) { if (Visit.IsBusy || value == Visit.ResourceType) return; ResetFilters(); await Visit.ChangeContextAsync(Visit.Namespace, value); await PersistAsync(); }
+    private async Task SearchAsync(string value) { Visit.SetSearch(value); ResetPage(); await PersistAsync(); }
     private Task PersistAsync() => !_browserReady || _retired ? Task.CompletedTask : Visit.PersistBrowserAsync(Storage);
     private void SelectRows(HashSet<K8SResourceSummary>? rows) => Visit.SetSelected(rows ?? []);
     private void ClearSelection() => Visit.ClearSelected();
-    private bool MatchesSearch(K8SResourceSummary row) => string.IsNullOrWhiteSpace(Visit.Search) || row.SearchText.Contains(Visit.Search, StringComparison.OrdinalIgnoreCase);
+    private bool MatchesSearch(K8SResourceSummary row) =>
+        (string.IsNullOrWhiteSpace(Visit.Search) || row.SearchText.Contains(Visit.Search, StringComparison.OrdinalIgnoreCase)) &&
+        (!_hideSidecars || _exposureFilter == "Sidecar" || !K8SInventoryPresentation.IsSidecar(row)) &&
+        (_exposureFilter is null || K8SInventoryPresentation.Exposure(row) == _exposureFilter) &&
+        (!_attentionOnly || K8SInventoryPresentation.NeedsAttention(row)) &&
+        (!_unboundOnly || row.RelatedWorkloads.Count == 0) &&
+        MatchesRestartWindow(row);
+    private bool MatchesRestartWindow(K8SResourceSummary row)
+    {
+        if (_restartWindow is not { } window) return true;
+        return row.ResourceType == K8SResourceType.Service
+            ? row.RelatedWorkloads.Any(workload => workload.LastRestartedAtUtc is { } time && time >= window.Start && time <= window.End)
+            : row.LastRestartedAtUtc is { } time && time >= window.Start && time <= window.End;
+    }
+    private void ResetPage() => _grid?.NavigateTo(Page.First);
+    private void ResetFilters() { _exposureFilter = null; _attentionOnly = false; _unboundOnly = false; _restartWindow = null; ResetPage(); }
+    private Task ClearFiltersAsync(bool focusSearch = false)
+    {
+        if (_retired || Visit.IsRetired || Visit.IsBusy || !_filterWork.IsCompleted) return Task.CompletedTask;
+        return _filterWork = ClearCoreAsync();
+
+        async Task ClearCoreAsync()
+        {
+            // Move focus before the recovery button disappears when records return.
+            if (focusSearch && _searchField is { } search) await search.FocusAsync();
+            if (_retired || Visit.IsRetired || Visit.IsBusy) return;
+            Visit.SetSearch(string.Empty);
+            ResetFilters();
+            var grid = _grid;
+            if (grid is not null) await grid.ClearFiltersAsync();
+            if (_retired || Visit.IsRetired) return;
+            if (ReferenceEquals(grid, _grid)) ResetPage();
+            await PersistAsync();
+        }
+    }
+    private void SetAttention(bool selected) { _attentionOnly = selected; ResetPage(); }
+    private void SetUnbound(bool selected) { _unboundOnly = selected; ResetPage(); }
+    private void ToggleExposure(string exposure) { _exposureFilter = _exposureFilter == exposure ? null : exposure; ResetPage(); }
+    private void ToggleSidecars() { _hideSidecars = !_hideSidecars; if (_hideSidecars && _exposureFilter == "Sidecar") _exposureFilter = null; ResetPage(); }
+    private void ClearRestartFilter() { _restartWindow = null; ResetPage(); }
+    private async Task FilterExposureAsync(string exposure) { if (Visit.IsBusy || !Visit.ContextMatchesNamespaceCapture) return; await ChangeKindAsync(K8SResourceType.Service); _exposureFilter = exposure; ResetPage(); }
+    private Task FilterAttentionAsync(bool selected) { if (!Visit.IsBusy && Visit.ContextMatchesNamespaceCapture) SetAttention(selected); return Task.CompletedTask; }
+    private void FilterRestartAsync((DateTimeOffset Start, DateTimeOffset End) window) { if (Visit.IsBusy || !Visit.ContextMatchesNamespaceCapture) return; _restartWindow = window; ResetPage(); }
+    private async Task CloseInspectorAsync(bool open)
+    {
+        if (open) return;
+        var inspector = _inspector;
+        _inspectedDetails = null;
+        _inspector = null;
+        if (inspector is not null) await inspector.DisposeAsync();
+    }
     private string KindLabel(K8SResourceType kind) => L[$"ResourceTypes:{kind.ToPluralDisplayName()}"];
     private string ActivityLabel() => L[Visit.Activity switch
     {
@@ -235,7 +355,7 @@
         _ => "Workbench:Activity:Reading"
     }];
     private string CaptureLabel(K8SResourceListResult capture) => L["Workbench:Inventory:Capture", KindLabel(capture.ResourceType), capture.Namespace, capture.Items.Count, FormatTime(capture.FetchedAtUtc)];
-    private static string FormatTime(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz");
+    private string FormatTime(DateTimeOffset value) => UiTime.Format(value);
 
     private string GetOutcomeScope(K8SOperationOutcome outcome)
     {
@@ -277,7 +397,14 @@
 
         async Task OperateCoreAsync()
         {
-            try { await Visit.OperateAsync(request, ConfirmRestartAsync, ConfirmScaleAsync); }
+            try
+            {
+                var previousOutcome = Visit.LatestOperation;
+                await Visit.OperateAsync(request, ConfirmRestartAsync, ConfirmScaleAsync);
+                if (!_retired && !ReferenceEquals(previousOutcome, Visit.LatestOperation) && Visit.LatestOperation?.Failure is null &&
+                    _inspectedDetails is { } inspected && inspected.Summary.Namespace == request.Namespace)
+                    await Visit.DescribeAsync(inspected.Summary, ShowDescribeAsync);
+            }
             finally { _operationOrigin = null; }
         }
     }
@@ -302,9 +429,9 @@
     private async Task ShowDescribeAsync(K8SResourceDetails details, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        await _dialogs.ShowAsync<K8SDescribeDialog>($"{details.Summary.Kind}/{details.Summary.Name}",
-            new DialogParameters<K8SDescribeDialog> { { x => x.Details, details }, { x => x.LifetimeToken, token } },
-            new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true, CloseButton = true, CloseOnEscapeKey = true });
+        _inspectedDetails = details;
+        _inspectedAt = DateTimeOffset.UtcNow;
+        await PublishAsync();
     }
 
     private async Task<bool> ConfirmRestartAsync(K8SRestartPreview preview, K8SOperationRequest request, CancellationToken token)
@@ -312,7 +439,7 @@
         token.ThrowIfCancellationRequested();
         var result = await _dialogs.ShowAsync<K8SRestartConfirmDialog>(L["Workbench:Operation:RestartTitle", request.Namespace],
             new DialogParameters<K8SRestartConfirmDialog> { { x => x.Preview, preview } },
-            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true });
         return result is { Canceled: false };
     }
 
@@ -321,7 +448,7 @@
         token.ThrowIfCancellationRequested();
         var result = await _dialogs.ShowAsync<K8SScaleConfirmDialog>(L[request.Operation == K8SInventoryOperation.ScaleDown ? "Workbench:Operation:DownTitle" : "Workbench:Operation:UpTitle", request.Namespace],
             new DialogParameters<K8SScaleConfirmDialog> { { x => x.Preview, preview } },
-            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true });
         return result is { Canceled: false };
     }
 
@@ -329,9 +456,10 @@
     private async Task RetireAsync()
     {
         _retired = true;
+        var inspector = _inspector?.DisposeAsync().AsTask() ?? Task.CompletedTask;
         var dialogs = _dialogs.DisposeAsync().AsTask();
         var visit = Visit.DisposeAsync().AsTask();
-        try { await Task.WhenAll(dialogs, visit, _initialization, _browserWork, _parameterWork, _inspectionWork, _operationWork); }
+        try { await Task.WhenAll(inspector, dialogs, visit, _initialization, _browserWork, _parameterWork, _inspectionWork, _operationWork, _filterWork); }
         finally { _inspectionOrigin = null; _operationOrigin = null; }
     }
 }

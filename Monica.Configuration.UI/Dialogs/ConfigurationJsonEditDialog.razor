@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Monica.Configuration.UI.Localization
 @using Monica.UI.Shared.Components.Dialogs
 @inject ConfigurationJsonDraftService DraftService
@@ -43,14 +44,7 @@
 
             @if (CanAnalyze)
             {
-                <MudTextField T="string"
-                              @bind-Value="_json"
-                              @bind-Value:after="InvalidateDraft"
-                              Label="@L["ImportExport:JsonEditor:Json"]"
-                              Variant="Variant.Outlined"
-                              Class="configuration-json-input"
-                              Lines="18"
-                              Immediate="false" />
+                <MoJson @bind-Value="_json" @bind-Value:after="InvalidateDraft" ReadOnly="false" Rows="18" Label="@L["ImportExport:JsonEditor:Json"]" />
             }
 
             @if (_draft is { IsJsonValid: false })

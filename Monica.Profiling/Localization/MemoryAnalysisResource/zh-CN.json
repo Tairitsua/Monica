@@ -206,7 +206,7 @@
         "Fragmentation": "碎片",
         "Inspect": "查看详情"
       },
-      "Help": "最新记录在前 · 可分页查看全部保留样本，并查看每条记录的原始值与 UTC 时间戳。",
+      "Help": "最新记录在前 · 可分页查看全部保留样本，并查看每条记录的原始值与时间戳。",
       "Inspect": "查看采样 {0}",
       "Range": "显示第 {0}–{1} 条，共 {2} 条",
       "Pagination": "内存样本分页"
@@ -222,8 +222,8 @@
     "Window": "观测跨度",
     "CollectorInterval": "采集间隔",
     "Seconds": "{0:0.##} 秒",
-    "HeapUnit": "十进制 MB · UTC 时间轴",
-    "AllocationUnit": "报告速率 · 二进制 MiB/s · UTC 时间轴",
+    "HeapUnit": "十进制 MB · 时间轴",
+    "AllocationUnit": "报告速率 · 二进制 MiB/s · 时间轴",
     "MeasurementHelp": "历史由主机采集器维护。暂停视图读取不会停止采集；不同单位分别绘图，缓存计数器在初始阶段可能为零。",
     "NoRetentionTitle": "未保留采样历史",
     "NoRetention": "主机不保留样本，仍可读取当前进程。",
@@ -354,7 +354,7 @@
       "Frozen": "类型、来源与来源总量保持固定，同时页面和实时采集器继续更新。",
       "FullName": "完整类型标识",
       "Source": "证据来源",
-      "LastSeen": "记录的类型时间戳 · UTC",
+      "LastSeen": "记录的类型时间戳",
       "CountShare": "记录的数量占比 · %",
       "ByteShare": "记录的字节占比 · %",
       "SourceTicks": "完整来源事件数",

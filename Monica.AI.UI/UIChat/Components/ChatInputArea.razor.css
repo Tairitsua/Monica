@@ -8,11 +8,11 @@
 .input-area[data-short="true"] .composer-editor { max-height: 88px; }
 .input-area[data-short="true"] .composer-hint { display: none; }
 .input-top { display: flex; position: relative; min-width: 0; }
-.input-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 360px) auto auto; align-items: center; gap: 8px; min-width: 0; }
-.input-actions-left { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.input-model { min-width: 0; }
-.input-model ::deep .model-selector { width: 100%; max-width: none; }
-.input-context, .input-send { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+.input-bottom { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.input-actions-left { display: flex; align-items: center; flex: 0 0 auto; gap: 4px; min-width: 0; margin-inline-end: auto; }
+.input-actions-left ::deep .attachment-button { width: 40px; height: 40px; }
+.input-model { flex: 0 1 auto; min-width: 0; }
+.input-context, .input-send { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; min-width: 0; }
 .input-send ::deep .mud-icon-button { width: 40px; height: 40px; border-radius: 10px; }
 .input-send ::deep .mud-icon-button:not(.mud-disabled):not([disabled]) { background: color-mix(in srgb, var(--mud-palette-primary) 10%, var(--mud-palette-surface)); }
 .input-send ::deep .composer-stop:not(.mud-disabled):not([disabled]) { background: color-mix(in srgb, var(--mud-palette-error) 10%, var(--mud-palette-surface)); }
@@ -20,11 +20,6 @@
 .composer-hint { color: color-mix(in srgb, var(--mud-palette-text-secondary) 75%, var(--mud-palette-text-primary)); font-size: .75rem; flex-shrink: 0; }
 .input-area ::deep .file-input { display: none; }
 @container chat-composer (max-width: 640px) {
-    .input-bottom { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
-    .input-model { grid-column: 1; grid-row: 1; }
-    .input-context { grid-column: 2; grid-row: 1; }
-    .input-actions-left { grid-column: 1; grid-row: 2; }
-    .input-send { grid-column: 2; grid-row: 2; }
     .input-area ::deep .input-container { gap: 10px; padding: 14px; }
 }
 @media(max-width: 600px) { .input-area { padding: 10px var(--mo-chat-reading-gutter, 14px) 14px; } .composer-hint { display: none; } }

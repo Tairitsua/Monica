@@ -81,7 +81,7 @@ public sealed class ConfigurationHistoryQuerySessionTests
 
     private static ConfigurationHistoryQuerySession.Query Begin(ConfigurationHistoryQuerySession session, string definitionKey)
     {
-        var requests = ConfigurationHistoryPage.CreateRequests(definitionKey, "", "all", null, null);
+        var requests = ConfigurationHistoryPage.CreateRequests(definitionKey, "", "all", null, null, TimeZoneInfo.Utc);
         return session.Begin(requests.History, requests.Groups);
     }
 

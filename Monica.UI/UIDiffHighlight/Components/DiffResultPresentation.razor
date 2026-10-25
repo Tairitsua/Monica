@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.UI.UIDiffHighlight.Models
 @inject IStringLocalizer<SharedResource> L
@@ -12,7 +13,7 @@
     <div class="diff-result__provenance">
         @if (ComparedAt is { } receipt)
         {
-            <span class="diff-result__receipt" title="@FullReceipt(receipt)">@L["DiffViewer:ComparedAt", receipt.ToString("T", CultureInfo.CurrentCulture)]</span>
+            <span class="diff-result__receipt" title="@UiTime.Format(receipt)">@L["DiffViewer:ComparedAt", UiTime.FormatTime(receipt)]</span>
         }
         <span class="diff-result__accepted-settings">@L[$"DiffHighlightPage:Modes:{Result.Options.Mode}"] · @L[$"DiffHighlightPage:Formats:{Result.Options.OutputFormat}"]</span>
         <span class="diff-result__current">@(IsCurrent ? CurrentInputsLabel ?? L["DiffViewer:Current"] : EarlierInputsLabel ?? L["DiffViewer:Stale"])</span>
@@ -123,6 +124,4 @@
     }
     private void ViewChanged(EDiffViewMode value) => _view = value;
     private void DisplayChanged(EDiffDisplayMode value) => _display = value;
-    private static string FullReceipt(DateTimeOffset value) => value.ToString("F", CultureInfo.CurrentCulture)
-        + value.ToString(" zzz", CultureInfo.InvariantCulture);
 }

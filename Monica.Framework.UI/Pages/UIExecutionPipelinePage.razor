@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @using Monica.Framework.UI.UIExecutionPipeline.Components
@@ -22,7 +23,7 @@
                     <div class="execution-pipeline-page__capture">
                         <span>@L["Page:Header:CaptureLabel"]</span>
                         <time datetime="@snapshot.CapturedAt.ToString("O")">
-                            @snapshot.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
+                            @UiTime.Format(snapshot.CapturedAt)
                         </time>
                         <small>@L["Page:Header:LocalTime"]</small>
                     </div>

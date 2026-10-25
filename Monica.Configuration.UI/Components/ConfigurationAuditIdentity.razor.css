@@ -1,0 +1,8 @@
+.configuration-audit-identity { min-width: 0; max-width: 100%; }
+.configuration-audit-identity summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--mud-palette-text-secondary); cursor: pointer; font-size: 12px; line-height: 1.6; list-style: none; }
+.configuration-audit-identity summary::-webkit-details-marker { display: none; }
+.configuration-audit-identity summary:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 4px; border-radius: 2px; }
+.configuration-audit-identity summary code { color: var(--mud-palette-text-primary); font-size: 12px; }
+.configuration-audit-identity summary ::deep .mo-icon { flex-shrink: 0; }
+.configuration-audit-identity[open] summary ::deep .mo-icon { transform: rotate(180deg); }
+.configuration-audit-identity-full { display: block; padding-top: 8px; font-size: 12px; line-height: 1.7; color: var(--mud-palette-text-secondary); white-space: normal; overflow-wrap: anywhere; }

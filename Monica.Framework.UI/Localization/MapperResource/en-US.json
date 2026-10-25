@@ -1,5 +1,9 @@
 {
-  "Pages": { "MapperDebug": { "Title": "Mapper Debug" } },
+  "Pages": {
+    "MapperDebug": {
+      "Title": "Mapper Debug"
+    }
+  },
   "Page": {
     "PageTitle": "Mapper Registry",
     "Header": {
@@ -54,5 +58,8 @@
       "LoadSucceeded": "Read {0} registered pairs.",
       "LoadFailed": "Registry read failed: {0}"
     }
+  },
+  "Navigation": {
+    "Category": "Object mapping"
   }
 }

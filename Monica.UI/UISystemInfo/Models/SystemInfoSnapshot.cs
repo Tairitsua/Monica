@@ -109,7 +109,7 @@ public sealed record SystemInfoHost
     /// <summary>Gets the process working directory at capture time.</summary>
     public required string CurrentDirectory { get; init; }
 
-    /// <summary>Gets the local time zone and its UTC offset at capture time.</summary>
+    /// <summary>Gets the configured Clock display timezone and its UTC offset at capture time.</summary>
     public required SystemTimeZone TimeZone { get; init; }
 }
 

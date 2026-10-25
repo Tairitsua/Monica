@@ -1,3 +1,5 @@
+@using Monica.Profiling.UIRuntimeMetrics.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Profiling.TypeAllocation.Models
 @using Monica.Profiling.UIMemoryAnalysis.Support
 @using Monica.UI.Shared.Components.Dialogs
@@ -14,9 +16,9 @@
             </div>
             <dl class="allocation-detail-context">
                 <div><dt>@L["Allocation:Details:Source"]</dt><dd data-field="Source">@L[Heap ? "Allocation:Sources:HeapTitle" : "Allocation:Sources:LiveTitle"]</dd></div>
-                <div><dt>@L["Allocation:Sources:Timestamp"] · UTC</dt><dd><time data-field="SnapshotTimestamp" datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.SnapshotTimestamp)">@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.SnapshotTimestamp)</time></dd></div>
-                <div><dt>@L["Allocation:Sources:ViewRead"]</dt><dd><time data-field="CapturedAt" datetime="@Evidence.CapturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(Evidence.CapturedAt)</time></dd></div>
-                <div><dt>@L["Allocation:Details:LastSeen"]</dt><dd><time data-field="LastSeenUtc" datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.LastSeenUtc)">@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.LastSeenUtc)</time></dd></div>
+                <div><dt>@L["Allocation:Sources:Timestamp"]</dt><dd><time data-field="SnapshotTimestamp" datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.SnapshotTimestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Evidence.SnapshotTimestamp))</time></dd></div>
+                <div><dt>@L["Allocation:Sources:ViewRead"]</dt><dd><time data-field="CapturedAt" datetime="@Evidence.CapturedAt.ToString("O")">@UiTime.Format(Evidence.CapturedAt)</time></dd></div>
+                <div><dt>@L["Allocation:Details:LastSeen"]</dt><dd><time data-field="LastSeenUtc" datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Evidence.LastSeenUtc)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Evidence.LastSeenUtc))</time></dd></div>
             </dl>
             <p class="allocation-detail-note">@L[Heap ? "Allocation:Sources:HeapHelp" : "Allocation:Sources:LiveHelp"]</p>
             <dl class="allocation-detail-values">

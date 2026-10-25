@@ -214,21 +214,6 @@ public class SubscriptionViewModel
     #region Display Properties
 
     /// <summary>
-    /// Creation time display text
-    /// </summary>
-    public string CreatedAtDisplay => CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-    /// <summary>
-    /// Activation time display text
-    /// </summary>
-    public string? ActivatedAtDisplay => ActivatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-    /// <summary>
-    /// Disable time display text
-    /// </summary>
-    public string? DeactivatedAtDisplay => DeactivatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-    /// <summary>
     /// Calculates the duration represented by the current subscription lifecycle state.
     /// </summary>
     /// <returns>

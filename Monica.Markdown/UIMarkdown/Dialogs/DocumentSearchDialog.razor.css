@@ -5,12 +5,21 @@
     max-height: calc(85dvh - 112px);
     min-height: 0;
     min-width: 0;
+    color: var(--mud-palette-text-primary);
+    font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
+}
+
+.document-search-header,
+.document-search-dialog ::deep .document-search-input,
+.document-search-status-row {
+    flex-shrink: 0;
 }
 
 .document-search-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 16px;
     min-width: 0;
 }
@@ -23,18 +32,21 @@
     margin: 0;
     font-size: .9rem;
     font-weight: 500;
-    color: var(--mud-palette-text-secondary);
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 80%, var(--mud-palette-text-secondary));
     overflow-wrap: anywhere;
 }
 
 .document-search-scope-card {
     flex-shrink: 0;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .document-search-status-row {
     min-height: 22px;
-    font-size: .8rem;
-    color: var(--mud-palette-text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 75%, var(--mud-palette-text-secondary));
 }
 
 .document-search-status-inline {
@@ -49,8 +61,11 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    padding: 2px;
+    gap: 12px;
+    padding: 3px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--mud-palette-lines-default) transparent;
 }
 
 .document-search-state {
@@ -60,7 +75,7 @@
     min-height: 104px;
     padding: 24px;
     text-align: center;
-    color: var(--mud-palette-text-secondary);
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 80%, var(--mud-palette-text-secondary));
 }
 
 .document-search-result {
@@ -70,15 +85,16 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    gap: 8px;
-    padding: 18px;
-    border: 0;
-    border-bottom: 1px solid var(--mud-palette-lines-default);
-    border-radius: 0;
+    gap: 7px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 12px;
     background: var(--mud-palette-surface);
     text-align: left;
     cursor: pointer;
     color: var(--mud-palette-text-primary);
+    font: inherit;
 }
 
 .document-search-result > div {
@@ -87,7 +103,9 @@
 }
 
 .document-search-result:hover {
-    background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
+    border-color: color-mix(in srgb, var(--mud-palette-primary) 28%, var(--mud-palette-lines-default));
+    background: color-mix(in srgb, var(--mud-palette-primary) 4%, var(--mud-palette-surface));
+    box-shadow: var(--mud-elevation-1);
 }
 
 .document-search-result:focus-visible {
@@ -101,12 +119,19 @@
     flex-wrap: wrap;
     gap: 4px 12px;
     min-width: 0;
-    font-size: .75rem;
-    color: var(--mud-palette-text-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 75%, var(--mud-palette-text-secondary));
 }
 
 .document-search-result-group {
-    font-weight: 500;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--mud-palette-primary) 65%, var(--mud-palette-text-primary));
+    background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--mud-palette-surface));
+    font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 .document-search-result-location {
@@ -114,16 +139,16 @@
 }
 
 .document-search-result-title {
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    line-height: 1.4;
+    line-height: 1.5;
     overflow-wrap: anywhere;
 }
 
 .document-search-result-preview {
-    font-size: .9rem;
+    font-size: 14px;
     line-height: 1.65;
-    color: var(--mud-palette-text-secondary);
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 85%, var(--mud-palette-text-secondary));
     overflow-wrap: anywhere;
 }
 
@@ -140,6 +165,6 @@
         gap: 8px;
     }
     .document-search-result {
-        padding: 14px 8px;
+        padding: 14px;
     }
 }

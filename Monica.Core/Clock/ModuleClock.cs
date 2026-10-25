@@ -36,7 +36,8 @@ public class ModuleClockOption : ModuleOptions<ModuleClock>
 {
     /// <summary>
     /// Gets or sets the deployment's wall-clock timezone used to stamp business audit timestamps
-    /// (creation, modification, deletion). The default <see langword="null" /> keeps UTC.
+    /// (creation, modification, deletion) and display Monica UI timestamps.
+    /// The default <see langword="null" /> keeps UTC; the UI never falls back to the server timezone.
     /// </summary>
     /// <remarks>
     /// <para>

@@ -48,14 +48,4 @@ public class SubscriptionChangeViewModel
     /// </summary>
     public DateTime Timestamp { get; set; }
 
-    /// <summary>
-    /// Timestamp display text (hours minutes seconds milliseconds)
-    /// </summary>
-    public string TimestampDisplay => Timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
-
-    /// <summary>
-    /// Full time display text
-    /// </summary>
-    public string FullTimestampDisplay => Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff");
-
 }

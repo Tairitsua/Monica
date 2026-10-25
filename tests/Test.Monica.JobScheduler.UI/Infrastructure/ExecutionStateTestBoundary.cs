@@ -14,6 +14,7 @@ using Monica.JobScheduler.UI.UIJobScheduler.Support;
 using Monica.Modules;
 using Monica.Testing.Localization;
 using NSubstitute;
+using Test.Monica.JobScheduler.UI.Support;
 
 namespace Test.Monica.JobScheduler.UI.Infrastructure;
 
@@ -70,7 +71,7 @@ internal sealed class ExecutionStateTestBoundary
         });
         var facade = new JobSchedulerFacade(Boundary, schedulerOptions, Clock, new JobSchedulerRuntimeState(),
             NullLogger<JobSchedulerFacade>.Instance);
-        var presentation = new SchedulerTimePresentation(schedulerOptions, new EchoStringLocalizer<JobSchedulerResource>());
+        var presentation = new SchedulerTimePresentation(schedulerOptions, new EchoStringLocalizer<JobSchedulerResource>(), SchedulerTimePresentationTests.CreateUiTimeFormatter());
         _factory = new(facade, Access, Options.Create(new ModuleJobSchedulerUIOption()), Clock, presentation);
     }
 

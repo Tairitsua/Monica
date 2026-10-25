@@ -39,23 +39,23 @@
 
             @if (_loading)
             {
-                <div class="configuration-sources-state" role="status">
+                <div class="configuration-sources-state"><MoContentState Compact="true" Loading="true">
                     <MudProgressLinear Indeterminate="true" Color="Color.Info" />
                     <p>@L["Common:States:Loading"]</p>
-                </div>
+                </MoContentState></div>
             }
             else if (_error is not null)
             {
-                <div class="configuration-sources-state">
+                <div class="configuration-sources-state"><MoContentState Compact="true">
                     <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_error</MudAlert>
-                </div>
+                </MoContentState></div>
             }
             else if (_contributions.Count == 0)
             {
-                <div class="configuration-sources-state configuration-sources-empty">
+                <div class="configuration-sources-state"><MoContentState Compact="true">
                     <MoIcon Icon="@MoIcons.Workflow" aria-hidden="true" Size="1.5rem" />
                     <p>@L["Sources:Definition:Empty"]</p>
-                </div>
+                </MoContentState></div>
             }
             else
             {

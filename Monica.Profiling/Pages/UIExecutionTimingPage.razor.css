@@ -28,7 +28,7 @@
 .timing-loading { margin-bottom: 16px; }
 .timing-error { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--mud-palette-lines-default); border-left: 3px solid var(--mud-palette-warning); background: var(--mud-palette-surface); border-radius: 8px; padding: 18px 24px; margin-bottom: 20px; font-size: 13px; }
 .timing-error p { margin: 6px 0 0; line-height: 1.75; color: var(--timing-muted-ink); overflow-wrap: anywhere; }
-.timing-awaiting { padding: 28px; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); color: var(--timing-muted-ink); font-size: 13px; }
+.timing-awaiting { border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); color: var(--timing-muted-ink); font-size: 13px; }
 @container timing-page (max-width: 800px) {
     .timing-heading__actions, .timing-freshness { justify-content: flex-start; }
     .timing-scope { grid-template-columns: minmax(0, 1fr); }

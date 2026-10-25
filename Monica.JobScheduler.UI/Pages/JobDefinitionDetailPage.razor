@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @attribute [Route(PAGE_URL)]
 
 @using Monica.JobScheduler.UI.Localization
@@ -15,10 +16,10 @@
             <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
                 @if (state.IsLoading && state.Summary is null)
                 {
-                    <div class="job-detail-page__loading" role="status">
+                    <MoContentState Loading="true">
                         <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
                         <MudText Typo="Typo.body2">@L["Common:Loading"]</MudText>
-                    </div>
+                    </MoContentState>
                 }
                 else if (state.Error is not null && state.Summary is null)
                 {

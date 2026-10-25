@@ -483,7 +483,7 @@
   },
   "ProviderInspector": {
     "Title": "提供者详情",
-    "Captured": "获取时间（UTC）",
+    "Captured": "获取时间",
     "Scope": "此详情在打开时固定所选提供者与订阅行的快照。能力表示提供者声明的契约，不代表传输当前可用。",
     "CapabilitiesHelp": "这些能力由提供者声明，此处不会执行发布或连接测试。",
     "LoadingOptions": "正在检查访问权限并加载脱敏配置…",
@@ -512,7 +512,7 @@
     "EmptyHelp": "启动监听器，再向其主题发布消息。提供者接受发布请求并不代表已经收到消息。",
     "Received": "接收时间（本地）",
     "MessageId": "消息 ID",
-    "CreatedUtc": "创建时间（UTC）",
+    "CreatedUtc": "创建时间",
     "ListenerLifetime": "此页面拥有监听器，离开时会尝试停止。若移除失败，再次进入会恢复同一个监听器，您可以重新停止。最近的接收记录保留在当前浏览器会话中，直到清除记录或会话结束。",
     "PreparingListener": "正在准备监听器…",
     "ListenerUnavailable": "监听器不可用"
@@ -550,7 +550,7 @@
     "ClearFilters": "清除筛选",
     "FilterScope": "筛选计数仅统计保留窗口，按观察顺序从新到旧排列。",
     "Shown": "显示 {0} / {1} 条保留记录",
-    "RecordedChange": "变更记录 · UTC",
+    "RecordedChange": "变更记录",
     "Subscription": "事件与订阅",
     "Route": "主题与提供者范围",
     "Registration": "记录时的注册状态",
@@ -569,5 +569,8 @@
     "RowsPerPage": "每页条目",
     "PageInfo": "{first_item}–{last_item} / {all_items}",
     "EvidenceHelp": "注册状态与已报告的主题运行状态相互独立，并随每条观察记录保存。查看操作会打开当时固定的证据，即使订阅已被移除，也不会重新查询当前注册行。"
+  },
+  "Navigation": {
+    "Category": "事件总线"
   }
 }

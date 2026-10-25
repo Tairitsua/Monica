@@ -38,7 +38,7 @@ internal static class SchedulerRuntimePresentation
     }
 
     /// <summary>
-    /// Preserves every tick of an interval in invariant constant format alongside its readable unit value.
+    /// Preserves every tick of an interval in invariant constant format for on-demand inspection.
     /// </summary>
     internal static string FormatExactInterval(TimeSpan value) => value.ToString("c", CultureInfo.InvariantCulture);
 

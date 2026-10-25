@@ -146,5 +146,8 @@
       "TargetId": "仓库 ID",
       "ObservedChanges": "报告的本地更改"
     }
+  },
+  "Navigation": {
+    "Category": "Git"
   }
 }

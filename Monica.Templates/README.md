@@ -5,7 +5,7 @@ Official `dotnet new` templates for the shortest path from an empty directory to
 ## Install from a package
 
 ```bash
-dotnet new install Monica.Templates@1.0.0-rc.13
+dotnet new install Monica.Templates@1.0.0-rc.15
 dotnet new monica-api --name Acme.Orders
 cd Acme.Orders
 dotnet run

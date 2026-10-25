@@ -42,6 +42,9 @@ public sealed class OptionalProfilingPageTests
     {
         var context = new BunitContext();
         context.Services.AddMudServices();
+        context.Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        context.Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        context.Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         context.Services.AddSingleton<IStringLocalizer<RuntimeMetricsResource>,
             EchoStringLocalizer<RuntimeMetricsResource>>();
         context.Services.AddSingleton<IStringLocalizer<MemoryAnalysisResource>,

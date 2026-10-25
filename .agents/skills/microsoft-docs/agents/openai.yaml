@@ -1,4 +1,0 @@
-interface:
-  display_name: "Microsoft Docs"
-  short_description: "Search official Microsoft documentation"
-  default_prompt: "Use $microsoft-docs to research official Microsoft documentation for Azure, .NET, Microsoft 365, Windows, and related technologies."

@@ -176,5 +176,8 @@
     "Catalog": {
       "AriaLabel": "执行目录视图"
     }
+  },
+  "Navigation": {
+    "Category": "执行管线"
   }
 }

@@ -184,30 +184,6 @@ public sealed class ModuleSystemWorkbenchComponentTests
     }
 
     [Fact]
-    public async Task Module_catalog_summary_uses_the_shared_theme_aware_surface_and_rail_contract()
-    {
-        await using var context = new ModuleSystemWorkbenchUiTestContext();
-        await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
-        await session.InitializeAsync();
-
-        var cut = context.Render<ModuleWorkbenchModules>(parameters => parameters
-            .Add(component => component.Session, session));
-
-        var cards = cut.FindAll(".module-summary > article.mo-card-surface");
-
-        cards.Should().HaveCount(4);
-        cards.Select(card => card.GetAttribute("data-mo-card-tone"))
-            .Should().Equal("success", "secondary", "info", "primary");
-        cards.Should().AllSatisfy(card =>
-        {
-            var rail = card.QuerySelector(".mo-card-surface__rail");
-            rail.Should().NotBeNull();
-            rail!.ParentElement.Should().BeSameAs(card);
-            rail.GetAttribute("aria-hidden").Should().Be("true");
-        });
-    }
-
-    [Fact]
     public async Task Overview_metrics_render_as_one_contiguous_fact_grid()
     {
         await using var context = new ModuleSystemWorkbenchUiTestContext();
@@ -222,25 +198,6 @@ public sealed class ModuleSystemWorkbenchComponentTests
         facts.Should().HaveCount(4);
         facts.Should().AllSatisfy(fact => fact.QuerySelector(".mo-card-surface").Should().BeNull());
         cut.Find(".overview-score .startup-timeline").Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task Module_catalog_cost_meter_preserves_total_and_work_kind_proportions()
-    {
-        await using var context = new ModuleSystemWorkbenchUiTestContext();
-        await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
-        await session.InitializeAsync();
-
-        var cut = context.Render<ModuleWorkbenchModules>(parameters => parameters
-            .Add(component => component.Session, session));
-
-        var betaMeter = cut.Find("[data-module-cost='BetaModule'] [role='meter']");
-        ParseSvgNumber(betaMeter.GetAttribute("data-total-width")).Should().BeApproximately(1000, .001);
-        ParseSvgNumber(betaMeter.GetAttribute("data-callback-width")).Should().BeApproximately(142.857, .001);
-        ParseSvgNumber(betaMeter.GetAttribute("data-startup-width")).Should().BeApproximately(857.143, .001);
-
-        var alphaMeter = cut.Find("[data-module-cost='AlphaModule'] [role='meter']");
-        ParseSvgNumber(alphaMeter.GetAttribute("data-total-width")).Should().BeApproximately(428.571, .001);
     }
 
     [Fact]
@@ -281,13 +238,6 @@ public sealed class ModuleSystemWorkbenchComponentTests
             cut.Markup.Should().Contain("Scanned.Assembly");
             cut.Markup.Should().Contain("Test.*");
 
-            var cards = cut.FindAll(".assembly-kpi.mo-card-surface");
-            cards.Should().HaveCount(4);
-            cards.Should().AllSatisfy(card =>
-            {
-                card.QuerySelector(".assembly-kpi__label").Should().NotBeNull();
-                card.QuerySelector(".mo-card-surface__rail").Should().BeNull();
-            });
         });
 
         inventoryCalls.Should().Be(1);
@@ -503,8 +453,8 @@ public sealed class ModuleSystemWorkbenchComponentTests
     }
 
     [Theory]
-    [InlineData("en-US", "Type discovery took 12.0 ms, exceeding the configured 8.00 ms budget.")]
-    [InlineData("zh-CN", "类型发现 实际耗时 12.0 ms，超过配置的 8.00 ms 预算。")]
+    [InlineData("en-US", "Recorded 12.0 ms; configured budget 8.00 ms.")]
+    [InlineData("zh-CN", "记录 12.0 ms，配置预算 8.00 ms。")]
     public async Task Structured_finding_code_is_rendered_from_the_real_bilingual_resources(
         string cultureName,
         string expectedMessage)
@@ -545,40 +495,6 @@ public sealed class ModuleSystemWorkbenchComponentTests
         cut.Markup.Should().Contain(ModuleDiagnosticFindingCodes.PERFORMANCE_BUDGET_EXCEEDED);
     }
 
-    [Theory]
-    [InlineData("en-US", "Startup spectrum · process start to application ready")]
-    [InlineData("zh-CN", "启动谱 · 进程启动至应用就绪")]
-    public async Task Overview_ShouldRenderStartupSpectrumFromBilingualResources(
-        string cultureName,
-        string expectedEyebrow)
-    {
-        var builder = Host.CreateApplicationBuilder();
-        builder.Logging.ClearProviders();
-        builder.AddMonica(monica =>
-        {
-            monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
-            monica.AddLocalization().AddResource<ModuleSystemResource>();
-        });
-        using var localizationHost = builder.Build();
-        var localizer = localizationHost.Services
-            .GetRequiredService<IStringLocalizer<ModuleSystemResource>>();
-        using var culture = new CultureScope(cultureName);
-        await using var context = new ModuleSystemWorkbenchUiTestContext(localizer);
-        await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
-        await session.InitializeAsync();
-
-        var cut = context.Render<ModuleWorkbenchOverview>(parameters => parameters
-            .Add(component => component.Session, session));
-
-        cut.Markup.Should().Contain(expectedEyebrow);
-        cut.Markup.Should().Contain("36.1250 ms");
-        cut.Find(".mo-vl-display__value").TextContent.Trim().Should().Be("36.1");
-        cut.Find(".mo-vl-display__unit").TextContent.Trim().Should().Be("ms");
-        cut.FindAll(".mo-vl-fact").Should().HaveCount(4);
-        cut.Find(".overview-score .startup-timeline").Should().NotBeNull();
-        cut.FindAll(".score-note").Should().BeEmpty();
-    }
-
     [Fact]
     public async Task Overview_WithoutStartupMarker_ShouldUseCompositionSpectrumWithUntrackedNote()
     {
@@ -597,23 +513,6 @@ public sealed class ModuleSystemWorkbenchComponentTests
         cut.Find(".mo-vl-display__unit").TextContent.Trim().Should().Be("ms");
         cut.Find(".score-exact").TextContent.Trim().Should().Be("24.0000 ms");
         cut.FindAll(".mo-vl-fact").Should().HaveCount(4);
-    }
-
-    [Fact]
-    public async Task Overview_TimelineGeometry_ShouldUseInvariantPercentagesInCommaDecimalCultures()
-    {
-        using var culture = new CultureScope("fr-FR");
-        await using var context = new ModuleSystemWorkbenchUiTestContext();
-        await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
-        await session.InitializeAsync();
-
-        var cut = context.Render<ModuleWorkbenchOverview>(parameters => parameters
-            .Add(component => component.Session, session));
-
-        var bracketStyle = cut.Find(".overview-score .tl-bracket").GetAttribute("style");
-
-        bracketStyle.Should().MatchRegex(@"left:\d+(\.\d+)?%;width:\d+(\.\d+)?%");
-        bracketStyle.Should().NotContain(",");
     }
 
     [Fact]

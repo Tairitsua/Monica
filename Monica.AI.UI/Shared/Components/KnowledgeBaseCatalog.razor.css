@@ -20,8 +20,8 @@
 .catalog-entry-heading ::deep svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--mud-palette-primary); }
 .catalog-entry-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 13px; line-height: 1.55; color: var(--mud-palette-text-secondary); }
 .catalog-entry-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 12px; line-height: 1.5; color: var(--mud-palette-text-secondary); }
-.catalog-message { padding: 16px 0; color: var(--mud-palette-text-secondary); font-size: 13px; line-height: 1.6; }
-.catalog-message p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.catalog-message { color: var(--mud-palette-text-secondary); font-size: 13px; line-height: 1.6; }
+.catalog-message p { margin: 0; overflow-wrap: anywhere; }
 @container knowledge-workspace (max-width: 1079px) {
     .catalog-disclosure { display: flex; }
     .knowledge-catalog[data-open="false"] .catalog-body { display: none; }

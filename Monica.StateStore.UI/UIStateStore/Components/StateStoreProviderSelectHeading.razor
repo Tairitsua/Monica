@@ -1,0 +1,11 @@
+@inject IStringLocalizer<StateStoreResource> L
+
+@if (!HideContent)
+{
+    <p class="provider-menu-caption">@L["Workbench:SwitchDataContext"]</p>
+}
+
+@code {
+    // MudSelect repeats child content for its hidden selected-value registry.
+    [CascadingParameter(Name = "HideContent")] private bool HideContent { get; set; }
+}

@@ -37,8 +37,6 @@
 .pu-catalog__type { display: inline-block; font-size: 11px; line-height: 1.65; padding: 4px 8px; background: color-mix(in srgb, var(--mud-palette-primary) 7%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); border-radius: 4px; }
 .pu-catalog__number { font-family: var(--mo-font-family-mono); font-size: 14px; }
 .pu-catalog__grid ::deep .mud-table-pagination-toolbar { flex-wrap: wrap; gap: 8px; padding: 16px 0 6px; }
-.pu-catalog__state { padding: 44px 24px; text-align: center; color: var(--project-units-muted-ink, var(--mud-palette-text-secondary)); }
-.pu-catalog__state p { font-size: 13px; line-height: 1.75; margin: 14px 0; }
 @container project-unit-catalog (max-width: 1060px) {
     .pu-catalog__workspace { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }

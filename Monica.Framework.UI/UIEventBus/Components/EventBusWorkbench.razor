@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
@@ -10,7 +11,7 @@
     <header class="eventbus-workbench-heading">
         <div><span class="eventbus-workbench-kicker">@L["Workbench:Eyebrow"]</span><h1>@Title</h1><p>@Description</p></div>
         <div class="eventbus-workbench-controls">
-            <div class="eventbus-capture"><span>@L["Workbench:Captured"]</span><time>@(capture?.CapturedAt is { } captured ? EventBusPresentation.Timestamp(captured) : L["Workbench:NoCapture"].Value)</time></div>
+            <div class="eventbus-capture"><span>@L["Workbench:Captured"]</span><time>@(capture?.CapturedAt is { } captured ? UiTime.Format(captured) : L["Workbench:NoCapture"].Value)</time></div>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" aria-disabled="@(State.IsRefreshing || _retired ? "true" : "false")">@L["Page:Header:Refresh"]</MudButton>
         </div>
     </header>

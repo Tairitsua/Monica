@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.SignalR.Models
 @inject IStringLocalizer<SignalRResource> L
 
@@ -16,16 +18,23 @@
     @if (Snapshot is not null)
     {
         <time class="signalr-evidence-captured" datetime="@Snapshot.SnapshotTimeUtc.ToString("O")">
-            @L["UISignalR:SendDiagnostics:SnapshotTime", Snapshot.SnapshotTimeUtc.ToString("yyyy-MM-dd HH:mm:ss.fff")]
+            @L["UISignalR:SendDiagnostics:SnapshotTime", UiTime.Format(Snapshot.SnapshotTimeUtc)]
         </time>
     }
 
     @if (IsLoading)
     {
-        <div class="signalr-evidence-loading">
+        @if (Snapshot is null)
+        {
+            <MoContentState Loading="true" Compact="true"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /><span>@L["UISignalR:SendDiagnostics:Loading"]</span></MoContentState>
+        }
+        else
+        {
+            <div class="signalr-evidence-loading">
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="@L["UISignalR:SendDiagnostics:Loading"]" />
             <span>@L["UISignalR:SendDiagnostics:Loading"]</span>
         </div>
+        }
     }
 
     @if (Snapshot is null)
@@ -36,7 +45,7 @@
         }
         else if (!IsLoading)
         {
-            <div class="signalr-evidence-empty">@L["UISignalR:SendDiagnostics:NotLoaded"]</div>
+            <div class="signalr-evidence-empty"><MoContentState Compact="true">@L["UISignalR:SendDiagnostics:NotLoaded"]</MoContentState></div>
         }
     }
     else
@@ -68,7 +77,7 @@
             var methodMetrics = TopMethodMetrics;
             @if (methodMetrics.Count == 0)
             {
-                <div class="signalr-evidence-empty">@L["UISignalR:SendDiagnostics:Empty"]</div>
+                <div class="signalr-evidence-empty"><MoContentState Compact="true">@L["UISignalR:SendDiagnostics:Empty"]</MoContentState></div>
             }
             else
             {
@@ -227,7 +236,7 @@
         : L["UISignalR:SendDiagnostics:NoTimestamp"].Value;
 
     private string FormatTimestamp(DateTime? timestamp) => timestamp is { } value
-        ? L["UISignalR:SendDiagnostics:UtcTime", value.ToString("yyyy-MM-dd HH:mm:ss.fff")].Value
+        ? UiTime.Format(value)
         : L["UISignalR:SendDiagnostics:NoTimestamp"].Value;
 
     private static string FormatMethod(SignalRSendMethodMetricInfo metric) => $"{metric.HubName}.{metric.MethodName}";

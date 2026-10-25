@@ -1,5 +1,9 @@
 # Inspect EventBus diagnostics
 
+Capture, notification and test-result timestamps follow the shell's page time display policy in `$monica-infra-ui` (`references/time-display.md`). Runtime instants and retained diagnostic payloads remain exact. Provider implementation identity stays available in the heading tooltip and detail view; the directory states its count semantics once.
+
+Subscription test payloads use the shared JSON editor and viewer in `$monica-infra-ui` (`references/json.md`). Syntax feedback and formatting leave test-command admission, service validation and receipt evidence with the EventBus UI.
+
 `monica.AddEventBusUI()` composes the EventBus monitor, provider discovery, scoped capture state and diagnostic test service, localization, and shell navigation. Local diagnostics and targeted local delivery require no distributed provider. Configure a distributed provider only when the host needs external publishing or receipt. The workbench has five independently addressable routes:
 
 | Route | Evidence or operations |

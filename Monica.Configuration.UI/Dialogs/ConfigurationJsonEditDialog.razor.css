@@ -34,12 +34,6 @@
     color: var(--configuration-json-muted);
 }
 
-.configuration-json-edit-dialog ::deep .configuration-json-input textarea {
-    font-family: var(--mud-typography-default-family);
-    line-height: 1.6;
-    overflow-wrap: anywhere;
-}
-
 .configuration-json-edit-dialog ::deep .mud-input-control {
     min-width: 0;
 }

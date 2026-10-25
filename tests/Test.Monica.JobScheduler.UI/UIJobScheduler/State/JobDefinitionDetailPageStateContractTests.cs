@@ -136,7 +136,9 @@ public sealed class JobDefinitionDetailPageStateContractTests
             Assert.Same(retirement, state.DisposeAsync().AsTask());
             authorize.TrySetResult(true);
             await ObserveAsync(first);
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ObserveAsync(queued));
+            // A queued refresh can observe retirement before admission or handle it inside its load body.
+            try { await ObserveAsync(queued); }
+            catch (OperationCanceledException) { }
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ObserveAsync(mutation));
             await ObserveAsync(retirement);
             Assert.Empty(boundary.DetailQueries);

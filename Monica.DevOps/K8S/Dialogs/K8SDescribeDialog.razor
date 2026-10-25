@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.K8S.Facades
 @using Monica.DevOps.K8S.Models
 @using Monica.DevOps.K8S.Support
@@ -23,12 +24,12 @@
                             {
                                 <dt>@L["DescribeDialog:ServiceType"]</dt><dd>@DisplayValue(Details.Summary.Type)</dd>
                                 <dt>@L["DescribeDialog:ClusterIp"]</dt><dd>@DisplayValue(Details.Summary.ClusterIp)</dd>
-                                <dt>@L["DescribeDialog:BackingWorkloadRestart"]</dt><dd>@Details.Summary.LastRestartedAtDisplay</dd>
+                                <dt>@L["DescribeDialog:BackingWorkloadRestart"]</dt><dd>@UiTime.Format(Details.Summary.LastRestartedAtUtc)</dd>
                             }
                             else
                             {
                                 <dt>@L["DescribeDialog:ReadyDesired"]</dt><dd>@Details.Summary.ReplicaStatus</dd>
-                                <dt>@L["DescribeDialog:LastRestart"]</dt><dd>@Details.Summary.LastRestartedAtDisplay</dd>
+                                <dt>@L["DescribeDialog:LastRestart"]</dt><dd>@UiTime.Format(Details.Summary.LastRestartedAtUtc)</dd>
                             }
                             <dt>@L["DescribeDialog:Selector"]</dt><dd>@Details.Summary.SelectorDisplay</dd>
                             <dt>@L["DescribeDialog:Ports"]</dt><dd>@Details.Summary.PortsDisplay</dd>
@@ -42,16 +43,16 @@
                             <MudText Typo="Typo.subtitle1">@L["DescribeDialog:RelatedWorkloads"]</MudText>
                             @if (Details.RelatedWorkloads.Count == 0)
                             {
-                                <MudText Typo="Typo.body2">@L["DescribeDialog:NoRelatedWorkloads"]</MudText>
+                                <MoContentState Compact="true"><MudText Typo="Typo.body2">@L["DescribeDialog:NoRelatedWorkloads"]</MudText></MoContentState>
                             }
                             else
                             {
-                                <MudList T="string" Dense="true">
+                                <ul class="related-workloads__list">
                                     @foreach (var workload in Details.RelatedWorkloads)
                                     {
-                                        <MudListItem T="string">@L["DescribeDialog:RelatedWorkloadChip", GetResourceDisplayName(workload.Kind, workload.Name), workload.ReplicaStatus, workload.LastRestartedAtDisplay]</MudListItem>
+                                        <li>@L["DescribeDialog:RelatedWorkloadChip", GetResourceDisplayName(workload.Kind, workload.Name), workload.ReplicaStatus, UiTime.Format(workload.LastRestartedAtUtc)]</li>
                                     }
-                                </MudList>
+                                </ul>
                             }
                         </section>
                     </div>
@@ -67,7 +68,7 @@
                             }
                             @if (Details.RelatedPods.Count == 0)
                             {
-                                <MudText Typo="Typo.body2">@L["DescribeDialog:NoRelatedPods"]</MudText>
+                                <MoContentState Compact="true"><MudText Typo="Typo.body2">@L["DescribeDialog:NoRelatedPods"]</MudText></MoContentState>
                             }
                             else
                             {
@@ -85,7 +86,7 @@
                                             <span>@L["DescribeDialog:Ready"]: @context.ReadyDisplay</span>
                                             <MudChip T="string" Color="@(context.IsReady ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@(context.IsReady ? L["DescribeDialog:ReadyStateReady"] : L["DescribeDialog:ReadyStateNotReady"])</MudChip>
                                         </div></MudTd>
-                                        <MudTd DataLabel="@L["Inspector:RestartsStarted"]"><div class="pod-evidence"><span>@L["DescribeDialog:Restarts"]: @context.RestartCount</span><span>@L["DescribeDialog:Started"]: @context.StartTimeDisplay</span></div></MudTd>
+                                        <MudTd DataLabel="@L["Inspector:RestartsStarted"]"><div class="pod-evidence"><span>@L["DescribeDialog:Restarts"]: @context.RestartCount</span><span>@L["DescribeDialog:Started"]: @UiTime.Format(context.StartTimeUtc)</span></div></MudTd>
                                         <MudTd DataLabel="@L["Inspector:Placement"]"><div class="pod-evidence"><span>@L["DescribeDialog:Node"]: @DisplayValue(context.NodeName)</span><span>@L["DescribeDialog:PodIp"]: @DisplayValue(context.PodIp)</span></div></MudTd>
                                         <MudTd DataLabel="@L["DescribeDialog:Issue"]">@GetPodIssueText(context)</MudTd>
                                         <MudTd DataLabel="@L["DescribeDialog:Actions"]"><MudButton Variant="Variant.Text" Disabled="@(_loadingPodName is not null && !IsLoadingPod(context))" aria-disabled="@(IsLoadingPod(context) ? "true" : "false")" OnClick="@(() => OpenPodDescribeDialogAsync(context))">@(IsLoadingPod(context) ? L["Common:Loading"] : L["DescribeDialog:DescribePod"])</MudButton></MudTd>

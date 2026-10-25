@@ -267,14 +267,6 @@
     border-bottom: 0;
 }
 
-.gc-movement__empty {
-    padding: 0 26px 26px;
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.8;
-    color: var(--gc-muted-ink);
-}
-
 .gc-heap-values {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -398,13 +390,6 @@
     font-size: 12px;
     line-height: 1.8;
     overflow-wrap: anywhere;
-}
-
-.gc-absence {
-    display: grid;
-    justify-items: start;
-    gap: 14px;
-    padding: 30px;
 }
 
 .gc-absence ::deep :is(.mud-icon-root, .mo-icon) {
@@ -581,13 +566,8 @@
         padding-inline: 20px;
     }
 
-    .gc-raw,
-    .gc-absence {
+    .gc-raw {
         padding: 22px 20px;
-    }
-
-    .gc-movement__empty {
-        padding-inline: 20px;
     }
 }
 

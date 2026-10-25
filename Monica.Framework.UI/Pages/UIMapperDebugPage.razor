@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @using System.Globalization
@@ -54,27 +56,27 @@
         {
             @if (_error is not null)
             {
-                <section class="mapper-page__state mapper-page__state--failed" role="alert">
+                <section class="mapper-page__state mapper-page__state--failed" role="alert"><MoContentState>
                     <MoIcon Icon="@MoIcons.Error" Size="1.5rem" />
                     <h2>@L["Page:States:FirstFailed"]</h2>
                     <p>@L["Page:States:FirstFailedDescription"]</p>
                     <details><summary>@L["Page:Read:Diagnostic"]</summary><p class="mapper-read-error__diagnostic">@_error</p></details>
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RefreshAsync" Disabled="@_loading">@L["Page:Actions:Retry"]</MudButton>
-                </section>
+                </MoContentState></section>
             }
             else
             {
-                <section class="mapper-page__state" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" /><h2>@L["Page:States:Reading"]</h2></section>
+                <section class="mapper-page__state"><MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /><h2>@L["Page:States:Reading"]</h2></MoContentState></section>
             }
         }
         else if (_read.Rows.IsEmpty)
         {
-            <section class="mapper-page__state mapper-page__state--empty">
+            <section class="mapper-page__state mapper-page__state--empty"><MoContentState>
                 <MoIcon Icon="@MoIcons.Braces" Size="1.5rem" />
                 <h2>@L["Page:States:EmptyTitle"]</h2>
                 <span class="mapper-catalog__count">@L["Page:Registry:Count", _read.ReportedCount]</span>
                 <p>@L["Page:States:EmptyDescription"]</p>
-            </section>
+            </MoContentState></section>
         }
         else
         {
@@ -109,7 +111,7 @@
                     <div class="mapper-catalog__entries">
                         @if (_visibleRows.Count == 0)
                         {
-                            <div class="mapper-catalog__no-matches" role="status"><h3>@L["Page:States:NoMatches"]</h3><p>@L["Page:States:NoMatchesDescription"]</p></div>
+                            <MoContentState role="status"><h3>@L["Page:States:NoMatches"]</h3><p>@L["Page:States:NoMatchesDescription"]</p></MoContentState>
                         }
                         else
                         {
@@ -134,7 +136,7 @@
                 <header class="mapper-reader__heading"><MoIcon Icon="@MoIcons.Code" Size="1.5rem" /><h2 id="mapper-expression-heading" tabindex="-1">@L["Page:Reader:Title"]</h2><span aria-hidden="true">C#</span></header>
                 @if (_selected is null)
                 {
-                    <div class="mapper-reader__empty"><h3>@L["Page:States:SelectTitle"]</h3><p>@(_refreshed ? L["Page:States:SelectAfterRefresh"] : L["Page:States:SelectDescription"])</p></div>
+                    <MoContentState><h3>@L["Page:States:SelectTitle"]</h3><p>@(_refreshed ? L["Page:States:SelectAfterRefresh"] : L["Page:States:SelectDescription"])</p></MoContentState>
                 }
                 else
                 {
@@ -153,7 +155,7 @@
                     </div>
                     @if (string.IsNullOrEmpty(_selected.Expression))
                     {
-                        <div class="mapper-reader__missing" role="status"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["Page:States:MissingExpression"]</p></div>
+                        <MoContentState role="status"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["Page:States:MissingExpression"]</p></MoContentState>
                     }
                     else
                     {
@@ -202,8 +204,8 @@
     private DotNetObjectReference<UIMapperDebugPage>? _callback;
 
     private string ReadState => _read is null ? (_error is null ? "reading" : "failed") : _read.Rows.IsEmpty ? "empty" : "populated";
-    private string ShortReceipt => _read?.ReceivedAt.ToString("T", CultureInfo.CurrentCulture) ?? string.Empty;
-    private string FullReceipt => _read is null ? string.Empty : _read.ReceivedAt.ToString("F", CultureInfo.CurrentCulture) + _read.ReceivedAt.ToString(" zzz", CultureInfo.InvariantCulture);
+    private string ShortReceipt => _read is null ? string.Empty : UiTime.FormatTime(_read.ReceivedAt);
+    private string FullReceipt => _read is null ? string.Empty : UiTime.Format(_read.ReceivedAt);
     private string RegistryCount => string.IsNullOrWhiteSpace(_query)
         ? L["Page:Registry:Count", _read!.ReportedCount]
         : L["Page:Registry:FilteredCount", _visibleRows.Count, _read!.ReportedCount];

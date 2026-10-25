@@ -46,6 +46,10 @@
     font-weight: 500;
 }
 
+.cluster-identity ::deep .mud-chip {
+    margin: 0;
+}
+
 .cluster-id {
     font-family: var(--mo-font-family-mono);
     font-size: .75rem;

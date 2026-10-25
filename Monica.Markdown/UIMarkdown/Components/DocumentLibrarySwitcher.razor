@@ -1,0 +1,49 @@
+@using Microsoft.Extensions.Localization
+@using Monica.Markdown.Localization
+@using Monica.Markdown.Models
+@inject IStringLocalizer<MarkdownResource> L
+
+<button type="button" class="knowledge-base-switcher" @onclick="OpenAsync"
+        title="@InspectionText" aria-label="@AccessibleLabel">
+    <span class="knowledge-base-switcher-leading">
+        <span class="knowledge-base-switcher-icon-shell"><MoIcon Icon="@MoIcons.Book" Size="1rem" /></span>
+        <span class="knowledge-base-switcher-copy">
+            <span class="knowledge-base-switcher-label">@GroupTitle</span>
+            <span class="knowledge-base-switcher-description">@L["MarkdownViewer:Navbar:KnowledgeBaseDocumentCount", DocumentCount]</span>
+        </span>
+    </span>
+    @if (CurrentGroup is { HasConfigurationError: true })
+    {
+        <MoIcon Icon="@MoIcons.Warning" Size="1.125rem" Class="knowledge-base-switcher-warning" />
+    }
+    <MoIcon Icon="@MoIcons.ChevronDown" Size="1.125rem" Class="knowledge-base-switcher-chevron" />
+</button>
+
+@code {
+    /// <summary>
+    /// Gets or sets the selected registered document library. Defaults to null, which displays the localized unknown-library label and zero documents.
+    /// </summary>
+    [Parameter]
+    public MarkdownDocumentGroup? CurrentGroup { get; set; }
+
+    /// <summary>
+    /// Gets or sets the selected document culture used for the library count. Defaults to null and follows the group's existing document resolution policy.
+    /// </summary>
+    [Parameter]
+    public string? CurrentCulture { get; set; }
+
+    /// <summary>
+    /// Requests the owner's library chooser. The owner retains dialog lifetime, focus and selection; this component does not load documents or open a dialog itself.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnOpen { get; set; }
+
+    private string GroupTitle => CurrentGroup?.Title ?? L["MarkdownViewer:Navbar:UnknownKnowledgeBase"].Value;
+    private int DocumentCount => CurrentGroup?.GetDocuments(CurrentCulture).Count ?? 0;
+    private string AccessibleLabel => $"{L["MarkdownViewer:Navbar:OpenKnowledgeBaseSwitcher"]}: {GroupTitle}";
+    private string InspectionText => string.IsNullOrWhiteSpace(CurrentGroup?.Description)
+        ? GroupTitle
+        : $"{GroupTitle}{Environment.NewLine}{CurrentGroup.Description}";
+
+    private Task OpenAsync() => OnOpen.InvokeAsync();
+}

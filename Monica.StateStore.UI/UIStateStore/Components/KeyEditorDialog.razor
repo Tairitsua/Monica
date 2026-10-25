@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Monica.StateStore.UI.Services
 @using Monica.StateStore.UI.Models
 @using Monica.Core.Results;
@@ -33,6 +34,7 @@
                 @if (!ReadOnly)
                 {
                     <MudNumericField @bind-Value="ttlSeconds"
+                                     HideSpinButtons="true"
                                      Disabled="isSaving"
                                      UserAttributes="structuredInputAttributes"
                                      Label="@L["KeyEditor:Labels:TTL"]"
@@ -63,41 +65,9 @@
 
             @if (!ReadOnly || string.IsNullOrWhiteSpace(originalKey.Error) || originalKey.RawValue is not null)
             {
-                <MudTextField @bind-Value="editedValue"
-                              Disabled="isSaving"
-                              Label="@L["KeyEditor:Labels:JsonValue"]"
-                              Variant="Variant.Outlined"
-                              Lines="10"
-                              ReadOnly="@ReadOnly"
-                              Class="key-dialog-value"
-                              UserAttributes="structuredInputAttributes"
-                              HelperText="@(ReadOnly ? "" : L["KeyEditor:Labels:JsonHelperText"])" />
+                <MoJson @bind-Value="editedValue" ReadOnly="@ReadOnly" AllowPlainText="@ReadOnly" Disabled="@isSaving" Label="@L["KeyEditor:Labels:JsonValue"]" />
+                <p class="key-dialog-hint">@L["KeyEditor:Labels:JsonHelperText"]</p>
             }
-
-            @if (!ReadOnly)
-            {
-                <div class="key-dialog-tools">
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Primary"
-                               StartIcon="@MoIcons.IndentIncrease"
-                               OnClick="FormatJson"
-                           Class="state-dialog-primary-text"
-                               Disabled="isSaving"
-                               Size="Size.Small">
-                        @L["KeyEditor:Actions:FormatJson"]
-                    </MudButton>
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Secondary"
-                               StartIcon="@MoIcons.Minimize"
-                               OnClick="MinifyJson"
-                           Class="state-dialog-secondary-text"
-                               Disabled="isSaving"
-                               Size="Size.Small">
-                        @L["KeyEditor:Actions:MinifyJson"]
-                    </MudButton>
-                </div>
-            }
-
             @if (errorMessage != null)
             {
                 <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@errorMessage</MudAlert>
@@ -193,47 +163,6 @@
             EStateStoreKeyTtlStatus.Unsupported => L["KeyExplorer:Detail:TTLUnavailable"],
             _ => L["KeyExplorer:Detail:TTLUnknown"]
         };
-    }
-
-    private void FormatJson()
-    {
-        if (IsRetired || isSaving || ReadOnly)
-        {
-            return;
-        }
-
-        try
-        {
-            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(editedValue);
-            editedValue = System.Text.Json.JsonSerializer.Serialize(obj, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-            errorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = L["KeyEditor:Messages:FormatFailed", ex.Message];
-        }
-    }
-
-    private void MinifyJson()
-    {
-        if (IsRetired || isSaving || ReadOnly)
-        {
-            return;
-        }
-
-        try
-        {
-            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(editedValue);
-            editedValue = System.Text.Json.JsonSerializer.Serialize(obj);
-            errorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = L["KeyEditor:Messages:MinifyFailed", ex.Message];
-        }
     }
 
     private async Task SaveAsync()

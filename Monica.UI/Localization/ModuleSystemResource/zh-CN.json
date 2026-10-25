@@ -1,7 +1,5 @@
 {
   "Navigation": {
-    "Title": "模块诊断",
-    "Description": "追踪启动健康、性能、类型发现与模块关系。",
     "Descriptions": {
       "Overview": "审阅启动健康、组合统计与模块诊断。",
       "Performance": "追踪初始化耗时、关键路径与性能回归。",

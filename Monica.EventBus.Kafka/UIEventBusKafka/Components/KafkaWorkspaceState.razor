@@ -1,4 +1,6 @@
+@using Monica.UI.Shared.Components.States
 <section class="@RootClass" role="@Role" aria-live="polite">
+    <MoContentState>
     <span class="kafka-workspace-state__icon" aria-hidden="true">
         <MoIcon Icon="@Icon" Size="1.5rem" />
     </span>
@@ -17,6 +19,7 @@
             @ActionLabel
         </MudButton>
     }
+    </MoContentState>
 </section>
 
 @code {

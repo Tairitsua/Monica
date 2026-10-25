@@ -16,6 +16,7 @@ using Monica.JobScheduler.UI.UIJobScheduler.Support;
 using Monica.Modules;
 using Monica.Testing.Localization;
 using NSubstitute;
+using Test.Monica.JobScheduler.UI.Support;
 
 namespace Test.Monica.JobScheduler.UI.Infrastructure;
 
@@ -75,7 +76,7 @@ internal sealed class SchedulerStateTestBoundary
 
     internal JobCatalogPageState CreateCatalog() => new(_facade, Access, _localizer, 20);
     internal JobDefinitionDetailPageState CreateDetail(JobId? id = null) => new(_facade, Access, TimeProvider.System,
-        new SchedulerTimePresentation(Options.Create(_options), _localizer), _localizer, id ?? new JobId(Owner, Job));
+        new SchedulerTimePresentation(Options.Create(_options), _localizer, SchedulerTimePresentationTests.CreateUiTimeFormatter()), _localizer, id ?? new JobId(Owner, Job));
 
     internal Task SeedAsync(CancellationToken cancellationToken) => Store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(Scope, Owner,
     [

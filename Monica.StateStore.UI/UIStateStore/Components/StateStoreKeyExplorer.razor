@@ -1,7 +1,9 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.UI.Shared.Components.Dialogs
 @using Monica.Modules
 @using Monica.StateStore.UI.Models
 @using Monica.StateStore.UI.Services
+@using Monica.StateStore.UI.Support
 @using Monica.StateStore.Models
 @inject StateStoreUIService StateStoreService
 @inject ISnackbar Snackbar
@@ -11,66 +13,44 @@
 @implements IAsyncDisposable
 @implements IDisposable
 
-<div class="state-browser-workspace" @ref="_workspace" data-visit="@_visit" data-provider-generation="@_providerGeneration" data-result-generation="@_resultGeneration" data-selection-generation="@_selectionGeneration" data-selected-key="@selectedKey?.Key" data-picker-open="@(_pickerOpen ? "true" : "false")" data-focus-version="@_focusVersion" aria-busy="@(isSearching ? "true" : "false")">
+<div class="state-browser-workspace" @ref="_workspace" data-visit="@_visit" data-provider-generation="@_providerGeneration" data-result-generation="@_resultGeneration" data-selection-generation="@_selectionGeneration" data-selected-key="@selectedKey?.Key" data-picker-open="@(_pickerOpen ? "true" : "false")" data-detail-open="@(_showDetail && selectedKey is not null ? "true" : "false")" data-expanded="@(_expanded ? "true" : "false")" data-focus-version="@_focusVersion" aria-busy="@(isSearching ? "true" : "false")">
     <header class="workspace-identity">
         <div class="workspace-identity__copy">@HeaderContent</div>
         @if (CanCreateSelectedProviderKeys())
         {
-            <MudButton Class="create-key" Color="Color.Success" Variant="Variant.Outlined" StartIcon="@MoIcons.Add" OnClick="OpenCreateKeyDialog">@L["KeyExplorer:Actions:Create"]</MudButton>
+            <MudButton Class="create-key" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.Add" OnClick="OpenCreateKeyDialog">@L["KeyExplorer:Actions:Create"]</MudButton>
         }
     </header>
+    @NavigationContent
     <section class="workspace-commands">
         <div class="provider-context">
-            <span class="section-label">@L["KeyExplorer:Labels:ProviderScope"]</span>
-            @if (Providers.Count > 1)
+            @if (selectedProvider is { } provider)
             {
-                <MudSelect T="string" Class="provider-select" Value="@selectedProvider?.UniqueId" ValueChanged="SelectProviderIdentity" Label="@L["KeyExplorer:Labels:ProviderScope"]" Variant="Variant.Outlined" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                    @foreach (var provider in Providers)
-                    {
-                        <MudSelectItem T="string" Value="@provider.UniqueId"><span class="provider-option">@GetProviderCaption(provider)</span></MudSelectItem>
-                    }
-                </MudSelect>
-            }
-            else if (selectedProvider is not null)
-            {
-                <strong class="provider-name">@L.GetProviderDisplayName(selectedProvider)</strong>
-            }
-            @if (selectedProvider is not null)
-            {
-                <span>@GetProviderCardDescription(selectedProvider)</span>
-                <div class="provider-actions">
-                    <MudButton Variant="Variant.Text" OnClick="() => OpenProviderDetail(selectedProvider)">@L["ProviderCard:Actions:ViewDetails"]</MudButton>
-                    @if (OnRefreshProviders.HasDelegate)
-                    {
-                        <MudButton Variant="Variant.Text" Disabled="@isRefreshingProviders" OnClick="RefreshProvidersAsync">@L["KeyExplorer:Actions:RefreshProviders"]</MudButton>
-                    }
-                </div>
+                <StateStoreProviderSelector Provider="provider" Providers="Providers" OnSelected="SelectProviderIdentity" />
+                <a class="provider-info" href="@StateStoreUi.Providers(provider.UniqueId)" aria-label="@L["ProviderCard:Actions:ViewDetails"]" title="@L["ProviderCard:Actions:ViewDetails"]"><MoIcon Icon="@MoIcons.Info" Size="1.1rem" /></a>
             }
         </div>
         <div class="query-context">
             <div class="mode-switch" role="group" aria-label="@L["KeyExplorer:Labels:SearchMode"]">
-                <MudButton Variant="@(IsSearchMode(EStateStoreKeySearchMode.ExactKey) ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Disabled="@(selectedProvider?.SupportsExactLookup != true)" aria-pressed="@(IsSearchMode(EStateStoreKeySearchMode.ExactKey) ? "true" : "false")" OnClick="() => SetSearchMode(EStateStoreKeySearchMode.ExactKey)">@L["KeyExplorer:Labels:ExactLookupMode"]</MudButton>
-                <MudButton Variant="@(IsSearchMode(EStateStoreKeySearchMode.PatternScan) ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Disabled="@(selectedProvider?.SupportsKeyScanning != true)" aria-pressed="@(IsSearchMode(EStateStoreKeySearchMode.PatternScan) ? "true" : "false")" OnClick="() => SetSearchMode(EStateStoreKeySearchMode.PatternScan)">@L["KeyExplorer:Labels:PatternSearchMode"]</MudButton>
+                <button type="button" disabled="@(selectedProvider?.SupportsKeyScanning != true)" aria-pressed="@(IsSearchMode(EStateStoreKeySearchMode.PatternScan) ? "true" : "false")" @onclick="() => SetSearchMode(EStateStoreKeySearchMode.PatternScan)">@L["KeyExplorer:Labels:PatternSearchMode"]</button>
+                <button type="button" disabled="@(selectedProvider?.SupportsExactLookup != true)" aria-pressed="@(IsSearchMode(EStateStoreKeySearchMode.ExactKey) ? "true" : "false")" @onclick="() => SetSearchMode(EStateStoreKeySearchMode.ExactKey)">@L["KeyExplorer:Labels:ExactLookupMode"]</button>
             </div>
-            <div class="query-field-row">
-                <MudTextField T="string" Class="search-field" Value="@searchQuery" ValueChanged="ChangeQuery" Label="@GetSearchLabel()" Placeholder="@GetSearchPlaceholder()" Variant="Variant.Outlined" Immediate="true" Disabled="@(selectedProvider is null)" Adornment="Adornment.End" AdornmentIcon="@MoIcons.Search" OnAdornmentClick="SearchKeysAsync" OnKeyDown="OnSearchKeyDown" UserAttributes="@_structuredInput" />
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSearch())" OnClick="SearchKeysAsync">@GetSearchActionText()</MudButton>
-            </div>
-            <p class="query-help">@GetSearchModeDescription()</p>
-            @if (!string.IsNullOrEmpty(GetWorkspaceSupportMessage())) { <MudAlert Severity="Severity.Info" Dense="true" Icon="@MoIcons.Info">@GetWorkspaceSupportMessage()</MudAlert> }
+            <label class="query-input"><MoIcon Icon="@MoIcons.Search" Size="1.1rem" /><input value="@searchQuery" @oninput="args => ChangeQuery(args.Value?.ToString() ?? string.Empty)" @onkeydown="OnSearchKeyDown" aria-label="@GetSearchLabel()" placeholder="@GetSearchPlaceholder()" disabled="@(selectedProvider is null)" spellcheck="false" autocomplete="off" /></label>
+            <MudButton Class="query-submit" Color="Color.Primary" Variant="Variant.Text" Disabled="@(!CanSearch())" OnClick="SearchKeysAsync">@GetSearchActionText()</MudButton>
         </div>
     </section>
-    @if (browseResult is not null)
-    {
-        <div class="accepted-context" data-query="@browseResult.Query" data-mode="@browseResult.AppliedMode" data-provider="@_acceptedProvider?.UniqueId">
-            <div><span>@GetProviderCaption(_acceptedProvider!) · @GetSearchModeText(browseResult.AppliedMode)</span><span class="accepted-query"><span>@L["KeyExplorer:Labels:CompletedQuery"]</span> <code>@browseResult.Query</code></span></div>
-            <strong>@L["KeyExplorer:Labels:ShownMatched", keys.Count, browseResult.TotalCount]</strong>
-            @if (browseResult.HasMore) { <p>@L["KeyExplorer:Messages:ShowingFirst", keys.Count]</p> }
-        </div>
-    }
+    <div class="accepted-context" data-provider="@_acceptedProvider?.UniqueId" data-query="@browseResult?.Query" data-mode="@browseResult?.AppliedMode">
+        @if (browseResult is not null)
+        {
+            <span>@L["KeyExplorer:Labels:CompletedQuery"] <code>@browseResult.Query</code> · @GetSearchModeText(browseResult.AppliedMode) · @L["KeyExplorer:Labels:ShownMatched", keys.Count, browseResult.TotalCount]</span>
+            @if (searchQuery.Trim() != browseResult.Query || searchMode != browseResult.AppliedMode) { <span class="draft-hint">@L["Workbench:QueryChanged"]</span> }
+            @if (browseResult.HasMore) { <span>@L["KeyExplorer:Messages:ShowingFirst", keys.Count]</span> }
+        }
+        else { <span>@(string.IsNullOrEmpty(GetWorkspaceSupportMessage()) ? GetSearchModeDescription() : GetWorkspaceSupportMessage())</span> }
+    </div>
     @if (isSearching)
     {
-        <div class="workspace-state" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><p>@GetSearchActionText()</p></div>
+        <section class="workspace-state"><MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /><p>@GetSearchActionText()</p></MoContentState></section>
     }
     else if (!string.IsNullOrWhiteSpace(browseError))
     {
@@ -78,67 +58,72 @@
     }
     else if (!hasBrowsed || selectedProvider is null)
     {
-        <div class="workspace-state"><h2>@L[selectedProvider is null ? "KeyExplorer:Workspace:NoProviderTitle" : "KeyExplorer:Workspace:ReadyTitle"]</h2><p>@L[selectedProvider is null ? "KeyExplorer:Workspace:NoProviderSubtitle" : "KeyExplorer:Workspace:ReadySubtitle"]</p></div>
-    }
-    else if (browseResult?.IsMissing == true)
-    {
-        <div class="workspace-state"><h2>@L["KeyExplorer:Messages:MissingKeyTitle"]</h2><p>@L["KeyExplorer:Messages:MissingKeyDescription", browseResult.Query]</p></div>
+        <section class="workspace-state"><MoContentState><MoIcon Icon="@MoIcons.Search" Size="2rem" /><h2>@L[selectedProvider is null ? "KeyExplorer:Workspace:NoProviderTitle" : "KeyExplorer:Workspace:ReadyTitle"]</h2><p>@L[selectedProvider is null ? "KeyExplorer:Workspace:NoProviderSubtitle" : "KeyExplorer:Workspace:ReadySubtitle"]</p></MoContentState></section>
     }
     else if (keys.Count == 0)
     {
-        <div class="workspace-state"><h2>@L["KeyExplorer:Messages:NoKeysFound"]</h2><p>@L["KeyExplorer:Messages:NoKeysFoundHint"]</p></div>
+        <section class="workspace-state"><MoContentState><MoIcon Icon="@MoIcons.Search" Size="2rem" /><h2>@L[browseResult?.IsMissing == true ? "KeyExplorer:Messages:MissingKeyTitle" : "KeyExplorer:Messages:NoKeysFound"]</h2><p>@(browseResult?.IsMissing == true ? L["KeyExplorer:Messages:MissingKeyDescription", browseResult.Query] : L["KeyExplorer:Messages:NoKeysFoundHint"])</p></MoContentState></section>
     }
     else
     {
         <div class="workspace-master-detail">
             <section class="inventory">
-                <header class="inventory-heading" id="@(_visit + "-inventory")" tabindex="-1"><h2>@L["KeyExplorer:Labels:Keys"]</h2><MudButton Class="picker-toggle" Variant="Variant.Text" aria-expanded="@(_pickerOpen ? "true" : "false")" aria-controls="@(_visit + "-list")" OnClick="TogglePicker">@L["KeyExplorer:Actions:ChooseKeys"]</MudButton></header>
-                <div class="compact-selection"><code title="@selectedKey?.Key">@selectedKey?.Key</code></div>
-                @if (CanShowRowSelection() && selectedKeyNames.Count > 0)
+                <header class="inventory-heading" id="@(_visit + "-inventory")" tabindex="-1"><h2>@L["KeyExplorer:Labels:Keys"] <span>@keys.Count</span></h2><div class="view-toggle" role="group" aria-label="@L["Workbench:ResultViews"]"><button type="button" aria-label="@L["Workbench:ListView"]" title="@L["Workbench:ListView"]" aria-pressed="@(!_treeView ? "true" : "false")" @onclick="() => _treeView = false"><MoIcon Icon="@MoIcons.List" Size="1.1rem" /></button><button type="button" aria-label="@L["Workbench:TreeView"]" title="@L["Workbench:TreeView"]" aria-pressed="@(_treeView ? "true" : "false")" @onclick="() => _treeView = true"><MoIcon Icon="@MoIcons.Workflow" Size="1.1rem" /></button></div></header>
+                @if (CanShowRowSelection() && selectedKeyNames.Count > 0) { <div class="bulk-actions"><span>@L["KeyExplorer:Labels:SelectedCount", selectedKeyNames.Count]</span><MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="@_isMutating" OnClick="DeleteSelectedKeysAsync">@L["KeyExplorer:Actions:DeleteSelected", selectedKeyNames.Count]</MudButton></div> }
+                <div class="list-column-heading">@if (CanShowRowSelection()) { <input type="checkbox" class="select-all" checked="@(selectedKeyNames.Count == keys.Count)" data-mixed="@(selectedKeyNames.Count > 0 && selectedKeyNames.Count < keys.Count ? "true" : "false")" @onchange="args => ToggleAllSelection(args.Value is true)" aria-label="@L["Workbench:SelectAll"]" /> }<span>@L["Workbench:KeyName"]</span><span>@L[_treeView ? "Workbench:Namespace" : "Workbench:InspectHint"]</span></div>
+                <div class="inventory-body" id="@(_visit + "-list")"><div class="results-list">
+                    @if (_treeView)
                     {
-                        <div class="bulk-actions"><span>@L["KeyExplorer:Labels:SelectedCount", selectedKeyNames.Count]</span><MudButton Variant="Variant.Text" Color="Color.Error" Disabled="@_isMutating" OnClick="DeleteSelectedKeysAsync">@L["KeyExplorer:Actions:DeleteSelected", selectedKeyNames.Count]</MudButton></div>
-                    }
-                <div class="inventory-body" id="@(_visit + "-list")">
-                    <div class="results-list">
-                        @foreach (var item in keys)
+                        <p class="tree-note">@L["Workbench:TreeNote"]</p>
+                        var groupIndex = 0;
+                        @foreach (var group in keys.GroupBy(item => StateStoreUi.SplitKey(item.Key).Prefix))
                         {
-                            <div class="@GetResultRowClass(item)" @key="item.Key">
-                                @if (CanShowRowSelection()) { <MudCheckBox T="bool" Color="Color.Primary" Value="@selectedKeyNames.Contains(item.Key)" ValueChanged="value => ToggleKeySelection(item, value)" aria-label="@L["KeyExplorer:Labels:SelectKey", item.Key]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /> }
-                                <button class="result-select" type="button" aria-pressed="@(selectedKey?.Key == item.Key ? "true" : "false")" title="@item.Key" data-key="@item.Key" @onclick="() => SelectKeyManualAsync(item)"><code class="result-key">@item.Key</code><span class="result-preview">@GetResultPreviewText(item)</span>@if (item.IsValueLoaded || loadingKeyName == item.Key) { <span class="result-status" data-tone="@GetResultStatusColor(item)">@GetResultStatusText(item)</span> }</button>
-                            </div>
+                            <details class="key-group" open="@(groupIndex++ == 0)" @key="group.Key"><summary><MoIcon Icon="@MoIcons.ChevronRight" Size="1rem" /><MoIcon Icon="@MoIcons.Folder" Size="1.1rem" /><code>@(string.IsNullOrEmpty(group.Key) ? L["Workbench:Ungrouped"] : group.Key)</code><span>@group.Count()</span></summary>@foreach (var item in group) { @KeyRow(item) }</details>
                         }
-                    </div>
-                </div>
+                    }
+                    else { @foreach (var item in keys) { @KeyRow(item) } }
+                </div></div>
+                <footer class="inventory-footer"><span>@L["KeyExplorer:Labels:ShownMatched", keys.Count, browseResult!.TotalCount]</span><span>@L["Workbench:ReadMarker"]</span></footer>
             </section>
-            @if (selectedKey is not null)
+            <div class="pane-resizer" role="separator" tabindex="0" aria-label="@L["Workbench:ResizeList"]" aria-orientation="vertical" aria-valuemin="30" aria-valuemax="65" aria-valuenow="43"></div>
+            @if (selectedKey is { } key)
             {
                 <section class="inspector">
-                    <header class="inspector-heading" id="@(_visit + "-detail")"><span class="section-label">@L["KeyExplorer:Detail:SelectedKeyLabel"]</span><h2 tabindex="-1"><code>@selectedKey.Key</code></h2></header>
-                    <div class="inspector-actions">
-                        @if (CanViewKeys()) { <MudButton Variant="Variant.Outlined" OnClick="() => ViewKeyAsync(selectedKey)">@L["KeyExplorer:Actions:View"]</MudButton> }
-                        @if (CanEditSelectedProviderKeys()) { <MudButton Variant="Variant.Outlined" Disabled="@_isMutating" OnClick="() => EditKeyAsync(selectedKey)">@L["KeyExplorer:Actions:Edit"]</MudButton> }
-                        @if (CanDeleteSelectedProviderKey()) { <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@_isMutating" OnClick="() => DeleteKeyAsync(selectedKey)">@L["KeyExplorer:Actions:Delete"]</MudButton> }
-                        <MudButton Class="back-to-keys" Variant="Variant.Text" OnClick="BackToKeysAsync">@L["KeyExplorer:Actions:BackToKeys"]</MudButton>
+                    <header class="inspector-heading" id="@(_visit + "-detail")">
+                        <div class="inspector-topline"><button class="back-to-keys" type="button" @onclick="BackToKeysAsync"><MoIcon Icon="@MoIcons.ArrowLeft" Size="1rem" />@L["KeyExplorer:Actions:BackToKeys"]</button><span class="mobile-provider" title="@GetProviderCaption(selectedProvider!)">@L.GetProviderDisplayName(selectedProvider!)</span><span class="inspector-label">@L["KeyExplorer:Detail:SelectedKeyLabel"]</span>@if (key.RawValue is not null) { <span class="format-badge">@GetValueFormat()</span> }<MudIconButton Class="copy-key" Icon="@MoIcons.Copy" Size="Size.Small" OnClick="CopyKeyAsync" aria-label="@L["Workbench:CopyKey"]" /><MudIconButton Class="expand-detail" Icon="@MoIcons.Maximize" Size="Size.Small" OnClick="() => _expanded = !_expanded" aria-label="@L[_expanded ? "Workbench:CollapseDetail" : "Workbench:ExpandDetail"]" /></div>
+                        <div class="key-identity"><span class="key-icon"><MoIcon Icon="@MoIcons.Key" Size="1.25rem" /></span><div><p>@StateStoreUi.SplitKey(key.Key).Prefix</p><h2 tabindex="-1">@StateStoreUi.SplitKey(key.Key).Name</h2></div></div>
+                    </header>
+                    <div class="inspector-scroll">
+                        <dl class="key-facts"><div><dt>@L["Workbench:TtlSnapshot"]</dt><dd class="ttl">@GetTtlText(key)</dd></div><div><dt>@L["KeyExplorer:Detail:Labels:ETag"]</dt><dd><code>@(string.IsNullOrEmpty(key.ETag) ? L["KeyExplorer:Detail:NotSupplied"] : key.ETag)</code></dd></div><div><dt>@L["Workbench:TextSize"]</dt><dd>@(key.RawValue is null ? L["KeyExplorer:Detail:NotSupplied"] : L["Workbench:ByteSize", System.Text.Encoding.UTF8.GetByteCount(key.RawValue)])</dd></div></dl>
+                        @if (loadingKeyName == key.Key) { <MoContentState Loading="true" Compact="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /><p>@L["KeyExplorer:Statuses:Loading"]</p></MoContentState> }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(key.Error)) { <div class="value-error"><MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@(key.RawValue is null ? key.Error : L["KeyExplorer:Messages:ValueRefreshFailed", key.Error])</MudAlert><MudButton OnClick="ReloadSelectedKeyAsync">@L["KeyValuePreview:Actions:LoadValue"]</MudButton>@if (key.RawValue is not null) { <p>@L["KeyExplorer:Messages:PreviewRetainedTitle"]</p> }</div> }
+                            @if (key.RawValue is not null) { <StateStoreValueViewer Value="@key.RawValue" Identity="@key.Key" OnCopy="CopyValueAsync" /> }
+                            else if (selectedProvider?.SupportsValuePreview != true) { <MoContentState Compact="true"><p>@L["KeyExplorer:Messages:ValuePreviewUnavailable"]</p></MoContentState> }
+                            else if (string.IsNullOrWhiteSpace(key.Error)) { <MoContentState Compact="true"><p>@L[key.IsValueLoaded ? "KeyValuePreview:Labels:Empty" : "KeyExplorer:Statuses:SelectToInspect"]</p></MoContentState> }
+                        }
                     </div>
-                    <dl class="key-facts"><div><dt>@L["KeyExplorer:Detail:Labels:ETag"]</dt><dd><code>@(string.IsNullOrEmpty(selectedKey.ETag) ? L["KeyExplorer:Detail:NotSupplied"].Value : selectedKey.ETag)</code></dd></div><div><dt>@L["KeyExplorer:Detail:Labels:TTL"]</dt><dd><code>@GetTtlText(selectedKey)</code></dd></div></dl>
-                    <h3>@L["KeyExplorer:Labels:ValuePreview"]</h3>
-                    @if (loadingKeyName == selectedKey.Key) { <p role="status">@L["KeyExplorer:Statuses:Loading"]</p> }
-                    else if (!string.IsNullOrWhiteSpace(selectedKey.Error))
-                    {
-                        <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@(selectedKey.RawValue is null ? selectedKey.Error : L["KeyExplorer:Messages:ValueRefreshFailed", selectedKey.Error])</MudAlert>
-                        <MudButton Variant="Variant.Text" OnClick="ReloadSelectedKeyAsync">@L["KeyValuePreview:Actions:LoadValue"]</MudButton>
-                        @if (selectedKey.RawValue is not null) { <p>@L["KeyExplorer:Messages:PreviewRetainedTitle"]</p><pre class="value-preview">@selectedKey.RawValue</pre> }
-                    }
-                    else if (selectedProvider?.SupportsValuePreview != true) { <p>@L["KeyExplorer:Messages:ValuePreviewUnavailable"]</p> }
-                    else if (!selectedKey.IsValueLoaded) { <p>@L["KeyExplorer:Statuses:SelectToInspect"]</p> }
-                    else if (selectedKey.RawValue is null) { <p>@L["KeyValuePreview:Labels:Empty"]</p> }
-                    else { <pre class="value-preview">@selectedKey.RawValue</pre> }
+                    <footer class="inspector-actions"><span>@GetProviderCaption(selectedProvider!)</span><div>
+                        @if (CanViewKeys()) { <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" OnClick="ReloadSelectedKeyAsync">@L["Workbench:RefreshValue"]</MudButton> }
+                        @if (CanEditSelectedProviderKeys()) { <MudButton Class="edit-key" Variant="Variant.Text" Color="Color.Primary" StartIcon="@MoIcons.Edit" Disabled="@_isMutating" OnClick="() => EditKeyAsync(key)">@L["KeyExplorer:Actions:Edit"]</MudButton> }
+                        @if (CanViewKeys() && selectedProvider?.SupportsValuePreview != true) { <MudButton OnClick="() => ViewKeyAsync(key)">@L["KeyExplorer:Actions:View"]</MudButton> }
+                        @if (CanDeleteSelectedProviderKey()) { <MudIconButton Icon="@MoIcons.Delete" Color="Color.Error" Size="Size.Small" Disabled="@_isMutating" OnClick="() => DeleteKeyAsync(key)" aria-label="@L["KeyExplorer:Actions:Delete"]" /> }
+                    </div></footer>
                 </section>
             }
         </div>
+        <p class="results-note">@L["Workbench:ResultScope"]</p>
     }
 </div>
-<StateStoreProviderDetailDialog IsVisible="isProviderDetailVisible" IsVisibleChanged="OnProviderDetailVisibilityChanged" Provider="providerDetailTarget" />
+
+@code {
+    private RenderFragment KeyRow(StateStoreKeyInfo item) => @<div class="@GetResultRowClass(item)" @key="item.Key">
+        @if (CanShowRowSelection()) { <input type="checkbox" checked="@selectedKeyNames.Contains(item.Key)" @onchange="args => ToggleKeySelection(item, args.Value is true)" aria-label="@L["KeyExplorer:Labels:SelectKey", item.Key]" /> }
+        <button class="result-select" type="button" aria-pressed="@(selectedKey?.Key == item.Key ? "true" : "false")" title="@item.Key" data-key="@item.Key" @onclick="() => SelectKeyManualAsync(item)"><span class="result-copy"><code class="result-prefix">@StateStoreUi.SplitKey(item.Key).Prefix</code><code class="result-key">@StateStoreUi.SplitKey(item.Key).Name</code></span>@if (item.IsValueLoaded) { <span class="read-mark" data-error="@(!string.IsNullOrEmpty(item.Error) ? "true" : null)" title="@GetResultStatusText(item)"></span> }<MoIcon Icon="@MoIcons.ChevronRight" Size=".9rem" /></button>
+    </div>;
+}
+
 <MudDialog Visible="@(_confirmation is not null)" VisibleChanged="OnConfirmationVisibilityChanged" Options="@_confirmationOptions" ContentClass="pa-0" ActionsClass="pa-0">
     <TitleContent><MoDialogHeading Text="@(_confirmation?.Title ?? string.Empty)" /></TitleContent>
     <DialogContent><div class="confirmation-content"><p>@_confirmation?.Message</p><code class="confirmation-provider">@_confirmation?.Provider</code></div></DialogContent>

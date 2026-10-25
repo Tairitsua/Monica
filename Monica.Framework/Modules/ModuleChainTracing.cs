@@ -153,4 +153,11 @@ public class ModuleChainTracingOption : ModuleOptions<ModuleChainTracing>
     /// recorded each chain. Leave empty for single-process hosts where the origin is obvious.
     /// </summary>
     public string? ServiceName { get; set; }
+
+    /// <summary>
+    /// Deployed version recorded on each chain root. Supply the host assembly's informational or product
+    /// version to retain build and commit metadata, preferably from the same source as service discovery.
+    /// Defaults to null, which omits the version. This value is independent of <see cref="ServiceName"/>.
+    /// </summary>
+    public string? ServiceVersion { get; set; }
 }

@@ -172,13 +172,6 @@
     flex-shrink: 0;
 }
 
-.exception-records-empty {
-    padding: 24px;
-    margin: 0;
-    color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary));
-    font-size: 13px;
-}
-
 .exception-record-value,
 .exception-record-preview {
     display: block;

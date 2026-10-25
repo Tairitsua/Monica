@@ -149,6 +149,10 @@ public sealed class ChainResultMetadataAttacherTests
             .GetString().Should().Be("local failure");
         var remote = metadata.GetProperty("chain").GetProperty("children")[0].GetProperty("remote");
         remote.GetProperty("traceId").GetString().Should().Be("remote-trace");
+        remote.GetProperty("chain").GetProperty("serviceVersion").GetString().Should().Be("2.0.0+remote-commit");
+        remote.GetProperty("chain").GetProperty("timestamp").GetDateTimeOffset()
+            .Should().Be(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero));
+        metadata.GetProperty("chain").GetProperty("serviceVersion").GetString().Should().Be("1.0.0+local-commit");
         remote.GetProperty("chain").GetProperty("exceptionId").GetString().Should().Be("e1");
         remote.GetProperty("diagnostics").GetProperty("exceptions")[0].GetProperty("message")
             .GetString().Should().Be("actor-host failure");
@@ -249,7 +253,9 @@ public sealed class ChainResultMetadataAttacherTests
         }, JSON));
         response.SetMetadata("chain", JsonSerializer.SerializeToElement(new
         {
-            operation = "Remote operation", service, exceptionId = "e1"
+            operation = "Remote operation", service, exceptionId = "e1",
+            serviceVersion = "2.0.0+remote-commit",
+            timestamp = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero)
         }, JSON));
         return response;
     }
@@ -261,7 +267,7 @@ public sealed class ChainResultMetadataAttacherTests
         new JsonSerializerOptionsProvider(JSON, DateTimeWireFormat.Iso8601WallClock));
 
     private static AsyncLocalChainTracingService CreateTracing() => new(
-        Options.Create(new ModuleChainTracingOption { ServiceName = "flight-api" }),
+        Options.Create(new ModuleChainTracingOption { ServiceName = "flight-api", ServiceVersion = "1.0.0+local-commit" }),
         NullLogger<AsyncLocalChainTracingService>.Instance,
         new JsonSerializerOptionsProvider(JSON, DateTimeWireFormat.Iso8601WallClock));
 }

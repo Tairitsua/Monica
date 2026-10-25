@@ -1,10 +1,10 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.UI.Localization;
 using Monica.JobScheduler.UI.UIJobScheduler.Support;
+using Monica.UI.Shared.Services;
 
 namespace Monica.JobScheduler.UI.UIJobScheduler.Components;
 
@@ -56,6 +56,9 @@ public partial class OperationalPolicyScheduleEditor : IAsyncDisposable
 
     [Inject]
     private TimeProvider TimeProvider { get; set; } = null!;
+
+    [Inject]
+    private MoTimeFormatter UiTime { get; set; } = null!;
 
     /// <summary>
     /// Gets the component-owned prospective schedule draft.
@@ -380,11 +383,7 @@ public partial class OperationalPolicyScheduleEditor : IAsyncDisposable
 
     private string FormatScheduleTime(DateTimeOffset? value) => value is null
         ? L["Common:NotAvailable"]
-        : Draft.ToScheduleTime(value.Value).ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.CurrentCulture);
-
-    private static string FormatUtc(DateTimeOffset? value) => value is null
-        ? "—"
-        : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+        : UiTime.FormatWallTime(Draft.ToScheduleTime(value.Value));
 
     /// <summary>Cancels and drains actual preview, description and draft callback work before releasing owned resources.</summary>
     /// <remarks>Concurrent disposal shares completion. Each resource cleanup is observed independently after actual work drains.</remarks>

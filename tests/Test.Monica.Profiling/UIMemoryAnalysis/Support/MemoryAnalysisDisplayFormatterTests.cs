@@ -23,8 +23,6 @@ public sealed class MemoryAnalysisDisplayFormatterTests
         MemoryAnalysisDisplayFormatter.Count(null).Should().Be("—");
         MemoryAnalysisDisplayFormatter.Percent(null).Should().Be("—");
         MemoryAnalysisDisplayFormatter.Milliseconds(null).Should().Be("—");
-        MemoryAnalysisDisplayFormatter.LocalSnapshotTime(null).Should().Be("—");
-        MemoryAnalysisDisplayFormatter.LocalDateTime(null).Should().Be("—");
 
         MemoryAnalysisDisplayFormatter.Bytes(0).Should().Be("0 B");
         MemoryAnalysisDisplayFormatter.SignedBytes(0).Should().Be("0 B");
@@ -97,26 +95,16 @@ public sealed class MemoryAnalysisDisplayFormatterTests
     }
 
     [Fact]
-    public void FormatTime_WhenSnapshotIsUtcUnspecifiedOrLocal_ShouldPreserveTheInstantAndExactUtcIdentity()
+    public void MachineTime_WhenSnapshotIsUtcUnspecifiedOrLocal_ShouldPreserveTheExactUtcIdentity()
     {
         var utc = new DateTime(2026, 10, 9, 3, 4, 5, 678, DateTimeKind.Utc).AddTicks(1234);
         var local = utc.ToLocalTime();
         foreach (var timestamp in new[] { utc, DateTime.SpecifyKind(utc, DateTimeKind.Unspecified), local })
         {
-            MemoryAnalysisDisplayFormatter.LocalSnapshotTime(timestamp).Should().Be(
-                new DateTimeOffset(local).ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture));
             var raw = MemoryAnalysisDisplayFormatter.MachineTime(timestamp);
             raw.Should().Be("2026-10-09T03:04:05.6781234Z");
             DateTime.ParseExact(raw, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).Should().Be(utc);
         }
     }
 
-    [Fact]
-    public void LocalDateTime_WhenViewReadHasAnotherOffset_ShouldShowTheHostOffsetWithoutChangingTheInstant()
-    {
-        var viewRead = new DateTimeOffset(2026, 10, 9, 8, 9, 10, 321, TimeSpan.FromHours(-4));
-        var display = MemoryAnalysisDisplayFormatter.LocalDateTime(viewRead);
-        display.Should().Be(viewRead.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture));
-        DateTimeOffset.ParseExact(display, "yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture).Should().Be(viewRead);
-    }
 }

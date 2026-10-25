@@ -11,7 +11,7 @@
                 <span class="mud-sr-only">@L["Workbench:Context"]</span>
                 <span class="context-visual" aria-hidden="true">
                 <MudProgressCircular Value="@Percent" Size="Size.Small" Color="@OccupancyColor" Class="context-ring" />
-                <span>@(Usage?.OccupancyRatio is { } ratio ? $"{ratio:P0}" : "—")</span>
+                @if (Usage?.OccupancyRatio is { } ratio) { <span>@ratio.ToString("P0")</span> }
                 </span>
             </span>
         </ActivatorContent>

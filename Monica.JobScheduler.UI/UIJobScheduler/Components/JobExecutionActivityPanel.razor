@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.JobScheduler.Models.Execution
 @using Monica.JobScheduler.UI.Localization
 
@@ -46,10 +47,10 @@
 
             @if (Running.Error is null && Running.Items.Count == 0)
             {
-                <div class="job-activity__empty">
+                <div class="job-activity__empty"><MoContentState Compact="true">
                     <MoIcon Icon="@MoIcons.Success" Size="1.25rem" />
                     <span>@L["JobDetail:Activity:RunningEmpty"]</span>
-                </div>
+                </MoContentState></div>
             }
             else
             {
@@ -105,10 +106,10 @@
 
             @if (Failures.Error is null && Failures.Items.Count == 0)
             {
-                <div class="job-activity__empty">
+                <div class="job-activity__empty"><MoContentState Compact="true">
                     <MoIcon Icon="@MoIcons.ClipboardCheck" Size="1.25rem" />
                     <span>@L["JobDetail:Activity:FailuresEmpty"]</span>
-                </div>
+                </MoContentState></div>
             }
             else
             {

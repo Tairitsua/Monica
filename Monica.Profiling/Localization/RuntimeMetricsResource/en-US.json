@@ -46,12 +46,12 @@
     "Window": "Observed span",
     "CollectorInterval": "Snapshot interval",
     "Seconds": "{0:0.##} s",
-    "CpuChart": "Process CPU history, percent, UTC time axis",
-    "MemoryChart": "Working-set history, decimal megabytes, UTC time axis",
-    "UtcPercent": "% · UTC",
-    "UtcMegabytes": "decimal MB · UTC",
+    "CpuChart": "Process CPU history, percent, time axis",
+    "MemoryChart": "Working-set history, decimal megabytes, time axis",
+    "UtcPercent": "%",
+    "UtcMegabytes": "decimal MB",
     "Plot": {
-      "Description": "Values follow actual UTC sample times. Browse retained samples for exact measurements.",
+      "Description": "Values follow actual sample times. Browse retained samples for exact measurements.",
       "BrowseSamples": "Browse retained samples",
       "KeyboardHelp": "Arrow keys or Home/End select a sample. Escape clears the preview.",
       "Idle": "Hover a sample or browse below.",
@@ -102,7 +102,7 @@
     "Title": "Runtime sample",
     "OpenFailed": "The sample inspector could not be opened.",
     "Frozen": "This sample stays fixed while the page and host continue to update. Values below preserve the recorded precision.",
-    "Timestamp": "Sample timestamp · UTC",
+    "Timestamp": "Sample timestamp",
     "ViewCapture": "Successful view read · local offset",
     "RecordedValues": "Recorded counter values",
     "Bytes": "bytes",
@@ -123,5 +123,8 @@
     "LoadingValue": "Reading observations…",
     "Unavailable": "—",
     "Close": "Close"
+  },
+  "Navigation": {
+    "Category": "Runtime metrics"
   }
 }

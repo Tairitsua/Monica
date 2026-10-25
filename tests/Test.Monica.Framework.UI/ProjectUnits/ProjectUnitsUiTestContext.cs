@@ -19,6 +19,9 @@ internal sealed class ProjectUnitsUiTestContext : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton<IStringLocalizer<ProjectUnitsResource>, EchoStringLocalizer<ProjectUnitsResource>>();
         Services.AddSingleton(dataSource);
         _ = Render<MudPopoverProvider>();

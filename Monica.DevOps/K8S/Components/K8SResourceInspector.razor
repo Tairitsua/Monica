@@ -1,0 +1,194 @@
+@using Monica.DevOps.K8S.Models
+@using Monica.UI.Shared.Components.Visual
+
+<div class="k8s-inspector-host">
+    <MudDrawer Class="k8s-resource-sheet" Open="@Open" OpenChanged="DrawerChangedAsync"
+               Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Overlay="true" OverlayAutoClose="@(!HasPendingAction)"
+               Fixed="true" Width="min(620px, 100vw)" Elevation="8"
+               role="dialog" aria-modal="true" aria-labelledby="@_titleId">
+        @if (Open)
+        {
+            <div class="inspector-content" @onkeydown="HandleKeyDownAsync">
+                <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild" Class="inspector-focus">
+                    <header class="inspector-heading">
+                        <MudIconButton Class="inspector-close" Icon="@MoIcons.Close" OnClick="CloseAsync"
+                                       aria-label="@L["Inspector:Close"]" aria-disabled="@(HasPendingAction ? "true" : null)" />
+                        <div class="inspector-identity">
+                            <span class="resource-kind @KindClass(Summary.ResourceType)"><i aria-hidden="true"></i>@LocalizedKind(Summary.Kind)</span>
+                            <h2 id="@_titleId">@Summary.Name</h2>
+                            <div class="inspector-provenance">
+                                <span>@L["DescribeDialog:Namespace"] <b>@Summary.Namespace</b></span>
+                                @if (CapturedAt.HasValue)
+                                {
+                                    <span>@L["Inspector:CapturedAt", UiTime.Format(CapturedAt)]</span>
+                                }
+                            </div>
+                        </div>
+                    </header>
+                    <MudTabs Class="inspector-tabs" @bind-ActivePanelIndex="_activeTab" Elevation="0" Rounded="false"
+                             KeepPanelsAlive="true" MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+                        <MudTabPanel Text="@L["Inspector:Summary"]">
+                            <div class="inspector-tab-body">
+                                @if (AttentionWorkloads.Count > 0)
+                                {
+                                    <MoSemanticCallout Severity="@AttentionRole" Title="@L["Inspector:ReadinessAttention"]">
+                                        <p>@L["Inspector:ReadinessFinding", string.Join("; ", AttentionWorkloads.Select(x => $"{x.Name} {x.ReadyReplicas}/{x.DesiredReplicas}"))]</p>
+                                        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" OnClick="@(() => _activeTab = 1)">@L["Inspector:ViewPods"]</MudButton>
+                                    </MoSemanticCallout>
+                                }
+                                <MoFactGrid Facts="@SummaryFacts" Class="inspector-facts" />
+                                @if (IsService)
+                                {
+                                    <section class="inspector-section">
+                                        <h3>@L["DescribeDialog:Ports"] <span>@Summary.Ports.Count</span></h3>
+                                        @if (Summary.Ports.Count == 0)
+                                        {
+                                            <MoContentState Compact="true"><span>@L["Inspector:NoPorts"]</span></MoContentState>
+                                        }
+                                        else
+                                        {
+                                            <div class="port-table-wrap">
+                                                <table class="port-table">
+                                                    <thead><tr><th>@L["Columns:Name"]</th><th>@L["Inspector:Protocol"]</th><th>@L["Inspector:Port"]</th><th>@L["Inspector:TargetPort"]</th><th>@L["Inspector:NodePort"]</th></tr></thead>
+                                                    <tbody>
+                                                        @foreach (var port in Summary.Ports)
+                                                        {
+                                                            <tr><td>@DisplayValue(port.Name)</td><td>@port.Protocol</td><td>@port.Port</td><td>@port.TargetPort</td><td>@(port.NodePort?.ToString() ?? L["Common:Empty"].Value)</td></tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    </section>
+                                    <section class="inspector-section">
+                                        <h3>@L["DescribeDialog:RelatedWorkloads"] <span>@L["Inspector:ResolvedBySelector"]</span></h3>
+                                        @if (Details.RelatedWorkloads.Count == 0)
+                                        {
+                                            <MoContentState Compact="true"><span>@L["DescribeDialog:NoRelatedWorkloads"]</span></MoContentState>
+                                        }
+                                        else
+                                        {
+                                            <div class="relation-chips">
+                                                @foreach (var workload in Details.RelatedWorkloads)
+                                                {
+                                                    <button type="button" class="relation-chip @KindClass(ParseKind(workload.Kind))" disabled="@(IsBusy || HasPendingWork)" @onclick="@(() => InspectWorkloadAsync(workload))">
+                                                        <i aria-hidden="true"></i><span>@workload.Name</span><small>@workload.ReadyReplicas/@workload.DesiredReplicas</small>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </section>
+                                }
+                                else
+                                {
+                                    <section class="inspector-section">
+                                        <h3>@L["DescribeDialog:Images"] <span>@Summary.Images.Count</span></h3>
+                                        @if (Summary.Images.Count == 0)
+                                        {
+                                            <MoContentState Compact="true"><span>@L["Inspector:NoImages"]</span></MoContentState>
+                                        }
+                                        else
+                                        {
+                                            <ul class="image-list">@foreach (var image in Summary.Images) { <li>@image</li> }</ul>
+                                        }
+                                    </section>
+                                    @if (ShowServiceRelations)
+                                    {
+                                        <section class="inspector-section">
+                                            <h3>@L["Inspector:RelatedServices"] <span>@RelatedServices.Count</span></h3>
+                                            @if (RelatedServices.Count == 0)
+                                            {
+                                                <MoContentState Compact="true"><span>@L["Inspector:NoRelatedServices"]</span></MoContentState>
+                                            }
+                                            else
+                                            {
+                                                <div class="relation-chips">
+                                                    @foreach (var service in RelatedServices)
+                                                    {
+                                                        <button type="button" class="relation-chip kind-service" disabled="@(IsBusy || HasPendingWork)" @onclick="@(() => InspectRelatedAsync(service))"><i aria-hidden="true"></i><span>@service.Name</span><small>@DisplayValue(service.Type)</small></button>
+                                                    }
+                                                </div>
+                                            }
+                                        </section>
+                                    }
+                                }
+                                <section class="inspector-section">
+                                    <h3>@L["DescribeDialog:Selector"]</h3>
+                                    @if (Summary.Selector.Count == 0)
+                                    {
+                                        <MoContentState Compact="true"><span>@L["Inspector:NoSelector"]</span></MoContentState>
+                                    }
+                                    else
+                                    {
+                                        <dl class="selector-list">
+                                            @foreach (var pair in Summary.Selector.OrderBy(x => x.Key, StringComparer.Ordinal))
+                                            {
+                                                <dt>@pair.Key</dt><dd>@pair.Value</dd>
+                                            }
+                                        </dl>
+                                    }
+                                </section>
+                            </div>
+                        </MudTabPanel>
+                        <MudTabPanel Text="@PodsTabCaption">
+                            <div class="inspector-tab-body">
+                                <p class="section-explanation">@L["DescribeDialog:PodStatusDescription"]</p>
+                                @if (Details.RelatedPods.Count == 0)
+                                {
+                                    <MoContentState Compact="true"><span>@L["DescribeDialog:NoRelatedPods"]</span></MoContentState>
+                                }
+                                else
+                                {
+                                    <div class="pod-list">
+                                        @foreach (var pod in Details.RelatedPods)
+                                        {
+                                            <article class="pod-evidence">
+                                                <div class="pod-topline">
+                                                    <i class="mo-vl-status-dot @((pod.IsReady ? MoVisualRole.Success : MoVisualRole.Warning).ToCssClass())" aria-hidden="true"></i>
+                                                    <h3>@pod.Name</h3>
+                                                    <MudChip T="string" Class="pod-state-badge" Size="Size.Small" Variant="Variant.Filled" Color="@(pod.IsReady ? Color.Success : Color.Warning)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@(pod.IsReady ? L["DescribeDialog:ReadyStateReady"] : L["DescribeDialog:ReadyStateNotReady"]) @pod.ReadyDisplay</MudChip>
+                                                </div>
+                                                <div class="pod-metadata">
+                                                    <MudChip T="string" Class="pod-state-badge" Size="Size.Small" Variant="Variant.Filled" Color="@PodPhaseColor(pod)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@pod.PhaseDisplay</MudChip>
+                                                    <span>@L["Inspector:RestartCount", pod.RestartCount]</span>
+                                                    <span class="diagnostic">@DisplayValue(pod.NodeName) · @DisplayValue(pod.PodIp)</span>
+                                                    <span>@L["Inspector:StartedAt", UiTime.Format(pod.StartTimeUtc)]</span>
+                                                    <span>@L["DescribeDialog:Workload"] @PodWorkloadName(pod)</span>
+                                                </div>
+                                                @if (!string.IsNullOrWhiteSpace(pod.IssueSummary))
+                                                {
+                                                    <p class="pod-issue">@pod.IssueSummary</p>
+                                                }
+                                                <MudButton Class="pod-describe" Variant="Variant.Text" Size="Size.Small"
+                                                           Disabled="@(IsBusy || HasPendingWork && !IsLoadingPod(pod))"
+                                                           aria-disabled="@(IsLoadingPod(pod) ? "true" : null)"
+                                                           OnClick="@(() => OpenPodDescribeAsync(pod))">@(IsLoadingPod(pod) ? L["Common:Loading"] : L["DescribeDialog:DescribePod"])</MudButton>
+                                            </article>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </MudTabPanel>
+                        <MudTabPanel Text="@L["Inspector:Describe"]">
+                            <div class="inspector-tab-body">
+                                <div class="describe-output"><pre>@Details.DescriptionText</pre></div>
+                            </div>
+                        </MudTabPanel>
+                    </MudTabs>
+                    <footer class="inspector-footer">
+                        @if (IsService)
+                        {
+                            <p>@L["Inspector:BackingScope", Details.RelatedWorkloads.Count]</p>
+                        }
+                        <div class="inspector-actions">
+                            <MudButton Class="inspector-operation mo-vl-role--warning" Color="Color.Warning" Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Restart" Disabled="@ActionDisabled("restart")" aria-disabled="@ActionAriaDisabled("restart")" OnClick="@(() => RunOperationAsync("restart", OnRestart))">@L["Actions:Restart"]</MudButton>
+                            <MudButton Class="inspector-operation mo-vl-role--error" Color="Color.Error" Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.ChevronDown" Disabled="@ActionDisabled("down")" aria-disabled="@ActionAriaDisabled("down")" OnClick="@(() => RunOperationAsync("down", OnScaleDown))">@L["Workbench:Operation:ScaleToZero"]</MudButton>
+                            <MudButton Class="inspector-operation mo-vl-role--primary" Color="Color.Primary" Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.ChevronUp" Disabled="@ActionDisabled("up")" aria-disabled="@ActionAriaDisabled("up")" OnClick="@(() => RunOperationAsync("up", OnScaleUp))">@L["Workbench:Operation:RestoreReplicas"]</MudButton>
+                            <MudButton Class="footer-close" Variant="Variant.Text" Size="Size.Small" OnClick="CloseAsync" aria-disabled="@(HasPendingAction ? "true" : null)">@L["Common:Close"]</MudButton>
+                        </div>
+                    </footer>
+                </MudFocusTrap>
+            </div>
+        }
+    </MudDrawer>
+</div>

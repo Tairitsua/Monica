@@ -19,6 +19,8 @@ internal sealed class ModuleSystemWorkbenchUiTestContext : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddOptions();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton<IStringLocalizer<ModuleSystemResource>>(
             moduleSystemLocalizer ?? new EchoStringLocalizer<ModuleSystemResource>());
         configureServices?.Invoke(Services);

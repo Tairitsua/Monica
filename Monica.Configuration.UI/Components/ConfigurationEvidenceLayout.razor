@@ -1,0 +1,11 @@
+<div class="configuration-evidence-page" aria-busy="@(Loading ? "true" : "false")">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>Gets or sets whether this page is refreshing its own evidence.</summary>
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>Gets or sets the page header, navigation, and evidence sections.</summary>
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+}

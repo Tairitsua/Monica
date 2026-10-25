@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<SeederResource> L
 
 <MudDrawer Open="@Session.IsDetailsOpen"
@@ -68,11 +69,11 @@
                             <dl class="seeder-timing-dates">
                                 <div>
                                     <dt>@L["Details:Timing:StartedAt"]</dt>
-                                    <dd>@L.FormatSeederTimestamp(seeder.StartedAtUtc)</dd>
+                                    <dd>@UiTime.Format(seeder.StartedAtUtc)</dd>
                                 </div>
                                 <div>
                                     <dt>@L["Details:Timing:CompletedAt"]</dt>
-                                    <dd>@L.FormatSeederTimestamp(seeder.CompletedAtUtc)</dd>
+                                    <dd>@UiTime.Format(seeder.CompletedAtUtc)</dd>
                                 </div>
                             </dl>
                         </section>
@@ -174,11 +175,11 @@
                                                 <dl class="seeder-attempt-facts">
                                                     <div>
                                                         <dt>@L["Details:Timing:StartedAt"]</dt>
-                                                        <dd>@L.FormatSeederTimestamp(attempt.StartedAtUtc)</dd>
+                                                        <dd>@UiTime.Format(attempt.StartedAtUtc)</dd>
                                                     </div>
                                                     <div>
                                                         <dt>@L["Details:Timing:CompletedAt"]</dt>
-                                                        <dd>@L.FormatSeederTimestamp(attempt.CompletedAtUtc)</dd>
+                                                        <dd>@UiTime.Format(attempt.CompletedAtUtc)</dd>
                                                     </div>
                                                     <div class="seeder-attempt-duration">
                                                         <dt>@L["Details:Timing:Duration"]</dt>

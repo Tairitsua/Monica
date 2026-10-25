@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.ServiceDiscovery.Facades
 @using Monica.ServiceDiscovery.Localization
 @using Monica.ServiceDiscovery.Models
@@ -150,8 +152,8 @@
                     }
                 </ul>
             }
-            @if (_hasSnapshot && NativeEvidenceCount == 0) { <p class="atlas-native__empty">@L[NativeEvidenceEmptyKey]</p> }
-            <footer class="atlas-native__footer"><span>@L["Atlas:Shared:Captured"]</span><time>@(_capturedAt?.ToLocalTime().ToString("HH:mm:ss") ?? L["Shared:Values:NotAvailable"].Value)</time></footer>
+            @if (_hasSnapshot && NativeEvidenceCount == 0) { <MoContentState Compact="true"><p>@L[NativeEvidenceEmptyKey]</p></MoContentState> }
+            <footer class="atlas-native__footer"><span>@L["Atlas:Shared:Captured"]</span><time>@(UiTime.FormatTime(_capturedAt) ?? L["Shared:Values:NotAvailable"].Value)</time></footer>
         </section>
     </div>
     <div class="atlas-legend"><span class="atlas-domain-key"><span class="atlas-domain-key__sample"></span>@L["Atlas:Domains:CatalogNode"]</span><span class="atlas-domain-key"><span class="atlas-domain-key__sample atlas-domain-key__sample--unlisted"></span>@L["Atlas:Domains:Unlisted"]</span><span class="atlas-legend__note">@L["Atlas:Domains:SnapshotHint"]</span></div>

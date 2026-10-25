@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.DevOps.Git.Components
 @using Monica.DevOps.Git.Models
@@ -49,7 +50,7 @@
                             @if (repository.State == GitRepositorySyncState.Syncing) { <span class="row-progress">@Safe(GitWorkspacePresentation.ProgressText(repository, L))</span> }
                         </button>
                     }
-                    @if (!VisibleRepositories.Any()) { <p class="catalog-empty">@CatalogEmptyText</p> }
+                    @if (!VisibleRepositories.Any()) { <MoContentState Compact="true">@CatalogEmptyText</MoContentState> }
                 </div>
             </div>
         </aside>

@@ -1,7 +1,9 @@
 .subscription-filters { min-width: 0; padding: 24px; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); }
 .subscription-filter-search { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: center; }
 .subscription-filter-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr); gap: 16px; margin-top: 14px; align-items: start; }
-.subscription-exact-key { min-width: 0; }
+.subscription-exact-key { display: grid; gap: 8px; min-width: 0; }
+.subscription-exact-key-toggle { display: flex; align-items: center; min-height: 40px; margin-top: 8px; }
+.subscription-filter-details ::deep .mud-input { min-height: 40px; }
 .subscription-filters ::deep .mud-input-label { font-size: .78rem; }
 .subscription-filters ::deep .mud-input { font-size: .82rem; }
 .subscription-filters ::deep input::placeholder { color: color-mix(in srgb, var(--mud-palette-text-secondary) 75%, var(--mud-palette-text-primary)); opacity: 1; }

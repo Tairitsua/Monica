@@ -1,0 +1,124 @@
+@page "/state-store-dashboard/providers"
+@using Monica.Core.Results
+@using Monica.StateStore.UI.Models
+@using Monica.StateStore.UI.Services
+@using Monica.StateStore.UI.Support
+@using Monica.StateStore.UI.UIStateStore.Components
+@using Monica.UI.Shared.Components.States
+@using Microsoft.JSInterop
+@inject StateStoreUIService Service
+@inject IStringLocalizer<StateStoreResource> L
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>@L["Workbench:Providers"]</PageTitle>
+<div class="state-providers-page" @ref="_page" data-provider="@_selected?.UniqueId">
+    <header class="page-heading"><div><span class="eyebrow">@L["Workbench:Eyebrow"]</span><h1>@L["Workbench:Providers"]</h1></div><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" OnClick="Load">@L["KeyExplorer:Actions:RefreshProviders"]</MudButton></header>
+    <StateStoreWorkbenchNavigation IsProvidersPage="true" ProviderIdentity="@_selected?.UniqueId" ProviderCount="@_providers.Count" />
+    @if (_error is not null) { <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@_error</MudAlert> }
+    @if (_providers.Count > 0)
+    {
+        <section class="provider-summary" aria-label="@L["Workbench:RegisteredSummary"]">
+            <div class="summary-identity"><span class="display-count">@_providers.Count.ToString("D2")</span><div><h2>@L["Workbench:RegisteredSummary"]</h2><p>@L["Workbench:ScopeSummary", _providers.Count(p => !p.IsDistributed), _providers.Count(p => p.IsDistributed)]</p>@if (_providers.FirstOrDefault(p => p.IsDefaultStateStore) is { } defaultProvider) { <p>@L["Workbench:DefaultResolution"] <strong>@L.GetProviderTypeText(defaultProvider.ProviderType)</strong></p> }</div></div>
+            <div class="summary-families">
+                @foreach (var group in _providers.GroupBy(p => p.ProviderType))
+                {
+                    <div data-tone="@StateStoreUi.Tone(group.First())"><span><i></i>@L.GetProviderTypeText(group.Key)</span><strong>@group.Count()</strong><small>@L["Workbench:Registrations"]</small></div>
+                }
+            </div>
+        </section>
+        <div class="provider-layout">
+            <section class="provider-registry">
+                <header><h2>@L["Workbench:Registry"]</h2><MudTextField T="string" Value="_filter" ValueChanged="FilterProviders" Immediate="true" Placeholder="@L["Workbench:SearchProviders"]" aria-label="@L["Workbench:SearchProviders"]" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Class="provider-filter" /></header>
+                @foreach (var provider in FilteredProviders)
+                {
+                    <div class="provider-row @(provider.UniqueId == _selected?.UniqueId ? "is-selected" : null)" data-tone="@StateStoreUi.Tone(provider)" @key="provider.UniqueId">
+                        <span class="provider-icon"><MoIcon Icon="@StateStoreUi.Icon(provider)" Size="1.35rem" /></span>
+                        <button class="select-provider" type="button" aria-pressed="@(provider.UniqueId == _selected?.UniqueId ? "true" : "false")" @onclick="() => Select(provider)">
+                            <strong>@L.GetProviderDisplayName(provider) @if (provider.IsDefaultStateStore) { <span class="default-tag">@L["Workbench:DefaultRegistration"]</span> }</strong>
+                            <span>@L.GetProviderTypeText(provider.ProviderType) · @L[provider.IsDistributed ? "ProviderDetail:Labels:Distributed" : "ProviderDetail:Labels:LocalMemory"]</span>
+                            <span class="capability-tag">@L[provider.SupportsKeyScanning ? "Workbench:ScanAndExact" : "Workbench:ExactOnly"]</span>
+                        </button>
+                        <a class="browse-link" href="@StateStoreUi.Browser(provider.UniqueId)">@L["Workbench:BrowseData"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a>
+                    </div>
+                }
+                @if (!FilteredProviders.Any()) { <MoContentState Compact="true"><MoIcon Icon="@MoIcons.Search" /><p>@L["Workbench:NoProviderMatches"]</p></MoContentState> }
+                <footer><MoIcon Icon="@MoIcons.Info" Size="1rem" /><span>@L["Workbench:RegistryNote"]</span></footer>
+            </section>
+            @if (_selected is { } selected) { <div class="selected-provider"><StateStoreProviderInspector Provider="selected" @key="selected.UniqueId" /></div> }
+        </div>
+    }
+    else if (_error is null) { <MoContentState><MoIcon Icon="@MoIcons.Database" Size="2rem" /><h2>@L["Dashboard:Messages:NoProviders"]</h2><p>@L["Dashboard:Messages:NoProvidersDescription"]</p></MoContentState> }
+    <p class="page-note">@L["Workbench:RegistrationNotHealth"]</p>
+</div>
+
+@code {
+    public const string PAGE_URL = "/state-store-dashboard/providers";
+    /// <summary>Gets or sets the exact registration identity selected through workspace navigation.</summary>
+    [SupplyParameterFromQuery(Name = "provider")] public string? ProviderIdentity { get; set; }
+    private List<StateStoreProviderInfo> _providers = [];
+    private StateStoreProviderInfo? _selected;
+    private string _filter = string.Empty;
+    private string? _error;
+    private ElementReference _page;
+    private string? _pendingReveal;
+    private int _focusVersion;
+    private bool _disposed;
+    private Task<IJSObjectReference>? _moduleImport;
+    private Task _revealWork = Task.CompletedTask;
+    private IEnumerable<StateStoreProviderInfo> FilteredProviders => _providers.Where(p =>
+        (L.GetProviderDisplayName(p) + " " + L.GetProviderTypeText(p.ProviderType) + " " + p.ImplementationType).Contains(_filter, StringComparison.OrdinalIgnoreCase));
+    protected override void OnInitialized() => Load();
+    protected override void OnParametersSet()
+    {
+        _focusVersion++;
+        Rebind();
+        if (_pendingReveal != _selected?.UniqueId) _pendingReveal = null;
+    }
+    private void Load()
+    {
+        CancelReveal();
+        if (Service.GetRegisteredProviders().IsFailed(out var error, out var providers)) _error = error.Message;
+        else { _providers = providers; _error = null; Rebind(); }
+    }
+    private void Rebind() => _selected = _providers.FirstOrDefault(p => p.UniqueId == ProviderIdentity)
+        ?? _providers.FirstOrDefault(p => p.UniqueId == _selected?.UniqueId) ?? _providers.FirstOrDefault();
+    private void Select(StateStoreProviderInfo provider)
+    {
+        _focusVersion++;
+        _pendingReveal = provider.UniqueId;
+        Navigation.NavigateTo(StateStoreUi.Providers(provider.UniqueId));
+    }
+    private void FilterProviders(string value) { _filter = value; CancelReveal(); }
+    private void CancelReveal() { _focusVersion++; _pendingReveal = null; }
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_disposed || _pendingReveal is not { } identity || identity != _selected?.UniqueId || identity != ProviderIdentity) return Task.CompletedTask;
+        _pendingReveal = null;
+        return _revealWork = RevealAfterAsync(_revealWork, identity, _focusVersion);
+    }
+    private async Task RevealAfterAsync(Task previous, string identity, int version)
+    {
+        await previous;
+        if (_disposed || version != _focusVersion || identity != _selected?.UniqueId) return;
+        try
+        {
+            _moduleImport ??= JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.StateStore.UI/UIStateStore/state-workspace.js").AsTask();
+            var module = await _moduleImport;
+            if (!_disposed && version == _focusVersion && identity == _selected?.UniqueId)
+                await module.InvokeVoidAsync("revealProvider", _page, identity);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) when (_disposed) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true; CancelReveal();
+        await _revealWork;
+        if (_moduleImport is null) return;
+        try { await (await _moduleImport).DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

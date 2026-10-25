@@ -184,5 +184,8 @@
         }
       }
     }
+  },
+  "Navigation": {
+    "Category": "依赖注入"
   }
 }

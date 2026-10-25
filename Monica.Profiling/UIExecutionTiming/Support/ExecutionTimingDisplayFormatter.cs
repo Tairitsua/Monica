@@ -6,10 +6,6 @@ namespace Monica.Profiling.UIExecutionTiming.Support;
 
 internal static class ExecutionTimingDisplayFormatter
 {
-    public static string FormatDateTime(DateTimeOffset? timestamp)
-    {
-        return timestamp?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture) ?? "—";
-    }
 
     public static string FormatMachineDateTime(DateTimeOffset? timestamp) =>
         timestamp?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;

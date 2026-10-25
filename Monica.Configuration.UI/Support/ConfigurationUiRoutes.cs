@@ -32,7 +32,12 @@ internal static class ConfigurationUiRoutes
     public const string DEBUG_ROUTE = "/configuration/debug";
 
     /// <summary>
-    /// Gets the configuration storage route.
+    /// Gets the runtime configuration sources route.
+    /// </summary>
+    public const string SOURCES_ROUTE = "/configuration/sources";
+
+    /// <summary>
+    /// Gets the configuration store implementations route.
     /// </summary>
     public const string STORAGE_ROUTE = "/configuration/storage";
 

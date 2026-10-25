@@ -4,7 +4,7 @@
     <TitleContent><MoDialogHeading Text="@L["Versions:Delete:ConfirmTitle", ConfigurationUnifiedVersionDisplayFormatter.VersionLabel(Version)]" /></TitleContent>
     <DialogContent><div class="configuration-saved-version-delete">
         <p>@L["Versions:Delete:ConfirmMessage", ConfigurationUnifiedVersionDisplayFormatter.VersionLabel(Version)]</p>
-        <dl><div><dt>@L["Versions:Workbench:CapturedAt"]</dt><dd>@ConfigurationUnifiedVersionDisplayFormatter.CreatedTimeText(Version)</dd></div>
+        <dl><div><dt>@L["Versions:Workbench:CapturedAt"]</dt><dd>@TimeDisplay.Format(Version.CreatedTime)</dd></div>
             <div><dt>@L["Versions:Workbench:CaptureGroup"]</dt><dd><code>@ConfigurationUnifiedVersionDisplayFormatter.ValueOrEmpty(Version.MutationGroupId, L["Common:States:Empty"])</code></dd></div>
             @if (!string.IsNullOrWhiteSpace(Version.Reason)) { <div><dt>@L["Group:Reason"]</dt><dd>@Version.Reason</dd></div> }
         </dl>

@@ -37,9 +37,9 @@ public static class GitWorkspacePresentation
     public static string Display(string? value, IStringLocalizer localizer) =>
         string.IsNullOrWhiteSpace(value) ? localizer["GitDashboard:States:None"] : value;
 
-    /// <summary>Formats a timestamp in the host's local time with an explicit numeric UTC offset.</summary>
-    public static string FormatDate(DateTimeOffset? value, IStringLocalizer localizer) =>
-        value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.CurrentCulture)
+    /// <summary>Formats a timestamp with the shared deployment timezone and page display policy.</summary>
+    public static string FormatDate(DateTimeOffset? value, IStringLocalizer localizer, Monica.UI.Shared.Services.MoTimeFormatter time) =>
+        (value is { } timestamp ? time.Format(timestamp) : null)
         ?? localizer["GitDashboard:States:None"];
 
     /// <summary>Formats the reported byte count as IEC units and retains the exact unrounded count.</summary>

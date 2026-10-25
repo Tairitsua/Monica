@@ -2,6 +2,10 @@
 
 Use this file to select units within the approved application specification. The feature's state and execution requirement determine the shape. Do not add a service, event, scheduler, or delivery policy speculatively.
 
+The selections below are composable examples, not a closed catalog of permitted business flows. Combine the units that the requirement needs while preserving their responsibilities and documented execution contracts. Apply [specification evolution](../../monica-application/references/01-specification-evolution.md) only for a concrete architectural gap or rule change that composition cannot resolve.
+
+For a flow involving slow external I/O and durable writes, first select the existing [transaction boundaries](../../monica-infra-persistence/references/transactions.md) and [delivery capabilities](../../monica-infra-persistence/references/transactional-events.md). A nontransactional orchestrator can coordinate independent local write operations; durable event handling can drive later work. Moving the whole slow flow into a transactional event handler does not shorten its transaction. Add a job only when the work needs its independent scheduling and execution lifecycle.
+
 ## 1. New query use case
 
 Create:
@@ -65,7 +69,7 @@ Load:
 - [14-event-handler-template.md](14-event-handler-template.md)
 - [15-job-template.md](15-job-template.md) when the reaction becomes queued or delayed
 
-## 5. New scheduled or asynchronous workflow
+## 5. New scheduled or independently managed background execution
 
 Create:
 
@@ -91,7 +95,7 @@ Use [04-adapters-lifecycle-and-support-types.md](04-adapters-lifecycle-and-suppo
 - Internal mediated operation: the existing `IRequestHandler` contract without HTTP exposure.
 - Public business UI/API entry: an ApplicationService reached through the generated domain client.
 
-These choices do not create new business roles. Use the native mechanism and the project's adopted placement; propose a new family or execution model through specification evolution before adopting it.
+These choices preserve existing business roles. Use the native mechanism and the project's adopted placement; a different combination of these adapters does not itself require specification evolution.
 
 ## 6. New configurable behavior
 

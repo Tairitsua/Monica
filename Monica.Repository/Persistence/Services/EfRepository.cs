@@ -6,7 +6,8 @@ using Monica.Repository.Persistence.Exceptions;
 namespace Monica.Repository.Persistence.Services;
 
 /// <summary>EF aggregate staging and infrastructure access backed by one directly injected scoped context.</summary>
-public class EfRepository<TDbContext, TEntity>(TDbContext context) : IEfEntityStore<TEntity>
+public class EfRepository<TDbContext, TEntity>(TDbContext context)
+    : IEfEntityStore<TEntity>, IRepositoryDetailsConfigurator<TEntity>
     where TDbContext : RepositoryDbContext<TDbContext>
     where TEntity : class, IEntity
 {
@@ -16,6 +17,18 @@ public class EfRepository<TDbContext, TEntity>(TDbContext context) : IEfEntitySt
     public DbContext Context => DbContext;
     /// <inheritdoc />
     public virtual IQueryable<TEntity> Query => DbContext.Set<TEntity>().AsNoTracking();
+    /// <summary>
+    /// Gets the current query with the repository's default detail graph applied.
+    /// Tracking follows <see cref="Query"/>; materialize the query within the owning operation scope.
+    /// </summary>
+    public IQueryable<TEntity> Details => ApplyDetails(Query);
+    /// <summary>
+    /// Applies the repository's default detail graph. The default implementation returns the query unchanged.
+    /// Override to include related data without changing plain queries or tracked key loading.
+    /// </summary>
+    /// <param name="query">The query to extend, retaining its filters and tracking behavior.</param>
+    /// <returns>The query with the repository's default detail graph applied.</returns>
+    public virtual IQueryable<TEntity> ApplyDetails(IQueryable<TEntity> query) => query;
     /// <inheritdoc />
     public virtual bool IsShardingTable => false;
     /// <inheritdoc />

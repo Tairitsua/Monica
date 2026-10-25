@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.OpenTelemetry.UI.UIOpenTelemetry.Support
 @using Monica.UI.Shared.Components.Dialogs
@@ -14,10 +15,10 @@
                 <div><dt>@L["Inspector:MeterVersion"]</dt><dd><code data-field="MeterVersion">@(Evidence.Instrument.MeterVersion ?? "—")</code></dd></div>
                 <div><dt>@L["Dossier:Kind"]</dt><dd data-field="Kind">@Evidence.Instrument.Kind</dd></div>
                 <div><dt>@L["Instrument:Unit"]</dt><dd><code data-field="Unit">@(Evidence.Instrument.Unit ?? L["Series:Unitless"].Value)</code></dd></div>
-                <div><dt>@L["Workbench:SourceCapture"] · UTC</dt><dd><time data-field="SnapshotTimestampUtc" datetime="@Evidence.SnapshotTimestampUtc.ToString("O")">@Evidence.SnapshotTimestampUtc.ToString("O")</time></dd></div>
-                <div><dt>@L["Workbench:ViewRead"] · UTC</dt><dd><time data-field="CapturedAt" datetime="@Evidence.CapturedAt.ToString("O")">@Evidence.CapturedAt.ToString("O")</time></dd></div>
+                <div><dt>@L["Workbench:SourceCapture"]</dt><dd><time data-field="SnapshotTimestampUtc" datetime="@Evidence.SnapshotTimestampUtc.ToString("O")">@UiTime.Format(Evidence.SnapshotTimestampUtc)</time></dd></div>
+                <div><dt>@L["Workbench:ViewRead"]</dt><dd><time data-field="CapturedAt" datetime="@Evidence.CapturedAt.ToString("O")">@UiTime.Format(Evidence.CapturedAt)</time></dd></div>
             </dl>
-            <section class="detail-point"><span>@L["Ledger:Raw"]</span><strong data-field="Value">@Raw(Evidence.Point.Value)</strong><span>@MetricValueFormatter.Format(Evidence.Point.Value, Evidence.Instrument.Unit, L)</span><time data-field="TimestampUtc" datetime="@Evidence.Point.TimestampUtc.ToString("O")">@Evidence.Point.TimestampUtc.ToString("O")</time></section>
+            <section class="detail-point"><span>@L["Ledger:Raw"]</span><strong data-field="Value">@Raw(Evidence.Point.Value)</strong><span>@MetricValueFormatter.Format(Evidence.Point.Value, Evidence.Instrument.Unit, L)</span><time data-field="TimestampUtc" datetime="@Evidence.Point.TimestampUtc.ToString("O")">@UiTime.Format(Evidence.Point.TimestampUtc)</time></section>
             <h3>@L["Inspector:SeriesContext"]</h3>
             <dl class="detail-context">
                 <div><dt>@L["Inspector:SourceIndex"]</dt><dd><code data-field="SourceIndex">@Evidence.SourceIndex</code></dd></div>
@@ -27,7 +28,7 @@
                 <div><dt>@L["Inspector:NonFiniteCount"]</dt><dd><code data-field="NonFiniteSampleCount">@Evidence.Series.NonFiniteSampleCount</code></dd></div>
                 <div><dt>@L["Series:LatestReading"]</dt><dd><code data-field="CurrentValue">@Raw(Evidence.Series.CurrentValue)</code></dd></div>
                 <div><dt>@L["Series:AdjacentDelta"]</dt><dd><code data-field="Delta">@Raw(Evidence.Series.Delta)</code></dd></div>
-                <div><dt>@L["Series:LastObservation"] · UTC</dt><dd><time data-field="LastUpdatedUtc" datetime="@Evidence.Series.LastUpdatedUtc.ToString("O")">@Evidence.Series.LastUpdatedUtc.ToString("O")</time></dd></div>
+                <div><dt>@L["Series:LastObservation"]</dt><dd><time data-field="LastUpdatedUtc" datetime="@Evidence.Series.LastUpdatedUtc.ToString("O")">@UiTime.Format(Evidence.Series.LastUpdatedUtc)</time></dd></div>
             </dl>
             <h3>@L["Table:Tags"]</h3>
             @if (Evidence.Series.Tags.Count == 0) { <p class="detail-note">@L["Series:Untagged"]</p> }

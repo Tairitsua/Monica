@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
@@ -16,7 +17,7 @@
         {
             <div class="system-info-capture">
                 <span>@L["Page:Pulse:CapturedAt"]</span>
-                <time datetime="@snapshot.CapturedAtUtc.ToString("O")" title="@SystemInfoDisplayFormatter.FormatDateTime(snapshot.CapturedAtUtc, CultureInfo.CurrentCulture)">@SystemInfoDisplayFormatter.FormatTime(snapshot.CapturedAtUtc, CultureInfo.CurrentCulture)</time>
+                <time datetime="@snapshot.CapturedAtUtc.ToString("O")" title="@UiTime.Format(snapshot.CapturedAtUtc)">@UiTime.FormatTime(snapshot.CapturedAtUtc)</time>
             </div>
         }
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh"

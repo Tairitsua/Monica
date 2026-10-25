@@ -58,9 +58,9 @@
                             {
                                 @foreach (var root in Groups)
                                 {
-                                    <MudNavGroup @key="root.Id" Title="@root.DisplayName" Icon="@root.Icon" ExpandIcon="@MoIcons.ChevronDown" Expanded="@ContainsActive(root)">
-                                        <NavigationTree Group="@root" ActiveItem="@ActiveItem" ShowPageIcons="@(!ShowOverview)" />
-                                    </MudNavGroup>
+                                    <MoNavigationGroup @key="root.Id" Group="@root" ActiveItem="@ActiveItem"
+                                                       IsRoot="true" ShowGroupIcon="true" InitiallyExpanded="false"
+                                                       ShowPageIcons="@(!ShowOverview)" />
                                 }
                             }
                         </MudNavMenu>
@@ -149,9 +149,6 @@
             _activatorRef, _popupId, OpenOnHover, _open, _openedByHover,
             focusFirst, restoreFocus, _pointerVersion);
     }
-
-    private bool ContainsActive(NavigationGroup group) =>
-        ActiveItem is not null && NavigationTreeBuilder.Flatten([group]).Contains(ActiveItem);
 
     private void Toggle()
     {

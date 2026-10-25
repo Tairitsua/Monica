@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.Json
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Text.Json
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
@@ -11,7 +13,7 @@
         <div class="inspector-body">
         @if (RecordedAt is { } time)
         {
-            <dl class="facts"><dt>@L["Workbench:RecordedAt"]</dt><dd>@time.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")</dd></dl>
+            <dl class="facts"><dt>@L["Workbench:RecordedAt"]</dt><dd>@UiTime.Format(time)</dd></dl>
         }
         @foreach (var part in selectedMessage.Parts)
         {
@@ -33,7 +35,7 @@
         <header class="inspector-heading"><span>@ChatExecutionPresentation.Title(step, L)</span><MudChip T="string" Size="Size.Small" Color="@(step.Status == ChatExecutionStatus.AwaitingApproval ? Color.Warning : ChatExecutionPresentation.StatusColor(step.Status))" Variant="Variant.Text">@ChatExecutionPresentation.Status(step.Status, L)</MudChip></header>
         <div class="inspector-body">
             <section class="inspector-section"><h3>@L["Workbench:Details"]</h3>
-                <dl class="facts"><dt>@L["Workbench:Started"]</dt><dd>@step.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")</dd><dt>@L["Workbench:Elapsed"]</dt><dd>@ChatExecutionPresentation.Duration(step.Duration)</dd></dl>
+                <dl class="facts"><dt>@L["Workbench:Started"]</dt><dd>@UiTime.Format(step.StartedAt)</dd><dt>@L["Workbench:Elapsed"]</dt><dd>@ChatExecutionPresentation.Duration(step.Duration)</dd></dl>
                 @if (step.Request is { } request)
                 {
                     <dl class="facts">
@@ -62,7 +64,7 @@
                 @if (step.Request is { } input)
                 {
                     @if (input.Instructions is { Length: > 0 } instructions) { <h4>@L["Provider:Settings:SystemPrompt"]</h4><pre>@instructions</pre> }
-                    <h4>@L["Workbench:RequestOptions"]</h4><pre>@Serialize(input.Settings)</pre>
+                    <h4>@L["Workbench:RequestOptions"]</h4><MoJson Value="@Serialize(input.Settings)" />
                     @foreach (var message in input.Messages)
                     {
                         <h4>@RoleLabel(message.Role)</h4>
@@ -74,7 +76,7 @@
                     }
                 }
                 @if (step.Request is null && step.Tool is null) { <p>@L["Workbench:NoRecordedContent"]</p> }
-                @if (step.Tool is { } toolInput) { <pre>@toolInput.Arguments</pre> }
+                @if (step.Tool is { } toolInput) { <MoJson Value="@toolInput.Arguments" AllowPlainText="true" /> }
             </details>
             <details class="inspector-section" open="@HasOutput(step)"><summary>@L["Workbench:Output"]</summary>
                 @if (!HasOutput(step)) { <p>@L["Workbench:NoRecordedContent"]</p> }
@@ -85,7 +87,7 @@
                         <h4>@part.Kind @(part.ToolName ?? string.Empty)</h4><pre>@(part.Text ?? part.Data?.ToString())</pre>
                     }
                 }
-                @if (step.Tool is { } toolOutput) { <pre>@toolOutput.Result</pre> }
+                @if (step.Tool is { } toolOutput) { <MoJson Value="@toolOutput.Result" AllowPlainText="true" /> }
                 @if (step.Compaction is { } compactOutput) { <pre>@compactOutput.Summary</pre> }
             </details>
             @if (step.Request is { } definitions)
@@ -93,7 +95,7 @@
                 <details class="inspector-section"><summary>@L["Workbench:Tools"]</summary>
                     @foreach (var tool in definitions.Tools)
                     {
-                        <details><summary>@tool.Name</summary><p>@tool.Description</p><pre>@Serialize(tool.Parameters)</pre></details>
+                        <details><summary>@tool.Name</summary><p>@tool.Description</p><MoJson Value="@Serialize(tool.Parameters)" ShowLineNumbers="false" /></details>
                     }
                     @if (definitions.Tools.Count == 0) { <MudText Typo="Typo.body2">@L["Workbench:NoTools"]</MudText> }
                 </details>

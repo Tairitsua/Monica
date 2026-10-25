@@ -4,8 +4,7 @@
 .terminal-header__actions { flex-shrink: 0; }
 .terminal-header h1 { font-family: var(--mo-font-family-display); font-size: 32px; line-height: 1.2; font-weight: 500; margin: 0 0 10px; color: var(--mud-palette-text-primary); }
 .terminal-header p { margin: 0; color: color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary)); font-size: .88rem; line-height: 1.6; }
-.terminal-initialization { padding: 24px; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; }
-.terminal-initialization > ::deep .mud-button { margin-top: 16px; }
+.terminal-initialization { background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; }
 .terminal-workbench { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; overflow: clip; background: var(--mud-palette-surface); }
 .terminal-body { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
 .terminal-body--context { grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }

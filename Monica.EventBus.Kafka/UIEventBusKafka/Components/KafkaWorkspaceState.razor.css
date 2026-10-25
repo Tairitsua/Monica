@@ -1,11 +1,5 @@
 .kafka-workspace-state {
     --kafka-state-accent: var(--mud-palette-info);
-    min-height: 148px;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 14px;
-    padding: 20px;
     border: 1px dashed color-mix(in srgb, var(--kafka-state-accent) 38%, var(--mud-palette-lines-default));
     border-radius: var(--mud-default-borderradius);
     background-color: color-mix(in srgb, var(--kafka-state-accent) 5%, var(--mud-palette-surface));
@@ -46,7 +40,7 @@
 .kafka-workspace-state__copy {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 6px;
     min-width: 0;
 }
 
@@ -55,14 +49,7 @@
 }
 
 @media (max-width: 720px) {
-    .kafka-workspace-state {
-        min-height: 0;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: start;
-        padding: 16px;
-    }
     .kafka-workspace-state ::deep .mud-button-root {
-        grid-column: 1 / -1;
         width: 100%;
     }
 }

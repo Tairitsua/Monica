@@ -56,27 +56,27 @@
 
     @if (!Diagnostics.IsFinalized)
     {
-        <div class="option-empty-state option-empty-state--pending" role="status">
+        <MoContentState Compact="true" Class="option-empty-state--pending" role="status">
             <span class="option-empty-state__icon">
                 <MoIcon Icon="@MoIcons.Hourglass" Size="2.25rem" />
             </span>
-            <div>
+            <div class="option-empty-copy">
                 <strong>@L["ModuleDrawer:Options:UnfinalizedTitle"]</strong>
                 <span>@L["ModuleDrawer:Options:Unfinalized"]</span>
             </div>
-        </div>
+        </MoContentState>
     }
     else if (Diagnostics.Entries.IsEmpty)
     {
-        <div class="option-empty-state" role="status">
+        <MoContentState Compact="true" role="status">
             <span class="option-empty-state__icon">
                 <MoIcon Icon="@MoIcons.FilterOff" Size="2.25rem" />
             </span>
-            <div>
+            <div class="option-empty-copy">
                 <strong>@L["ModuleDrawer:Options:EmptyTitle"]</strong>
                 <span>@L["ModuleDrawer:Options:Empty"]</span>
             </div>
-        </div>
+        </MoContentState>
     }
     else
     {

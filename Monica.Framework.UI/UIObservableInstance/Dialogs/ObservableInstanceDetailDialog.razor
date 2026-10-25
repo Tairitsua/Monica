@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.Framework.UI.Localization
 @using Monica.Framework.UI.UIObservableInstance.Models
 @inject IStringLocalizer<ObservableInstanceResource> L
@@ -16,7 +17,7 @@
         }
         else
         {
-            <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info">@L["Shared:States:NoInstanceSelected"]</MudAlert>
+            <MoContentState Compact="true"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["Shared:States:NoInstanceSelected"]</p></MoContentState>
         }
     </DialogContent>
     <DialogActions>

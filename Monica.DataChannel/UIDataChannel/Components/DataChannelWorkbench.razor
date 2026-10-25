@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.Pages
 @using Monica.DataChannel.UIDataChannel.Support
 @using Monica.UI.Shared.Components.Navigation
@@ -14,7 +15,7 @@
         <div class="datachannel-identity__tools">
             <div class="datachannel-capture">
                 <span>@L["Workbench:Captured"]</span>
-                <time>@(capture is null ? L["Workbench:NoCapture"].Value : DataChannelPresentation.Timestamp(capture.CapturedAt))</time>
+                <time>@(capture is null ? L["Workbench:NoCapture"].Value : UiTime.Format(capture.CapturedAt))</time>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" Disabled="State.IsRefreshing">@L["Common:Actions:Refresh"]</MudButton>
         </div>

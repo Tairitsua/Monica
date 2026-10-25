@@ -1147,7 +1147,7 @@
           },
           {
             "id": "monica-application-specification-evolution",
-            "text": "Use monica-application's specification evolution rules for a concrete gap or new pattern; obtain a scoped human decision before adopting a new role, layer, dependency direction, base family, execution model, or local deviation. Reuse existing explicit approval within its agreed scope."
+            "text": "Compose existing ProjectUnits and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope."
           },
           {
             "id": "reconcile-project-application-specification",

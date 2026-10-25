@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
 @inject IStringLocalizer<AIResource> L
@@ -11,7 +12,7 @@
             <MudText Typo="Typo.body2" Class="error-text">@Message.Content</MudText>
             <div class="error-meta">
                 <MudText Typo="Typo.caption" Class="error-time">
-                    @Message.CreatedAt.ToLocalTime().ToString("HH:mm")
+                    @UiTime.FormatTime(Message.CreatedAt)
                 </MudText>
                 <MudButton Variant="Variant.Text"
                            Color="Color.Error"

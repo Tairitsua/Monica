@@ -38,7 +38,6 @@
 .row-states ::deep .mud-chip { margin: 0; border-radius: 5px; }
 .git-page ::deep .mud-chip-outlined .mud-chip-content { color: color-mix(in srgb, currentColor 55%, var(--git-ink)); }
 .row-progress { color: var(--git-muted); font-size: 12px; }
-.catalog-empty { margin: 0; padding: 16px 8px; font-size: 13px; line-height: 1.6; color: var(--git-muted); }
 .catalog-toggle { display: none; }
 .worksheet-owner { min-width: 0; display: grid; gap: 12px; }
 .git-worksheet { min-width: 0; padding: 24px; border: 1px solid var(--git-line); border-radius: 10px; background: var(--git-surface); container: git-sheet / inline-size; }

@@ -146,5 +146,8 @@
       "TargetId": "Repository ID",
       "ObservedChanges": "Local changes reported"
     }
+  },
+  "Navigation": {
+    "Category": "Git"
   }
 }

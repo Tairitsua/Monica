@@ -39,23 +39,27 @@ internal sealed class PageRegistry : INavigationRegistryBuilder, IPageCatalog
     /// </summary>
     public PageRegistry()
     {
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.AI, "NavBar:Categories:AI", 100, MoIcons.Sparkle,
-            "NavBar:CategoryDescriptions:AI");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.KnowledgeRetrieval, "NavBar:Categories:KnowledgeRetrieval", 200, MoIcons.BookSearch,
-            "NavBar:CategoryDescriptions:KnowledgeRetrieval");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Documentation, "NavBar:Categories:Documentation", 300, MoIcons.Book,
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Intelligence, "NavBar:Categories:Intelligence", 100, MoIcons.Sparkle,
+            "NavBar:CategoryDescriptions:Intelligence");
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Platform, "NavBar:Categories:Platform", 200, MoIcons.Cube,
+            "NavBar:CategoryDescriptions:Platform");
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.AI, "NavBar:Categories:AI", 10, MoIcons.Sparkle,
+            "NavBar:CategoryDescriptions:AI", BuiltInNavigationCategoryIds.Intelligence);
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.KnowledgeRetrieval, "NavBar:Categories:KnowledgeRetrieval", 20, MoIcons.BookSearch,
+            "NavBar:CategoryDescriptions:KnowledgeRetrieval", BuiltInNavigationCategoryIds.Intelligence);
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Documentation, "NavBar:Categories:Documentation", 500, MoIcons.Book,
             "NavBar:CategoryDescriptions:Documentation");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Configuration, "NavBar:Categories:Configuration", 400, MoIcons.Sliders,
-            "NavBar:CategoryDescriptions:Configuration");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Infrastructure, "NavBar:Categories:Infrastructure", 500, MoIcons.Server,
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Configuration, "NavBar:Categories:Configuration", 20, MoIcons.Sliders,
+            "NavBar:CategoryDescriptions:Configuration", BuiltInNavigationCategoryIds.Platform);
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Infrastructure, "NavBar:Categories:Infrastructure", 400, MoIcons.Server,
             "NavBar:CategoryDescriptions:Infrastructure");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Module, "NavBar:Categories:Module", 600, MoIcons.Cube,
-            "NavBar:CategoryDescriptions:Module");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.TaskScheduling, "NavBar:Categories:TaskScheduling", 700, MoIcons.CalendarCheck,
-            "NavBar:CategoryDescriptions:TaskScheduling");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Monitor, "NavBar:Categories:Monitor", 800, MoIcons.Pulse,
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Module, "NavBar:Categories:Module", 10, MoIcons.Cube,
+            "NavBar:CategoryDescriptions:Module", BuiltInNavigationCategoryIds.Platform);
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.TaskScheduling, "NavBar:Categories:TaskScheduling", 20, MoIcons.CalendarCheck,
+            "NavBar:CategoryDescriptions:TaskScheduling", BuiltInNavigationCategoryIds.Monitor);
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Monitor, "NavBar:Categories:Monitor", 300, MoIcons.Pulse,
             "NavBar:CategoryDescriptions:Monitor");
-        AddBuiltInCategory(BuiltInNavigationCategoryIds.Debug, "NavBar:Categories:Debug", 900, MoIcons.Bug,
+        AddBuiltInCategory(BuiltInNavigationCategoryIds.Debug, "NavBar:Categories:Debug", 600, MoIcons.Bug,
             "NavBar:CategoryDescriptions:Debug");
         AddBuiltInCategory(BuiltInNavigationCategoryIds.Uncategorized, "NavBar:Categories:Uncategorized", 1_000, MoIcons.Folder,
             "NavBar:CategoryDescriptions:Uncategorized");
@@ -257,7 +261,13 @@ internal sealed class PageRegistry : INavigationRegistryBuilder, IPageCatalog
         return accessPolicyType;
     }
 
-    private void AddBuiltInCategory(NavigationCategoryId id, string displayNameKey, int order, string icon, string descriptionKey)
+    private void AddBuiltInCategory(
+        NavigationCategoryId id,
+        string displayNameKey,
+        int order,
+        string icon,
+        string descriptionKey,
+        NavigationCategoryId? parentId = null)
     {
         _categories.Add(
             id,
@@ -265,6 +275,7 @@ internal sealed class PageRegistry : INavigationRegistryBuilder, IPageCatalog
                 id,
                 UIRegistryText.Localized<SharedResource>(displayNameKey),
                 order,
+                parentId,
                 icon: icon,
                 description: UIRegistryText.Localized<SharedResource>(descriptionKey)));
     }

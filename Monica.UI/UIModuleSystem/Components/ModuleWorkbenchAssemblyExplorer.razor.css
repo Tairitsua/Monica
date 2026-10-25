@@ -24,7 +24,7 @@
 .assembly-explorer-header p { margin: 0; color: var(--module-workbench-muted-text, color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary) 15%)); font-size: 13px; line-height: 1.8; }
 .assembly-retry { min-width: 0; }
 .assembly-retry ::deep .mud-button-root { min-height: 36px; border-radius: 6px; font-size: 12px; font-weight: 400; text-transform: none; }
-.assembly-loading { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 28px 26px; color: var(--mud-palette-text-primary); font-size: 13px; line-height: 1.8; }
+
 .assembly-load-failure { display: flex; align-items: flex-start; gap: 12px; min-width: 0; margin: 0 26px 24px; padding: 18px; border: 1px solid color-mix(in srgb, var(--mud-palette-error) 30%, var(--mud-palette-divider)); border-radius: 6px; background: color-mix(in srgb, var(--mud-palette-error) 4%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); font-size: 13px; line-height: 1.8; }
 .assembly-load-failure ::deep :is(.mud-icon-root, .mo-icon) { flex-shrink: 0; margin-top: 2px; color: var(--mud-palette-error); }
 
@@ -138,7 +138,7 @@
 .assembly-failure { min-width: 0; max-height: 12rem; padding-inline-end: 6px; overflow: auto; color: var(--mud-palette-text-primary); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
 .assembly-failure:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: -2px; }
 .assembly-unavailable { font-size: 12px; line-height: 1.8; }
-.assembly-empty { margin: 0; padding: 24px 12px; color: var(--module-workbench-muted-text, color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary) 15%)); font-size: 13px; line-height: 1.8; }
+
 .assembly-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 24px; min-width: 0; padding: 18px 26px; border-top: 1px solid var(--mud-palette-divider); }
 .assembly-pagination ::deep .mud-pagination { flex-wrap: wrap; }
 
@@ -187,7 +187,7 @@
     .assembly-configuration summary,
     .assembly-configuration-facts { padding-inline: 16px; }
     .assembly-load-failure { margin-inline: 16px; }
-    .assembly-loading { padding-inline: 16px; }
+
     .assembly-summary { gap: 16px; }
     .assembly-summary dd { font-size: 21px; }
     .assembly-configuration summary { display: grid; grid-template-columns: minmax(0, 1fr) 18px; gap: 7px 12px; }

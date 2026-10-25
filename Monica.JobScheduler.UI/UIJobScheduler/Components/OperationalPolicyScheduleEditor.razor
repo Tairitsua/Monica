@@ -279,8 +279,7 @@
         <div>
             <span>@L["Policy:Schedule:AuthoritativeNext"]</span>
             <strong>@FormatScheduleTime(Draft.AuthoritativeNextOccurrenceUtc)</strong>
-            <code>@FormatUtc(Draft.AuthoritativeNextOccurrenceUtc)</code>
-            <small>@L["Policy:Schedule:AuthoritativeObservedAt", FormatUtc(Draft.ObservedAtUtc)]</small>
+            <small>@L["Policy:Schedule:AuthoritativeObservedAt", UiTime.Format(Draft.ObservedAtUtc)]</small>
         </div>
         <MoIcon Icon="@MoIcons.ArrowRight" Size="1.5rem" Style="color:var(--mud-palette-warning);" />
         <div>
@@ -288,12 +287,10 @@
             @if (IsPaused)
             {
                 <strong>@L["Policy:Schedule:PreviewSuspended"]</strong>
-                <code>—</code>
             }
             else
             {
                 <strong>@FormatScheduleTime(Draft.ProposedNextOccurrenceUtc)</strong>
-                <code>@FormatUtc(Draft.ProposedNextOccurrenceUtc)</code>
             }
         </div>
     </div>
@@ -308,23 +305,22 @@
                 <tr>
                     <th>@L["Policy:Schedule:Preview:Sequence"]</th>
                     <th>@L["Policy:Schedule:Preview:ConfiguredTime"]</th>
-                    <th>@L["Policy:Schedule:Preview:Utc"]</th>
                 </tr>
             </thead>
             <tbody>
                 @if (IsPaused)
                 {
                     <tr>
-                        <td colspan="3">@L["Policy:Schedule:PreviewSuspendedDescription"]</td>
+                        <td colspan="2">@L["Policy:Schedule:PreviewSuspendedDescription"]</td>
                     </tr>
                 }
                 else if (!IsDraftValid)
                 {
-                    <tr><td colspan="3">@L["Policy:Schedule:Preview:Invalid"]</td></tr>
+                    <tr><td colspan="2">@L["Policy:Schedule:Preview:Invalid"]</td></tr>
                 }
                 else if (Draft.Evaluation.Occurrences.Count == 0)
                 {
-                    <tr><td colspan="3">@L["Policy:Schedule:Preview:Empty"]</td></tr>
+                    <tr><td colspan="2">@L["Policy:Schedule:Preview:Empty"]</td></tr>
                 }
                 else
                 {
@@ -334,7 +330,6 @@
                         <tr>
                             <td>@(index + 1)</td>
                             <td><code>@FormatScheduleTime(occurrence.Utc)</code></td>
-                            <td><code>@FormatUtc(occurrence.Utc)</code></td>
                         </tr>
                     }
                 }

@@ -35,6 +35,8 @@
     font-size: 11px;
     line-height: 1.5;
 }
+.navbar-brand--contextual .brand-version { min-width: 0; flex-shrink: 1; overflow-wrap: anywhere; }
+.navbar-brand--contextual :is(.brand-appid, .brand-version, .brand-environment) { color: color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary)); }
 .brand-environment::before { content: "\00b7"; margin-right: 7px; }
 @media (max-width: 929px) {
     .brand-name { max-width: min(160px, 26vw); font-size: 14px; }

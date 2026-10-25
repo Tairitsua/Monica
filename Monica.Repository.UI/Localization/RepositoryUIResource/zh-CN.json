@@ -409,5 +409,8 @@
       "PostgreSqlWaitDescription": "仅当 wait_event_type 为 Lock 时返回 true；false 不排除其他 PostgreSQL 等待类型。"
     },
     "BulkOutcome": "迁移命令完成 · {0} 个已应用，{1} 个已跳过，{2} 个失败"
+  },
+  "Navigation": {
+    "Category": "数据持久化"
   }
 }

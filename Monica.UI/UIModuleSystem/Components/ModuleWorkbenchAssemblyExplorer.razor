@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using Monica.Core.Modularity.Diagnostics.Models
 @using Monica.UI.Localization
@@ -29,10 +30,10 @@
     {
         case ModuleSystemLazyLoadState.NotRequested:
         case ModuleSystemLazyLoadState.Loading:
-            <div class="assembly-loading" role="status">
+            <MoContentState Loading="true" Compact="true">
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
                 <span>@L["Discovery:Inventory:Loading"]</span>
-            </div>
+            </MoContentState>
             break;
         case ModuleSystemLazyLoadState.Failed:
             <div class="assembly-load-failure" role="alert">
@@ -60,7 +61,7 @@
             <details class="assembly-configuration">
                 <summary>
                     <span class="assembly-configuration__label"><MoIcon Icon="@MoIcons.Sliders" Size="1.25rem" />@L["Discovery:Inventory:Configuration:Title"]</span>
-                    <span class="assembly-captured-at">@L["Discovery:Inventory:Configuration:CapturedAt", inventory.CapturedAtUtc.ToLocalTime().ToString("g")]</span>
+                    <span class="assembly-captured-at">@L["Discovery:Inventory:Configuration:CapturedAt", UiTime.Format(inventory.CapturedAtUtc)]</span>
                     <span class="assembly-configuration__expand" aria-hidden="true"><MoIcon Icon="@MoIcons.ChevronDown" Size="1.25rem" /></span>
                 </summary>
                 <dl class="assembly-configuration-facts">
@@ -197,7 +198,7 @@
                             </MudTd>
                         </RowTemplate>
                         <NoRecordsContent>
-                            <p class="assembly-empty">@L["Discovery:Inventory:Records:Empty"]</p>
+                            <MoContentState Compact="true"><p>@L["Discovery:Inventory:Records:Empty"]</p></MoContentState>
                         </NoRecordsContent>
                     </MudTable>
                 </div>

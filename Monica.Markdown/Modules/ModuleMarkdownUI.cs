@@ -50,13 +50,20 @@ public class ModuleMarkdownUI : MonicaModule<ModuleMarkdownUIOption>, IWebHostRe
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<MarkdownResource>(
+                    "Monica.Markdown.Documents", "Navigation:Category", 10,
+                    parentId: BuiltInNavigationCategoryIds.Documentation,
+                    icon: MoIcons.Book);
+
                 registry.RegisterLocalizedPage<UIMarkdownPage, MarkdownResource>(
                     MarkdownViewerLocation.PAGE_URL,
                     "Pages:MarkdownDocuments:Title",
                     MoIcons.Book,
-                    BuiltInNavigationCategoryIds.Documentation,
+                    category,
                     addToNav: true,
-                    navOrder: 50));
+                    navOrder: 50);
+            });
         });
     }
 

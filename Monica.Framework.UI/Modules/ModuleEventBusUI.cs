@@ -52,21 +52,26 @@ public class ModuleEventBusUI : MonicaModule<ModuleEventBusUIOption>, IWebHostRe
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<EventBusResource>(
+                    "Monica.Framework.UI.EventBus", "Navigation:Category", 90,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Network);
+
                 registry.RegisterLocalizedPage<UIEventBusMonitorPage, EventBusResource>(
                     UIEventBusMonitorPage.PAGE_URL, "Pages:EventBusMonitor:Title", MoIcons.Network,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 40, descriptionKey: "Workbench:OverviewDescription");
+                    category, addToNav: true, navOrder: 40, descriptionKey: "Workbench:OverviewDescription");
                 registry.RegisterLocalizedPage<UIEventBusProvidersPage, EventBusResource>(
                     UIEventBusProvidersPage.PAGE_URL, "Pages:EventBusProviders:Title", MoIcons.Cloud,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 41, descriptionKey: "Workbench:ProvidersDescription");
+                    category, addToNav: true, navOrder: 41, descriptionKey: "Workbench:ProvidersDescription");
                 registry.RegisterLocalizedPage<UIEventBusSubscriptionsPage, EventBusResource>(
                     UIEventBusSubscriptionsPage.PAGE_URL, "Pages:EventBusSubscriptions:Title", MoIcons.Route,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 42, descriptionKey: "Workbench:SubscriptionsDescription");
+                    category, addToNav: true, navOrder: 42, descriptionKey: "Workbench:SubscriptionsDescription");
                 registry.RegisterLocalizedPage<UIEventBusChangesPage, EventBusResource>(
                     UIEventBusChangesPage.PAGE_URL, "Pages:EventBusChanges:Title", MoIcons.History,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 43, descriptionKey: "Workbench:ChangesDescription");
+                    category, addToNav: true, navOrder: 43, descriptionKey: "Workbench:ChangesDescription");
                 registry.RegisterLocalizedPage<UIEventBusTestToolsPage, EventBusResource>(
                     UIEventBusTestToolsPage.PAGE_URL, "Pages:EventBusTestTools:Title", MoIcons.Flask,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 44, descriptionKey: "Workbench:TestToolsDescription");
+                    category, addToNav: true, navOrder: 44, descriptionKey: "Workbench:TestToolsDescription");
             }));
     }
 

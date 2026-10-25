@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.ServiceDiscovery.Facades
 @using Monica.ServiceDiscovery.Localization
 @using Monica.ServiceDiscovery.Models
@@ -22,13 +24,13 @@
                     <button type="button" aria-pressed="@(Selected?.Id.Equals(domain.Id,StringComparison.Ordinal) == true ? "true" : "false")" @onclick="() => Select(domain.Id)"><span>@(domain.DisplayName ?? domain.Id)</span><code>@domain.Id</code><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button>
                 }
             </nav>
-            @if (_hasCatalog && _domains.Count == 0) { <p class="domain-index-empty">@L["Workbench:CatalogEmpty"]</p> }
-            else if (_hasCatalog && !VisibleDomains.Any()) { <p class="domain-index-empty">@L["Workbench:FilterMiss"]</p> }
+            @if (_hasCatalog && _domains.Count == 0) { <MoContentState Compact="true"><p>@L["Workbench:CatalogEmpty"]</p></MoContentState> }
+            else if (_hasCatalog && !VisibleDomains.Any()) { <MoContentState Compact="true"><p>@L["Workbench:FilterMiss"]</p></MoContentState> }
         </aside>
         <div class="domain-detail-workspace">
             @if (Selected is { } selected)
             {
-                <header class="domain-identity"><span>@L["Workbench:SelectedDomain"]</span><h3>@(selected.DisplayName ?? selected.Id)</h3><code>@selected.Id</code><p>@(selected.Description ?? L["Workbench:NoCatalogDescription"].Value)</p>@if (_catalogCapturedAt is { } stamp) { <small>@L["Workbench:CapturedUTC"] · <time>@stamp.ToString("HH:mm:ss")</time></small> }</header>
+                <header class="domain-identity"><span>@L["Workbench:SelectedDomain"]</span><h3>@(selected.DisplayName ?? selected.Id)</h3><code>@selected.Id</code><p>@(selected.Description ?? L["Workbench:NoCatalogDescription"].Value)</p>@if (_catalogCapturedAt is { } stamp) { <small>@L["Workbench:CapturedUTC"] · <time>@UiTime.FormatTime(stamp)</time></small> }</header>
                 @if (_servicesError is not null) { <div class="domain-notice" role="alert"><strong>@L["Workbench:DomainServicesFailed"]</strong><p>@_servicesError</p><p>@L["Workbench:DomainServicesUnavailable"]</p></div> }
                 else if (_hasServices)
                 {

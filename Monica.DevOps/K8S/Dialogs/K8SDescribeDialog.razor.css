@@ -28,6 +28,8 @@
 .facts dd { margin: 0; min-width: 0; }
 .k8s-inspector ::deep .explanation { margin-top: 20px; }
 .related-workloads { margin-top: 24px; }
+.related-workloads__list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; font-size: .875rem; line-height: 1.7; }
+.related-workloads__list li { min-width: 0; overflow-wrap: anywhere; }
 .pod-evidence { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: .875rem; }
 .k8s-inspector ::deep .mud-table-container { overflow-x: auto; overflow-y: visible; }
 .k8s-inspector ::deep .mud-table-cell { overflow-wrap: anywhere; font-size: .875rem; }

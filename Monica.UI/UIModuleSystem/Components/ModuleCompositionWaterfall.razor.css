@@ -132,8 +132,7 @@
 .timeline-value[aria-current="true"] { font-weight: 600; }
 .timeline-value:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
 .timeline-waterfall__table-wrapper ::deep .timeline-row-selected { background: color-mix(in srgb, var(--mud-palette-primary) 8%, var(--mud-palette-surface)); box-shadow: inset 3px 0 var(--mud-palette-primary); }
-.timeline-waterfall__empty { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 36px 24px; color: var(--timeline-muted); }
-.timeline-waterfall__empty p { margin: 0; font-size: 13px; line-height: 1.65; }
+
 @container module-timeline (max-width: 860px) {
     .timeline-waterfall__selection { grid-template-columns: minmax(0, 1fr); }
     .timeline-waterfall__heading { flex-direction: column; gap: 14px; }

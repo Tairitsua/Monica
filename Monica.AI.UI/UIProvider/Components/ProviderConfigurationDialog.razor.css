@@ -16,7 +16,6 @@
 .discovery-context { display: grid; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-background-gray); }
 .discovery-toolbar ::deep .mud-input-control { flex: 1 1 180px; min-width: 0; }
 .draft-discovery-list { max-height: 280px; overflow-y: auto; border: 1px solid var(--mud-palette-lines-default); border-radius: 6px; background: var(--mud-palette-surface); }
-.discovery-empty { padding: 18px; }
 .discovered-model, .configured-model { display: flex; align-items: center; min-width: 0; gap: 8px; padding: 12px; }
 .discovered-model { min-height: 56px; }
 .configured-model + .configured-model { border-top: 1px solid var(--mud-palette-lines-default); }

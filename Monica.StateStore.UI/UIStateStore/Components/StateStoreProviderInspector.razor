@@ -1,0 +1,47 @@
+@using Monica.StateStore.UI.Models
+@using Monica.StateStore.UI.Support
+@inject IStringLocalizer<StateStoreResource> L
+
+<section class="provider-inspector" data-tone="@StateStoreUi.Tone(Provider)">
+    <header class="identity">
+        <span class="provider-icon"><MoIcon Icon="@StateStoreUi.Icon(Provider)" Size="1.4rem" /></span>
+        <div><span class="eyebrow">@L["Workbench:Provider"]</span><h2 tabindex="-1">@L.GetProviderDisplayName(Provider)</h2><p>@L.GetProviderTypeText(Provider.ProviderType) · @L[Provider.IsDistributed ? "ProviderDetail:Labels:Distributed" : "ProviderDetail:Labels:LocalMemory"]</p></div>
+    </header>
+    <dl class="facts">
+        <div><dt>@L["ProviderDetail:Labels:ProviderType"]</dt><dd><span class="type">@L.GetProviderTypeText(Provider.ProviderType)</span></dd></div>
+        <div><dt>@L["ProviderDetail:Labels:StorageMode"]</dt><dd>@L[Provider.IsDistributed ? "ProviderDetail:Labels:Distributed" : "ProviderDetail:Labels:LocalMemory"]</dd></div>
+        <div><dt>@L["ProviderDetail:Labels:ServiceKey"]</dt><dd><code>@(Provider.ServiceKey ?? L["ProviderDetail:Labels:DefaultNoKey"])</code></dd></div>
+        <div><dt>@L["ProviderDetail:Labels:ImplementationType"]</dt><dd><code>@Provider.ImplementationType</code></dd></div>
+    </dl>
+    <div class="capabilities">
+        <h3>@L["Workbench:BrowserCapabilities"]</h3>
+        <div class="capability-grid">
+            @foreach (var feature in Features)
+            {
+                <div class="@(feature.Supported ? null : "unavailable")"><MoIcon Icon="@(feature.Supported ? MoIcons.Check : MoIcons.Minus)" Size="1rem" /><span>@L[feature.Label]</span></div>
+            }
+        </div>
+    </div>
+    <div class="options">
+        <button type="button" aria-expanded="@_optionsOpen.ToString().ToLowerInvariant()" @onclick="() => _optionsOpen = !_optionsOpen"><MoIcon Icon="@(_optionsOpen ? MoIcons.ChevronDown : MoIcons.ChevronRight)" Size="1rem" />@L["Workbench:ModuleOptions"]</button>
+        @if (_optionsOpen) { <StateStoreProviderOptions Provider="Provider" @key="Provider.UniqueId" /> }
+    </div>
+    <footer><a href="@StateStoreUi.Browser(Provider.UniqueId)">@L["Workbench:BrowseData"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a></footer>
+</section>
+
+@code {
+    /// <summary>Gets or sets the selected registration; option reads retain their own authorization check.</summary>
+    [Parameter, EditorRequired] public StateStoreProviderInfo Provider { get; set; } = null!;
+    private bool _optionsOpen;
+    private IEnumerable<(string Label, bool Supported)> Features =>
+    [
+        ("KeyExplorer:Labels:ExactLookupMode", Provider.SupportsExactLookup),
+        ("KeyExplorer:Labels:PatternSearchMode", Provider.SupportsKeyScanning),
+        ("KeyExplorer:Labels:ValuePreview", Provider.SupportsValuePreview),
+        ("KeyExplorer:Actions:Create", Provider.SupportsKeyCreation),
+        ("KeyExplorer:Actions:Edit", Provider.SupportsKeyUpdate),
+        ("KeyExplorer:Actions:Delete", Provider.SupportsKeyDeletion),
+        ("Workbench:BulkDelete", Provider.SupportsBulkDelete),
+        ("KeyExplorer:Detail:Labels:TTL", Provider.SupportsKeyTTL)
+    ];
+}

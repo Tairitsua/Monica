@@ -1,6 +1,7 @@
 {
   "Navigation": {
-    "Title": "数据播种"
+    "Title": "数据播种",
+    "Category": "启动播种"
   },
   "Page": {
     "Title": "初始化执行",
@@ -195,7 +196,6 @@
     "Unknown": "未知",
     "NotAvailable": "暂无",
     "None": "无",
-    "UtcTimestamp": "{0} UTC",
     "DurationMilliseconds": "{0:0} 毫秒",
     "DurationSeconds": "{0:0.0} 秒",
     "DurationMinutesSeconds": "{0} 分 {1} 秒",

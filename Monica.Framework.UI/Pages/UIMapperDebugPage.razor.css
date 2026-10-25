@@ -51,9 +51,8 @@
 .mapper-pair__direction { display: flex; align-items: center; gap: .375rem; margin-top: .375rem; }
 .mapper-pair__direction ::deep :is(.mud-icon-root, .mo-icon) { width: .875rem; height: .875rem; color: var(--mud-palette-primary); }
 .mapper-pair code, .mapper-reader__pair code { color: var(--mud-palette-text-primary); font-family: var(--mo-font-family-mono, monospace); font-size: .8125rem; font-weight: 400; line-height: 1.65; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
-.mapper-catalog__no-matches { padding: 1.5rem; }
-.mapper-catalog h3, .mapper-reader h3 { margin: 0 0 .75rem; font-size: .9375rem; line-height: 1.5; font-weight: 500; }
-.mapper-catalog__no-matches p, .mapper-reader__empty p { margin: 0; font-size: .875rem; line-height: 1.65; }
+
+.mapper-catalog h3, .mapper-reader h3 { margin: 0; font-size: .9375rem; line-height: 1.5; font-weight: 500; }
 
 .mapper-reader { container-type: inline-size; container-name: mapper-reader; scroll-margin-block-start: 1rem; }
 .mapper-reader__heading { display: flex; align-items: center; gap: .75rem; padding: 1.25rem 1.5rem; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); }
@@ -70,9 +69,7 @@
 .mapper-reader__destination { background: color-mix(in srgb, var(--mud-palette-primary) 6%, var(--mud-palette-surface)); border-top: 1px solid var(--mud-palette-lines-default); }
 .mapper-reader__pair > div > span { font-size: .75rem; }
 .mapper-reader__pair ::deep .mapper-reader__arrow { display: none; }
-.mapper-reader__empty, .mapper-reader__missing { padding: 1.5rem; }
-.mapper-reader__missing { display: flex; gap: .75rem; align-items: flex-start; font-size: .875rem; line-height: 1.6; }
-.mapper-reader__missing p { margin: 0; }
+
 .mapper-code { min-width: 0; padding-top: 1.5rem; }
 .mapper-code ::deep .mud-markdown-body, .mapper-code ::deep .mud-markdown-code-highlight,
 .mapper-code ::deep pre { min-width: 0; max-width: 100%; margin: 0; border-radius: 0; overflow: visible; }
@@ -98,10 +95,10 @@
 .mapper-code ::deep code.hljs .hljs-literal { color: color-mix(in srgb, var(--mud-palette-text-primary) 70%, var(--mo-color-code-boolean)); }
 .mapper-code ::deep code.hljs .hljs-comment { color: color-mix(in srgb, var(--mud-palette-text-primary) 80%, var(--mo-color-code-null)); }
 
-.mapper-page__state { grid-column: 1 / -1; padding: 1.5rem; display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; }
-.mapper-page__state > p { max-width: 60rem; margin: 0; font-size: .875rem; line-height: 1.6; }
-.mapper-page__state > ::deep :is(.mud-icon-root, .mo-icon) { color: var(--mud-palette-primary); }
-.mapper-page__state--failed > ::deep :is(.mud-icon-root, .mo-icon), .mapper-read-error__summary ::deep :is(.mud-icon-root, .mo-icon) { color: var(--mud-palette-error); }
+.mapper-page__state { grid-column: 1 / -1; }
+.mapper-page__state p { font-size: .875rem; line-height: 1.6; }
+.mapper-page__state ::deep :is(.mud-icon-root, .mo-icon) { color: var(--mud-palette-primary); }
+.mapper-page__state--failed ::deep :is(.mud-icon-root, .mo-icon), .mapper-read-error__summary ::deep :is(.mud-icon-root, .mo-icon) { color: var(--mud-palette-error); }
 .mapper-read-error { padding: 1.5rem; margin-bottom: 1.5rem; }
 .mapper-read-error__summary { display: flex; align-items: center; gap: .625rem; }
 .mapper-read-error p { font-size: .875rem; line-height: 1.6; margin-block: .75rem; }
@@ -121,11 +118,10 @@
     .mapper-refresh__full { display: none; }
     .mapper-refresh__short { display: inline; }
     .mapper-page__heading-row { align-items: flex-start; flex-wrap: wrap; }
-    .mapper-catalog__header, .mapper-reader__heading, .mapper-reader__empty, .mapper-reader__missing,
-    .mapper-page__state, .mapper-read-error { padding: 1rem; }
+    .mapper-catalog__header, .mapper-reader__heading, .mapper-read-error { padding: 1rem; }
     .mapper-catalog__controls { padding: 0 1rem .75rem; }
     .mapper-pair { padding: 1rem; }
-    .mapper-catalog__no-matches { padding: 1rem; }
+
     .mapper-reader__context { padding: .75rem 1rem; }
     .mapper-reader__pair { margin-inline: 1rem; }
     .mapper-reader__outside-filter { margin-inline: 1rem; }

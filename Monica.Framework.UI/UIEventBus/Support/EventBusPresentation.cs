@@ -24,6 +24,4 @@ internal static class EventBusPresentation
         _ => key
     };
 
-    internal static string Timestamp(DateTime value) => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'");
-    internal static string Timestamp(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'");
 }

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Repository.UI.UIRepository.State
 @using Monica.Tool.Extensions
 @using Monica.UI.Shared.Components.Dialogs
@@ -17,7 +18,7 @@
         </div>
         <div class="repository-refresh">
             <span>@L["Workbench:CapturedAt"]</span>
-            <time>@(State.ContextsCapturedAt?.ToString("HH:mm:ss 'UTC'") ?? L["Common:Values:Unavailable"].Value)</time>
+            <time>@(UiTime.FormatTime(State.ContextsCapturedAt))</time>
             <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="_busy" OnClick="RefreshAsync">@L["Common:Actions:Refresh"]</MudButton>
         </div>
     </header>

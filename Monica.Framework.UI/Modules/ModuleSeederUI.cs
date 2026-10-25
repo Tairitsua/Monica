@@ -47,14 +47,21 @@ public sealed class ModuleSeederUI : MonicaModule<ModuleSeederUIOption>, IUIModu
             static option => option.AddResource<SeederResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<SeederResource>(
+                    "Monica.Framework.UI.Seeder", "Navigation:Category", 25,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Sprout);
+
                 registry.RegisterLocalizedPage<UISeederPage, SeederResource>(
                     UISeederPage.PAGE_URL,
                     "Navigation:Title",
                     MoIcons.ListChecks,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 15,
-                    accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleSeederUIOption>))));
+                    accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleSeederUIOption>));
+            }));
     }
 
     /// <inheritdoc />

@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <MonicaVersion>1.0.0-rc.13</MonicaVersion>
+    <MonicaVersion>1.0.0-rc.15</MonicaVersion>
   </PropertyGroup>
 
   <ItemGroup>

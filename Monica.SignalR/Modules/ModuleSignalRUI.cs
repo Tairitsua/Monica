@@ -53,13 +53,20 @@ public class ModuleSignalRUI : MonicaModule<ModuleSignalRUIOption>, IUIModule
             static option => option.AddResource<SignalRResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<SignalRResource>(
+                    "Monica.SignalR", "Navigation:Category", 30,
+                    parentId: BuiltInNavigationCategoryIds.Debug,
+                    icon: MoIcons.Network);
+
                 registry.RegisterLocalizedPage<UISignalRDebugPage, SignalRResource>(
                     UISignalRDebugPage.PAGE_URL,
                     "Pages:SignalRDebug:Title",
                     MoIcons.Settings,
-                    BuiltInNavigationCategoryIds.Debug,
+                    category,
                     addToNav: true,
-                    navOrder: 20)));
+                    navOrder: 20);
+            }));
     }
 }
 

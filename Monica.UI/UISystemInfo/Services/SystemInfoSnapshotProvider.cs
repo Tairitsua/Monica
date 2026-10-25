@@ -10,6 +10,7 @@ using Monica.Core;
 using Monica.Core.Modularity.Models;
 using Monica.Modules;
 using Monica.UI.UISystemInfo.Models;
+using Monica.UI.Shared.Services;
 
 namespace Monica.UI.UISystemInfo.Services;
 
@@ -30,6 +31,7 @@ internal sealed class SystemInfoSnapshotProvider(
     IServer server,
     MonicaApplication monicaApplication,
     IOptions<ModuleShellUIOption> shellOptions,
+    MoTimeFormatter timeFormatter,
     IHostEnvironment hostEnvironment)
 {
     internal SystemInfoSnapshot Capture()
@@ -84,7 +86,11 @@ internal sealed class SystemInfoSnapshotProvider(
                 UserDomainName = Environment.UserDomainName,
                 OperatingSystem = RuntimeInformation.OSDescription,
                 CurrentDirectory = Environment.CurrentDirectory,
-                TimeZone = SystemTimeZone.CaptureLocal(capturedAtUtc)
+                TimeZone = new SystemTimeZone
+                {
+                    Id = timeFormatter.TimeZone.Id,
+                    UtcOffset = timeFormatter.TimeZone.GetUtcOffset(capturedAtUtc)
+                }
             },
             Artifact = new SystemInfoArtifact
             {

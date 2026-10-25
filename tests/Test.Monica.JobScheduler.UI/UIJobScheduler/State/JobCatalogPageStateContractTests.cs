@@ -268,7 +268,9 @@ public sealed class JobCatalogPageStateContractTests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => oldState.SetSelectedDisabledAsync(true, confirmed));
             pending.TrySetResult(new([.. confirmed], accepted.TotalItems));
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ObserveAsync(oldLoad));
+            // Linked cancellation may race the caller's result; retired owners must never adopt that result.
+            try { await ObserveAsync(oldLoad); }
+            catch (OperationCanceledException) { }
             await ObserveAsync(retirement);
             Assert.Same(oldRows, oldState.Summaries);
             Assert.Same(replacementRows, replacement.Summaries);

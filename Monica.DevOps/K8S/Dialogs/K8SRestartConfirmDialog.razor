@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.Localization
 @using Monica.DevOps.K8S.Models
 @using Monica.UI.Shared.Components.Dialogs
@@ -5,66 +6,90 @@
 @inject IStringLocalizer<K8SResource> L
 
 <MudDialog DefaultFocus="DefaultFocus.LastChild">
-    <TitleContent><MoDialogHeading @ref="_heading" Text="@L["RestartDialog:Title", Preview.ScopeName, Preview.Namespace]" /></TitleContent>
+    <TitleContent>
+        <div class="review-heading review--restart">
+            <span class="review-icon"><MoIcon Icon="@MoIcons.Restart" Size="1.25rem" /></span>
+            <div>
+                <MoDialogHeading @ref="_heading" Text="@L["RestartDialog:Title", Preview.ScopeName, Preview.Namespace]" />
+                <p>@L["OperationReview:GeneratedAt", UiTime.Format(Preview.GeneratedAtUtc)]</p>
+            </div>
+        </div>
+    </TitleContent>
     <DialogContent>
-        <div class="operation-review">
-            <MudStack Spacing="3">
-                <MudAlert Severity="@(Preview.HasRestartableTargets ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Icon="@(Preview.HasRestartableTargets ? MoIcons.Warning : MoIcons.Info)">
-                    @(Preview.HasRestartableTargets ? L["RestartDialog:SummaryWithWorkloads", Preview.Workloads.Count, Preview.EligibleTargets.Count] : L["RestartDialog:SummaryWithoutWorkloads"])
-                </MudAlert>
-                <MudText Typo="Typo.body2">@L["OperationReview:TargetCounts", Preview.RequestedTargets.Count, Preview.EligibleTargets.Count, Preview.IgnoredTargets.Count]</MudText>
-                @if (Preview.ResourceType is null || Preview.ResourceType == K8SResourceType.Service)
+        <div class="operation-review review--restart">
+            <dl class="review-facts" aria-label="@L["OperationReview:TargetCounts", Preview.RequestedTargets.Count, Preview.EligibleTargets.Count, Preview.IgnoredTargets.Count]">
+                <div><dt>@L["ReviewDesign:Requested"]</dt><dd>@Preview.RequestedTargets.Count</dd></div>
+                <div class="fact--eligible"><dt>@L["ReviewDesign:Eligible"]</dt><dd>@Preview.EligibleTargets.Count</dd></div>
+                <div><dt>@L["ReviewDesign:Ignored"]</dt><dd>@Preview.IgnoredTargets.Count</dd></div>
+            </dl>
+            <p class="review-summary">@(Preview.HasRestartableTargets ? L["RestartDialog:SummaryWithWorkloads", Preview.Workloads.Count, Preview.EligibleTargets.Count] : L["RestartDialog:SummaryWithoutWorkloads"])</p>
+            @if (Preview.ResourceType is null || Preview.ResourceType == K8SResourceType.Service)
+            {
+                <p class="review-explanation">@L["RestartDialog:ServiceExplanation"]</p>
+            }
+            @if (Preview.RestrictionKeywords.Count > 0)
+            {
+                <p class="review-restrictions"><MoIcon Icon="@MoIcons.Shield" Size="1rem" /><span>@L["OperationReview:AllowedKeywords", string.Join(", ", Preview.RestrictionKeywords)]</span></p>
+            }
+            <section class="workloads">
+                <h3>@L["RestartDialog:WorkloadsToRestart"]<span>@Preview.Workloads.Count</span></h3>
+                @if (Preview.Workloads.Count == 0)
                 {
-                    <MudText Typo="Typo.body2">@L["RestartDialog:ServiceExplanation"]</MudText>
+                    <div class="review-empty"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" /><p>@L["RestartDialog:NoWorkloads"]</p></div>
                 }
-                @if (Preview.RestrictionKeywords.Count > 0)
+                else
                 {
-                    <MudText Typo="Typo.body2">@L["OperationReview:AllowedKeywords", string.Join(", ", Preview.RestrictionKeywords)]</MudText>
-                }
-                <section class="workloads">
-                    <MudText Typo="Typo.subtitle1">@L["RestartDialog:WorkloadsToRestart"]</MudText>
-                    @if (Preview.Workloads.Count == 0)
-                    {
-                        <MudText Typo="Typo.body2">@L["RestartDialog:NoWorkloads"]</MudText>
-                    }
-                    else
-                    {
-                        <MudTable T="K8SWorkloadReference" Items="Preview.Workloads" Dense="true" Breakpoint="Breakpoint.Sm">
-                            <HeaderContent><MudTh>@L["DescribeDialog:Workload"]</MudTh><MudTh>@L["DescribeDialog:ReadyDesired"]</MudTh><MudTh>@L["DescribeDialog:LastRestart"]</MudTh></HeaderContent>
+                    <div class="workload-table">
+                        <MudTable T="K8SWorkloadReference" Items="Preview.Workloads.Take(_showAllWorkloads ? int.MaxValue : 8)" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>@L["DescribeDialog:Workload"]</MudTh>
+                                <MudTh>@L["DescribeDialog:ReadyDesired"]</MudTh>
+                                <MudTh>@L["DescribeDialog:LastRestart"]</MudTh>
+                            </HeaderContent>
                             <RowTemplate>
-                                <MudTd DataLabel="@L["DescribeDialog:Workload"]">@GetDisplayName(context.Kind, context.Name)</MudTd>
-                                <MudTd DataLabel="@L["DescribeDialog:ReadyDesired"]">@context.ReplicaStatus</MudTd>
-                                <MudTd DataLabel="@L["DescribeDialog:LastRestart"]">@context.LastRestartedAtDisplay</MudTd>
+                                <MudTd DataLabel="@L["DescribeDialog:Workload"]"><span class="workload-identity @GetKindClass(context.Kind)"><i></i><span>@context.Name<small>@GetLocalizedKind(context.Kind)</small></span></span></MudTd>
+                                <MudTd DataLabel="@L["DescribeDialog:ReadyDesired"]"><span class="diagnostic-value">@context.ReplicaStatus</span></MudTd>
+                                <MudTd DataLabel="@L["DescribeDialog:LastRestart"]"><span class="diagnostic-value">@UiTime.Format(context.LastRestartedAtUtc)</span></MudTd>
                             </RowTemplate>
                         </MudTable>
+                    </div>
+                    @if (Preview.Workloads.Count > 8)
+                    {
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _showAllWorkloads = !_showAllWorkloads)" aria-expanded="@_showAllWorkloads">@L[_showAllWorkloads ? "ReviewDesign:ShowFewer" : "ReviewDesign:ShowRemaining", Preview.Workloads.Count - 8]</MudButton>
                     }
-                </section>
-                <MudExpansionPanels Elevation="0" MultiExpansion="true">
-                    <MudExpansionPanel Text="@L["OperationReview:RequestedTargets", Preview.RequestedTargets.Count]" Icon="@MoIcons.ChevronDown">
-                        <div class="disclosure-body">
-                            @if (Preview.RequestedTargets.Count == 0) { <MudText Typo="Typo.body2">@L["OperationReview:NoRequestedTargets"]</MudText> }
-                            else { <ul class="target-list">@foreach (var target in Preview.RequestedTargets) { <li>@GetDisplayName(target.Kind, target.Name)</li> }</ul> }
-                        </div>
-                    </MudExpansionPanel>
-                    <MudExpansionPanel Text="@L["OperationReview:EligibleTargets", Preview.EligibleTargets.Count]" Icon="@MoIcons.ChevronDown">
-                        <div class="disclosure-body">
-                            @if (Preview.EligibleTargets.Count == 0) { <MudText Typo="Typo.body2">@L["RestartDialog:NoEligibleTargets"]</MudText> }
-                            else { <ul class="target-list">@foreach (var target in Preview.EligibleTargets) { <li>@GetDisplayName(target.Kind, target.Name)</li> }</ul> }
-                        </div>
-                    </MudExpansionPanel>
-                    <MudExpansionPanel Text="@L["OperationReview:IgnoredTargets", Preview.IgnoredTargets.Count]" Expanded="@(!Preview.HasRestartableTargets && Preview.IgnoredTargets.Count > 0)" Icon="@MoIcons.ChevronDown">
-                        <div class="disclosure-body">
-                            @if (Preview.IgnoredTargets.Count == 0) { <MudText Typo="Typo.body2">@L["RestartDialog:NoIgnoredTargets"]</MudText> }
-                            else { <ul class="target-list">@foreach (var target in Preview.IgnoredTargets) { <li><span>@GetDisplayName(target.Kind, target.Name)</span><p class="ignored-reason">@target.Reason</p></li> }</ul> }
-                        </div>
-                    </MudExpansionPanel>
-                    <MudExpansionPanel Text="@L["OperationReview:CommandArguments"]" Icon="@MoIcons.ChevronDown">
-                        <div class="disclosure-body"><MudText Typo="Typo.body2">@L["OperationReview:CommandArgumentsHelp"]</MudText><div class="command-output"><pre>@string.Join(Environment.NewLine, Preview.CommandPreview)</pre></div></div>
-                    </MudExpansionPanel>
-                </MudExpansionPanels>
-                <MudText Typo="Typo.body2">@L["OperationReview:GeneratedAt", Preview.GeneratedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")]</MudText>
-                <MudText Typo="Typo.body2">@L["OperationReview:ExecutionRechecks"]</MudText>
-            </MudStack>
+                }
+            </section>
+            <div class="review-disclosures">
+                <details>
+                    <summary>@L["OperationReview:RequestedTargets", Preview.RequestedTargets.Count]</summary>
+                    <div class="disclosure-body">
+                        @if (Preview.RequestedTargets.Count == 0) { <p>@L["OperationReview:NoRequestedTargets"]</p> }
+                        else { <ul class="target-list">@foreach (var target in Preview.RequestedTargets) { <li class="@GetKindClass(target.Kind)"><i></i><span>@GetDisplayName(target.Kind, target.Name)</span></li> }</ul> }
+                    </div>
+                </details>
+                <details>
+                    <summary>@L["OperationReview:EligibleTargets", Preview.EligibleTargets.Count]</summary>
+                    <div class="disclosure-body">
+                        @if (Preview.EligibleTargets.Count == 0) { <p>@L["RestartDialog:NoEligibleTargets"]</p> }
+                        else { <ul class="target-list">@foreach (var target in Preview.EligibleTargets) { <li class="@GetKindClass(target.Kind)"><i></i><span>@GetDisplayName(target.Kind, target.Name)</span></li> }</ul> }
+                    </div>
+                </details>
+                <details open="@(!Preview.HasRestartableTargets && Preview.IgnoredTargets.Count > 0)">
+                    <summary>@L["OperationReview:IgnoredTargets", Preview.IgnoredTargets.Count]</summary>
+                    <div class="disclosure-body">
+                        @if (Preview.IgnoredTargets.Count == 0) { <p>@L["RestartDialog:NoIgnoredTargets"]</p> }
+                        else { <ul class="target-list target-list--ignored">@foreach (var target in Preview.IgnoredTargets) { <li><i></i><div><span>@GetDisplayName(target.Kind, target.Name)</span><p class="ignored-reason">@target.Reason</p></div></li> }</ul> }
+                    </div>
+                </details>
+                <details class="command-disclosure" open="@(Preview.CommandPreview.Count <= 4)">
+                    <summary><span>@L["OperationReview:CommandArguments"]</span><span class="command-count">@Preview.CommandPreview.Count</span></summary>
+                    <div class="disclosure-body">
+                        <p class="command-help">@L["OperationReview:CommandArgumentsHelp"]</p>
+                        <div class="command-output"><pre>@string.Join(Environment.NewLine, Preview.CommandPreview)</pre></div>
+                    </div>
+                </details>
+            </div>
+            <p class="review-execution-note"><MoIcon Icon="@MoIcons.Info" Size="1rem" /><span>@L["OperationReview:ExecutionRechecks"]</span></p>
         </div>
     </DialogContent>
     <DialogActions>
@@ -85,10 +110,16 @@
     /// <summary>Retained for source compatibility. The native confirmation label uses the preview's concrete workload count and does not display this value.</summary>
     [Parameter] public string ConfirmButtonText { get; set; } = string.Empty;
     private MoDialogHeading? _heading;
+    private bool _showAllWorkloads;
     private void Cancel() => MudDialog?.Cancel();
     private void Confirm() { if (Preview.HasRestartableTargets) MudDialog?.Close(DialogResult.Ok(true)); }
     /// <summary>Drains the owned accessible heading before returning the native result.</summary>
     public ValueTask DisposeAsync() => _heading?.DisposeAsync() ?? ValueTask.CompletedTask;
+    private static string GetKindClass(string kind) => kind switch
+    {
+        "Service" => "kind--service", "Deployment" => "kind--deployment",
+        "StatefulSet" => "kind--statefulset", "DaemonSet" => "kind--daemonset", _ => string.Empty
+    };
     private string GetDisplayName(string kind, string name) => $"{GetLocalizedKind(kind)}/{name}";
     private string GetLocalizedKind(string kind) => kind switch
     {

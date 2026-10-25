@@ -43,13 +43,20 @@ public sealed class ModuleTerminalUI : MonicaModule<ModuleTerminalUIOption>, IUI
             static option => option.AddResource<TerminalResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<TerminalResource>(
+                    "Monica.DevOps.Terminal", "Navigation:Category", 60,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Terminal);
+
                 registry.RegisterLocalizedPage<UITerminalPage, TerminalResource>(
                     UITerminalPage.PAGE_URL,
                     "Pages:Terminal:Title",
                     MoIcons.Terminal,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
-                    navOrder: 58)));
+                    navOrder: 58);
+            }));
     }
 }
 

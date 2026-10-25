@@ -53,19 +53,11 @@ public class ModuleSystemUI : MonicaModule<ModuleSystemUIOption>, IUIModule
 
     private static void RegisterNavigation(INavigationRegistryBuilder registry)
     {
-        var workbenchCategory = registry.RegisterLocalizedCategory<ModuleSystemResource>(
-            "monica.module.workbench",
-            "Navigation:Title",
-            order: 10,
-            parentId: BuiltInNavigationCategoryIds.Module,
-            icon: MoIcons.Workflow,
-            descriptionKey: "Navigation:Description");
-
         registry.RegisterLocalizedPage<ModuleSystemPage, ModuleSystemResource>(
             ModuleSystemPage.MODULE_SYSTEM_DASHBOARD_URL,
             "Sections:Overview",
             MoIcons.Dashboard,
-            workbenchCategory,
+            BuiltInNavigationCategoryIds.Module,
             addToNav: true,
             navOrder: 10,
             accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleSystemUIOption>),
@@ -82,7 +74,7 @@ public class ModuleSystemUI : MonicaModule<ModuleSystemUIOption>, IUIModule
                 $"{ModuleSystemPage.MODULE_SYSTEM_DASHBOARD_URL}/{segment}",
                 labelKey,
                 icon,
-                workbenchCategory,
+                BuiltInNavigationCategoryIds.Module,
                 addToNav,
                 order,
                 accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleSystemUIOption>),

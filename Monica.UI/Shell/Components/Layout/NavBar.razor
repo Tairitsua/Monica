@@ -12,7 +12,7 @@
         <span class="breadcrumb-category">@ActiveCategory?.DisplayName</span>
         @if (ActiveItem is not null)
         {
-            <MoIcon Icon="@MoIcons.ChevronRight" Size="20px" />
+            <span class="breadcrumb-divider" aria-hidden="true">/</span>
             <span class="breadcrumb-page">@ActiveItem.ResolveText(LocalizationCatalog)</span>
         }
     </div>
@@ -56,20 +56,24 @@
             @foreach (var category in AllCategories)
             {
                 <div @key="category.Id" class="rail-category @(IsSelectedCategory(category) ? "selected" : null)" data-navigation-category-id="@category.Id.Value">
-                    @if (Shell.SidebarCollapsed)
-                    {
-                        <MudIconButton @ref="_contextNavigationTriggers[category.Id]" Icon="@GetCategoryIcon(category)"
-                                       OnClick="@(() => OpenContextNavigation(category))"
-                                       title="@category.DisplayName" aria-label="@category.DisplayName"
-                                       aria-expanded="@(IsContextCategoryOpen(category) ? "true" : "false")"
-                                       aria-controls="mo-context-navigation" />
-                    }
-                    else
-                    {
-                        <MudIconButton Icon="@GetCategoryIcon(category)" OnClick="@(() => SelectCategory(category))"
-                                       title="@category.DisplayName" aria-label="@category.DisplayName"
-                                       aria-pressed="@(category == SelectedCategory ? "true" : "false")" />
-                    }
+                    <MudTooltip Text="@category.DisplayName" Placement="Placement.Right" Delay="0" Duration="0" Arrow="false"
+                                Class="mo-navigation-rail-tooltip" Visible="@(_visibleCategoryTooltipId == category.Id)"
+                                VisibleChanged="@((bool visible) => SetCategoryTooltipVisible(category.Id, visible))">
+                        @if (Shell.SidebarCollapsed)
+                        {
+                            <MudIconButton @ref="_contextNavigationTriggers[category.Id]" Icon="@GetCategoryIcon(category)"
+                                           OnClick="@(() => OpenContextNavigation(category))"
+                                           aria-label="@category.DisplayName"
+                                           aria-expanded="@(IsContextCategoryOpen(category) ? "true" : "false")"
+                                           aria-controls="mo-context-navigation" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@GetCategoryIcon(category)" OnClick="@(() => SelectCategory(category))"
+                                           aria-label="@category.DisplayName"
+                                           aria-pressed="@(category == SelectedCategory ? "true" : "false")" />
+                        }
+                    </MudTooltip>
                 </div>
             }
         </nav>
@@ -82,6 +86,7 @@
     </div>
     <div class="sidebar-context">
         <div class="sidebar-identity"><NavBarBrand ShowIcon="false" Contextual="true" /></div>
+        <div class="sidebar-pages">
         <div class="sidebar-navigation-label">@L["NavBar:Explore"]</div>
         @if (SelectedCategory is { } selected)
         {
@@ -90,6 +95,13 @@
                 <NavigationTree @key="selected.Id" Group="@selected" ActiveItem="@ActiveItem" ShowPageIcons="false" />
             </MudNavMenu>
         }
+        </div>
+        <div class="sidebar-footer">
+            <button type="button" class="sidebar-collapse" @onclick="Shell.ToggleSidebarAsync">
+                <MoIcon Icon="@MoIcons.CollapseSidebar" Size="16px" />
+                <span>@L["NavBar:CollapseSidebar"]</span>
+            </button>
+        </div>
     </div>
 </aside>
 
@@ -119,26 +131,25 @@
 
 <MudDrawer Open="@_mobileNavigationOpen" OpenChanged="MobileNavigationChanged"
            Variant="DrawerVariant.Temporary" Width="min(320px, 90vw)" Elevation="0"
-           Class="mo-mobile-navigation">
+           Class="mo-mobile-navigation" aria-label="@L["NavBar:Navigation"]">
     <div class="mobile-navigation-content" @onkeydown="HandleDrawerKeyDown">
         @if (_mobileNavigationOpen)
         {
         <MudFocusTrap>
             <div class="mobile-navigation-header">
-                <NavBarBrand />
+                <NavBarBrand ShowIcon="false" Contextual="true" />
                 <MudIconButton Icon="@MoIcons.Close" OnClick="CloseMobileNavigation"
                                aria-label="@L["NavBar:CloseNavigation"]" />
             </div>
             <CascadingValue Value="@((MudBlazor.Interfaces.INavigationEventReceiver)this)" IsFixed="true">
-            <MudNavMenu aria-label="@L["NavBar:Navigation"]">
+            <nav class="mobile-navigation-tree" aria-label="@L["NavBar:Navigation"]">
+                <div class="sidebar-navigation-label">@L["NavBar:Explore"]</div>
                 @foreach (var category in AllCategories)
                 {
-                    <MudNavGroup Title="@category.DisplayName" Icon="@GetCategoryIcon(category)" ExpandIcon="@MoIcons.ChevronDown"
-                                 Expanded="@(category == ActiveCategory)">
-                        <NavigationTree Group="@category" ActiveItem="@ActiveItem" />
-                    </MudNavGroup>
+                    <MoNavigationGroup @key="category.Id" Group="@category" ActiveItem="@ActiveItem"
+                                       IsRoot="true" ShowGroupIcon="true" InitiallyExpanded="false" />
                 }
-            </MudNavMenu>
+            </nav>
             </CascadingValue>
         </MudFocusTrap>
         }

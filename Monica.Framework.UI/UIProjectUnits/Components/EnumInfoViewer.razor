@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Globalization
 @using Monica.ProjectUnits.Facades
 @using Monica.Core.Results
@@ -78,7 +79,7 @@
                 }
                 @if (!_loading && _loadError is null && _enumGroups.Count == 0)
                 {
-                    <p class="enum-info-viewer__empty">@L["EnumInfoViewer:States:Empty"]</p>
+                    <MoContentState Compact="true"><p>@L["EnumInfoViewer:States:Empty"]</p></MoContentState>
                 }
             </div>
         </section>
@@ -108,7 +109,7 @@
                 }
                 else
                 {
-                    <p class="enum-info-viewer__empty">@L["EnumInfoViewer:States:SelectAssembly"]</p>
+                    <MoContentState Compact="true"><p>@L["EnumInfoViewer:States:SelectAssembly"]</p></MoContentState>
                 }
             </div>
         </section>
@@ -146,7 +147,7 @@
                 }
                 else
                 {
-                    <p class="enum-info-viewer__empty">@L["EnumInfoViewer:States:SelectEnum"]</p>
+                    <MoContentState Compact="true"><p>@L["EnumInfoViewer:States:SelectEnum"]</p></MoContentState>
                 }
             </div>
         </section>

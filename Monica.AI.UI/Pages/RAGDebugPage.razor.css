@@ -29,10 +29,8 @@ code { font-family: var(--mo-font-family-mono); overflow-wrap: anywhere; }
 .submitted-request p { margin: 4px 0 0; font-size: 13px; line-height: 1.55; }
 .submitted-request .submitted-query { font-size: 16px; }
 .search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.empty-state { padding: 28px; border: 1px dashed var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); }
-.empty-state h2 { margin-top: 12px; }
-.empty-state p, .scope-empty { font-size: 14px; line-height: 1.6; }
-.loading-state { display: flex; align-items: center; gap: 12px; padding: 24px; }
+.empty-state { border: 1px dashed var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); }
+.empty-state p { font-size: 14px; line-height: 1.6; }
 @container retrieval (max-width: 1079px) {
  .retrieval-grid { grid-template-columns: minmax(0,1fr); gap: 18px; }
  .scope-desktop { display: none; }
@@ -42,4 +40,4 @@ code { font-family: var(--mo-font-family-mono); overflow-wrap: anywhere; }
  .scope-list { max-height: 360px; }
 }
 @container query (max-width: 540px) { .query-settings { grid-template-columns: minmax(0,1fr); gap: 8px; } }
-@media (max-width: 600px) { .rag-debug-page { padding: 20px; } .query-workbench, .scope-body, .submitted-request { padding: 16px 20px; } .empty-state { padding: 20px; } }
+@media (max-width: 600px) { .rag-debug-page { padding: 20px; } .query-workbench, .scope-body, .submitted-request { padding: 16px 20px; } }

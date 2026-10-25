@@ -47,8 +47,4 @@ internal static class ProfilingDisplayFormatter
         return $"{count / 1_000_000.0:F1}M";
     }
 
-    public static string FormatLocalTime(DateTime timestamp)
-    {
-        return timestamp.ToLocalTime().ToString("HH:mm:ss");
-    }
 }

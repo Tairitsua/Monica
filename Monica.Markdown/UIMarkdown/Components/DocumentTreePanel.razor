@@ -20,10 +20,10 @@
                       Class="tree-search" />
     </div>
 
-    <div class="tree-content">
-        @if (_treeItems is null || _treeItems.Count == 0)
+    <div class="tree-content @(IsTreeEmpty ? "tree-content--empty" : null)">
+        @if (IsTreeEmpty)
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="pa-4 empty-state">
+            <MoContentState Compact="true" Class="tree-empty-state">
                 <MoIcon Icon="@MoIcons.SearchOff"
                          Size="2.25rem"
                          Class="tree-empty-icon" />
@@ -32,7 +32,7 @@
                         ? L["MarkdownViewer:States:NoMatchingDocuments"]
                         : L["MarkdownViewer:States:NoDocumentsFound"])
                 </MudText>
-            </MudStack>
+            </MoContentState>
         }
         else
         {
@@ -77,6 +77,8 @@
     private MarkdownDocumentNodeData? _selectedValue;
     private List<DocumentTreeItemBuilder.DocumentTreeItem>? _treeItems;
     private bool HasSearchText => !string.IsNullOrWhiteSpace(_searchText);
+
+    private bool IsTreeEmpty => _treeItems is null || _treeItems.Count == 0;
 
     private string? SearchText
     {

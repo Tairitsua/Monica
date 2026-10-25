@@ -20,6 +20,7 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
     internal string Search { get; private set; } = navigation.Search;
     internal string? ExecutionNode { get; private set; }
     internal IReadOnlyList<K8SNamespaceInfo>? Namespaces { get; private set; }
+    internal K8SNamespaceInventoryResult? NamespaceCapture { get; private set; }
     internal K8SResourceListResult? Capture { get; private set; }
     internal K8SReadFailure? ReadFailure { get; private set; }
     internal string? ContextFailure { get; private set; }
@@ -28,6 +29,7 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
     internal string ActivityIdentity { get; private set; } = string.Empty;
     internal bool IsInitialized { get; private set; }
     internal bool ContextMatchesCapture => Capture is not null && Capture.Namespace == Namespace && Capture.ResourceType == ResourceType;
+    internal bool ContextMatchesNamespaceCapture => NamespaceCapture is not null && NamespaceCapture.Namespace == Namespace;
     internal bool NamespaceExists => Namespaces?.Any(x => x.Name == Namespace && x.Exists && x.IsInScope) == true;
     internal bool CanOperate => !IsBusy && !IsRetired && NamespaceExists && ContextMatchesCapture;
     internal int SelectedCount => _selected.Count;
@@ -57,7 +59,7 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         Search = context.Search ?? string.Empty;
         _selected.Clear();
         RememberContext();
-        await ReadListCoreAsync(token);
+        await AdoptContextCoreAsync(token);
     });
 
     internal Task PersistBrowserAsync(IBrowserStorage storage)
@@ -81,7 +83,7 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         _contextVersion++;
         _selected.Clear();
         RememberContext();
-        await ReadListCoreAsync(token);
+        await AdoptContextCoreAsync(token);
     });
 
     internal void SetSearch(string value)
@@ -219,14 +221,23 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         var namespaceName = Namespace;
         var type = ResourceType;
         await SetActivityAsync(K8SInventoryActivity.Reading, namespaceName, type, token);
-        var response = await facade.ListResourcesAsync(namespaceName, type, token);
+        var response = await facade.ListNamespaceInventoryAsync(namespaceName, token);
         token.ThrowIfCancellationRequested();
         if (response.IsFailed(out var error, out var list)) ReadFailure = new(namespaceName, type, error.Message ?? string.Empty);
         else
         {
-            Capture = list;
-            _selected.IntersectWith(list.Items.Select(K8SResourceIdentity.From));
+            NamespaceCapture = list;
+            Capture = list.ForResourceType(type);
+            _selected.IntersectWith(Capture.Items.Select(K8SResourceIdentity.From));
         }
+    }
+
+    private Task AdoptContextCoreAsync(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!ContextMatchesNamespaceCapture) return ReadListCoreAsync(token);
+        Capture = NamespaceCapture!.ForResourceType(ResourceType);
+        return Task.CompletedTask;
     }
 
     private void RememberContext()

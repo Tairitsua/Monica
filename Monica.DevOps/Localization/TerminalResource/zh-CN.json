@@ -99,5 +99,8 @@
   "Input": {
     "Placeholder": "输入命令",
     "Helper": "每条命令后 Shell 状态都会重置。使用 cd 更改此会话的目录。"
+  },
+  "Navigation": {
+    "Category": "终端"
   }
 }

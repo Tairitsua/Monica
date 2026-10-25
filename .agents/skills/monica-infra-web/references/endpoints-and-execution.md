@@ -1,5 +1,7 @@
 # Request endpoints and execution
 
+The execution-pipeline UI formats its plan-capture timestamp with the shell's shared Clock display policy in `$monica-infra-ui` (`references/time-display.md`); the catalog's captured instant and pipeline behavior are unchanged.
+
 ## Transport-independent application calls
 
 `ApplicationService`, `ServiceBase`, `DomainService`, and `IResultRequest` are owned by `Monica.Application.Abstractions`; request validation is in `Monica.Application.Validation`. `AddWebApi()` composes `AddApplication()` for the shared mediator, authorization and DataAnnotations validation path. `AddApplication()` alone publishes no HTTP endpoints. Standard authorization no longer requires a permission-bit enum; use `AddAuthorization<TEnum>` only for that model.
@@ -20,6 +22,8 @@ With an application model, generated request receivers require a local implement
 For a host containing several local domains, configure `AddAutoControllers(configureCrud: options => options.RoutePath = "api/v1/{domain}")`. The literal `{domain}` token expands using the concrete controller assembly's declared role or domain core, yielding routes such as `api/v1/Ordering/order`. It is not a caller-supplied route value or the current host's single domain. An unowned controller using this token fails endpoint composition. Explicit controller Route attributes still override the global prefix. The default prefix remains `api/v1/[controller]` for standalone compatibility.
 
 `AddAutoModel()` registers model snapshots and expression operations. Its optional Web status route is `/auto-model/status` when the common minimal-API switch permits it. `EnableActiveMode` limits AutoModel fields to those marked `AutoField`; most other AutoModel switches control naming, ignored attributes, or diagnostics. Avoid turning on `EnableTitleAsActivateName`: the property is marked obsolete and unimplemented.
+
+The ProjectUnit domain-event tester uses the shared JSON editor in `$monica-infra-ui` (`references/json.md`) for its event draft. Formatting and syntax feedback do not publish events; its explicit Publish command retains the framework serialization, deserialization and dispatch behavior.
 
 ProjectUnit HTTP endpoints follow request-owned metadata and execute through the shared typed execution pipeline. `AddProjectUnits()` owns architecture discovery and requires EventBus; its optional request filter is off unless `EnableRequestFilter` is selected. The pipeline is also used outside HTTP: authorization and execution timing install filtered behaviors for business operations. Do not bypass it with a second ad hoc controller path for the same request contract.
 

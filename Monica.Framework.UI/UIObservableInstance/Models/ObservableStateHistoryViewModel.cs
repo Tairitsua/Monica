@@ -79,11 +79,6 @@ public class ObservableStateHistoryViewModel
     public string CurrentStateDisplay => FormatStateDisplay(CurrentState);
 
     /// <summary>
-    /// Formatted timestamp
-    /// </summary>
-    public string TimestampDisplay => Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff");
-
-    /// <summary>
     /// Exception message (if exception exists)
     /// </summary>
     public string ExceptionMessage => Exception?.GetMessageRecursively() ?? string.Empty;

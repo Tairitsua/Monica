@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Kafka.UIEventBusKafka.State
 @inject IStringLocalizer<EventBusKafkaResource> L
 @{ var metrics = FilteredMetrics; }
@@ -6,19 +7,24 @@
     <section class="performance-sampling">
         <div class="performance-sampling-copy"><p>@L["Performance:Evidence:OffsetBased"]</p></div>
         <div class="performance-controls">
-            <MudSwitch T="bool" Value="@State.IsPerformanceAutoRefreshEnabled" ValueChanged="SetAutoRefreshAsync" Color="Color.Primary"
-                       Disabled="@(IsBusy || !State.CanAdminSelectedCluster)" Label="@L["Performance:Live:AutoRefresh"]" />
+            <div class="performance-auto-refresh">
+                <MudSwitch T="bool" Value="@State.IsPerformanceAutoRefreshEnabled" ValueChanged="SetAutoRefreshAsync" Color="Color.Primary"
+                           Disabled="@(IsBusy || !State.CanAdminSelectedCluster)" Label="@L["Performance:Live:AutoRefresh"]" />
+            </div>
             <div class="performance-interval-control">
                 <MudNumericField T="int" Value="@State.PerformanceRefreshIntervalSeconds" ValueChanged="SetRefreshIntervalAsync"
-                                 Label="@L["Performance:Live:IntervalSeconds"]" HelperText="@L["Performance:Live:IntervalHint", KafkaPerformancePollingState.MinimumRefreshIntervalSeconds, KafkaPerformancePollingState.MaximumRefreshIntervalSeconds]"
+                                 Label="@L["Performance:Live:IntervalSeconds"]" HelperId="performance-interval-hint"
                                  Min="@KafkaPerformancePollingState.MinimumRefreshIntervalSeconds" Max="@KafkaPerformancePollingState.MaximumRefreshIntervalSeconds"
                                  Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(IsBusy || !State.CanAdminSelectedCluster || !State.IsPerformanceAutoRefreshEnabled)" />
             </div>
-            <KafkaPrimaryButton StartIcon="@MoIcons.HeartPulse"
-                       Disabled="@(IsBusy || State.IsPerformanceSampling || !State.CanAdminSelectedCluster)" OnClick="OnCapture">
-                @if (State.IsPerformanceSampling) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
-                @L["Performance:Actions:Capture"]
-            </KafkaPrimaryButton>
+            <div class="performance-capture">
+                <KafkaPrimaryButton StartIcon="@MoIcons.HeartPulse"
+                           Disabled="@(IsBusy || State.IsPerformanceSampling || !State.CanAdminSelectedCluster)" OnClick="OnCapture">
+                    @if (State.IsPerformanceSampling) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    @L["Performance:Actions:Capture"]
+                </KafkaPrimaryButton>
+            </div>
+            <p class="performance-interval-hint" id="performance-interval-hint">@L["Performance:Live:IntervalHint", KafkaPerformancePollingState.MinimumRefreshIntervalSeconds, KafkaPerformancePollingState.MaximumRefreshIntervalSeconds]</p>
         </div>
     </section>
     @if (!string.IsNullOrWhiteSpace(State.PerformanceSamplingError ?? State.LatestPerformanceError))
@@ -72,7 +78,7 @@
                 <RowTemplate>
                     <MudTd DataLabel="@($"{L["Performance:Columns:Topic"]} / {L["Performance:Columns:ConsumerGroup"]}")">
                         <div class="performance-context"><span class="performance-topic">@context.TopicName</span><span>@L["Performance:Columns:ConsumerGroup"]: @context.GroupId</span>
-                            <span class="performance-captured">@L["Performance:Columns:CapturedAt"]: @context.CapturedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")</span></div>
+                            <span class="performance-captured">@L["Performance:Columns:CapturedAt"]: @UiTime.Format(context.CapturedAt)</span></div>
                     </MudTd>
                     <MudTd DataLabel="@L["Performance:Columns:RetainedMessages"]">@KafkaMetricDisplayFormatter.FormatOptionalInt64(context.TotalRetainedMessageCount, L["Performance:Values:RetainedMessagesUnknown"])</MudTd>
                     <MudTd DataLabel="@($"{L["Performance:Columns:WriteRate"]} / {L["Performance:Columns:ConsumeRate"]}")"><div class="performance-rates"><span>@L["Performance:Columns:WriteRate"]: @KafkaMetricDisplayFormatter.FormatRate(context.WriteRatePerSecond, L)</span><span>@L["Performance:Columns:ConsumeRate"]: @KafkaMetricDisplayFormatter.FormatRate(context.ConsumeRatePerSecond, L)</span></div></MudTd>
@@ -99,7 +105,7 @@
         .Where(metric => string.IsNullOrWhiteSpace(_metricsFilter) || metric.TopicName.Contains(_metricsFilter.Trim(), StringComparison.OrdinalIgnoreCase) || metric.GroupId.Contains(_metricsFilter.Trim(), StringComparison.OrdinalIgnoreCase))
         .OrderBy(metric => metric.TopicName, StringComparer.OrdinalIgnoreCase).ThenBy(metric => metric.GroupId, StringComparer.OrdinalIgnoreCase).ToList() ?? [];
     private string LiveStatus => State.IsPerformanceSampling ? L["Performance:Live:Sampling"] :
-        State.LastPerformanceCapturedAt is { } capturedAt ? L["Performance:Live:LastCapturedAt", capturedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")] :
+        State.LastPerformanceCapturedAt is { } capturedAt ? L["Performance:Live:LastCapturedAt", UiTime.Format(capturedAt)] :
         State.IsPerformanceAutoRefreshEnabled ? L["Performance:Live:WaitingForFirstSample"] : L["Performance:Live:Paused"];
     private Task SetAutoRefreshAsync(bool enabled) => State.SetPerformanceAutoRefreshAsync(enabled);
     private Task SetRefreshIntervalAsync(int seconds) => State.SetPerformanceRefreshIntervalAsync(seconds);

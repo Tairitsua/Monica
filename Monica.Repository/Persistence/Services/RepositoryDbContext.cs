@@ -305,7 +305,18 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         CachedServiceProvider.GetService<UnitOfWorkManager>()?.ValidateSave(this);
     }
 
-    void IRepositoryContextLifetime.ValidateDatabaseAccess()
+    /// <summary>
+    /// Validates native database access against this context's save state, operation lifetime,
+    /// transaction participation, and physical adapter ownership before provider I/O begins.
+    /// </summary>
+    /// <remarks>
+    /// Provider APIs that bypass EF command interceptors, such as binary COPY, must call this method
+    /// immediately before access. It performs no database I/O, starts no transaction, and does not
+    /// apply save policies. Callers still own provider-specific prerequisites and failure handling.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The context or operation is failed, terminal, or not a selected participant.</exception>
+    /// <exception cref="NotSupportedException">A physical adapter does not share its owner's connection and transaction.</exception>
+    public void ValidateDatabaseAccess()
     {
         // Save owns its internal commands and rollback/savepoint cleanup. Outside it, native EF access
         // must obey the same operation lifetime and participant selection as tracked saves.

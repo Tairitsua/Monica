@@ -12,6 +12,9 @@
     "ConfigurationDebug": {
       "Title": "配置调试"
     },
+    "ConfigurationSources": {
+      "Title": "运行时配置来源"
+    },
     "ConfigurationStorage": {
       "Title": "配置存储"
     }
@@ -401,7 +404,10 @@
       "TargetMonica": "Monica 存储",
       "TargetExternal": "外部来源",
       "UnavailableDefinition": "{0}（元数据不可用）",
-      "RetiredDefinition": "{0}（已退役）"
+      "RetiredDefinition": "{0}（已退役）",
+      "ReversedDates": "开始日期不能晚于结束日期。",
+      "MissingBoundary": "所选日期在配置时区中没有有效的日期边界，请选择其他日期。",
+      "RepeatedBoundary": "所选日期在配置时区中存在重复的日期边界，请选择其他日期。"
     },
     "States": {
       "Empty": "未找到历史记录。"
@@ -486,7 +492,7 @@
       "QueryPending": "等待查询成功。",
       "AllDefinitions": "全部定义",
       "AllDates": "全部日期",
-      "DateRange": "{0} — {1}（本地时间）",
+      "DateRange": "{0} — {1}",
       "OpenStart": "起始",
       "OpenEnd": "至今",
       "Actions": "操作",
@@ -544,7 +550,11 @@
       "Unavailable": "无法加载所选快照的比较结果。"
     },
     "Definitions": {
-      "Empty": "未捕获配置定义。"
+      "Empty": "未捕获配置定义。",
+      "ViewAll": "查看完整定义清单",
+      "Search": "查找定义",
+      "NoMatches": "没有匹配的定义。",
+      "FullIdentity": "完整定义标识"
     },
     "Actions": {
       "ComparePrevious": "与前一个保留快照比较",
@@ -647,10 +657,11 @@
       "LatestHelp": "纳入捕获范围的配置变更完成后自动保存。这份历史快照与当前生效值是不同的数据。",
       "CapturedAt": "捕获时间",
       "CaptureGroup": "捕获变更组",
+      "OperatorId": "操作人标识",
       "CapturedDefinitions": "捕获范围",
       "TriggeredBy": "触发定义",
       "RetainedEvidence": "已保留证据",
-      "LedgerHelp": "查看已加载快照的完整标识、捕获定义和操作审计。",
+      "LedgerHelp": "比较历史快照、了解捕获范围，需要时展开查看完整标识。",
       "Loaded": "已加载 {0} 个快照",
       "Filter": "筛选已加载快照",
       "Matched": "显示 {0} / {1} 个已加载快照",
@@ -695,7 +706,7 @@
     }
   },
   "Storage": {
-    "Subtitle": "查看运行时来源贡献、已注册存储能力和已记录的操作。",
+    "Subtitle": "查看已注册的存储能力和已记录的操作。",
     "Empty": "未注册配置存储。",
     "Roles": {
       "EffectiveValues": "有效值",
@@ -719,8 +730,6 @@
       "NotRegistered": "未注册"
     },
     "Workbench": {
-      "SourcesTab": "运行时来源",
-      "StoresTab": "存储实现",
       "AcceptedAt": "接收时间",
       "SourceCount": "{0} 个运行时来源",
       "OverviewHelp": "注册信息描述能力；操作记录描述最近报告的结果。",
@@ -1119,6 +1128,7 @@
     "State": "配置值",
     "History": "变更记录",
     "Versions": "版本",
+    "Sources": "运行时来源",
     "Storage": "存储",
     "Debug": "诊断",
     "Catalog": "配置定义",

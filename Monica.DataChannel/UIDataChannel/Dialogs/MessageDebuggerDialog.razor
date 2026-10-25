@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.Json
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.Models
 @using Monica.DataChannel.Middlewares
 @using Monica.DataChannel.Pipeline
@@ -61,7 +63,7 @@
                                 <div class="debugger-message__summary">
                                     <span class="debugger-message__source" data-source="@message.Source">@SourceLabel(message.Source)</span>
                                     <code title="@message.MessageType">@message.MessageType</code>
-                                    <time>@message.Timestamp.ToUniversalTime().ToString("HH:mm:ss.fff 'UTC'")</time>
+                                    <time>@UiTime.Format(message.Timestamp)</time>
                                     <MudButton Size="Size.Small" Color="Color.Primary" OnClick="() => _selectedMessage = message" aria-label="@L["Debugger:InspectMessage", message.Sequence]">@L["Channel:Actions:Inspect"]</MudButton>
                                 </div>
                                 <p class="debugger-message__preview">@Preview(message.FormattedContent)</p>
@@ -77,7 +79,7 @@
                         <div>
                             <span>@L["Debugger:SelectedEvidence", selected.Sequence]</span>
                             <h3 id="debugger-inspector-title">@selected.MessageType</h3>
-                            <p>@SourceLabel(selected.Source) · @DataChannelPresentation.Timestamp(selected.Timestamp)</p>
+                            <p>@SourceLabel(selected.Source) · @UiTime.Format(selected.Timestamp)</p>
                         </div>
                         <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" OnClick="() => _selectedMessage = null" aria-label="@L["Debugger:CloseSelection"]" />
                     </header>
@@ -89,7 +91,7 @@
                         <MudTabPanel Text="@L["Debugger:Tabs:FormattedContent"]">
                             <div class="debugger-inspector__tab">
                                 <h4>@L["Debugger:Tabs:FormattedContent"]</h4>
-                                <pre class="debugger-payload">@selected.FormattedContent</pre>
+                                <MoJson Value="@selected.FormattedContent" AllowPlainText="true" />
                             </div>
                         </MudTabPanel>
                         <MudTabPanel Text="@L["Debugger:Tabs:PayloadSnapshot"]">

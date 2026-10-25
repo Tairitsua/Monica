@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.Json
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.AI.Mcp.Models
 @using Monica.AI.UI.Shared.Components
@@ -28,7 +30,7 @@
     {
         @RenderCatalog()
     }
-    else if (_state?.Error is null) { <div class="initial-loading" role="status">@L["Capabilities:Administration:Loading"]</div> }
+    else if (_state?.Error is null) { <MoContentState Loading="true">@L["Capabilities:Administration:Loading"]</MoContentState> }
 </div>
 
 @code {
@@ -79,7 +81,7 @@
                                 <span class="entry-source">@GetSourceText(catalogEntry)</span>
                             </button>
                         }
-                        @if (_state.VisibleEntries.Count == 0) { <MudText Typo="Typo.body2" Class="catalog-empty">@L[_state.CurrentEntries.Count == 0 ? "Capabilities:Administration:CatalogEmpty" : "Capabilities:Administration:NoMatches"]</MudText> }
+                        @if (_state.VisibleEntries.Count == 0) { <MoContentState Compact="true"><MudText Typo="Typo.body2">@L[_state.CurrentEntries.Count == 0 ? "Capabilities:Administration:CatalogEmpty" : "Capabilities:Administration:NoMatches"]</MudText></MoContentState> }
                     </div>
                 </div>
             </aside>
@@ -163,7 +165,7 @@
                         {
                             <MudAlert Icon="@(result.Success ? MoIcons.Success : MoIcons.Error)" Severity="@(result.Success ? Severity.Success : Severity.Error)" Dense="true">@FormatConnectivityMessage(result)</MudAlert>
                             <dl class="probe-facts">
-                                <div><dt>@L["Capabilities:Administration:TestedAt"]</dt><dd title="@result.TestedAt.ToLocalTime().ToString("O")">@result.TestedAt.ToLocalTime().ToString("g")</dd></div>
+                                <div><dt>@L["Capabilities:Administration:TestedAt"]</dt><dd title="@UiTime.Format(result.TestedAt)">@UiTime.Format(result.TestedAt)</dd></div>
                                 <div><dt>@L["Capabilities:Administration:Duration", result.Duration.TotalMilliseconds.ToString("0")]</dt><dd>@L["Capabilities:Administration:ToolCount", result.ToolCount]</dd></div>
                             </dl>
                             @if (result.ToolNames is { Count: > 0 } toolNames) { <p class="technical">@string.Join(", ", toolNames)</p> }
@@ -208,7 +210,9 @@
                                 }
                                 @if (!string.IsNullOrWhiteSpace(context.ParametersSchemaJson))
                                 {
-                                    <MudExpansionPanels Elevation="0" Dense="true" Class="schema-panels"><MudExpansionPanel Text="@L["Capabilities:Tool:Schema"]" Icon="@MoIcons.Braces"><pre class="diagnostic-block">@context.ParametersSchemaJson</pre></MudExpansionPanel></MudExpansionPanels>
+                                    <div class="schema-disclosure">
+                                        <MudExpansionPanels Elevation="0" Dense="true"><MudExpansionPanel Text="@L["Capabilities:Tool:Schema"]" Icon="@MoIcons.Braces"><MoJson Value="@context.ParametersSchemaJson" ShowLineNumbers="false" /></MudExpansionPanel></MudExpansionPanels>
+                                    </div>
                                 }
                             </MudTd>
                         </RowTemplate>

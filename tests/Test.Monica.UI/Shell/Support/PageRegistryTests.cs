@@ -339,20 +339,36 @@ public sealed class PageRegistryTests
             order: 450);
         registry.Seal();
 
-        var ids = registry.GetNavigationCategories().Select(static category => category.Id).ToArray();
+        var ids = registry.GetNavigationCategories()
+            .Where(static category => category.ParentId is null)
+            .Select(static category => category.Id)
+            .ToArray();
 
         ids.Should().ContainInOrder(
-            BuiltInNavigationCategoryIds.AI,
-            BuiltInNavigationCategoryIds.KnowledgeRetrieval,
-            BuiltInNavigationCategoryIds.Documentation,
-            BuiltInNavigationCategoryIds.Configuration,
-            NavigationCategoryId.Create("Tairitsua.Monica.GachaPool"),
-            BuiltInNavigationCategoryIds.Infrastructure,
-            BuiltInNavigationCategoryIds.Module,
-            BuiltInNavigationCategoryIds.TaskScheduling,
+            BuiltInNavigationCategoryIds.Intelligence,
+            BuiltInNavigationCategoryIds.Platform,
             BuiltInNavigationCategoryIds.Monitor,
+            BuiltInNavigationCategoryIds.Infrastructure,
+            NavigationCategoryId.Create("Tairitsua.Monica.GachaPool"),
+            BuiltInNavigationCategoryIds.Documentation,
             BuiltInNavigationCategoryIds.Debug,
             BuiltInNavigationCategoryIds.Uncategorized);
+    }
+
+    [Fact]
+    public void BuiltInCategories_ShouldNestCapabilitiesUnderStableRootIdentities()
+    {
+        var registry = new PageRegistry();
+        registry.Seal();
+        var categories = registry.GetNavigationCategories().ToDictionary(static category => category.Id);
+
+        categories[BuiltInNavigationCategoryIds.AI].ParentId.Should().Be(BuiltInNavigationCategoryIds.Intelligence);
+        categories[BuiltInNavigationCategoryIds.KnowledgeRetrieval].ParentId.Should().Be(BuiltInNavigationCategoryIds.Intelligence);
+        categories[BuiltInNavigationCategoryIds.Module].ParentId.Should().Be(BuiltInNavigationCategoryIds.Platform);
+        categories[BuiltInNavigationCategoryIds.Configuration].ParentId.Should().Be(BuiltInNavigationCategoryIds.Platform);
+        categories[BuiltInNavigationCategoryIds.TaskScheduling].ParentId.Should().Be(BuiltInNavigationCategoryIds.Monitor);
+        categories[BuiltInNavigationCategoryIds.Module].Order.Should()
+            .BeLessThan(categories[BuiltInNavigationCategoryIds.Configuration].Order);
     }
 
     [Fact]

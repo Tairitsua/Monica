@@ -1,3 +1,6 @@
+@using Monica.UI.Shared.Components.States
+@using Monica.Profiling.UIRuntimeMetrics.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Profiling.TypeAllocation.Models
 @using Monica.Profiling.UIMemoryAnalysis.Support
 @inject TypeAllocationPanelStateFactory StateFactory
@@ -26,7 +29,7 @@
             </p>
             @if (State.LiveCapturedAt is { } liveRead)
             {
-                <div class="allocation-collector__read"><span>@L["Allocation:Sources:ViewRead"]</span><time datetime="@liveRead.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(liveRead)</time></div>
+                <div class="allocation-collector__read"><span>@L["Allocation:Sources:ViewRead"]</span><time datetime="@liveRead.ToString("O")">@UiTime.Format(liveRead)</time></div>
             }
         </header>
         <div class="allocation-actions">
@@ -76,7 +79,7 @@
         <div class="allocation-action-result" data-action="@action.Operation" data-action-status="@((int)action.Status)" role="status">
             <span>@L["Allocation:Action:Title"]</span><strong>@ActionLabel(action.Operation)</strong>
             <span>@L[action.IsSuccessful ? "Allocation:Action:Completed" : "Allocation:Action:Failed"]</span>
-            <code>@((int)action.Status)</code><time datetime="@action.CompletedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(action.CompletedAt)</time>
+            <code>@((int)action.Status)</code><time datetime="@action.CompletedAt.ToString("O")">@UiTime.Format(action.CompletedAt)</time>
             @if (!string.IsNullOrEmpty(action.Message)) { <p>@action.Message</p> }
         </div>
     }
@@ -95,11 +98,11 @@
                 <span>@SourceLabel(snapshot?.DataSource ?? TypeAllocationDataSource.None)</span>
                 @if (snapshot is not null)
                 {
-                    <span>@L["Allocation:Sources:Timestamp"] <time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(snapshot.Timestamp)">@MemoryAnalysisDisplayFormatter.LocalSnapshotTime(snapshot.Timestamp)</time></span>
+                    <span>@L["Allocation:Sources:Timestamp"] <time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(snapshot.Timestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(snapshot.Timestamp))</time></span>
                 }
                 @if (view.CapturedAt is { } capturedAt)
                 {
-                    <span>@L["Allocation:Sources:ViewRead"] <time datetime="@capturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(capturedAt)</time></span>
+                    <span>@L["Allocation:Sources:ViewRead"] <time datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time></span>
                 }
             </div>
             @if (heap && State.IsCollecting) { <p class="allocation-preserved">@L["Allocation:Sources:Preserved"]</p> }
@@ -170,6 +173,7 @@
             else
             {
                 <div class="allocation-empty">
+                    <MoContentState Loading="@(Busy && snapshot is null)">
                     @if (Busy && snapshot is null)
                     {
                         <MudProgressCircular Indeterminate="true" Size="Size.Small" /><p>@L["Common:LoadingValue"]</p>
@@ -179,6 +183,7 @@
                         <MoIcon Icon="@MoIcons.Shapes" aria-hidden="true" Size="1.5rem" />
                         <h3>@EmptyTitle(view)</h3><p>@EmptyHelp(view)</p>
                     }
+                    </MoContentState>
                 </div>
             }
         </div>

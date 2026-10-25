@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -19,7 +20,7 @@
                 {
                     <time datetime="@RuntimeMetricsDisplayFormatter.MachineTime(DataPoint.Timestamp)"
                           title="@RuntimeMetricsDisplayFormatter.MachineTime(DataPoint.Timestamp)">
-                        @L["Vitals:Sampled", RuntimeMetricsDisplayFormatter.LocalTime(DataPoint.Timestamp)]
+                        @L["Vitals:Sampled", UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(DataPoint.Timestamp))]
                     </time>
                 }
                 else

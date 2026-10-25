@@ -15,3 +15,19 @@
 }
 .mud-popover.mo-navbar-menu-popover--overview { border-radius: 12px; margin-top: 8px; }
 .mo-mobile-navigation { background: var(--mo-color-navigation-context-background); }
+
+/* Category hints use a surface popover beside the scrolling icon rail. */
+:root .mud-tooltip.mo-navigation-rail-tooltip,
+:root[data-theme] .mud-tooltip.mo-navigation-rail-tooltip {
+    padding: 7px 11px;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 5px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-shadow: var(--mud-elevation-2);
+    font-family: var(--mud-typography-default-family);
+    font-size: .8125rem;
+    font-weight: 400;
+    line-height: 1.45;
+    pointer-events: none;
+}

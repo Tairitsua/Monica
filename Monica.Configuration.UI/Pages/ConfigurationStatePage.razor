@@ -129,7 +129,7 @@
                                                                        IsSchemaValid="@attempt.IsSchemaValid"
                                                                        Issues="@attempt.Issues.Select(issue => ConfigurationValidationPresentation.FromRuntime(issue, actualOptions: true)).ToArray()"
                                                                        JumpRequested="JumpToRuntimeValidationIssueAsync">
-                                                                        <MudText Typo="Typo.caption">@L["Validation:ObservedAt", attempt.AttemptedAt.LocalDateTime]</MudText>
+                                                                        <MudText Typo="Typo.caption">@L["Validation:ObservedAt", TimeDisplay.Format(attempt.AttemptedAt)]</MudText>
                                                                         <MudText Typo="Typo.caption">@L["Validation:Attempt", attempt.AttemptId]</MudText>
                                                                         <MudText Typo="Typo.caption">@(string.IsNullOrEmpty(attempt.OptionsName) ? L["Validation:DefaultName"].Value : attempt.OptionsName)</MudText>
                                                                     </ConfigurationValidationReportView>
@@ -221,9 +221,11 @@
 
             @if (_loadingDefinitions)
             {
-                <MudPaper Outlined="true" Class="pa-6 configuration-loading">
+                <MudPaper Outlined="true">
+                    <MoContentState Loading="true">
                     <MudProgressCircular Indeterminate="true" />
                     <MudText>@L["Common:States:Loading"]</MudText>
+                    </MoContentState>
                 </MudPaper>
             }
             else

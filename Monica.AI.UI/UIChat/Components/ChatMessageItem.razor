@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Windows.Input
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
@@ -44,7 +45,7 @@
                 <span class="waiting-label"><MudProgressCircular Size="Size.Small" Indeterminate="true" />@L["Workbench:Waiting"]</span>
             }
             <footer class="message-footer">
-                <time datetime="@Message.CreatedAt.ToString("O")">@Message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</time>
+                <time datetime="@Message.CreatedAt.ToString("O")">@UiTime.FormatTime(Message.CreatedAt)</time>
                 @if (Status is ChatExecutionStatus.Cancelled or ChatExecutionStatus.Interrupted or ChatExecutionStatus.AwaitingApproval)
                 {
                     <MudText Typo="Typo.caption" Color="@ChatExecutionPresentation.StatusColor(Status.Value)">@ChatExecutionPresentation.Status(Status.Value, L)</MudText>

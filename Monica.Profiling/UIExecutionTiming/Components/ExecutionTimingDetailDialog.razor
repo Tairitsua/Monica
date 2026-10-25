@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.ExecutionTiming.Models
 @using Monica.UI.Shared.Components.Dialogs
@@ -7,7 +8,7 @@
     <TitleContent><MoDialogHeading Text="@(Completed is null ? L["Details:RunningTitle"] : L["Details:CompletedTitle"])" /></TitleContent>
     <DialogContent>
         <div class="timing-detail">
-            <p class="timing-detail-capture">@L["Details:CaptureHelp"] <time datetime="@ExecutionTimingDisplayFormatter.FormatMachineDateTime(CapturedAt)">@ExecutionTimingDisplayFormatter.FormatDateTime(CapturedAt)</time></p>
+            <p class="timing-detail-capture">@L["Details:CaptureHelp"] <time datetime="@ExecutionTimingDisplayFormatter.FormatMachineDateTime(CapturedAt)">@UiTime.Format(CapturedAt)</time></p>
             <dl class="timing-detail-identity">
                 <div><dt>@L["Details:DisplayName"]</dt><dd>@(Completed?.DisplayName ?? Running?.DisplayName)</dd></div>
                 <div><dt>@L["Details:OperationKey"]</dt><dd><code>@(Completed?.OperationKey ?? Running?.OperationKey)</code></dd></div>

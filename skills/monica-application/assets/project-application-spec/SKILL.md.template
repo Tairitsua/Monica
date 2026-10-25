@@ -9,4 +9,4 @@ Load `$monica-application` and this skill before application design or code chan
 
 Read [the application specification](references/application-specification.md) for the actual architecture, local conventions and extensions, validation, and migration gaps. Load the unified architecture and relevant ProjectUnit references for the affected work.
 
-Reconcile impacted specification facts and rules in the same change. Apply shared specification evolution before adopting a new pattern or deviation; keep its rationale and exact approved scope with the owning rule.
+Compose existing units and documented capabilities within their adopted contracts. Reconcile impacted specification facts and rules in the same change. Apply shared specification evolution only when a concrete architectural contract must change or is missing; keep its rationale and exact approved scope with the owning rule.

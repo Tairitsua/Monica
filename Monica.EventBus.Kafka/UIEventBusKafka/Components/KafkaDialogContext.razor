@@ -2,11 +2,17 @@
 <dl class="kafka-dialog-context">
     @if (!string.IsNullOrWhiteSpace(ClusterId))
     {
-        <div><dt>@L["Common:Labels:ClusterId"]</dt><dd>@ClusterId</dd></div>
+        <div class="kafka-dialog-context__cluster">
+            <dt><MoIcon Icon="@MoIcons.Server" Size="1rem" />@L["Common:Labels:ClusterId"]</dt>
+            <dd>@ClusterId</dd>
+        </div>
     }
     @if (!string.IsNullOrWhiteSpace(TopicName))
     {
-        <div><dt>@L["Common:Labels:Topic"]</dt><dd>@TopicName</dd></div>
+        <div class="kafka-dialog-context__topic">
+            <dt><MoIcon Icon="@MoIcons.Layers" Size="1rem" />@L["Common:Labels:Topic"]</dt>
+            <dd>@TopicName</dd>
+        </div>
     }
 </dl>
 @code {

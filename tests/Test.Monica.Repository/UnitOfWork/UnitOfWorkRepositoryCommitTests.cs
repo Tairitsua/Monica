@@ -109,11 +109,26 @@ public sealed class UnitOfWorkRepositoryCommitTests
         if (fail) await Assert.ThrowsAsync<ApplicationException>(operation);
         else await operation();
         Assert.Null(manager.Current);
+        Assert.Throws<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().ValidateDatabaseAccess());
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(() => Task.CompletedTask, cancellationToken: Token));
         scope.Resolve<TestRepositoryDbContext>().Add(new SoftDeleteAuditRow { Title = "stale" });
         await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().SaveChangesAsync(Token));
         await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().SoftDeleteRows
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Title, "stale SQL"), Token));
+    }
+
+    [Fact]
+    public async Task ValidateDatabaseAccess_WhenOperationIsRollbackOnly_ShouldRejectNativeAccess()
+    {
+        await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(scope =>
+        {
+            var db = scope.Resolve<TestRepositoryDbContext>();
+            db.ValidateDatabaseAccess();
+            scope.Resolve<IUnitOfWorkManager>().Current!.MarkRollbackOnly();
+            Assert.Throws<InvalidOperationException>(db.ValidateDatabaseAccess);
+            return Task.CompletedTask;
+        }, cancellationToken: Token));
     }
 
     [Fact]

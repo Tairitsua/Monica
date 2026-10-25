@@ -188,7 +188,7 @@
         "UnknownCount": "Target identifiers: {0}"
       },
       "Scope": "Host snapshot · since process start",
-      "SnapshotTime": "Captured {0} UTC",
+      "SnapshotTime": "Captured {0}",
       "EvidenceNote": "Counts describe Monica-observed server-to-client send tasks. Task completion does not confirm receipt by a client.",
       "Loading": "Loading send evidence…",
       "LoadFailed": "Send evidence could not be loaded. Try refreshing again.",
@@ -200,8 +200,7 @@
       "TargetPageInfo": "{first_item}–{last_item} of {all_items}",
       "LastStarted": "Last started",
       "LastCompleted": "Last finished",
-      "NoTimestamp": "Not observed",
-      "UtcTime": "{0} UTC"
+      "NoTimestamp": "Not observed"
     },
     "MethodListener": {
       "Title": "Browser callbacks",
@@ -325,5 +324,8 @@
       "ListenerToggleFailed": "Failed to update the listener state: {0}",
       "ConnectionStatusChanged": "Connection status changed: {0}"
     }
+  },
+  "Navigation": {
+    "Category": "SignalR"
   }
 }

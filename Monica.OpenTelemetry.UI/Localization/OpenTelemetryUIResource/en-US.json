@@ -165,7 +165,7 @@
     "Finite": "{0} finite / {1} retained",
     "RecordedValue": "Recorded value",
     "Unitless": "No declared unit",
-    "PlotHelp": "Every finite retained value is positioned by its actual UTC observation time. Nonfinite values remain in the ledger and break the line; the plot does not invent missing samples.",
+    "PlotHelp": "Every finite retained value is positioned by its actual observation time. Nonfinite values remain in the ledger and break the line; the plot does not invent missing samples.",
     "Omitted": "{0} nonfinite values are retained in the ledger and omitted from plotting.",
     "NoSamples": "No retained observations are available for this series.",
     "NoFiniteSamples": "The retained values are all nonfinite. Inspect the raw ledger; there is no finite plot or distribution.",
@@ -195,5 +195,8 @@
     "SeriesKey": "Exact series key",
     "FiniteCount": "Finite retained samples",
     "NonFiniteCount": "Nonfinite retained samples"
+  },
+  "Navigation": {
+    "Category": "Telemetry"
   }
 }

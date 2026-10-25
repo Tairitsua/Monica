@@ -21,7 +21,8 @@ internal sealed class K8SStateFixture
         })));
         var discovery = new K8SResourceDiscoveryService(Provider);
         var localizer = new EchoStringLocalizer<K8SResource>();
-        Facade = new(new K8SClusterService(Store, discovery, Provider, NullLogger<K8SClusterService>.Instance),
+        Cluster = new K8SClusterService(Store, discovery, Provider, NullLogger<K8SClusterService>.Instance);
+        Facade = new(Cluster,
             new K8SRestartService(discovery, Store, Provider), new K8SScaleService(discovery, Store, Provider),
             new K8SMessageLocalizer(localizer), localizer, NullLogger<K8SFacade>.Instance);
     }
@@ -29,6 +30,7 @@ internal sealed class K8SStateFixture
     internal ControlledK8SProvider Provider { get; } = new();
     internal ControlledK8SConfigStore Store { get; }
     internal K8SFacade Facade { get; }
+    internal K8SClusterService Cluster { get; }
 }
 
 internal sealed class ControlledK8SProvider : IK8SProvider

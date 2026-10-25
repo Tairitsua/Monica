@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Profiling.UIRuntimeMetrics.Components
 @using Monica.Profiling.UIMemoryAnalysis.Support
 @inject IServiceProvider ServiceProvider
@@ -15,7 +16,7 @@
             <div class="memory-observation-controls"><MudSwitch T="bool" Value="_state.AutoRefresh" ValueChanged="SetAutoRefresh" Disabled="@(!_state.CanAutoRefresh)" Color="Color.Primary" Label="@L["Page:Actions:AutoRefresh"]" />
                 <MudButton @ref="_refreshButton" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" Disabled="_state.IsLoading">@L["Page:Actions:Refresh"]</MudButton></div>
             <div class="memory-observation-freshness"><span>@PollingLabel</span>
-                @if (_state.SnapshotCapturedAt is { } capturedAt) { <span>@L["Page:Captured"] <time data-memory-view-capture datetime="@capturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(capturedAt)</time></span> }
+                @if (_state.SnapshotCapturedAt is { } capturedAt) { <span>@L["Page:Captured"] <time data-memory-view-capture datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time></span> }
             </div>
         }
     </Actions>

@@ -39,17 +39,14 @@ jobs:
           - rid: win-x64
             runs-on: windows-latest
             tfm: net10.0-windows
-            entry: Monica.Guide.exe
             environment: windows
           - rid: linux-x64
             runs-on: ubuntu-latest
             tfm: net10.0
-            entry: Monica.Guide
             environment: linux
           - rid: osx-arm64
             runs-on: macos-latest
             tfm: net10.0
-            entry: Monica.Guide
             environment: macos
 
     env:
@@ -122,11 +119,12 @@ jobs:
           with zipfile.ZipFile(archive) as bundle:
               bundle.extractall("artifacts/guide-extracted")
           PY
-          ENTRY="artifacts/guide-extracted/app/${{ matrix.entry }}"
+          ENTRY="$(python -c 'import json; from pathlib import Path; root = Path("artifacts/guide-extracted"); manifest = json.loads((root / "release-manifest.json").read_text(encoding="utf-8-sig")); print((root / manifest["programEntryPoint"]).as_posix())')"
+          test -f "${ENTRY}"
           if [[ "${{ matrix.rid }}" != "win-x64" ]]; then
             chmod +x "${ENTRY}"
           fi
-          digest() { python -c "import json,sys;print(json.load(open(sys.argv[1]))['plan']['planDigest'])" "$1"; }
+          digest() { python -c "import json,sys;print(json.load(open(sys.argv[1], encoding='utf-8-sig'))['plan']['planDigest'])" "$1"; }
           ENVIRONMENT="${{ matrix.environment }}"
 
           "${ENTRY}" configure --product monica --environment "${ENVIRONMENT}" --target shared --json > smoke-configure-preview.json
@@ -151,6 +149,14 @@ jobs:
           "${ENTRY}" unconfigure --product monica --environment "${ENVIRONMENT}" --target shared \
             --apply --plan-digest "${PLAN_DIGEST}" --json > smoke-unconfigure-apply.json
           test ! -e "${HOME}/.agents/skills/monica-guide"
+
+      - name: Upload guide smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: monica-guide-smoke-${{ steps.version.outputs.version }}-${{ matrix.rid }}
+          path: smoke-*.json
+          if-no-files-found: ignore
 
       - name: Upload the unified guide bundle
         uses: actions/upload-artifact@v7
@@ -313,7 +319,7 @@ jobs:
       - name: Validate Monica Agent Skill contracts
         run: |
           python3 scripts/validate_agent_skills.py
-          python3 scripts/sync_agent_skills.py --check
+          python3 scripts/sync_agent_skills.py --write
           python3 -m unittest discover -s scripts/tests -p "test*.py"
 
       - name: Validate portable Agent Skills

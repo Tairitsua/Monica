@@ -67,6 +67,7 @@
     <Project Path="tests/Test.Monica.ServiceDiscovery/Test.Monica.ServiceDiscovery.csproj" />
     <Project Path="tests/Test.Monica.SignalR/Test.Monica.SignalR.csproj" />
     <Project Path="tests/Test.Monica.StateStore.StackExchange/Test.Monica.StateStore.StackExchange.csproj" />
+    <Project Path="tests/Test.Monica.StateStore/Test.Monica.StateStore.csproj" />
     <Project Path="tests/Test.Monica.Tool/Test.Monica.Tool.csproj" />
     <Project Path="tests/Test.Monica.UI/Test.Monica.UI.csproj" />
   </Folder>

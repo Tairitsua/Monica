@@ -219,8 +219,8 @@ AppPackages/
 BundleArtifacts/
 Package.StoreAssociation.xml
 
-# Rider bridge local MCP config
-.idea/rider-native-rename-mcp.json
+# JetBrains IDE per-machine state
+.idea/
 _pkginfo.txt
 *.appx
 *.appxbundle
@@ -368,6 +368,7 @@ FodyWeavers.xsd
 /NuGet.Config
 /rules/mudblazor/src
 .auto-claude
+
 .claude/worktrees/
 
 .playwright-cli
@@ -379,6 +380,5 @@ temp/
 .zcode/
 .zcodeignore
 
-# Local UI modernization designs and verification evidence
-/.ui-design/ui-modernization/
-/.ui-design/ui-modernization-v2/
+# Local UI design prototypes and verification evidence
+.ui-design/

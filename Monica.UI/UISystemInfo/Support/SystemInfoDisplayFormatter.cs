@@ -43,22 +43,4 @@ public static class SystemInfoDisplayFormatter
         return $"{Math.Max(0, bytes).ToString("N0", culture)} B";
     }
 
-    /// <summary>Formats a timestamp with its UTC offset for evidence inspection.</summary>
-    public static string FormatDateTime(DateTimeOffset timestamp, CultureInfo culture)
-    {
-        ArgumentNullException.ThrowIfNull(culture);
-        return timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", culture);
-    }
-
-    /// <summary>Formats an optional evidence timestamp, using an em dash when no physical timestamp exists.</summary>
-    public static string FormatDateTime(DateTimeOffset? timestamp, CultureInfo culture) =>
-        timestamp is { } value ? FormatDateTime(value, culture) : "—";
-
-    /// <summary>Formats only the local time portion of a timestamp.</summary>
-    public static string FormatTime(DateTimeOffset timestamp, CultureInfo culture)
-    {
-        ArgumentNullException.ThrowIfNull(culture);
-        return timestamp.ToLocalTime().ToString("HH:mm:ss", culture);
-    }
-
 }

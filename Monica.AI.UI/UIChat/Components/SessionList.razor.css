@@ -3,11 +3,11 @@
 .session-heading { display: flex; align-items: center; justify-content: space-between; min-height: 32px; margin-bottom: 14px; font-size: 1rem; font-weight: 500; }
 .session-header ::deep .new-chat-button { justify-content: flex-start; width: 100%; min-height: 40px; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--mud-palette-primary) 6%, var(--mud-palette-surface)); border-color: color-mix(in srgb, var(--mud-palette-primary) 25%, var(--mud-palette-lines-default)); text-transform: none; font-weight: 500; }
 .session-list-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 16px; }
+.session-list-content.is-empty { display: flex; flex-direction: column; padding: 0; }
+.session-list-content.is-empty ::deep .mo-content-state { flex: 1; }
 .session-group + .session-group { margin-top: 22px; }
 .session-group-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 8px; color: var(--mud-palette-text-secondary); font-size: .6875rem; font-weight: 600; letter-spacing: .035em; }
 .session-count { font-variant-numeric: tabular-nums; color: var(--mud-palette-text-secondary); font-weight: 400; }
-.empty-sessions, .session-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 36px 18px; text-align: center; color: var(--mud-palette-text-secondary); font-size: .8125rem; }
-.empty-sessions small { color: var(--mud-palette-text-secondary); line-height: 1.6; }
 .session-footer { padding: 8px 12px 14px; border-top: 1px solid var(--mud-palette-lines-default); }
 .session-footer ::deep .archive-manager-button { justify-content: flex-start; width: 100%; padding: 8px 10px; text-transform: none; color: var(--mud-palette-text-secondary); font-size: .8125rem; }
 .session-footer ::deep .mud-button-label { width: 100%; justify-content: flex-start; }

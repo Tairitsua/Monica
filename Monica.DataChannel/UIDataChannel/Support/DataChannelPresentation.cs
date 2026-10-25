@@ -38,7 +38,6 @@ internal static class DataChannelPresentation
         PipelineComponentKind.InfoDisplayMiddleware => "Information",
         PipelineComponentKind.BaseMiddleware => "Base", _ => "Unknown"
     };
-    public static string Timestamp(DateTime value) => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.CurrentCulture);
     public static string Group(string? groupId, IStringLocalizer<DataChannelResource> localizer) =>
         string.IsNullOrEmpty(groupId) ? localizer["Workbench:Ungrouped"].Value : groupId;
 }

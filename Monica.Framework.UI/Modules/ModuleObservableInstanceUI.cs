@@ -47,22 +47,27 @@ public class ModuleObservableInstanceUI : MonicaModule<ModuleObservableInstanceU
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<ObservableInstanceResource>(
+                    "Monica.Framework.UI.ObservableInstances", "Navigation:Category", 10,
+                    parentId: BuiltInNavigationCategoryIds.Debug,
+                    icon: MoIcons.Pulse);
+
                 registry.RegisterLocalizedPage<UIObservableInstanceMonitorPage, ObservableInstanceResource>(
                     UIObservableInstanceMonitorPage.PAGE_URL,
                     "Pages:ObservableInstance:Title",
                     MoIcons.Package,
-                    BuiltInNavigationCategoryIds.Debug,
+                    category,
                     addToNav: true,
                     navOrder: 50);
                 registry.RegisterLocalizedPage<UIObservableInstanceRegistryPage, ObservableInstanceResource>(
                     UIObservableInstanceRegistryPage.PAGE_URL, "Workbench:InstancesTitle", MoIcons.Package,
-                    BuiltInNavigationCategoryIds.Debug, addToNav: true, navOrder: 51);
+                    category, addToNav: true, navOrder: 51);
                 registry.RegisterLocalizedPage<UIObservableInstanceGroupsPage, ObservableInstanceResource>(
                     UIObservableInstanceGroupsPage.PAGE_URL, "Workbench:GroupsTitle", MoIcons.Workspace,
-                    BuiltInNavigationCategoryIds.Debug, addToNav: true, navOrder: 52);
+                    category, addToNav: true, navOrder: 52);
                 registry.RegisterLocalizedPage<UIObservableInstanceExceptionsPage, ObservableInstanceResource>(
                     UIObservableInstanceExceptionsPage.PAGE_URL, "Workbench:ExceptionsTitle", MoIcons.Error,
-                    BuiltInNavigationCategoryIds.Debug, addToNav: true, navOrder: 53);
+                    category, addToNav: true, navOrder: 53);
             }));
     }
 

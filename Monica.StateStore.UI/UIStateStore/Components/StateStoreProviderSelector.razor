@@ -1,0 +1,48 @@
+@using Monica.StateStore.UI.Models
+@using Monica.StateStore.UI.Support
+@inject IStringLocalizer<StateStoreResource> L
+
+<HeadContent><link rel="stylesheet" href="_content/Monica.StateStore.UI/UIStateStore/provider-selector.css" /></HeadContent>
+<div class="provider-picker" data-open="@(_open ? "true" : "false")">
+    @if (Providers.Count > 1)
+    {
+        <MudSelect T="string" Class="provider-select" Value="@Provider.UniqueId" ValueChanged="OnSelected"
+                   @bind-Open="_open" Variant="Variant.Text" Underline="false" Margin="Margin.None"
+                   RelativeWidth="DropdownWidth.Ignore" PopoverClass="state-store-provider-popover" ListClass="state-store-provider-options"
+                   MaxHeight="420" SelectionOnEnter="true" aria-label="@L["KeyExplorer:Labels:ProviderScope"]"
+                   OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronDown">
+            <StateStoreProviderSelectHeading />
+            @foreach (var item in Providers)
+            {
+                <MudSelectItem T="string" Value="@item.UniqueId">@ProviderContent(item)</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else
+    {
+        <div class="provider-static">@ProviderContent(Provider)</div>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets the actual registration displayed as the current data context.</summary>
+    [Parameter, EditorRequired] public StateStoreProviderInfo Provider { get; set; } = null!;
+    /// <summary>Gets or sets registrations available for switching; a single registration has no menu.</summary>
+    [Parameter] public IReadOnlyList<StateStoreProviderInfo> Providers { get; set; } = [];
+    /// <summary>Gets or sets the callback that commits an exact, opaque registration identity.</summary>
+    [Parameter] public EventCallback<string> OnSelected { get; set; }
+    private bool _open;
+    private string? _identity;
+
+    protected override void OnParametersSet()
+    {
+        if (_identity != Provider.UniqueId || Providers.Count < 2) _open = false;
+        _identity = Provider.UniqueId;
+    }
+
+    private RenderFragment ProviderContent(StateStoreProviderInfo provider) => @<span class="provider-option" data-tone="@StateStoreUi.Tone(provider)">
+        <span class="provider-symbol"><MoIcon Icon="@StateStoreUi.Icon(provider)" Size="1.25rem" /></span>
+        <span class="provider-caption"><strong>@L.GetProviderDisplayName(provider)</strong><small class="provider-description">@L.GetProviderTypeText(provider.ProviderType) · @L[provider.IsDistributed ? "ProviderDetail:Labels:Distributed" : "ProviderDetail:Labels:LocalMemory"]</small></span>
+        @if (provider.UniqueId == Provider.UniqueId) { <span class="provider-selection-mark"><MoIcon Icon="@MoIcons.Check" Size="1.125rem" /></span> }
+    </span>;
+}

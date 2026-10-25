@@ -33,6 +33,7 @@ public partial class JobPolicyDialog : IAsyncDisposable
     [Inject] private IJobSchedulerUiAccess Access { get; set; } = null!;
     [Inject] private IStringLocalizer<JobSchedulerResource> L { get; set; } = null!;
     [Inject] private TimeProvider TimeProvider { get; set; } = null!;
+    [Inject] private SchedulerTimePresentation TimePresentation { get; set; } = null!;
 
     /// <summary>Gets or sets the exact definition used as the initial immutable optimistic policy baseline.</summary>
     /// <remarks>Changing parameters does not retarget an open editor; open a new native dialog for another job.</remarks>
@@ -53,8 +54,8 @@ public partial class JobPolicyDialog : IAsyncDisposable
         new(L["Policy:Identity:JobType"], L[$"JobTypes:{_state.Definition.Declaration.JobType}"]),
         new(L["Policy:Identity:ArgumentContract"], _state.Definition.Declaration.JobArgsKey ?? L["Common:NotAvailable"]),
         new(L["Policy:Identity:PolicyRevision"], _state.Definition.Policy.ConcurrencyStamp),
-        new(L["Policy:Identity:UpdatedAt"], _state.Definition.Policy.UpdatedAtUtc.UtcDateTime.ToString("u", CultureInfo.CurrentCulture)),
-        new(L["Policy:Identity:LastObserved"], _state.Definition.LastObservedAtUtc.UtcDateTime.ToString("u", CultureInfo.CurrentCulture))
+        new(L["Policy:Identity:UpdatedAt"], TimePresentation.FormatTimestamp(_state.Definition.Policy.UpdatedAtUtc)),
+        new(L["Policy:Identity:LastObserved"], TimePresentation.FormatTimestamp(_state.Definition.LastObservedAtUtc))
     ];
 
     protected override void OnParametersSet() => _lifetime.TryApply(() =>

@@ -1,7 +1,5 @@
 {
   "Navigation": {
-    "Title": "Module diagnostics",
-    "Description": "Trace startup health, performance, discovery, and module relationships.",
     "Descriptions": {
       "Overview": "Review startup health, composition totals, and module diagnostics.",
       "Performance": "Trace initialization timing, critical paths, and regressions.",

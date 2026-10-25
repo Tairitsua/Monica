@@ -1,0 +1,74 @@
+@using Microsoft.Extensions.DependencyInjection
+@using Monica.Core.Modularity.Diagnostics.Facades
+@using Monica.Core.Modularity.Diagnostics.Models
+@using Monica.Core.Results
+@using Monica.StateStore.UI.Models
+@using Monica.UI.Shell.Support
+@using Monica.UI.UIModuleSystem.Components
+@using Monica.UI.Shared.Components.States
+@inject IServiceProvider Services
+@inject OperationalPageAccessEvaluator Access
+@inject IStringLocalizer<StateStoreResource> L
+@implements IDisposable
+
+<div class="provider-options">
+    @if (Provider.OptionDiagnosticsTarget is null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Icon="@MoIcons.Info">@L["ProviderDetail:Messages:ConfigurationShared"]</MudAlert>
+    }
+    else if (_denied)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Icon="@MoIcons.Warning">@L["ProviderDetail:Messages:ConfigurationAccessDenied"]</MudAlert>
+    }
+    else if (_failed)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Icon="@MoIcons.Error">@L["ProviderDetail:Messages:ConfigurationLoadFailed"]<MudButton OnClick="LoadAsync">@L["ProviderDetail:Actions:RetryConfiguration"]</MudButton></MudAlert>
+    }
+    else if (_diagnostics is { } diagnostics)
+    {
+        @if (diagnostics.ProfileResolution == ModuleOptionProfileResolution.DefaultFallback)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Icon="@MoIcons.Info">@L["ProviderDetail:Messages:ConfigurationDefaultProfileFallback", diagnostics.RequestedProfileName ?? Provider.ServiceKey ?? string.Empty]</MudAlert>
+        }
+        <ModuleOptionDiagnosticsPanel Diagnostics="diagnostics" />
+    }
+    else
+    {
+        <MoContentState Loading="true" Compact="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /></MoContentState>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets the registration whose authorized module diagnostics are inspected.</summary>
+    [Parameter, EditorRequired] public StateStoreProviderInfo Provider { get; set; } = null!;
+    private ModuleOptionDiagnostics? _diagnostics;
+    private string? _identity;
+    private bool _failed, _denied, _disposed;
+    private int _version;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_identity == Provider.UniqueId) return;
+        _identity = Provider.UniqueId;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var version = ++_version;
+        var identity = Provider.UniqueId;
+        var target = Provider.OptionDiagnosticsTarget;
+        _diagnostics = null; _failed = false; _denied = false;
+        if (target is null) return;
+        var authorized = await Access.IsAuthorizedAsync();
+        if (_disposed || version != _version || identity != _identity) return;
+        if (!authorized) { _denied = true; return; }
+        var facade = Services.GetService<ModuleDiagnosticsFacade>();
+        if (facade is null) { _failed = true; return; }
+        var result = facade.GetModuleOptions(target.ModuleKey, target.ProfileSelector);
+        if (result.IsFailed(out _, out var diagnostics)) _failed = true;
+        else _diagnostics = diagnostics;
+    }
+
+    public void Dispose() { _disposed = true; _version++; }
+}

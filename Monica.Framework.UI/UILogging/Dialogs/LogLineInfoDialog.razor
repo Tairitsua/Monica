@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.Support
@@ -26,8 +27,8 @@
                 </section>
                 <dl class="log-inspector-context">
                     <div><dt>@L["Workbench:Inspector:Generation"]</dt><dd><code data-field="Generation">@(evidence.Source?.Generation ?? L["Workbench:Inspector:Missing"].Value)</code></dd></div>
-                    <div><dt>@L["Workbench:Inspector:ViewRead"]</dt><dd><time data-field="ViewReadAt" datetime="@evidence.ViewReadAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@(evidence.ViewReadAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? L["Workbench:Inspector:Missing"].Value)</time></dd></div>
-                    <div><dt>@L["Workbench:Inspector:InspectedAt"]</dt><dd><time data-field="InspectedAt" datetime="@evidence.InspectedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@evidence.InspectedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)</time></dd></div>
+                    <div><dt>@L["Workbench:Inspector:ViewRead"]</dt><dd><time data-field="ViewReadAt" datetime="@evidence.ViewReadAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@(evidence.ViewReadAt is { } viewedAt ? UiTime.Format(viewedAt) : L["Workbench:Inspector:Missing"].Value)</time></dd></div>
+                    <div><dt>@L["Workbench:Inspector:InspectedAt"]</dt><dd><time data-field="InspectedAt" datetime="@evidence.InspectedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@UiTime.Format(evidence.InspectedAt)</time></dd></div>
                 </dl>
                 <h3>@L["Workbench:Inspector:PositionTitle"]</h3>
                 <dl class="log-inspector-context log-inspector-context--positions">
@@ -40,7 +41,7 @@
                 else
                 {
                     <dl class="log-inspector-context">
-                        <div><dt>@L["Page:Components:LineInfo:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@line.Timestamp?.ToString("O", CultureInfo.InvariantCulture)">@(line.Timestamp?.ToString("O", CultureInfo.InvariantCulture) ?? L["Workbench:Inspector:Missing"].Value)</time></dd></div>
+                        <div><dt>@L["Page:Components:LineInfo:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@line.Timestamp?.ToString("O", CultureInfo.InvariantCulture)">@(line.Timestamp is { } timestamp ? UiTime.Format(timestamp) : L["Workbench:Inspector:Missing"].Value)</time></dd></div>
                         <div><dt>@L["Page:Components:LineInfo:Severity"]</dt><dd data-field="Severity">@(string.IsNullOrEmpty(line.LevelText) ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)</dd></div>
                         <div><dt>@L["Page:Components:LineInfo:Thread"]</dt><dd data-field="Thread">@(string.IsNullOrEmpty(line.Thread) ? L["Workbench:Inspector:Missing"].Value : line.Thread)</dd></div>
                     </dl>

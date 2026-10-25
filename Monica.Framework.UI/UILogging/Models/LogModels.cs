@@ -264,13 +264,6 @@ public sealed record LogLineViewModel
         };
     }
 
-    /// <summary>
-    /// Get formatted timestamp
-    /// </summary>
-    public string GetFormattedTimestamp()
-    {
-        return Timestamp?.ToString("yyyy-MM-dd HH:mm:ss.fff") ?? "N/A";
-    }
 }
 
 /// <summary>

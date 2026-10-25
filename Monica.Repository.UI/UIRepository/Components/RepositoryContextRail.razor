@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.Tool.Extensions
 @inject IStringLocalizer<RepositoryUIResource> L
 
@@ -6,15 +7,15 @@
     <MudTextField T="string" @bind-Value="_search" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="@L["Workbench:ContextSearch"]" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" />
     @if (IsLoading && Contexts.Count == 0)
     {
-        <div class="rail-state"><MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />@L["ContextRail:Loading"]</div>
+        <MoContentState Compact="true" Loading="true"><MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" /><span>@L["ContextRail:Loading"]</span></MoContentState>
     }
     else if (Contexts.Count == 0)
     {
-        <div class="rail-state">@L["ContextRail:Empty"]</div>
+        <MoContentState Compact="true">@L["ContextRail:Empty"]</MoContentState>
     }
     else if (!VisibleContexts.Any())
     {
-        <div class="rail-state">@L["Workbench:ContextNoMatches"]</div>
+        <MoContentState Compact="true">@L["Workbench:ContextNoMatches"]</MoContentState>
     }
     else
     {

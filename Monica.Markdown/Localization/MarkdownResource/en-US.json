@@ -49,6 +49,7 @@
       "DocumentTree": "Document tree",
       "ShowOutline": "Show outline",
       "HideOutline": "Hide outline",
+      "OutlineDescription": "Jump to a section in this document.",
       "NoOutlineAvailable": "The outline appears once the current document exposes headings.",
       "NoDocumentOutline": "Select a document to browse its outline."
     },
@@ -71,16 +72,11 @@
       "LoadDataFailed": "Failed to load markdown data: {0}"
     },
     "Metadata": {
-      "About": "About this document",
       "Author": "Author",
-      "Modified": "Last modified",
-      "Path": "Document path",
-      "Language": "Document language",
-      "Size": "File size",
-      "Bytes": "{0:N0} bytes",
-      "Fields": "Front matter",
-      "NoFrontMatter": "This document has no front matter.",
-      "Library": "Document library"
+      "Modified": "Last modified"
     }
+  },
+  "Navigation": {
+    "Category": "Markdown library"
   }
 }

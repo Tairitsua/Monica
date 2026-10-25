@@ -64,10 +64,10 @@
 
         @if (TimelineRows.Count == 0)
         {
-            <div class="timeline-waterfall__empty">
+            <MoContentState>
                 <MoIcon Icon="@MoIcons.ChartLine" Size="2.25rem" />
                 <p>@L["Performance:Waterfall:Empty"]</p>
-            </div>
+            </MoContentState>
         }
         else
         {

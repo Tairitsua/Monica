@@ -1,15 +1,8 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.StateStore.Abstractions
 @using Monica.StateStore.UI.Models
-@using Microsoft.Extensions.DependencyInjection
-@using Monica.Core.Modularity.Diagnostics.Facades
-@using Monica.Core.Modularity.Diagnostics.Models
-@using Monica.Core.Results
-@using Monica.UI.Shell.Support
-@using Monica.UI.UIModuleSystem.Components
 @using Monica.UI.Shared.Components.Dialogs
 @implements IDisposable
-@inject IServiceProvider Services
-@inject OperationalPageAccessEvaluator OperationalPageAccess
 @inject IStringLocalizer<StateStoreResource> L
 
 <MudDialog Visible="IsVisible" VisibleChanged="OnVisibleChanged" Options="DialogOptions"
@@ -73,56 +66,12 @@
 
                     <MudTabPanel Text="@L["ProviderDetail:Tabs:Options"]" Icon="@MoIcons.Settings">
                         <div class="provider-dialog__tab-content">
-                            <div class="provider-dialog__section">
-                                <div class="provider-dialog__section-header">
-                                    <div>
-                                        <MudText Typo="Typo.subtitle1">@L["ProviderDetail:Tabs:ConfigOptions"]</MudText>
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                            @L["ProviderDetail:Messages:ConfigurationDescription"]
-                                        </MudText>
-                                    </div>
-                                </div>
-
-                                @if (Provider.OptionDiagnosticsTarget is null)
-                                {
-                                    <MudAlert Class="state-dialog-info" Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">
-                                        @L["ProviderDetail:Messages:ConfigurationShared"]
-                                    </MudAlert>
-                                }
-                                else if (_optionDiagnosticsAccessDenied)
-                                {
-                                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">
-                                        @L["ProviderDetail:Messages:ConfigurationAccessDenied"]
-                                    </MudAlert>
-                                }
-                                else if (_optionDiagnosticsFailed)
-                                {
-                                    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">
-                                        @L["ProviderDetail:Messages:ConfigurationLoadFailed"]
-                                        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadOptionDiagnosticsAsync">
-                                            @L["ProviderDetail:Actions:RetryConfiguration"]
-                                        </MudButton>
-                                    </MudAlert>
-                                }
-                                else if (_optionDiagnostics is not null)
-                                {
-                                    @if (_optionDiagnostics.ProfileResolution == ModuleOptionProfileResolution.DefaultFallback)
-                                    {
-                                        <MudAlert Class="state-dialog-info" Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">
-                                            @L[
-                                                "ProviderDetail:Messages:ConfigurationDefaultProfileFallback",
-                                                _optionDiagnostics.RequestedProfileName ?? Provider.ServiceKey ?? string.Empty]
-                                        </MudAlert>
-                                    }
-                                    <ModuleOptionDiagnosticsPanel Diagnostics="@_optionDiagnostics" />
-                                }
-                                else
-                                {
-                                    <div class="provider-dialog__configuration-loading" role="status">
-                                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-                                    </div>
-                                }
-                            </div>
+                            <h3>@L["ProviderDetail:Tabs:ConfigOptions"]</h3>
+                            <p>@L["ProviderDetail:Messages:ConfigurationDescription"]</p>
+                            @if (IsVisible && _activeTabIndex == 1)
+                            {
+                                <StateStoreProviderOptions Provider="Provider" />
+                            }
                         </div>
                     </MudTabPanel>
                 </MudTabs>
@@ -153,11 +102,6 @@
 
     private string? _providerIdentity;
     private int _activeTabIndex;
-    private ModuleOptionDiagnostics? _optionDiagnostics;
-    private bool _optionDiagnosticsFailed;
-    private bool _optionDiagnosticsAccessDenied;
-    private int _optionLoadVersion;
-    private bool _disposed;
 
     protected override void OnParametersSet()
     {
@@ -165,12 +109,12 @@
         if (!string.Equals(_providerIdentity, providerIdentity, StringComparison.Ordinal))
         {
             _providerIdentity = providerIdentity;
-            ClearOptionDiagnostics(resetTab: true);
+            ResetTab();
         }
 
         if (!IsVisible)
         {
-            ClearOptionDiagnostics(resetTab: true);
+            ResetTab();
         }
     }
 
@@ -188,97 +132,19 @@
         IsVisible = isVisible;
         if (!isVisible)
         {
-            ClearOptionDiagnostics(resetTab: true);
+            ResetTab();
         }
 
         await IsVisibleChanged.InvokeAsync(isVisible);
     }
 
-    private async Task OnActiveTabChanged(int tabIndex)
-    {
-        if (tabIndex != 1)
-        {
-            ClearOptionDiagnostics(resetTab: false);
-            _activeTabIndex = tabIndex;
-            return;
-        }
+    private void OnActiveTabChanged(int tabIndex) => _activeTabIndex = tabIndex;
 
-        _activeTabIndex = tabIndex;
-        if (Provider?.OptionDiagnosticsTarget is not null
-            && _optionDiagnostics is null
-            && !_optionDiagnosticsFailed
-            && !_optionDiagnosticsAccessDenied)
-        {
-            await LoadOptionDiagnosticsAsync();
-        }
-    }
-
-    private async Task LoadOptionDiagnosticsAsync()
-    {
-        var target = Provider?.OptionDiagnosticsTarget;
-        if (target is null)
-        {
-            return;
-        }
-
-        var providerIdentity = _providerIdentity;
-        var requestVersion = ++_optionLoadVersion;
-        _optionDiagnostics = null;
-        _optionDiagnosticsFailed = false;
-        _optionDiagnosticsAccessDenied = false;
-
-        var isAuthorized = await OperationalPageAccess.IsAuthorizedAsync();
-        if (!CanApplyOptionLoad(requestVersion, providerIdentity))
-        {
-            return;
-        }
-
-        if (!isAuthorized)
-        {
-            _optionDiagnosticsAccessDenied = true;
-            return;
-        }
-
-        var facade = Services.GetService<ModuleDiagnosticsFacade>();
-        if (facade is null)
-        {
-            _optionDiagnosticsFailed = true;
-            return;
-        }
-
-        var result = facade.GetModuleOptions(target.ModuleKey, target.ProfileSelector);
-        if (result.IsFailed(out _, out var diagnostics))
-        {
-            _optionDiagnosticsFailed = true;
-            return;
-        }
-
-        _optionDiagnostics = diagnostics;
-    }
-
-    private bool CanApplyOptionLoad(int requestVersion, string? providerIdentity) =>
-        !_disposed
-        && requestVersion == _optionLoadVersion
-        && IsVisible
-        && _activeTabIndex == 1
-        && string.Equals(_providerIdentity, providerIdentity, StringComparison.Ordinal);
-
-    private void ClearOptionDiagnostics(bool resetTab)
-    {
-        _optionLoadVersion++;
-        _optionDiagnostics = null;
-        _optionDiagnosticsFailed = false;
-        _optionDiagnosticsAccessDenied = false;
-        if (resetTab)
-        {
-            _activeTabIndex = 0;
-        }
-    }
+    private void ResetTab() => _activeTabIndex = 0;
 
     public void Dispose()
     {
-        _disposed = true;
-        ClearOptionDiagnostics(resetTab: true);
+        ResetTab();
     }
 
     private string GetServiceKeyText(StateStoreProviderInfo provider)

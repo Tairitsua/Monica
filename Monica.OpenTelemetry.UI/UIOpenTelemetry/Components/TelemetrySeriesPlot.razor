@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.OpenTelemetry.UI.UIOpenTelemetry.Support
 @inject IStringLocalizer<OpenTelemetryUIResource> L
@@ -5,7 +6,7 @@
 <div class="telemetry-plot" data-omitted-values="@_geometry.OmittedValueCount">
     @if (_geometry.HasValues)
     {
-        <div class="plot-caption"><span>@L["Series:RecordedValue"] · @(string.IsNullOrEmpty(Unit) ? L["Series:Unitless"].Value : Unit)</span><span>UTC</span></div>
+        <div class="plot-caption"><span>@L["Series:RecordedValue"] · @(string.IsNullOrEmpty(Unit) ? L["Series:Unitless"].Value : Unit)</span></div>
         <div class="plot-grid">
             <div class="plot-values" aria-hidden="true">@foreach (var tick in _geometry.ValueTicks) { <span title="@Raw(tick.Value)">@AxisValue(tick.Value)</span> }</div>
             <svg class="plot-canvas" viewBox="0 0 1000 240" preserveAspectRatio="none" role="img" aria-labelledby="@_titleId" aria-describedby="@_descriptionId">
@@ -14,7 +15,7 @@
                 @foreach (var segment in _geometry.Segments.Where(segment => segment.Count > 1)) { <path class="plot-line" d="@Path(segment)" fill="none" vector-effect="non-scaling-stroke" /> }
                 @foreach (var point in _geometry.Points)
                 {
-                    <circle class="plot-point" cx="@Raw(point.X)" cy="@Raw(point.Y)" r="4" data-source-index="@point.SourceIndex" data-sample-timestamp="@point.TimestampUtc.ToString("O")" data-raw-value="@Raw(point.RawValue)"><title>@point.TimestampUtc.ToString("O") · @Raw(point.RawValue) @Unit</title></circle>
+                    <circle class="plot-point" cx="@Raw(point.X)" cy="@Raw(point.Y)" r="4" data-source-index="@point.SourceIndex" data-sample-timestamp="@point.TimestampUtc.ToString("O")" data-raw-value="@Raw(point.RawValue)"><title>@UiTime.Format(point.TimestampUtc) · @Raw(point.RawValue) @Unit</title></circle>
                 }
             </svg>
             <div class="plot-times" aria-hidden="true">
@@ -27,7 +28,7 @@
         </div>
         @if (_geometry.OmittedValueCount > 0) { <p class="plot-note">@L["Series:Omitted", _geometry.OmittedValueCount]</p> }
     }
-    else { <p class="plot-empty" role="status">@L[Samples.Count == 0 ? "Series:NoSamples" : "Series:NoFiniteSamples"]</p> }
+    else { <MoContentState role="status" Compact="true">@L[Samples.Count == 0 ? "Series:NoSamples" : "Series:NoFiniteSamples"]</MoContentState> }
 </div>
 
 @code {
@@ -48,8 +49,9 @@
         var duration = _geometry.TimeTicks.Count > 1
             ? _geometry.TimeTicks[^1].TimestampUtc - _geometry.TimeTicks[0].TimestampUtc
             : TimeSpan.Zero;
-        return value.ToString(duration < TimeSpan.FromMilliseconds(10) ? "HH:mm:ss.ffffff" :
-            duration < TimeSpan.FromSeconds(2) ? "HH:mm:ss.fff" : "HH:mm:ss", CultureInfo.InvariantCulture);
+        return duration < TimeSpan.FromSeconds(2)
+            ? UiTime.Format(value, duration < TimeSpan.FromMilliseconds(10) ? "HH:mm:ss.ffffff" : "HH:mm:ss.fff")
+            : UiTime.FormatTime(value);
     }
     private static string AxisValue(double value) => value.ToString(value != 0 && (Math.Abs(value) >= 100000 || Math.Abs(value) < .01) ? "0.##E+0" : "0.##", CultureInfo.CurrentCulture);
     private static string Path(IReadOnlyList<OpenTelemetrySeriesPlotPoint> points) => string.Join(" ", points.Select((point, index) => $"{(index == 0 ? "M" : "L")} {Raw(point.X)} {Raw(point.Y)}"));

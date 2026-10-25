@@ -36,12 +36,12 @@
             <div class="group-switcher-list">
                 @if (_refreshing)
                 {
-                    <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="group-switcher-empty">
+                    <MoContentState Loading="true" Compact="true">
                         <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
                         <MudText Typo="Typo.body2" Color="Color.Secondary">
                             @L["MarkdownViewer:States:RefreshingKnowledgeBases"]
                         </MudText>
-                    </MudStack>
+                    </MoContentState>
                 }
                 else if (RefreshError is not null)
                 {
@@ -49,14 +49,14 @@
                 }
                 else if (FilteredGroups.Count == 0)
                 {
-                    <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="group-switcher-empty">
+                    <MoContentState Compact="true">
                         <MoIcon Icon="@MoIcons.SearchOff"
                                  Size="2.25rem"
                                  Class="group-switcher-empty-icon" Style="color:var(--mud-palette-text-secondary);" />
                         <MudText Typo="Typo.body2" Color="Color.Secondary">
                             @GetEmptyStateText()
                         </MudText>
-                    </MudStack>
+                    </MoContentState>
                 }
                 else
                 {

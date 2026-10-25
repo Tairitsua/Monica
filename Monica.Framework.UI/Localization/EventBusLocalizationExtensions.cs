@@ -71,7 +71,7 @@ public static class EventBusLocalizationExtensions
     /// Builds the tooltip text describing the most recent error of a subscription's topic,
     /// or an empty string when no error was reported.
     /// </summary>
-    public static string BuildTopicRuntimeErrorTooltip(this IStringLocalizer localizer, SubscriptionViewModel subscription)
+    public static string BuildTopicRuntimeErrorTooltip(this IStringLocalizer localizer, SubscriptionViewModel subscription, Monica.UI.Shared.Services.MoTimeFormatter time)
     {
         if (subscription.TopicStatus is not { LastErrorMessage: { } message } status)
         {
@@ -79,7 +79,7 @@ public static class EventBusLocalizationExtensions
         }
 
         var occurredAt = status.LastErrorAt.HasValue
-            ? localizer.FormatEventBusRelativeTime(status.LastErrorAt.Value)
+            ? localizer.FormatEventBusRelativeTime(status.LastErrorAt.Value, time)
             : string.Empty;
         return localizer["SubscriptionTable:Labels:RuntimeError", message, occurredAt].Value;
     }
@@ -231,7 +231,7 @@ public static class EventBusLocalizationExtensions
     /// <summary>
     /// Formats a relative timestamp with localized units.
     /// </summary>
-    public static string FormatEventBusRelativeTime(this IStringLocalizer localizer, DateTime timestamp)
+    public static string FormatEventBusRelativeTime(this IStringLocalizer localizer, DateTime timestamp, Monica.UI.Shared.Services.MoTimeFormatter time)
     {
         var elapsed = DateTime.UtcNow - timestamp;
         if (elapsed < TimeSpan.Zero)
@@ -259,6 +259,6 @@ public static class EventBusLocalizationExtensions
             return localizer["Shared:RelativeTime:DaysAgo", (int)elapsed.TotalDays].Value;
         }
 
-        return timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff");
+        return time.Format(timestamp);
     }
 }

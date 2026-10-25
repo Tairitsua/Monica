@@ -15,7 +15,7 @@
     <KnowledgeRagHeader Title="@L["KnowledgeWorkbench:Chunking:Title"]" Description="@L["KnowledgeWorkbench:Chunking:Description"]" CurrentRoute="@PAGE_URL">
         <Actions><MudButton @ref="_refreshButton" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="LoadStateAsync" aria-disabled="@((_isLoading || _isTesting || MutationBusy) ? "true" : "false")">@L["ProviderManage:Refresh"]</MudButton></Actions>
     </KnowledgeRagHeader>
-    @if (_isLoading) { <div class="loading-state" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Chunking:Loading"]</div> }
+    @if (_isLoading) { <MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Chunking:Loading"]</MoContentState> }
     else if (!string.IsNullOrWhiteSpace(_loadError)) { <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_loadError <MudButton OnClick="LoadStateAsync">@L["KnowledgeWorkbench:Retrieval:Retry"]</MudButton></MudAlert> }
     else
     {
@@ -53,7 +53,7 @@
                             }
                         </article>
                     }
-                    @if (_routes.Count == 0) { <p>@L["KnowledgeWorkbench:Chunking:NoRoutes"]</p> }
+                    @if (_routes.Count == 0) { <MoContentState Compact="true">@L["KnowledgeWorkbench:Chunking:NoRoutes"]</MoContentState> }
                 </div>
             </section>
             <section class="test-panel">
@@ -66,7 +66,7 @@
                     <MudTextField T="string" @bind-Value="_testContent" Immediate="true" Label="@L["RAG:Chunker:TestContent"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="10" />
                     <div class="test-actions"><MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Flask" Disabled="@(_isTesting || string.IsNullOrWhiteSpace(_testChunkerId))" OnClick="RunChunkerTestAsync">@(_isTesting ? L["KnowledgeWorkbench:Chunking:Testing"] : L["RAG:Chunker:RunTest"])</MudButton></div>
                 </div>
-                @if (_isTesting) { <div class="inline-loading" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Chunking:Testing"]</div> }
+                @if (_isTesting) { <MoContentState Loading="true" Compact="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Chunking:Testing"]</MoContentState> }
                 else if (!string.IsNullOrWhiteSpace(_testError)) { <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_testError</MudAlert> }
                 else if (_testResult is { } test)
                 {
@@ -86,7 +86,7 @@
                         <MudTd DataLabel="@L["RAG:Chunker:Description"]">@context.Description</MudTd>
                         <MudTd DataLabel="@L["RAG:Chunker:Extensions"]"><div class="registry-extensions">@foreach (var extension in context.SupportedExtensions) { <code>@extension</code> }</div></MudTd>
                     </RowTemplate>
-                    <NoRecordsContent><div class="registry-empty">@L["KnowledgeWorkbench:Chunking:NoChunkers"]</div></NoRecordsContent>
+                    <NoRecordsContent><MoContentState Compact="true">@L["KnowledgeWorkbench:Chunking:NoChunkers"]</MoContentState></NoRecordsContent>
                 </MudTable>
             </div>
         </section>

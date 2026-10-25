@@ -15,6 +15,7 @@ using Monica.UI.Icons;
 using Monica.UI.Pages;
 using Monica.UI.Shell.Components;
 using Monica.UI.Shared.Components.Markdown;
+using Monica.UI.Shared.Services;
 using Monica.UI.Shell.State;
 using Monica.UI.Shell.Models;
 using Monica.UI.Shell.Support;
@@ -73,6 +74,7 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
             options.CatalogPageLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
             options.DefaultLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
         });
+        module.Require<ModuleClock, ModuleClockOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             options => options.AddResource<NavigationSearchResource>());
     }
@@ -80,6 +82,7 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
     /// <inheritdoc />
     public override void ConfigureServices(ModuleContext<ModuleShellUIOption> context)
     {
+        context.Services.AddSingleton<MoTimeFormatter>();
         context.Services.AddScoped<OperationalPageAccessEvaluator>();
         context.Services.AddScoped<NavigationSearchCatalog>();
         context.Services.AddScoped<ShellState>();
@@ -104,6 +107,12 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
 /// </summary>
 public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
 {
+    /// <summary>
+    /// Gets the shared page timestamp formats. The Clock module owns the timezone;
+    /// the defaults show seconds and omit timezone suffixes. Configure before host startup.
+    /// </summary>
+    public MoTimeDisplayOptions TimeDisplay { get; } = new();
+
     private readonly List<Action<INavigationRegistryBuilder>> _navigationContributions = [];
 
     /// <summary>

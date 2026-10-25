@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.StateStore.UI.Models
 @inject IStringLocalizer<StateStoreResource> L
 
@@ -14,15 +15,13 @@
 
     @if (IsLoading)
     {
-            <div class="provider-list-panel__state">
+            <MoContentState Loading="true" Compact="true">
                 <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-            </div>
+            </MoContentState>
     }
     else if (!Providers.Any())
     {
-            <MudAlert Severity="Severity.Info" Icon="@MoIcons.Info">
-                @L["ProviderList:Messages:NoProvidersFound"]
-            </MudAlert>
+            <MoContentState Compact="true"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["ProviderList:Messages:NoProvidersFound"]</p></MoContentState>
     }
     else
     {

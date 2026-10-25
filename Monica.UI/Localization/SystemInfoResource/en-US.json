@@ -177,5 +177,8 @@
       "RestartAlreadyRequested": "A restart request is already pending.",
       "RestartSchedulingFailed": "Failed to schedule the graceful shutdown request. See the host logs for details."
     }
+  },
+  "Navigation": {
+    "Category": "Host information"
   }
 }

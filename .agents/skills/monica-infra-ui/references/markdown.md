@@ -8,7 +8,7 @@ builder.AddMonica(monica =>
     monica.AddMarkdown()
         .AddDocumentGroup("handbook", "Handbook", "docs/handbook")
         .EnableMultilingualDocuments();
-    monica.AddMarkdownUI();
+    monica.AddMarkdownUI(options => options.EnableMinimalApi = true);
 });
 ```
 
@@ -60,7 +60,9 @@ var href = new MarkdownViewerLocation(
     "handbook", "getting-started.md", "installation", "en-US").ToRelativeUri();
 ```
 
-The toolbar owns group selection, document search, language selection, and pane toggles. The page measures the workspace content box after the shell, page gutters, and toolbar have consumed their space. The library can be pinned at an owner width of at least 1040px and height of at least 560px. The outline can be pinned at at least 1280px and 560px when the rendered document has headings at levels 1–3. Smaller or shorter owners use temporary native drawers; these start closed. Separate in-visit preferences restore each pinned pane when space becomes available. A document without qualifying headings has no open outline. When both panes are temporary, opening one closes the other.
+The viewer uses independent outlined library, article, and outline cards sharing the theme's Surface background. The library chooser belongs at the top of the document sidebar, above its tree; the article contains its own search, language, and pane commands above the breadcrumb and reading area. Pane visibility and all commands remain page-owned.
+
+Measure the workspace width and the marked reading-stage height below the article's inline toolbar, after the shell and page gutters have consumed their space. The existing instance-owned interop session observes both through one `ResizeObserver`; it rebinds the reading-stage target only when that element's identity changes. Do not introduce another observer owner or subtract the toolbar height a second time. The library can be pinned at an owner width of at least 1040px and reading-stage height of at least 560px. The outline can be pinned at at least 1280px and 560px when the rendered document has headings at levels 1–3. Smaller or shorter owners use temporary native drawers; these start closed. Separate in-visit preferences restore each pinned pane when space becomes available. A document without qualifying headings has no open outline. When both panes are temporary, opening one closes the other.
 
 Selecting a document closes its temporary library and queues focus/reveal of that document's heading after the matching content renders. Selecting an outline heading closes the temporary outline and navigates to the anchor. Opening group selection or search closes temporary panes. Resize transitions close temporary panes while retaining the independent pinned preferences. Keep pane visibility with the page; child components request actions and do not own navigation or retries.
 
@@ -75,16 +77,19 @@ Consumers that embed the public components must migrate the toolbar and metadata
 | `DocumentContentViewer.OnToggleSidebar`, `ShowSidebarToggle` | `DocumentViewerToolbar.OnToggleSidebar` and `IsSidebarVisible`; toolbar composition supplies the action |
 | `DocumentContentViewer.OnOpenDocumentSearch`, `OnLanguageChanged`, `ShowLanguageSwitcher` | The same callbacks/flag on `DocumentViewerToolbar` |
 | `DocumentContentViewer.OnToggleTableOfContents`, `IsTableOfContentsVisible` | `DocumentViewerToolbar.OnToggleOutline`, `IsOutlineVisible`, and `HasOutline` |
-| `DocumentSidebar.OnOpenGroupSwitcher` | `DocumentViewerToolbar.OnOpenGroupSwitcher` |
 | `DocumentMetadataPanel.FrontMatter`, `FileSize` | Required `DocumentMetadataPanel.Document`, containing the full selected catalog document |
+
+`DocumentSidebar.OnOpenGroupSwitcher` requests the page-owned library chooser. The sidebar and optional toolbar chooser reuse `DocumentLibrarySwitcher`, whose `CurrentGroup` and `CurrentCulture` provide the selected library identity and culture-scoped document count; `OnOpen` requests the owner's chooser without acquiring dialog or document-loading ownership. `DocumentViewerToolbar.ShowLibrarySwitcher` defaults to `true` for embedded compositions. The routed page sets it to `false` because the sidebar supplies the chooser, and passes the accepted `Document` to the toolbar for its modification-date context. Keep one visible library chooser per composition.
 
 `DocumentContentViewer` renders the article, breadcrumb, metadata, loading/error/missing-translation states, and reports `HeadingsChanged`. Supply `ContentError` and `DocumentSidebar.TreeError` from the page's load owner; both default to null and neither child retries the load. `DocumentTableOfContentsPanel.OnClose` is optional: without a callback, it omits the close control; with one, the page closes the pane and handles focus restoration as appropriate.
 
-The metadata summary uses the selected document's author, modification time, and tags. Its initially collapsed About panel shows the navigation path, culture, group, byte count, exact UTC modification timestamp, and every parsed front-matter field, including nested values. It collapses when group, document-relative path, or document culture changes. Pass the actual document rather than constructing a front-matter-only substitute.
+`DocumentMetadataPanel` displays authored tags and author, followed by the remaining non-null front-matter fields directly as compact inline chips. It excludes the reserved keys `title`, `date`, `tags`, and `author` from custom chips case-insensitively. Values retain Razor encoding; structured values use `MarkdownMetadataFormatter`, and native titles retain the full displayed values. A document without front matter displays no metadata. Pass the actual selected document through the required `Document` parameter. The panel has no About disclosure or path/byte/timestamp inspector; `DocumentViewerToolbar.Document` supplies the actual file modification date and native date/time context. No reading-time estimate is derived from file size.
 
 ## Local image assets
 
-The viewer's local image asset endpoint is on by default at `/markdown-ui/assets/{groupKey}`. `AssetEndpointBasePath` changes the base path; `EnableLocalImageAssetEndpoint = false` disables serving. `AllowedImageExtensions` defaults to `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.ico`, and `.avif`. Serving requires both an allowed extension and a known image content type.
+`EnableLocalImageAssetEndpoint` defaults to `true`, but mapping the local image endpoint also requires the module's effective Minimal API setting to be enabled. `ModuleMarkdownUIOption.EnableMinimalApi` defaults to null and inherits the host's `EnableMinimalApiByDefault`, whose default is `false`. Set `AddMarkdownUI(options => options.EnableMinimalApi = true)` when the viewer should serve local images independently of that host default. `EnableLocalImageAssetEndpoint = false` disables this endpoint even when Minimal API is enabled.
+
+When mapped, the endpoint uses `/markdown-ui/assets/{groupKey}`; `AssetEndpointBasePath` changes its base path. `AllowedImageExtensions` defaults to `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.ico`, and `.avif`. Serving requires both an allowed extension and a known image content type.
 
 The renderer rewrites relative image URLs using the document's group and filesystem-relative path. It leaves already browser-safe absolute/root-relative URLs unchanged. HTTP query binding removes the endpoint transport encoding; `OpenImageAsync` then decodes the authored image URL's percent escapes once before path validation. It does not URL-decode the catalog document path again. For example, `images/release%20notes.png` resolves to a filename containing a space; `images/100%25.png` resolves to a filename containing a literal percent sign. Direct callers of `OpenImageAsync` supply the authored relative asset URL after transport decoding, not a repeatedly decoded filesystem path.
 

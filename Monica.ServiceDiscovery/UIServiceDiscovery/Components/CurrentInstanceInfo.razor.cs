@@ -110,7 +110,9 @@ public partial class CurrentInstanceInfo : IAsyncDisposable
         ? L["Shared:Values:NotSpecified"].Value : value;
     private string Time(DateTime? timestamp) => timestamp is null || timestamp == DateTime.MinValue
         ? L["Shared:Values:NotAvailable"].Value
-        : timestamp.Value.FromUtcToLocal().ToString("yyyy-MM-dd HH:mm:ss");
+        : UiTime.Format(timestamp.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(timestamp.Value, DateTimeKind.Utc)
+            : timestamp.Value);
 
     private string HeartbeatAge()
     {

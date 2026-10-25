@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.OpenTelemetry.UI.UIOpenTelemetry.Support
 @inject IStringLocalizer<OpenTelemetryUIResource> L
@@ -5,7 +6,7 @@
 <section class="telemetry-dossier" aria-label="@L["Dossier:Title"]">
     @if (Instrument is not { } instrument)
     {
-        <div class="dossier-empty" role="status"><MoIcon Icon="@MoIcons.Sliders" Size="2.25rem" /><h2>@L["Dossier:ChooseTitle"]</h2><p>@L["Dossier:Choose"]</p></div>
+        <div class="dossier-empty"><MoContentState role="status"><MoIcon Icon="@MoIcons.Sliders" Size="2.25rem" /><h2>@L["Dossier:ChooseTitle"]</h2><p>@L["Dossier:Choose"]</p></MoContentState></div>
     }
     else
     {
@@ -14,7 +15,7 @@
         @if (instrument.Overflow) { <div class="dossier-overflow" role="note"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" /><p>@L["Dossier:Overflow", instrument.DroppedSamples]</p></div> }
         @if (instrument.TagSets.Count == 0)
         {
-            <div class="dossier-no-series" role="status"><h3>@L["Dossier:UnmeasuredTitle"]</h3><p>@L["Dossier:Unmeasured"]</p></div>
+            <div class="dossier-no-series"><MoContentState role="status" Compact="true"><h3>@L["Dossier:UnmeasuredTitle"]</h3><p>@L["Dossier:Unmeasured"]</p></MoContentState></div>
         }
         else
         {
@@ -31,22 +32,22 @@
             </div>
             @if (Series is { } series)
             {
-                <div class="selected-series" data-selected-series-key="@series.Key"><span class="dossier-eyebrow">@L["Series:Selected"]</span><p class="selected-series-tags">@TagText(series)</p><div class="selected-series-readings"><div><span>@L["Series:LatestReading"]</span><strong data-series-current title="@Raw(series.CurrentValue)">@(series.Samples.Count == 0 ? "—" : Format(series.CurrentValue))</strong></div><div><span>@L["Series:AdjacentDelta"]</span><strong class="series-delta" data-series-delta title="@Raw(series.Delta)">@(series.Samples.Count < 2 ? "—" : Format(series.Delta))</strong></div></div><p class="series-basis">@L["Series:DeltaHelp"]</p><div class="series-timing"><span>@L["Series:LastObservation"] <time datetime="@series.LastUpdatedUtc.ToString("O")" title="@series.LastUpdatedUtc.ToString("O")">@(series.Samples.Count == 0 ? "—" : series.LastUpdatedUtc.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture))</time> UTC</span><span>@L["Series:Retention", series.Samples.Count, SamplesPerSeries]</span></div></div>
+                <div class="selected-series" data-selected-series-key="@series.Key"><span class="dossier-eyebrow">@L["Series:Selected"]</span><p class="selected-series-tags">@TagText(series)</p><div class="selected-series-readings"><div><span>@L["Series:LatestReading"]</span><strong data-series-current title="@Raw(series.CurrentValue)">@(series.Samples.Count == 0 ? "—" : Format(series.CurrentValue))</strong></div><div><span>@L["Series:AdjacentDelta"]</span><strong class="series-delta" data-series-delta title="@Raw(series.Delta)">@(series.Samples.Count < 2 ? "—" : Format(series.Delta))</strong></div></div><p class="series-basis">@L["Series:DeltaHelp"]</p><div class="series-timing"><span>@L["Series:LastObservation"] <time datetime="@series.LastUpdatedUtc.ToString("O")" title="@series.LastUpdatedUtc.ToString("O")">@(series.Samples.Count == 0 ? "—" : UiTime.Format(series.LastUpdatedUtc))</time></span><span>@L["Series:Retention", series.Samples.Count, SamplesPerSeries]</span></div></div>
                 <div class="series-evidence"><div class="section-heading"><h3>@L["Series:HistoryTitle"]</h3><span>@L["Series:Finite", series.FiniteSampleCount, series.Samples.Count]</span></div><TelemetrySeriesPlot Samples="series.Samples" Unit="@instrument.Unit" Label="@(instrument.Name + " · " + TagText(series))" /><p class="series-basis">@L[instrument.Kind == "Histogram" ? "Series:HistogramBasis" : !instrument.IsObservable && instrument.Kind is "Counter" or "UpDownCounter" ? "Series:CounterBasis" : "Series:MeasurementBasis"]</p></div>
                 @if (series.Histogram is { } histogram) { <HistogramView Histogram="histogram" Unit="@instrument.Unit" /> }
                 <div class="series-ledger-heading"><div><h3>@L["Ledger:Title"]</h3><p>@L["Ledger:Help"]</p></div><span>@series.Samples.Count</span></div>
-                @if (series.Samples.Count == 0) { <p class="ledger-empty" role="status">@L["Series:NoSamples"]</p> }
+                @if (series.Samples.Count == 0) { <MoContentState role="status" Compact="true">@L["Series:NoSamples"]</MoContentState> }
                 else
                 {
-                    <div class="sample-frame"><table class="sample-table"><thead><tr><th scope="col">@L["Ledger:Timestamp"] · UTC</th><th scope="col">@L["Ledger:Raw"]</th><th scope="col">@L["Ledger:Value"]</th><th scope="col"><span class="visually-hidden">@L["Inspector:Open"]</span></th></tr></thead><tbody>
+                    <div class="sample-frame"><table class="sample-table"><thead><tr><th scope="col">@L["Ledger:Timestamp"]</th><th scope="col">@L["Ledger:Raw"]</th><th scope="col">@L["Ledger:Value"]</th><th scope="col"><span class="visually-hidden">@L["Inspector:Open"]</span></th></tr></thead><tbody>
                         @foreach (var row in series.Samples.Select((point, index) => (point, index)).Skip((_samplePage - 1) * SamplePageSize).Take(SamplePageSize))
                         {
-                            <tr data-sample-index="@row.index"><td data-label="@L["Ledger:Timestamp"]"><time datetime="@row.point.TimestampUtc.ToString("O")" title="@row.point.TimestampUtc.ToString("O")">@row.point.TimestampUtc.ToString("MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)</time></td><td data-label="@L["Ledger:Raw"]"><code data-raw-value="@Raw(row.point.Value)">@Raw(row.point.Value)</code></td><td data-label="@L["Ledger:Value"]">@Format(row.point.Value)</td><td class="sample-inspect"><MudButton Variant="Variant.Text" Color="Color.Default" OnClick="@(() => OnInspect.InvokeAsync(new TelemetrySampleRequest(series, row.index)))" aria-label="@L["Inspector:OpenSample", row.point.TimestampUtc.ToString("O")]">@L["Inspector:Open"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></MudButton></td></tr>
+                            <tr data-sample-index="@row.index"><td data-label="@L["Ledger:Timestamp"]"><time datetime="@row.point.TimestampUtc.ToString("O")" title="@row.point.TimestampUtc.ToString("O")">@UiTime.Format(row.point.TimestampUtc)</time></td><td data-label="@L["Ledger:Raw"]"><code data-raw-value="@Raw(row.point.Value)">@Raw(row.point.Value)</code></td><td data-label="@L["Ledger:Value"]">@Format(row.point.Value)</td><td class="sample-inspect"><MudButton Variant="Variant.Text" Color="Color.Default" OnClick="@(() => OnInspect.InvokeAsync(new TelemetrySampleRequest(series, row.index)))" aria-label="@L["Inspector:OpenSample", UiTime.Format(row.point.TimestampUtc)]">@L["Inspector:Open"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></MudButton></td></tr>
                         }
                     </tbody></table><footer class="dossier-pager"><span>@L["Registry:Shown", (_samplePage - 1) * SamplePageSize + 1, Math.Min(_samplePage * SamplePageSize, series.Samples.Count), series.Samples.Count]</span>@if (SamplePageCount > 1) { <MudPagination Count="@SamplePageCount" Selected="_samplePage" SelectedChanged="SetSamplePageAsync" ShowFirstButton="true" ShowLastButton="true" Color="Color.Default" Size="Size.Small" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /> }</footer></div>
                 }
             }
-            else { <p class="dossier-no-series" role="status">@L["Series:Choose"]</p> }
+            else { <MoContentState role="status" Compact="true">@L["Series:Choose"]</MoContentState> }
         }
     }
 </section>

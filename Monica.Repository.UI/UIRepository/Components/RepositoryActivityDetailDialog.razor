@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using System.Text.Json
 @using Monica.Repository.Persistence.Services.Support
@@ -155,8 +156,8 @@
 
     private string Unavailable => L["Common:Values:Unavailable"];
     private string Value(string? value) => string.IsNullOrWhiteSpace(value) ? Unavailable : value;
-    private string FormatTimestamp(DateTime? timestamp) => timestamp?.ToString("O", CultureInfo.InvariantCulture) ?? Unavailable;
-    private string FormatCapture(DateTimeOffset? timestamp) => timestamp?.ToString("O", CultureInfo.InvariantCulture) ?? Unavailable;
+    private string FormatTimestamp(DateTime? timestamp) => timestamp is { } value ? UiTime.Format(value) : Unavailable;
+    private string FormatCapture(DateTimeOffset? timestamp) => timestamp is { } value ? UiTime.Format(value) : Unavailable;
     private bool IsPostgreSql => (ProviderKind ?? RepositoryActivityProviderGuideCatalog.Resolve(ProviderName).ProviderKind)
         == RepositoryActivityProviderKind.PostgreSql;
     private string WaitingText(bool? waiting) => waiting switch

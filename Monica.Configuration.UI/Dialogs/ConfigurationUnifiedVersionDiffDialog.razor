@@ -62,7 +62,7 @@
         Definitions = snapshot.Definitions.Select(definition => definition with { SourceContributions = definition.SourceContributions.ToArray() }).ToArray()
     };
     private static string VersionLabel(long version) => ConfigurationUnifiedVersionJsonFormatter.VersionLabel(version);
-    private static string FormatTime(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fffffff zzz");
+    private string FormatTime(DateTimeOffset value) => TimeDisplay.Format(value);
     private string ValueOrEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? L["Common:States:Empty"] : value;
     private void Close() => MudDialog.Close();
 }

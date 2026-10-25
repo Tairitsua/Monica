@@ -10,7 +10,6 @@
 .document-info { min-width:0; }
 .document-info ::deep .mud-typography { overflow-wrap:anywhere; line-height:1.6; }
 .document-info ::deep .mud-typography-caption { font:12px/1.6 var(--mo-font-family-mono); }
-.filter-empty { padding-block:24px; margin:0; color:var(--mud-palette-text-secondary); font-size:14px; }
 @media (max-width:600px) { .document-selection-content { padding:20px; } .document-item { grid-template-columns:auto minmax(0,1fr); } .document-item ::deep .mud-chip { grid-column:2; justify-self:start; margin:0; } }
 
 .dialog-actions { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; width:100%; padding:16px 24px 20px; }

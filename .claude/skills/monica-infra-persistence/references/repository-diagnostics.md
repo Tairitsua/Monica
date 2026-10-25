@@ -1,5 +1,7 @@
 # Inspect Repository contexts and database evidence
 
+Activity rows, inspection timestamps and capture receipts follow page time display in `$monica-infra-ui` (`references/time-display.md`). UTC activity instants and database audit wall-time values keep their distinct source semantics; UI formatting does not rewrite either stored representation.
+
 `Monica.Repository.UI` adds operational views for contexts registered through `AddRepositoryDbContext<TContext>()`. It does not enumerate every EF Core context in DI. Register the application's context and provider through [repositories](repositories.md), then add the UI to the same web host:
 
 ```csharp

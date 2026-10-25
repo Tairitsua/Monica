@@ -52,17 +52,6 @@ internal static class MemoryAnalysisDisplayFormatter
     public static string Milliseconds(TimeSpan? value) =>
         value.HasValue ? $"{value.Value.TotalMilliseconds.ToString("0.00", CultureInfo.CurrentCulture)} ms" : UNAVAILABLE;
 
-    /// <summary>
-    /// Formats a snapshot's host-local date, time and explicit offset. Unspecified snapshot timestamps
-    /// are interpreted as UTC, matching the memory diagnostics capture contract.
-    /// </summary>
-    public static string LocalSnapshotTime(DateTime? timestamp) =>
-        timestamp.HasValue ? LocalDateTime(new DateTimeOffset(AsUtc(timestamp.Value))) : UNAVAILABLE;
-
-    /// <summary>Formats a successful view read as host-local date, time and explicit UTC offset.</summary>
-    public static string LocalDateTime(DateTimeOffset? timestamp) =>
-        timestamp?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture) ?? UNAVAILABLE;
-
     /// <summary>Formats the exact snapshot timestamp as round-trip UTC evidence.</summary>
     public static string MachineTime(DateTime timestamp) => AsUtc(timestamp).ToString("O", CultureInfo.InvariantCulture);
 

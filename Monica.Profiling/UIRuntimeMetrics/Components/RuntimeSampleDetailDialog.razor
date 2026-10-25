@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -10,8 +11,8 @@
         <div class="runtime-sample-detail" data-sample-timestamp="@RuntimeMetricsDisplayFormatter.MachineTime(Point.Timestamp)">
             <p class="runtime-detail-note">@L["Details:Frozen"]</p>
             <dl class="runtime-detail-identity">
-                <div><dt>@L["Details:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@RuntimeMetricsDisplayFormatter.MachineTime(Point.Timestamp)">@RuntimeMetricsDisplayFormatter.MachineTime(Point.Timestamp)</time></dd></div>
-                <div><dt>@L["Details:ViewCapture"]</dt><dd><time data-field="CapturedAt" datetime="@CapturedAt.ToString("O")">@RuntimeMetricsDisplayFormatter.LocalDateTime(CapturedAt)</time></dd></div>
+                <div><dt>@L["Details:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@RuntimeMetricsDisplayFormatter.MachineTime(Point.Timestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Point.Timestamp))</time></dd></div>
+                <div><dt>@L["Details:ViewCapture"]</dt><dd><time data-field="CapturedAt" datetime="@CapturedAt.ToString("O")">@UiTime.Format(CapturedAt)</time></dd></div>
             </dl>
             <h3>@L["Details:RecordedValues"]</h3>
             <dl class="runtime-detail-values">

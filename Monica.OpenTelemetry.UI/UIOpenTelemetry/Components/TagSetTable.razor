@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<OpenTelemetryUIResource> L
 
 <MudTable T="TagSetSamples" Items="@TagSets" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
@@ -29,7 +30,7 @@
         <MudTd DataLabel="@L["Table:Current"]">@FormatValue(context.CurrentValue)</MudTd>
         <MudTd DataLabel="@L["Table:Delta"]">@FormatSignedValue(context.Delta)</MudTd>
         <MudTd DataLabel="@L["Table:Samples"]">@context.Samples.Count</MudTd>
-        <MudTd DataLabel="@L["Table:Updated"]">@context.LastUpdatedUtc.ToLocalTime().ToString("HH:mm:ss")</MudTd>
+        <MudTd DataLabel="@L["Table:Updated"]">@UiTime.FormatTime(context.LastUpdatedUtc)</MudTd>
     </RowTemplate>
 </MudTable>
 

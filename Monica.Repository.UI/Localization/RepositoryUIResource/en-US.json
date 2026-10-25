@@ -409,5 +409,8 @@
       "PostgreSqlWaitDescription": "True only when wait_event_type is Lock. False does not exclude other PostgreSQL wait categories."
     },
     "BulkOutcome": "Migration command completed · {0} applied, {1} skipped, {2} failed"
+  },
+  "Navigation": {
+    "Category": "Persistence"
   }
 }

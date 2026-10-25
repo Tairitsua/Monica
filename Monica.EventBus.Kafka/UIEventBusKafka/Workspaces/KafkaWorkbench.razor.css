@@ -16,7 +16,7 @@
 .kafka-context code { font-family: var(--mo-font-family-mono); font-size: .8rem; line-height: 1.65; overflow-wrap: anywhere; }
 .kafka-context-bootstrap { color: var(--mud-palette-text-secondary); font-family: var(--mo-font-family-mono); font-size: .76rem; overflow-wrap: anywhere; }
 .kafka-context-unavailable { color: color-mix(in srgb, var(--mud-palette-warning) 55%, var(--mud-palette-text-primary)); font-size: .78rem; }
-.kafka-page-loading { display: flex; align-items: center; gap: 18px; padding: 28px; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); }
+.kafka-page-loading { background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); }
 .kafka-page-loading p { margin: 6px 0 0; color: var(--mud-palette-text-secondary); }
 .kafka-workspace-body { min-width: 0; }
 .kafka-confirmation-content { padding: 4px 8px 12px; }

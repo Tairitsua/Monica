@@ -164,7 +164,9 @@
 @media (max-width: 960px) {
     .instance-table ::deep .mud-table-root,
     .instance-table ::deep .mud-table-body,
-    .instance-table ::deep .mud-table-row {
+    .instance-table ::deep .mud-table-row,
+    .instance-table ::deep tr:has(> .mud-table-empty-row),
+    .instance-table ::deep .mud-table-empty-row {
         display: block;
         width: 100%;
         min-width: 0;

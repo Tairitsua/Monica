@@ -206,19 +206,9 @@
     display: grid;
     gap: 16px;
     min-width: 0;
-    padding: 20px;
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: var(--mud-default-borderradius);
     background: var(--mud-palette-surface);
-}
-
-.configuration-sources-empty {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-}
-
-.configuration-sources-empty ::deep :is(.mud-icon-root, .mo-icon) {
-    color: var(--sources-muted);
 }
 
 .configuration-sources-state ::deep .mud-alert-text-error {

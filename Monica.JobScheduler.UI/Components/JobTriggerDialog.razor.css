@@ -74,12 +74,6 @@
     min-width: 0;
 }
 
-.trigger-dialog__json-field ::deep textarea {
-    font-family: var(--mo-font-family-mono);
-    font-size: 0.82rem;
-    line-height: 1.55;
-}
-
 .trigger-dialog__availability {
     display: grid;
     gap: 12px;

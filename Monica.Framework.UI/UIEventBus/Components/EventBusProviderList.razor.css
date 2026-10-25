@@ -23,7 +23,6 @@
 .provider-directory-identity h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 15px; font-weight: 500; }
 .provider-mode { font-size: 11px; font-weight: 400; color: var(--provider-muted); }
 .provider-directory-identity code { display: block; font: 12px/1.7 var(--mo-font-family-mono); overflow-wrap: anywhere; white-space: pre-wrap; }
-.provider-directory-identity p { margin: 5px 0 0; color: var(--provider-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .provider-directory-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; min-width: 0; }
 .provider-directory-counts > div { min-width: 0; }
 .provider-directory-counts dt { font-size: 10px; color: var(--provider-muted); line-height: 1.6; margin-bottom: 8px; }

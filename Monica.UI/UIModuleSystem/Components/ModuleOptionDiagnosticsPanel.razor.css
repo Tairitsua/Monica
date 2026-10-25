@@ -13,11 +13,11 @@
 .option-diagnostics ::deep .mud-chip-outlined.mud-chip-color-primary { color: color-mix(in srgb, var(--mud-palette-primary) 80%, var(--mud-palette-text-primary)); }
 .option-diagnostics ::deep .mud-chip-outlined.mud-chip-color-warning { color: color-mix(in srgb, var(--mud-palette-warning) 70%, var(--mud-palette-text-primary)); }
 .option-diagnostics ::deep .mud-chip-outlined.mud-chip-color-error { color: color-mix(in srgb, var(--mud-palette-error) 70%, var(--mud-palette-text-primary)); }
-.option-empty-state { display: flex; align-items: start; gap: 12px; min-height: 6rem; padding: 16px 0; color: var(--module-workbench-muted-text, var(--mud-palette-text-primary)); }
+
 .option-empty-state__icon { display: inline-flex; flex: 0 0 auto; color: var(--module-workbench-accent-ink, var(--mud-palette-text-primary)); }
 .option-empty-state--pending .option-empty-state__icon { color: color-mix(in srgb, var(--mud-palette-warning) 70%, var(--mud-palette-text-primary)); }
-.option-empty-state > div { display: grid; gap: 5px; min-width: 0; font-size: 12px; line-height: 1.8; }
-.option-empty-state strong { color: var(--mud-palette-text-primary); font-size: 13px; font-weight: 500; }
+.option-empty-copy { display: grid; gap: 5px; min-width: 0; font-size: 12px; line-height: 1.8; }
+.option-empty-copy strong { color: var(--mud-palette-text-primary); font-size: 13px; font-weight: 500; }
 .option-tree { display: grid; gap: 0; min-width: 0; }
 @container module-option-panel (max-width: 520px) {
     .option-projection-header { flex-direction: column; }

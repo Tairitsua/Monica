@@ -176,5 +176,8 @@
     "Catalog": {
       "AriaLabel": "Execution catalog views"
     }
+  },
+  "Navigation": {
+    "Category": "Execution pipeline"
   }
 }

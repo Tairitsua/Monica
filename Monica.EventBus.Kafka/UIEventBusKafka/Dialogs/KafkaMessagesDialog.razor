@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<EventBusKafkaResource> L
 
@@ -75,14 +76,14 @@
 
     private string FormatCapturedAt()
     {
-        return Batch.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz");
+        return UiTime.Format(Batch.CapturedAt);
     }
 
     private string FormatTimestamp(KafkaTopicMessageSample message)
     {
         return message.Timestamp is null
             ? L["Topics:Values:TimestampUnknown"]
-            : message.Timestamp.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff zzz");
+            : UiTime.Format(message.Timestamp.Value);
     }
 
     private string FormatKey(KafkaTopicMessageSample message)

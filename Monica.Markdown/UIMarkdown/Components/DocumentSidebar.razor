@@ -5,17 +5,12 @@
 @inject IStringLocalizer<MarkdownResource> L
 
 <div class="sidebar">
+    <div class="sidebar-group-switcher">
+        <DocumentLibrarySwitcher CurrentGroup="CurrentGroup" CurrentCulture="@CurrentCulture" OnOpen="OnOpenGroupSwitcher" />
+    </div>
     <div class="sidebar-pane-header">
-        <div class="sidebar-pane-copy">
-            <h2 class="sidebar-pane-label">@L["MarkdownViewer:Toolbar:DocumentTree"]</h2>
-            <span class="sidebar-pane-count">@L["MarkdownViewer:Navbar:KnowledgeBaseDocumentCount", ResolveVisibleDocumentCount()]</span>
-        </div>
-        <MudIconButton Icon="@MoIcons.ChevronLeft"
-                       Size="Size.Small"
-                       OnClick="OnCollapseRequested"
-                       title="@L["MarkdownViewer:Navbar:HideSidebar"]"
-                       aria-label="@L["MarkdownViewer:Navbar:HideSidebar"]"
-                       Class="sidebar-collapse-button" />
+        <h2 class="sidebar-pane-label">@L["MarkdownViewer:Toolbar:DocumentTree"]</h2>
+        <span class="sidebar-pane-rule" aria-hidden="true"></span>
     </div>
 
     <div class="sidebar-tree">
@@ -34,6 +29,15 @@
                                SelectedDocument="SelectedDocument"
                                SelectedDocumentChanged="SelectedDocumentChanged" />
         }
+    </div>
+    <div class="sidebar-footer">
+        <span class="footer-value" title="@FooterValue">@FooterValue</span>
+        <MudIconButton Icon="@MoIcons.ChevronLeft"
+                       Size="Size.Small"
+                       OnClick="OnCollapseRequested"
+                       title="@L["MarkdownViewer:Navbar:HideSidebar"]"
+                       aria-label="@L["MarkdownViewer:Navbar:HideSidebar"]"
+                       Class="sidebar-collapse-button" />
     </div>
 </div>
 
@@ -63,5 +67,13 @@
     [Parameter]
     public EventCallback OnCollapseRequested { get; set; }
 
-    private int ResolveVisibleDocumentCount() => CurrentGroup?.GetDocuments(CurrentCulture).Count ?? 0;
+    /// <summary>
+    /// Requests the page-owned library chooser. Defaults to an unassigned callback; the sidebar does not own dialog lifetime or selection state.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnOpenGroupSwitcher { get; set; }
+
+    private string FooterValue => !string.IsNullOrWhiteSpace(CurrentGroup?.Key)
+        ? CurrentGroup.Key
+        : CurrentGroup?.Title ?? L["MarkdownViewer:Navbar:UnknownKnowledgeBase"].Value;
 }

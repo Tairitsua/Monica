@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.State
@@ -82,7 +83,7 @@
                 <MudTd DataLabel="@L["ChangeLedger:RecordedChange"]">
                     <div class="changes-ledger-cell">
                         <EventBusStatusBadge Tone="@context.ChangeTypeColor">@L.GetSubscriptionChangeTypeText(context.ChangeType)</EventBusStatusBadge>
-                        <time class="changes-ledger-timestamp" datetime="@context.Timestamp.ToUniversalTime().ToString("O")">@EventBusPresentation.Timestamp(context.Timestamp)</time>
+                        <time class="changes-ledger-timestamp" datetime="@context.Timestamp.ToUniversalTime().ToString("O")">@UiTime.Format(context.Timestamp)</time>
                     </div>
                 </MudTd>
                 <MudTd DataLabel="@L["ChangeLedger:Subscription"]">
@@ -124,7 +125,7 @@
                     <div class="changes-ledger-cell changes-ledger-action">
                         <MudTooltip Text="@L["ChangeLedger:InspectEvidence"]">
                             <MudIconButton Icon="@MoIcons.ArrowRight" Color="Color.Primary" Size="Size.Small"
-                                           OnClick="() => Inspect(context)" aria-label="@L["ChangeLedger:Inspect", context.Subscription.SubscriptionId, L.GetSubscriptionChangeTypeText(context.ChangeType), EventBusPresentation.Timestamp(context.Timestamp)]" />
+                                           OnClick="() => Inspect(context)" aria-label="@L["ChangeLedger:Inspect", context.Subscription.SubscriptionId, L.GetSubscriptionChangeTypeText(context.ChangeType), UiTime.Format(context.Timestamp)]" />
                         </MudTooltip>
                     </div>
                 </MudTd>

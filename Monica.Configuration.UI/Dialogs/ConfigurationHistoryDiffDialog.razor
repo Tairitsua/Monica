@@ -404,7 +404,7 @@
     }
 
     private string MutationText(ConfigurationMutationKind kind) => kind == ConfigurationMutationKind.Remove ? L["Mutation:Kinds:Remove"] : L["Mutation:Kinds:Set"];
-    private static string FormatTime(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fffffff zzz");
+    private string FormatTime(DateTimeOffset value) => TimeDisplay.Format(value);
     private static string TargetTone(IReadOnlyList<ConfigurationValueHistory> rows) => rows.Any(row => row.TargetKind == ConfigurationMutationTargetKind.ExternalConfigurationSource) ? "warning" : "primary";
     private static string GroupTone(ConfigurationMutationGroupStatus status) => status switch
     {

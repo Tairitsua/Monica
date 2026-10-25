@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.State
@@ -30,7 +31,7 @@
         </div>
         <div class="source-status">
             <span class="following-state @(IsRunning ? "is-following" : "")"><i aria-hidden="true"></i>@L[IsRunning ? "Workbench:Following" : "Workbench:Paused"]</span>
-            <dl><div><dt>@L["Workbench:CompleteLines"]</dt><dd>@(_snapshot?.TotalFileLineCount.ToString("N0") ?? "—")</dd></div><div><dt>@L["Workbench:Retained"]</dt><dd>@(_snapshot?.TotalStoredLines.ToString("N0") ?? "—")</dd></div><div><dt>@L["Workbench:ReadAt"]</dt><dd><time datetime="@(_snapshot?.GeneratedAt.ToString("O"))">@(_snapshot?.GeneratedAt.ToLocalTime().ToString("HH:mm:ss") ?? "—")</time></dd></div></dl>
+            <dl><div><dt>@L["Workbench:CompleteLines"]</dt><dd>@(_snapshot?.TotalFileLineCount.ToString("N0") ?? "—")</dd></div><div><dt>@L["Workbench:Retained"]</dt><dd>@(_snapshot?.TotalStoredLines.ToString("N0") ?? "—")</dd></div><div><dt>@L["Workbench:ReadAt"]</dt><dd><time datetime="@(_snapshot?.GeneratedAt.ToString("O"))">@(UiTime.FormatTime(_snapshot?.GeneratedAt) ?? "—")</time></dd></div></dl>
         </div>
     </section>
 

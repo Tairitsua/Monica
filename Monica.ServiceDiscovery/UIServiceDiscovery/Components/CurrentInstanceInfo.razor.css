@@ -1,5 +1,8 @@
 .current-host-dossier { min-width: 0; color: var(--mud-palette-text-primary); }
 .host-controls ::deep .mud-button-outlined-primary { color: color-mix(in srgb, var(--mud-palette-primary) 60%, var(--mud-palette-text-primary)); }
+.host-controls ::deep .mud-button-root { min-height: 40px; }
+.host-controls ::deep .mud-switch { min-height: 40px; margin: 0; }
+.host-interval ::deep .mud-input-control { margin-block: 0; }
 .host-election ::deep .mud-chip { --host-role-tone: var(--mud-palette-text-secondary); color: color-mix(in srgb, var(--host-role-tone) 35%, var(--mud-palette-text-primary)); background: color-mix(in srgb, var(--host-role-tone) 8%, var(--mud-palette-surface)); border-color: color-mix(in srgb, var(--host-role-tone) 45%, var(--mud-palette-lines-default)); }
 .host-election ::deep .mud-chip-color-warning { --host-role-tone: var(--mud-palette-warning); }
 .host-election ::deep .mud-chip-color-success { --host-role-tone: var(--mud-palette-success); }

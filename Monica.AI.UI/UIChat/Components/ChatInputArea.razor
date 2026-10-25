@@ -62,17 +62,17 @@
         <div class="input-bottom">
             <div class="input-actions-left">
                 <InputFile id="@_uploadId" class="file-input" OnChange="@OnUpload" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.txt,.md,.csv,.json,.xml,.html" disabled="@(IsSending || IsUploading || Disabled)" />
-                <MudButton HtmlTag="label" for="@_uploadId" StartIcon="@MoIcons.Paperclip" Size="Size.Small" Disabled="@(IsSending || IsUploading || Disabled)" aria-label="@L["Workbench:Attach"]"><span class="attachment-label">@L["Workbench:Attach"]</span></MudButton>
+                <MudIconButton HtmlTag="label" for="@_uploadId" Icon="@MoIcons.Paperclip" Class="attachment-button" Disabled="@(IsSending || IsUploading || Disabled)" aria-label="@L["Workbench:Attach"]" title="@L["Workbench:Attach"]" />
                 @if (KnowledgeBases is { Count: > 0 })
                 {
                     <KnowledgeBaseSelector KnowledgeBases="@KnowledgeBases" SelectedIds="@SelectedKnowledgeBaseIds" SelectedIdsChanged="@SelectedKnowledgeBaseIdsChanged" Disabled="@(IsSending || IsUploading || Disabled)" />
                 }
             </div>
-            <div class="input-model">
-                <ChatModelSelector Providers="@Providers" ProviderId="@ProviderId" ModelName="@ModelName" CurrentModel="@CurrentModel" ReasoningLevel="@ReasoningLevel" AllowProviderSelection="@ShowProviderInfo" Disabled="@(IsSending || IsUploading || Disabled)" OnModelChanged="@OnModelChanged" ReasoningLevelChanged="@ReasoningLevelChanged" />
-            </div>
             <div class="input-context">
                 <ChatContextIndicator Usage="@ContextUsage" AutomaticCompaction="@AutomaticCompaction" AutomaticCompactionChanged="@AutomaticCompactionChanged" Disabled="@(IsSending || IsUploading || Disabled)" OnCompact="@OnCompact" CompactionThreshold="@CompactionThreshold" RetainedTurns="@RetainedTurns" OutputBudget="@OutputBudget" CompactionPreferencesChanged="@CompactionPreferencesChanged" />
+            </div>
+            <div class="input-model">
+                <ChatModelSelector Providers="@Providers" ProviderId="@ProviderId" ModelName="@ModelName" CurrentModel="@CurrentModel" ReasoningLevel="@ReasoningLevel" AllowProviderSelection="@ShowProviderInfo" Disabled="@(IsSending || IsUploading || Disabled)" OnModelChanged="@OnModelChanged" ReasoningLevelChanged="@ReasoningLevelChanged" />
             </div>
             <div class="input-send">
                 @if (IsSending)

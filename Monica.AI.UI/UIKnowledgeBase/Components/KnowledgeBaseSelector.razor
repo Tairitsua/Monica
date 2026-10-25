@@ -68,14 +68,14 @@
             <div class="kb-list">
                 @if (FilteredKnowledgeBases.Count == 0)
                 {
-                    <div class="kb-empty">
+                    <MoContentState Compact="true">
                         <MoIcon Icon="@MoIcons.SearchOff"
                                  Size="1.5rem"
                                  Class="kb-empty-icon" />
                         <MudText Typo="Typo.body2" Class="kb-empty-text">
                             @L["Chat:KnowledgeBaseSelector:NoMatching"]
                         </MudText>
-                    </div>
+                    </MoContentState>
                 }
                 else
                 {

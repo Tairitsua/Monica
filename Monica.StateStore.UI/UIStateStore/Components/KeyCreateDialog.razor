@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Monica.StateStore.UI.Services
 @using Monica.StateStore.UI.Models
 @using Monica.Core.Results;
@@ -29,6 +30,7 @@
                           Placeholder="@L["KeyCreate:Placeholders:KeyNameExample"]" />
 
             <MudNumericField @bind-Value="ttlSeconds"
+                             HideSpinButtons="true"
                              Disabled="isSaving"
                              UserAttributes="structuredInputAttributes"
                              Label="@L["KeyCreate:Labels:TTL"]"
@@ -37,36 +39,9 @@
                              Adornment="Adornment.End"
                              AdornmentText="@L["KeyCreate:Labels:TTLUnit"]" />
 
-            <MudTextField @bind-Value="jsonValue"
-                          Disabled="isSaving"
-                          Label="@L["KeyCreate:Labels:JsonValue"]"
-                          Variant="Variant.Outlined"
-                          Lines="10"
-                          Class="key-dialog-value"
-                          UserAttributes="structuredInputAttributes"
-                          HelperText="@L["KeyCreate:Labels:JsonHelperText"]"
-                          Placeholder="@L["KeyCreate:Placeholders:JsonExample"]" />
+            <MoJson @bind-Value="jsonValue" ReadOnly="false" Disabled="@isSaving" Label="@L["KeyCreate:Labels:JsonValue"]" />
+            <p class="key-dialog-hint">@L["KeyCreate:Labels:JsonHelperText"]</p>
 
-            <div class="key-dialog-tools">
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Primary"
-                           StartIcon="@MoIcons.IndentIncrease"
-                           OnClick="FormatJson"
-                           Class="state-dialog-primary-text"
-                           Disabled="isSaving"
-                           Size="Size.Small">
-                    @L["KeyCreate:Actions:FormatJson"]
-                </MudButton>
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Secondary"
-                           StartIcon="@MoIcons.Minimize"
-                           OnClick="MinifyJson"
-                           Class="state-dialog-secondary-text"
-                           Disabled="isSaving"
-                           Size="Size.Small">
-                    @L["KeyCreate:Actions:MinifyJson"]
-                </MudButton>
-            </div>
 
             @if (errorMessage != null)
             {
@@ -126,47 +101,6 @@
         dialogServiceKey = ServiceKey;
         lifetimeCancellation = CancellationTokenSource.CreateLinkedTokenSource(ScopeCancellationToken);
         lifetimeToken = lifetimeCancellation.Token;
-    }
-
-    private void FormatJson()
-    {
-        if (IsRetired || isSaving)
-        {
-            return;
-        }
-
-        try
-        {
-            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonValue);
-            jsonValue = System.Text.Json.JsonSerializer.Serialize(obj, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-            errorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = L["KeyCreate:Messages:FormatFailed", ex.Message];
-        }
-    }
-
-    private void MinifyJson()
-    {
-        if (IsRetired || isSaving)
-        {
-            return;
-        }
-
-        try
-        {
-            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonValue);
-            jsonValue = System.Text.Json.JsonSerializer.Serialize(obj);
-            errorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = L["KeyCreate:Messages:MinifyFailed", ex.Message];
-        }
     }
 
     private async Task CreateAsync()

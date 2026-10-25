@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Options
 @using Monica.Modules
 @using Monica.ServiceDiscovery.Abstractions
@@ -74,7 +75,11 @@
         .Distinct(StringComparer.Ordinal).Where(key => Services.Any(service => service.GetValidInstanceInfo()?.Metadata.ContainsKey(key) == true));
     private Task InspectAsync(RegisteredServiceStatus service) => _inspector?.ShowAsync(service, CapturedAt) ?? Task.CompletedTask;
     private string Value(string? value) => string.IsNullOrEmpty(value) ? L["Shared:Values:NotAvailable"].Value : value;
-    private string Time(DateTime? value) => value is null || value == default(DateTime) ? L["Shared:Values:NotAvailable"].Value : value.Value.ToLocalTime().ToString("MM-dd HH:mm:ss");
+    private string Time(DateTime? value) => value is null || value == default(DateTime)
+        ? L["Shared:Values:NotAvailable"].Value
+        : UiTime.Format(value.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value.Value);
     private async Task CopyAsync(string value)
     {
         if (_disposed) return;

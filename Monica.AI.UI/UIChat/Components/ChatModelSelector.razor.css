@@ -1,6 +1,6 @@
-.model-selector { min-width: 0; width: 100%; max-width: 100%; }
-.model-selector ::deep .mud-menu { min-width: 0; max-width: 100%; width: 100%; }
-.model-selector ::deep .mud-menu-button-activator { min-width: 0; max-width: 100%; width: 100%; padding: 8px 10px; border-radius: var(--mud-default-borderradius); font-size: .875rem; }
+.model-selector { display: inline-flex; min-width: 0; max-width: 100%; }
+.model-selector ::deep .mud-menu { display: inline-flex; min-width: 0; max-width: 100%; }
+.model-selector ::deep .mud-menu-button-activator { min-width: 0; max-width: 100%; padding: 8px 10px; border-radius: var(--mud-default-borderradius); font-size: .875rem; }
 .model-selector ::deep .mud-button-label { display: block; position: relative; min-width: 0; flex: 1; padding-inline-end: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
 .model-selector ::deep .mud-button-icon-end { position: absolute; inset-inline-end: 0; top: 50%; transform: translateY(-50%); margin: 0; display: inline-flex; }
 .model-picker { width: min(400px, calc(100vw - 48px)); max-height: calc(100dvh - 72px); min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; color: var(--mud-palette-text-primary); background: var(--mud-palette-surface); }

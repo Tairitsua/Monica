@@ -132,16 +132,6 @@ public class ObservableInstanceViewModel
     public string InstanceTypeFullName => InstanceType?.GetCleanFullName() ?? "-";
 
     /// <summary>
-    /// Formatted registered timestamp
-    /// </summary>
-    public string RegisteredAtDisplay => RegisteredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-    /// <summary>
-    /// Formatted state changed timestamp
-    /// </summary>
-    public string StateChangedAtDisplay => StateChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-    /// <summary>
     /// MudBlazor color for log level
     /// </summary>
     public Color LogLevelColor => ObservableInstanceDisplayMapping.GetLogLevelColor(CurrentLogLevel);

@@ -7,7 +7,7 @@ description: Apply Monica application unit rules when implementing, refactoring,
 
 ## Overview
 
-Use this skill for unit-level application development in Monica-based DDD projects. Before changing or reviewing units, load `$monica-application` and the repository-designated project specification, even when this skill was invoked directly. The [shared specification](../monica-application/references/00-application-specification.md) defines rule strength; [specification evolution](../monica-application/references/01-specification-evolution.md) governs a new pattern or deviation.
+Use this skill for unit-level application development in Monica-based DDD projects. Before changing or reviewing units, load `$monica-application` and the repository-designated project specification, even when this skill was invoked directly. The [shared specification](../monica-application/references/00-application-specification.md) defines rule strength; [specification evolution](../monica-application/references/01-specification-evolution.md) governs concrete architectural gaps and rule changes, not ordinary combinations of these units.
 
 ## Workflow
 

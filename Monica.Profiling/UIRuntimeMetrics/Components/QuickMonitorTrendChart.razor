@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -18,7 +20,7 @@
             <div><span>@L["Trend:Retained"]</span><strong data-window-count="@(TrendData is null ? null : Points.Count.ToString(CultureInfo.InvariantCulture))">@(TrendData is null ? L["Common:Unavailable"] : L["Trend:Capacity", Points.Count, TrendData.MaxHistoryPoints])</strong></div>
             <div><span>@L["Trend:Window"]</span>
                 <strong>@WindowDuration</strong>
-                <small><time data-window-start datetime="@MachineTime(TrendData?.StartTime)" title="@FullLocalTime(TrendData?.StartTime)">@RuntimeMetricsDisplayFormatter.LocalTime(TrendData?.StartTime)</time><span aria-hidden="true"> → </span><time data-window-end datetime="@MachineTime(TrendData?.EndTime)" title="@FullLocalTime(TrendData?.EndTime)">@RuntimeMetricsDisplayFormatter.LocalTime(TrendData?.EndTime)</time></small>
+                <small><time data-window-start datetime="@MachineTime(TrendData?.StartTime)" title="@FullLocalTime(TrendData?.StartTime)">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(TrendData?.StartTime))</time><span aria-hidden="true"> → </span><time data-window-end datetime="@MachineTime(TrendData?.EndTime)" title="@FullLocalTime(TrendData?.EndTime)">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(TrendData?.EndTime))</time></small>
             </div>
             <div><span>@L["Trend:CollectorInterval"]</span><strong data-sample-interval="@TrendData?.SampleIntervalMs">@(TrendData is null ? L["Common:Unavailable"] : L["Trend:Seconds", TrendData.SampleIntervalMs / 1000d])</strong></div>
         </div>
@@ -68,7 +70,7 @@
                         @foreach (var point in VisiblePoints)
                         {
                             <tr @key="point.Timestamp" data-sample-timestamp="@RuntimeMetricsDisplayFormatter.MachineTime(point.Timestamp)">
-                                <td data-label="@L["Recent:Columns:Time"]" class="runtime-sample-time"><time datetime="@RuntimeMetricsDisplayFormatter.MachineTime(point.Timestamp)">@RuntimeMetricsDisplayFormatter.LocalTime(point.Timestamp)</time></td>
+                                <td data-label="@L["Recent:Columns:Time"]" class="runtime-sample-time"><time datetime="@RuntimeMetricsDisplayFormatter.MachineTime(point.Timestamp)">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(point.Timestamp))</time></td>
                                 <td data-label="@L["Recent:Columns:Cpu"]">@RuntimeMetricsDisplayFormatter.Percent(point.CpuUsagePercent)</td>
                                 <td data-label="@L["Recent:Columns:WorkingSet"]">@RuntimeMetricsDisplayFormatter.Megabytes(point.WorkingSetMB)</td>
                                 <td data-label="@L["Recent:Columns:GcHeap"]">@RuntimeMetricsDisplayFormatter.Megabytes(point.GcHeapSizeMB)</td>
@@ -92,7 +94,7 @@
         }
         else
         {
-            <div class="runtime-ledger-empty">@L["Recent:Empty"]</div>
+            <MoContentState Compact="true">@L["Recent:Empty"]</MoContentState>
         }
     </section>
 </div>
@@ -129,7 +131,7 @@
     private void OnMetricSelectionChanged(IReadOnlyCollection<string> selectedValues) => _selectedMetrics = selectedValues;
     private void ChangePage(int value) => _page = Math.Clamp(value, 1, PageCount);
     private static string? MachineTime(DateTime? timestamp) => timestamp is { } value ? RuntimeMetricsDisplayFormatter.MachineTime(value) : null;
-    private static string FullLocalTime(DateTime? timestamp) => RuntimeMetricsDisplayFormatter.LocalDateTime(timestamp is { } value ? new DateTimeOffset(value.ToUniversalTime()) : null);
+    private string FullLocalTime(DateTime? timestamp) => UiTime.Format(timestamp is { } value ? new DateTimeOffset(RuntimeMetricsDisplayFormatter.AsUtc(value)) : null);
     private async Task InspectAsync(RuntimeMetricsPoint point)
     {
         if (CapturedAt is not { } capturedAt) return;

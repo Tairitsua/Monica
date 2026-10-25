@@ -41,7 +41,9 @@ public sealed class ModuleHealthCheckUITests
         page.DisplayName.ResourceType.Should().Be(typeof(HealthCheckResource));
         page.AccessPolicyType.Should().Be(typeof(OperationalPageAccessPolicy<ModuleHealthCheckUIOption>));
         navigation.Page.Should().BeSameAs(page);
-        navigation.CategoryId.Should().Be(BuiltInNavigationCategoryIds.Monitor);
+        navigation.CategoryId.Should().Be(NavigationCategoryId.Create("Monica.HealthCheck"));
+        catalog.GetNavigationCategories().Single(category => category.Id == navigation.CategoryId)
+            .ParentId.Should().Be(BuiltInNavigationCategoryIds.Monitor);
         navigation.Order.Should().Be(10);
     }
 

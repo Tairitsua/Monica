@@ -10,7 +10,7 @@
 .plot-times time { position: absolute; white-space: nowrap; transform: translateX(-50%); }
 .plot-times [data-anchor="start"] { transform: none; }
 .plot-times [data-anchor="end"] { transform: translateX(-100%); }
-.plot-note, .plot-empty { margin: 12px 0 0; font-size: 12px; line-height: 1.7; color: var(--telemetry-muted); }
+.plot-note { margin: 12px 0 0; font-size: 12px; line-height: 1.7; color: var(--telemetry-muted); }
 @media (max-width: 600px) { .plot-grid { grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: 170px 28px; gap: 6px; } .plot-canvas { height: 170px; } }
 @media (max-width: 600px) { .plot-times { font-size: 10px; } .plot-times [data-anchor="middle"]:not(:only-child) { display: none; } }
 @media (max-width: 360px) {

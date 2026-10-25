@@ -1,20 +1,21 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using Monica.Markdown.Localization
 @using Monica.Markdown.Models
 @inject IStringLocalizer<MarkdownResource> L
 
-<header class="reader-toolbar">
-    <button type="button" class="reader-library-button" @onclick="OnOpenGroupSwitcher"
-            title="@CurrentGroup?.Title" aria-label="@L["MarkdownViewer:Navbar:OpenKnowledgeBaseSwitcher"]">
-        <MoIcon Icon="@MoIcons.Book" Size="1.5rem" />
-        <span class="reader-library-copy"><span class="reader-library-name">@(CurrentGroup?.Title ?? L["MarkdownViewer:Navbar:UnknownKnowledgeBase"])</span>
-        <span class="reader-library-count">@L["MarkdownViewer:Navbar:KnowledgeBaseDocumentCount", CurrentGroup?.ResolveLanguage(CurrentCulture)?.DocumentCount ?? CurrentGroup?.DocumentCount ?? 0]</span></span>
-        <MoIcon Icon="@MoIcons.ChevronDown" Size="1.25rem" />
-    </button>
+<header class="@(ShowLibrarySwitcher ? "reader-toolbar has-library-switcher" : "reader-toolbar")">
+    @if (ShowLibrarySwitcher)
+    {
+        <DocumentLibrarySwitcher CurrentGroup="CurrentGroup" CurrentCulture="@CurrentCulture" OnOpen="OnOpenGroupSwitcher" />
+    }
     <div class="reader-tool-actions">
+        @if (ShowSidebarToggle)
+        {
         <MudButton OnClick="OnToggleSidebar" StartIcon="@MoIcons.FolderOpen" Class="reader-documents-button"
             aria-label="@(IsSidebarVisible ? L["MarkdownViewer:Navbar:HideSidebar"] : L["MarkdownViewer:Navbar:ShowSidebar"])"
             aria-expanded="@IsSidebarVisible.ToString().ToLowerInvariant()" aria-pressed="@IsSidebarVisible.ToString().ToLowerInvariant()"><span class="reader-button-label">@L["MarkdownViewer:Toolbar:DocumentTree"]</span></MudButton>
+        }
         <MudButton OnClick="OnOpenDocumentSearch" StartIcon="@MoIcons.Search" Variant="Variant.Outlined"
             Class="reader-search-button">@L["MarkdownViewer:Toolbar:SearchPlaceholder"]</MudButton>
         @if (ShowLanguageSwitcher)
@@ -33,11 +34,26 @@
             aria-label="@(IsOutlineVisible ? L["MarkdownViewer:Toolbar:HideOutline"] : L["MarkdownViewer:Toolbar:ShowOutline"])"
             aria-pressed="@IsOutlineVisible.ToString().ToLowerInvariant()"
             aria-expanded="@IsOutlineVisible.ToString().ToLowerInvariant()"
-            Class="@(IsOutlineVisible ? "reader-outline-button is-active" : "reader-outline-button")"><span class="reader-button-label">@L["MarkdownViewer:Navbar:Outline"]</span></MudButton>
+            Class="@(IsOutlineVisible ? "reader-outline-button is-active" : "reader-outline-button")"><span class="reader-button-label">@(IsOutlineVisible ? L["MarkdownViewer:Toolbar:HideOutline"] : L["MarkdownViewer:Toolbar:ShowOutline"])</span></MudButton>
     </div>
+    @if (Document is not null)
+    {
+        <span class="reader-last-edited" title="@UiTime.Format(Document.LastModifiedUtc)">
+            <MoIcon Icon="@MoIcons.Clock" Size="1rem" />
+            @L["MarkdownViewer:Metadata:Modified"] @UiTime.FormatDate(Document.LastModifiedUtc)
+        </span>
+    }
 </header>
 
 @code {
+    /// <summary>Whether the library visibility control is needed. Defaults to true; a visible persistent sidebar may supply its own collapse control.</summary>
+    [Parameter] public bool ShowSidebarToggle { get; set; } = true;
+
+    /// <summary>Whether the toolbar includes a library chooser. Defaults to true; hide it when the sidebar owns that control.</summary>
+    [Parameter] public bool ShowLibrarySwitcher { get; set; } = true;
+    /// <summary>The accepted document whose actual last-modified date is displayed, or null when no document is selected.</summary>
+    [Parameter] public MarkdownDocument? Document { get; set; }
+
     /// <summary>The selected library whose identity and registered count are displayed.</summary>
     [Parameter] public MarkdownDocumentGroup? CurrentGroup { get; set; }
     /// <summary>The selected document culture, independent of the shell language.</summary>

@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.UI.Shared.Components.Navigation
 @using Monica.UI.Shared.Components.Dialogs
 @inject KafkaWorkbenchSessionFactory SessionFactory
@@ -32,9 +33,11 @@
 
     @if (State.IsLoading)
     {
-        <div class="kafka-page-loading" role="status">
+        <div class="kafka-page-loading">
+            <MoContentState Loading="true">
             <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
             <div><strong>@L["Page:States:Loading"]</strong><p>@L["Page:States:LoadingDescription"]</p></div>
+            </MoContentState>
         </div>
     }
     else

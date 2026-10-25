@@ -13,9 +13,7 @@
 .system-info-environment-grid,
 .system-info-artifact-grid { min-width: 0; margin: 0; padding: 0 24px; }
 .system-info-environment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-.system-info-empty-state { padding: 0 24px 24px; color: var(--mud-palette-text-secondary); }
-.system-info-empty-state strong { display: block; color: var(--mud-palette-text-primary); font-size: 13px; font-weight: 500; }
-.system-info-empty-state p { margin: 8px 0 0; font-size: 12px; line-height: 1.7; }
+
 .system-info-endpoints { padding: 0 24px; }
 .system-info-endpoint { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--mud-palette-divider); }
 .system-info-endpoint:first-child { padding-top: 0; }
@@ -47,5 +45,5 @@
     .system-info-artifact-grid,
     .system-info-endpoints { padding-inline: 18px; }
     .system-info-environment-grid { grid-template-columns: 1fr; }
-    .system-info-empty-state { padding-inline: 18px; }
+
 }

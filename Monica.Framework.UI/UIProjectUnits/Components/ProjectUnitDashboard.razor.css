@@ -76,9 +76,8 @@
 .pu-dashboard__page-actions button { display: inline-flex; padding: 5px; border-radius: 4px; }
 .pu-dashboard button:disabled { opacity: .45; cursor: default; }
 .pu-dashboard button:focus-visible, .pu-dashboard input:focus-visible, .pu-dashboard select:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
-.pu-dashboard__state, .pu-dashboard__error { padding: 40px 24px; text-align: center; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; }
+.pu-dashboard__state, .pu-dashboard__error { background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; }
 .pu-dashboard__state p, .pu-dashboard__error p { color: var(--project-units-muted-ink, var(--mud-palette-text-secondary)); }
-.pu-dashboard__no-gaps { padding: 12px 28px 28px; color: var(--project-units-muted-ink, var(--mud-palette-text-secondary)); }
 @container project-unit-dashboard (max-width: 900px) {
     .pu-dashboard__board { grid-template-columns: 1fr; }
     .pu-dashboard__identity, .pu-dashboard__context, .pu-dashboard__topology { grid-row: auto; grid-column: auto; }

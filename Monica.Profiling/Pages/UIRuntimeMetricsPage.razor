@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.Profiling.UIRuntimeMetrics.Components
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -36,7 +37,7 @@
                     <span class="runtime-polling">@PollingLabel</span>
                     @if (_pageState.SnapshotCapturedAt is { } capturedAt)
                     {
-                        <span>@L["Page:Captured"] <time data-view-capture datetime="@capturedAt.ToString("O")">@RuntimeMetricsDisplayFormatter.LocalDateTime(capturedAt)</time></span>
+                        <span>@L["Page:Captured"] <time data-view-capture datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time></span>
                     }
                 </div>
             </div>

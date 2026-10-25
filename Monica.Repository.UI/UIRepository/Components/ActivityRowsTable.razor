@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Globalization
 @inject IStringLocalizer<RepositoryUIResource> L
 
@@ -53,7 +54,7 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <div class="activity-table-empty">@L["Activity:NoMatches"]</div>
+            <MoContentState Compact="true">@L["Activity:NoMatches"]</MoContentState>
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager PageSizeOptions="@PageSizes" RowsPerPageString="@L["Workbench:Activity:PageSize"]"

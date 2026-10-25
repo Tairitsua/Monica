@@ -170,11 +170,11 @@ public partial class ConfigurationHistoryPage
 
     /// <summary>Freezes the edited filters at Search/Refresh admission. Invalid paths never become broad queries.</summary>
     internal static (ConfigurationHistoryPageRequest History, ConfigurationMutationGroupPageRequest Groups) CreateRequests(
-        string? definitionKey, string pathText, string targetFilter, DateTime? fromDate, DateTime? toDate)
+        string? definitionKey, string pathText, string targetFilter, DateTime? fromDate, DateTime? toDate,
+        TimeZoneInfo timeZone)
     {
         var path = string.IsNullOrWhiteSpace(pathText) ? null : LogicalPath.Parse(pathText);
-        DateTimeOffset? from = fromDate is null ? null : new DateTimeOffset(fromDate.Value);
-        DateTimeOffset? to = toDate is null ? null : new DateTimeOffset(toDate.Value.Date.AddDays(1).AddTicks(-1));
+        var (from, to) = ConfigurationCalendarRange.Create(fromDate, toDate, timeZone);
         return (new ConfigurationHistoryPageRequest
         {
             From = from, To = to, DefinitionKey = definitionKey, LogicalPath = path,
@@ -197,7 +197,7 @@ public partial class ConfigurationHistoryPage
         ClearQueryEvidence();
         try
         {
-            var requests = CreateRequests(_definitionKey, _pathText, _targetFilter, _fromDate, _toDate);
+            var requests = CreateRequests(_definitionKey, _pathText, _targetFilter, _fromDate, _toDate, TimeDisplay.TimeZone);
             if (requests.History.LogicalPath is { } path) _pathText = path.ToCanonicalString();
             var query = _queries.Begin(requests.History, requests.Groups);
             _activeQuery = query;
@@ -208,8 +208,15 @@ public partial class ConfigurationHistoryPage
         }
         catch (Exception exception)
         {
-            var message = L[exception is ConfigurationPathFormatException ? "Common:Errors:InvalidPath" : "Common:Errors:LoadFailed"];
-            _historyLoadError = $"{message}: {exception.Message}";
+            var message = exception switch
+            {
+                ConfigurationCalendarRangeException { Error: ConfigurationCalendarRangeError.Reversed } => L["History:Filters:ReversedDates"],
+                ConfigurationCalendarRangeException { Error: ConfigurationCalendarRangeError.MissingBoundary } => L["History:Filters:MissingBoundary"],
+                ConfigurationCalendarRangeException => L["History:Filters:RepeatedBoundary"],
+                ConfigurationPathFormatException => L["Common:Errors:InvalidPath"],
+                _ => L["Common:Errors:LoadFailed"]
+            };
+            _historyLoadError = exception is ConfigurationCalendarRangeException ? message.Value : $"{message}: {exception.Message}";
             _groupLoadError = _historyLoadError;
             _loading = false;
             Snackbar.Add(_historyLoadError, Severity.Error);

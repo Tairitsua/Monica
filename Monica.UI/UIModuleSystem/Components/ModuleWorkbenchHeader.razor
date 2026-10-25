@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using System.Globalization
 @using Microsoft.AspNetCore.Components.Forms
@@ -30,7 +31,7 @@
                     </button>
                 </MudTooltip>
                 <span class="mo-vl-sep" aria-hidden="true"></span>
-                <span>@L["Common:CapturedAt", current.CapturedAtUtc.ToLocalTime().ToString("t", CultureInfo.CurrentCulture)]</span>
+                <span>@L["Common:CapturedAt", UiTime.FormatTime(current.CapturedAtUtc)]</span>
             </div>
         }
     </div>

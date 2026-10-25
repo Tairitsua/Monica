@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.Localization
 @using Monica.DevOps.Terminal.Models
 @inject IStringLocalizer<TerminalResource> L
@@ -23,7 +24,7 @@
             <p class="terminal-context__intro">@L["History:Scope", Math.Min(12, Session.History.Length), Session.History.Length]</p>
             @if (Session.History.Length == 0)
             {
-                <p class="terminal-context__empty">@L["History:Empty"]</p>
+                <MoContentState Compact="true">@L["History:Empty"]</MoContentState>
             }
             else
             {
@@ -45,8 +46,8 @@
                 <dl><dt>@L["Labels:SessionName"]</dt><dd>@Session.Name</dd>
                     <dt>@L["Labels:SessionId"]</dt><dd><code>@Session.Id</code></dd>
                     <dt>@L["Labels:WorkingDirectory"]</dt><dd><code>@Session.WorkingDirectory</code></dd>
-                    <dt>@L["Labels:CreatedAt"]</dt><dd>@Session.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss zzz")</dd>
-                    <dt>@L["Labels:ActivityAt"]</dt><dd>@Session.LastActivityAt.ToString("yyyy-MM-dd HH:mm:ss zzz")</dd></dl>
+                    <dt>@L["Labels:CreatedAt"]</dt><dd>@UiTime.Format(Session.CreatedAt)</dd>
+                    <dt>@L["Labels:ActivityAt"]</dt><dd>@UiTime.Format(Session.LastActivityAt)</dd></dl>
             </div>
             @if (Environment is not null)
             {

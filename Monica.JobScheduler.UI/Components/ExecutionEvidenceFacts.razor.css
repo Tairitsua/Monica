@@ -12,7 +12,6 @@
 .execution-evidence__facts dd { min-width: 0; margin: 0; color: var(--mud-palette-text-primary); font-size: .8rem; line-height: 1.6; font-variant-numeric: tabular-nums; text-align: end; overflow-wrap: anywhere; white-space: pre-wrap; }
 .execution-evidence__facts code, .execution-evidence__facts time { color: inherit; font-family: var(--mo-font-family-mono); }
 .execution-evidence__empty { padding: 24px; color: var(--execution-muted); font-size: .82rem; }
-.execution-evidence__arguments { min-width: 0; margin: 0; padding: 24px; color: var(--mud-palette-text-primary); background: color-mix(in srgb, var(--mud-palette-primary) 3%, var(--mud-palette-surface)); font-family: var(--mo-font-family-mono); font-size: .82rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .execution-evidence__scope { margin: -4px 0 0; min-width: 0; color: var(--execution-muted); font-size: .77rem; line-height: 1.6; overflow-wrap: anywhere; }
 .execution-evidence__help { margin: 0; padding: 16px 24px 0; color: var(--execution-muted); font-size: .77rem; line-height: 1.6; }
 @container execution-inspector (max-width: 780px) {

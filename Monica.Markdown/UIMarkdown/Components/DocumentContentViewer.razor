@@ -109,11 +109,6 @@
     }
     else
     {
-        <div class="content-scroll" data-markdown-scroll-root="true">
-            <div class="content-body" data-markdown-content-root="true"
-                 data-markdown-group="@Document.GroupKey"
-                 data-markdown-document="@Document.RelativePath"
-                 data-markdown-culture="@Document.Culture">
                 <div class="content-breadcrumb-bar">
                     @if (_breadcrumbs.Count > 0)
                     {
@@ -145,12 +140,18 @@
                         </MudBreadcrumbs>
                     }
                 </div>
+        <div class="content-scroll" data-markdown-scroll-root="true">
+            <div class="content-body" data-markdown-content-root="true"
+                 data-markdown-group="@Document.GroupKey"
+                 data-markdown-document="@Document.RelativePath"
+                 data-markdown-culture="@Document.Culture">
+                <header class="article-heading">
+
 
                 <h1 class="doc-title" data-markdown-document-heading="true" tabindex="-1">@Document.Title</h1>
 
                 <DocumentMetadataPanel Document="Document" />
-
-                <MudDivider Class="article-divider" />
+                </header>
 
                 <div class="markdown-body" data-markdown-body="true">
                     @if (string.IsNullOrWhiteSpace(_strippedContent))

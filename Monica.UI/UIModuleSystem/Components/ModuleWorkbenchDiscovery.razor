@@ -32,7 +32,7 @@
             </header>
             @if (snapshot.TypeDiscovery.Stages.Length == 0)
             {
-                <p class="discovery-stage-empty">@L["Discovery:Stages:Empty"]</p>
+                <MoContentState Compact="true"><p>@L["Discovery:Stages:Empty"]</p></MoContentState>
             }
             else
             {
@@ -90,7 +90,7 @@
                             <MudTd DataLabel="@L["Discovery:Queries:Matches"]"><span class="query-match-count">@query.MatchCount</span></MudTd>
                         </RowTemplate>
                         <NoRecordsContent>
-                            <p class="discovery-query-empty">@L["Discovery:Queries:Empty"]</p>
+                            <MoContentState Compact="true"><p>@L["Discovery:Queries:Empty"]</p></MoContentState>
                         </NoRecordsContent>
                     </MudTable>
                 </div>

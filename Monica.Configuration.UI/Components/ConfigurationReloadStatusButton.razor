@@ -339,7 +339,7 @@
 
     private string FormatTime(DateTimeOffset? time)
     {
-        return time is null ? L["State:ReloadStatus:Never"].Value : time.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        return time is null ? L["State:ReloadStatus:Never"].Value : TimeDisplay.Format(time.Value);
     }
 
     private string FormatDuration(TimeSpan? duration)

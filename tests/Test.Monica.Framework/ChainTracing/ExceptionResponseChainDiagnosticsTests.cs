@@ -43,11 +43,16 @@ public sealed class ExceptionResponseChainDiagnosticsTests
 
         diagnostics.Attach(httpContext, response);
 
-        var json = JsonSerializer.Serialize(response);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var json = JsonSerializer.Serialize(response, jsonOptions);
         json.Should().Contain("traceId");
         if (exposeDiagnostics)
         {
             json.Should().Contain("SELECT 1");
+            var chain = JsonSerializer.SerializeToElement(response, jsonOptions)
+                .GetProperty("metadata").GetProperty("chain");
+            chain.GetProperty("timestamp").GetDateTimeOffset().Should().Be(downstream.GetCurrentChain()!.Root!.Timestamp);
+            chain.GetProperty("serviceVersion").GetString().Should().Be("1.0.0+app-x-commit");
         }
         else
         {
@@ -78,7 +83,7 @@ public sealed class ExceptionResponseChainDiagnosticsTests
     private static AsyncLocalChainTracingService CreateTracing()
     {
         return new AsyncLocalChainTracingService(
-            Options.Create(new ModuleChainTracingOption { ServiceName = "app-x" }),
+            Options.Create(new ModuleChainTracingOption { ServiceName = "app-x", ServiceVersion = "1.0.0+app-x-commit" }),
             NullLogger<AsyncLocalChainTracingService>.Instance,
             new JsonSerializerOptionsProvider(new JsonSerializerOptions(), DateTimeWireFormat.Iso8601WallClock));
     }

@@ -1,0 +1,5 @@
+.state-workbench-navigation ::deep .mo-workbench-navigation {gap:8px;}
+.state-workbench-navigation ::deep .mo-workbench-navigation a {min-height:34px;padding:7px 11px;border-radius:6px;font-weight:400;}
+.state-workbench-navigation ::deep .mo-workbench-navigation a[aria-current="page"] {color:color-mix(in srgb,var(--mud-palette-primary) 65%,var(--mud-palette-text-primary));background:color-mix(in srgb,var(--mud-palette-primary) 15%,var(--mud-palette-surface));}
+.nav-count {padding:0 5px;border:1px solid var(--mud-palette-lines-default);border-radius:4px;font:11.5px var(--mo-font-family-mono,monospace);}
+@media(max-width:760px) {.state-workbench-navigation ::deep .mo-workbench-navigation {gap:5px;}.state-workbench-navigation ::deep .mo-workbench-navigation a {padding:7px 10px;}}

@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.SignalR.Models
 @inject IStringLocalizer<SignalRResource> L
@@ -19,7 +21,14 @@
             }
             @if (IsLoading)
             {
+                @if (!DataLoaded)
+            {
+                <MoContentState Loading="true" Compact="true"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><span>@L["UISignalR:ConnectionConfig:Loading"]</span></MoContentState>
+            }
+            else
+            {
                 <div class="connection-config-loading" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><span>@L["UISignalR:ConnectionConfig:Loading"]</span></div>
+            }
             }
             else if (!DataLoaded && !LoadFailed)
             {
@@ -161,5 +170,5 @@
         await SelectedHubRouteChanged.InvokeAsync(value);
     }
 
-    private static string FormatUtc(DateTime value) => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.CurrentCulture);
+    private string FormatUtc(DateTime value) => UiTime.Format(value);
 }

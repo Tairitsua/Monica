@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Text.Json
 @using Monica.SignalR.UISignalR.Models
 @using Monica.SignalR.UISignalR.Support
@@ -13,7 +14,7 @@
 
     @if (HubMethods.Count == 0)
     {
-        <div class="signalr-invoker-empty">@L["UISignalR:MethodInvoker:Empty"]</div>
+        <div class="signalr-invoker-empty"><MoContentState Compact="true">@L["UISignalR:MethodInvoker:Empty"]</MoContentState></div>
     }
     else
     {

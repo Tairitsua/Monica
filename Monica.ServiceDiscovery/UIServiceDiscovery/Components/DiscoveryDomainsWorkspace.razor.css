@@ -14,7 +14,7 @@
 .domain-index button[aria-pressed="true"] { background: var(--mud-palette-surface); border-color: color-mix(in srgb,var(--mud-palette-primary) 25%,var(--mud-palette-lines-default)); }
 .domain-index button:hover { background: var(--mud-palette-action-default-hover); }
 .domain-index button:focus-visible,.domain-service-ledger button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
-.domain-index-empty { font-size: 13px; padding: 20px 4px; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
+
 .domain-detail-workspace { min-width: 0; padding: 28px; }
 .domain-identity { padding-bottom: 24px; border-bottom: 1px solid var(--mud-palette-lines-default); }
 .domain-identity h3 { font-size: 29px; font-weight: 500; letter-spacing: -.025em; margin: 10px 0 7px; overflow-wrap: anywhere; }

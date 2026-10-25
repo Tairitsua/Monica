@@ -483,7 +483,7 @@
   },
   "ProviderInspector": {
     "Title": "Provider details",
-    "Captured": "Captured (UTC)",
+    "Captured": "Captured",
     "Scope": "This inspector freezes the selected provider and its subscription rows when opened. Capabilities describe the provider contract; they are not a live transport availability check.",
     "CapabilitiesHelp": "These capabilities are declared by the provider. No publish or connection test is performed here.",
     "LoadingOptions": "Checking access and loading redacted configuration…",
@@ -512,7 +512,7 @@
     "EmptyHelp": "Start the listener, then publish to its topic. Provider acceptance alone does not prove receipt.",
     "Received": "Received (local)",
     "MessageId": "Message ID",
-    "CreatedUtc": "Created (UTC)",
+    "CreatedUtc": "Created",
     "ListenerLifetime": "This page owns its listener and attempts to stop it when you leave. If removal fails, the next visit recovers the same listener so you can retry Stop. Recent receipts remain in this browser circuit until cleared or the circuit ends.",
     "PreparingListener": "Preparing listener…",
     "ListenerUnavailable": "Listener unavailable"
@@ -550,7 +550,7 @@
     "ClearFilters": "Clear filters",
     "FilterScope": "Filter counts describe the retained window. Newest observations first.",
     "Shown": "Showing {0} of {1} retained entries",
-    "RecordedChange": "Recorded change · UTC",
+    "RecordedChange": "Recorded change",
     "Subscription": "Event and subscription",
     "Route": "Topic and provider scope",
     "Registration": "Recorded registration",
@@ -569,5 +569,8 @@
     "RowsPerPage": "Entries per page",
     "PageInfo": "{first_item}–{last_item} of {all_items}",
     "EvidenceHelp": "Registration and reported topic runtime are independent states recorded with each observation. Inspect opens that frozen evidence, including removed subscriptions; it does not look up the current registry row."
+  },
+  "Navigation": {
+    "Category": "Event bus"
   }
 }

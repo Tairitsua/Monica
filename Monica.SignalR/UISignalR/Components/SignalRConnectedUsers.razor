@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.SignalR.Models
 @using Monica.UI.Shared.Components.Dialogs
@@ -24,7 +26,14 @@
         }
         @if (IsLoading)
         {
-            <div class="connected-users-loading" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><span>@L["UISignalR:ConnectedUsers:Loading"]</span></div>
+            @if (!DataLoaded)
+            {
+                <MoContentState Loading="true" Compact="true"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><span>@L["UISignalR:ConnectedUsers:Loading"]</span></MoContentState>
+            }
+            else
+            {
+                <div class="connected-users-loading" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" /><span>@L["UISignalR:ConnectedUsers:Loading"]</span></div>
+            }
         }
 
         @if (!DataLoaded)
@@ -217,5 +226,5 @@
 
     private void CloseDetails() => _dialogVisible = false;
     private string DisplayValue(string? value) => string.IsNullOrEmpty(value) ? L["UISignalR:Common:None"].Value : value;
-    private static string FormatUtc(DateTime value) => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.CurrentCulture);
+    private string FormatUtc(DateTime value) => UiTime.Format(value);
 }

@@ -57,7 +57,7 @@
                 @if (_report.Document is not null)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        @L["ImportExport:Import:PackageMeta", _report.Document.ExportedAt.LocalDateTime, _report.Document.ExportedBy ?? L["Common:States:Empty"], _report.Document.SystemVersion ?? L["Common:States:Empty"]]
+                        @L["ImportExport:Import:PackageMeta", TimeDisplay.Format(_report.Document.ExportedAt), _report.Document.ExportedBy ?? L["Common:States:Empty"], _report.Document.SystemVersion ?? L["Common:States:Empty"]]
                     </MudText>
                 }
 

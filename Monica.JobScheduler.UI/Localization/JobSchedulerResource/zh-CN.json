@@ -321,7 +321,7 @@
     "Identity": {
       "ArgumentContract": "参数契约",
       "PolicyRevision": "策略修订",
-      "UpdatedAt": "策略更新时间（UTC）",
+      "UpdatedAt": "策略更新时间",
       "JobType": "作业类型",
       "LastObserved": "所有者最近上报"
     },
@@ -434,8 +434,7 @@
       "Preview": {
         "AriaLabel": "后续五个拟议调度时点",
         "Sequence": "序号",
-        "ConfiguredTime": "已配置时区时间",
-        "Utc": "UTC 时间戳",
+        "ConfiguredTime": "计划时间",
         "Empty": "当前草稿没有可匹配的未来计划触发。",
         "Invalid": "请输入有效的触发规则及边界范围后预览计划触发。"
       },
@@ -598,7 +597,7 @@
       "Enable": "延迟准入",
       "Date": "可用日期",
       "Time": "可用时间",
-      "TimeZoneHelp": "所选墙上时间按调度时区 {0} 解释，并以 UTC 持久化。",
+      "TimeZoneHelp": "日期和时间按调度时区 {0} 解释。",
       "Required": "请选择完整的日期和时间。",
       "InvalidWallTime": "该墙上时间在调度时区 {0} 中不存在，请选择其他时间。",
       "Future": "延迟可用时间必须晚于当前时间。"
@@ -609,7 +608,7 @@
     "RefreshFailed": "最近一次分析刷新失败：{0}",
     "Range": {
       "Title": "分析时间范围",
-      "Description": "今天从调度时区 {0} 的午夜开始；其他选项使用滚动 UTC 时间范围。",
+      "Description": "今天从 {0} 的零点开始；其他选项从当前时间向前计算。",
       "Today": "今天",
       "Last24Hours": "最近 24 小时",
       "Last7Days": "最近 7 天",
@@ -627,20 +626,19 @@
     },
     "Trend": {
       "Title": "分段完成结果",
-      "Description": "比较连续分段中的完成结果计数。折线连接计数，不表示连续速率。",
+      "Description": "按分段比较完成结果。折线连接计数，不表示速率。",
       "LegendAriaLabel": "结果趋势图例",
       "ViewAriaLabel": "结果趋势图展示方式",
       "Bars": "柱状图",
       "Lines": "折线图",
       "Unit": "每个分段的完成数",
-      "HourBuckets": "固定一小时 UTC 分段",
-      "DayBuckets": "固定 24 小时 UTC 分段",
+      "HourBuckets": "每小时分段",
+      "DayBuckets": "每 24 小时分段",
       "NoCompletions": "此时间范围内没有完成结果。仍可在下方查看返回的分段数据。",
       "ViewData": "查看分段数据",
       "DataAriaLabel": "每个返回分段的完成计数",
-      "Interval": "分段 · 含开始时间，不含结束时间",
+      "Interval": "时间段",
       "PartialBucket": "最后一个分段未满",
-      "UtcInterval": "UTC：{0} → {1}",
       "ChartWindowLabel": "{0}；{1} → {2}；{3}"
     },
     "Duration": {
@@ -684,7 +682,7 @@
       "CompletedDescription": "此时间范围内记录的终态结果",
       "Accepted": "已接受的分析时间范围",
       "Requested": "请求的分析时间范围",
-      "Bounds": "含开始时间 · 不含结束时间 · {0}",
+      "Bounds": "含开始时间 · 不含结束时间",
       "Resolved": "成功 + 失败",
       "Measured": "可度量完成",
       "Observed": "观测时间",
@@ -775,7 +773,7 @@
       "ConsumedFailures": "已消耗重试的失败次数",
       "NoCurrentWorker": "当前无工作节点租约"
     },
-    "RecordedTimeNotice": "按所有记录的创建时间筛选，包括已跳过的发生项 · {0}",
+    "RecordedTimeNotice": "包含所有创建的记录，包括跳过的计划。",
     "AcceptedQuery": "保留快照的筛选条件：{0}",
     "QueryDescription": "{0} · {1} · {2} 至 {3} · 第 {4} 页",
     "AnyIdentifier": "所有标识",
@@ -829,7 +827,7 @@
       "History": "保留历史 · {0}"
     },
     "RefreshFailed": "仍显示最近一次成功检查的快照，刷新失败：{0}",
-    "EvidenceScope": "时间按 {0} 显示。工作节点领取、已消耗重试的失败与租约恢复是不同的记录事实。",
+    "EvidenceScope": "领取、重试失败和租约恢复各自保留独立记录。",
     "CapturedPolicyNotice": "这些设置在准入时捕获，后续定义或策略修改不会改变此执行。"
   },
   "ExecutionHistoryKinds": {

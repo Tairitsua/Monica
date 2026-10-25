@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
@@ -13,7 +14,7 @@
             <dl>
                 <div><dt>@L["Page:Dialogs:Endpoint:Transport"]</dt><dd>@Transport</dd></div>
                 <div><dt>@L["Page:Dialogs:Endpoint:ExactAddress"]</dt><dd>@Endpoint.Address</dd></div>
-                <div><dt>@L["Page:Dialogs:Endpoint:Captured"]</dt><dd>@SystemInfoDisplayFormatter.FormatDateTime(CapturedAtUtc, CultureInfo.CurrentCulture)</dd></div>
+                <div><dt>@L["Page:Dialogs:Endpoint:Captured"]</dt><dd>@UiTime.Format(CapturedAtUtc)</dd></div>
             </dl>
         </div>
     </DialogContent>

@@ -46,16 +46,22 @@ public sealed class ModuleHealthCheckUI : MonicaModule<ModuleHealthCheckUIOption
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<HealthCheckResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
-            option.ConfigureNavigation(static registry => registry.RegisterLocalizedPage<
-                UIHealthCheckPage,
-                HealthCheckResource>(
-                UIHealthCheckPage.PAGE_URL,
-                "Navigation:Title",
-                MoIcons.HeartPulse,
-                BuiltInNavigationCategoryIds.Monitor,
-                addToNav: true,
-                navOrder: 10,
-                accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleHealthCheckUIOption>))));
+            option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<HealthCheckResource>(
+                    "Monica.HealthCheck", "Navigation:Category", 10,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.HeartPulse);
+
+                registry.RegisterLocalizedPage<UIHealthCheckPage, HealthCheckResource>(
+                    UIHealthCheckPage.PAGE_URL,
+                    "Navigation:Title",
+                    MoIcons.HeartPulse,
+                    category,
+                    addToNav: true,
+                    navOrder: 10,
+                    accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleHealthCheckUIOption>));
+            }));
     }
 
     /// <inheritdoc />

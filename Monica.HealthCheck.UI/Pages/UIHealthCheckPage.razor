@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @inject HealthCheckPageSessionFactory SessionFactory
@@ -37,7 +38,7 @@
                     {
                         <div class="health-last-check">
                             <span>@L["Page:LastChecked"]</span>
-                            <time datetime="@snapshot.CheckedAt.ToString("O")" title="@snapshot.CheckedAt.ToLocalTime().ToString("F")">@snapshot.CheckedAt.ToLocalTime().ToString("HH:mm:ss")</time>
+                            <time datetime="@snapshot.CheckedAt.ToString("O")" title="@UiTime.Format(snapshot.CheckedAt)">@UiTime.FormatTime(snapshot.CheckedAt)</time>
                         </div>
                     }
                     <MudButton Variant="Variant.Outlined"

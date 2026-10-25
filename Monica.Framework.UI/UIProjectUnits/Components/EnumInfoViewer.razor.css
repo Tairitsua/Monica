@@ -53,7 +53,6 @@
 .enum-info-viewer__selected-enum { display: grid; gap: 7px; min-width: 0; padding: 20px; border-bottom: 1px solid var(--mud-palette-divider); background: color-mix(in srgb, var(--mud-palette-primary) 3%, var(--mud-palette-surface)); }
 .enum-info-viewer__selected-enum > strong { color: var(--mud-palette-text-primary); font-family: var(--mo-font-family-mono); font-size: 16px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
 .enum-info-viewer__selected-enum > span, .enum-info-viewer__selected-enum p { margin: 0; color: var(--enum-muted); font-size: 11px; line-height: 1.8; }
-.enum-info-viewer__empty { margin: 0; padding: 24px 20px; color: var(--enum-muted); font-size: 13px; line-height: 1.8; }
 .enum-info-viewer ::deep mark.enum-info-viewer__highlight { padding: 0; border-radius: 2px; background: color-mix(in srgb, var(--mud-palette-primary) 15%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); }
 .enum-info-viewer__error { margin-block: 16px; padding: 16px 20px; border: 1px solid color-mix(in srgb, var(--mud-palette-error) 30%, var(--mud-palette-divider)); border-radius: 6px; background: color-mix(in srgb, var(--mud-palette-error) 4%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
 @container enum-reference (max-width: 1100px) {
@@ -67,6 +66,6 @@
     .enum-info-viewer__panel, .enum-info-viewer__panel--assemblies, .enum-info-viewer__panel--enums { grid-row: auto; height: 22rem; }
     .enum-info-viewer__panel--values { height: 26rem; }
     .enum-info-viewer__toolbar { padding-inline: 16px; }
-    .enum-info-viewer__panel-header, .enum-info-viewer__item, .enum-info-viewer__selected-enum, .enum-info-viewer__empty { padding-inline: 16px; }
+    .enum-info-viewer__panel-header, .enum-info-viewer__item, .enum-info-viewer__selected-enum { padding-inline: 16px; }
     .enum-info-viewer__search-input { flex-basis: 100%; }
 }

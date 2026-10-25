@@ -42,9 +42,9 @@ code, .source-kind { color: var(--mud-palette-text-secondary); }
 .document-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 7px; font-size: 12px; border-radius: 4px; background: color-mix(in srgb, currentColor 6%, var(--mud-palette-surface)); }
 i { display: block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: 0 0 5px; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 2px; }
-.queue-message { padding: 28px 24px; font-size: 14px; color: var(--mud-palette-text-secondary); line-height: 1.6; }
-.queue-message p { margin: 0 0 8px; overflow-wrap: anywhere; }
-@media (max-width: 960px) { .queue-table-frame ::deep .mud-table-cell, .queue-table-frame ::deep .mud-table-cell:first-child { padding: 14px 20px; min-width: 0; } .queue-table-frame ::deep .mud-table-cell::before { flex: 0 0 32%; padding-right: 12px; font-size: 12px; font-weight: 500; color: var(--mud-palette-text-secondary); } .queue-table-frame ::deep .mud-table-cell > * { min-width: 0; max-width: 68%; } }
+.queue-message { font-size: 14px; color: var(--mud-palette-text-secondary); line-height: 1.6; }
+.queue-message p { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 960px) { .queue-table-frame ::deep .mud-table-cell, .queue-table-frame ::deep .mud-table-cell:first-child { padding: 14px 20px; min-width: 0; } .queue-table-frame ::deep .mud-table-cell::before { flex: 0 0 32%; padding-right: 12px; font-size: 12px; font-weight: 500; color: var(--mud-palette-text-secondary); } .queue-table-frame ::deep .mud-table-cell[data-label] > * { min-width: 0; max-width: 68%; } }
 @media (max-width: 600px) { .queue-table-frame ::deep .mud-table-pagination-toolbar { height: auto; min-height: 52px; flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; } .queue-table-frame ::deep .mud-table-pagination-spacer { display: none; } }
 @container document-queue (max-width: 650px) { .queue-heading { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; } .queue-search { grid-column: 1 / -1; grid-row: 2; } .queue-actions { grid-column: 2; grid-row: 1; } }
 @media (max-width: 600px) { .queue-heading { padding: 12px 20px 8px; } .queue-filters { padding: 0 20px 12px; } .batch-toolbar { padding: 10px 20px; } .queue-table-frame ::deep .mud-table-cell { padding: 12px 20px; } .queue-table-frame ::deep .mud-table-cell::before { flex: 0 0 34%; padding-right: 12px; font-size: 12px; font-weight: 500; color: var(--mud-palette-text-secondary); } .queue-table-frame ::deep .mud-table-pagination { padding: 8px; flex-wrap: wrap; } }

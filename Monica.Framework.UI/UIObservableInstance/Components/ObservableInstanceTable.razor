@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Framework.UI.Localization
 @using Monica.Framework.UI.UIObservableInstance.Models
 @inject IStringLocalizer<ObservableInstanceResource> L
@@ -98,7 +99,7 @@
             </MudTd>
             <MudTd DataLabel="@L["Shared:Fields:RegisteredAt"]">
                 <MudStack Spacing="0">
-                    <span class="cell-text">@context.RegisteredAtDisplay</span>
+                    <span class="cell-text">@UiTime.Format(context.RegisteredAt)</span>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                         @L["Shared:Labels:RunningDuration", L.FormatDuration(DateTime.UtcNow - context.RegisteredAt)]
                     </MudText>

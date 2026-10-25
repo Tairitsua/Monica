@@ -1,4 +1,5 @@
 @inject ConfigurationValueVisibility Visibility
+@using Monica.UI.Shared.Components.Json
 @using Monica.UI.Shared.Components.Dialogs
 @implements IAsyncDisposable
 @inject ConfigurationFacade Facade
@@ -26,12 +27,12 @@
                 {
                     <p class="configuration-source-file-redaction">@L["Sources:File:RedactionHelp"]</p>
                 }
-                <section class="configuration-source-file-content"><header><h4>@L["Sources:File:Content"]</h4></header><pre class="configuration-source-json">@_fileView.Content</pre></section>
+                <section class="configuration-source-file-content"><header><h4>@L["Sources:File:Content"]</h4></header><MoJson Value="@_fileView.Content" AllowPlainText="true" FormatOnDisplay="false" /></section>
             }
             else
             {
                 <dl class="configuration-source-file-facts"><div class="configuration-source-file-fact-wide"><dt>@L["Sources:File:SourceKey"]</dt><dd><code>@SourceKey</code></dd></div></dl>
-                @if (_loading) { <p class="configuration-source-file-loading">@L["Common:States:Loading"]</p> }
+                @if (_loading) { <MoContentState Loading="true" Compact="true"><p>@L["Common:States:Loading"]</p></MoContentState> }
             }
         </div>
     </DialogContent>

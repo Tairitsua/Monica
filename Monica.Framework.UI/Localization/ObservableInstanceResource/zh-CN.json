@@ -249,13 +249,16 @@
     "Current": "当前状态",
     "History": "留存历史",
     "Registration": "注册代次",
-    "RegisteredUTC": "注册时间 · UTC",
-    "LastRecordedUTC": "最后记录时间 · UTC",
+    "RegisteredUTC": "注册时间",
+    "LastRecordedUTC": "最后记录时间",
     "Retention": "留存容量",
     "RetentionPair": "留存 {0} / 容量 {1}",
     "HistoryScope": "可通过分页查看全部留存记录。序号在当前注册实例内标识条目；累计数量包含已经淘汰或清理的记录。",
     "StateEvidence": "变更前后状态证据",
     "ClearScope": "此操作移除留存历史及其中的异常证据。当前状态、注册身份、累计计数与序号连续性保留。",
     "FormattedEvidence": "高亮诊断文本与复制"
+  },
+  "Navigation": {
+    "Category": "可观测实例"
   }
 }

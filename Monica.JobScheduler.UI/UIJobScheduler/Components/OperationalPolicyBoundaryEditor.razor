@@ -1,8 +1,9 @@
-@using System.Globalization
 @using Monica.JobScheduler.UI.Localization
+@using Monica.UI.Shared.Services
 
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject TimeProvider TimeProvider
+@inject MoTimeFormatter UiTime
 
 <article class="boundary-editor">
     <div class="boundary-editor__heading">
@@ -17,7 +18,6 @@
         <div>
             <span>@L["Policy:Provenance:Declared"]</span>
             <strong>@FormatScheduleTime(DeclaredUtc)</strong>
-            <code>@FormatUtc(DeclaredUtc)</code>
         </div>
         <div class="boundary-editor__operator">
             <span>@L["Policy:Provenance:Override"]</span>
@@ -71,7 +71,6 @@
         <div>
             <span>@L["Policy:Provenance:Effective"]</span>
             <strong>@FormatScheduleTime(EffectiveUtc)</strong>
-            <code>@FormatUtc(EffectiveUtc)</code>
         </div>
     </div>
 </article>
@@ -129,10 +128,5 @@
 
     private string FormatScheduleTime(DateTimeOffset? value) => value is null
         ? L["Common:NotAvailable"]
-        : TimeZoneInfo.ConvertTime(value.Value, TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId))
-            .ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.CurrentCulture);
-
-    private static string FormatUtc(DateTimeOffset? value) => value is null
-        ? "—"
-        : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+        : UiTime.FormatWallTime(TimeZoneInfo.ConvertTime(value.Value, TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId)));
 }

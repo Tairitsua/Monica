@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Globalization
 @using System.Net
 @using System.Text
@@ -37,7 +38,7 @@
     <div class="log-viewer-scroll" @ref="_scrollContainer" @onscroll="OnNativeScrollAsync">
         @if (CurrentLines.Count == 0)
         {
-            <div class="log-viewer-empty" role="status"><MoIcon Icon="@MoIcons.Text" Size="1.5rem" /><p>@L[Filter?.IsActive == true ? "Workbench:Viewer:FilterEmpty" : "Workbench:Viewer:Empty"]</p></div>
+            <MoContentState role="status"><MoIcon Icon="@MoIcons.Text" Size="1.5rem" /><p>@L[Filter?.IsActive == true ? "Workbench:Viewer:FilterEmpty" : "Workbench:Viewer:Empty"]</p></MoContentState>
         }
         else
         {

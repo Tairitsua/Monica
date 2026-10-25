@@ -30,17 +30,32 @@
 }
 
 .performance-controls {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(160px, 180px) auto;
     align-items: center;
-    gap: 16px;
+    gap: 6px 16px;
     min-width: 0;
 }
 
 .performance-interval-control {
-    flex: 1 1 180px;
-    width: 180px;
     min-width: 0;
+}
+
+.performance-auto-refresh ::deep .mud-switch {
+    min-height: 40px;
+    margin: 0;
+}
+
+.performance-capture ::deep .mud-button-root {
+    min-height: 40px;
+}
+
+.performance-interval-hint {
+    grid-column: 2;
+    margin: 0;
+    color: var(--mud-palette-text-secondary);
+    font-size: .75rem;
+    line-height: 1.5;
 }
 
 .performance-interval-control ::deep .mud-input-control {
@@ -98,10 +113,13 @@
     }
     .performance-controls {
         width: 100%;
+        grid-template-columns: minmax(0, 1fr) auto;
     }
-    .performance-interval-control {
-        flex-basis: 100%;
-        width: 100%;
+    .performance-auto-refresh {
+        grid-column: 1 / -1;
+    }
+    .performance-interval-hint {
+        grid-column: 1 / -1;
     }
 }
 

@@ -257,21 +257,6 @@
     font-weight: 500;
 }
 
-.debugger-payload {
-    max-height: 320px;
-    overflow: auto;
-    margin: 0;
-    padding: 16px;
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: 6px;
-    color: var(--mud-palette-text-primary);
-    background: var(--mud-palette-background-gray);
-    font-family: var(--mo-font-family-mono);
-    font-size: 12px;
-    line-height: 1.7;
-    white-space: pre;
-}
-
 .debugger-metadata {
     margin: 0;
 }

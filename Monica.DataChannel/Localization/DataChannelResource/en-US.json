@@ -264,5 +264,8 @@
     "Messages": {
       "ReadFailed": "The latest queue read failed: {0}. Previous captured messages remain visible."
     }
+  },
+  "Navigation": {
+    "Category": "Data channels"
   }
 }

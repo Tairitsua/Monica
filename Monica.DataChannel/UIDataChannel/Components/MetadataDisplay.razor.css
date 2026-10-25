@@ -62,19 +62,6 @@
     padding: 0;
 }
 
-.metadata-code {
-    max-height: 300px;
-    margin: 0;
-    padding: 16px;
-    overflow: auto;
-    color: var(--mud-palette-text-primary);
-    background: var(--mud-palette-surface);
-    font-family: var(--mo-font-family-mono);
-    font-size: 12px;
-    line-height: 1.65;
-    white-space: pre;
-}
-
 .metadata-empty {
     margin: 0;
     padding: 12px 0;
@@ -86,9 +73,5 @@
     .metadata-row {
         grid-template-columns: minmax(0,1fr);
         gap: 5px;
-    }
-    .metadata-code {
-        padding: 16px;
-        max-height: 240px;
     }
 }

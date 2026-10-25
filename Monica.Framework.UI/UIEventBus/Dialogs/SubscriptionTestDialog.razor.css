@@ -27,7 +27,6 @@
 .runtime-test-heading h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
 .runtime-test-heading p { margin: 0; font-size: 12px; line-height: 1.65; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
 .runtime-test-editor { padding: 20px; }
-.runtime-test-editor ::deep textarea { font: 12px/1.8 var(--mo-font-family-mono); overflow-wrap: normal; }
 .runtime-test-validation { margin: 12px 0 0; font-size: 11px; line-height: 1.7; color: color-mix(in srgb, var(--mud-palette-success) 35%, var(--mud-palette-text-primary)); overflow-wrap: anywhere; }
 .runtime-test-validation[data-error="true"] { color: color-mix(in srgb, var(--mud-palette-error) 35%, var(--mud-palette-text-primary)); }
 .runtime-test-editor-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; margin-top: 18px; }
@@ -51,7 +50,6 @@
 .runtime-test-receipts dl { margin: 14px 0; display: grid; gap: 7px; }
 .runtime-test-receipts dl > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
 .runtime-test-receipts dd { margin: 0; font: 11px/1.6 var(--mo-font-family-mono); overflow-wrap: anywhere; }
-.runtime-test-receipts pre { margin: 0; padding: 13px; border: 1px solid var(--mud-palette-lines-default); border-radius: 5px; background: var(--mud-palette-background-gray); font: 11px/1.75 var(--mo-font-family-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .runtime-test-listener-help { display: flex; align-items: flex-start; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--mud-palette-lines-default); color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
 .runtime-test-listener-help ::deep :is(.mud-icon-root, .mo-icon) { margin-top: 2px; flex-shrink: 0; }
 .runtime-test-listener-help p { margin: 0; font-size: 11px; line-height: 1.75; }

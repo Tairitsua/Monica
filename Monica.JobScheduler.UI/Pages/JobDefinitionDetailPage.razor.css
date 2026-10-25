@@ -2,8 +2,6 @@
 .job-detail-page { container: job-detail-page / inline-size; color: var(--mud-palette-text-primary); }
 .job-detail-page__breadcrumb { display: flex; align-items: center; min-width: 0; }
 .job-detail-page__breadcrumb ::deep .mud-button-root { color: color-mix(in srgb, var(--mud-palette-primary) 25%, var(--mud-palette-text-primary)); }
-.job-detail-page__loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 32px 20px; }
-.job-detail-page__loading ::deep .mud-typography-body2 { color: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); }
 .job-detail-page__evidence-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); align-items: start; gap: var(--mo-page-section-gap); min-width: 0; }
 .job-detail-page__freshness { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; color: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); font-size: .8rem; line-height: 1.5; }
 .job-detail-page__freshness > span { overflow-wrap: anywhere; }

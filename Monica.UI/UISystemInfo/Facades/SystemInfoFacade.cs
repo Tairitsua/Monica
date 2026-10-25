@@ -9,6 +9,7 @@ using Monica.Modules;
 using Monica.UI.Localization;
 using Monica.UI.UISystemInfo.Models;
 using Monica.UI.UISystemInfo.Services;
+using Monica.UI.Shared.Services;
 
 namespace Monica.UI.UISystemInfo.Facades;
 
@@ -18,6 +19,7 @@ namespace Monica.UI.UISystemInfo.Facades;
 /// <param name="server">The host-owned server whose live feature collection publishes listening addresses.</param>
 /// <param name="monicaApplication">The host-owned Monica application state.</param>
 /// <param name="shellOptions">The application identity displayed by the Monica shell.</param>
+/// <param name="timeFormatter">The host-owned Clock timezone used by Monica pages.</param>
 /// <param name="hostEnvironment">The Generic Host environment.</param>
 /// <param name="applicationLifetime">The Generic Host lifetime controller.</param>
 /// <param name="systemInfoOptions">The system-information module options.</param>
@@ -27,6 +29,7 @@ public sealed class SystemInfoFacade(
     IServer server,
     MonicaApplication monicaApplication,
     IOptions<ModuleShellUIOption> shellOptions,
+    MoTimeFormatter timeFormatter,
     IHostEnvironment hostEnvironment,
     IHostApplicationLifetime applicationLifetime,
     IOptions<ModuleSystemInfoUIOption> systemInfoOptions,
@@ -37,6 +40,7 @@ public sealed class SystemInfoFacade(
         server,
         monicaApplication,
         shellOptions,
+        timeFormatter,
         hostEnvironment);
     private readonly SystemInfoRestartCoordinator _restartCoordinator = new(
         applicationLifetime,

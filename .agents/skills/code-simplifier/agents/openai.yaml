@@ -1,4 +1,0 @@
-interface:
-  display_name: "Code Simplifier"
-  short_description: "Simplify local .NET changes without behavior drift"
-  default_prompt: "Use $code-simplifier to simplify the current .NET changes within a narrow scope while preserving the task's intended behavior."

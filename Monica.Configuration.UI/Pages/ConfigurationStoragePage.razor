@@ -1,207 +1,80 @@
-@inject ConfigurationValueVisibility Visibility
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @inject ConfigurationFacade Facade
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
 @inject IStringLocalizer<ConfigurationUIResource> L
 
 <PageTitle>@L["Pages:ConfigurationStorage:Title"]</PageTitle>
-<div class="configuration-storage-page" aria-busy="@(_loading ? "true" : "false")">
+<ConfigurationEvidenceLayout Loading="@_loading">
     <ConfigurationPageHeader Title="@L["Pages:ConfigurationStorage:Title"]" Subtitle="@L["Storage:Subtitle"]">
         <Actions><MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Refresh" Disabled="@_loading" OnClick="LoadAsync">@L["Common:Actions:Refresh"]</MudButton></Actions>
     </ConfigurationPageHeader>
     <ConfigurationWorkbenchNavigation ActiveRoute="@PAGE_URL" />
     @if (_loading) { <MudProgressLinear Indeterminate="true" Color="Color.Primary" /> }
-    <div class="configuration-storage-tabs">
-        <MudTabs PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" MinimumTabWidth="140px" Elevation="0" Rounded="false" KeepPanelsAlive="true">
-            <MudTabPanel Text="@L["Storage:Workbench:SourcesTab"]" Icon="@MoIcons.Workflow">
-                <section class="configuration-source-workspace">
-                    <header class="configuration-source-feature">
-                        <div><span class="configuration-storage-feature-label">@L["Storage:Workbench:SourcesTab"]</span><h2>@L["Sources:Runtime:Title"]</h2><p>@L["Sources:Runtime:Subtitle"]</p></div>
-                        <div class="configuration-source-observation">
-                            @if (_hasLoadedSourceInventories) { <strong>@L["Storage:Workbench:SourceCount", _sourceInventories.Count]</strong> }
-                            @if (_sourceInventoriesObservedAtUtc is { } observed) { <span>@L["Storage:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@observed.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time> }
-                        </div>
-                    </header>
-                    <div class="configuration-source-evidence">
-                    <div class="configuration-source-filter"><MudTextField ClearIcon="@MoIcons.Close" T="string" @bind-Value="_sourceSearchText" Label="@L["Storage:Workbench:SearchSources"]" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />@if (_hasLoadedSourceInventories) { <p>@L["Storage:Workbench:SourcesShowing", FilteredSourceInventories.Count(), _sourceInventories.Count]</p> }</div>
-                    @if (!string.IsNullOrWhiteSpace(_sourceInventoryLoadError))
-                    {
-                        <div class="configuration-storage-feedback"><MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_sourceInventoryLoadError</MudAlert></div>
-                    }
-                    @if (_hasLoadedSourceInventories && _sourceInventories.Count == 0)
-                    {
-                        <div class="configuration-storage-empty"><MoIcon Icon="@MoIcons.Workflow" Size="1.5rem" /><p>@L["Sources:Empty"]</p></div>
-                    }
-                    else if (_hasLoadedSourceInventories && !FilteredSourceInventories.Any())
-                    {
-                        <div class="configuration-storage-empty"><MoIcon Icon="@MoIcons.SearchOff" Size="1.5rem" /><p>@L["Storage:Workbench:NoSourcesMatch"]</p></div>
-                    }
-                    else if (FilteredSourceInventories.Any())
-                    {
-                        <div class="configuration-source-panels">
-                            <MudExpansionPanels MultiExpansion="true" Elevation="0" Square="true" Outlined="false" Gutters="false">
-                                @foreach (var inventory in FilteredSourceInventories)
-                                {
-                                    <MudExpansionPanel Icon="@MoIcons.ChevronDown" @key="inventory.Source.SourceKey">
-                                        <TitleContent>
-                                            <div class="configuration-source-title">
-                                                <span class="configuration-source-priority">@L["Sources:Columns:Priority"] <strong>@inventory.Source.PriorityIndex</strong></span>
-                                                <div class="configuration-source-title-main"><h3>@inventory.Source.DisplayName</h3><code>@inventory.Source.SourceKey</code></div>
-                                                <div class="configuration-source-counts"><span data-tone="info">@L["Sources:Inventory:SuppliedCount", inventory.SuppliedValueCount]</span><span data-tone="success">@L["Sources:Inventory:EffectiveCount", inventory.EffectiveValueCount]</span><span>@L["Sources:Inventory:ManagedCount", inventory.ManagedValueCount]</span><span data-tone="warning">@L["Sources:Inventory:UnmanagedCount", inventory.UnmanagedValueCount]</span></div>
-                                            </div>
-                                        </TitleContent>
-                                        <ChildContent>
-                                            <div class="configuration-source-content">
-                                                <div class="configuration-source-toolbar">
-                                                    <div class="configuration-storage-badges"><span>@inventory.Source.Kind</span><span data-tone="@(inventory.Source.IsWritable ? "info" : "secondary")">@(inventory.Source.IsWritable ? L["Sources:Writable"] : L["Sources:ReadOnly"])</span><span data-tone="@(inventory.Source.IsManagedByMonica ? "primary" : "warning")">@(inventory.Source.IsManagedByMonica ? L["Sources:Managed"] : L["Sources:Unmanaged"])</span></div>
-                                                    @if (inventory.Source.Kind == ConfigurationSourceKind.JsonFile) { <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.FileText" OnClick="() => ViewFileAsync(inventory.Source)">@L["Sources:Actions:ViewFile"]</MudButton> }
-                                                </div>
-                                                <dl class="configuration-storage-facts">
-                                                    <div><dt>@L["Sources:File:SourceKey"]</dt><dd><code>@inventory.Source.SourceKey</code></dd></div>
-                                                    <div><dt>@L["Sources:File:ProviderType"]</dt><dd><code>@inventory.Source.ProviderType</code></dd></div>
-                                                    @if (inventory.Source.PhysicalPath is not null) { <div class="configuration-storage-fact-wide"><dt>@L["Sources:File:PhysicalPath"]</dt><dd><code>@inventory.Source.PhysicalPath</code></dd></div> }
-                                                    @if (inventory.Source.SourcePath is not null) { <div><dt>@L["Sources:File:DeclaredPath"]</dt><dd><code>@inventory.Source.SourcePath</code></dd></div> }
-                                                    <div><dt>@L["Storage:Workbench:Reload"]</dt><dd>@ReloadText(inventory.Source)</dd></div>
-                                                    @if (inventory.Source.Optional is { } optional) { <div><dt>@L["Storage:Workbench:SourceOptional"]</dt><dd>@(optional ? L["Storage:Workbench:Optional"] : L["Storage:Workbench:Required"])</dd></div> }
-                                                    @if (!string.IsNullOrWhiteSpace(inventory.Source.ReadOnlyReason)) { <div class="configuration-storage-fact-wide"><dt>@L["Storage:Workbench:ReadOnlyReason"]</dt><dd>@inventory.Source.ReadOnlyReason</dd></div> }
-                                                    @if (!string.IsNullOrWhiteSpace(inventory.Source.Description)) { <div class="configuration-storage-fact-wide"><dt>@L["Storage:Workbench:Description"]</dt><dd>@inventory.Source.Description</dd></div> }
-                                                </dl>
-                                                @if (inventory.Items.Count == 0) { <div class="configuration-storage-empty"><p>@L["Sources:Inventory:NoItems"]</p></div> }
-                                                else
-                                                {
-                                                    <div class="configuration-source-groups">
-                                                        @foreach (var group in SourceInventoryGroups(inventory))
-                                                        {
-                                                            <section class="configuration-source-group" data-effective="@(group.EffectiveCount == group.Items.Count ? "true" : "false")">
-                                                                <header><div><h4>@group.Title</h4>@if (!string.IsNullOrWhiteSpace(group.Subtitle)) { <code>@group.Subtitle</code> }</div><div class="configuration-source-counts"><span>@L["Sources:Inventory:ItemCount", group.Items.Count]</span><span data-tone="success">@L["Sources:Inventory:EffectiveCount", group.EffectiveCount]</span>@if (group.UnmanagedCount > 0) { <span data-tone="warning">@L["Sources:Unmanaged"]</span> }</div></header>
-                                                                <div class="configuration-source-table-owner">
-                                                                    <MudTable T="ConfigurationSourceInventoryItem" Items="@group.Items" Dense="true" Hover="true" Elevation="0" Square="true" Breakpoint="Breakpoint.Sm" RowsPerPage="10" Class="configuration-source-table">
-                                                                        <ColGroup><col style="width: 38%" /><col style="width: 40%" /><col style="width: 22%" /></ColGroup>
-                                                                        <HeaderContent><MudTh>@L["Sources:Inventory:FieldColumn"]</MudTh><MudTh>@L["Sources:Inventory:ValueColumn"]</MudTh><MudTh>@L["Sources:Inventory:StateColumn"]</MudTh></HeaderContent>
-                                                                        <RowTemplate>
-                                                                            <MudTd DataLabel="@L["Sources:Inventory:FieldColumn"]"><div class="configuration-source-field"><strong>@FieldLabel(context)</strong><code>@context.ConfigurationPath</code></div></MudTd>
-                                                                            <MudTd DataLabel="@L["Sources:Inventory:ValueColumn"]"><code class="configuration-source-value" data-sensitive="@(context.IsSensitive ? "true" : "false")">@DisplayValue(context)</code></MudTd>
-                                                                            <MudTd DataLabel="@L["Sources:Inventory:StateColumn"]">
-                                                                                <div class="configuration-source-state" data-tone="@(context.IsEffective ? "success" : "secondary")">
-                                                                                    @if (context.IsEffective)
-                                                                                    {
-                                                                                        <span>@L["Sources:Effective"]</span>
-                                                                                    }
-                                                                                    else
-                                                                                    {
-                                                                                        var overriddenExplanation = OverriddenTooltip(OverridingSourceFor(context, inventory.Source));
-                                                                                        <MudTooltip Text="@overriddenExplanation" ShowOnFocus="true" ShowOnHover="true" Placement="Placement.Top">
-                                                                                            <span class="configuration-source-state-detail" tabindex="0" role="note" aria-label="@($"{L["Sources:Inventory:Overridden"]}. {overriddenExplanation}")">
-                                                                                                @L["Sources:Inventory:Overridden"]<MoIcon Icon="@MoIcons.Info" Size="1.25rem" aria-hidden="true" />
-                                                                                            </span>
-                                                                                        </MudTooltip>
-                                                                                    }
-                                                                                </div>
-                                                                            </MudTd>
-                                                                        </RowTemplate>
-                                                                        <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Storage:Workbench:RowsPerPage"]" InfoFormat="@L["Common:Pagination:InfoFormat"]" /></PagerContent>
-                                                                    </MudTable>
-                                                                </div>
-                                                            </section>
-                                                        }
-                                                    </div>
-                                                }
-                                            </div>
-                                        </ChildContent>
-                                    </MudExpansionPanel>
-                                }
-                            </MudExpansionPanels>
-                        </div>
-                    }
-                    else if (_loading) { <div class="configuration-storage-empty"><p>@L["Common:States:Loading"]</p></div> }
-                    </div>
-                </section>
-            </MudTabPanel>
-            <MudTabPanel Text="@L["Storage:Workbench:StoresTab"]" Icon="@MoIcons.Database">
-                <section class="configuration-store-workspace">
-                    <header><div><h2>@L["Storage:Workbench:StoresTab"]</h2><p>@L["Storage:Workbench:OverviewHelp"]</p></div>@if (_overviewObservedAtUtc is { } observed) { <div class="configuration-storage-observation"><span>@L["Storage:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@observed.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time></div> }</header>
-                    @if (!string.IsNullOrWhiteSpace(_overviewLoadError)) { <div class="configuration-storage-feedback"><MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_overviewLoadError</MudAlert></div> }
-                    @if (!string.IsNullOrWhiteSpace(_storeStateLoadError)) { <div class="configuration-storage-feedback"><MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_storeStateLoadError</MudAlert></div> }
-                    @if (_overview is not null)
-                    {
-                        <div class="configuration-store-dossiers">
-                            @foreach (var role in new[] { (Label: L["Storage:Roles:EffectiveValues"].Value, Store: _overview.EffectiveValueStore), (Label: L["Storage:Roles:History"].Value, Store: _overview.HistoryStore), (Label: L["Storage:Roles:Metadata"].Value, Store: _overview.MetadataStore) })
-                            {
-                                var state = _states.FirstOrDefault(candidate => string.Equals(candidate.StoreKey, role.Store.StoreKey, StringComparison.OrdinalIgnoreCase));
-                                <article class="configuration-store-dossier">
-                                    <header><span>@role.Label</span><h3>@role.Store.DisplayName</h3></header>
-                                    <dl class="configuration-storage-facts"><div><dt>@L["Storage:Workbench:StoreKey"]</dt><dd><code>@role.Store.StoreKey</code></dd></div><div><dt>@L["Storage:Workbench:Kind"]</dt><dd>@role.Store.Kind</dd></div><div><dt>@L["Storage:Workbench:WriteAccess"]</dt><dd>@(role.Store.IsWritable ? L["Sources:Writable"] : L["Sources:ReadOnly"])</dd></div></dl>
-                                    <dl class="configuration-store-capabilities">
-                                        @foreach (var capability in new[] { (Label: L["Storage:Capabilities:EffectiveValues"].Value, Supported: role.Store.SupportsEffectiveValues), (Label: L["Storage:Capabilities:History"].Value, Supported: role.Store.SupportsHistory), (Label: L["Storage:Capabilities:Metadata"].Value, Supported: role.Store.SupportsMetadata), (Label: L["Storage:Notifications:Title"].Value, Supported: role.Store.SupportsNotifications) })
-                                        { <div data-supported="@(capability.Supported ? "true" : "false")"><dt>@capability.Label</dt><dd><MoIcon Icon="@(capability.Supported ? MoIcons.Success : MoIcons.MinusCircle)" Size="1.25rem" />@(capability.Supported ? L["Storage:Workbench:Supported"] : L["Storage:Workbench:NotSupported"])</dd></div> }
-                                    </dl>
-                                    <section class="configuration-store-operation" data-outcome="@(!_hasLoadedStoreStates || !HasRecordedOperation(state) ? "unknown" : state!.LastOperationSucceeded ? "success" : "error")">
-                                        <h4>@L["Storage:Workbench:LatestOperation"]</h4>
-                                        @if (!_hasLoadedStoreStates) { <p>@L["Storage:Workbench:NotAvailable"]</p> }
-                                        else if (state is null || !HasRecordedOperation(state)) { <p>@L["Storage:State:Unknown"]</p> }
-                                        else
-                                        {
-                                            <strong>@(state!.LastOperationSucceeded ? L["Storage:State:Succeeded"] : L["Storage:State:Failed"])</strong>
-                                            <dl><div><dt>@L["Storage:Workbench:OperationTime"]</dt><dd>@if (state!.LastOperationTime is { } recorded) { <time datetime="@recorded.ToString("O")">@recorded.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time> } else { @L["Storage:Workbench:NotAvailable"] }</dd></div></dl>
-                                            @if (state.LastError is not null) { <dl><div><dt>@L["Storage:Workbench:OperationError"]</dt><dd>@state.LastError</dd></div></dl> }
-                                        }
-                                    </section>
-                                </article>
-                            }
-                        </div>
-                        <section class="configuration-store-notifier"><div><h3>@L["Storage:Notifications:Title"]</h3><p>@L["Storage:Notifications:Subtitle"]</p></div><span data-tone="@(_overview.HasChangeNotifier ? "primary" : "secondary")">@(_overview.HasChangeNotifier ? L["Storage:Notifications:Registered"] : L["Storage:Notifications:NotRegistered"])</span></section>
-                    }
-                    else if (_hasLoadedOverview) { <div class="configuration-storage-empty"><p>@L["Storage:Empty"]</p></div> }
-                    else if (_loading) { <div class="configuration-storage-empty"><p>@L["Common:States:Loading"]</p></div> }
-                    @if (_overview is null && _hasLoadedStoreStates)
-                    {
-                        <section class="configuration-store-operation-ledger">
-                            <header><h3>@L["Storage:Workbench:LatestOperation"]</h3><p>@L["Storage:Workbench:OperationEvidenceHelp"]</p></header>
-                            @if (_states.Count == 0)
-                            {
-                                <div class="configuration-storage-empty"><p>@L["Storage:State:Unknown"]</p></div>
-                            }
+    <section class="configuration-store-workspace">
+        <header><div><h2>@L["Workbench:Storage"]</h2><p>@L["Storage:Workbench:OverviewHelp"]</p></div>@if (_overviewObservedAtUtc is { } observed) { <div class="configuration-storage-observation"><span>@L["Storage:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@TimeDisplay.Format(observed)</time></div> }</header>
+        @if (!string.IsNullOrWhiteSpace(_overviewLoadError)) { <div class="configuration-storage-feedback"><MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_overviewLoadError</MudAlert></div> }
+        @if (!string.IsNullOrWhiteSpace(_storeStateLoadError)) { <div class="configuration-storage-feedback"><MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_storeStateLoadError</MudAlert></div> }
+        @if (_overview is not null)
+        {
+            <div class="configuration-store-dossiers">
+                @foreach (var dossier in StoreDossiers)
+                {
+                    var state = _states.FirstOrDefault(candidate => string.Equals(candidate.StoreKey, dossier.Store.StoreKey, StringComparison.OrdinalIgnoreCase));
+                    <article class="configuration-store-dossier" @key="dossier.Store.StoreKey">
+                        <header><div class="configuration-store-roles">@foreach (var label in dossier.Roles) { <span>@label</span> }</div><h3>@dossier.Store.DisplayName</h3></header>
+                        <dl class="configuration-storage-facts"><div><dt>@L["Storage:Workbench:StoreKey"]</dt><dd><code>@dossier.Store.StoreKey</code></dd></div><div><dt>@L["Storage:Workbench:Kind"]</dt><dd>@dossier.Store.Kind</dd></div><div><dt>@L["Storage:Workbench:WriteAccess"]</dt><dd>@(dossier.Store.IsWritable ? L["Sources:Writable"] : L["Sources:ReadOnly"])</dd></div></dl>
+                        <dl class="configuration-store-capabilities">
+                            @foreach (var capability in new[] { (Label: L["Storage:Capabilities:EffectiveValues"].Value, Supported: dossier.Store.SupportsEffectiveValues), (Label: L["Storage:Capabilities:History"].Value, Supported: dossier.Store.SupportsHistory), (Label: L["Storage:Capabilities:Metadata"].Value, Supported: dossier.Store.SupportsMetadata), (Label: L["Storage:Notifications:Title"].Value, Supported: dossier.Store.SupportsNotifications) })
+                            { <div data-supported="@(capability.Supported ? "true" : "false")"><dt>@capability.Label</dt><dd><MoIcon Icon="@(capability.Supported ? MoIcons.Success : MoIcons.MinusCircle)" Size="1.25rem" />@(capability.Supported ? L["Storage:Workbench:Supported"] : L["Storage:Workbench:NotSupported"])</dd></div> }
+                        </dl>
+                        <section class="configuration-store-operation" data-outcome="@(!_hasLoadedStoreStates || !HasRecordedOperation(state) ? "unknown" : state!.LastOperationSucceeded ? "success" : "error")">
+                            <h4>@L["Storage:Workbench:LatestOperation"]</h4>
+                            @if (!_hasLoadedStoreStates) { <p>@L["Storage:Workbench:NotAvailable"]</p> }
+                            else if (state is null || !HasRecordedOperation(state)) { <p>@L["Storage:State:Unknown"]</p> }
                             else
                             {
-                                <div class="configuration-store-dossiers">
-                                    @foreach (var state in _states)
-                                    {
-                                        <article @key="state.StoreKey" class="configuration-store-dossier">
-                                            <header><span>@L["Storage:Workbench:StoreKey"]</span><h3><code>@state.StoreKey</code></h3></header>
-                                            <section class="configuration-store-operation" data-outcome="@(!HasRecordedOperation(state) ? "unknown" : state.LastOperationSucceeded ? "success" : "error")">
-                                                @if (!HasRecordedOperation(state)) { <p>@L["Storage:State:Unknown"]</p> }
-                                                else
-                                                {
-                                                    <strong>@(state.LastOperationSucceeded ? L["Storage:State:Succeeded"] : L["Storage:State:Failed"])</strong>
-                                                    <dl><div><dt>@L["Storage:Workbench:OperationTime"]</dt><dd>@if (state.LastOperationTime is { } recorded) { <time datetime="@recorded.ToString("O")">@recorded.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time> } else { @L["Storage:Workbench:NotAvailable"] }</dd></div></dl>
-                                                    @if (state.LastError is not null) { <dl><div><dt>@L["Storage:Workbench:OperationError"]</dt><dd>@state.LastError</dd></div></dl> }
-                                                }
-                                            </section>
-                                        </article>
-                                    }
-                                </div>
+                                <strong>@(state!.LastOperationSucceeded ? L["Storage:State:Succeeded"] : L["Storage:State:Failed"])</strong>
+                                <dl><div><dt>@L["Storage:Workbench:OperationTime"]</dt><dd>@if (state!.LastOperationTime is { } recorded) { <time datetime="@recorded.ToString("O")">@TimeDisplay.Format(recorded)</time> } else { @L["Storage:Workbench:NotAvailable"] }</dd></div></dl>
+                                @if (state.LastError is not null) { <dl><div><dt>@L["Storage:Workbench:OperationError"]</dt><dd>@state.LastError</dd></div></dl> }
                             }
                         </section>
-                    }
-                    @if (_storeStatesObservedAtUtc is { } operationsObserved) { <footer class="configuration-storage-observation"><span>@L["Storage:Workbench:LatestOperation"] · @L["Storage:Workbench:AcceptedAt"]</span><time datetime="@operationsObserved.ToString("O")">@operationsObserved.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time></footer> }
-                </section>
-            </MudTabPanel>
-        </MudTabs>
-    </div>
-</div>
-
-@code {
-    private static bool HasRecordedOperation(ConfigurationStoreState? state) =>
-        state is not null && (state.LastOperationTime.HasValue ||
-                              !state.LastOperationSucceeded ||
-                              !string.IsNullOrWhiteSpace(state.LastError));
-    private string _sourceSearchText = string.Empty;
-    private IEnumerable<ConfigurationSourceInventory> FilteredSourceInventories => string.IsNullOrWhiteSpace(_sourceSearchText)
-        ? _sourceInventories : _sourceInventories.Where(inventory => SourceMatches(inventory.Source));
-
-    private bool SourceMatches(ConfigurationSourceDescriptor source) =>
-        new[] { source.DisplayName, source.SourceKey, source.PhysicalPath, source.SourcePath, source.ProviderType, source.Kind.ToString() }
-            .Any(value => value?.Contains(_sourceSearchText, StringComparison.OrdinalIgnoreCase) == true);
-}
+                    </article>
+                }
+            </div>
+            <section class="configuration-store-notifier"><div><h3>@L["Storage:Notifications:Title"]</h3><p>@L["Storage:Notifications:Subtitle"]</p></div><span data-tone="@(_overview.HasChangeNotifier ? "primary" : "secondary")">@(_overview.HasChangeNotifier ? L["Storage:Notifications:Registered"] : L["Storage:Notifications:NotRegistered"])</span></section>
+        }
+        else if (_hasLoadedOverview) { <div class="configuration-storage-empty"><p>@L["Storage:Empty"]</p></div> }
+        else if (_loading) { <div class="configuration-storage-empty"><p>@L["Common:States:Loading"]</p></div> }
+        @if (_overview is null && _hasLoadedStoreStates)
+        {
+            <section class="configuration-store-operation-ledger">
+                <header><h3>@L["Storage:Workbench:LatestOperation"]</h3><p>@L["Storage:Workbench:OperationEvidenceHelp"]</p></header>
+                @if (_states.Count == 0)
+                {
+                    <div class="configuration-storage-empty"><p>@L["Storage:State:Unknown"]</p></div>
+                }
+                else
+                {
+                    <div class="configuration-store-dossiers">
+                        @foreach (var state in _states)
+                        {
+                            <article @key="state.StoreKey" class="configuration-store-dossier">
+                                <header><span>@L["Storage:Workbench:StoreKey"]</span><h3><code>@state.StoreKey</code></h3></header>
+                                <section class="configuration-store-operation" data-outcome="@(!HasRecordedOperation(state) ? "unknown" : state.LastOperationSucceeded ? "success" : "error")">
+                                    @if (!HasRecordedOperation(state)) { <p>@L["Storage:State:Unknown"]</p> }
+                                    else
+                                    {
+                                        <strong>@(state.LastOperationSucceeded ? L["Storage:State:Succeeded"] : L["Storage:State:Failed"])</strong>
+                                        <dl><div><dt>@L["Storage:Workbench:OperationTime"]</dt><dd>@if (state.LastOperationTime is { } recorded) { <time datetime="@recorded.ToString("O")">@TimeDisplay.Format(recorded)</time> } else { @L["Storage:Workbench:NotAvailable"] }</dd></div></dl>
+                                        @if (state.LastError is not null) { <dl><div><dt>@L["Storage:Workbench:OperationError"]</dt><dd>@state.LastError</dd></div></dl> }
+                                    }
+                                </section>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+        }
+        @if (_storeStatesObservedAtUtc is { } operationsObserved) { <footer class="configuration-storage-observation"><span>@L["Storage:Workbench:LatestOperation"] · @L["Storage:Workbench:AcceptedAt"]</span><time datetime="@operationsObserved.ToString("O")">@TimeDisplay.Format(operationsObserved)</time></footer> }
+    </section>
+</ConfigurationEvidenceLayout>

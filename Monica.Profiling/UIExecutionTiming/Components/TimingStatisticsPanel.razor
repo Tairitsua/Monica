@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Globalization
 @using Monica.Profiling.ExecutionTiming.Models
 @inject IStringLocalizer<ExecutionTimingResource> L
@@ -74,9 +75,9 @@
     }
     else
     {
-        <div class="timing-empty" role="status"><MoIcon Icon="@(Statistics.Count == 0 ? MoIcons.ChartTrend : MoIcons.SearchOff)" Size="1.5rem" />
+        <div class="timing-empty" role="status"><MoContentState><MoIcon Icon="@(Statistics.Count == 0 ? MoIcons.ChartTrend : MoIcons.SearchOff)" Size="1.5rem" />
             <div><strong>@(Statistics.Count == 0 ? L["Statistics:Empty"] : L["Common:NoMatches"])</strong>
-                <p>@(Statistics.Count == 0 ? L["Statistics:EmptyHelp"] : L["Common:NoMatchesHelp"])</p></div></div>
+                <p>@(Statistics.Count == 0 ? L["Statistics:EmptyHelp"] : L["Common:NoMatchesHelp"])</p></div></MoContentState></div>
     }
     <footer class="timing-ledger-footer">
         <div><p>@L["Statistics:ComparisonHelp"]</p><p>@L["Statistics:RateHelp"]</p></div>

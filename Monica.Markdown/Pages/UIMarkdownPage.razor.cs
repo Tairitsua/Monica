@@ -17,7 +17,7 @@ public partial class UIMarkdownPage : IAsyncDisposable
     private ElementReference _viewerRoot;
     private MarkdownViewerPageState PageState { get; set; } = null!;
     private int _disposeRequested;
-    private string LayoutClass => $"doc-layout mo-page-shell mo-page-shell--compact{(!PageState.IsLoading && PageState.Groups is { Count: > 0 } ? "" : " no-toolbar")}";
+    private const string LayoutClass = "doc-layout mo-page-shell mo-page-shell--compact";
     private string WorkspaceClass => $"doc-workspace{(PageState.ShowSidebar && !PageState.IsSidebarTemporary ? " has-library" : "")}{(PageState.ShowTableOfContents && !PageState.IsOutlineTemporary ? " has-outline" : "")}";
     protected override void OnInitialized() => PageState = PageStateFactory.Create(RequestRenderAsync, action => InvokeAsync(action));
     protected override Task OnInitializedAsync() => PageState.InitializeAsync();

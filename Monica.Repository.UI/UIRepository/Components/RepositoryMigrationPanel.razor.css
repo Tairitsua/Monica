@@ -19,7 +19,6 @@ code { font: 11px/1.8 var(--mo-font-family-mono,monospace); overflow-wrap: anywh
 .migration-filters ::deep .mud-chip { --migration-tone: var(--mud-palette-info); color: color-mix(in srgb, var(--migration-tone) 35%, var(--mud-palette-text-primary)); border-color: color-mix(in srgb, var(--migration-tone) 45%, var(--mud-palette-lines-default)); }
 .migration-filters ::deep .migration-status-applied { --migration-tone: var(--mud-palette-success); } .migration-filters ::deep .migration-status-pending { --migration-tone: var(--mud-palette-warning); }
 .migration-filters ::deep .mud-chip-selected { background: color-mix(in srgb, var(--migration-tone) 10%, var(--mud-palette-surface)); }
-.migration-empty { padding: 32px 24px; color: var(--migration-muted); font-size: 12px; text-align: center; }
 footer { padding: 16px 24px; border-top: 1px solid var(--mud-palette-lines-default); color: var(--migration-muted); font-size: 11px; }
 summary { cursor: pointer; } ul { padding-left: 18px; margin: 12px 0; } li + li { margin-top: 8px; }
 .repository-migrations ::deep .mud-button-outlined-primary { color: var(--migration-ink); }
@@ -38,3 +37,13 @@ summary { cursor: pointer; } ul { padding-left: 18px; margin: 12px 0; } li + li 
 }
 
 @media (max-width: 600px) { .migration-table-frame ::deep .mud-xs-table .migration-result-assembly { grid-column: 2; } }
+
+.migration-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) { display: block; width: 100%; min-width: 0; max-width: 100%; }
+.migration-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: table; width: 100%; table-layout: fixed; }
+.migration-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-body { display: block; width: 100%; }
+.migration-table-frame ::deep .mud-table-body > tr:has(> .mud-table-empty-row) { display: block; width: 100%; padding: 0; }
+.migration-table-frame ::deep .mud-table-root .mud-table-body .mud-table-empty-row { display: block; width: 100%; max-width: none; padding: 0; }
+.migration-table-frame ::deep .mud-table-empty-row::before { display: none; }
+@media (max-width: 600px) {
+    .migration-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: none; }
+}

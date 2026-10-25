@@ -339,12 +339,6 @@
     flex: 1 1 220px;
 }
 
-.timeline-empty {
-    margin: 30px 0;
-    color: var(--mud-palette-text-secondary);
-    font-size: .8125rem;
-}
-
 .timeline-sr-only {
     position: absolute;
     width: 1px;

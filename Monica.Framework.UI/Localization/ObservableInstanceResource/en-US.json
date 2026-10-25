@@ -249,13 +249,16 @@
     "Current": "Current state",
     "History": "Retained history",
     "Registration": "Registration generation",
-    "RegisteredUTC": "Registered at · UTC",
-    "LastRecordedUTC": "Last recorded at · UTC",
+    "RegisteredUTC": "Registered at",
+    "LastRecordedUTC": "Last recorded at",
     "Retention": "Retention capacity",
     "RetentionPair": "{0} retained / {1} capacity",
     "HistoryScope": "Every retained record is reachable by paging. Sequences identify entries within this registration; lifetime totals include entries already evicted or cleared.",
     "StateEvidence": "Before and after state evidence",
     "ClearScope": "This removes retained history and its exception evidence. Current state, registration, lifetime counters, and sequence numbering are preserved.",
     "FormattedEvidence": "Highlighted diagnostic text and copy"
+  },
+  "Navigation": {
+    "Category": "Observable instances"
   }
 }

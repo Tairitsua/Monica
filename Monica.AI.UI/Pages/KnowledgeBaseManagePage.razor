@@ -14,7 +14,7 @@
     <div class="knowledge-workspace">
         @if (!PageState.IsInitialLoading && string.IsNullOrWhiteSpace(PageState.CatalogErrorMessage) && PageState.KnowledgeBases.Count == 0)
         {
-            <section class="knowledge-empty"><MoIcon Icon="@MoIcons.Library" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:FirstCollection"]</h2><p>@L["KnowledgeWorkbench:FirstCollectionHint"]</p><MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Add" OnClick="PageState.ShowCreateKnowledgeBaseDialogAsync">@L["Common:Create"]</MudButton></section>
+            <section class="knowledge-empty"><MoContentState><MoIcon Icon="@MoIcons.Library" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:FirstCollection"]</h2><p>@L["KnowledgeWorkbench:FirstCollectionHint"]</p><MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Add" OnClick="PageState.ShowCreateKnowledgeBaseDialogAsync">@L["Common:Create"]</MudButton></MoContentState></section>
         }
         else
         {
@@ -23,7 +23,7 @@
             <section class="knowledge-dossier" aria-busy="@((PageState.IsInitialLoading || PageState.IsSelectionLoading).ToString().ToLowerInvariant())">
                 @if (PageState.IsInitialLoading || PageState.IsSelectionLoading)
                 {
-                    <div class="knowledge-loading" role="status"><p>@PageState.LoadingPhaseText</p><MudProgressLinear Value="PageState.LoadingProgressValue" Color="Color.Primary" /></div>
+                    <div class="knowledge-loading"><MoContentState Loading="true"><p>@PageState.LoadingPhaseText</p><MudProgressLinear Value="PageState.LoadingProgressValue" Color="Color.Primary" /></MoContentState></div>
                 }
                 else if (PageState.SelectedKnowledgeBase is { } kb)
                 {
@@ -41,7 +41,7 @@
                 }
                 else
                 {
-                    <div class="knowledge-empty"><MoIcon Icon="@MoIcons.Library" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:ChooseCollection"]</h2><p>@L["KnowledgeWorkbench:ChooseCollectionHint"]</p></div>
+                    <div class="knowledge-empty"><MoContentState><MoIcon Icon="@MoIcons.Library" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:ChooseCollection"]</h2><p>@L["KnowledgeWorkbench:ChooseCollectionHint"]</p></MoContentState></div>
                 }
             </section>
         </div>

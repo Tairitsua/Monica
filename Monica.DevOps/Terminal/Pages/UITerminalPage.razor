@@ -28,7 +28,7 @@
     {
         @if (!visit.IsInitialized)
         {
-            <div class="terminal-initialization">
+            <div class="terminal-initialization"><MoContentState Loading="@visit.IsLoading">
                 @if (visit.InitializationFailure is not null)
                 {
                     <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@(visit.OwnerStorageFailure is not null ? L["Messages:OwnerStorageFailed"] : L["Messages:InitializationFailed", visit.InitializationFailure])</MudAlert>
@@ -38,7 +38,7 @@
                 {
                     <MudProgressLinear Indeterminate="true" Color="Color.Primary" /><p>@L["States:Loading"]</p>
                 }
-            </div>
+            </MoContentState></div>
         }
         else if (visit.ActiveSession is { } session)
         {
@@ -113,11 +113,11 @@
         }
         else
         {
-            <div class="terminal-initialization"><p>@L["States:NoSession"]</p>
+            <div class="terminal-initialization"><MoContentState Loading="@visit.IsLoading"><p>@L["States:NoSession"]</p>
                 @if (visit.ReadFailure is not null) { <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@L["Messages:RefreshFailed", visit.ReadFailure]</MudAlert> }
                 @if (visit.OperationFailure is not null) { <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@L["Messages:OperationFailed", visit.OperationFailure]</MudAlert> }
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@(!visit.CanChangeSession)" OnClick="visit.CreateSessionAsync">@L["Actions:NewSession"]</MudButton>
-            </div>
+            </MoContentState></div>
         }
     }
 </div>

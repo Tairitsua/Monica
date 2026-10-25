@@ -33,7 +33,7 @@ public sealed partial class RAGManagePageState
 
         var statusText = document.Status switch
         {
-            DocumentStatus.Done => _localizer["RAG:ChunkViewer:Indexed", document.IndexedAt?.ToString("yyyy-MM-dd") ?? ""].Value,
+            DocumentStatus.Done => _localizer["RAG:ChunkViewer:Indexed", document.IndexedAt is { } indexedAt ? _time.FormatDate(indexedAt) : ""].Value,
             DocumentStatus.Pending => _localizer["RAG:ChunkViewer:PendingIndexing"].Value,
             _ => document.Status.ToString()
         };

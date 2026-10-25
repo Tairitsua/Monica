@@ -159,7 +159,7 @@
 .allocation-pager ::deep .mud-pagination { display: flex; flex-wrap: wrap; max-width: 100%; }
 .allocation-pager ::deep .mud-pagination .mud-button-root { min-width: 28px; }
 
-.allocation-empty { min-width: 0; padding: 34px 26px; display: grid; justify-items: start; gap: 10px; background: color-mix(in srgb, var(--mud-palette-background) 50%, var(--mud-palette-surface)); }
+.allocation-empty { min-width: 0; background: color-mix(in srgb, var(--mud-palette-background) 50%, var(--mud-palette-surface)); }
 .allocation-empty ::deep :is(.mud-icon-root, .mo-icon) { color: var(--allocation-secondary); }
 .allocation-empty h3 { margin: 5px 0 0; font-size: 16px; font-weight: 500; line-height: 1.5; }
 .allocation-empty p { margin: 0; color: var(--allocation-secondary); font-size: 13px; line-height: 1.8; max-width: 80ch; }
@@ -209,7 +209,6 @@
     .allocation-mode-field ::deep .mud-input-slot { font-size: 14px; }
     .allocation-filter-meta { align-items: flex-start; flex-direction: column; }
     .allocation-table-frame ::deep tbody tr { padding: 18px 16px; gap: 14px 12px; }
-    .allocation-empty { padding: 28px 20px; }
     .allocation-pager { padding: 14px 16px; gap: 10px; }
     .allocation-pager ::deep .mud-pagination { gap: 1px; }
     .allocation-error,

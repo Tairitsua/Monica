@@ -16,7 +16,7 @@ namespace Test.Monica.UI.UISystemInfo.Pages;
 public sealed class UISystemInfoPageTests
 {
     [Fact]
-    public async Task Render_WhenLinksAreConfigured_ShouldPlaceThemBeforeTheDetailedDossier()
+    public async Task Render_WhenLinksAreConfigured_ShouldExposeEnabledDestinations()
     {
         var snapshot = SystemInfoTestData.Snapshot();
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
@@ -25,7 +25,8 @@ public sealed class UISystemInfoPageTests
         {
             CustomLinks =
             [
-                SystemInfoTestData.Link("API console", "/swagger")
+                SystemInfoTestData.Link("API console", "/swagger"),
+                SystemInfoTestData.Link("Disabled", "/disabled", enabled: false)
             ]
         });
         await using var context = new SystemInfoUiTestContext(configureServices: services =>
@@ -36,16 +37,11 @@ public sealed class UISystemInfoPageTests
 
         var cut = context.Render<UISystemInfoPage>();
 
-        var directChildren = cut.Find(".system-info-page").Children.ToList();
-        var heroIndex = directChildren.FindIndex(static element => element.ClassList.Contains("system-info-hero"));
-        var pulseIndex = directChildren.FindIndex(static element => element.ClassList.Contains("system-info-pulse"));
-        var linksIndex = directChildren.FindIndex(static element => element.ClassList.Contains("system-info-links"));
-        var dossierIndex = directChildren.FindIndex(static element => element.ClassList.Contains("system-info-dossier"));
-        new[] { heroIndex, pulseIndex, linksIndex, dossierIndex }
-            .Should().OnlyContain(index => index >= 0);
-        heroIndex.Should().BeLessThan(pulseIndex);
-        pulseIndex.Should().BeLessThan(linksIndex);
-        linksIndex.Should().BeLessThan(dossierIndex);
+        var link = cut.Find("a[href='/swagger']");
+        link.TextContent.Should().Contain("API console");
+        link.GetAttribute("target").Should().Be("_blank");
+        link.GetAttribute("rel").Should().Contain("noopener");
+        cut.FindAll("a[href='/disabled']").Should().BeEmpty();
     }
 
     [Fact]
@@ -83,13 +79,13 @@ public sealed class UISystemInfoPageTests
         await using var context = CreateContext(factory, new ModuleSystemInfoUIOption());
 
         var cut = context.Render<UISystemInfoPage>();
-        var originalIdentity = cut.Find(".system-info-hero__name h2").TextContent;
+        var originalIdentity = cut.Find("#system-info-service-name").TextContent;
 
         cut.FindAll("button")
             .Single(button => button.TextContent.Contains("Page:Actions:Refresh", StringComparison.Ordinal))
             .Click();
 
-        cut.Find(".system-info-hero__name h2").TextContent.Should().Be(originalIdentity);
+        cut.Find("#system-info-service-name").TextContent.Should().Be(originalIdentity);
         cut.FindAll(".system-info-load-state").Should().BeEmpty();
         callCount.Should().Be(2);
     }

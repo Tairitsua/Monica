@@ -45,8 +45,8 @@
 .telemetry-explorer { display: grid; grid-template-columns: minmax(285px, .85fr) minmax(0, 1.65fr); gap: 24px; align-items: start; min-width: 0; }
 .telemetry-mobile-navigation { display: none; gap: 10px; flex-wrap: wrap; }
 .telemetry-navigation-count { margin-left: 10px; font-family: var(--mo-font-family-mono); }
-.telemetry-empty { padding: 32px; border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
-.telemetry-empty h2 { margin: 0 0 10px; font-size: 20px; font-weight: 500; }
+.telemetry-empty { border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
+.telemetry-empty h2 { margin: 0; font-size: 20px; font-weight: 500; }
 .telemetry-empty p { margin: 0; max-width: 62ch; font-size: 13px; line-height: 1.7; color: var(--telemetry-muted); }
 .telemetry-export { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 24px; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-surface); }
 .telemetry-export h2 { margin: 0 0 6px; font-size: 15px; font-weight: 500; }
@@ -55,7 +55,7 @@
 .telemetry-workspace ::deep .mud-button-root { min-height: 34px; font-size: 12px; border-radius: 6px; }
 @media (max-width: 1200px) { .telemetry-workspace { padding: 24px; } .telemetry-explorer { grid-template-columns: minmax(260px, .85fr) minmax(0, 1.4fr); gap: 20px; } }
 @media (max-width: 960px) { .telemetry-heading { flex-direction: column; gap: 18px; } .telemetry-controls { align-items: flex-start; } .telemetry-scope { grid-template-columns: minmax(0, 1fr); } .telemetry-explorer { grid-template-columns: minmax(0, 1fr); } .telemetry-resource h2 { font-size: 26px; } .telemetry-export { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 600px) { .telemetry-workspace { padding: 20px 16px; gap: 20px; } .telemetry-heading h1 { font-size: 30px; } .telemetry-resource, .telemetry-coverage { padding: 22px 20px; } .telemetry-counts { gap: 12px; } .telemetry-counts dd { font-size: 26px; } .telemetry-empty { padding: 24px 20px; } .telemetry-export { padding: 20px; } .telemetry-read-error { padding: 18px; } }
+@media (max-width: 600px) { .telemetry-workspace { padding: 20px 16px; gap: 20px; } .telemetry-heading h1 { font-size: 30px; } .telemetry-resource, .telemetry-coverage { padding: 22px 20px; } .telemetry-counts { gap: 12px; } .telemetry-counts dd { font-size: 26px; } .telemetry-export { padding: 20px; } .telemetry-read-error { padding: 18px; } }
 @media (max-width: 960px) {
     .telemetry-mobile-navigation { display: flex; }
     .telemetry-explorer.is-inspecting ::deep .telemetry-registry,

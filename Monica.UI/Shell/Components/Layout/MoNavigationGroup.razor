@@ -1,0 +1,66 @@
+@using Monica.UI.Shell.Models
+@using Monica.UI.Shell.Support
+
+<section class="mo-navigation-group @(IsRoot ? "is-root" : null)" data-navigation-group-id="@Group.Id.Value">
+    <button type="button" class="mo-navigation-group__toggle" aria-expanded="@_expanded.ToString().ToLowerInvariant()"
+            aria-controls="@_contentId" @onclick="Toggle">
+        @if (ShowGroupIcon && !string.IsNullOrEmpty(Group.Icon))
+        {
+            <MoIcon Icon="@Group.Icon" Size="20px" Class="mo-navigation-group__icon" />
+        }
+        <span class="mo-navigation-group__label">@Group.DisplayName</span>
+        <span class="mo-navigation-group__count">@Group.DestinationCount</span>
+        <span class="mo-navigation-group__chevron @(_expanded ? "is-expanded" : null)" aria-hidden="true">
+            <MoIcon Icon="@MoIcons.ChevronDown" Size="14px" />
+        </span>
+    </button>
+    <div id="@_contentId" class="mo-navigation-group__children" hidden="@(!_expanded)">
+        <NavigationTree Group="@Group" ActiveItem="@ActiveItem" ShowPageIcons="@ShowPageIcons" />
+    </div>
+</section>
+
+@code {
+    private readonly string _contentId = $"mo-navigation-branch-{Guid.NewGuid():N}";
+    private NavigationCategoryId? _groupId;
+    private string? _previousActiveHref;
+    private bool _expanded;
+
+    /// <summary>Gets or sets the authorized category whose label, count, and destinations are rendered.</summary>
+    [Parameter, EditorRequired] public NavigationGroup Group { get; set; } = default!;
+
+    /// <summary>Gets or sets the shell's single longest matching destination. A changed active destination reveals its containing branch.</summary>
+    [Parameter] public NavigationItem? ActiveItem { get; set; }
+
+    /// <summary>Gets or sets whether page destinations show registered icons instead of quiet dots. Defaults to false.</summary>
+    [Parameter] public bool ShowPageIcons { get; set; }
+
+    /// <summary>Gets or sets whether the category heading shows its registered icon. Defaults to false.</summary>
+    [Parameter] public bool ShowGroupIcon { get; set; }
+
+    /// <summary>Gets or sets whether the heading uses the root-category scale. Defaults to false.</summary>
+    [Parameter] public bool IsRoot { get; set; }
+
+    /// <summary>
+    /// Gets or sets the initial expanded state. Defaults to true. The active branch always opens on initialization;
+    /// subsequent parameter updates preserve the user's disclosure choice until the active destination changes.
+    /// </summary>
+    [Parameter] public bool InitiallyExpanded { get; set; } = true;
+
+    protected override void OnParametersSet()
+    {
+        var containsActive = ActiveItem is not null && NavigationTreeBuilder.Flatten([Group]).Contains(ActiveItem);
+        if (_groupId != Group.Id)
+        {
+            _groupId = Group.Id;
+            _expanded = InitiallyExpanded || containsActive;
+        }
+        else if (!string.Equals(_previousActiveHref, ActiveItem?.Href, StringComparison.OrdinalIgnoreCase) && containsActive)
+        {
+            _expanded = true;
+        }
+
+        _previousActiveHref = ActiveItem?.Href;
+    }
+
+    private void Toggle() => _expanded = !_expanded;
+}

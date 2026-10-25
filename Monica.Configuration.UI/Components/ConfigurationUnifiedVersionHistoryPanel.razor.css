@@ -16,10 +16,10 @@
 .configuration-version-table ::deep .mud-table-cell { padding: 20px 24px; vertical-align: top; overflow-wrap: anywhere; }
 .configuration-version-table ::deep .mud-table-head .mud-table-cell { padding-block: 12px; color: var(--version-muted); font-size: 11px; font-weight: 500; background: color-mix(in srgb, var(--mud-palette-text-primary) 3%, var(--mud-palette-surface)); }
 .configuration-version-table ::deep .configuration-version-selected { background: color-mix(in srgb, var(--mud-palette-primary) 6%, var(--mud-palette-surface)); }
-.configuration-version-identity, .configuration-version-scope, .configuration-version-audit { display: grid; justify-items: start; gap: 7px; min-width: 0; max-width: 100%; }
+.configuration-version-identity, .configuration-version-audit { display: grid; justify-items: start; gap: 7px; min-width: 0; max-width: 100%; }
 .configuration-version-identity > strong { font-size: 18px; font-weight: 500; }
-.configuration-version-scope > strong, .configuration-version-audit > strong { font-size: 12px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
-.configuration-version-identity time, .configuration-version-meta-label, .configuration-version-scope > span { color: var(--version-muted); font-size: 11px; line-height: 1.6; }
+.configuration-version-audit > strong { font-size: 13px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+.configuration-version-identity time, .configuration-version-meta-label { color: var(--version-muted); font-size: 12px; line-height: 1.6; }
 .configuration-version-table code { font-size: 11px; color: var(--version-muted); line-height: 1.7;
     white-space: normal; overflow-wrap: anywhere; }
 .configuration-version-audit p { margin: 0; color: var(--version-muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
@@ -32,9 +32,25 @@
 .configuration-version-table ::deep .mud-table-pagination .mud-table-pagination-toolbar .mud-table-pagination-actions { margin-inline: 0; }
 .configuration-version-ledger-footer { display: flex; align-items: flex-start; gap: 8px; padding: 16px 28px; border-top: 1px solid var(--mud-palette-lines-default); color: var(--version-muted); font-size: 11px; line-height: 1.7; }
 .configuration-version-ledger-footer ::deep :is(.mud-icon-root, .mo-icon) { flex-shrink: 0; }
-.configuration-version-empty { padding: 28px; text-align: start; }
-.configuration-version-empty h3 { margin: 12px 0 8px; font-size: 16px; font-weight: 500; }
-.configuration-version-empty p { margin: 0; font-size: 12px; color: var(--version-muted); line-height: 1.7; }
+
 @media (max-width: 960px) { .configuration-version-table ::deep .mud-table-root, .configuration-version-table ::deep .mud-table-body, .configuration-version-table ::deep .mud-table-body > .mud-table-row { display: block; width: 100%; } .configuration-version-table ::deep colgroup { display: none; } .configuration-version-table ::deep .mud-table-cell { display: grid; grid-template-columns: 104px minmax(0, 1fr); width: 100%; gap: 12px; padding: 16px 24px; align-items: start; } .configuration-version-table ::deep .mud-table-cell::before { width: auto; margin: 0; padding: 0; color: var(--version-muted); font-size: 11px; line-height: 1.6; } .configuration-version-table ::deep .mud-table-cell:first-child { border-radius: 0; } .configuration-version-actions { justify-content: flex-start; } }
 @media (max-width: 800px) { .configuration-version-ledger-heading, .configuration-version-ledger-filter, .configuration-version-ledger-footer { padding-inline: 20px; } .configuration-version-ledger-filter { grid-template-columns: minmax(0, 1fr); gap: 12px; } .configuration-version-table ::deep .mud-table-cell { padding-inline: 20px; } }
 @media (max-width: 600px) { .configuration-version-table ::deep .mud-table-cell { grid-template-columns: minmax(0, 1fr); gap: 8px; } .configuration-version-table ::deep .mud-table-pagination { padding-inline: 16px; } }
+
+.configuration-version-table ::deep .mud-table-empty-row {
+    width: 100%;
+    padding: 0;
+}
+
+@media (max-width: 960px) {
+    .configuration-version-table ::deep tr:has(> .mud-table-empty-row) {
+        display: block;
+        width: 100%;
+    }
+    .configuration-version-table ::deep .mud-table-empty-row {
+        display: flow-root;
+    }
+    .configuration-version-table ::deep .mud-table-empty-row::before {
+        display: none;
+    }
+}

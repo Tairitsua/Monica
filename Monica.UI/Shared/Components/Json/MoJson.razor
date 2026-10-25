@@ -1,0 +1,241 @@
+@using Microsoft.Extensions.Logging
+@using Monica.UI.Shared.Support
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ILogger<MoJson> Logger
+@inject IStringLocalizer<SharedResource> L
+
+<div @ref="_root" class="mo-json @(ReadOnly ? "is-readonly" : "is-editable") @(_lineNumbers ? "has-line-numbers" : null) @(_wrap && ReadOnly ? "is-wrapped" : null) @(Disabled ? "is-disabled" : null)"
+     style="--json-rows:@Math.Clamp(Rows, 2, 40);--json-max-height:@MaxHeight;" data-json-valid="@(_presentation.Validation.IsValid ? "true" : "false")">
+    @if (ShowToolbar)
+    {
+        <div class="json-toolbar">
+            <span class="json-caption" title="@Label"><MoIcon Icon="@MoIcons.Braces" Size="16px" /><span>@(Label ?? L["Json:Caption"])</span></span>
+            <div class="json-actions">
+                @if (ReadOnly)
+                {
+                    <button type="button" class="json-text-button" disabled="@(!_presentation.Validation.IsValid || Disabled)"
+                            aria-pressed="@(_formatted && _presentation.Validation.IsValid ? "true" : "false")"
+                            @onclick="() => SetFormat(true)">@L["Json:Formatted"]</button>
+                    <button type="button" class="json-text-button" disabled="@Disabled"
+                            aria-pressed="@(!_formatted || !_presentation.Validation.IsValid ? "true" : "false")"
+                            @onclick="() => SetFormat(false)">@L["Json:Raw"]</button>
+                }
+                else
+                {
+                    <button type="button" class="json-text-button" disabled="@(!CanFormat)" @onclick="FormatAsync">@L["Json:Format"]</button>
+                    <button type="button" class="json-icon-button" title="@L["Json:Minify"]" aria-label="@L["Json:Minify"]" disabled="@(!CanFormat)" @onclick="MinifyAsync"><MoIcon Icon="@MoIcons.Minimize" Size="16px" /></button>
+                }
+                <button type="button" class="json-icon-button" title="@L["Json:LineNumbers"]" aria-label="@L["Json:LineNumbers"]" aria-pressed="@(_lineNumbers ? "true" : "false")" disabled="@Disabled" @onclick="ToggleLines"><MoIcon Icon="@MoIcons.List" Size="16px" /></button>
+                @if (ReadOnly)
+                {
+                    <button type="button" class="json-icon-button" title="@L["Json:Wrap"]" aria-label="@L["Json:Wrap"]" aria-pressed="@(_wrap ? "true" : "false")" disabled="@Disabled" @onclick="ToggleWrap"><MoIcon Icon="@MoIcons.Text" Size="16px" /></button>
+                }
+                <button type="button" class="json-icon-button" title="@L["Json:Copy"]" aria-label="@L["Json:Copy"]" aria-disabled="@(!Disabled && CopyState.CanCopy ? "false" : "true")" aria-busy="@(CopyState.IsCopying ? "true" : "false")" @onclick="CopyAsync"><MoIcon Icon="@(CopyState.Feedback == TextCopyFeedback.Copied ? MoIcons.Success : MoIcons.Copy)" Size="16px" /></button>
+            </div>
+        </div>
+    }
+    <div class="json-code-region">
+        @if (_lineNumbers && !ReadOnly)
+        {
+            <div class="json-gutter" aria-hidden="true">@for (var line = 1; line <= LineCount; line++) { <span>@line</span> }</div>
+        }
+        @if (ReadOnly)
+        {
+            <div class="json-readout" tabindex="0" role="region" aria-label="@(Label ?? L["Json:Caption"])">
+                @{ var lineNumber = 0; }
+                @foreach (var line in NormalizedDisplay.Split('\n'))
+                {
+                    <div class="json-view-line">@if (_lineNumbers) { <span class="json-view-number" aria-hidden="true">@(++lineNumber)</span> }<code>@Highlight(line)@if (line.Length == 0) { @("\n") }</code></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="json-editor-stack">
+                <pre class="json-highlight" aria-hidden="true"><code>@Highlight(NormalizedDisplay)@("\n")</code></pre>
+                <textarea class="json-input" @bind:get="_presentation.Source" @bind:set="ChangeAsync" @bind:event="oninput"
+                          disabled="@Disabled" rows="@Math.Clamp(Rows, 2, 40)" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off"
+                          aria-label="@(Label ?? L["Json:Editor"])"
+                          aria-invalid="@(!_presentation.Validation.IsValid && !_presentation.Validation.IsEmpty && !AllowPlainText ? "true" : "false")"
+                          aria-describedby="@(ShowStatus ? _feedbackId : null)" placeholder="@Placeholder"></textarea>
+            </div>
+        }
+    </div>
+    @if (ShowStatus)
+    {
+        <div class="json-status @StatusClass" id="@_feedbackId" role="status" aria-live="polite" aria-atomic="true" title="@_presentation.Validation.Error">
+            <span class="json-validation"><span class="json-status-dot" aria-hidden="true"></span>@StatusText</span>
+            <span class="json-copy-feedback">@CopyFeedback</span>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets the untrusted source, rendered as encoded text. Formatting a preview never changes this value.</summary>
+    [Parameter] public string? Value { get; set; }
+    /// <summary>Publishes every native input edit and explicit format/minify action, including invalid and empty drafts.</summary>
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    /// <summary>Gets or sets whether source is read-only. Defaults to true; false enables a native textarea with syntax highlighting.</summary>
+    [Parameter] public bool ReadOnly { get; set; } = true;
+    /// <summary>Gets or sets whether editing and toolbar commands are unavailable. Defaults to false.</summary>
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>Gets or sets the localized accessible caption. Null uses the shared JSON caption.</summary>
+    [Parameter] public string? Label { get; set; }
+    /// <summary>Gets or sets an optional native editor placeholder.</summary>
+    [Parameter] public string? Placeholder { get; set; }
+    /// <summary>Gets or sets initial line-number visibility. Defaults to true; toolbar changes remain local until this parameter changes.</summary>
+    [Parameter] public bool ShowLineNumbers { get; set; } = true;
+    /// <summary>Gets or sets initial wrapping in read-only mode. Defaults to false. Editing retains native horizontal scrolling.</summary>
+    [Parameter] public bool WrapLines { get; set; }
+    /// <summary>Gets or sets initial formatting of a read-only projection. Defaults to true. Editor source is never formatted automatically.</summary>
+    [Parameter] public bool FormatOnDisplay { get; set; } = true;
+    /// <summary>Gets or sets whether to render toolbar commands. Defaults to true.</summary>
+    [Parameter] public bool ShowToolbar { get; set; } = true;
+    /// <summary>Gets or sets whether to display syntax and copy feedback. Defaults to true.</summary>
+    [Parameter] public bool ShowStatus { get; set; } = true;
+    /// <summary>Gets or sets whether non-JSON input is expected text rather than a syntax error. Defaults to false; no coercion occurs.</summary>
+    [Parameter] public bool AllowPlainText { get; set; }
+    /// <summary>Gets or sets native editor height in lines, clamped to 2–40. Defaults to 10.</summary>
+    [Parameter] public int Rows { get; set; } = 10;
+    /// <summary>Gets or sets the CSS maximum content height. Defaults to 420px; the code region scrolls independently.</summary>
+    [Parameter] public string MaxHeight { get; set; } = "420px";
+    /// <summary>Publishes changed strict JSON syntax evidence, including initial parameters. Callers own schema validation, submission and persistence.</summary>
+    [Parameter] public EventCallback<MoJsonValidation> ValidationChanged { get; set; }
+
+    private readonly string _feedbackId = $"json-status-{Guid.NewGuid():N}";
+    private ElementReference _root;
+    private JsonTextPresentation _presentation = JsonTextPresentation.Create(null);
+    private MoJsonValidation? _lastValidation;
+    private TextCopySession? _copy;
+    private IJSObjectReference? _module, _connection;
+    private Task? _initialization, _retirement;
+    private bool _retired, _lineNumbers = true, _wrap, _formatted = true;
+    private bool? _lastLines, _lastWrap, _lastFormat;
+    private string DisplayText => ReadOnly && _formatted ? _presentation.Formatted : _presentation.Source;
+    private string NormalizedDisplay => DisplayText.Replace("\r\n", "\n").Replace('\r', '\n');
+    private int LineCount => NormalizedDisplay.Count(character => character == '\n') + 1;
+    private bool CanFormat => !_retired && !Disabled && _presentation.Validation.IsValid;
+    private TextCopyState CopyState => _copy?.State ?? default;
+    private string CopyFeedback => CopyState.Feedback switch
+    {
+        TextCopyFeedback.Copied => L["Json:Copied"],
+        TextCopyFeedback.Failed => L["Json:CopyFailed"],
+        _ => string.Empty
+    };
+    private string StatusClass => _presentation.Validation.IsValid ? "is-valid"
+        : _presentation.Validation.IsEmpty || AllowPlainText ? "is-neutral" : "is-invalid";
+    private string StatusText => _presentation.Validation switch
+    {
+        { IsValid: true } => L["Json:Valid"],
+        { IsEmpty: true } => L["Json:Empty"],
+        _ when AllowPlainText => L["Json:PlainText"],
+        var result => L["Json:Invalid", result.LineNumber ?? 1, result.BytePositionInLine ?? 1]
+    };
+
+    protected override void OnInitialized() => _copy = new(JS, Logger);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_retired) return;
+        if (_lastLines != ShowLineNumbers) { _lastLines = ShowLineNumbers; _lineNumbers = ShowLineNumbers; }
+        if (_lastWrap != WrapLines) { _lastWrap = WrapLines; _wrap = WrapLines; }
+        if (_lastFormat != FormatOnDisplay) { _lastFormat = FormatOnDisplay; _formatted = FormatOnDisplay; }
+        SetSource(Value ?? string.Empty);
+        await NotifyValidationAsync();
+    }
+
+    private void SetSource(string source)
+    {
+        if (_presentation.Source != source) _presentation = JsonTextPresentation.Create(source);
+        _copy?.SetSource(source);
+    }
+
+    private async Task ChangeAsync(string source)
+    {
+        if (_retired || Disabled || ReadOnly) return;
+        SetSource(source);
+        Value = source;
+        await ValueChanged.InvokeAsync(source);
+        if (!_retired) await NotifyValidationAsync();
+    }
+
+    private Task NotifyValidationAsync()
+    {
+        if (_lastValidation == _presentation.Validation) return Task.CompletedTask;
+        _lastValidation = _presentation.Validation;
+        return ValidationChanged.InvokeAsync(_lastValidation);
+    }
+
+    private Task FormatAsync() => CanFormat ? ChangeAsync(_presentation.Formatted) : Task.CompletedTask;
+    private Task MinifyAsync() => CanFormat ? ChangeAsync(_presentation.Compact) : Task.CompletedTask;
+    private void ToggleLines() { if (!_retired && !Disabled) _lineNumbers = !_lineNumbers; }
+    private void ToggleWrap() { if (!_retired && !Disabled) _wrap = !_wrap; }
+    private void SetFormat(bool formatted) { if (!_retired && !Disabled && (!formatted || CanFormat)) _formatted = formatted; }
+    private Task CopyAsync() => !_retired && !Disabled && _copy is { } copy ? copy.CopyAsync() : Task.CompletedTask;
+
+    private RenderFragment Highlight(string text) => builder =>
+    {
+        if (AllowPlainText && !_presentation.Validation.IsValid) { builder.AddContent(0, text); return; }
+        foreach (var token in JsonTextPresentation.Tokenize(text))
+        {
+            if (token.Role is null) builder.AddContent(1, token.Text);
+            else
+            {
+                builder.OpenElement(2, "span");
+                builder.AddAttribute(3, "class", $"json-token-{token.Role}");
+                builder.AddContent(4, token.Text);
+                builder.CloseElement();
+            }
+        }
+    };
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => _initialization ??= ConnectAsync();
+
+    private async Task ConnectAsync()
+    {
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.UI/Shared/Components/Json/MoJson.razor.js");
+            if (!_retired) _connection = await _module.InvokeAsync<IJSObjectReference>("connect", _root);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException exception) { Logger.LogWarning(exception, "JSON editor enhancement is unavailable; native text remains editable."); }
+    }
+
+    /// <summary>Stops admission and drains initialization and the actual clipboard write before releasing owned JavaScript references.</summary>
+    public ValueTask DisposeAsync()
+    {
+        _retired = true;
+        return new(_retirement ??= RetireAsync());
+    }
+
+    private async Task RetireAsync()
+    {
+        try { if (_initialization is not null) await _initialization; }
+        finally
+        {
+            try { if (_copy is not null) await _copy.DisposeAsync(); }
+            finally
+            {
+                try
+                {
+                    if (_connection is not null)
+                    {
+                        try { await _connection.InvokeVoidAsync("dispose"); }
+                        finally { await _connection.DisposeAsync(); }
+                    }
+                }
+                catch (JSDisconnectedException) { }
+                finally
+                {
+                    if (_module is not null)
+                    {
+                        try { await _module.DisposeAsync(); }
+                        catch (JSDisconnectedException) { }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @attribute [Route(PAGE_URL)]
 
 @using Monica.JobScheduler.UI.Localization
@@ -22,10 +23,10 @@
             <div class="overview-page">
                 @if (_state.IsLoading && _state.Overview is null)
                 {
-                    <div class="overview-page__loading" role="status">
+                    <MoContentState Loading="true">
                         <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
                         <MudText Typo="Typo.body2">@L["Common:Loading"]</MudText>
-                    </div>
+                    </MoContentState>
                 }
                 else if (_state.Error is not null && _state.Overview is null)
                 {

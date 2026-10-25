@@ -261,5 +261,8 @@
   },
   "Common": {
     "Cancel": "取消"
+  },
+  "Navigation": {
+    "Category": "文件"
   }
 }

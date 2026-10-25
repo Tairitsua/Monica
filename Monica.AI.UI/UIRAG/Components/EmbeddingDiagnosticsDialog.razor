@@ -22,12 +22,12 @@
 
             @if (_isLoading)
             {
-                <div class="diagnostics-loading">
+                <MoContentState Loading="true">
                     <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
                         @L["RAG:EmbeddingDiagnostics:Loading"]
                     </MudText>
-                </div>
+                </MoContentState>
             }
             else if (_models.Count == 0)
             {

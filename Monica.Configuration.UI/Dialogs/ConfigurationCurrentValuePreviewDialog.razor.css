@@ -31,12 +31,3 @@
 .configuration-current-value-diff ::deep .diff-content {
     max-height: min(52vh, 620px);
 }
-
-.configuration-current-value-json pre {
-    margin: 0;
-    padding: 1rem;
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mud-typography-default-family);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}

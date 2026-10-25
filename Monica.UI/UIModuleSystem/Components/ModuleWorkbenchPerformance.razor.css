@@ -77,7 +77,7 @@
 .performance-work-state::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ""; }
 .performance-work-state--failed { --work-state: var(--mud-palette-error); }
 .performance-work-state--complete { --work-state: var(--mud-palette-success); }
-.performance-empty { margin: 0; padding: 24px; color: var(--performance-muted); font-size: 13px; line-height: 1.65; text-align: start; }
+
 @container module-performance (max-width: 1150px) { .performance-grid--causal { grid-template-columns: minmax(0, 1fr); } }
 @container module-performance (max-width: 900px) {
     .performance-budgets { grid-template-columns: minmax(0, 1fr); }
@@ -105,4 +105,24 @@
     .stage-strip { grid-template-columns: minmax(0, 1fr); }
     .stage-strip li { padding: 20px; border-inline-end: 0; }
     .stage-strip li + li { border-top: 1px solid var(--mud-palette-divider); }
+}
+
+@container module-performance (max-width: 700px) {
+    .startup-work-table-wrapper ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+    .startup-work-table-wrapper ::deep tr:has(> .mud-table-empty-row) {
+        display: block;
+        width: 100%;
+    }
+    .startup-work-table-wrapper ::deep .mud-table-empty-row {
+        display: flow-root;
+        width: 100%;
+        padding: 0;
+    }
+    .startup-work-table-wrapper ::deep .mud-table-empty-row::before {
+        display: none;
+    }
 }

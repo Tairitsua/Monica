@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.Core.Results
 @using Monica.Framework.UI.UIProjectUnits.Services
 @using Monica.ProjectUnits.Models
@@ -12,14 +13,13 @@
     <DialogContent>
         @if (_loading)
         {
-            <div class="pu-dossier__state" data-testid="project-unit-detail-loading" role="status">
-                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MoContentState Loading="true" data-testid="project-unit-detail-loading" role="status"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
                 <p>@L["ProjectUnitDetailDialog:States:Loading"]</p>
-            </div>
+            </MoContentState>
         }
         else if (_loadError is not null)
         {
-            <div class="pu-dossier__error" data-testid="project-unit-detail-error" role="status">@_loadError</div>
+            <MoContentState data-testid="project-unit-detail-error" role="status">@_loadError</MoContentState>
         }
         else if (_detail is not null)
         {
@@ -51,11 +51,16 @@
                     <div><dt>@L["ProjectUnitDetailDialog:Fields:DependedBy"]</dt><dd>@summary.DependedByCount</dd></div>
                     <div><dt>@L["ProjectUnitDetailDialog:Fields:Methods"]</dt><dd>@summary.MethodCount</dd></div>
                 </dl>
-                <section class="pu-dossier__section">
-                    <header><span class="pu-dossier__section-index" aria-hidden="true">01</span><div><h4>@L["ProjectUnitDetailDialog:Sections:Requirements"]</h4><p>@L["ProjectUnitDetailDialog:Sections:RequirementsHint"]</p></div><span class="pu-dossier__section-count">@_detail.Requirements.Count</span></header>
+                <section class="pu-dossier__section pu-dossier__section--requirements">
+                    <header><span class="pu-dossier__section-icon"><MoIcon Icon="@MoIcons.ClipboardList" Size="1.25rem" /></span><div><h4>@L["ProjectUnitDetailDialog:Sections:Requirements"]</h4><p>@L["ProjectUnitDetailDialog:Sections:RequirementsHint"]</p></div><span class="pu-dossier__section-count">@_detail.Requirements.Count</span></header>
                     @if (_detail.Requirements.Count == 0)
                     {
-                        <p class="pu-dossier__absence">@L["ProjectUnitDetailDialog:States:NoRequirements"]</p>
+                        <div class="pu-dossier__requirements-empty">
+                            <MoContentState Compact="true">
+                                <MoIcon Icon="@MoIcons.Link" Size="1.5rem" />
+                                <p>@L["ProjectUnitDetailDialog:States:NoRequirements"]</p>
+                            </MoContentState>
+                        </div>
                     }
                     else
                     {
@@ -84,8 +89,8 @@
                 {
                     <section class="pu-dossier__tags"><h4>@L["ProjectUnitDetailDialog:Sections:Tags"]</h4><ul>@foreach (var tag in summary.Tags) { <li>@tag</li> }</ul></section>
                 }
-                <section class="pu-dossier__section">
-                    <header><span class="pu-dossier__section-index" aria-hidden="true">02</span><div><h4>@L["ProjectUnitDetailDialog:Sections:Relationships"]</h4><p>@L["ProjectUnitDetailDialog:Sections:RelationshipsHint"]</p></div></header>
+                <section class="pu-dossier__section pu-dossier__section--relationships">
+                    <header><span class="pu-dossier__section-icon"><MoIcon Icon="@MoIcons.Network" Size="1.25rem" /></span><div><h4>@L["ProjectUnitDetailDialog:Sections:Relationships"]</h4><p>@L["ProjectUnitDetailDialog:Sections:RelationshipsHint"]</p></div></header>
                     <div class="pu-dossier__relationships">
                         <div><h5>@L["ProjectUnitDetailDialog:Fields:Dependencies"] <span>@summary.Dependencies.Count</span></h5>
                             @if (summary.Dependencies.Count == 0) { <p class="pu-dossier__absence">@L["Shared:Labels:None"]</p> }
@@ -132,7 +137,7 @@
                 @if (_detail.ConstructorParameters.Count != 0 || _detail.Methods.Count != 0)
                 {
                     <section class="pu-dossier__section">
-                        <header><span class="pu-dossier__section-index" aria-hidden="true">03</span><div><h4>@L["ProjectUnitDetailDialog:Sections:TechnicalShape"]</h4><p>@L["ProjectUnitDetailDialog:Sections:TechnicalHint"]</p></div></header>
+                        <header><span class="pu-dossier__section-icon"><MoIcon Icon="@MoIcons.Code" Size="1.25rem" /></span><div><h4>@L["ProjectUnitDetailDialog:Sections:TechnicalShape"]</h4><p>@L["ProjectUnitDetailDialog:Sections:TechnicalHint"]</p></div></header>
                         @if (_detail.ConstructorParameters.Count != 0)
                         {
                             <h5>@L["ProjectUnitDetailDialog:Fields:ConstructorParameters"]</h5>

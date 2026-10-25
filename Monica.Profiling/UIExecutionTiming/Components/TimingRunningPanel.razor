@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.Profiling.ExecutionTiming.Models
 @inject IStringLocalizer<ExecutionTimingResource> L
 
@@ -41,8 +42,8 @@
     }
     else
     {
-        <div class="timing-running-empty" role="status"><MoIcon Icon="@MoIcons.Hourglass" Size="1.25rem" />
-            <span>@(Operations.Count == 0 ? L["Running:Empty"] : L["Common:NoMatches"])</span></div>
+        <div class="timing-running-empty" role="status"><MoContentState Compact="true"><MoIcon Icon="@MoIcons.Hourglass" Size="1.25rem" />
+            <span>@(Operations.Count == 0 ? L["Running:Empty"] : L["Common:NoMatches"])</span></MoContentState></div>
     }
     <footer class="timing-running-footer"><span>@L["Running:CapturedHelp"]</span>
         @if (PageCount > 1)

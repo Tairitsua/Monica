@@ -187,8 +187,8 @@
       "Frozen": "此证据从所选视图中冻结，跟随或更换文件不会改变其内容。",
       "Source": "源文件",
       "Generation": "观测世代",
-      "ViewRead": "视图读取 · UTC",
-      "InspectedAt": "检查时间 · UTC",
+      "ViewRead": "视图读取",
+      "InspectedAt": "检查时间",
       "ParsedTitle": "已解析字段",
       "PositionTitle": "在所选视图中的位置",
       "RawTitle": "原始物理行",
@@ -200,5 +200,8 @@
       "Close": "关闭",
       "CopyRaw": "复制原始行"
     }
+  },
+  "Navigation": {
+    "Category": "日志"
   }
 }

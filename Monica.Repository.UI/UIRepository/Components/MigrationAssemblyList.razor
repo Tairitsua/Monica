@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @inject IStringLocalizer<RepositoryUIResource> L
 
 <div class="migration-assembly-list">
@@ -16,7 +17,7 @@
 
     @if (Items.Count == 0)
     {
-        <MudText Typo="Typo.body2" Color="Color.Secondary">@EmptyText</MudText>
+        <MoContentState Compact="true"><MudText Typo="Typo.body2" Color="Color.Secondary">@EmptyText</MudText></MoContentState>
     }
     else
     {

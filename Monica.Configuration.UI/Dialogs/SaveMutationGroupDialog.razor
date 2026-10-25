@@ -131,7 +131,7 @@
 
     protected override void OnInitialized()
     {
-        _label = string.Format(L["Group:DefaultLabel"], DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm"));
+        _label = string.Format(L["Group:DefaultLabel"], TimeDisplay.Format(DateTimeOffset.UtcNow));
     }
 
     private async Task SaveAsync()

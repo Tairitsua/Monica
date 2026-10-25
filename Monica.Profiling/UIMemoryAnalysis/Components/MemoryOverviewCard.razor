@@ -1,3 +1,5 @@
+@using Monica.Profiling.UIRuntimeMetrics.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using System.Runtime
 @using Monica.Profiling.MemoryDiagnostics.Models
@@ -46,7 +48,7 @@
                     @if (Snapshot is not null)
                     {
                         <time data-field="SnapshotTimestamp" datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)"
-                              title="@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)">@MemoryAnalysisDisplayFormatter.LocalSnapshotTime(Snapshot.Timestamp)</time>
+                              title="@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Snapshot.Timestamp))</time>
                     }
                     else
                     {
@@ -56,7 +58,7 @@
                 @if (CapturedAt is { } capturedAt)
                 {
                     <div><span>@L["Overview:Snapshot:ViewRead"]</span>
-                        <time data-field="CapturedAt" datetime="@capturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(capturedAt)</time>
+                        <time data-field="CapturedAt" datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time>
                     </div>
                 }
             </div>
@@ -100,7 +102,7 @@
                 <div><dt>@L["Overview:ManagedMemory"] <small>@L["Common:RawBytes"]</small></dt><dd data-raw-field="TotalManagedMemory">@MemoryAnalysisDisplayFormatter.Raw(Snapshot.TotalManagedMemory)</dd></div>
                 <div><dt>@L["Overview:ManagedHeap"] <small>@L["Common:RawBytes"]</small></dt><dd data-raw-field="GcHeapSizeBytes">@MemoryAnalysisDisplayFormatter.Raw(Snapshot.GcHeapSizeBytes)</dd></div>
                 <div><dt>@L["Overview:Committed"] <small>@L["Common:RawBytes"]</small></dt><dd data-raw-field="CommittedBytes">@MemoryAnalysisDisplayFormatter.Raw(Snapshot.CommittedBytes)</dd></div>
-                <div><dt>@L["Overview:Snapshot:CapturedAt"]</dt><dd><time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)">@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)</time></dd></div>
+                <div><dt>@L["Overview:Snapshot:CapturedAt"]</dt><dd><time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Snapshot.Timestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Snapshot.Timestamp))</time></dd></div>
             </dl>
         </details>
     }

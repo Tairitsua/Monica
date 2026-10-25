@@ -29,12 +29,10 @@ h3 { margin: 0; font-size: 17px; font-weight: 500; }
 .vector-evidence .is-missing { color: color-mix(in srgb, var(--mud-palette-warning) 45%, var(--mud-palette-text-primary)); }
 .vector-evidence .vector-error { color: color-mix(in srgb, var(--mud-palette-error) 55%, var(--mud-palette-text-primary)); }
 .vector-evidence .vector-scope-note { font-size: 12px; margin: 8px 0; }
-.knowledge-empty, .knowledge-loading { padding: 48px 28px; border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
+.knowledge-empty, .knowledge-loading { border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
 .knowledge-empty ::deep svg { color: var(--mud-palette-primary); width: 32px; height: 32px; }
-.knowledge-empty h2 { margin: 18px 0 10px; font-size: 22px; font-weight: 500; }
+.knowledge-empty h2 { margin: 0; font-size: 22px; font-weight: 500; }
 .knowledge-empty p, .knowledge-loading p { color: var(--mud-palette-text-secondary); font-size: 14px; line-height: 1.65; margin: 0; }
-.knowledge-loading p { margin-bottom: 18px; }
-.knowledge-empty ::deep .mud-button { margin-top: 20px; }
 @container knowledge-workspace (max-width: 1079px) { .knowledge-workspace-grid { grid-template-columns: minmax(0,1fr); gap: 20px; } }
 @media (max-height: 650px) { .knowledge-workspace-grid { grid-template-columns: minmax(0,1fr); gap: 20px; } }
 @container knowledge-workspace (max-width: 850px) { .indexing-setup { grid-template-columns: minmax(0,1fr); } .vector-evidence { border-left: 0; border-top: 1px solid var(--mud-palette-lines-default); } }

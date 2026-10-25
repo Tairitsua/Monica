@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Logging
 @using Monica.Core.ObservableInstance.Models
 @using Monica.Framework.UI.UIObservableInstance.Models
@@ -14,13 +16,13 @@
 <div class="observable-workbench" data-view="@View">
     <header class="observable-heading">
         <div><span class="observable-eyebrow">@L["Workbench:Eyebrow"]</span><h1>@L[$"Workbench:{View}Title"]</h1><p>@L[$"Workbench:{View}Intro"]</p></div>
-        <div class="observable-refresh"><span>@L["Workbench:ReadAt"]<time datetime="@Workspace.Capture?.ReadAt.ToString("O")">@(Workspace.Capture?.ReadAt.ToLocalTime().ToString("HH:mm:ss") ?? "—")</time></span><MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Shared:Actions:Refresh"]</MudButton></div>
+        <div class="observable-refresh"><span>@L["Workbench:ReadAt"]<time datetime="@Workspace.Capture?.ReadAt.ToString("O")">@(UiTime.FormatTime(Workspace.Capture?.ReadAt) ?? "—")</time></span><MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Shared:Actions:Refresh"]</MudButton></div>
     </header>
     <nav class="observable-navigation" aria-label="@L["Workbench:Navigation"]">
         @foreach (var entry in Routes) { <a href="@Url(entry.Path)" aria-current="@(View == entry.View ? "page" : null)"><MoIcon Icon="@entry.Icon" Size="1.25rem" />@L[$"Workbench:{entry.View}"]</a> }
     </nav>
     @if (_error is not null) { <div class="observable-error" role="alert"><strong>@L["Workbench:ReadFailed"]</strong><p>@_error</p><span>@L["Workbench:StaleHelp"]</span></div> }
-    @if (_busy && Workspace.Capture is null) { <div class="observable-loading" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />@L["Page:States:LoadingInstances"]</div> }
+    @if (_busy && Workspace.Capture is null) { <MoContentState Loading="true" role="status"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />@L["Page:States:LoadingInstances"]</MoContentState> }
     else if (Workspace.Capture is { } capture)
     {
         @if (View == "Overview")
@@ -81,7 +83,7 @@
                         @if (ExceptionEntries.Count == 0) { <div class="exception-empty"><MoIcon Icon="@MoIcons.Success" Size="1.5rem" /><strong>@L["Shared:States:NoExceptions"]</strong><p>@L["Workbench:NoExceptionHelp"]</p></div> }
                         @foreach (var item in ExceptionEntries.Skip(ExceptionPage * 12).Take(12))
                         {
-                            <article data-instance-id="@item.Instance.Identity.InstanceId" data-sequence="@item.Entry.Sequence"><div class="exception-sequence"><span>#@item.Entry.Sequence</span><time datetime="@item.Entry.Timestamp.ToString("O")">@item.Entry.Timestamp.ToLocalTime().ToString("MM-dd HH:mm:ss")</time></div><div class="exception-evidence"><strong>@item.Entry.Exception!.TypeName</strong><p>@item.Entry.Exception.Message</p><code>@item.Instance.Identity.InstanceId</code><span>@item.Instance.InstanceName · @L[$"Shared:LogLevels:{item.Entry.LogLevel?.ToString() ?? "Unknown"}"]</span></div><button type="button" @onclick="() => InspectExceptionAsync(item.Instance, item.Entry.Sequence)" aria-label="@L["Workbench:InspectExceptionNamed", item.Instance.InstanceName, item.Entry.Sequence]">@L["Workbench:Inspect"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button></article>
+                            <article data-instance-id="@item.Instance.Identity.InstanceId" data-sequence="@item.Entry.Sequence"><div class="exception-sequence"><span>#@item.Entry.Sequence</span><time datetime="@item.Entry.Timestamp.ToString("O")">@UiTime.Format(item.Entry.Timestamp)</time></div><div class="exception-evidence"><strong>@item.Entry.Exception!.TypeName</strong><p>@item.Entry.Exception.Message</p><code>@item.Instance.Identity.InstanceId</code><span>@item.Instance.InstanceName · @L[$"Shared:LogLevels:{item.Entry.LogLevel?.ToString() ?? "Unknown"}"]</span></div><button type="button" @onclick="() => InspectExceptionAsync(item.Instance, item.Entry.Sequence)" aria-label="@L["Workbench:InspectExceptionNamed", item.Instance.InstanceName, item.Entry.Sequence]">@L["Workbench:Inspect"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button></article>
                         }
                         <footer class="exception-pager"><span>@L["Workbench:PageCount", ExceptionPage + 1, ExceptionPageCount, ExceptionEntries.Count]</span><div><button type="button" disabled="@(ExceptionPage == 0)" @onclick="() => _exceptionPage = ExceptionPage - 1" aria-label="@L["Workbench:Previous"]"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.5rem" /></button><button type="button" disabled="@(ExceptionPage + 1 >= ExceptionPageCount)" @onclick="() => _exceptionPage = ExceptionPage + 1" aria-label="@L["Workbench:Next"]"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.5rem" /></button></div></footer>
                     </div>

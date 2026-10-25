@@ -99,5 +99,8 @@
   "Input": {
     "Placeholder": "Enter a command",
     "Helper": "Shell state resets after each command. Use cd to change this session’s directory."
+  },
+  "Navigation": {
+    "Category": "Terminal"
   }
 }

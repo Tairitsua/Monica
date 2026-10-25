@@ -14,7 +14,7 @@
            Overlay="true"
            OverlayAutoClose="true"
            Fixed="true"
-           Width="min(460px, calc(100vw - 24px))"
+           Width="min(460px, 100vw)"
            Elevation="8"
            role="dialog"
            aria-modal="true"
@@ -112,7 +112,7 @@
                             </section>
                             @if (!snapshot.TraceSpans.Any(span => span.ModuleKey == module.ModuleKey))
                             {
-                                <div class="drawer-empty">@L["ModuleDrawer:Performance:Empty"]</div>
+                                <MoContentState Compact="true">@L["ModuleDrawer:Performance:Empty"]</MoContentState>
                             }
                         </div>
                     </MudTabPanel>
@@ -138,10 +138,10 @@
                             {
                                 case ModuleSystemLazyLoadState.NotRequested:
                                 case ModuleSystemLazyLoadState.Loading:
-                                    <div class="drawer-loading" role="status">
+                                    <MoContentState Loading="true" Compact="true">
                                         <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
                                         <span>@L["ModuleDrawer:Options:Loading"]</span>
-                                    </div>
+                                    </MoContentState>
                                     break;
                                 case ModuleSystemLazyLoadState.Failed:
                                     <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">
@@ -167,7 +167,7 @@
                             }
                             @if (!snapshot.Findings.Any(finding => finding.RelatedModules.Contains(module.ModuleKey)))
                             {
-                                <div class="drawer-empty"><MoIcon Size="1.5rem" Icon="@MoIcons.ClipboardCheck" />@L["ModuleDrawer:Errors:Empty"]</div>
+                                <MoContentState Compact="true"><MoIcon Size="1.5rem" Icon="@MoIcons.ClipboardCheck" />@L["ModuleDrawer:Errors:Empty"]</MoContentState>
                             }
                         </div>
                     </MudTabPanel>

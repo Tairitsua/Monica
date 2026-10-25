@@ -26,18 +26,23 @@ public class ModuleUtilitiesUI : MonicaModule<ModuleUtilitiesUIOption>, IUIModul
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<UtilitiesResource>(
+                    "Monica.Utilities", "Navigation:Category", 70,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Wrench);
+
                 registry.RegisterLocalizedPage<UIUtilitiesPage, UtilitiesResource>(
                     UIUtilitiesPage.PAGE_URL,
                     "Pages:UtilitiesToolbox:Title",
                     MoIcons.Network,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 38);
                 registry.RegisterLocalizedPage<UIUtilitiesTextPage, UtilitiesResource>(
                     UIUtilitiesTextPage.PAGE_URL,
                     "Pages:TextTransform:Title",
                     MoIcons.Code,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 39);
             }));

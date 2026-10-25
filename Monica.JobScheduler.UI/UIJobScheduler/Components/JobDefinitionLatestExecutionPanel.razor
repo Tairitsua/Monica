@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.JobScheduler.Models.Execution
 @using Monica.JobScheduler.UI.Localization
 
@@ -25,12 +26,12 @@
 
     @if (Execution is null)
     {
-        <div class="job-latest-panel__empty">
+        <div class="job-latest-panel__empty"><MoContentState Compact="true">
             <MoIcon Icon="@MoIcons.Hourglass" Size="2.25rem" />
             <MudText Typo="Typo.body2">
                 @L["JobDetail:LatestExecution:Empty"]
             </MudText>
-        </div>
+        </MoContentState></div>
     }
     else if (Execution is { } execution)
     {

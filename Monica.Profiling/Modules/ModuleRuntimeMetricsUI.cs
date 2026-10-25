@@ -46,14 +46,21 @@ public class ModuleRuntimeMetricsUI : MonicaModule<ModuleRuntimeMetricsUIOption>
         });
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<RuntimeMetricsResource>(
+                    "Monica.Profiling.RuntimeMetrics", "Navigation:Category", 50,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Gauge);
+
                 registry.RegisterLocalizedPage<UIRuntimeMetricsPage, RuntimeMetricsResource>(
                     UIRuntimeMetricsPage.PAGE_URL,
                     "Pages:RuntimeMetrics:Title",
                     MoIcons.Gauge,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 10,
-                    descriptionKey: "Pages:RuntimeMetrics:Description")));
+                    descriptionKey: "Pages:RuntimeMetrics:Description");
+            }));
     }
 
     /// <inheritdoc />

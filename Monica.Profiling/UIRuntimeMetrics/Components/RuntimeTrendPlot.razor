@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -63,17 +64,17 @@
                 <span class="runtime-plot-active-marker" style="@PointStyle(activeSample.X, activeY)" aria-hidden="true"></span>
             }
         </div>
-        <div class="runtime-plot-time-axis @(CrossesUtcDate ? "runtime-plot-time-axis--dated" : null) @(Span.Ticks is > 0 and < 4 * TimeSpan.TicksPerSecond ? "runtime-plot-time-axis--fractional" : null) @(Span.Ticks is > 0 and < 4 * TimeSpan.TicksPerMillisecond ? "runtime-plot-time-axis--precise" : null)" aria-hidden="true">
+        <div class="runtime-plot-time-axis @(CrossesDisplayDate ? "runtime-plot-time-axis--dated" : null) @(Span.Ticks is > 0 and < 4 * TimeSpan.TicksPerSecond ? "runtime-plot-time-axis--fractional" : null) @(Span.Ticks is > 0 and < 4 * TimeSpan.TicksPerMillisecond ? "runtime-plot-time-axis--precise" : null)" aria-hidden="true">
             @for (var index = 0; index < _projection.TimeTicks.Count; index++)
             {
                 var tick = _projection.TimeTicks[index];
                 var isEndpoint = index == 0 || index == _projection.TimeTicks.Count - 1;
                 <time class="runtime-plot-time-label @TimeTickClass(index)" style="@FractionStyle("x", tick.X)"
                       datetime="@RuntimeMetricsDisplayFormatter.MachineTime(tick.UtcTimestamp)" title="@RuntimeMetricsDisplayFormatter.MachineTime(tick.UtcTimestamp)">
-                    <span>@RuntimeMetricsDisplayFormatter.UtcAxisTime(tick.UtcTimestamp, Span)</span>
-                    @if (CrossesUtcDate && isEndpoint)
+                    <span>@AxisTime(tick.UtcTimestamp)</span>
+                    @if (CrossesDisplayDate && isEndpoint)
                     {
-                        <span>@RuntimeMetricsDisplayFormatter.UtcDate(tick.UtcTimestamp)</span>
+                        <span>@UiTime.FormatDate(tick.UtcTimestamp)</span>
                     }
                 </time>
             }
@@ -81,7 +82,7 @@
         <div class="runtime-plot-readout" data-active-sample="@(activeSample is null ? null : RuntimeMetricsDisplayFormatter.MachineTime(activeSample.UtcTimestamp))">
             @if (activeSample is not null)
             {
-                <time datetime="@RuntimeMetricsDisplayFormatter.MachineTime(activeSample.UtcTimestamp)" title="@RuntimeMetricsDisplayFormatter.MachineTime(activeSample.UtcTimestamp)">@RuntimeMetricsDisplayFormatter.UtcDateTime(activeSample.UtcTimestamp)</time>
+                <time datetime="@RuntimeMetricsDisplayFormatter.MachineTime(activeSample.UtcTimestamp)" title="@RuntimeMetricsDisplayFormatter.MachineTime(activeSample.UtcTimestamp)">@UiTime.Format(activeSample.UtcTimestamp)</time>
                 <strong>@SampleValue(activeSample)</strong>
                 @if (_selection.WasEvicted && _selection.PointerSample is null && _selection.HasFocus)
                 {
@@ -135,7 +136,8 @@
     private readonly RuntimeTrendPlotSelection _selection = new();
     private RuntimeTrendPlotProjection _projection = RuntimeTrendPlotProjection.Create([], RuntimeTrendMetric.Cpu);
     private TimeSpan Span => _projection.StartUtc is { } start && _projection.EndUtc is { } end ? end - start : TimeSpan.Zero;
-    private bool CrossesUtcDate => _projection.StartUtc?.Date != _projection.EndUtc?.Date;
+    private bool CrossesDisplayDate => _projection.StartUtc is { } start && _projection.EndUtc is { } end
+        && UiTime.ToDisplayTime(start).Date != UiTime.ToDisplayTime(end).Date;
 
     protected override void OnParametersSet()
     {
@@ -149,7 +151,7 @@
 
     private string RangeValueText(RuntimeTrendPlotSample? sample) => sample is null ? L["Common:Unavailable"]
         : L["Trend:Plot:SampleValue", sample.SourceIndex + 1, _projection.Samples.Count,
-            RuntimeMetricsDisplayFormatter.MachineTime(sample.UtcTimestamp), SampleValue(sample)];
+            UiTime.Format(sample.UtcTimestamp), SampleValue(sample)];
 
     private void SelectRange(RuntimeTrendPlotProjection renderedProjection, int index) =>
         _selection.TrySelectRange(renderedProjection, index);
@@ -176,6 +178,10 @@
         if (index == _projection.TimeTicks.Count - 1) return "runtime-plot-tick--last";
         return index == _projection.TimeTicks.Count / 2 ? "runtime-plot-tick--middle" : "runtime-plot-tick--detail";
     }
+
+    private string AxisTime(DateTime timestamp) => Span.Ticks is > 0 and < 4 * TimeSpan.TicksPerSecond
+        ? UiTime.Format(timestamp, Span.Ticks < 4 * TimeSpan.TicksPerMillisecond ? "HH:mm:ss.fffffff" : "HH:mm:ss.fff")
+        : UiTime.FormatTime(timestamp);
 
     private static string Coordinate(double fraction) => RuntimeMetricsDisplayFormatter.Raw(fraction * 1000);
     private static string FractionStyle(string axis, double fraction) => $"--plot-{axis}: {RuntimeMetricsDisplayFormatter.Raw(fraction)}";

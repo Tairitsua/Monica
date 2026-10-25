@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Monica.JobScheduler.UI.Localization
 @using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
 
@@ -80,7 +81,7 @@
         </section>
     </div>
 
-    <p class="execution-evidence__scope">@L["ExecutionDetail:EvidenceScope", TimePresentation.TimeZoneDisplayName]</p>
+    <p class="execution-evidence__scope">@L["ExecutionDetail:EvidenceScope"]</p>
 
     <div class="execution-evidence__grid execution-evidence__grid--contract">
         <section class="execution-evidence__panel" aria-labelledby="execution-policy-heading">
@@ -152,7 +153,7 @@
         }
         else
         {
-            <pre class="execution-evidence__arguments">@ExecutionUiPresentation.FormatJson(Execution.JobArgs)</pre>
+            <MoJson Value="@Execution.JobArgs" AllowPlainText="true" />
         }
     </section>
 </div>

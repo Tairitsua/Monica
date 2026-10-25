@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Options
 @using Monica.Core.Results
 @using Monica.Modules
@@ -21,7 +22,7 @@
     <div class="service-inspector">
         <header class="inspector-identity">
             <div><span class="inspector-eyebrow">@L["Workbench:FrozenServiceCapture"]</span><h3 @ref="_identityHeading" tabindex="-1">@service.AppName</h3><code>@service.AppId</code></div>
-            <div class="inspector-capture">@if (_hasCaptureTime) { <span>@L["Workbench:CapturedUTC"]</span><time datetime="@_capturedAt.ToString("O")">@_capturedAt.ToString("O")</time> }<span>@L["Workbench:FrozenUTC"]</span><time datetime="@_frozenAt.ToString("O")">@_frozenAt.ToString("O")</time><MudChip T="string" Color="@service.OverallStatus.GetColor()" Icon="@service.OverallStatus.GetIcon()" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@service.OverallStatus.GetText(L)</MudChip></div>
+            <div class="inspector-capture">@if (_hasCaptureTime) { <span>@L["Workbench:CapturedUTC"]</span><time datetime="@_capturedAt.ToString("O")">@UiTime.Format(_capturedAt)</time> }<span>@L["Workbench:FrozenUTC"]</span><time datetime="@_frozenAt.ToString("O")">@UiTime.Format(_frozenAt)</time><MudChip T="string" Color="@service.OverallStatus.GetColor()" Icon="@service.OverallStatus.GetIcon()" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@service.OverallStatus.GetText(L)</MudChip></div>
         </header>
         <p class="inspector-scope">@L["Workbench:FrozenServiceHelp"]</p>
         <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Class="inspector-tabs" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
@@ -146,7 +147,10 @@
     private sealed record InstanceDisplayItem(InstanceState Instance, bool IsEvicted, DateTime? EvictionTime);
     private string Value(string? value) => string.IsNullOrWhiteSpace(value) ? L["Shared:Values:NotSpecified"].Value : value;
     private string Time(DateTime? timestamp) => timestamp is null || timestamp == DateTime.MinValue
-        ? L["Shared:Values:NotAvailable"].Value : timestamp.Value.FromUtcToLocal().ToString("yyyy-MM-dd HH:mm:ss");
+        ? L["Shared:Values:NotAvailable"].Value
+        : UiTime.Format(timestamp.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(timestamp.Value, DateTimeKind.Utc)
+            : timestamp.Value);
     private string HeartbeatHealth(DateTime heartbeat)
     {
         if (heartbeat == DateTime.MinValue) return L["Shared:Values:NotAvailable"].Value;

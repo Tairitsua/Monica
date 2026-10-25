@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @namespace Monica.ServiceDiscovery.Pages
 @attribute [Route(SERVICE_DISCOVERY_DEBUG_URL)]
 @using Monica.ServiceDiscovery.UIServiceDiscovery.Components
@@ -12,7 +13,7 @@
 <DiscoveryWorkbench View="Registry">
     <section class="discovery-registry-summary" aria-label="@L["Workbench:RegistryScope"]">
         <div class="registry-summary-copy"><span>@L["Workbench:Membership"]</span><strong>@(State.CapturedAt is null ? L["Shared:Values:NotAvailable"] : L["Workbench:RegistryComposition", State.Services.Count(s => s.TotalInstanceCount > 0), State.Services.Sum(s => s.TotalInstanceCount)])</strong><p>@L["Workbench:MembershipHelp"]</p></div>
-        <div class="registry-summary-stamp"><span>@L["Workbench:CapturedUTC"]</span><time>@(State.CapturedAt?.ToString("HH:mm:ss") ?? L["Shared:Values:NotAvailable"].Value)</time><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@State.IsLoading" OnClick="() => RefreshAsync()">@L["Shared:Actions:Refresh"]</MudButton></div>
+        <div class="registry-summary-stamp"><span>@L["Workbench:CapturedUTC"]</span><time>@(UiTime.FormatTime(State.CapturedAt))</time><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@State.IsLoading" OnClick="() => RefreshAsync()">@L["Shared:Actions:Refresh"]</MudButton></div>
     </section>
     @if (State.ErrorMessage is not null)
     {

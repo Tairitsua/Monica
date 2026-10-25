@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.Models
 @using Monica.DataChannel.UIDataChannel.Abstractions
 @using Monica.DataChannel.UIDataChannel.Models
@@ -21,7 +22,7 @@
                     <MoIcon Icon="@DataChannelPresentation.InitializationIcon(Channel)" Size="1.25rem" />@L[$"Channel:States:{DataChannelPresentation.Initialization(Channel)}"]</span>
             </header>
             <div class="pipeline-inspector__capture">
-                <span>@L["Workbench:Captured"] <time>@DataChannelPresentation.Timestamp(Channel.CapturedAt)</time>
+                <span>@L["Workbench:Captured"] <time>@UiTime.Format(Channel.CapturedAt)</time>
                 </span>
                 <span>@L["PipelineInspector:FrozenHelp"]</span>
             </div>
@@ -168,7 +169,7 @@
                                     <section class="middleware-evidence">
                                         <header>
                                             <h3>@selected.TypeName</h3>
-                                            <span>@L["Workbench:Captured"] @DataChannelPresentation.Timestamp(selected.CapturedAt)</span>
+                                            <span>@L["Workbench:Captured"] @UiTime.Format(selected.CapturedAt)</span>
                                         </header>
                                         @if (selected.InfoDictionary is { Count: > 0 } information)
                                         {

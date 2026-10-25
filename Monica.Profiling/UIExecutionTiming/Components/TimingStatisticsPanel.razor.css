@@ -33,7 +33,7 @@
 .timing-relative-track span { display: block; height: 100%; background: var(--mud-palette-primary); }
 .timing-ledger-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-top: 18px; font-size: 11px; line-height: 1.7; color: var(--timing-muted-ink); }
 .timing-ledger-footer p { margin: 0 0 3px; }
-.timing-empty { display: flex; align-items: flex-start; gap: 14px; padding: 24px; border: 1px solid var(--mud-palette-lines-default); border-radius: 7px; font-size: 13px; }
+.timing-empty { border: 1px solid var(--mud-palette-lines-default); border-radius: 7px; font-size: 13px; }
 .timing-empty strong { font-weight: 500; }
 .timing-empty p { margin: 8px 0 0; line-height: 1.75; color: var(--timing-muted-ink); }
 .timing-accessible-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }

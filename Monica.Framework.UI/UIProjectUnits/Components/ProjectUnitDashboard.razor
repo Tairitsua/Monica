@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using System.Globalization
 @using Monica.Core.Results
 @using Monica.Framework.UI.UIProjectUnits.Services
@@ -9,14 +10,13 @@
 <section class="pu-dashboard" data-testid="project-unit-dashboard">
     @if (_loading && _snapshot is null)
     {
-        <div class="pu-dashboard__state" data-testid="project-unit-dashboard-loading" role="status">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        <div class="pu-dashboard__state" data-testid="project-unit-dashboard-loading"><MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
             <p>@L["ProjectUnitDashboard:States:Loading"]</p>
-        </div>
+        </MoContentState></div>
     }
     @if (_error is not null)
     {
-        <div class="pu-dashboard__error" data-testid="project-unit-dashboard-error" role="status">
+        <div class="pu-dashboard__error" data-testid="project-unit-dashboard-error" role="status"><MoContentState>
             <h2>@L["ProjectUnitDashboard:States:LoadFailedTitle"]</h2>
             <p>@_error</p>
             @if (_snapshot is not null)
@@ -26,7 +26,7 @@
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadDashboardAsync" Disabled="@_loading">
                 @L["ProjectUnitDashboard:Actions:Retry"]
             </MudButton>
-        </div>
+        </MoContentState></div>
     }
     @if (_snapshot is not null)
     {
@@ -108,11 +108,11 @@
         }
         @if (_snapshot.TotalUnits == 0)
         {
-            <div class="pu-dashboard__state" data-testid="project-unit-dashboard-empty">
+            <div class="pu-dashboard__state" data-testid="project-unit-dashboard-empty"><MoContentState>
                 <MoIcon Icon="@MoIcons.Package" Size="1.5rem" />
                 <h3>@L["ProjectUnitDashboard:States:EmptyTitle"]</h3>
                 <p>@L["ProjectUnitDashboard:States:EmptyDescription"]</p>
-            </div>
+            </MoContentState></div>
         }
         else
         {
@@ -142,7 +142,7 @@
                 </header>
                 @if (_snapshot.CoverageGaps.Count == 0)
                 {
-                    <p class="pu-dashboard__no-gaps">@L["ProjectUnitDashboard:States:NoCoverageGaps"]</p>
+                    <MoContentState Compact="true"><p>@L["ProjectUnitDashboard:States:NoCoverageGaps"]</p></MoContentState>
                 }
                 else
                 {
@@ -177,7 +177,7 @@
                     </div>
                     @if (_filteredGaps.Count == 0)
                     {
-                        <div class="pu-dashboard__state" role="status"><p>@L["ProjectUnitDashboard:States:NoGapMatches"]</p><button type="button" @onclick="ResetGapFilters">@L["ProjectUnitDashboard:Filters:Reset"]</button></div>
+                        <div class="pu-dashboard__state" role="status"><MoContentState><p>@L["ProjectUnitDashboard:States:NoGapMatches"]</p><button type="button" @onclick="ResetGapFilters">@L["ProjectUnitDashboard:Filters:Reset"]</button></MoContentState></div>
                     }
                     else
                     {

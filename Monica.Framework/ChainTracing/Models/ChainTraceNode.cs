@@ -155,6 +155,20 @@ public class ChainTraceNode
     public string? Service { get; set; }
 
     /// <summary>
+    /// UTC instant when this chain started, captured once on the root node. The offset is preserved
+    /// independently of the host's timezone-free business DateTime serialization policy.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? Timestamp { get; set; }
+
+    /// <summary>
+    /// Deployed service version configured by the host, including build or commit metadata when available.
+    /// Only the chain root carries this value; omitted when the host does not provide a version.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ServiceVersion { get; set; }
+
+    /// <summary>
     /// Service identity of the remote target this node invoked, regardless of outcome. Chain tracing is
     /// the debugging channel when no distributed-tracing infrastructure exists, so both successful and
     /// failed remote calls carry the target identity.

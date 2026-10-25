@@ -46,32 +46,37 @@ public sealed class ModuleRepositoryUI : MonicaModule<ModuleRepositoryUIOption>,
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<RepositoryUIResource>(
+                    "Monica.Repository", "Navigation:Category", 110,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Database);
+
                 registry.RegisterLocalizedPage<UIRepositoryDashboardPage, RepositoryUIResource>(
                     UIRepositoryDashboardPage.PAGE_URL,
                     "Workbench:Views:Overview:Label",
                     MoIcons.Database,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 35);
                 registry.RegisterLocalizedPage<UIRepositoryActivityPage, RepositoryUIResource>(
                     UIRepositoryActivityPage.PAGE_URL,
                     "Workbench:Views:Activity:Label",
                     MoIcons.ChartTrend,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 36);
                 registry.RegisterLocalizedPage<UIRepositoryMigrationsPage, RepositoryUIResource>(
                     UIRepositoryMigrationsPage.PAGE_URL,
                     "Workbench:Views:Migrations:Label",
                     MoIcons.Workflow,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 37);
                 registry.RegisterLocalizedPage<UIRepositoryOptionsPage, RepositoryUIResource>(
                     UIRepositoryOptionsPage.PAGE_URL,
                     "Workbench:Views:Options:Label",
                     MoIcons.Sliders,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 38);
             }));

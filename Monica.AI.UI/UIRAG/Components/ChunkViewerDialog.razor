@@ -31,7 +31,7 @@
             <div class="chunk-viewer-content">
                 @if (string.IsNullOrWhiteSpace(OriginalText))
                 {
-                    <div class="empty-state">@L["RAG:ChunkViewer:NoContent"]</div>
+                    <MoContentState Compact="true">@L["RAG:ChunkViewer:NoContent"]</MoContentState>
                 }
                 else if (UseMarkdownRendering)
                 {

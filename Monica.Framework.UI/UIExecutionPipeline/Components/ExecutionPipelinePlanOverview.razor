@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Core.Execution.Models
 @inject IStringLocalizer<ExecutionPipelineResource> L
 
@@ -69,6 +70,6 @@
             </dd>
         </div>;
 
-    private static string FormatTime(DateTimeOffset value) =>
-        value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff zzz");
+    private string FormatTime(DateTimeOffset value) =>
+        UiTime.Format(value);
 }

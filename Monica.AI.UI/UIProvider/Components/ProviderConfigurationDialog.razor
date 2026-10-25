@@ -92,8 +92,8 @@
                                 <div class="discovered-identity"><strong>@model.ModelName</strong><span>@ModelSummary(model)</span></div>
                             </div>
                         </Virtualize>
-                        @if (_discovered.Count == 0) { <MudText Typo="Typo.body2" Class="discovery-empty">@L["Settings:NoDiscoveredModels"]</MudText> }
-                        else if (FilteredDiscovery.Count == 0) { <MudText Typo="Typo.body2" Class="discovery-empty">@L["Settings:NoModelMatches"]</MudText> }
+                        @if (_discovered.Count == 0) { <MoContentState Compact="true"><MudText Typo="Typo.body2">@L["Settings:NoDiscoveredModels"]</MudText></MoContentState> }
+                        else if (FilteredDiscovery.Count == 0) { <MoContentState Compact="true"><MudText Typo="Typo.body2">@L["Settings:NoModelMatches"]</MudText></MoContentState> }
                     </div>
                     <div class="models-heading"><MudText Typo="Typo.caption">@L["Settings:DiscoveredModelCount", _discovered.Count]</MudText><MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="ImportSelected" aria-disabled="@((_selectedModels.Count == 0 || _discovering || _saving || _editingModel).ToString().ToLowerInvariant())">@L["Settings:ImportSelectedModels", _selectedModels.Count]</MudButton></div>
                     </div>

@@ -39,13 +39,20 @@ public class ModuleMapperUI : MonicaModule<ModuleMapperUIOption>, IUIModule
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<MapperResource>(
+                    "Monica.Framework.UI.Mapper", "Navigation:Category", 40,
+                    parentId: BuiltInNavigationCategoryIds.Debug,
+                    icon: MoIcons.Workflow);
+
                 registry.RegisterLocalizedPage<UIMapperDebugPage, MapperResource>(
                     UIMapperDebugPage.PAGE_URL,
                     "Pages:MapperDebug:Title",
                     MoIcons.Code,
-                    BuiltInNavigationCategoryIds.Debug,
+                    category,
                     addToNav: true,
-                    navOrder: 10));
+                    navOrder: 10);
+            });
         });
     }
 }

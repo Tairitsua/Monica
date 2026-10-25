@@ -1,15 +1,16 @@
+@using Monica.UI.Shared.Components.States
 @inject IStringLocalizer<RepositoryUIResource> L
 
 <section class="repository-options">
     <header><div><span>@L["Workbench:Options:Eyebrow"]</span><h3>@L["Workbench:Options:Title"]</h3><p>@L["Workbench:Options:Description"]</p></div><strong>@L["Workbench:Options:Count", Options.Count]</strong></header>
     <div class="options-controls"><MudTextField T="string" @bind-Value="_search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Label="@L["Workbench:Options:Search"]" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" ClearIcon="@MoIcons.Close" /><MudSelect T="string" @bind-Value="_group" Label="@L["Workbench:Options:Group"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp"><MudSelectItem T="string" Value="@(string.Empty)">@L["Workbench:Options:All"]</MudSelectItem>@foreach (var group in Groups) { <MudSelectItem T="string" Value="@group">@group</MudSelectItem> }</MudSelect></div>
-    @if (Options.Count == 0) { <div class="options-empty">@L["Options:Empty"]</div> }
+    @if (Options.Count == 0) { <MoContentState Compact="true">@L["Options:Empty"]</MoContentState> }
     else
     {
         <div class="options-table-frame"><MudTable T="RepositoryOptionEntry" Items="FilteredOptions" Dense="true" Hover="true" Square="true" Elevation="0" Breakpoint="Breakpoint.Xs" RowsPerPage="10">
             <HeaderContent><MudTh><MudTableSortLabel T="RepositoryOptionEntry" SortBy="@(entry => entry.Label)" SortIcon="@MoIcons.ArrowUp">@L["Options:Columns:Name"]</MudTableSortLabel></MudTh><MudTh><MudTableSortLabel T="RepositoryOptionEntry" SortBy="@(entry => entry.Path)" InitialDirection="SortDirection.Ascending" SortIcon="@MoIcons.ArrowUp">@L["Options:Columns:Path"]</MudTableSortLabel></MudTh><MudTh><MudTableSortLabel T="RepositoryOptionEntry" SortBy="@(entry => entry.Value)" SortIcon="@MoIcons.ArrowUp">@L["Options:Columns:Value"]</MudTableSortLabel></MudTh></HeaderContent>
             <RowTemplate><MudTd DataLabel="@L["Options:Columns:Name"].Value"><strong>@context.Label</strong><span>@Group(context)</span></MudTd><MudTd DataLabel="@L["Options:Columns:Path"].Value"><code>@context.Path</code></MudTd><MudTd DataLabel="@L["Options:Columns:Value"].Value"><code>@context.Value</code></MudTd></RowTemplate>
-            <NoRecordsContent><div class="options-empty">@L["Workbench:Options:NoMatches"]</div></NoRecordsContent>
+            <NoRecordsContent><MoContentState Compact="true">@L["Workbench:Options:NoMatches"]</MoContentState></NoRecordsContent>
             <PagerContent><MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Workbench:RowsPerPage"]" InfoFormat="@L["Workbench:PageInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></PagerContent>
         </MudTable></div>
     }

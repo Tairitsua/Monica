@@ -1,0 +1,131 @@
+.configuration-evidence-page {
+    --storage-muted: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary));
+    display: grid;
+    gap: 24px;
+    width: 100%;
+    min-width: 0;
+    padding: clamp(20px, 3vw, 36px);
+    color: var(--mud-palette-text-primary);
+}
+
+.configuration-evidence-page ::deep time,
+.configuration-evidence-page ::deep code {
+    font-family: var(--mo-font-family-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-badges span {
+    --storage-tone: var(--mud-palette-text-secondary);
+    padding: 5px 9px;
+    border: 1px solid color-mix(in srgb, var(--storage-tone) 30%, var(--mud-palette-lines-default));
+    border-radius: 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--storage-tone) 7%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--storage-tone) 25%, var(--mud-palette-text-primary));
+    overflow-wrap: anywhere;
+}
+
+.configuration-evidence-page ::deep [data-tone="primary"] {
+    --storage-tone: var(--mud-palette-primary);
+}
+
+.configuration-evidence-page ::deep [data-tone="info"] {
+    --storage-tone: var(--mud-palette-info);
+}
+
+.configuration-evidence-page ::deep [data-tone="success"] {
+    --storage-tone: var(--mud-palette-success);
+}
+
+.configuration-evidence-page ::deep [data-tone="warning"] {
+    --storage-tone: var(--mud-palette-warning);
+}
+
+.configuration-evidence-page ::deep [data-tone="secondary"] {
+    --storage-tone: var(--mud-palette-text-secondary);
+}
+
+.configuration-evidence-page ::deep .configuration-storage-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 24px;
+    margin: 0;
+    min-width: 0;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-facts > div {
+    min-width: 0;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-facts dt {
+    margin-bottom: 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--storage-muted);
+}
+
+.configuration-evidence-page ::deep .configuration-storage-facts dd {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-fact-wide {
+    grid-column: 1 / -1;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-observation {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--storage-muted);
+}
+
+.configuration-evidence-page ::deep .configuration-storage-empty {
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--storage-muted);
+}
+
+.configuration-evidence-page ::deep .configuration-storage-empty p {
+    margin: 0;
+    line-height: 1.65;
+}
+
+.configuration-evidence-page ::deep .configuration-storage-feedback {
+    min-width: 0;
+    padding: 20px;
+}
+
+.configuration-evidence-page ::deep .mud-alert-text-error {
+    color: color-mix(in srgb, var(--mud-palette-error) 40%, var(--mud-palette-text-primary));
+}
+
+@media (max-width: 800px) {
+    .configuration-evidence-page {
+        gap: 20px;
+        padding: 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    .configuration-evidence-page ::deep .configuration-storage-facts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

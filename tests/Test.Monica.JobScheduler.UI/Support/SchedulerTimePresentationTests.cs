@@ -1,12 +1,14 @@
 using System.Globalization;
 using AwesomeAssertions;
 using Microsoft.Extensions.Options;
+using Monica.Core.Clock;
 using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.UI.Localization;
 using Monica.JobScheduler.UI.UIJobScheduler.Shared;
 using Monica.JobScheduler.UI.UIJobScheduler.Support;
 using Monica.Modules;
 using Monica.Testing.Localization;
+using Monica.UI.Shared.Services;
 using Xunit;
 
 namespace Test.Monica.JobScheduler.UI.Support;
@@ -14,17 +16,19 @@ namespace Test.Monica.JobScheduler.UI.Support;
 public sealed class SchedulerTimePresentationTests
 {
     [Fact]
-    public void Timestamp_ShouldUseConfiguredSchedulerWallTimeWithMillisecondsAndNoOffset()
+    public void Timestamp_ShouldUseClockTimezoneAndSharedFormatIndependentlyOfSchedulerCalendar()
     {
         var timeZone = CreateFixedTimeZone();
-        var presentation = CreatePresentation(timeZone);
+        var presentation = CreatePresentation(timeZone, CommonTimeZone.Japan);
 
         var formatted = presentation.FormatTimestamp(
             new DateTimeOffset(2026, 8, 14, 1, 2, 3, 456, TimeSpan.Zero));
 
-        formatted.Should().Be("2026-08-14 09:02:03.456");
-        formatted.Should().NotContain("+08:00");
+        formatted.Should().Be("2026-08-14 10:02:03");
+        formatted.Should().NotContain("+09:00");
         presentation.TimeZoneId.Should().Be(timeZone.Id);
+        presentation.ToSchedulerWallTime(new DateTimeOffset(2026, 8, 14, 1, 2, 3, TimeSpan.Zero))
+            .Should().Be(new DateTime(2026, 8, 14, 9, 2, 3));
     }
 
     [Fact]
@@ -46,19 +50,17 @@ public sealed class SchedulerTimePresentationTests
     }
 
     [Fact]
-    public void OffsetTimestamp_WhenWallHourRepeats_ShouldRetainDistinctAbsoluteBoundaries()
+    public void Timestamp_WhenSchedulerWallHourRepeats_ShouldStillUseIndependentDisplayClock()
     {
         var presentation = CreatePresentation(CreateDaylightSavingTimeZone());
         var earlier = new DateTimeOffset(2026, 11, 1, 5, 30, 0, TimeSpan.Zero);
         var later = earlier.AddHours(1);
 
-        presentation.FormatTimestamp(earlier).Should().Be(presentation.FormatTimestamp(later));
-        presentation.FormatTimestampWithOffset(earlier).Should().Be("2026-11-01 01:30:00.000 -04:00");
-        presentation.FormatTimestampWithOffset(later).Should().Be("2026-11-01 01:30:00.000 -05:00");
-        presentation.FormatUtcTimestamp(earlier).Should().Be("2026-11-01T05:30:00.0000000+00:00");
-        presentation.FormatUtcTimestamp(later.ToOffset(TimeSpan.FromHours(8))).Should().Be("2026-11-01T06:30:00.0000000+00:00");
-        presentation.FormatTimestampWithOffset(null).Should().Be("—");
-        presentation.FormatUtcTimestamp(null).Should().Be("—");
+        presentation.ToSchedulerWallTime(earlier).Should().Be(presentation.ToSchedulerWallTime(later));
+        presentation.FormatTimestamp(earlier).Should().Be("2026-11-01 05:30:00");
+        presentation.FormatTimestamp(later).Should().Be("2026-11-01 06:30:00");
+        presentation.FormatTimestamp(later.ToOffset(TimeSpan.FromHours(8))).Should().Be("2026-11-01 06:30:00");
+        presentation.FormatTimestamp(null).Should().Be("—");
     }
 
     [Fact]
@@ -206,9 +208,13 @@ public sealed class SchedulerTimePresentationTests
             .Should().Be("GenerateReport");
     }
 
-    private static SchedulerTimePresentation CreatePresentation(TimeZoneInfo timeZone) => new(
+    private static SchedulerTimePresentation CreatePresentation(TimeZoneInfo timeZone, CommonTimeZone? displayTimeZone = null) => new(
         Options.Create(new ModuleJobSchedulerOption { CronTimeZone = timeZone }),
-        new EchoStringLocalizer<JobSchedulerResource>());
+        new EchoStringLocalizer<JobSchedulerResource>(), CreateUiTimeFormatter(displayTimeZone));
+
+    internal static MoTimeFormatter CreateUiTimeFormatter(CommonTimeZone? timeZone = null) => new(
+        Options.Create(new ModuleShellUIOption()),
+        Options.Create(new ModuleClockOption { LocalTimeZone = timeZone }));
 
     internal static TimeZoneInfo CreateFixedTimeZone() => TimeZoneInfo.CreateCustomTimeZone(
         "Scheduler/Test+08",

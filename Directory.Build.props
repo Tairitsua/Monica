@@ -10,7 +10,7 @@
 
   <PropertyGroup Condition="'$(IsPackable)' != 'false'">
     <!-- Package Metadata -->
-    <Version>1.0.0-rc.13</Version>
+    <Version>1.0.0-rc.15</Version>
     <Authors>MonicaFramework</Authors>
     <Company>MonicaFramework</Company>
     <Product>Monica Framework</Product>
@@ -34,7 +34,7 @@
     <PackageTags>monica;dotnet;aspnetcore;blazor;mudblazor;ddd;ai-agent;jobscheduler;modular;recurringjob</PackageTags>
 
     <!-- Package Release Notes -->
-    <PackageReleaseNotes>Monica 1.0 release candidate 9 introduces frozen host-owned module composition, bounded startup diagnostics, comprehensive module observability, exact ProjectUnit source contracts, and a hardened Agent-first Guide bootstrap.</PackageReleaseNotes>
+    <PackageReleaseNotes>Monica 1.0 release candidate 15 delivers redesigned operational workbenches, reusable JSON viewing and editing, owner-local job scheduling, configuration revision and sensitive-value controls, cross-platform Monica Guide bundles, and shared ProjectUnit source-analysis snapshots.</PackageReleaseNotes>
 
     <!-- Symbol Packages -->
     <IncludeSymbols>true</IncludeSymbols>

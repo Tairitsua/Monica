@@ -90,28 +90,32 @@
     "More": "More",
     "MoreModules": "More destinations",
     "Categories": {
-      "AI": "AI",
+      "AI": "AI workspace",
       "KnowledgeRetrieval": "Knowledge & Retrieval",
       "Documentation": "Documentation",
       "Configuration": "Configuration",
       "Infrastructure": "Infrastructure",
-      "Module": "Module",
+      "Module": "Module System",
       "TaskScheduling": "Task Scheduling",
-      "Monitor": "Monitor",
-      "Debug": "Debug",
-      "Uncategorized": "Uncategorized"
+      "Monitor": "Operations",
+      "Debug": "Diagnostics",
+      "Uncategorized": "Uncategorized",
+      "Intelligence": "Intelligence",
+      "Platform": "Platform"
     },
     "CategoryDescriptions": {
       "AI": "Converse with models, compare providers, and inspect AI integrations.",
       "KnowledgeRetrieval": "Organize knowledge bases and trace document retrieval.",
       "Documentation": "Read guides, reference material, and rendered Markdown.",
       "Configuration": "Inspect managed settings and review configuration changes.",
-      "Infrastructure": "Inspect service composition, persistence, and messaging.",
+      "Infrastructure": "Inspect host infrastructure, developer tools, and integrations.",
       "Module": "Explore module composition, startup timing, and dependencies.",
       "TaskScheduling": "Manage scheduled work and inspect job execution history.",
-      "Monitor": "Follow service health, runtime metrics, and log evidence.",
+      "Monitor": "Follow health, scheduled work, runtime evidence, and service operations.",
       "Debug": "Inspect execution behavior and use troubleshooting utilities.",
-      "Uncategorized": "Access host extensions beyond the shared navigation categories."
+      "Uncategorized": "Access host extensions beyond the shared navigation categories.",
+      "Intelligence": "Work with AI models, knowledge, and retrieval.",
+      "Platform": "Inspect module composition and manage application configuration."
     },
     "Navigation": "Navigation",
     "ExpandSidebar": "Expand sidebar",
@@ -251,5 +255,25 @@
     "DeniedTitle": "Access denied",
     "DeniedDescription": "Access to this page was not granted.",
     "DeniedRecovery": "Use the application navigation to choose another page."
+  },
+  "Navigation": {
+    "Category": "Text comparison"
+  },
+  "Json": {
+    "Caption": "JSON",
+    "Editor": "JSON editor",
+    "Formatted": "Formatted",
+    "Raw": "Raw",
+    "Format": "Format",
+    "Minify": "Minify JSON",
+    "LineNumbers": "Line numbers",
+    "Wrap": "Wrap lines",
+    "Copy": "Copy original text",
+    "Copied": "Copied",
+    "CopyFailed": "Copy failed. Please select and copy the text.",
+    "Valid": "Valid JSON",
+    "Empty": "No content",
+    "PlainText": "Plain text",
+    "Invalid": "Invalid JSON · line {0}, UTF-8 byte {1}"
   }
 }

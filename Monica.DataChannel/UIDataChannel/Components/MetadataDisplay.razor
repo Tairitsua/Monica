@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using System.Text.Json
 @using Monica.DataChannel.Models
 @inject IStringLocalizer<DataChannelResource> L
@@ -22,7 +23,7 @@ else if (_items.Count > 0)
                         <div class="metadata-structured">
                             <MudExpansionPanels Elevation="0" Dense="true">
                                 <MudExpansionPanel Text="@L["Metadata:ComplexValue"]" Icon="@MoIcons.Braces">
-                                    <pre class="metadata-code">@item.Value</pre>
+                                    <MoJson Value="@item.Value" AllowPlainText="true" ShowLineNumbers="false" />
                                 </MudExpansionPanel>
                             </MudExpansionPanels>
                         </div>

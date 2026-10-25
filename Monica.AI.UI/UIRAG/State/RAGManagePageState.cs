@@ -29,6 +29,7 @@ public sealed partial class RAGManagePageState : IAsyncDisposable
     private readonly ISnackbar _snackbar;
     private readonly IStringLocalizer<AIResource> _localizer;
     private readonly RAGQueuePollingState _queuePollingState;
+    private readonly Monica.UI.Shared.Services.MoTimeFormatter _time;
 
     private bool _isAttached;
     private string? _batchStartInFlightKnowledgeBaseId;
@@ -51,6 +52,7 @@ public sealed partial class RAGManagePageState : IAsyncDisposable
         IDialogService dialogService,
         IStringLocalizer<AIResource> localizer,
         RAGQueuePollingState queuePollingState,
+        Monica.UI.Shared.Services.MoTimeFormatter time,
         Func<Action, Task> dispatch)
     {
         _indexingFacade = indexingFacade;
@@ -63,6 +65,7 @@ public sealed partial class RAGManagePageState : IAsyncDisposable
         _session = new(() => SelectedKnowledgeBase?.Id, dialogService, dispatch);
         _localizer = localizer;
         _queuePollingState = queuePollingState;
+        _time = time;
     }
 
     /// <summary>

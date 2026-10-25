@@ -17,8 +17,8 @@
                 <h3>@Descriptor.ServiceTypeDisplayName</h3>
                 <code>@Descriptor.ServiceType</code>
                 <div class="di-inspector-identity-meta">
-                    <span>@L[$"Page:Shared:Lifetimes:{Descriptor.Lifetime}"]</span>
-                    <span>@L[$"Page:Grid:Kinds:{Descriptor.ImplementationKind}"]</span>
+                    <span title="@L["Page:Dialog:Fields:Lifetime"]">@L[$"Page:Shared:Lifetimes:{Descriptor.Lifetime}"]</span>
+                    <span title="@L["Page:Dialog:Fields:ImplementationKind"]">@L[$"Page:Grid:Kinds:{Descriptor.ImplementationKind}"]</span>
                     <span>@L["Page:Dialog:Fields:Index"] @Descriptor.Index</span>
                     @if (Descriptor.IsAutoRegistered)
                     {
@@ -36,16 +36,8 @@
                             <dd>@GetTextOrFallback(Descriptor.ServiceAssemblyName)</dd>
                         </div>
                         <div>
-                            <dt>@L["Page:Dialog:Fields:Lifetime"]</dt>
-                            <dd>@L[$"Page:Shared:Lifetimes:{Descriptor.Lifetime}"]</dd>
-                        </div>
-                        <div>
                             <dt>@L["Page:Dialog:Fields:ServiceKey"]</dt>
                             <dd><code>@GetTextOrFallback(Descriptor.ServiceKey)</code></dd>
-                        </div>
-                        <div>
-                            <dt>@L["Page:Dialog:Fields:Index"]</dt>
-                            <dd><code>@Descriptor.Index</code></dd>
                         </div>
                         <div>
                             <dt>@L["Page:Dialog:Fields:IsKeyed"]</dt>
@@ -60,10 +52,6 @@
                 <section class="di-inspector-section">
                     <h4>@L["Page:Dialog:Sections:Implementation"]</h4>
                     <dl class="di-definition-list">
-                        <div>
-                            <dt>@L["Page:Dialog:Fields:ImplementationKind"]</dt>
-                            <dd>@L[$"Page:Grid:Kinds:{Descriptor.ImplementationKind}"]</dd>
-                        </div>
                         <div>
                             <dt>@L["Page:Dialog:Fields:ImplementationType"]</dt>
                             <dd><code>@GetTextOrFallback(Descriptor.ImplementationType)</code></dd>

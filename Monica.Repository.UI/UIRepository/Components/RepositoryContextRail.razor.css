@@ -12,6 +12,5 @@
 .context-status[data-tone=warning] { --status-tone: var(--mud-palette-warning); } .context-status[data-tone=error] { --status-tone: var(--mud-palette-error); }
 .context-status::before { content: ''; display: inline-block; margin-right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--status-tone); }
 .context-pending { color: color-mix(in srgb, var(--mud-palette-warning) 35%, var(--mud-palette-text-primary)); }
-.rail-state { padding: 24px 0; font-size: 12px; color: var(--rail-muted); }
 @media (max-width: 1050px) { .context-list { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); max-height: 340px; } }
 @media (max-width: 450px) { .repository-context-rail { padding: 20px 16px; } }

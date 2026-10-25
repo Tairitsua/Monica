@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.Profiling.UIMemoryAnalysis.Components
 @using Monica.Profiling.UIMemoryAnalysis.Support
@@ -19,13 +20,13 @@
             <DiagnosticActionsCard Options="_state.Options" OnForceGC="ForceGcAsync" OnCreateDump="CreateDumpAsync" IsLoading="_state.IsLoading" />
             @if (_state.IsActionRunning)
             {
-                <div class="memory-diagnostic-running" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" /><div><strong>@L["Diagnostics:Running"]</strong><p>@L["Diagnostics:Started"] @MemoryAnalysisDisplayFormatter.LocalDateTime(_state.ActionStartedAt)</p></div></div>
+                <div class="memory-diagnostic-running" role="status"><MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" /><div><strong>@L["Diagnostics:Running"]</strong><p>@L["Diagnostics:Started"] @UiTime.Format(_state.ActionStartedAt)</p></div></div>
             }
             @if (_state.LastAction is { } action)
             {
                 <section class="memory-diagnostic-result" data-action-status="@action.Status" aria-live="polite">
                     <header><div><span>@L["Diagnostics:Outcome:Eyebrow"]</span><h2>@(action.Action == MemoryDiagnosticAction.GarbageCollection ? L["Diagnostics:ManualGc:Title"] : L["Diagnostics:Dump:Title"])</h2></div><strong class="@(action.IsSuccessful ? "memory-action-success" : "memory-action-failed")">@(action.IsSuccessful ? L["Diagnostics:Outcome:Completed"] : L["Diagnostics:Outcome:Failed"])</strong></header>
-                    <dl><div><dt>@L["Diagnostics:Started"]</dt><dd><time datetime="@action.StartedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(action.StartedAt)</time></dd></div><div><dt>@L["Diagnostics:Outcome:Finished"]</dt><dd><time datetime="@action.CompletedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(action.CompletedAt)</time></dd></div><div><dt>@L["Diagnostics:Outcome:Status"]</dt><dd>@action.Status</dd></div>
+                    <dl><div><dt>@L["Diagnostics:Started"]</dt><dd><time datetime="@action.StartedAt.ToString("O")">@UiTime.Format(action.StartedAt)</time></dd></div><div><dt>@L["Diagnostics:Outcome:Finished"]</dt><dd><time datetime="@action.CompletedAt.ToString("O")">@UiTime.Format(action.CompletedAt)</time></dd></div><div><dt>@L["Diagnostics:Outcome:Status"]</dt><dd>@action.Status</dd></div>
                         @if (action.Generation is { } generation) { <div><dt>@L["Diagnostics:Generation"]</dt><dd>@(generation < 0 ? L["Diagnostics:FullCollection"] : L["Common:Generation", generation])</dd></div> }</dl>
                     @if (!string.IsNullOrEmpty(action.Message)) { <p class="memory-action-message">@action.Message</p> }
                     @if (action.ServerDumpPath is { } path) { <div class="memory-dump-path"><span>@L["Diagnostics:Outcome:ServerPath"]</span><code>@path</code><p>@L["Diagnostics:Dump:ServerFile"]</p></div> }
@@ -37,7 +38,7 @@
             }
             @if (_state.SnapshotCapturedAt is { } capturedAt)
             {
-                <div class="memory-diagnostic-evidence"><span>@L["Diagnostics:Outcome:ReadScope"]</span><time data-memory-view-capture datetime="@capturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(capturedAt)</time><span>@L["Overview:WorkingSet"] <strong>@MemoryAnalysisDisplayFormatter.Bytes(_state.CurrentSnapshot?.WorkingSetBytes)</strong></span></div>
+                <div class="memory-diagnostic-evidence"><span>@L["Diagnostics:Outcome:ReadScope"]</span><time data-memory-view-capture datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time><span>@L["Overview:WorkingSet"] <strong>@MemoryAnalysisDisplayFormatter.Bytes(_state.CurrentSnapshot?.WorkingSetBytes)</strong></span></div>
             }
         }
     </ChildContent>

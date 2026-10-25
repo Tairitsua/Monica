@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.UIDataChannel.Models
 @using Monica.DataChannel.UIDataChannel.Support
 @inject IStringLocalizer<DataChannelResource> L
@@ -60,7 +61,7 @@
                 <PropertyColumn Property="item => item.MaxPoolSize" Title="@L["Exceptions:Columns:PoolSize"]" />
                 <PropertyColumn Property="item => item.LatestException" Title="@L["Exceptions:Columns:Latest"]">
                     <CellTemplate>
-                        <time>@(context.Item.LatestException is { } latest ? DataChannelPresentation.Timestamp(latest) : L["Common:Values:None"].Value)</time>
+                        <time>@(context.Item.LatestException is { } latest ? UiTime.Format(latest) : L["Common:Values:None"].Value)</time>
                     </CellTemplate>
                 </PropertyColumn>
                 <TemplateColumn Title="@L["Common:Columns:Actions"]" Sortable="false" Filterable="false">

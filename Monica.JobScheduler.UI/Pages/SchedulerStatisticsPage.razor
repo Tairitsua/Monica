@@ -49,25 +49,22 @@
                                 @if ((state.LoadedQuery ?? state.RequestedQuery) is { } query)
                                 {
                                     <span class="statistics-window__eyebrow">@(state.HasLoadedSnapshot ? L["Analytics:Window:Accepted"] : L["Analytics:Window:Requested"])</span>
-                                    <div class="statistics-window__interval">
-                                        <time datetime="@query.StartTimeUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(query.StartTimeUtc)</time>
-                                        <span aria-hidden="true">→</span>
-                                        <time datetime="@query.EndTimeUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(query.EndTimeUtc)</time>
+                                    <div class="statistics-window__interval" data-start="@query.StartTimeUtc.ToString("O")" data-end="@query.EndTimeUtc.ToString("O")">
+                                        @TimePresentation.FormatRange(query.StartTimeUtc, query.EndTimeUtc)
                                     </div>
-                                    <span>@L["Analytics:Window:Bounds", TimePresentation.TimeZoneId]</span>
+                                    <span>@L["Analytics:Window:Bounds"]</span>
                                 }
                                 @if (state.Snapshot is { } snapshot)
                                 {
                                     <dl class="statistics-window__facts">
                                         <div><dt>@L["Analytics:Window:Resolved"]</dt><dd>@snapshot.Trend.Sum(bucket => bucket.SucceededCount + bucket.FailedCount).ToString("N0", CultureInfo.CurrentCulture)</dd></div>
                                         <div><dt>@L["Analytics:Window:Measured"]</dt><dd>@snapshot.Duration.Count.ToString("N0", CultureInfo.CurrentCulture)</dd></div>
-                                        <div><dt>@L["Analytics:Window:Observed"]</dt><dd>@TimePresentation.FormatTimestampWithOffset(state.ObservedAtUtc)</dd></div>
+                                        <div><dt>@L["Analytics:Window:Observed"]</dt><dd>@TimePresentation.FormatTimestamp(state.ObservedAtUtc)</dd></div>
                                     </dl>
                                 }
                             </div>
                         </div>
                         <div class="statistics-window__controls">
-                            <p class="statistics-window__basis">@L["Analytics:Range:Description", TimePresentation.TimeZoneId]</p>
                             <div class="statistics-window__presets" role="group" aria-label="@L["Analytics:Range:Title"]">
                                 @foreach (var range in Enum.GetValues<SchedulerAnalyticsTimeRange>())
                                 {
@@ -75,6 +72,9 @@
                                             aria-pressed="@(state.TimeRange == range ? "true" : "false")"
                                             @onclick="@(() => SelectRangeAsync(range))">@L[$"Analytics:Range:{range}"]</button>
                                 }
+                                <MudTooltip Text="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]">
+                                    <MudIconButton Icon="@MoIcons.Info" Size="Size.Small" Color="Color.Inherit" aria-label="@L["Analytics:Range:Title"]" aria-description="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]" />
+                                </MudTooltip>
                             </div>
                             <button type="button" class="statistics-window__refresh" disabled="@state.IsLoading" @onclick="RefreshAsync">
                                 <MoIcon Icon="@MoIcons.Refresh" Size="1.25rem" aria-hidden="true" />

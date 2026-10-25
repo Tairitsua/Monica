@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.Profiling.ExecutionTiming.Models
 @using Monica.Profiling.UIExecutionTiming.Components
@@ -26,7 +28,7 @@
                 <span class="timing-polling"><span class="timing-polling__dot" aria-hidden="true"></span>@PollingLabel</span>
                 @if (PageState.SnapshotCapturedAt is { } capturedAt)
                 {
-                    <span>@L["Page:Captured"] <time datetime="@ExecutionTimingDisplayFormatter.FormatMachineDateTime(capturedAt)">@ExecutionTimingDisplayFormatter.FormatDateTime(capturedAt)</time></span>
+                    <span>@L["Page:Captured"] <time datetime="@ExecutionTimingDisplayFormatter.FormatMachineDateTime(capturedAt)">@UiTime.Format(capturedAt)</time></span>
                 }
             </div>
         </div>
@@ -62,7 +64,7 @@
     }
     else if (PageState.LoadError is null)
     {
-        <div class="timing-awaiting" role="status">@L["Page:Loading"]</div>
+        <div class="timing-awaiting"><MoContentState Loading="true">@L["Page:Loading"]</MoContentState></div>
     }
 </div>
 

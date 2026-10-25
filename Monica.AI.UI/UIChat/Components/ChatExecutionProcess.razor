@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
 @using Monica.AI.UI.UIChat.Support
@@ -47,7 +48,7 @@
                         }
                         @if (step.Tool is { } tool)
                         {
-                            <details class="tool-details"><summary>@L["Workbench:ArgumentsAndResult"]</summary><pre>@tool.Arguments</pre><pre>@tool.Result</pre></details>
+                            <details class="tool-details"><summary>@L["Workbench:ArgumentsAndResult"]</summary><MoJson Value="@tool.Arguments" AllowPlainText="true" /><MoJson Value="@tool.Result" AllowPlainText="true" /></details>
                         }
                         @if (step.Compaction is { } compaction)
                         {

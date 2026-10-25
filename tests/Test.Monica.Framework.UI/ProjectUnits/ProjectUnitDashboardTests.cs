@@ -79,14 +79,11 @@ public sealed class ProjectUnitDashboardTests
 
         cut.WaitForAssertion(() =>
         {
-            var versionChip = cut.Find(".project-unit-dashboard__service-version");
-            versionChip.TextContent.Should().Contain(version);
-            versionChip.GetAttribute("title").Should().Be(version);
-
-            var gapKey = cut.Find(".project-unit-dashboard__gap-key");
-            gapKey.TextContent.Should().Contain(key);
-            gapKey.GetAttribute("title").Should().Be(key);
-            cut.Find(".project-unit-dashboard__gap-chevron").Should().NotBeNull();
+            cut.Find("[data-testid='project-unit-service-project-name']").ParentElement!
+                .ParentElement!.TextContent.Should().Contain(version);
+            var gap = cut.Find($"[data-unit-key='{key}']");
+            gap.QuerySelector("code")!.TextContent.Should().Be(key);
+            gap.QuerySelector("button[aria-label]").Should().NotBeNull();
         });
     }
 
@@ -113,8 +110,9 @@ public sealed class ProjectUnitDashboardTests
         cut.WaitForAssertion(() =>
         {
             cut.Find("[data-testid='project-unit-dashboard-empty']").Should().NotBeNull();
-            cut.Markup.Should().Contain("--");
-            cut.Markup.Should().NotContain("100%");
+            cut.Find("[data-testid='project-unit-coverage']").TextContent.Should().Contain("--");
+            cut.FindAll("[data-testid='project-unit-coverage'] [role='progressbar']")
+                .Should().OnlyContain(bar => bar.GetAttribute("aria-valuenow") == "0");
         });
     }
 

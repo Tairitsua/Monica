@@ -42,7 +42,9 @@
             <MudSelectItem T="string" Value="@bool.FalseString">@L.GetDiscoveryModeText(false)</MudSelectItem>
         </MudSelect>
         <div class="subscription-exact-key">
-            <MudCheckBox CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" T="bool" Value="@(Filter?.ServiceKey != null)" ValueChanged="ExactKeyChanged" Dense="true" Label="@L["Registry:ExactKey"]" />
+            <div class="subscription-exact-key-toggle">
+                <MudCheckBox CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" T="bool" Value="@(Filter?.ServiceKey != null)" ValueChanged="ExactKeyChanged" Dense="true" Label="@L["Registry:ExactKey"]" />
+            </div>
             @if (Filter?.ServiceKey != null)
             {
                 <MudTextField T="string" Value="@Filter.ServiceKey" ValueChanged="KeyChanged" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined"

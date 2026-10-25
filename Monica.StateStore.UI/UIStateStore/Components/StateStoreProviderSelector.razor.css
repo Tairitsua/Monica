@@ -1,0 +1,19 @@
+.provider-picker {min-width:0;}
+.provider-picker ::deep .provider-select {margin:0;min-width:0;}
+.provider-picker ::deep .mud-input {padding:9px 12px;min-height:60px;border:1px solid var(--mud-palette-lines-default);border-radius:8px;background:var(--mud-palette-surface);font-family:var(--mo-font-family-body);}
+.provider-picker ::deep .mud-input-slot {padding:0;min-width:0;}
+.provider-picker ::deep div[role="combobox"].mud-input-slot {height:auto;overflow:visible;}
+.provider-picker ::deep .mud-input-adornment {margin-left:11px;color:var(--mud-palette-text-primary);}
+.provider-picker ::deep .mud-input-adornment-icon {width:18px;height:18px;}
+.provider-picker ::deep .mud-input:hover,.provider-picker ::deep .mud-input:focus-within,.provider-picker[data-open="true"] ::deep .mud-input {border-color:var(--mud-palette-primary);}
+.provider-picker ::deep [role="combobox"]:focus-visible {outline:none;}
+.provider-static {padding:9px 12px;min-height:60px;border:1px solid var(--mud-palette-lines-default);border-radius:8px;background:var(--mud-palette-surface);display:flex;align-items:center;}
+.provider-option {display:flex;align-items:center;gap:11px;min-width:0;width:100%;text-align:start;color:var(--mud-palette-text-primary);font:400 14px/1.5 var(--mo-font-family-body);--provider-role:var(--mud-palette-primary);}
+.provider-option[data-tone="info"] {--provider-role:var(--mud-palette-info);}
+.provider-option[data-tone="secondary"] {--provider-role:var(--mud-palette-secondary);}
+.provider-symbol {display:inline-flex;align-items:center;justify-content:center;width:35px;height:35px;flex:0 0 auto;border-radius:8px;background:color-mix(in srgb,var(--provider-role) 13%,var(--mud-palette-surface));color:color-mix(in srgb,var(--provider-role) 65%,var(--mud-palette-text-primary));}
+.provider-caption {display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;}
+.provider-caption strong {font-size:14px;font-weight:500;line-height:21px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.provider-description {font-size:12px;line-height:18px;color:var(--mud-palette-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.provider-selection-mark {display:none;flex:0 0 auto;}
+@media(max-width:760px) {.provider-caption strong {font-size:13px;}.provider-static,.provider-picker ::deep .mud-input {padding:7px 10px;min-height:56px;}}

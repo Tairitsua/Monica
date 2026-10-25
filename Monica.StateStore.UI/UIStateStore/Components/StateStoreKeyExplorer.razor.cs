@@ -17,6 +17,12 @@ public partial class StateStoreKeyExplorer
     [Parameter] public EventCallback OnRefreshProviders { get; set; }
     /// <summary>Optional caller-owned page identity. Null renders no identity copy; this explorer owns the scoped Create action.</summary>
     [Parameter] public RenderFragment? HeaderContent { get; set; }
+    /// <summary>Gets or sets the shared route navigation rendered below the page identity.</summary>
+    [Parameter] public RenderFragment? NavigationContent { get; set; }
+    /// <summary>Gets or sets the opaque registration identity supplied by the browser route.</summary>
+    [Parameter] public string? ProviderIdentity { get; set; }
+    /// <summary>Gets or sets the callback that writes a committed provider selection to the route.</summary>
+    [Parameter] public EventCallback<string?> ProviderIdentityChanged { get; set; }
 
     private readonly HashSet<string> selectedKeyNames = new(StringComparer.Ordinal);
     private readonly List<Task> _operations = [];
@@ -43,17 +49,26 @@ public partial class StateStoreKeyExplorer
     private Task? _retirement;
     private Reveal? _pendingReveal, _pendingBack;
     private Confirmation? _confirmation;
+    private bool _treeView, _showDetail, _expanded;
+    private string? _previewSource;
+    private bool _previewIsJson;
 
     protected override void OnParametersSet()
     {
         if (isDisposed) return;
-        var rebound = Providers.FirstOrDefault(item => item.UniqueId == selectedProvider?.UniqueId)
+        var rebound = Providers.FirstOrDefault(item => item.UniqueId == ProviderIdentity)
+            ?? Providers.FirstOrDefault(item => item.UniqueId == selectedProvider?.UniqueId)
             ?? Providers.FirstOrDefault(item => item.IsDefaultStateStore) ?? Providers.FirstOrDefault();
         if (rebound?.UniqueId != selectedProvider?.UniqueId) ChangeProvider(rebound);
         else selectedProvider = rebound;
     }
 
-    private void SelectProviderIdentity(string identity) => ChangeProvider(Providers.FirstOrDefault(item => item.UniqueId == identity));
+    private async Task SelectProviderIdentity(string identity)
+    {
+        if (isDisposed) return;
+        ChangeProvider(Providers.FirstOrDefault(item => item.UniqueId == identity));
+        if (!isDisposed) await ProviderIdentityChanged.InvokeAsync(identity);
+    }
     private void ChangeProvider(StateStoreProviderInfo? provider)
     {
         if (isDisposed || selectedProvider?.UniqueId == provider?.UniqueId) return;
@@ -73,6 +88,7 @@ public partial class StateStoreKeyExplorer
         _acceptedProvider = null; browseResult = null; selectedKey = null; keys = []; selectedKeyNames.Clear();
         browseError = null; loadingKeyName = null; hasBrowsed = false; isSearching = false; _isMutating = false;
         _pendingReveal = null; _pickerOpen = false; isProviderDetailVisible = false; providerDetailTarget = null;
+        _showDetail = false; _expanded = false;
         searchMode = provider is null ? EStateStoreKeySearchMode.Auto : NormalizeSearchMode(provider, provider.DefaultSearchMode);
         searchQuery = searchMode == EStateStoreKeySearchMode.PatternScan ? Options.DefaultScanPattern : string.Empty;
         if (cleanupErrors.Count > 0)
@@ -141,6 +157,7 @@ public partial class StateStoreKeyExplorer
         var request = new StateStoreKeyBrowseRequest { Query = searchQuery.Trim(), SearchMode = searchMode, Limit = Options.MaxKeysPerPage };
         isSearching = true; hasBrowsed = true; browseError = null; browseResult = null; _acceptedProvider = null;
         keys = []; selectedKey = null; selectedKeyNames.Clear(); loadingKeyName = null;
+        _showDetail = false;
         _resultGeneration++; _selectionGeneration++; _pendingReveal = null; _pickerOpen = false;
         RequestRender();
         try
@@ -165,6 +182,7 @@ public partial class StateStoreKeyExplorer
         var scope = CaptureScope(); var result = _resultGeneration; var selection = ++_selectionGeneration;
         RenewCancellation(ref _selectionCancellation, _queryCancellation.Token);
         selectedKey = key; _pickerOpen = false; _pendingReveal = null; RequestRender();
+        if (manual) _showDetail = true;
         await LoadCoreAsync(key, scope, result, selection);
         if (manual && Current(scope) && focus == _focusVersion && result == _resultGeneration && selection == _selectionGeneration && selectedKey?.Key == key.Key)
         { _pendingReveal = new(scope.Generation, result, selection, focus, key.Key); RequestRender(); }
@@ -244,6 +262,12 @@ public partial class StateStoreKeyExplorer
             { item => item.OnCreated, EventCallback.Factory.Create<StateStoreKeyInfo>(this, created => PublishCreated(scope, result, created)) }
         };
         await ShowOwnedAsync<KeyCreateDialog>(scope, parameters, L["KeyCreate:Dialogs:Title"]);
+        if (Current(scope) && result != _resultGeneration && selectedKey is { } createdKey && browseResult?.Query == createdKey.Key)
+        {
+            // The compact layout hides the Create trigger. Reveal only after its dialog has retired.
+            _pendingReveal = new(_providerGeneration, _resultGeneration, _selectionGeneration, _focusVersion, createdKey.Key);
+            RequestRender();
+        }
     });
     private async Task ShowOwnedAsync<T>(Scope scope, DialogParameters<T> parameters, string title) where T : IComponent
     {
@@ -278,6 +302,7 @@ public partial class StateStoreKeyExplorer
         var copy = Copy(created); searchMode = NormalizeSearchMode(selectedProvider!, EStateStoreKeySearchMode.ExactKey); searchQuery = copy.Key;
         keys = [copy]; selectedKey = copy; selectedKeyNames.Clear(); browseError = null; hasBrowsed = true; _pickerOpen = false;
         _acceptedProvider = selectedProvider; browseResult = new() { Query = copy.Key, AppliedMode = searchMode, Items = keys.ToList(), TotalCount = 1 };
+        _showDetail = true;
         Snackbar.Add(L["KeyExplorer:Messages:KeyCreateSuccess"], Severity.Success); RequestRender();
     }
     private Task ReloadSelectedKeyAsync() => Track(async () =>
@@ -325,6 +350,11 @@ public partial class StateStoreKeyExplorer
     private void CompleteConfirmation(bool confirmed) { var current = _confirmation; _confirmation = null; current?.Completion.TrySetResult(confirmed); RequestRender(); }
     private Task OnConfirmationVisibilityChanged(bool visible) { if (!visible) CompleteConfirmation(false); return Task.CompletedTask; }
     private void ToggleKeySelection(StateStoreKeyInfo key, bool selected) { if (selected) selectedKeyNames.Add(key.Key); else selectedKeyNames.Remove(key.Key); }
+    private void ToggleAllSelection(bool selected)
+    {
+        selectedKeyNames.Clear();
+        if (selected) foreach (var key in keys) selectedKeyNames.Add(key.Key);
+    }
     private void TogglePicker()
     {
         if (isDisposed) return;
@@ -343,6 +373,7 @@ public partial class StateStoreKeyExplorer
             var module = await _moduleImport;
             if (isDisposed) return;
             if (firstRender) await module.InvokeVoidAsync("observe", _workspace, _visit);
+            await module.InvokeVoidAsync("sync", _workspace, _visit);
             if (_pendingBack is { } back)
             {
                 _pendingBack = null;
@@ -365,12 +396,38 @@ public partial class StateStoreKeyExplorer
         {
             CancelFocusIntent();
             _pickerOpen = true;
+            _showDetail = false; _expanded = false;
             _pendingBack = new(_providerGeneration, _resultGeneration, _selectionGeneration, _focusVersion, selectedKey.Key);
             RequestRender();
         }
         return Task.CompletedTask;
     }
     private void RequestRender() { if (!isDisposed) StateHasChanged(); }
+    private Task CopyKeyAsync() => CopyAsync(selectedKey?.Key);
+    private Task CopyValueAsync() => CopyAsync(selectedKey?.RawValue);
+    private Task CopyAsync(string? text) => Track(async () =>
+    {
+        if (text is null || _moduleImport is null) return;
+        try
+        {
+            var copied = await (await _moduleImport).InvokeAsync<bool>("copy", text);
+            if (!isDisposed) Snackbar.Add(L[copied ? "Workbench:Copied" : "Workbench:CopyFailed"], copied ? Severity.Success : Severity.Warning);
+        }
+        catch (JSDisconnectedException) { }
+    });
+    private string GetValueFormat()
+    {
+        if (_previewSource != selectedKey?.RawValue)
+        {
+            _previewSource = selectedKey?.RawValue; _previewIsJson = false;
+            if (_previewSource is not null)
+            {
+                try { using var value = System.Text.Json.JsonDocument.Parse(_previewSource); _previewIsJson = true; }
+                catch (System.Text.Json.JsonException) { }
+            }
+        }
+        return L[_previewIsJson ? "Workbench:Json" : "Workbench:Text"];
+    }
     public void Dispose() => _ = DisposeAsync();
     public ValueTask DisposeAsync()
     {
@@ -418,7 +475,6 @@ public partial class StateStoreKeyExplorer
     private bool CanShowRowSelection() => Options.AllowKeyDeletion && selectedProvider?.SupportsBulkDelete == true;
     private bool IsSearchMode(EStateStoreKeySearchMode mode) => searchMode == mode;
     private string GetProviderCaption(StateStoreProviderInfo provider) => L.GetProviderDisplayName(provider) + " · " + L.GetProviderTypeText(provider.ProviderType);
-    private string GetProviderCardDescription(StateStoreProviderInfo provider) => L.GetProviderTypeText(provider.ProviderType) + " · " + L[provider.IsDistributed ? "ProviderDetail:Labels:Distributed" : "ProviderDetail:Labels:LocalMemory"];
     private string GetSearchLabel() => L[searchMode == EStateStoreKeySearchMode.PatternScan ? "KeyExplorer:Labels:KeyPattern" : "KeyExplorer:Labels:KeyName"];
     private string GetSearchPlaceholder() => L[searchMode == EStateStoreKeySearchMode.PatternScan ? "KeyExplorer:Placeholders:PatternSearch" : "KeyExplorer:Placeholders:FullKeyName"];
     private string GetSearchActionText() => L[searchMode == EStateStoreKeySearchMode.PatternScan ? "KeyExplorer:Actions:Scan" : "KeyExplorer:Actions:Query"];

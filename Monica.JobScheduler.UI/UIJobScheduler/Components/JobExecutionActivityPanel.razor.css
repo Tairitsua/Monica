@@ -23,7 +23,7 @@
 .job-activity__identity small, .job-activity__timing small { color: var(--activity-muted); font-size: .76rem; overflow-wrap: anywhere; line-height: 1.45; }
 .job-activity__duration { color: var(--stream-ink); font-family: var(--mo-font-family-mono); font-size: .79rem; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .job-activity__item ::deep .job-activity__chevron { color: var(--stream-ink); }
-.job-activity__empty { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 16px; color: var(--activity-muted); background: color-mix(in srgb, var(--stream-tone) 4%, var(--mud-palette-surface)); font-size: .8rem; line-height: 1.5; }
+.job-activity__empty { min-width: 0; color: var(--activity-muted); background: color-mix(in srgb, var(--stream-tone) 4%, var(--mud-palette-surface)); font-size: .8rem; line-height: 1.5; }
 .job-activity__empty ::deep :is(.mud-icon-root, .mo-icon) { color: var(--stream-ink); flex-shrink: 0; }
 .job-activity__stream ::deep .mud-alert-outlined-warning { color: color-mix(in srgb, var(--mud-palette-warning) 25%, var(--mud-palette-text-primary)); }
 @container job-activity (max-width: 900px) { .job-activity__streams { grid-template-columns: minmax(0, 1fr); } }

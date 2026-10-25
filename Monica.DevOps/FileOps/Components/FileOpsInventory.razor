@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.FileOps.Models
 @using Monica.DevOps.FileOps.State
 @using Monica.DevOps.Localization
@@ -35,13 +36,13 @@
     @if (Controller.BrowseStale) { <p class="retained-note">@L["Inventory:Retained"]</p> }
     @if (Controller.Browse is null)
     {
-        <div class="empty-state" tabindex="-1">
+        <div class="empty-state" tabindex="-1"><MoContentState Loading="@Busy">
             @if (Busy) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" /><h3>@L["Workspace:Loading"]</h3> }
             else { <MoIcon Icon="@MoIcons.FolderOff" Size="1.5rem" /><h3>@L["Inventory:NoAccepted"]</h3><p>@L["Inventory:RetryHint"]</p> }
-        </div>
+        </MoContentState></div>
     }
     else if (Entries.Count == 0)
-    { <div class="empty-state" tabindex="-1"><MoIcon Icon="@MoIcons.FolderOpen" Size="1.5rem" /><h3>@L["Workspace:EmptyDirectory"]</h3></div> }
+    { <div class="empty-state" tabindex="-1"><MoContentState><MoIcon Icon="@MoIcons.FolderOpen" Size="1.5rem" /><h3>@L["Workspace:EmptyDirectory"]</h3></MoContentState></div> }
     else
     {
         <div class="inventory-list" tabindex="0" aria-label="@L["Inventory:Entries"]">
@@ -134,7 +135,7 @@
     private string FieldLabel(FileOpsSortField field) => L[field switch { FileOpsSortField.Name => "Columns:Name", FileOpsSortField.Type => "Columns:Type", FileOpsSortField.Size => "Columns:Size", _ => "Columns:Modified" }];
     private string SortAria(FileOpsSortField field) => Controller.SortField != field ? "none" : Controller.SortDescending ? "descending" : "ascending";
     private string TypeText(FileOpsEntrySummary entry) => entry.IsDirectory ? L["Labels:Directory"] : string.IsNullOrWhiteSpace(entry.Extension) ? L["Labels:File"] : entry.Extension;
-    private static string DateText(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz");
+    private string DateText(DateTimeOffset value) => UiTime.Format(value);
     private string RowClass(FileOpsEntrySummary entry, int index) => Same(entry.FullPath, Controller.InspectedEntry?.FullPath) ? "entry-row entry-selected" : "entry-row";
     private static bool Same(string? left, string? right) => string.Equals(left, right, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
     private async Task CheckAsync(FileOpsEntrySummary entry, bool value) { if (Busy) return; Controller.ToggleEntrySelection(entry, value); await Changed.InvokeAsync(); }

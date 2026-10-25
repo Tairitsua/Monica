@@ -54,14 +54,6 @@
     line-height: 1.5;
 }
 
-.key-dialog-tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    margin-top: -8px;
-}
-
-.key-dialog-tools ::deep .mud-button-label,
 .key-dialog-actions ::deep .mud-button-label {
     white-space: normal;
 }
@@ -77,17 +69,9 @@
     border-top: 1px solid var(--mud-palette-lines-default);
 }
 
-.key-dialog-body ::deep .key-dialog__diagnostic-input input,
-.key-dialog-body ::deep .key-dialog-value textarea {
+.key-dialog-body ::deep .key-dialog__diagnostic-input input {
     font-family: var(--mo-font-family-mono);
     font-size: .875rem;
-}
-
-.key-dialog-body ::deep .key-dialog-value textarea {
-    box-sizing: border-box;
-    height: clamp(9rem, 30dvh, 20rem);
-    line-height: 1.6;
-    overflow-wrap: anywhere;
 }
 
 @media (max-width: 600px) {
@@ -106,12 +90,10 @@
 }
 
 .key-dialog-body,
-.key-dialog-tools,
 .key-dialog-actions {
     --state-dialog-primary-ink: color-mix(in srgb, var(--mud-palette-primary) 70%, var(--mud-palette-text-primary));
 }
 
-.key-dialog-tools ::deep .state-dialog-primary-text.mud-button-text-primary:not(:disabled):not(.mud-disabled),
 .key-dialog-actions ::deep .state-dialog-primary-text.mud-button-text-primary:not(:disabled):not(.mud-disabled) {
     color: var(--state-dialog-primary-ink) !important;
 }
@@ -120,10 +102,5 @@
     color: var(--state-dialog-primary-ink) !important;
 }
 
-.key-dialog-tools {
-    --state-dialog-secondary-ink: color-mix(in srgb, var(--mud-palette-secondary) 70%, var(--mud-palette-text-primary));
-}
 
-.key-dialog-tools ::deep .state-dialog-secondary-text.mud-button-text-secondary:not(:disabled):not(.mud-disabled) {
-    color: var(--state-dialog-secondary-ink) !important;
-}
+.key-dialog-hint {margin:-8px 0 0;color:var(--mud-palette-text-secondary);font-size:12px;line-height:1.6;}

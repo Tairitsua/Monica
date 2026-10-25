@@ -3,15 +3,6 @@
 
 <PageTitle>@L["Pages:MarkdownDocuments:Title"]</PageTitle>
 <div class="@LayoutClass">
-    @if (!PageState.IsLoading && PageState.Groups is { Count: > 0 })
-    {
-        <DocumentViewerToolbar CurrentGroup="PageState.CurrentGroup" CurrentCulture="@PageState.SelectedCulture"
-            CurrentLanguage="PageState.CurrentLanguage" Languages="PageState.CurrentLanguages"
-            ShowLanguageSwitcher="PageState.ShowLanguageSwitcher" IsSidebarVisible="PageState.ShowSidebar"
-            IsOutlineVisible="PageState.ShowTableOfContents" HasOutline="@(PageState.DocumentHeadings.Count > 0)" OnToggleSidebar="PageState.ToggleSidebar"
-            OnOpenGroupSwitcher="PageState.OpenGroupSwitcherAsync" OnOpenDocumentSearch="PageState.OpenDocumentSearchAsync"
-            OnLanguageChanged="PageState.OnLanguageSelectedAsync" OnToggleOutline="PageState.ToggleTableOfContents" />
-    }
     <div @ref="_viewerRoot" class="@WorkspaceClass">
         @if (PageState.IsLoading)
         {
@@ -44,12 +35,22 @@
                 <aside class="doc-sidebar-rail" aria-label="@L["MarkdownViewer:Toolbar:DocumentTree"]">@LibraryContent</aside>
             }
             <main class="doc-reader-card">
-                <DocumentContentViewer CurrentGroup="PageState.CurrentGroup" Document="PageState.SelectedDocument"
-                    Content="@PageState.DocumentContent" CurrentAnchorId="@PageState.CurrentAnchorId"
-                    CurrentCulture="@PageState.SelectedCulture" CurrentLanguage="PageState.CurrentLanguage"
-                    Languages="PageState.CurrentLanguages" MissingTranslation="PageState.MissingTranslation"
-                    IsLoading="PageState.IsContentLoading" ContentError="@PageState.ContentError"
-                    HeadingsChanged="PageState.OnDocumentHeadingsChangedAsync" />
+                <div class="doc-reader-toolbar">
+                    <DocumentViewerToolbar ShowSidebarToggle="@(!PageState.ShowSidebar || PageState.IsSidebarTemporary)" ShowLibrarySwitcher="false" Document="PageState.SelectedDocument" CurrentGroup="PageState.CurrentGroup" CurrentCulture="@PageState.SelectedCulture"
+                        CurrentLanguage="PageState.CurrentLanguage" Languages="PageState.CurrentLanguages"
+                        ShowLanguageSwitcher="PageState.ShowLanguageSwitcher" IsSidebarVisible="PageState.ShowSidebar"
+                        IsOutlineVisible="PageState.ShowTableOfContents" HasOutline="@(PageState.DocumentHeadings.Count > 0)" OnToggleSidebar="PageState.ToggleSidebar"
+                        OnOpenGroupSwitcher="PageState.OpenGroupSwitcherAsync" OnOpenDocumentSearch="PageState.OpenDocumentSearchAsync"
+                        OnLanguageChanged="PageState.OnLanguageSelectedAsync" OnToggleOutline="PageState.ToggleTableOfContents" />
+                </div>
+                <div class="doc-reader-stage" data-markdown-reading-stage="true">
+                    <DocumentContentViewer CurrentGroup="PageState.CurrentGroup" Document="PageState.SelectedDocument"
+                        Content="@PageState.DocumentContent" CurrentAnchorId="@PageState.CurrentAnchorId"
+                        CurrentCulture="@PageState.SelectedCulture" CurrentLanguage="PageState.CurrentLanguage"
+                        Languages="PageState.CurrentLanguages" MissingTranslation="PageState.MissingTranslation"
+                        IsLoading="PageState.IsContentLoading" ContentError="@PageState.ContentError"
+                        HeadingsChanged="PageState.OnDocumentHeadingsChangedAsync" />
+                </div>
             </main>
             @if (PageState.ShowTableOfContents && !PageState.IsOutlineTemporary)
             {
@@ -85,7 +86,7 @@
     private RenderFragment LibraryContent => @<DocumentSidebar CurrentGroup="PageState.CurrentGroup"
         CurrentTree="PageState.CurrentTree" CurrentCulture="@PageState.SelectedCulture" SelectedDocument="PageState.SelectedDocument"
         TreeError="@PageState.TreeError" SelectedDocumentChanged="PageState.OnDocumentSelectedAsync"
-        OnCollapseRequested="PageState.ToggleSidebar" />;
+        OnOpenGroupSwitcher="PageState.OpenGroupSwitcherAsync" OnCollapseRequested="PageState.ToggleSidebar" />;
     private RenderFragment OutlineContent => @<DocumentTableOfContentsPanel Document="PageState.SelectedDocument"
         Headings="PageState.DocumentHeadings" CurrentAnchorId="@PageState.CurrentAnchorId"
         OnClose="PageState.ToggleTableOfContents" OnHeadingSelected="PageState.OnHeadingSelectedAsync" />;

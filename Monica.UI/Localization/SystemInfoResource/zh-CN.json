@@ -177,5 +177,8 @@
       "RestartAlreadyRequested": "已有重启请求正在等待执行",
       "RestartSchedulingFailed": "调度优雅关闭请求失败，请查看宿主日志了解详情"
     }
+  },
+  "Navigation": {
+    "Category": "主机信息"
   }
 }

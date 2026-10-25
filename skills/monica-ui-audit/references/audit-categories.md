@@ -109,6 +109,7 @@ Indicators:
 - The page has no signature region, uses a single accent where its data has several categories, or applies category colors inconsistently between its signature, ledger, and inspector; see the [visual language](../../monica-ui-development/references/monica-visual-language.md)
 - Unrelated effects compete as the page's signature treatment, or a glow/pattern has no clear role in the page's intentional visual plan
 - Color, depth, or illustration obscures evidence, lowers contrast, or makes semantic states hard to distinguish; a decorative chart or graphic implies unsupported data, history, or coverage
+- A rate, score, trend, or percentile has no domain definition, population, or window, or a judgment such as "overrunning" has no written rule; see the [design method](../../monica-ui-design/references/design-method.md#3-define-every-judgment)
 - A uniformly neutral composition erases useful identity and hierarchy even though its geometry and token usage are correct
 - Actionable controls, rows, or cards lack visible hover, focus, pressed, or selected feedback
 - Informational surfaces translate, scale, change the cursor, or use strong lift on hover, falsely implying an unavailable action; subtle border, tonal, or low-shadow spatial-focus feedback is valid

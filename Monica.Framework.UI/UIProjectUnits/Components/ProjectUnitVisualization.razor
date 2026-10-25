@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.ProjectUnits.Facades
 @using Monica.Core.Results;
 @using Monica.ProjectUnits.Models
@@ -101,7 +102,7 @@
             }
             else
             {
-                <div class="graph-selection-empty"><MoIcon Icon="@MoIcons.Navigation" Size="1.5rem" /><h3>@L["ProjectUnitVisualization:Workspace:SelectUnit"]</h3><p>@L["ProjectUnitVisualization:Workspace:SelectUnitHint"]</p><button type="button" class="graph-action" @onclick="ToggleNativeEvidence">@L["ProjectUnitVisualization:Workspace:NativeEvidence"]</button></div>
+                <MoContentState><MoIcon Icon="@MoIcons.Navigation" Size="1.5rem" /><h3>@L["ProjectUnitVisualization:Workspace:SelectUnit"]</h3><p>@L["ProjectUnitVisualization:Workspace:SelectUnitHint"]</p><button type="button" class="graph-action" @onclick="ToggleNativeEvidence">@L["ProjectUnitVisualization:Workspace:NativeEvidence"]</button></MoContentState>
             }
         </aside>
     </div>
@@ -185,7 +186,7 @@
                         </tbody>
                     </table>
                 }
-                @if (EvidenceCount == 0){<p class="graph-ledger-empty">@L["ProjectUnitVisualization:Workspace:NoEvidence"]</p>}
+                @if (EvidenceCount == 0){<MoContentState Compact="true"><p>@L["ProjectUnitVisualization:Workspace:NoEvidence"]</p></MoContentState>}
             </div>
             <footer class="graph-evidence-pager"><span>@L["ProjectUnitVisualization:Workspace:PageRange", EvidenceCount == 0 ? 0 : _evidencePage * EVIDENCE_PAGE_SIZE + 1, Math.Min((_evidencePage + 1) * EVIDENCE_PAGE_SIZE, EvidenceCount), EvidenceCount]</span><div><button type="button" class="graph-camera-button" aria-label="@L["ProjectUnitVisualization:Workspace:PreviousPage"]" disabled="@(_evidencePage == 0)" @onclick="() => ChangeEvidencePage(-1)"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.25rem" /></button><button type="button" class="graph-camera-button" aria-label="@L["ProjectUnitVisualization:Workspace:NextPage"]" disabled="@((_evidencePage + 1) * EVIDENCE_PAGE_SIZE >= EvidenceCount)" @onclick="() => ChangeEvidencePage(1)"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button></div></footer>
         }

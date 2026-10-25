@@ -22,6 +22,10 @@ internal sealed class ConfigurationUiTestContext : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddOptions<ModuleShellUIOption>();
+        Services.AddOptions<ModuleClockOption>();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
+        Services.AddSingleton<IStringLocalizer<global::Monica.UI.Localization.SharedResource>, EchoStringLocalizer<global::Monica.UI.Localization.SharedResource>>();
         Services.AddSingleton<ConfigurationValueVisibility>();
         Services.AddSingleton<IStringLocalizer<ConfigurationUIResource>, EchoStringLocalizer<ConfigurationUIResource>>();
         Services.AddSingleton<IOptions<ModuleConfigurationUIOption>>(Options.Create(option ?? new ModuleConfigurationUIOption()));

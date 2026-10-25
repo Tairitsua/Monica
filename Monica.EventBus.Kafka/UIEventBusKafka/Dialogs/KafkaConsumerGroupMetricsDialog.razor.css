@@ -101,6 +101,12 @@
     min-width: 0;
 }
 
+.consumer-metrics-controls ::deep .mud-button-outlined,
+.consumer-metrics-auto-refresh ::deep .mud-switch,
+.consumer-metrics-interval__field ::deep .mud-input {
+    min-height: 40px;
+}
+
 .consumer-metrics-auto-refresh {
     min-width: 0;
 }

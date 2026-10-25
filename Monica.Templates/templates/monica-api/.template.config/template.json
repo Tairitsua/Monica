@@ -22,8 +22,8 @@
     "frameworkVersion": {
       "type": "parameter",
       "datatype": "string",
-      "defaultValue": "1.0.0-rc.13",
-      "replaces": "1.0.0-rc.13",
+      "defaultValue": "1.0.0-rc.15",
+      "replaces": "1.0.0-rc.15",
       "displayName": "Monica framework version",
       "description": "The Monica package version referenced by the generated project."
     },

@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.SignalR.UISignalR.Models
 @using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<SignalRResource> L
@@ -34,11 +35,11 @@
 
     @if (HubMethods.Count == 0)
     {
-        <div class="signalr-listener-empty">@L["UISignalR:MethodListener:Empty"]</div>
+        <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:Empty"]</MoContentState></div>
     }
     else if (EnabledMethods.Count == 0)
     {
-        <div class="signalr-listener-empty">@L["UISignalR:MethodListener:EmptyEnabled"]</div>
+        <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:EmptyEnabled"]</MoContentState></div>
     }
     else
     {
@@ -95,7 +96,7 @@
                 }
                 @if (FilteredHubMethods.Count == 0)
                 {
-                    <div class="signalr-listener-empty">@L["UISignalR:MethodListener:SearchEmpty"]</div>
+                    <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:SearchEmpty"]</MoContentState></div>
                 }
                 else
                 {

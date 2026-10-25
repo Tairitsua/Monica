@@ -267,7 +267,7 @@ public partial class UIGitRepositoriesPage : IAsyncDisposable
     private string StateText(GitRepositorySyncState state) => GitWorkspacePresentation.StateText(state, L);
     private static Color StateColor(GitRepositorySyncState state) => GitWorkspacePresentation.StateColor(state);
     private string BoolText(bool value) => GitWorkspacePresentation.BoolText(value, L);
-    private string DateText(DateTimeOffset? value) => value is null ? L["Workspace:Repositories:NeverSynced"] : GitWorkspacePresentation.FormatDate(value, L);
+    private string DateText(DateTimeOffset? value) => value is null ? L["Workspace:Repositories:NeverSynced"] : GitWorkspacePresentation.FormatDate(value, L, UiTime);
     private string ConfirmationTitle(GitCommandKind kind) => L[kind switch
     {
         GitCommandKind.SyncAll => "Workspace:Confirm:SyncAllTitle",

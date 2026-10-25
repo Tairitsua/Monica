@@ -153,14 +153,21 @@ public class ModuleSystemInfoUI : MonicaModule<ModuleSystemInfoUIOption>, IWebHo
             static option => option.AddResource<SystemInfoResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<SystemInfoResource>(
+                    "Monica.UI.SystemInfo", "Navigation:Category", 5,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Info);
+
                 registry.RegisterLocalizedPage<UISystemInfoPage, SystemInfoResource>(
                     UISystemInfoPage.PAGE_URL,
                     "Pages:SystemInfo:Title",
                     MoIcons.Info,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 50,
-                    descriptionKey: "Page:Summary")));
+                    descriptionKey: "Page:Summary");
+            }));
     }
 
     /// <summary>

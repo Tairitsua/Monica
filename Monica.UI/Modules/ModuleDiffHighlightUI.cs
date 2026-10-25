@@ -37,13 +37,20 @@ public class ModuleDiffHighlightUI : MonicaModule<ModuleDiffHighlightUIOption>, 
             static option => option.AddResource<SharedResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<SharedResource>(
+                    "Monica.UI.TextDiff", "Navigation:Category", 50,
+                    parentId: BuiltInNavigationCategoryIds.Debug,
+                    icon: MoIcons.Columns);
+
                 registry.RegisterLocalizedPage<DiffHighlightPage, SharedResource>(
                     DiffHighlightPage.DIFF_HIGHLIGHT_URL,
                     "Pages:DiffHighlight:Title",
                     MoIcons.Columns,
-                    BuiltInNavigationCategoryIds.Debug,
+                    category,
                     addToNav: true,
-                    navOrder: 60)));
+                    navOrder: 60);
+            }));
     }
 
     public override void ConfigureServices(ModuleContext<ModuleDiffHighlightUIOption> context)

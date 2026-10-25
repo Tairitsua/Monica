@@ -165,10 +165,7 @@
 .log-entry.context-target { border-inline-start-color: var(--mud-palette-primary); background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--mud-palette-surface)); }
 .log-entry.current-match { background: var(--mo-color-state-warning-soft-background); }
 .log-entry.selected { border-inline-start-color: var(--mud-palette-primary); }
-
-.log-viewer-empty { display: grid; justify-items: start; align-content: start; gap: 12px; min-height: 16rem; padding: 32px 20px; color: var(--mud-palette-text-secondary); }
 .log-viewer-empty ::deep :is(.mud-icon-root, .mo-icon) { width: 28px; height: 28px; }
-.log-viewer-empty p { max-width: 36rem; margin: 0; font-size: 13px; line-height: 1.7; }
 .log-viewer-footer { padding-block: 10px; border-top: 1px solid var(--mud-palette-divider); background: var(--mud-palette-background-gray); }
 .log-viewer-browse-hint { overflow-wrap: anywhere; }
 
@@ -189,7 +186,7 @@
     .match-navigation-actions ::deep .mud-icon-button,
     .log-entry__actions ::deep .mud-icon-button { width: 36px; height: 36px; }
     .log-viewer-footer { align-items: center; gap: 8px; }
-    .log-viewer-empty { padding: 24px 16px; }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

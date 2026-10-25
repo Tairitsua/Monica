@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.MemoryDiagnostics.Models
 @using Monica.Profiling.UIMemoryAnalysis.Support
@@ -28,7 +30,7 @@
                 <div><span>@L["Gc:LastCollection:ViewRead"]</span>
                     @if (CapturedAt is { } capturedAt)
                     {
-                        <time data-view-capture datetime="@capturedAt.ToString("O")">@MemoryAnalysisDisplayFormatter.LocalDateTime(capturedAt)</time>
+                        <time data-view-capture datetime="@capturedAt.ToString("O")">@UiTime.Format(capturedAt)</time>
                     }
                     else
                     {
@@ -62,7 +64,7 @@
             }
             else
             {
-                <p class="gc-movement__empty">@L["Gc:Generations:Empty"]</p>
+                <MoContentState Compact="true">@L["Gc:Generations:Empty"]</MoContentState>
             }
         </section>
 
@@ -126,10 +128,12 @@
     else
     {
         <div class="gc-absence" role="status">
+            <MoContentState Loading="@(IsLoading && GCInfo is null)">
             <MoIcon Icon="@MoIcons.Layers" Size="2.25rem" aria-hidden="true" />
             <span class="gc-eyebrow">@L["Gc:LastCollection:Eyebrow"]</span>
             <h2>@(GCInfo is not null ? L["Gc:LastCollection:NoCollectionTitle"] : IsLoading ? L["Common:LoadingValue"] : L["Gc:LastCollection:Empty"])</h2>
             <p>@(GCInfo is not null ? L["Gc:LastCollection:NoCollectionHelp"] : L["Gc:LastCollection:EmptyHelp"])</p>
+            </MoContentState>
         </div>
     }
 </section>

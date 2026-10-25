@@ -321,7 +321,7 @@
     "Identity": {
       "ArgumentContract": "Argument contract",
       "PolicyRevision": "Policy revision",
-      "UpdatedAt": "Policy updated (UTC)",
+      "UpdatedAt": "Policy updated",
       "JobType": "Job type",
       "LastObserved": "Owner last observed"
     },
@@ -434,8 +434,7 @@
       "Preview": {
         "AriaLabel": "Next five prospective schedule occurrences",
         "Sequence": "#",
-        "ConfiguredTime": "Configured-timezone time",
-        "Utc": "UTC timestamp",
+        "ConfiguredTime": "Scheduled time",
         "Empty": "No future occurrence matches the current draft.",
         "Invalid": "Enter a valid cadence and boundary range to preview occurrences."
       },
@@ -598,7 +597,7 @@
       "Enable": "Delay admission",
       "Date": "Available date",
       "Time": "Available time",
-      "TimeZoneHelp": "The selected wall time is interpreted in scheduler timezone {0} and persisted as UTC.",
+      "TimeZoneHelp": "Date and time use scheduler timezone {0}.",
       "Required": "Choose both a date and time.",
       "InvalidWallTime": "This wall time does not exist in scheduler timezone {0}. Choose another time.",
       "Future": "Delayed availability must be in the future."
@@ -609,7 +608,7 @@
     "RefreshFailed": "The latest analytics refresh failed: {0}",
     "Range": {
       "Title": "Analysis window",
-      "Description": "Today uses scheduler midnight in {0}; other presets are rolling UTC windows.",
+      "Description": "Today starts at midnight in {0}; other presets look back from now.",
       "Today": "Today",
       "Last24Hours": "Last 24 hours",
       "Last7Days": "Last 7 days",
@@ -627,20 +626,19 @@
     },
     "Trend": {
       "Title": "Completions by interval",
-      "Description": "Compare recorded outcome counts in consecutive intervals. Lines connect counts; they do not represent a continuous rate.",
+      "Description": "Outcome counts per interval. Lines connect counts, not rates.",
       "LegendAriaLabel": "Outcome chart legend",
       "ViewAriaLabel": "Outcome chart display",
       "Bars": "Bars",
       "Lines": "Lines",
       "Unit": "Completions per bucket",
-      "HourBuckets": "Fixed one-hour UTC buckets",
-      "DayBuckets": "Fixed 24-hour UTC buckets",
+      "HourBuckets": "1-hour intervals",
+      "DayBuckets": "24-hour intervals",
       "NoCompletions": "No completed outcomes in this window. The returned intervals remain available below.",
       "ViewData": "View interval data",
       "DataAriaLabel": "Completion counts for every returned interval",
-      "Interval": "Interval · start included, end excluded",
+      "Interval": "Interval",
       "PartialBucket": "Partial final bucket",
-      "UtcInterval": "UTC: {0} → {1}",
       "ChartWindowLabel": "{0}; {1} → {2}; {3}"
     },
     "Duration": {
@@ -684,7 +682,7 @@
       "CompletedDescription": "Recorded terminal outcomes in this interval",
       "Accepted": "Accepted analysis window",
       "Requested": "Requested analysis window",
-      "Bounds": "Start included · End excluded · {0}",
+      "Bounds": "Start included · End excluded",
       "Resolved": "Succeeded + failed",
       "Measured": "Measured completions",
       "Observed": "Observed",
@@ -775,7 +773,7 @@
       "ConsumedFailures": "Consumed retry failures",
       "NoCurrentWorker": "No current worker lease"
     },
-    "RecordedTimeNotice": "Windows include all record creation, including skipped occurrences · {0}",
+    "RecordedTimeNotice": "Includes all created records, including skipped occurrences.",
     "AcceptedQuery": "Retained snapshot filters: {0}",
     "QueryDescription": "{0} · {1} · {2} to {3} · page {4}",
     "AnyIdentifier": "all identifiers",
@@ -829,7 +827,7 @@
       "History": "Retained history · {0}"
     },
     "RefreshFailed": "Showing the last accepted inspection. Refresh failed: {0}",
-    "EvidenceScope": "Timestamps use {0}. Claims, consumed retry failures, and recovered leases are separate recorded facts.",
+    "EvidenceScope": "Claims, failed retries, and recovered leases are separate recorded facts.",
     "CapturedPolicyNotice": "These settings were captured at admission. Later definition or policy edits do not change this execution."
   },
   "ExecutionHistoryKinds": {

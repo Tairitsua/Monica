@@ -46,14 +46,21 @@ public class ModuleOpenTelemetryUI : MonicaModule<ModuleOpenTelemetryUIOption>, 
             static option => option.AddResource<OpenTelemetryUIResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<OpenTelemetryUIResource>(
+                    "Monica.OpenTelemetry", "Navigation:Category", 40,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.ChartLine);
+
                 registry.RegisterLocalizedPage<UIOpenTelemetryDashboardPage, OpenTelemetryUIResource>(
                     UIOpenTelemetryDashboardPage.PAGE_URL,
                     "Pages:OpenTelemetryMetrics:Title",
                     MoIcons.Radio,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 12,
-                    descriptionKey: "Pages:OpenTelemetryMetrics:Description")));
+                    descriptionKey: "Pages:OpenTelemetryMetrics:Description");
+            }));
     }
 
     /// <inheritdoc />

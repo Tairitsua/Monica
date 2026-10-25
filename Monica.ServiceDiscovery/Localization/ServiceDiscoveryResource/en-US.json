@@ -475,8 +475,8 @@
     "CurrentHostScope": "Inspect this host’s identity, registration evidence and local election state alongside the application’s provider lease.",
     "CurrentHostReadFailed": "Current host capture failed",
     "LastSuccessfulCapture": "The last successful capture remains visible below.",
-    "CapturedUTC": "Captured at · UTC",
-    "FrozenUTC": "Frozen at · UTC",
+    "CapturedUTC": "Captured at",
+    "FrozenUTC": "Frozen at",
     "RegistrationEvidence": "Registration evidence",
     "LocalTimes": "Event timestamps are shown in local time.",
     "HeartbeatAgeAtCapture": "Heartbeat age at capture",
@@ -609,5 +609,8 @@
       "Failure": "Transport / resolution failure",
       "Canceled": "Canceled"
     }
+  },
+  "Navigation": {
+    "Category": "Service discovery"
   }
 }

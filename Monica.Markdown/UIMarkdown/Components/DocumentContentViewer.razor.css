@@ -56,12 +56,21 @@
 
 .content-body {
     min-width: 0;
-    padding: 28px 28px 40px;
+    padding: 28px 40px 40px;
+}
+
+.article-heading {
+    min-width: 0;
+    margin-bottom: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
 }
 
 .content-breadcrumb-bar {
     min-width: 0;
-    margin-bottom: 18px;
+    flex-shrink: 0;
+    padding: 0 20px 14px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
 }
 
 .content-breadcrumb-bar ::deep .content-breadcrumbs {
@@ -75,7 +84,7 @@
 .content-breadcrumb-bar ::deep .mud-breadcrumb-item {
     min-width: 0;
     max-width: 100%;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.5;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -95,12 +104,12 @@
 }
 
 .doc-title {
-    margin: 0 0 14px;
+    margin: 0 0 12px;
     color: var(--mud-palette-text-primary);
-    font-family: var(--mud-typography-h1-family, var(--mo-font-family-display));
-    font-size: 34px;
-    font-weight: 500;
-    line-height: 1.18;
+    font-family: inherit;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
     overflow-wrap: anywhere;
 }
 
@@ -109,27 +118,23 @@
     outline-offset: 6px;
 }
 
-.content-body ::deep .article-divider {
-    margin: 20px 0 24px;
-}
-
 .markdown-body {
     min-width: 0;
-    font-size: 16px;
-    line-height: 1.75;
+    font-size: .95rem;
+    line-height: 1.7;
 }
 
 .markdown-body ::deep .mo-markdown-host {
     min-width: 0;
-    --mo-markdown-body-font-size: 16px;
-    --mo-markdown-body-line-height: 1.75;
+    --mo-markdown-body-font-size: .95rem;
+    --mo-markdown-body-line-height: 1.7;
 }
 
 .markdown-body ::deep .mud-markdown-body {
     min-width: 0;
     font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
-    font-size: 16px;
-    line-height: 1.75;
+    font-size: .95rem;
+    line-height: 1.7;
 }
 
 .markdown-body ::deep .mud-markdown-body p,
@@ -165,7 +170,8 @@
     margin: 24px 0;
     padding: 12px 18px;
     color: color-mix(in srgb, var(--mud-palette-text-primary) 85%, var(--mud-palette-text-secondary));
-    background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
+    border-inline-start: 3px solid var(--mud-palette-primary);
+    background: transparent;
 }
 
 .markdown-body ::deep .mud-markdown-body h2,
@@ -174,19 +180,20 @@
 .markdown-body ::deep .mud-markdown-body h5,
 .markdown-body ::deep .mud-markdown-body h6 {
     font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
-    font-weight: 500;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
 .markdown-body ::deep .mud-markdown-body h2 {
     margin: 36px 0 16px;
-    font-size: 25px;
+    font-family: inherit;
+    font-size: 22px;
     line-height: 1.3;
 }
 
 .markdown-body ::deep .mud-markdown-body h3 {
     margin: 28px 0 12px;
-    font-size: 21px;
+    font-size: 20px;
     line-height: 1.4;
 }
 
@@ -288,13 +295,14 @@
     color: color-mix(in srgb, var(--mud-palette-text-primary) 80%, var(--mud-palette-text-secondary));
 }
 
-@container markdown-reader (max-width: 1039px) {
-    .content-body { padding: 24px 24px 36px; }
-    .doc-title { font-size: 30px; }
+@container markdown-reader (max-width: 760px) {
+    .content-body { padding: 24px 24px 40px; }
 }
 
 @container markdown-reader (max-width: 519px) {
-    .content-body { padding: 18px 18px 32px; }
+    .content-body { padding: 20px 16px 32px; }
+    .article-heading { margin-bottom: 24px; padding-bottom: 20px; }
+    .content-breadcrumb-bar { padding-inline: 16px; }
     .doc-title { font-size: 28px; }
     .center-state { padding: 18px; }
 }

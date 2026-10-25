@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.Json
+@using Monica.UI.Shared.Components.States
 @using Monica.ProjectUnits.Facades
 @using Monica.Core.Results
 @using System.Text.Json
@@ -53,7 +55,7 @@
                 }
                 @if (!_loading && _loadError is null && _domainEvents.Count == 0)
                 {
-                    <p class="event-desk__empty">@L["DomainEventTester:States:Empty"]</p>
+                    <MoContentState Compact="true"><p>@L["DomainEventTester:States:Empty"]</p></MoContentState>
                 }
             </div>
         </section>
@@ -71,9 +73,7 @@
                                   Variant="Variant.Outlined" ReadOnly="true" />
                 </div>
                 <div class="event-payload__editor">
-                    <MudTextField T="string" @bind-Value="_eventContent" Label="@L["DomainEventTester:Fields:EventContent"]"
-                                  Variant="Variant.Outlined" Lines="18" Immediate="true"
-                                  Placeholder="@L["DomainEventTester:Fields:EventContentPlaceholder"]" Disabled="@_publishing" />
+                    <MoJson @bind-Value="_eventContent" ReadOnly="false" Rows="18" Label="@L["DomainEventTester:Fields:EventContent"]" Placeholder="@L["DomainEventTester:Fields:EventContentPlaceholder"]" Disabled="@_publishing" />
                 </div>
                 <footer class="event-payload__actions">
                     <p>@L["DomainEventTester:Desk:DraftHint"]</p>

@@ -216,6 +216,8 @@ public sealed class SystemInfoFacadeTests
             AppId = "DEV-SERVICE-FLIGHT-API",
             AppVersion = "v1.0.3"
         }),
+        new global::Monica.UI.Shared.Services.MoTimeFormatter(
+            Options.Create(new ModuleShellUIOption()), Options.Create(new ModuleClockOption())),
         host.Services.GetRequiredService<IHostEnvironment>(),
         host.Services.GetRequiredService<IHostApplicationLifetime>(),
         Options.Create(new ModuleSystemInfoUIOption()),

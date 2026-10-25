@@ -18,9 +18,3 @@
     border-radius: 12px;
     overflow: hidden;
 }
-
-.provider-list-panel__state {
-    display: grid;
-    min-height: 160px;
-    place-items: center;
-}

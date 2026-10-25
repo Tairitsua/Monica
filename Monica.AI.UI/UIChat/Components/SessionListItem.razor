@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
 @inject IStringLocalizer<AIResource> L
@@ -13,7 +14,7 @@
         <span class="session-title">@Session.Title</span>
     </MudButton>
     <span class="session-tail">
-        <time class="session-time" datetime="@Session.UpdatedAt.ToString("O")" title="@Session.UpdatedAt.ToLocalTime().ToString("g")">@GetTimeDisplay()</time>
+        <time class="session-time" datetime="@Session.UpdatedAt.ToString("O")" title="@UiTime.Format(Session.UpdatedAt)">@GetTimeDisplay()</time>
         <span class="archive-action">
             <MudIconButton Icon="@MoIcons.Archive" Size="Size.Small" Disabled="@Disabled"
                            aria-label="@L["Session:Archive:Action"]" title="@L["Session:Archive:Action"]" OnClick="@OnArchive" />
@@ -49,6 +50,6 @@
             age.TotalMinutes < 60 ? L["Session:MinutesAgo", (int)age.TotalMinutes] :
             age.TotalHours < 24 ? L["Session:HoursAgo", (int)age.TotalHours] :
             age.TotalDays < 7 ? L["Session:DaysAgo", (int)age.TotalDays] :
-            Session.UpdatedAt.ToLocalTime().ToString("MM-dd");
+            UiTime.FormatDate(Session.UpdatedAt);
     }
 }

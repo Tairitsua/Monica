@@ -1,0 +1,84 @@
+.knowledge-base-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 12px;
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-surface);
+    font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
+    text-align: start;
+    cursor: pointer;
+}
+
+.knowledge-base-switcher:hover {
+    border-color: color-mix(in srgb, var(--mud-palette-primary) 28%, var(--mud-palette-lines-default));
+    background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
+}
+
+.knowledge-base-switcher:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 3px;
+}
+
+.knowledge-base-switcher-leading {
+    display: flex;
+    flex: 1;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.knowledge-base-switcher-icon-shell {
+    display: inline-flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    border-radius: 12px;
+    color: var(--mud-palette-primary);
+    background: color-mix(in srgb, var(--mud-palette-primary) 12%, var(--mud-palette-surface));
+}
+
+.knowledge-base-switcher-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.knowledge-base-switcher-label {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mud-palette-text-primary);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.knowledge-base-switcher-description {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 55%, var(--mud-palette-text-secondary));
+    font-size: 12.5px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.knowledge-base-switcher ::deep .knowledge-base-switcher-warning {
+    flex-shrink: 0;
+    color: var(--mud-palette-warning);
+}
+
+.knowledge-base-switcher ::deep .knowledge-base-switcher-chevron {
+    flex-shrink: 0;
+    color: var(--mud-palette-text-secondary);
+}

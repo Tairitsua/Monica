@@ -58,6 +58,20 @@ The page gutter and a surface's content inset are separate responsibilities. A t
 
 Also inspect surface-to-surface spacing: a child card needs a visible inset from an enclosing painted panel, and a local tab bar needs separation from the first content card. Text padding inside a card does not establish either relationship. A deliberately contiguous table or statistic strip is a different contract; independent cards and their enclosing panel must not accidentally share an edge. Verify these distances in the rendered component, using the installed native tab-bar and panel elements rather than a remembered internal class.
 
+## Keep operational evidence concise
+
+Use the [shared page time formatter](../../monica-infra-ui/references/time-display.md)
+for page timestamps. State the effective timezone in its owning system/context
+view rather than repeating offsets or a second UTC rendering in every row.
+Default timestamp precision is seconds; exact machine-readable instants, raw
+payloads and precision-sensitive plots retain their own contracts.
+
+Large identity collections start with an actual count and a few useful labels.
+Expose the complete searchable identities on demand. A short label never replaces
+an exact action target or search identity. Put repeated explanatory text at its
+common owner, show one provenance label when two facts have the same value, and
+keep low-frequency correlation IDs inspectable without expanding every row.
+
 ## Give surfaces distinct roles and character
 
 Use the full width supplied by the shell for working pages. An operational page root must not have an arbitrary `max-width` or fixed-width cap; retain a root cap only for an explicitly authorized interaction or viewport requirement. Limit local explanatory or reading text when needed without narrowing the registry, graph, editor, or surrounding workspace. Assign canvas, identity, ordinary evidence, contextual, raised-overlay, and semantic-state roles before styling. Choose solid color fields, inverse surfaces, tonal contrast, borders, depth, and spacing to make those roles visibly distinct. Give identity, useful groups, and semantic states purposeful color rather than flattening every region into the same neutral bordered panel. Judge whether the visual treatment strengthens the task and hierarchy; quietness is not a quality requirement.

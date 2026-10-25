@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.UIDataChannel.Models
 @using Monica.DataChannel.UIDataChannel.Support
 @inject IStringLocalizer<DataChannelResource> L
@@ -8,7 +10,7 @@
             <header class="exception-details-identity">
                 <span>@L["Exceptions:Details:Eyebrow"]</span>
                 <h2>@ChannelId</h2>
-                <p>@L["Exceptions:Details:Captured", DataChannelPresentation.Timestamp(ExceptionInfo.CapturedAt)]</p>
+                <p>@L["Exceptions:Details:Captured", UiTime.Format(ExceptionInfo.CapturedAt)]</p>
             </header>
             <section class="exception-details-strip" aria-label="@L["Exceptions:Details:SummaryAriaLabel"]">
                 <div>
@@ -37,7 +39,7 @@
             <div class="exception-records">
                 @if (ExceptionInfo.Exceptions.Count == 0)
                 {
-                    <p class="exception-records-empty">@L["Exceptions:Details:Empty"]</p>
+                    <MoContentState Compact="true"><p>@L["Exceptions:Details:Empty"]</p></MoContentState>
                 }
                 else
                 {
@@ -45,7 +47,7 @@
                         <Columns>
                             <PropertyColumn Property="item => item.Timestamp" Title="@L["Exceptions:Columns:Timestamp"]" HeaderClass="exception-record-time" CellClass="exception-record-time">
                                 <CellTemplate>
-                                    <time class="exception-record-value">@DataChannelPresentation.Timestamp(context.Item.Timestamp)</time>
+                                    <time class="exception-record-value">@UiTime.Format(context.Item.Timestamp)</time>
                                 </CellTemplate>
                             </PropertyColumn>
                             <PropertyColumn Property="item => item.SourceType" Title="@L["Exceptions:Columns:SourceType"]" HeaderClass="exception-record-source" CellClass="exception-record-source">
@@ -75,7 +77,7 @@
                             </TemplateColumn>
                         </Columns>
                         <NoRecordsContent>
-                            <p class="exception-records-empty">@L["Exceptions:Details:NoMatches"]</p>
+                            <MoContentState Compact="true"><p>@L["Exceptions:Details:NoMatches"]</p></MoContentState>
                         </NoRecordsContent>
                     </MudDataGrid>
                 }
@@ -105,7 +107,7 @@
                                 <dl class="exception-facts">
                                     <div>
                                         <dt>@L["Exceptions:Columns:Timestamp"]</dt>
-                                        <dd>@DataChannelPresentation.Timestamp(selected.Timestamp)</dd>
+                                        <dd>@UiTime.Format(selected.Timestamp)</dd>
                                     </div>
                                     <div>
                                         <dt>@L["Exceptions:Details:Sequence"]</dt>

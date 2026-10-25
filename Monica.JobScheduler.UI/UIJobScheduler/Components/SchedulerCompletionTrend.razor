@@ -50,7 +50,7 @@
     else
     {
         <div class="analytics-trend__plot" role="img"
-             aria-label="@L["Analytics:Trend:ChartWindowLabel", L["Analytics:Trend:Unit"], TimePresentation.FormatTimestampWithOffset(Snapshot.StartTimeUtc), TimePresentation.FormatTimestampWithOffset(Snapshot.EndTimeUtc), BucketKind]">
+             aria-label="@L["Analytics:Trend:ChartWindowLabel", L["Analytics:Trend:Unit"], TimePresentation.FormatTimestamp(Snapshot.StartTimeUtc), TimePresentation.FormatTimestamp(Snapshot.EndTimeUtc), BucketKind]">
             <span class="analytics-trend__unit">@L["Analytics:Trend:Unit"]</span>
             <div class="analytics-trend__graph">
                 <div class="analytics-trend__y-axis" aria-hidden="true">
@@ -104,7 +104,7 @@
                         {
                             <time class="@label.CssClass" style="@label.Position"
                                   datetime="@Snapshot.Trend[label.Index].StartTimeUtc.ToString("O")"
-                                  title="@TimePresentation.FormatTimestampWithOffset(Snapshot.Trend[label.Index].StartTimeUtc)">
+                                  title="@TimePresentation.FormatTimestamp(Snapshot.Trend[label.Index].StartTimeUtc)">
                                 @TimePresentation.FormatBucketLabel(Snapshot.Trend[label.Index].StartTimeUtc, Snapshot.BucketSize)
                             </time>
                         }
@@ -117,6 +117,7 @@
     <div class="analytics-trend__data">
         <MudExpansionPanels Elevation="0" Dense="true">
             <MudExpansionPanel Text="@L["Analytics:Trend:ViewData"]" Icon="@MoIcons.ChevronDown">
+                <p class="analytics-trend__bounds">@L["Analytics:Window:Bounds"]</p>
                 <div class="analytics-trend__table" role="region" aria-label="@L["Analytics:Trend:DataAriaLabel"]">
                     <MudTable T="JobExecutionAnalyticsBucket" Items="@Snapshot.Trend" Dense="true" Hover="true"
                               Breakpoint="Breakpoint.None" Elevation="0">
@@ -130,11 +131,8 @@
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="@L["Analytics:Trend:Interval"]" Class="analytics-trend__interval-cell">
-                                <div class="analytics-trend__interval">
-                                    <time datetime="@context.StartTimeUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(context.StartTimeUtc)</time>
-                                    <span aria-hidden="true">→</span>
-                                    <time datetime="@context.EndTimeUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(context.EndTimeUtc)</time>
-                                    <small>@L["Analytics:Trend:UtcInterval", TimePresentation.FormatUtcTimestamp(context.StartTimeUtc), TimePresentation.FormatUtcTimestamp(context.EndTimeUtc)]</small>
+                                <div class="analytics-trend__interval" data-start="@context.StartTimeUtc.ToString("O")" data-end="@context.EndTimeUtc.ToString("O")">
+                                    <span class="analytics-trend__range">@TimePresentation.FormatRange(context.StartTimeUtc, context.EndTimeUtc)</span>
                                     @if (IsPartial(context))
                                     {
                                         <span class="analytics-trend__partial">@L["Analytics:Trend:PartialBucket"]</span>
@@ -200,7 +198,7 @@
     private string IsPressed(ChartMode mode) => _mode == mode ? "true" : "false";
     private bool IsPartial(JobExecutionAnalyticsBucket bucket) => bucket.EndTimeUtc == Snapshot.EndTimeUtc
         && bucket.EndTimeUtc - bucket.StartTimeUtc < (Snapshot.BucketSize == JobExecutionAnalyticsBucketSize.Hour ? TimeSpan.FromHours(1) : TimeSpan.FromDays(1));
-    private string GetBucketTitle(JobExecutionAnalyticsBucket bucket, CompletionSeries series) => $"{series.Label}: {series.GetValue(bucket).ToString("N0", CultureInfo.CurrentCulture)} · {TimePresentation.FormatTimestampWithOffset(bucket.StartTimeUtc)} → {TimePresentation.FormatTimestampWithOffset(bucket.EndTimeUtc)}";
+    private string GetBucketTitle(JobExecutionAnalyticsBucket bucket, CompletionSeries series) => $"{series.Label}: {series.GetValue(bucket).ToString("N0", CultureInfo.CurrentCulture)} · {TimePresentation.FormatRange(bucket.StartTimeUtc, bucket.EndTimeUtc)}";
 
     private IEnumerable<AxisLabel> GetAxisLabels()
     {

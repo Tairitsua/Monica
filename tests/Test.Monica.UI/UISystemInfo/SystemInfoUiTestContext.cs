@@ -20,6 +20,8 @@ internal sealed class SystemInfoUiTestContext : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddOptions();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton(localizer ?? new EchoStringLocalizer<SystemInfoResource>());
         configureServices?.Invoke(Services);
         PopoverProvider = Render<MudPopoverProvider>();

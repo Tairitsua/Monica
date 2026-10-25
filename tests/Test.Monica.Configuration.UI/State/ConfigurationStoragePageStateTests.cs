@@ -7,12 +7,11 @@ namespace Test.Monica.Configuration.UI.State;
 public sealed class ConfigurationStoragePageStateTests
 {
     [Fact]
-    public async Task Load_WhenOneReadFails_ShouldAcceptOtherEmptyAndPopulatedReadsIndependently()
+    public async Task Load_WhenOverviewFails_ShouldAcceptEmptyOperationEvidenceIndependently()
     {
         await using var state = new ConfigurationStoragePageState(
             () => Task.FromException<Res<ConfigurationStorageOverview>>(new InvalidOperationException("overview unavailable")),
-            () => Task.FromResult(States()),
-            () => Task.FromResult(Inventories(Inventory("source"))), "unavailable");
+            () => Task.FromResult(States()), "unavailable");
 
         await ObserveAsync(state.LoadAsync());
 
@@ -23,10 +22,28 @@ public sealed class ConfigurationStoragePageStateTests
         Assert.True(state.StoreStates.HasLoaded);
         Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationStoreState>>(state.StoreStates.Value));
         Assert.NotNull(state.StoreStates.ObservedAtUtc);
-        Assert.True(state.SourceInventories.HasLoaded);
-        Assert.Equal("source", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationSourceInventory>>(
-            state.SourceInventories.Value)).Source.SourceKey);
         Assert.True(state.HasAcceptedEvidence);
+    }
+
+    [Fact]
+    public async Task Load_WhenOperationsFail_ShouldAcceptStorageCapabilitiesIndependently()
+    {
+        await using var state = new ConfigurationStoragePageState(
+            () => Task.FromResult(Res.Ok(Overview("available"))),
+            () => Task.FromResult<Res<IReadOnlyList<ConfigurationStoreState>>>(Res.Fail("operations unavailable")),
+            "unavailable");
+
+        await ObserveAsync(state.LoadAsync());
+
+        Assert.False(state.Loading);
+        Assert.True(state.HasAcceptedEvidence);
+        Assert.Equal("available", Assert.IsType<ConfigurationStorageOverview>(state.Overview.Value)
+            .EffectiveValueStore.StoreKey);
+        Assert.NotNull(state.Overview.ObservedAtUtc);
+        Assert.False(state.StoreStates.HasLoaded);
+        Assert.Null(state.StoreStates.Value);
+        Assert.Null(state.StoreStates.ObservedAtUtc);
+        Assert.Equal("operations unavailable", state.StoreStates.Error);
     }
 
     [Fact]
@@ -34,32 +51,26 @@ public sealed class ConfigurationStoragePageStateTests
     {
         var pendingOverview = NewCompletion<Res<ConfigurationStorageOverview>>();
         var pendingStates = NewCompletion<Res<IReadOnlyList<ConfigurationStoreState>>>();
-        var pendingInventories = NewCompletion<Res<IReadOnlyList<ConfigurationSourceInventory>>>();
         var overviewCalls = 0;
         var stateCalls = 0;
-        var inventoryCalls = 0;
         var clock = new FixedTimeProvider(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         await using var state = new ConfigurationStoragePageState(
             () => ++overviewCalls == 1 ? Task.FromResult(Res.Ok(Overview("original"))) : pendingOverview.Task,
             () => ++stateCalls == 1 ? Task.FromResult(States(new ConfigurationStoreState { StoreKey = "original" })) : pendingStates.Task,
-            () => ++inventoryCalls == 1 ? Task.FromResult(Inventories(Inventory("original"))) : pendingInventories.Task,
             "unavailable", clock);
         await ObserveAsync(state.LoadAsync());
         var overview = state.Overview.Value;
         var states = state.StoreStates.Value;
-        var inventories = state.SourceInventories.Value;
         var observed = state.Overview.ObservedAtUtc;
         var refresh = state.LoadAsync();
 
         Assert.True(state.Loading);
         Assert.Same(overview, state.Overview.Value);
         Assert.Same(states, state.StoreStates.Value);
-        Assert.Same(inventories, state.SourceInventories.Value);
         Assert.Equal(observed, state.Overview.ObservedAtUtc);
         clock.UtcNow = clock.UtcNow.AddMinutes(1);
         pendingOverview.SetResult(Res.Fail("new overview failed"));
         pendingStates.SetResult(States());
-        pendingInventories.SetResult(Inventories(Inventory("new")));
         await ObserveAsync(refresh);
 
         Assert.False(state.Overview.HasLoaded);
@@ -69,8 +80,6 @@ public sealed class ConfigurationStoragePageStateTests
         Assert.True(state.StoreStates.HasLoaded);
         Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationStoreState>>(state.StoreStates.Value));
         Assert.Equal(clock.UtcNow, state.StoreStates.ObservedAtUtc);
-        Assert.Equal("new", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationSourceInventory>>(
-            state.SourceInventories.Value)).Source.SourceKey);
     }
 
     [Theory]
@@ -82,7 +91,7 @@ public sealed class ConfigurationStoragePageStateTests
         var calls = 0;
         await using var state = new ConfigurationStoragePageState(
             () => ++calls == 1 ? pending.Task : Task.FromResult(Res.Ok(Overview("new"))),
-            () => Task.FromResult(States()), () => Task.FromResult(Inventories()), "unavailable");
+            () => Task.FromResult(States()), "unavailable");
         var older = state.LoadAsync();
         await ObserveAsync(state.LoadAsync());
         pending.SetResult(olderFails ? Res.Fail("old failure") : Res.Ok(Overview("old")));
@@ -100,7 +109,6 @@ public sealed class ConfigurationStoragePageStateTests
         Task? nestedRefresh = null;
         var overviewCalls = 0;
         var stateCalls = 0;
-        var inventoryCalls = 0;
         state = new ConfigurationStoragePageState(() =>
         {
             if (++overviewCalls == 1)
@@ -109,8 +117,7 @@ public sealed class ConfigurationStoragePageStateTests
                 return Task.FromResult(Res.Ok(Overview("old")));
             }
             return Task.FromResult(Res.Ok(Overview("new")));
-        }, () => Task.FromResult(States(new ConfigurationStoreState { StoreKey = ++stateCalls == 1 ? "new" : "old" })),
-            () => Task.FromResult(Inventories(Inventory(++inventoryCalls == 1 ? "new" : "old"))), "unavailable");
+        }, () => Task.FromResult(States(new ConfigurationStoreState { StoreKey = ++stateCalls == 1 ? "new" : "old" })), "unavailable");
         await using var owner = state;
 
         await ObserveAsync(state.LoadAsync());
@@ -119,31 +126,20 @@ public sealed class ConfigurationStoragePageStateTests
         Assert.Equal("new", Assert.IsType<ConfigurationStorageOverview>(state.Overview.Value).EffectiveValueStore.StoreKey);
         Assert.Equal("new", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationStoreState>>(
             state.StoreStates.Value)).StoreKey);
-        Assert.Equal("new", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationSourceInventory>>(
-            state.SourceInventories.Value)).Source.SourceKey);
     }
 
     [Fact]
-    public async Task Load_ShouldCopyMutableProviderCollectionsBeforeAcceptingThem()
+    public async Task Load_ShouldCopyMutableOperationCollectionsBeforeAcceptingThem()
     {
         var states = new List<ConfigurationStoreState> { new() { StoreKey = "accepted" } };
-        var items = new List<ConfigurationSourceInventoryItem>
-        {
-            new() { ConfigurationPath = "Example:Value", RelativeConfigurationPath = "Value", DisplayValue = "accepted" }
-        };
-        var inventories = new List<ConfigurationSourceInventory> { Inventory("accepted") with { Items = items } };
         await using var state = new ConfigurationStoragePageState(() => Task.FromResult(Res.Ok(Overview("accepted"))),
-            () => Task.FromResult(Res.Ok<IReadOnlyList<ConfigurationStoreState>>(states)),
-            () => Task.FromResult(Res.Ok<IReadOnlyList<ConfigurationSourceInventory>>(inventories)), "unavailable");
+            () => Task.FromResult(Res.Ok<IReadOnlyList<ConfigurationStoreState>>(states)), "unavailable");
         await ObserveAsync(state.LoadAsync());
 
         states.Clear();
-        items.Clear();
-        inventories.Clear();
 
-        Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationStoreState>>(state.StoreStates.Value));
-        Assert.Single(Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationSourceInventory>>(
-            state.SourceInventories.Value)).Items);
+        Assert.Equal("accepted", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationStoreState>>(
+            state.StoreStates.Value)).StoreKey);
     }
 
     [Fact]
@@ -151,19 +147,17 @@ public sealed class ConfigurationStoragePageStateTests
     {
         var overview = NewCompletion<Res<ConfigurationStorageOverview>>();
         var states = NewCompletion<Res<IReadOnlyList<ConfigurationStoreState>>>();
-        var inventories = NewCompletion<Res<IReadOnlyList<ConfigurationSourceInventory>>>();
         var calls = 0;
         var state = new ConfigurationStoragePageState(() => { calls++; return overview.Task; },
-            () => states.Task, () => inventories.Task, "unavailable");
+            () => states.Task, "unavailable");
         var load = state.LoadAsync();
         var first = state.DisposeAsync().AsTask();
         var repeated = state.DisposeAsync().AsTask();
         Assert.Same(first, repeated);
         Assert.False(first.IsCompleted);
         overview.SetResult(Res.Ok(Overview("late")));
-        states.SetResult(Res.Fail("late failure"));
         Assert.False(first.IsCompleted);
-        inventories.SetResult(Inventories(Inventory("late")));
+        states.SetResult(Res.Fail("late failure"));
         await ObserveAsync(load);
         await ObserveAsync(first);
 
@@ -180,12 +174,7 @@ public sealed class ConfigurationStoragePageStateTests
         return new() { EffectiveValueStore = descriptor, HistoryStore = descriptor, MetadataStore = descriptor };
     }
 
-    private static ConfigurationSourceInventory Inventory(string key) => new()
-    {
-        Source = new() { SourceKey = key, DisplayName = key, ProviderType = "ReviewProvider" }
-    };
     private static Res<IReadOnlyList<ConfigurationStoreState>> States(params ConfigurationStoreState[] values) => Res.Ok<IReadOnlyList<ConfigurationStoreState>>(values);
-    private static Res<IReadOnlyList<ConfigurationSourceInventory>> Inventories(params ConfigurationSourceInventory[] values) => Res.Ok<IReadOnlyList<ConfigurationSourceInventory>>(values);
     private static TaskCompletionSource<T> NewCompletion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static Task ObserveAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

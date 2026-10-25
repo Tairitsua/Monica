@@ -1,4 +1,5 @@
 @inject ConfigurationValueVisibility Visibility
+@using Monica.UI.Shared.Components.Json
 @using Monica.Configuration.UI.Localization
 @inject IStringLocalizer<ConfigurationUIResource> L
 
@@ -22,9 +23,7 @@
             @if (ScopedPendingChanges.Count == 0)
             {
                 <div class="configuration-current-value-json">
-                    <MudPaper Outlined="true">
-                        <pre>@PendingDisplayJson</pre>
-                    </MudPaper>
+                    <MoJson Value="@PendingDisplayJson" />
                 </div>
             }
             else

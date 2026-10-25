@@ -1,0 +1,24 @@
+.value-viewer {min-width:0;}
+header {display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 20px 11px;}
+header strong {font-size:13px;font-weight:500;}
+.value-tools {display:flex;align-items:center;gap:5px;}
+.view-switch {display:flex;border:1px solid var(--mud-palette-lines-default);border-radius:5px;overflow:hidden;}
+.view-switch button {background:none;border:0;font:inherit;font-size:12px;padding:4px 9px;color:var(--mud-palette-text-secondary);cursor:pointer;}
+.view-switch button[aria-pressed="true"],.view-switch button:hover:not(:disabled) {background:color-mix(in srgb,var(--mud-palette-text-primary) 7%,var(--mud-palette-surface));color:var(--mud-palette-text-primary);}
+.value-tools ::deep .mud-icon-button:hover:not(:disabled):not(.mud-disabled) {background:color-mix(in srgb,var(--mud-palette-text-primary) 7%,var(--mud-palette-surface));color:var(--mud-palette-text-primary);}
+.view-switch button:disabled {opacity:.4;cursor:default;}
+button:focus-visible {outline:2px solid var(--mud-palette-primary);outline-offset:-2px;}
+.json-preview {margin:0 20px 16px;}
+.json-fields {margin:0 20px 16px;border:1px solid var(--mud-palette-lines-default);border-radius:6px;overflow:hidden;}
+.json-field {display:grid;grid-template-columns:minmax(0,40%) minmax(0,60%);padding:10px 12px;font:12px/1.7 var(--mo-font-family-mono,monospace);border-bottom:1px solid var(--mud-palette-lines-default);}
+.json-field:last-child {border:0;}
+.json-field>code {color:color-mix(in srgb,var(--mud-palette-primary) 65%,var(--mud-palette-text-primary));padding-right:12px;}
+.json-field>* {min-width:0;overflow-wrap:anywhere;}
+.json-field code {font:inherit;}
+.json-field summary {cursor:pointer;color:var(--mud-palette-text-secondary);}
+
+@media(max-width:760px) {header {padding:12px 15px 10px;}.json-preview,.json-fields {margin-inline:15px;}}
+
+.json-string {color:color-mix(in srgb,var(--mud-palette-success) 68%,var(--mud-palette-text-primary));}
+.json-number {color:color-mix(in srgb,var(--mud-palette-warning) 70%,var(--mud-palette-text-primary));}
+.json-literal {color:color-mix(in srgb,var(--mud-palette-info) 75%,var(--mud-palette-text-primary));}

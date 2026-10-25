@@ -4,7 +4,6 @@ header { display: flex; justify-content: space-between; gap: 24px; align-items: 
 .options-table-frame { min-width: 0; border-top: 1px solid var(--mud-palette-lines-default); }
 .options-table-frame ::deep .mud-table-container { overflow: auto; } .options-table-frame ::deep table { min-width: 720px; } .options-table-frame ::deep .mud-table .mud-table-cell { padding: 18px 24px; }
 .options-table-frame ::deep th { background: var(--mud-palette-background-gray); font-size: 11px; } .options-table-frame ::deep td { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; max-width: 440px; } strong { font-weight: 500; } td span { display: block; color: var(--options-muted); font-size: 10px; margin-top: 6px; } code { font: 11px/1.8 var(--mo-font-family-mono,monospace); white-space: pre-wrap; }
-.options-empty { padding: 32px 24px; text-align: center; font-size: 12px; color: var(--options-muted); }
 @media (max-width: 650px) { header { flex-direction: column; gap: 12px; padding: 20px 16px; } .options-controls { grid-template-columns: 1fr; padding: 0 16px 20px; } }
 
 @media (max-width: 600px) {
@@ -17,3 +16,13 @@ header { display: flex; justify-content: space-between; gap: 24px; align-items: 
 }
 
 @media (max-width: 600px) { .options-table-frame ::deep .mud-xs-table .mud-table-cell > span { grid-column: 2; } }
+
+.options-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) { display: block; width: 100%; min-width: 0; max-width: 100%; }
+.options-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: table; width: 100%; table-layout: fixed; }
+.options-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-body { display: block; width: 100%; }
+.options-table-frame ::deep .mud-table-body > tr:has(> .mud-table-empty-row) { display: block; width: 100%; padding: 0; }
+.options-table-frame ::deep .mud-table-root .mud-table-body .mud-table-empty-row { display: block; width: 100%; max-width: none; padding: 0; }
+.options-table-frame ::deep .mud-table-empty-row::before { display: none; }
+@media (max-width: 600px) {
+    .options-table-frame ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: none; }
+}

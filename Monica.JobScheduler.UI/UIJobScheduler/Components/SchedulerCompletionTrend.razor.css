@@ -56,19 +56,17 @@
 .analytics-trend__data ::deep .mud-expand-panel-header { min-height: 52px; padding: 14px 20px; color: var(--trend-muted); font-size: 13px; line-height: 1.5; }
 .analytics-trend__data ::deep .mud-expand-panel-icon { color: var(--trend-muted) !important; }
 .analytics-trend__data ::deep .mud-expand-panel-content { padding: 0 20px 20px !important; }
+.analytics-trend__bounds { margin: 0 0 12px; color: var(--trend-muted); font-size: 12px; line-height: 1.6; }
 .analytics-trend__table { min-width: 0; overflow: clip; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-surface); }
 .analytics-trend__table ::deep .mud-table { border-radius: 0 !important; background: transparent; }
 .analytics-trend__table ::deep .mud-table-container { width: 100%; min-width: 0; height: auto; max-height: none; }
 .analytics-trend__table ::deep .mud-table-root { width: 100%; min-width: 0; table-layout: fixed; }
-.analytics-trend__interval-column { width: 52%; }
+.analytics-trend__interval-column { width: 44%; }
 .analytics-trend__table ::deep .mud-table-root .mud-table-cell { padding: 14px 16px; color: var(--mud-palette-text-primary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; vertical-align: top; }
 .analytics-trend__table ::deep .mud-table-head .mud-table-cell { background: color-mix(in srgb, var(--mud-palette-action-default-hover) 45%, var(--mud-palette-surface)); color: var(--trend-muted); font-size: 12px; font-weight: 500; }
 .analytics-trend__table ::deep .mud-table-row:last-child .mud-table-cell { border-block-end: 0; }
 .analytics-trend__interval { display: grid; gap: 4px; min-width: 0; }
-.analytics-trend__interval time,
-.analytics-trend__interval small { min-width: 0; font-family: var(--mo-font-family-mono); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.analytics-trend__interval > span:not(.analytics-trend__partial),
-.analytics-trend__interval small { color: var(--trend-muted); }
+.analytics-trend__range { min-width: 0; font-family: var(--mo-font-family-mono); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .analytics-trend__partial { width: fit-content; max-width: 100%; margin-block-start: 3px; padding: 3px 6px; border-radius: 4px; background: color-mix(in srgb, var(--mud-palette-info) 8%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--mud-palette-info) 25%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .analytics-trend__table-count { color: color-mix(in srgb, var(--trend-tone) 25%, var(--mud-palette-text-primary)); font-family: var(--mo-font-family-mono); font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 

@@ -1,32 +1,61 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.K8S.Models
 @using Monica.DevOps.Localization
 @inject IStringLocalizer<K8SResource> L
 
 <div class="k8s-operation-evidence">
-    <MudAlert Severity="@(Failure is null ? Severity.Success : Severity.Error)" Variant="Variant.Outlined" Icon="@(Failure is null ? MoIcons.Success : MoIcons.Error)">
-        <strong>@L[Failure is null ? "Workbench:Operation:Completed" : "Workbench:Operation:Failed"]</strong>
-        <div class="operation-context">@Namespace · @Scope · @CompletedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</div>
-        <p>@(Failure ?? L["Workbench:Operation:Readiness"].Value)</p>
-        @if (Failure is not null) { <p>@L["Workbench:Operation:Partial"]</p> }
+    <section class="evidence-panel @(Failure is null ? "evidence--completed" : "evidence--failed")" role="status" aria-live="polite">
+        <div class="evidence-summary">
+            <span class="evidence-icon"><MoIcon Icon="@(Failure is null ? MoIcons.Success : MoIcons.Error)" Size="1.25rem" /></span>
+            <div>
+                <h2>@L[Failure is null ? "Workbench:Operation:Completed" : "Workbench:Operation:Failed"]</h2>
+                <p class="operation-context">@Namespace · @Scope · @UiTime.Format(CompletedAt)</p>
+                <p class="evidence-finding">@(Failure ?? L["Workbench:Operation:Readiness"].Value)</p>
+                @if (Failure is not null) { <p class="evidence-warning">@L["Workbench:Operation:Partial"]</p> }
+            </div>
+        </div>
         @if (Failure is null)
         {
-            <MudExpansionPanels Elevation="0"><MudExpansionPanel Text="@L["Workbench:Operation:Details"]" Icon="@MoIcons.ChevronDown">
+            <details class="evidence-disclosure">
+                <summary>@L["Workbench:Operation:Details"]</summary>
                 <div class="operation-details">
-                    <div><h3>@L["Workbench:Operation:Targets"]</h3>@foreach (var target in Restart?.AffectedTargets ?? Scale?.AffectedTargets ?? []) { <div>@target</div> }</div>
-                    <div><h3>@L["Workbench:Operation:Workloads"]</h3>
-                        @foreach (var workload in Restart?.Workloads ?? []) { <div>@workload.DisplayName · @workload.ReplicaStatus</div> }
-                        @foreach (var workload in Scale?.Workloads ?? [])
-                        { <div>@workload.Kind/@workload.Name · @L["OperationReview:ReplicaChange"]: @workload.CurrentReplicas → @workload.TargetReplicas · @L["OperationReview:RecordedReplicas"]: @(workload.PreviousReplicas?.ToString() ?? L["Common:Empty"].Value)</div> }
-                    </div>
-                    <div><h3>@L["Workbench:Operation:Ignored"]</h3>
-                        @foreach (var target in Restart?.IgnoredTargets ?? []) { <div>@target.DisplayText</div> }
-                        @foreach (var target in Scale?.IgnoredTargets ?? []) { <div>@target.DisplayText</div> }
-                    </div>
-                    <div><h3>@L["Workbench:Operation:Commands"]</h3>@foreach (var command in Restart?.ExecutedCommands ?? Scale?.ExecutedCommands ?? []) { <pre>@command</pre> }</div>
+                    <dl class="evidence-facts">
+                        <div><dt>@L["Workbench:Operation:Targets"]</dt><dd>@(Restart?.AffectedTargets.Count ?? Scale?.AffectedTargets.Count ?? 0)</dd></div>
+                        <div><dt>@L["Workbench:Operation:Workloads"]</dt><dd>@(Restart?.Workloads.Count ?? Scale?.Workloads.Count ?? 0)</dd></div>
+                        <div><dt>@L["Workbench:Operation:Commands"]</dt><dd>@(Restart?.ExecutedCommands.Count ?? Scale?.ExecutedCommands.Count ?? 0)</dd></div>
+                    </dl>
+                    <section>
+                        <h3>@L["Workbench:Operation:Targets"]</h3>
+                        <ul class="evidence-list">@foreach (var target in Restart?.AffectedTargets ?? Scale?.AffectedTargets ?? []) { <li>@target</li> }</ul>
+                    </section>
+                    <section>
+                        <h3>@L["Workbench:Operation:Workloads"]</h3>
+                        <ul class="evidence-list evidence-list--workloads">
+                            @foreach (var workload in Restart?.Workloads ?? []) { <li><span>@workload.DisplayName</span><span class="workload-replicas">@workload.ReplicaStatus</span></li> }
+                            @foreach (var workload in Scale?.Workloads ?? [])
+                            {
+                                <li><span>@workload.Kind/@workload.Name</span><span class="workload-replicas">@L["OperationReview:ReplicaChange"]: @workload.CurrentReplicas → @workload.TargetReplicas<small>@L["OperationReview:RecordedReplicas"]: @(workload.PreviousReplicas?.ToString() ?? L["Common:Empty"].Value)</small></span></li>
+                            }
+                        </ul>
+                    </section>
+                    @if ((Restart?.IgnoredTargets.Count ?? Scale?.IgnoredTargets.Count ?? 0) > 0)
+                    {
+                        <section>
+                            <h3>@L["Workbench:Operation:Ignored"]</h3>
+                            <ul class="evidence-list">
+                                @foreach (var target in Restart?.IgnoredTargets ?? []) { <li><span>@target.DisplayName</span><small>@target.Reason</small></li> }
+                                @foreach (var target in Scale?.IgnoredTargets ?? []) { <li><span>@target.DisplayName</span><small>@target.Reason</small></li> }
+                            </ul>
+                        </section>
+                    }
+                    <section>
+                        <h3>@L["Workbench:Operation:Commands"]</h3>
+                        <div class="executed-commands"><pre>@string.Join(Environment.NewLine, Restart?.ExecutedCommands ?? Scale?.ExecutedCommands ?? [])</pre></div>
+                    </section>
                 </div>
-            </MudExpansionPanel></MudExpansionPanels>
+            </details>
         }
-    </MudAlert>
+    </section>
 </div>
 
 @code {

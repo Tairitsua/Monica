@@ -19,24 +19,6 @@ internal static class ExecutionUiPresentation
         WriteIndented = true
     };
 
-    internal static string FormatJson(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            return JsonSerializer.Serialize(document.RootElement, INDENTED_JSON_OPTIONS);
-        }
-        catch (JsonException)
-        {
-            return json;
-        }
-    }
-
     internal static string ExportDiagnostics(JobExecutionInstance execution, DateTimeOffset observedAtUtc)
     {
         return JsonSerializer.Serialize(

@@ -84,7 +84,7 @@
 }
 
 .signalr-invoker-empty {
-    padding: 20px;
+
     border: 1px dashed var(--mud-palette-lines-default);
     border-radius: 8px;
     background: var(--mud-palette-background-gray);

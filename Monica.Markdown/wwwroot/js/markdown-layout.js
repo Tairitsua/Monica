@@ -11,12 +11,18 @@ class MarkdownViewerSession {
         this.activeSearchHit = null;
         this.pendingCallbacks = new Set();
         this.pendingViewport = null;
+        this.workspaceSize = null;
+        this.readingStage = null;
+        this.readingStageHeight = null;
+        this.lastViewport = null;
         this.viewportNotificationTask = null;
         this.disposed = false;
         this.shutdownPromise = null;
         this.removalObserver = new MutationObserver(() => {
             if (!this.viewerRoot?.isConnected) {
                 void this.shutdown();
+            } else {
+                this.observeReadingStage();
             }
         });
 
@@ -26,12 +32,52 @@ class MarkdownViewerSession {
         }
 
         this.viewportObserver = new ResizeObserver(entries => {
-            const entry = entries.find(item => item.target === this.viewerRoot);
-            if (entry) {
-                this.queueViewport(entry.contentRect.width, entry.contentRect.height);
+            for (const entry of entries) {
+                if (entry.target === this.viewerRoot) {
+                    this.workspaceSize = entry.contentRect;
+                } else if (entry.target === this.readingStage) {
+                    this.readingStageHeight = entry.contentRect.height;
+                }
             }
+
+            this.queueMeasuredViewport();
         });
         this.viewportObserver.observe(viewerRoot);
+        this.observeReadingStage();
+    }
+
+    observeReadingStage() {
+        const stage = this.viewerRoot?.querySelector("[data-markdown-reading-stage='true']") ?? null;
+        if (stage === this.readingStage) {
+            return;
+        }
+
+        if (this.readingStage) {
+            this.viewportObserver.unobserve(this.readingStage);
+        }
+
+        this.readingStage = stage;
+        this.readingStageHeight = null;
+        if (stage) {
+            this.viewportObserver.observe(stage);
+        } else {
+            this.queueMeasuredViewport();
+        }
+    }
+
+    queueMeasuredViewport() {
+        if (!this.workspaceSize || (this.readingStage && this.readingStageHeight === null)) {
+            return;
+        }
+
+        const width = this.workspaceSize.width;
+        const height = this.readingStageHeight ?? this.workspaceSize.height;
+        if (this.lastViewport?.width === width && this.lastViewport?.height === height) {
+            return;
+        }
+
+        this.lastViewport = { width, height };
+        this.queueViewport(width, height);
     }
 
     queueViewport(width, height) {
@@ -212,6 +258,9 @@ class MarkdownViewerSession {
         this.dotNetReference = null;
         this.activeSearchHit = null;
         this.viewerRoot = null;
+        this.readingStage = null;
+        this.workspaceSize = null;
+        this.readingStageHeight = null;
         this.shutdownPromise = Promise.allSettled(Array.from(this.pendingCallbacks));
         return this.shutdownPromise;
     }

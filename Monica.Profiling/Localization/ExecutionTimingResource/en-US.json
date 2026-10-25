@@ -104,5 +104,8 @@
     "NoMatches": "No matching evidence.",
     "NoMatchesHelp": "Change or clear the query to see the captured records.",
     "PageRange": "{0}–{1} of {2}"
+  },
+  "Navigation": {
+    "Category": "Execution timing"
   }
 }

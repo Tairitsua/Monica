@@ -62,6 +62,7 @@ public sealed class ModuleEventBusUICompositionTests
         var dependencies = GetDirectDependencyTypes(application, typeof(ModuleEventBusUI));
 
         dependencies.Should().Contain(typeof(ModuleEventBus));
+        dependencies.Should().Contain(typeof(ModuleResultEnvelope));
         dependencies.Should().Contain(typeof(ModuleLocalization));
         dependencies.Should().Contain(typeof(ModuleShellUI));
         using var scope = app.Services.CreateScope();

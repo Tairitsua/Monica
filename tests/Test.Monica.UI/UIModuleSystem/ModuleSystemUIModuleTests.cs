@@ -47,8 +47,8 @@ public sealed class ModuleSystemUIModuleTests
             $"{route}/dependencies",
             $"{route}/discovery");
         var workbenchCategory = catalog.GetNavigationCategories()
-            .Single(definition => definition.Id == NavigationCategoryId.Create("monica.module.workbench"));
-        workbenchCategory.ParentId.Should().Be(BuiltInNavigationCategoryIds.Module);
+            .Single(definition => definition.Id == BuiltInNavigationCategoryIds.Module);
+        workbenchCategory.ParentId.Should().Be(BuiltInNavigationCategoryIds.Platform);
         catalog.GetNavItems().Count(item => item.CategoryId == workbenchCategory.Id).Should().Be(5);
     }
 

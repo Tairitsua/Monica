@@ -23,6 +23,9 @@ internal sealed class ExecutionPipelineUiTestContext : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton<IStringLocalizer<ExecutionPipelineResource>, EchoStringLocalizer<ExecutionPipelineResource>>();
         Services.AddSingleton<IExecutionPipelineCatalog>(new StubExecutionPipelineCatalog(snapshot));
         Services.AddSingleton(serviceProvider => new ExecutionPipelineCatalogFacade(

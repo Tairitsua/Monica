@@ -78,7 +78,7 @@
     private string ModelLabel => CurrentModel?.DisplayName ?? ModelName ?? L["Model:Label"];
     private string? EffectiveEffort => ReasoningLevel ?? CurrentModel?.DefaultReasoningLevel;
     private string EffortLabel => EffectiveEffort is null ? L["Workbench:ReasoningDefault"] : CurrentModel?.ReasoningLevels.FirstOrDefault(level => level.Id == EffectiveEffort)?.DisplayName ?? EffectiveEffort;
-    private string TriggerLabel => ModelLabel + (ShowEffort ? $" · {EffortLabel}" : string.Empty);
+    private string TriggerLabel => ModelLabel + (ShowEffort ? $" {EffortLabel}" : string.Empty);
     private string FullSelection => $"{ProviderId} / {ModelName}" + (ShowEffort ? $" · {EffortLabel}" : string.Empty);
     private IEnumerable<(AIProviderInfo Provider, LLMModelInfo[] Models)> MatchingGroups => Providers
         .Where(provider => AllowProviderSelection || provider.ProviderId == ProviderId)

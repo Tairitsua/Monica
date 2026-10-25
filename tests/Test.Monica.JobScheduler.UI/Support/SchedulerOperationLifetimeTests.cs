@@ -98,6 +98,7 @@ public sealed class SchedulerOperationLifetimeTests
             await gate.WaitAsync(token);
             try
             {
+                token.ThrowIfCancellationRequested();
                 producers++;
                 entered.TrySetResult(true);
                 await release.Task.WaitAsync(ObservationTimeout, TestContext.Current.CancellationToken);

@@ -1,7 +1,6 @@
 .provider-card { padding: 24px; min-width: 0; border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); background: var(--mud-palette-surface); }
 .provider-card h3 { font-size: 1rem; font-weight: 600; margin: 12px 0 8px; }
 .provider-card code { font-family: var(--mo-font-family-mono); font-size: .78rem; line-height: 1.7; overflow-wrap: anywhere; }
-.provider-card p { font-size: .76rem; line-height: 1.7; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); overflow-wrap: anywhere; margin-top: 8px; }
 .provider-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 20px 0; }
 .provider-card dt { font-size: .72rem; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
 .provider-card dd { margin-top: 6px; font-family: var(--mo-font-family-mono); font-size: 1.25rem; }

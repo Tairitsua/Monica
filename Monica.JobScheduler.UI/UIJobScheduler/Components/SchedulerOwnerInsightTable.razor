@@ -9,10 +9,10 @@
         <MoIcon Icon="@MoIcons.Network" aria-hidden="true" Size="1.5rem" />
         <div>
             <h2 id="runtime-owners-heading">@L["Runtime:Owners:Title"]</h2>
-            <p>@L["Runtime:Owners:Description", SchedulerRuntimePresentation.FormatInterval(Overview.OwnerOnlineThreshold, L)]</p>
-            <p class="runtime-owners__threshold">
-                <span>@L["Runtime:Config:ExactInterval"]</span>
-                <code>@SchedulerRuntimePresentation.FormatExactInterval(Overview.OwnerOnlineThreshold)</code>
+            <p>
+                <MudTooltip Text="@($"{L["Runtime:Config:ExactInterval"]}: {SchedulerRuntimePresentation.FormatExactInterval(Overview.OwnerOnlineThreshold)}")">
+                    <span class="runtime-owners__threshold" tabindex="0">@L["Runtime:Owners:Description", SchedulerRuntimePresentation.FormatInterval(Overview.OwnerOnlineThreshold, L)]</span>
+                </MudTooltip>
             </p>
         </div>
     </header>
@@ -46,8 +46,7 @@
                         </span>
                         <div class="runtime-owners__time">
                             <span>@L["Runtime:Owners:LastObserved"]</span>
-                            <time datetime="@context.LastObservedAtUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(context.LastObservedAtUtc)</time>
-                            <code>@TimePresentation.FormatUtcTimestamp(context.LastObservedAtUtc)</code>
+                            <time datetime="@context.LastObservedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(context.LastObservedAtUtc)</time>
                         </div>
                     </div>
                 </MudTd>

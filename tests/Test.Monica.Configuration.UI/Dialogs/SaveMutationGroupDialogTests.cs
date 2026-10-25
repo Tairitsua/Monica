@@ -32,7 +32,8 @@ public sealed class SaveMutationGroupDialogTests
         result.Should().NotBeNull();
         result!.Canceled.Should().BeFalse();
         impactService.ReceivedCalls().Should().BeEmpty();
-        applyService.ReceivedCalls().Should().ContainSingle();
+        await applyService.Received(1).ApplyAsync(
+            Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -52,14 +53,15 @@ public sealed class SaveMutationGroupDialogTests
 
         surface.WaitForAssertion(() =>
             surface.Markup.Should().NotContain("Dialogs:SaveGroup:Impact:Actions:ConfirmSave"));
-        applyService.ReceivedCalls().Should().BeEmpty();
+        await applyService.DidNotReceive().ApplyAsync(
+            Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
         var impactCall = impactService.ReceivedCalls().Single();
         var targets = (IReadOnlyCollection<ConfigurationParameterChangeTarget>)impactCall.GetArguments()[0]!;
         targets.Should().ContainSingle();
         targets.Single().DefinitionKey.Should().Be("Sample.Options");
         targets.Single().LogicalPath.ToCanonicalString().Should().Be("Name");
 
-        FindButton(surface, "Common:Actions:Cancel").Click();
+        await surface.InvokeAsync(() => FindButton(surface, "Common:Actions:Cancel").Click());
         var result = await dialog.Result;
         result.Should().NotBeNull();
         result!.Canceled.Should().BeTrue();
@@ -83,7 +85,7 @@ public sealed class SaveMutationGroupDialogTests
         var result = await dialog.Result;
         result.Should().NotBeNull();
         result!.Canceled.Should().BeFalse();
-        var applyCall = applyService.ReceivedCalls().Single();
+        var applyCall = applyService.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(applyService.ApplyAsync));
         var request = (ConfigurationMutationGroupApplyRequest)applyCall.GetArguments()[0]!;
         request.Commands.Should().ContainSingle(command => command.DefinitionKey == "Sample.Options");
     }
@@ -127,7 +129,7 @@ public sealed class SaveMutationGroupDialogTests
         FindLastDialogButton(surface, "Common:Actions:Cancel").Click();
         surface.WaitForAssertion(() =>
             surface.Markup.Should().NotContain("Dialogs:SaveGroup:Impact:Actions:ConfirmSave"));
-        FindButton(surface, "Common:Actions:Cancel").Click();
+        await surface.InvokeAsync(() => FindButton(surface, "Common:Actions:Cancel").Click());
         (await dialog.Result)!.Canceled.Should().BeTrue();
     }
 
@@ -150,14 +152,16 @@ public sealed class SaveMutationGroupDialogTests
         surface.WaitForAssertion(() =>
             FindButton(surface, "Dialogs:SaveGroup:Impact:Actions:SaveAnyway").Should().NotBeNull());
         surface.Markup.Should().Contain("publisher metadata failed");
-        applyService.ReceivedCalls().Should().BeEmpty();
+        await applyService.DidNotReceive().ApplyAsync(
+            Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
 
         FindButton(surface, "Dialogs:SaveGroup:Impact:Actions:SaveAnyway").Click();
 
         var result = await dialog.Result;
         result.Should().NotBeNull();
         result!.Canceled.Should().BeFalse();
-        applyService.ReceivedCalls().Should().ContainSingle();
+        await applyService.Received(1).ApplyAsync(
+            Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
     }
 
     private static IConfigurationDefinitionChangeImpactService CreateSuccessfulImpactService()
@@ -195,12 +199,36 @@ public sealed class SaveMutationGroupDialogTests
     private static IConfigurationMutationGroupApplyService CreateSuccessfulApplyService()
     {
         var applyService = Substitute.For<IConfigurationMutationGroupApplyService>();
+        applyService.PreviewAsync(
+                Arg.Any<ConfigurationMutationGroupApplyRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => new ConfigurationMutationGroupValidationPreview
+            {
+                ValidationFingerprint = "reviewed-group",
+                Definitions = call.Arg<ConfigurationMutationGroupApplyRequest>().Commands
+                    .Select(command => command.DefinitionKey)
+                    .Distinct(StringComparer.Ordinal)
+                    .Select(key => new ConfigurationCandidateValidationReport
+                    {
+                        DefinitionKey = key,
+                        DefinitionDisplayName = key,
+                        ScopePath = LogicalPath.Root,
+                        Scope = ConfigurationValidationScope.CompleteAggregate,
+                        Coverage = ConfigurationValidationCoverage.Complete
+                    }).ToArray()
+            });
         applyService.ApplyAsync(
                 Arg.Any<ConfigurationMutationGroupApplyRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => new ConfigurationMutationGroupApplyResult
             {
                 Status = ConfigurationMutationGroupApplyStatus.Applied,
+                Outcomes = call.Arg<ConfigurationMutationGroupApplyRequest>().Commands
+                    .Select(command => new ConfigurationMutationOutcome
+                    {
+                        RequestId = command.RequestId,
+                        Status = ConfigurationMutationOutcomeStatus.Applied
+                    }).ToArray(),
                 MutationGroup = new ConfigurationMutationGroup
                 {
                     GroupId = "group-1",

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.Localization
 @using Monica.AI.UI.Localization
 @implements IAsyncDisposable
@@ -50,7 +51,7 @@
                                              Dense="true" Disabled="@ActionsDisabled" aria-label="@L["Session:Archive:SelectConversation", session.Title]" />
                                 <div class="archive-row-content">
                                     <span class="archive-row-title" title="@session.Title">@session.Title</span>
-                                    <span class="archive-row-date">@L["Session:Archive:ArchivedOn", session.ArchivedAt?.ToLocalTime().ToString("g") ?? string.Empty]</span>
+                                    <span class="archive-row-date">@L["Session:Archive:ArchivedOn", UiTime.Format(session.ArchivedAt) ?? string.Empty]</span>
                                 </div>
                                 <span class="restore-action">
                                     <MudIconButton Icon="@MoIcons.Unarchive" Size="Size.Small" Disabled="@ActionsDisabled"

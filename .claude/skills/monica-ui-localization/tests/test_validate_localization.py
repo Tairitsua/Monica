@@ -396,6 +396,22 @@ class LocalizationValidatorTests(unittest.TestCase):
         self.assertIn(included.resolve(), validator.ui_projects)
         self.assertNotIn(stale.resolve(), validator.ui_projects)
 
+    def test_pending_input_copies_do_not_shadow_shared_resources(self) -> None:
+        for prefix in ('Live', '.pending/baseline'):
+            self._add_project(
+                f'{prefix}/Shell',
+                resources={'SharedResource': {
+                    'en-US': {'Page': {'Title': 'Title'}},
+                    'zh-CN': {'Page': {'Title': '标题'}},
+                }},
+                sources={'Page.razor': '@inject IStringLocalizer<SharedResource> L\n@L["Page:Title"]\n'},
+            )
+
+        validator, report = self._validate()
+
+        self.assertEqual('PASSED', report['summary']['status'])
+        self.assertEqual(1, len(validator.resources_by_name['SharedResource']))
+
     def test_empty_discovery_cannot_report_success(self) -> None:
         self._write(
             'EmptyUi/EmptyUi.csproj',

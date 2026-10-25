@@ -3,7 +3,7 @@
 @inject IStringLocalizer<EventBusResource> L
 
 <article class="provider-card">
-    <header><EventBusStatusBadge Tone="@(Provider.IsDistributed ? Color.Secondary : Color.Info)">@L.GetProviderModeText(Provider.IsDistributed)</EventBusStatusBadge><h3>@L.GetProviderKindText(Provider.ProviderType)</h3><code>@EventBusPresentation.KeyText(Provider.ServiceKey, L)</code><p>@Provider.ImplementationType</p></header>
+    <header>@if (L.GetProviderModeText(Provider.IsDistributed) != L.GetProviderKindText(Provider.ProviderType)) { <EventBusStatusBadge Tone="@(Provider.IsDistributed ? Color.Secondary : Color.Info)">@L.GetProviderModeText(Provider.IsDistributed)</EventBusStatusBadge> }<h3 title="@Provider.ImplementationType">@L.GetProviderKindText(Provider.ProviderType)</h3><code>@EventBusPresentation.KeyText(Provider.ServiceKey, L)</code></header>
     <dl><div><dt>@L["ProviderDirectory:Registrations"]</dt><dd>@Provider.SubscriptionCount</dd></div><div><dt>@L["ProviderDirectory:Active"]</dt><dd>@Provider.ActiveSubscriptionCount</dd></div><div><dt>@L["ProviderDirectory:ReportedProblems"]</dt><dd>@Provider.UnhealthyTopicCount</dd></div></dl>
     <div class="provider-card-capabilities">
         @if (Provider.SupportsBulkPublish) { <span>@L["Providers:Capabilities:BulkPublish"]</span> }
@@ -11,7 +11,6 @@
         @if (Provider.SupportsDeadLetterQueue) { <span>@L["Providers:Capabilities:DeadLetterQueue"]</span> }
         @if (Provider.HasOptionDiagnostics) { <span>@L["Providers:Capabilities:HasOptions"]</span> }
     </div>
-    <p class="provider-card-note">@L["ProviderDirectory:CountsHelp"]</p>
     <MudButton Color="Color.Primary" EndIcon="@MoIcons.ArrowRight" OnClick="() => OnViewDetailsClicked.InvokeAsync(Provider)">@L["Providers:Card:ViewDetails"]</MudButton>
 </article>
 

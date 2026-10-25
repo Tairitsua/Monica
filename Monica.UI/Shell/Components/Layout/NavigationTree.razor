@@ -1,29 +1,34 @@
 @using Monica.Core.Localization.Abstractions
 @using Monica.UI.Shell.Models
-@using Monica.UI.Shell.Support
 @inject ILocalizationCatalog LocalizationCatalog
 
 <div class="@(ShowPageIcons ? "mo-navigation-tree" : "mo-navigation-tree is-quiet")">
     @foreach (var item in Group.Items)
     {
-            <MudNavLink Href="@item.Href" Icon="@(ShowPageIcons ? item.Icon : null)" Match="NavLinkMatch.All"
-                        Class="@(item == ActiveItem ? "active" : null)">
-                @if (ShowPageIcons)
+        var isCurrent = item == ActiveItem;
+        <MudNavLink Href="@item.Href" Match="NavLinkMatch.All" ActiveClass="mo-navigation-link-matched"
+                    Ripple="false" Class="@(isCurrent ? "mo-navigation-item is-current" : "mo-navigation-item")"
+                    aria-current="@(isCurrent ? "page" : null)">
+            <span class="mo-navigation-tree__destination">
+                @if (ShowPageIcons && !string.IsNullOrEmpty(item.Icon))
                 {
-                    @item.ResolveText(LocalizationCatalog)
+                    <MoIcon Icon="@item.Icon" Size="18px" />
                 }
                 else
                 {
-                    <span class="mo-navigation-tree__destination"><span class="mo-navigation-tree__dot" aria-hidden="true"></span>@item.ResolveText(LocalizationCatalog)</span>
+                    <span class="mo-navigation-tree__dot" aria-hidden="true"></span>
                 }
-            </MudNavLink>
+                <span class="mo-navigation-tree__label">@item.ResolveText(LocalizationCatalog)</span>
+                @if (isCurrent)
+                {
+                    <span class="mo-navigation-tree__current" aria-hidden="true"></span>
+                }
+            </span>
+        </MudNavLink>
     }
     @foreach (var child in Group.Children)
     {
-        <MudNavGroup @key="child.Id" Title="@child.DisplayName" Icon="@(ShowPageIcons ? child.Icon : null)" ExpandIcon="@MoIcons.ChevronDown"
-                     Expanded="@ContainsActive(child)">
-            <NavigationTree Group="@child" ActiveItem="@ActiveItem" ShowPageIcons="@ShowPageIcons" />
-        </MudNavGroup>
+        <MoNavigationGroup @key="child.Id" Group="@child" ActiveItem="@ActiveItem" ShowPageIcons="@ShowPageIcons" />
     }
 </div>
 
@@ -33,9 +38,6 @@
     /// <summary>The single longest matching destination in the complete navigation tree.</summary>
     [Parameter] public NavigationItem? ActiveItem { get; set; }
 
-    /// <summary>Gets or sets whether leaf destinations show their registered icons. Defaults to true; false uses quiet dots in overview menus.</summary>
+    /// <summary>Gets or sets whether leaf destinations show their registered icons. Defaults to true; false uses quiet dots.</summary>
     [Parameter] public bool ShowPageIcons { get; set; } = true;
-
-    private bool ContainsActive(NavigationGroup group) =>
-        ActiveItem is not null && NavigationTreeBuilder.Flatten([group]).Contains(ActiveItem);
 }

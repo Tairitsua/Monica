@@ -1,6 +1,7 @@
 {
   "Navigation": {
-    "Title": "Seeders"
+    "Title": "Seeders",
+    "Category": "Startup seeding"
   },
   "Page": {
     "Title": "Seeder initialization",
@@ -195,7 +196,6 @@
     "Unknown": "Unknown",
     "NotAvailable": "Not available",
     "None": "None",
-    "UtcTimestamp": "{0} UTC",
     "DurationMilliseconds": "{0:0} ms",
     "DurationSeconds": "{0:0.0} s",
     "DurationMinutesSeconds": "{0} min {1} s",

@@ -1,5 +1,4 @@
 .overview-page { display: grid; gap: var(--mo-page-section-gap); width: 100%; min-width: 0; }
-.overview-page__loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 48px 20px; color: var(--mud-palette-text-secondary); }
 .overview-page__snapshot { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
 .overview-page__snapshot-time { display: flex; align-items: center; gap: 8px; min-width: 0; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.65; }
 .overview-page__snapshot-time time { overflow-wrap: anywhere; }

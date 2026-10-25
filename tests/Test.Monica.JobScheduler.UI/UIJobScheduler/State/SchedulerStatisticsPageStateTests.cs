@@ -10,6 +10,7 @@ using Monica.JobScheduler.UI.UIJobScheduler.Support;
 using Monica.Modules;
 using Monica.Testing.Localization;
 using NSubstitute;
+using Test.Monica.JobScheduler.UI.Support;
 using Test.Monica.JobScheduler.UI.Infrastructure;
 using Xunit;
 
@@ -437,7 +438,7 @@ public sealed class SchedulerStatisticsPageStateTests
 
     private static SchedulerTimePresentation CreatePresentation(TimeZoneInfo timeZone) => new(
         Options.Create(new ModuleJobSchedulerOption { CronTimeZone = timeZone }),
-        new EchoStringLocalizer<JobSchedulerResource>());
+        new EchoStringLocalizer<JobSchedulerResource>(), SchedulerTimePresentationTests.CreateUiTimeFormatter());
 
     private static TaskCompletionSource<T> Signal<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static Task ObserveAsync(Task task) => task.WaitAsync(OBSERVATION_TIMEOUT, TestContext.Current.CancellationToken);

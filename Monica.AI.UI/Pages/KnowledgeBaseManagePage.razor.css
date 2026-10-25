@@ -16,12 +16,10 @@ code { font-family: var(--mo-font-family-mono); font-size: 12px; color: var(--mu
 .collection-binding { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
 .collection-binding ::deep svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--mud-palette-primary); }
 .collection-binding small { display: block; margin-top: 2px; color: var(--mud-palette-text-secondary); font-size: 12px; }
-.knowledge-empty, .knowledge-loading { padding: 48px 28px; border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
+.knowledge-empty, .knowledge-loading { border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); }
 .knowledge-empty ::deep svg { color: var(--mud-palette-primary); width: 32px; height: 32px; }
-.knowledge-empty h2 { margin: 18px 0 10px; font-size: 22px; font-weight: 500; }
+.knowledge-empty h2 { margin: 0; font-size: 22px; font-weight: 500; }
 .knowledge-empty p, .knowledge-loading p { color: var(--mud-palette-text-secondary); font-size: 14px; line-height: 1.65; margin: 0; }
-.knowledge-loading p { margin-bottom: 18px; }
-.knowledge-empty ::deep .mud-button { margin-top: 20px; }
 @container knowledge-workspace (max-width: 1079px) { .knowledge-workspace-grid { grid-template-columns: minmax(0,1fr); gap: 20px; } }
 @media (max-height: 650px) { .knowledge-workspace-grid { grid-template-columns: minmax(0,1fr); gap: 20px; } }
 @media (max-width: 900px) { .knowledge-base-manage-page { padding: 20px; } }

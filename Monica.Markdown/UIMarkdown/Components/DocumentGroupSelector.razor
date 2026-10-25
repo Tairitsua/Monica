@@ -11,7 +11,9 @@
                 class="group-item @(isActive ? "active" : "")"
                 @onclick="() => OnGroupClicked(group.Key)"
                 title="@GetItemTitle(group)">
-            <span class="group-dot @(group.HasConfigurationError ? "invalid" : string.Empty)"></span>
+            <span class="group-mark @(group.HasConfigurationError ? "invalid" : string.Empty)" aria-hidden="true">
+                <MoIcon Icon="@MoIcons.Book" Size="1.25rem" />
+            </span>
 
             <div class="group-content">
                 <div class="group-title-row">

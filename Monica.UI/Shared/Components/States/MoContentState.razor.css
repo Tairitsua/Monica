@@ -1,0 +1,50 @@
+.mo-content-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 180px;
+    padding: 28px 24px;
+    color: var(--mud-palette-text-secondary);
+    font-size: .875rem;
+    line-height: 1.65;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.mo-content-state--compact {
+    min-height: 96px;
+    padding: 20px;
+}
+
+.mo-content-state ::deep > * {
+    flex-shrink: 0;
+    max-width: 100%;
+}
+
+.mo-content-state ::deep :is(h2, h3, h4, p, .mud-typography) {
+    margin: 0;
+    max-width: 60ch;
+}
+
+.mo-content-state ::deep :is(h2, h3, h4) {
+    color: var(--mud-palette-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.mo-content-state ::deep .mud-alert {
+    min-width: 0;
+    max-width: 48rem;
+    text-align: start;
+}
+
+@media (max-width: 600px) {
+    .mo-content-state { padding-inline: 20px; }
+}

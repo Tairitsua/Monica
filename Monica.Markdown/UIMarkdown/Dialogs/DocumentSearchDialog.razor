@@ -106,6 +106,7 @@
                         <button type="button"
                                 class="document-search-result"
                                 @onclick="@(() => SelectResult(result))">
+                            <div class="document-search-result-title">@result.DocumentTitle</div>
                             <div class="document-search-result-meta">
                                 <span class="document-search-result-group">@result.GroupTitle</span>
 
@@ -114,7 +115,6 @@
                                     <div class="document-search-result-location">@locationText</div>
                                 }
                             </div>
-                            <div class="document-search-result-title">@result.DocumentTitle</div>
                             <div class="document-search-result-preview">
                                 @foreach (var part in MarkdownSearchPreviewFormatter.BuildParts(result))
                                 {

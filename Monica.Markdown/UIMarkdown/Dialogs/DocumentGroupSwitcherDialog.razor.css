@@ -1,14 +1,18 @@
 .group-switcher-dialog {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
     min-height: 0;
+    min-width: 0;
+    font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
 }
 
 .group-switcher-search-row {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .group-switcher-search-row ::deep .group-switcher-search {
@@ -25,10 +29,7 @@
     overflow-y: auto;
     min-height: 0;
     padding: 2px;
-}
-
-.group-switcher-empty {
-    min-height: 104px;
-    padding: 24px;
-    justify-content: center;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--mud-palette-lines-default) transparent;
 }

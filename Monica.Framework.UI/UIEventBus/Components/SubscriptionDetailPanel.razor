@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
 @using Monica.EventBus.Models
@@ -7,7 +8,7 @@
 {
     <div class="subscription-inspector">
         <header class="subscription-inspector-identity"><span>@L.GetSubscriptionScopeText(row.Scope) · @L.GetDiscoveryModeText(row.IsAutoDiscovered)</span><h2>@row.EventTypeShortName</h2><code>@row.EventType</code></header>
-        <div class="subscription-inspector-capture"><span>@L["Inspector:FrozenCapture"]</span><time>@EventBusPresentation.Timestamp(CapturedAt)</time></div>
+        <div class="subscription-inspector-capture"><span>@L["Inspector:FrozenCapture"]</span><time>@UiTime.Format(CapturedAt)</time></div>
         <MudTabs PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" Elevation="0" Rounded="false">
             <MudTabPanel Text="@L["Inspector:Routing"]">
                 <section class="subscription-inspector-section">
@@ -35,9 +36,9 @@
                     </dl>
                     <h3>@L["SubscriptionDetail:Sections:Lifecycle"]</h3>
                     <dl class="subscription-inspector-facts">
-                        <div><dt>@L["SubscriptionDetail:Timeline:Created"]</dt><dd><time>@EventBusPresentation.Timestamp(row.CreatedAt)</time></dd></div>
-                        <div><dt>@L["SubscriptionDetail:Timeline:Activated"]</dt><dd><time>@(row.ActivatedAt is { } activated ? EventBusPresentation.Timestamp(activated) : L["Inspector:NoTimestamp"].Value)</time></dd></div>
-                        <div><dt>@L["SubscriptionDetail:Timeline:Deactivated"]</dt><dd><time>@(row.DeactivatedAt is { } deactivated ? EventBusPresentation.Timestamp(deactivated) : L["Inspector:NoTimestamp"].Value)</time></dd></div>
+                        <div><dt>@L["SubscriptionDetail:Timeline:Created"]</dt><dd><time>@UiTime.Format(row.CreatedAt)</time></dd></div>
+                        <div><dt>@L["SubscriptionDetail:Timeline:Activated"]</dt><dd><time>@(row.ActivatedAt is { } activated ? UiTime.Format(activated) : L["Inspector:NoTimestamp"].Value)</time></dd></div>
+                        <div><dt>@L["SubscriptionDetail:Timeline:Deactivated"]</dt><dd><time>@(row.DeactivatedAt is { } deactivated ? UiTime.Format(deactivated) : L["Inspector:NoTimestamp"].Value)</time></dd></div>
                     </dl>
                 </section>
             </MudTabPanel>

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
 @using Monica.UI.Shared.Components.Dialogs
@@ -7,7 +8,7 @@
     <TitleContent><MoDialogHeading Text="@L["Overview:TopicInspector"]" /></TitleContent>
     <DialogContent>
         <div class="topic-inspector">
-            <header><span>@L.GetProviderKindText(Status.Provider) · @EventBusPresentation.KeyText(Status.ServiceKey, L)</span><h2>@Status.TopicName</h2><p>@L["Inspector:FrozenCapture"] · @EventBusPresentation.Timestamp(CapturedAt)</p></header>
+            <header><span>@L.GetProviderKindText(Status.Provider) · @EventBusPresentation.KeyText(Status.ServiceKey, L)</span><h2>@Status.TopicName</h2><p>@L["Inspector:FrozenCapture"] · @UiTime.Format(CapturedAt)</p></header>
             <EventBusTopicEvidence Status="Status" />
         </div>
     </DialogContent>

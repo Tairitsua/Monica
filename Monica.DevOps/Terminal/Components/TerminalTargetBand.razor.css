@@ -1,15 +1,16 @@
-.terminal-target { display: grid; grid-template-columns: 240px minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 18px 20px; border-bottom: 1px solid var(--mud-palette-lines-default); background: var(--mud-palette-surface); }
+.terminal-target { display: grid; grid-template-columns: 240px minmax(0, 1fr) auto; align-items: start; gap: 20px; padding: 18px 20px; border-bottom: 1px solid var(--mud-palette-lines-default); background: var(--mud-palette-surface); }
 .terminal-target__handle { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.terminal-target__caption { font-size: .7rem; color: var(--mud-palette-text-secondary); }
+.terminal-target__caption { font-size: .75rem; line-height: 1.5; color: var(--mud-palette-text-secondary); }
 .terminal-target__handle ::deep .mud-menu, .terminal-target__handle ::deep .mud-button { width: 100%; }
+.terminal-target__handle ::deep .mud-button-root { min-height: 40px; }
 .terminal-target__handle ::deep .mud-button:not(:disabled) { color: var(--mud-palette-primary-text); background: var(--mud-palette-primary); }
 .terminal-target__handle ::deep .mud-button-label { min-width: 0; justify-content: space-between; text-align: start; overflow-wrap: anywhere; }
 .terminal-target__directory { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.terminal-target__directory > span { font-size: .75rem; color: var(--mud-palette-text-secondary); }
-.terminal-target__directory code { font-family: var(--mo-font-family-mono); font-size: .84rem; color: var(--mud-palette-text-primary); overflow-wrap: anywhere; }
+.terminal-target__directory > span { font-size: .75rem; line-height: 1.5; color: var(--mud-palette-text-secondary); }
+.terminal-target__directory code { display: flex; align-items: center; min-height: 40px; font-family: var(--mo-font-family-mono); font-size: .84rem; line-height: 1.5; color: var(--mud-palette-text-primary); overflow-wrap: anywhere; }
 .terminal-target__directory small { color: var(--mud-palette-text-secondary); font-size: .73rem; }
 .terminal-target__directory:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 4px; }
-.terminal-target__actions { display: flex; align-items: center; gap: 4px; }
+.terminal-target__actions { display: flex; align-items: center; gap: 4px; padding-top: 23px; }
 .terminal-choice { display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); padding: 6px 0; text-align: start; }
 .terminal-choice strong { font-weight: 500; }
 .terminal-choice code { font-family: var(--mo-font-family-mono); font-size: .75rem; overflow-wrap: anywhere; white-space: normal; }

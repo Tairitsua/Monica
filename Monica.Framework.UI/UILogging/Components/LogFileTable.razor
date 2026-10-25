@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Framework.UI.UILogging.Models
 @inject IStringLocalizer<LoggingResource> L
 
@@ -23,7 +25,7 @@
             <RowTemplate>
                 <MudTd>@context.RelativePath</MudTd>
                 <MudTd>@FormatSize(context.Size)</MudTd>
-                <MudTd>@context.LastModified.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                <MudTd>@UiTime.Format(context.LastModified)</MudTd>
                 <MudTd>
                     <MudButton Variant="Variant.Text"
                                Size="Size.Small"
@@ -34,7 +36,7 @@
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Page:Components:Files:Empty"]</MudAlert>
+                <MoContentState Compact="true"><MoIcon Icon="@MoIcons.FolderOpen" Size="1.5rem" /><p>@L["Page:Components:Files:Empty"]</p></MoContentState>
             </NoRecordsContent>
         </MudTable>
     </div>

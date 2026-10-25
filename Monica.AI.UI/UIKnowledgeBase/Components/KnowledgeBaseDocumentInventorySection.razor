@@ -15,7 +15,7 @@
     </div>
     @if (!string.IsNullOrWhiteSpace(PageState.InventoryErrorMessage))
     {
-        <div class="inventory-message" role="alert"><p>@PageState.InventoryErrorMessage</p><MudButton OnClick="PageState.ReloadSelectedInventoryAsync">@L["KnowledgeWorkbench:Retry"]</MudButton></div>
+        <div class="inventory-message" role="alert"><MoContentState Compact="true"><p>@PageState.InventoryErrorMessage</p><MudButton OnClick="PageState.ReloadSelectedInventoryAsync">@L["KnowledgeWorkbench:Retry"]</MudButton></MoContentState></div>
     }
     else
     {
@@ -29,7 +29,7 @@
                     <MudTd DataLabel="@L["RAG:DocumentQueue:Column:Chunks"]"><span class="chunk-count">@context.ChunkCount</span></MudTd>
                     <MudTd DataLabel="@L["RAG:DocumentQueue:Column:Actions"]"><div class="row-actions"><MudIconButton Icon="@MoIcons.Eye" Size="Size.Small" OnClick="() => PageState.ShowDocumentPreviewAsync(context)" aria-label="@L["KnowledgeBase:Documents:Actions:Preview"]" /><MudIconButton Icon="@MoIcons.Delete" Size="Size.Small" Color="Color.Error" Disabled="@(context.Status == DocumentStatus.Indexing)" OnClick="() => PageState.DeleteDocumentAsync(context)" aria-label="@L["RAG:DocumentQueue:Actions:Delete"]" />@if (context.Status == DocumentStatus.Error && !string.IsNullOrWhiteSpace(context.ErrorMessage)) { <MudIconButton Icon="@MoIcons.Error" Size="Size.Small" Color="Color.Error" OnClick="() => PageState.ShowIndexingErrorAsync(context)" aria-label="@L["Common:Error"]" /> }</div></MudTd>
                 </RowTemplate>
-                <NoRecordsContent><div class="inventory-message"><p>@(PageState.DocumentInventory.Count == 0 ? L["KnowledgeWorkbench:NoDocuments"] : L["KnowledgeWorkbench:NoDocumentsMatch"])</p>@if (PageState.DocumentInventory.Count > 0) { <MudButton OnClick="ClearFilters">@L["KnowledgeWorkbench:ClearFilters"]</MudButton> }</div></NoRecordsContent>
+                <NoRecordsContent><div class="inventory-message"><MoContentState Compact="true"><p>@(PageState.DocumentInventory.Count == 0 ? L["KnowledgeWorkbench:NoDocuments"] : L["KnowledgeWorkbench:NoDocumentsMatch"])</p>@if (PageState.DocumentInventory.Count > 0) { <MudButton OnClick="ClearFilters">@L["KnowledgeWorkbench:ClearFilters"]</MudButton> }</MoContentState></div></NoRecordsContent>
                 <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@(new[] { 10, 25, 50 })" /></PagerContent>
             </MudTable>
         </div>

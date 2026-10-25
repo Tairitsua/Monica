@@ -32,11 +32,16 @@ public class ModuleK8SUI : MonicaModule<ModuleK8SUIOption>, IUIModule
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<K8SResource>(
+                    "Monica.DevOps.Kubernetes", "Navigation:Category", 30,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Server);
+
                 registry.RegisterLocalizedPage<UIK8SPage, K8SResource>(
                     UIK8SPage.PAGE_URL,
                     "Pages:K8S:Title",
                     MoIcons.Server,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 35,
                     descriptionKey: "Workbench:Inventory:Subtitle");
@@ -44,7 +49,7 @@ public class ModuleK8SUI : MonicaModule<ModuleK8SUIOption>, IUIModule
                     UIK8SRuntimeConfigPage.PAGE_URL,
                     "Workbench:Config:Title",
                     MoIcons.Sliders,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 35,
                     descriptionKey: "Workbench:Config:Subtitle");

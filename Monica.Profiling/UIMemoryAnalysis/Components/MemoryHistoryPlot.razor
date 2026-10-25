@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIMemoryAnalysis.Support
@@ -5,7 +6,7 @@
 <div class="memory-owned-plot" data-plot-unit="@_geometry.Unit" data-omitted-values="@_geometry.OmittedValueCount">
     @if (_geometry.HasValues)
     {
-        <span class="memory-owned-plot-unit">@_geometry.Unit · UTC</span>
+        <span class="memory-owned-plot-unit">@_geometry.Unit</span>
         <div class="memory-owned-plot-grid">
             <div class="memory-owned-plot-values" aria-hidden="true">
                 @foreach (var tick in _geometry.ValueTicks)
@@ -15,7 +16,7 @@
             </div>
             <svg class="memory-owned-plot-canvas" viewBox="0 0 1000 240" preserveAspectRatio="none" role="img"
                  aria-labelledby="@_titleId" aria-describedby="@(string.IsNullOrEmpty(Description) ? null : _descriptionId)">
-                <title id="@_titleId">@SeriesLabel · @_geometry.Unit · UTC</title>
+                <title id="@_titleId">@SeriesLabel · @_geometry.Unit</title>
                 @if (!string.IsNullOrEmpty(Description)) { <desc id="@_descriptionId">@Description</desc> }
                 @foreach (var tick in _geometry.ValueTicks)
                 {
@@ -41,7 +42,7 @@
                     var tick = _geometry.TimeTicks[index];
                     var anchor = _geometry.TimeTicks.Count == 1 ? "middle" : index == 0 ? "start" : index == _geometry.TimeTicks.Count - 1 ? "end" : "middle";
                     <time class="memory-owned-plot-time" data-anchor="@anchor" style="left:@Percent(tick.X / MemoryHistoryPlotGeometry.Width)"
-                          datetime="@MemoryAnalysisDisplayFormatter.MachineTime(tick.TimestampUtc)" title="@MemoryAnalysisDisplayFormatter.MachineTime(tick.TimestampUtc)">@tick.TimestampUtc.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture)</time>
+                          datetime="@MemoryAnalysisDisplayFormatter.MachineTime(tick.TimestampUtc)" title="@MemoryAnalysisDisplayFormatter.MachineTime(tick.TimestampUtc)">@UiTime.FormatTime(tick.TimestampUtc)</time>
                 }
             </div>
         </div>

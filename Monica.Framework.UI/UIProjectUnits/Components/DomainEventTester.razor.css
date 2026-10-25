@@ -32,7 +32,6 @@
 .event-payload__identity { margin-bottom: 18px; }
 .event-payload__identity ::deep .mud-input, .event-payload__editor ::deep .mud-input { min-width: 0; border-radius: 6px; font-family: var(--mo-font-family-mono); font-size: 12px; line-height: 1.8; }
 .event-payload__identity ::deep input { overflow-x: auto; }
-.event-payload__editor ::deep textarea { height: 28rem; min-height: 12rem; max-height: 36rem; overflow: auto; resize: vertical; white-space: pre; }
 .event-payload ::deep label.mud-input-label:not(.mud-input-error):not(.mud-disabled) { color: var(--event-muted); }
 .event-payload ::deep .mud-input:focus-within ~ label.mud-input-label:not(.mud-input-error):not(.mud-disabled) { color: var(--event-accent); }
 .event-payload__actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px; min-width: 0; margin-top: 20px; }
@@ -48,7 +47,6 @@
 .event-payload__unselected { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 24rem; gap: 16px; padding: 24px; text-align: center; color: var(--event-muted); }
 .event-payload__unselected ::deep :is(.mud-icon-root, .mo-icon) { width: 36px; height: 36px; color: var(--event-accent); }
 .event-payload__unselected p { max-width: 30rem; margin: 0; font-size: 14px; line-height: 1.8; }
-.event-desk__empty { margin: 0; padding: 24px 22px; color: var(--event-muted); font-size: 13px; line-height: 1.8; }
 .event-desk__error { margin-bottom: 20px; padding: 16px 20px; border: 1px solid color-mix(in srgb, var(--mud-palette-error) 30%, var(--mud-palette-divider)); border-radius: 6px; background: color-mix(in srgb, var(--mud-palette-error) 4%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
 @container event-desk (max-width: 850px) {
     .event-desk__workspace { grid-template-columns: minmax(0, 1fr); }
@@ -58,5 +56,4 @@
 @container event-desk (max-width: 500px) {
     .event-desk h1 { font-size: 28px; }
     .event-descriptors__header, .event-descriptor, .event-payload { padding-inline: 16px; }
-    .event-payload__editor ::deep textarea { height: 22rem; }
-}
+    }

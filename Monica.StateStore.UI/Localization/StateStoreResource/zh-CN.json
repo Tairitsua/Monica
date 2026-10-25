@@ -1,16 +1,12 @@
 {
   "Pages": {
     "StateStoreManage": {
-      "Title": "状态存储管理"
+      "Title": "数据浏览器"
     }
   },
   "Dashboard": {
-    "PageTitle": "状态存储管理",
-    "Title": "状态存储",
-    "Summary": {
-      "RegisteredProviders": "已注册 {0} 个提供者",
-      "RegisteredProvider": "已注册 1 个提供者"
-    },
+    "PageTitle": "数据浏览器",
+    "Title": "数据浏览器",
     "Messages": {
       "NoProviders": "未注册任何 StateStore Provider",
       "NoProvidersDescription": "请先注册至少一个 StateStore Provider，才能使用浏览工作台。",
@@ -129,7 +125,6 @@
       "Edit": "编辑",
       "Delete": "删除",
       "DeleteSelected": "删除选中 ({0})",
-      "ChooseKeys": "选择 Key",
       "BackToKeys": "返回 Key 列表",
       "RefreshProviders": "刷新提供者"
     },
@@ -179,16 +174,11 @@
       "JsonHelperText": "JSON 会被解析；其他输入按文本存储。"
     },
     "Actions": {
-      "FormatJson": "格式化 JSON",
-      "MinifyJson": "压缩 JSON",
       "Cancel": "取消",
       "Save": "保存",
       "Close": "关闭"
     },
-    "Messages": {
-      "FormatFailed": "JSON 格式化失败: {0}",
-      "MinifyFailed": "JSON 压缩失败: {0}"
-    }
+    "Messages": {}
   },
   "KeyCreate": {
     "Dialogs": {
@@ -203,18 +193,13 @@
       "JsonHelperText": "JSON 会被解析；其他输入按文本存储。"
     },
     "Placeholders": {
-      "KeyNameExample": "例如: user:123, session:abc",
-      "JsonExample": "例如: {\"name\": \"test\", \"count\": 1}"
+      "KeyNameExample": "例如: user:123, session:abc"
     },
     "Actions": {
-      "FormatJson": "格式化 JSON",
-      "MinifyJson": "压缩 JSON",
       "Cancel": "取消",
       "Create": "创建"
     },
     "Messages": {
-      "FormatFailed": "JSON 格式化失败: {0}",
-      "MinifyFailed": "JSON 压缩失败: {0}",
       "KeyNameRequired": "请输入 Key 名称"
     }
   },
@@ -251,5 +236,61 @@
       "KeyDeleted": "Key 删除成功",
       "KeysDeleted": "已删除 {0} 个 Key"
     }
+  },
+  "Navigation": {
+    "Category": "状态存储"
+  },
+  "Workbench": {
+    "Navigation": "状态存储页面",
+    "Providers": "存储提供者",
+    "Browser": "数据浏览器",
+    "Eyebrow": "STATE STORE",
+    "Provider": "提供者",
+    "SwitchDataContext": "切换数据上下文",
+    "RegisteredSummary": "已注册的存储提供者",
+    "ScopeSummary": "{0} 个本地 · {1} 个分布式",
+    "DefaultResolution": "默认解析至",
+    "Registrations": "个注册",
+    "Registry": "注册列表",
+    "SearchProviders": "搜索提供者",
+    "NoProviderMatches": "没有匹配的提供者",
+    "RegistryNote": "注册信息来自应用。这里查看配置与能力；进入数据浏览器后操作 Key。",
+    "RegistrationNotHealth": "注册信息不代表连接健康状态。",
+    "DefaultRegistration": "默认 IStateStore",
+    "ScanAndExact": "扫描 + 精确查询",
+    "ExactOnly": "仅精确查询",
+    "BrowseData": "浏览数据",
+    "BrowserCapabilities": "浏览器能力",
+    "BulkDelete": "批量删除",
+    "ModuleOptions": "模块选项 · 只读诊断",
+    "ResultViews": "结果视图",
+    "ListView": "列表视图",
+    "TreeView": "树形视图",
+    "SelectAll": "选择当前全部结果",
+    "KeyName": "Key 名称",
+    "Namespace": "命名空间",
+    "InspectHint": "点击查看值",
+    "TreeNote": "以 : 分组 · 数量仅代表当前结果",
+    "Ungrouped": "未分组",
+    "ReadMarker": "蓝点 · 已读取",
+    "ResizeList": "调整列表宽度",
+    "QueryChanged": "条件已修改，执行后更新结果。",
+    "ResultScope": "列表与分组均基于本次查询结果。",
+    "TtlSnapshot": "TTL · 读取时快照",
+    "TextSize": "值的文本大小",
+    "ByteSize": "{0} B",
+    "CopyKey": "复制完整 Key",
+    "CopyValue": "复制 Value",
+    "ExpandDetail": "展开详情",
+    "CollapseDetail": "收起详情",
+    "RefreshValue": "刷新",
+    "Copied": "已复制",
+    "CopyFailed": "剪贴板不可用，请选中文本手动复制。",
+    "Json": "JSON",
+    "Text": "文本",
+    "Fields": "字段",
+    "Object": "对象",
+    "Array": "数组",
+    "ValueViews": "值的显示方式"
   }
 }

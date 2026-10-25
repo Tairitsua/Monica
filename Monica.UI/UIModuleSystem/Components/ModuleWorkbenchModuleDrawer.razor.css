@@ -1,22 +1,24 @@
 .module-inspector-host ::deep .module-inspector-sheet.mud-drawer.mud-drawer-temporary.mud-drawer-pos-right {
-    top: 12px;
-    bottom: 12px;
-    height: calc(100% - 24px);
-    max-height: calc(100% - 24px);
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    max-height: 100%;
     overflow: hidden;
-    border: 1px solid var(--mud-palette-divider);
-    border-radius: 16px;
+    border: 0;
+    border-left: 1px solid var(--mud-palette-divider);
+    /* This edge-attached frame stays square when expressive themes round native surfaces. */
+    border-radius: 0 !important;
     color: var(--mud-palette-text-primary);
     background: var(--mud-palette-surface);
     box-shadow: var(--mud-elevation-12);
 }
 
 .module-inspector-host ::deep .module-inspector-sheet.mud-drawer.mud-drawer-temporary.mud-drawer-pos-right.mud-drawer--open {
-    right: 12px;
+    right: 0;
 }
 
 .module-inspector-host ::deep .module-inspector-sheet.mud-drawer.mud-drawer-temporary.mud-drawer-pos-right.mud-drawer--closed {
-    right: calc(-1 * var(--mud-drawer-width, 460px) - 12px);
+    right: calc(-1 * var(--mud-drawer-width, 460px));
     box-shadow: none;
 }
 
@@ -132,8 +134,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
 }
-.module-drawer-content ::deep .mud-tabs-panels > [role="tabpanel"] { padding: 20px 22px 28px; }
-.drawer-section-stack { display: grid; align-content: start; gap: 22px; min-width: 0; }
+.drawer-section-stack { display: grid; align-content: start; gap: 22px; min-width: 0; padding: 20px 22px 28px; }
 .drawer-section-title {
     margin: 0 0 8px;
     color: var(--mud-palette-text-secondary);
@@ -237,14 +238,9 @@
 .drawer-section-stack details summary:focus-visible,
 .drawer-section-stack ::deep .drawer-explorer-button:focus-visible,
 .drawer-header-content ::deep .drawer-close:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
-.drawer-loading,
-.drawer-empty { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 12px 0; color: var(--mud-palette-text-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
-.drawer-loading ::deep .mud-progress-circular,
-.drawer-empty ::deep :is(.mud-icon-root, .mo-icon) { flex-shrink: 0; color: var(--mud-palette-text-secondary); }
-
 @media (max-width: 500px) {
     .module-drawer-content ::deep .mud-drawer-header { padding: 18px 16px 14px; }
-    .module-drawer-content ::deep .mud-tabs-panels > [role="tabpanel"] { padding: 18px 16px 24px; }
+    .drawer-section-stack { padding: 18px 16px 24px; }
     .drawer-identity-grid { grid-template-columns: 80px minmax(0, 1fr); column-gap: 10px; }
     .drawer-cost-legend > div { padding: 10px; }
 }

@@ -27,21 +27,28 @@
                 <MudTd DataLabel="@L["Versions:Workbench:Snapshot"]">
                     <div class="configuration-version-identity"><strong>@ConfigurationUnifiedVersionDisplayFormatter.VersionLabel(context)</strong>
                         @if (context.Version == LatestVersion) { <span class="configuration-version-latest">@L["Versions:Workbench:LatestBadge"]</span> }
-                        <time datetime="@context.CreatedTime.ToString("O")">@ConfigurationUnifiedVersionDisplayFormatter.CreatedTimeText(context)</time>
-                        <span class="configuration-version-meta-label">@L["Versions:Workbench:CaptureGroup"]</span><code>@ConfigurationUnifiedVersionDisplayFormatter.ValueOrEmpty(context.MutationGroupId, L["Common:States:Empty"])</code>
+                        <time datetime="@context.CreatedTime.ToString("O")">@TimeDisplay.Format(context.CreatedTime)</time>
+                        @if (!string.IsNullOrWhiteSpace(context.MutationGroupId))
+                        {
+                            <ConfigurationAuditIdentity Label="@L["Versions:Workbench:CaptureGroup"]" Value="@context.MutationGroupId" />
+                        }
                     </div>
                 </MudTd>
                 <MudTd DataLabel="@L["Versions:Workbench:CapturedDefinitions"]">
-                    <div class="configuration-version-scope"><strong>@L["Versions:Current:DefinitionCount", context.DefinitionCount]</strong>
-                        @foreach (var key in context.DefinitionKeys) { <code>@key</code> }
-                        @if (context.DefinitionKeys.Count == 0) { <span>@L["Versions:Definitions:Empty"]</span> }
-                    </div>
+                    <ConfigurationDefinitionScope @key="context.Version" DefinitionKeys="context.DefinitionKeys" DefinitionCount="context.DefinitionCount" />
                 </MudTd>
                 <MudTd DataLabel="@L["Versions:Workbench:Audit"]">
                     <div class="configuration-version-audit"><strong>@ConfigurationUnifiedVersionDisplayFormatter.OperatorText(context, L["Common:States:Empty"])</strong>
-                        @if (!string.IsNullOrWhiteSpace(context.ModifierId)) { <code>@context.ModifierId</code> }
+                        @if (!string.IsNullOrWhiteSpace(context.ModifierName) && !string.IsNullOrWhiteSpace(context.ModifierId) && context.ModifierName != context.ModifierId)
+                        {
+                            <ConfigurationAuditIdentity Label="@L["Versions:Workbench:OperatorId"]" Value="@context.ModifierId" />
+                        }
                         @if (!string.IsNullOrWhiteSpace(context.Reason)) { <p>@context.Reason</p> }
-                        @if (context.TriggerDefinitionKeys.Count > 0) { <span class="configuration-version-meta-label">@L["Versions:Workbench:TriggeredBy"]</span>@foreach (var key in context.TriggerDefinitionKeys) { <code>@key</code> } }
+                        @if (context.TriggerDefinitionKeys.Count > 0)
+                        {
+                            <span class="configuration-version-meta-label">@L["Versions:Workbench:TriggeredBy"]</span>
+                            <ConfigurationDefinitionScope @key="context.Version" DefinitionKeys="context.TriggerDefinitionKeys" />
+                        }
                     </div>
                 </MudTd>
                 <MudTd DataLabel="@L["Versions:Workbench:Actions"]">
@@ -53,7 +60,7 @@
                     </div>
                 </MudTd>
             </RowTemplate>
-            <NoRecordsContent><div class="configuration-version-empty"><MoIcon Icon="@MoIcons.LayersRemove" Size="1.5rem" /><h3>@L["Versions:Workbench:NoMatches"]</h3><p>@L["Versions:Workbench:NoMatchesHelp"]</p></div></NoRecordsContent>
+            <NoRecordsContent><MoContentState><MoIcon Icon="@MoIcons.LayersRemove" Size="1.5rem" /><h3>@L["Versions:Workbench:NoMatches"]</h3><p>@L["Versions:Workbench:NoMatchesHelp"]</p></MoContentState></NoRecordsContent>
             <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@PageSizes" RowsPerPageString="@L["Common:Pagination:RowsPerPage"]" InfoFormat="@L["Common:Pagination:InfoFormat"]" /></PagerContent>
         </MudTable>
     </div>

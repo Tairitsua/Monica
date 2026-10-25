@@ -45,13 +45,27 @@ public class ModuleStateStoreUI : MonicaModule<ModuleStateStoreUIOption>, IUIMod
         });
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<StateStoreResource>(
+                    "Monica.StateStore", "Navigation:Category", 20,
+                    parentId: BuiltInNavigationCategoryIds.Debug,
+                    icon: MoIcons.Database);
+
                 registry.RegisterLocalizedPage<UIStateStoreDashboardPage, StateStoreResource>(
                     UIStateStoreDashboardPage.PAGE_URL,
                     "Pages:StateStoreManage:Title",
                     MoIcons.Database,
-                    BuiltInNavigationCategoryIds.Debug,
+                    category,
                     addToNav: true,
-                    navOrder: 20)));
+                    navOrder: 20);
+                registry.RegisterLocalizedPage<UIStateStoreProvidersPage, StateStoreResource>(
+                    UIStateStoreProvidersPage.PAGE_URL,
+                    "Workbench:Providers",
+                    MoIcons.Database,
+                    category,
+                    addToNav: true,
+                    navOrder: 10);
+            }));
     }
 
     public override void ConfigureServices(ModuleContext<ModuleStateStoreUIOption> context)

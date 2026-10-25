@@ -7,7 +7,6 @@
 .matched-label { display: flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 5px; font-size: 12px; color: color-mix(in srgb,var(--mud-palette-primary) 35%,var(--mud-palette-text-primary)); background: color-mix(in srgb,var(--mud-palette-primary) 9%,var(--mud-palette-surface)); }
 .chunk-viewer-content, .markdown-preview-content { min-width: 0; }
 .original-text { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mud-typography-default-family,var(--mo-font-family-body)); font-size: 14px; line-height: 1.75; }
-.empty-state { padding: 24px 0; font-size: 14px; line-height: 1.6; }
 .chunk-viewer-actions { display: flex; justify-content: flex-end; width: 100%; padding: 12px 20px; border-top: 1px solid var(--mud-palette-lines-default); }
 .chunk-viewer-root ::deep .rag-chunk { position: relative; color: var(--mud-palette-text-primary); }
 .chunk-viewer-root ::deep .rag-chunk--block { display: block; margin: 12px 0; padding: 16px; border-radius: 7px; background: color-mix(in srgb,var(--mud-palette-primary) 5%,var(--mud-palette-surface)); border: 1px solid color-mix(in srgb,var(--mud-palette-primary) 20%,var(--mud-palette-lines-default)); }

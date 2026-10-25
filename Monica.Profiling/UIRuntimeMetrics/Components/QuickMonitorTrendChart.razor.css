@@ -37,7 +37,6 @@
 .runtime-sample-action { width: 48px; text-align: right; }
 .runtime-ledger-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 26px; font-size: 11px; color: var(--runtime-muted-ink); }
 .runtime-ledger-footer ::deep .mud-pagination { flex-wrap: wrap; gap: 3px; }
-.runtime-ledger-empty { padding: 12px 26px 30px; font-size: 13px; color: var(--runtime-muted-ink); }
 .runtime-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
     white-space: nowrap; }
 @container (max-width: 900px) {

@@ -238,9 +238,7 @@ internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
         if (failure is not null && !IsDisposed) _reportError($"{_loadFailedText}: {failure}");
     }
 
-    private string VersionText(long version) => _versions.FirstOrDefault(candidate => candidate.Version == version) is { } summary
-        ? ConfigurationUnifiedVersionDisplayFormatter.VersionText(summary)
-        : ConfigurationUnifiedVersionJsonFormatter.VersionLabel(version);
+    private static string VersionText(long version) => ConfigurationUnifiedVersionJsonFormatter.VersionLabel(version);
 
     private ConfigurationUnifiedVersionSummary? PreviousVersion(ConfigurationUnifiedVersionSummary version)
     {

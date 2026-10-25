@@ -45,13 +45,20 @@ public sealed class ModuleExecutionPipelineUI : MonicaModule<ModuleExecutionPipe
             static option => option.AddResource<ExecutionPipelineResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<ExecutionPipelineResource>(
+                    "Monica.Framework.UI.ExecutionPipeline", "Navigation:Category", 20,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Workflow);
+
                 registry.RegisterLocalizedPage<UIExecutionPipelinePage, ExecutionPipelineResource>(
                     UIExecutionPipelinePage.PAGE_URL,
                     "Pages:ExecutionPipeline:Title",
                     MoIcons.Workflow,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
-                    navOrder: 20)));
+                    navOrder: 20);
+            }));
     }
 
     /// <inheritdoc />

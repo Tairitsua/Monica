@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.ProjectUnits.Facades
 @using Monica.Core.Results
 @using Monica.ProjectUnits.Models
@@ -126,18 +127,18 @@
                     }
                     else
                     {
-                        <div class="pu-catalog__state" role="status">
+                        <MoContentState role="status">
                             <MoIcon Icon="@MoIcons.SearchOff" Size="1.5rem" />
                             <p>@L["ProjectUnitMonitor:States:NoMatches"]</p>
                             <MudButton Variant="Variant.Text" OnClick="ResetFiltersAsync">@L["ProjectUnitMonitor:Actions:Reset"]</MudButton>
-                        </div>
+                        </MoContentState>
                     }
                 </div>
             </div>
         }
         else if (_loaded)
         {
-            <div class="pu-catalog__state" role="status"><MoIcon Icon="@MoIcons.Package" Size="1.5rem" /><p>@L["ProjectUnitMonitor:States:Empty"]</p></div>
+            <MoContentState role="status"><MoIcon Icon="@MoIcons.Package" Size="1.5rem" /><p>@L["ProjectUnitMonitor:States:Empty"]</p></MoContentState>
         }
     </div>
 </section>

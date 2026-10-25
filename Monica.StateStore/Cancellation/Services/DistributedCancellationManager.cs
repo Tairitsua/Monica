@@ -40,9 +40,9 @@ public class DistributedCancellationManager(
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _localTokenSources = new();
 
     /// <summary>
-    /// Polling task cache, each key corresponds to a background polling task
+    /// Polling ownership markers; each key has at most one background observer.
     /// </summary>
-    private readonly ConcurrentDictionary<string, Task> _pollingTasks = new();
+    private readonly ConcurrentDictionary<string, byte> _pollingTasks = new();
 
     /// <summary>
     /// Get prefixed key for storage
@@ -168,15 +168,14 @@ public class DistributedCancellationManager(
         try
         {
             // Reset distributed state
-            var state = await stateStore.GetStateAsync<DistributedCancellationTokenState>(GetPrefixedKey(key), cancellationToken);
-            if (state != null)
-            {
-                state.IsCancelled = false;
-                state.LastUpdatedAt = DateTime.Now;
-                state.Version++;
+            var state = await stateStore.GetStateAsync<DistributedCancellationTokenState>(GetPrefixedKey(key), cancellationToken)
+                ?? new DistributedCancellationTokenState { Key = key, Version = 0 };
+            state.IsCancelled = false;
+            state.LastUpdatedAt = DateTime.Now;
+            state.Version++;
 
-                await stateStore.SaveStateAsync(GetPrefixedKey(key), state, cancellationToken, _options.StateTtl);
-            }
+            // Persist even for a new key before polling starts; missing state means deletion to observers.
+            await stateStore.SaveStateAsync(GetPrefixedKey(key), state, cancellationToken, _options.StateTtl);
 
             // Reset local token source
             var newTokenSource = new CancellationTokenSource();
@@ -282,18 +281,23 @@ public class DistributedCancellationManager(
     /// <param name="key">cancel token key</param>
     private void StartPollingTask(string key)
     {
-        if (_pollingTasks.ContainsKey(key))
+        // Claim ownership before scheduling, including when the worker finishes synchronously.
+        if (!_pollingTasks.TryAdd(key, 0))
+        {
             return;
+        }
 
-        var pollingTask = Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             var pollingIntervalMs = _options.PollingIntervalMs;
             var lastVersion = 0L;
+            _localTokenSources.TryGetValue(key, out var observedSource);
 
             if (_options.EnableVerboseLogging)
                 logger.LogDebug("Started polling task for cancellation token key: {Key} with interval {IntervalMs}ms", key, pollingIntervalMs);
 
-            while (_localTokenSources.TryGetValue(key, out var tokenSource) && !tokenSource.Token.IsCancellationRequested)
+            while (_localTokenSources.TryGetValue(key, out var tokenSource)
+                   && ReferenceEquals(tokenSource, observedSource) && !tokenSource.IsCancellationRequested)
             {
                 try
                 {
@@ -301,9 +305,10 @@ public class DistributedCancellationManager(
                     if (state == null)
                     {
                         // The distributed state has been deleted and local resources have been cleaned up.
-                        if (_localTokenSources.TryRemove(key, out var localSource))
+                        // A late read from an old observer must not remove a replacement created by reset.
+                        if (_localTokenSources.TryRemove(new KeyValuePair<string, CancellationTokenSource>(key, tokenSource)))
                         {
-                            await localSource.SafeCancelAndDisposeAsync();
+                            await tokenSource.SafeCancelAndDisposeAsync();
                         }
                         if (_options.EnableVerboseLogging)
                             logger.LogDebug("Distributed state deleted, cleaned up local resources for key: {Key}", key);
@@ -339,13 +344,17 @@ public class DistributedCancellationManager(
                 }
             }
 
-            // Cleanup polling tasks
+            // A reset may have replaced a cancelled source while this worker was exiting.
             _pollingTasks.TryRemove(key, out _);
             if (_options.EnableVerboseLogging)
+            {
                 logger.LogDebug("Polling task completed for key: {Key}", key);
+            }
+            if (_localTokenSources.TryGetValue(key, out var currentSource) && !currentSource.IsCancellationRequested)
+            {
+                StartPollingTask(key);
+            }
         });
-
-        _pollingTasks.TryAdd(key, pollingTask);
     }
 
     /// <summary>

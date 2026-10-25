@@ -94,7 +94,9 @@ public sealed class ModuleSeederUITests
         page.DisplayName.Key.Should().Be("Navigation:Title");
         page.AccessPolicyType.Should().Be(typeof(OperationalPageAccessPolicy<ModuleSeederUIOption>));
         navigation.Page.Should().BeSameAs(page);
-        navigation.CategoryId.Should().Be(BuiltInNavigationCategoryIds.Monitor);
+        navigation.CategoryId.Should().Be(NavigationCategoryId.Create("Monica.Framework.UI.Seeder"));
+        catalog.GetNavigationCategories().Single(category => category.Id == navigation.CategoryId)
+            .ParentId.Should().Be(BuiltInNavigationCategoryIds.Monitor);
         navigation.Order.Should().Be(15);
     }
 

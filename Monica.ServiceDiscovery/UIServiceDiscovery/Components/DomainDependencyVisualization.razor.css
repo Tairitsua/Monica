@@ -57,7 +57,7 @@
 .atlas-status--updating { color: var(--atlas-accent); }
 .atlas-status--unhealthy { color: var(--atlas-warning); }
 .atlas-status--error { color: var(--atlas-error); }
-.atlas-native__empty { margin: 0; padding: 24px 22px; font-size: 12px; line-height: 1.65; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
+
 .atlas-native__footer { margin-top: auto; padding: 16px 22px 20px; border-top: 1px solid var(--mud-palette-divider); display: flex; gap: 12px; justify-content: space-between; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); font-size: 10px; }
 .atlas-native__footer time { font-family: var(--mo-font-family-mono); }
 .atlas-legend { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 0 4px; min-width: 0; }

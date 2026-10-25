@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Core.Results
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.State
@@ -45,9 +46,9 @@
                     @foreach (var message in _messages.AsEnumerable().Reverse())
                     {
                         <li @key="message">
-                            <header><span class="test-bench-received-mark"><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="1.25rem" />@L["TestBench:Received"]</span><time>@message.ReceivedAt.ToString("HH:mm:ss.fff")</time></header>
+                            <header><span class="test-bench-received-mark"><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="1.25rem" />@L["TestBench:Received"]</span><time>@UiTime.FormatTime(message.ReceivedAt)</time></header>
                             <p class="test-bench-message">@message.EventData.Message</p>
-                            <dl><div><dt>@L["TestPanel:Publish:TopicName"]</dt><dd><code>@message.TopicName</code></dd></div><div><dt>@L["TestBench:MessageId"]</dt><dd><code>@message.EventData.MessageId</code></dd></div><div><dt>@L["TestBench:CreatedUtc"]</dt><dd><time>@message.EventData.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss.fff")</time></dd></div></dl>
+                            <dl><div><dt>@L["TestPanel:Publish:TopicName"]</dt><dd><code>@message.TopicName</code></dd></div><div><dt>@L["TestBench:MessageId"]</dt><dd><code>@message.EventData.MessageId</code></dd></div><div><dt>@L["TestBench:CreatedUtc"]</dt><dd><time>@UiTime.Format(message.EventData.CreatedAt)</time></dd></div></dl>
                         </li>
                     }
                 </ol>

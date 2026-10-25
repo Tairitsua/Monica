@@ -81,6 +81,13 @@ public sealed class ModuleConfigurationUI : MonicaModule<ModuleConfigurationUIOp
             BuiltInNavigationCategoryIds.Configuration,
             addToNav: true,
             navOrder: 30);
+        registry.RegisterLocalizedPage<ConfigurationSourcesPage, ConfigurationUIResource>(
+            ConfigurationUiRoutes.SOURCES_ROUTE,
+            "Pages:ConfigurationSources:Title",
+            MoIcons.Workflow,
+            BuiltInNavigationCategoryIds.Configuration,
+            addToNav: true,
+            navOrder: 35);
         registry.RegisterLocalizedPage<ConfigurationStoragePage, ConfigurationUIResource>(
             ConfigurationUiRoutes.STORAGE_ROUTE,
             "Pages:ConfigurationStorage:Title",

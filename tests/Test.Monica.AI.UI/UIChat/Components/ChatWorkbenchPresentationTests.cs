@@ -18,6 +18,10 @@ public sealed class ChatWorkbenchPresentationTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddSingleton<IStringLocalizer<global::Monica.UI.Localization.SharedResource>, EchoStringLocalizer<global::Monica.UI.Localization.SharedResource>>();
+        Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton<IStringLocalizer<AIResource>, EchoStringLocalizer<AIResource>>();
         _ = Render<MudBlazor.MudPopoverProvider>();
     }
@@ -28,8 +32,11 @@ public sealed class ChatWorkbenchPresentationTests : BunitContext
         var view = Render<ChatContextIndicator>(parameters => parameters
             .Add(component => component.Usage, new ChatContextUsage { EstimatedNextInputTokens = 800 }));
 
-        view.Markup.Should().Contain("0%");
-        view.Markup.Should().NotContain("100%");
+        var usage = new ChatContextUsage { EstimatedNextInputTokens = 800 };
+        var expectedPercent = (usage.OccupancyRatio ?? 0) * 100;
+        double.Parse(view.Find("[role='progressbar']").GetAttribute("aria-valuenow")!,
+            System.Globalization.CultureInfo.InvariantCulture).Should().BeApproximately(expectedPercent, 0.000001);
+        expectedPercent.Should().BeLessThan(1);
     }
 
     [Fact]

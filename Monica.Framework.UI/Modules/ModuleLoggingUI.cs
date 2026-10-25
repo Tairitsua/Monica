@@ -50,11 +50,16 @@ public class ModuleLoggingUI : MonicaModule<ModuleLoggingUIOption>, IWebHostRequ
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<LoggingResource>(
+                    "Monica.Framework.UI.Logging", "Navigation:Category", 30,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.FileText);
+
                 registry.RegisterLocalizedPage<UILoggingMonitorPage, LoggingResource>(
                     UILoggingMonitorPage.PAGE_URL,
                     "Pages:LoggingMonitor:Title",
                     MoIcons.FileText,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 30,
                     descriptionKey: "Pages:LoggingMonitor:Description");
@@ -62,7 +67,7 @@ public class ModuleLoggingUI : MonicaModule<ModuleLoggingUIOption>, IWebHostRequ
                     UILoggingFilesPage.PAGE_URL,
                     "Pages:LoggingFiles:Title",
                     MoIcons.FolderOpen,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 31,
                     descriptionKey: "Pages:LoggingFiles:Description");

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.Support
@@ -30,7 +31,7 @@
             <label class="files-sort"><span>@L["Workbench:Order"]</span><select value="@_order" @onchange="OrderChanged"><option value="modified">@L["Workbench:NewestModified"]</option><option value="name">@L["Workbench:FileName"]</option><option value="size">@L["Workbench:Largest"]</option></select></label>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Workbench:RefreshFiles"]</MudButton>
         </div>
-        <div class="files-results-summary"><span>@L["Workbench:FileResults", MatchingFiles.Count, _files.Count]</span><span>@L["Workbench:FileReadAt", _readAt?.ToLocalTime().ToString("HH:mm:ss") ?? "—"]</span></div>
+        <div class="files-results-summary"><span>@L["Workbench:FileResults", MatchingFiles.Count, _files.Count]</span><span>@L["Workbench:FileReadAt", UiTime.FormatTime(_readAt) ?? "—"]</span></div>
         <div class="files-table-frame">
             <table class="files-table"><thead><tr><th scope="col">@L["Workbench:Artifact"]</th><th scope="col">@L["Workbench:Size"]</th><th scope="col">@L["Workbench:Modified"]</th><th scope="col">@L["Workbench:Actions"]</th></tr></thead><tbody>
             @if (_busy && _files.Count == 0)
@@ -48,7 +49,7 @@
                     <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(string.Equals(File, file.RelativePath, StringComparison.Ordinal) ? "is-current" : "")">
                         <td class="artifact-name"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><div><a href="@OpenUrl(file.RelativePath)">@file.FileName</a><code>@file.RelativePath</code>@if (string.Equals(File, file.RelativePath, StringComparison.Ordinal)) { <span class="current-source">@L["Workbench:LastSource"]</span> }</div></td>
                         <td class="artifact-size" data-bytes="@file.Size"><span class="mobile-label">@L["Workbench:Size"]</span><span>@FormatSize(file.Size)</span><small>@L["Workbench:ExactBytes", file.Size.ToString("N0")]</small></td>
-                        <td class="artifact-modified"><span class="mobile-label">@L["Workbench:Modified"]</span><time datetime="@file.LastModified.ToString("O")">@file.LastModified.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</time></td>
+                        <td class="artifact-modified"><span class="mobile-label">@L["Workbench:Modified"]</span><time datetime="@file.LastModified.ToString("O")">@UiTime.Format(file.LastModified)</time></td>
                         <td class="artifact-actions"><a href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></a><button type="button" disabled="@_busy" @onclick="() => DownloadAsync(file.RelativePath)" aria-label="@L["Workbench:DownloadFile", file.FileName]"><MoIcon Icon="@MoIcons.Download" Size="1.25rem" /><span>@L["Workbench:Download"]</span></button></td>
                     </tr>
                 }

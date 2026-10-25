@@ -12,8 +12,7 @@
             @if (HasWorkerInsight && HasLoadedWorkerInsight && WorkerInsightObservedAtUtc is { } acceptedAt)
             {
                 <div class="runtime-workers__accepted">
-                    <span>@L["Runtime:Workers:ObservationAccepted", TimePresentation.FormatTimestampWithOffset(acceptedAt)]</span>
-                    <time datetime="@acceptedAt.ToString("O")"><code>@TimePresentation.FormatUtcTimestamp(acceptedAt)</code></time>
+                    <time datetime="@acceptedAt.ToString("O")">@L["Runtime:Workers:ObservationAccepted", TimePresentation.FormatTimestamp(acceptedAt)]</time>
                 </div>
             }
         </div>
@@ -113,15 +112,13 @@
                                     <div>
                                         <dt>@L["Runtime:Workers:Heartbeat"]</dt>
                                         <dd>
-                                            <time datetime="@context.LastHeartbeatUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(context.LastHeartbeatUtc)</time>
-                                            <code class="runtime-workers__utc">@TimePresentation.FormatUtcTimestamp(context.LastHeartbeatUtc)</code>
+                                            <time datetime="@context.LastHeartbeatUtc.ToString("O")">@TimePresentation.FormatTimestamp(context.LastHeartbeatUtc)</time>
                                         </dd>
                                     </div>
                                     <div>
                                         <dt>@L["Runtime:Workers:Registered"]</dt>
                                         <dd>
-                                            <time datetime="@context.RegisteredAtUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(context.RegisteredAtUtc)</time>
-                                            <code class="runtime-workers__utc">@TimePresentation.FormatUtcTimestamp(context.RegisteredAtUtc)</code>
+                                            <time datetime="@context.RegisteredAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(context.RegisteredAtUtc)</time>
                                         </dd>
                                     </div>
                                 </dl>

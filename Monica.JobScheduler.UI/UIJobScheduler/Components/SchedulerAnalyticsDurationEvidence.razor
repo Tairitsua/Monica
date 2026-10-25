@@ -48,7 +48,7 @@
                 var capture = Snapshot.SlowestExecutions[index];
                 <li @key="capture.InstanceId" data-instance-id="@capture.InstanceId">
                     <MudButton @key="capture.InstanceId" Variant="Variant.Text" Class="analytics-duration__inspect"
-                               aria-label="@L["Analytics:Slowest:OpenDetails", index + 1, capture.JobName, capture.InstanceId, L[$"ExecutionStates:{capture.State}"], TimePresentation.FormatTimestampWithOffset(capture.CompletedAtUtc), FormatDuration(capture.Duration)]"
+                               aria-label="@L["Analytics:Slowest:OpenDetails", index + 1, capture.JobName, capture.InstanceId, L[$"ExecutionStates:{capture.State}"], TimePresentation.FormatTimestamp(capture.CompletedAtUtc), FormatDuration(capture.Duration)]"
                                OnClick="@(() => InspectExecution.InvokeAsync(capture))">
                         <span class="analytics-duration__slow-row">
                             <span class="analytics-duration__rank" aria-hidden="true">@(index + 1)</span>
@@ -63,7 +63,7 @@
                                     @L[$"ExecutionStates:{capture.State}"]
                                 </span>
                                 <span class="analytics-duration__fact"><span>@L["ExecutionDetail:Instance"]</span><code>@capture.InstanceId</code></span>
-                                <span class="analytics-duration__fact"><span>@L["ExecutionDetail:Completed"]</span><time datetime="@capture.CompletedAtUtc.ToString("O")">@TimePresentation.FormatTimestampWithOffset(capture.CompletedAtUtc)</time></span>
+                                <span class="analytics-duration__fact"><span>@L["ExecutionDetail:Completed"]</span><time datetime="@capture.CompletedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(capture.CompletedAtUtc)</time></span>
                             </span>
                             <span class="analytics-duration__value">
                                 <b>@FormatDuration(capture.Duration)</b>

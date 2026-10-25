@@ -1,0 +1,17 @@
+@using Monica.UI.Shared.Components.Navigation
+@using Monica.StateStore.UI.Support
+@inject IStringLocalizer<StateStoreResource> L
+
+<div class="state-workbench-navigation"><MoWorkbenchNavigation Label="@L["Workbench:Navigation"]">
+    <a href="@StateStoreUi.Providers(ProviderIdentity)" aria-current="@(IsProvidersPage ? "page" : null)"><MoIcon Icon="@MoIcons.Database" Size="1.125rem" /><span>@L["Workbench:Providers"]</span>@if (ProviderCount is { } count) { <span class="nav-count" aria-hidden="true">@count</span> }</a>
+    <a href="@StateStoreUi.Browser(ProviderIdentity)" aria-current="@(!IsProvidersPage ? "page" : null)"><MoIcon Icon="@MoIcons.Code" Size="1.125rem" /><span>@L["Workbench:Browser"]</span></a>
+</MoWorkbenchNavigation></div>
+
+@code {
+    /// <summary>Gets or sets whether the provider registry is the active route.</summary>
+    [Parameter] public bool IsProvidersPage { get; set; }
+    /// <summary>Gets or sets the opaque registration identity retained across workspace routes.</summary>
+    [Parameter] public string? ProviderIdentity { get; set; }
+    /// <summary>Gets or sets the actual registration count shown in navigation; null omits the badge.</summary>
+    [Parameter] public int? ProviderCount { get; set; }
+}

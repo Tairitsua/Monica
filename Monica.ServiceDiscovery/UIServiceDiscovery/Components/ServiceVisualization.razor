@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.ServiceDiscovery.Facades
 @using Monica.ServiceDiscovery.Localization
 @using Monica.ServiceDiscovery.Models
@@ -106,8 +108,8 @@
                     </li>
                 }
             </ul>
-            @if (_hasSnapshot && _filteredServices.Count == 0) { <p class="atlas-native__empty">@L[_allServices.Count == 0 ? "Atlas:Services:Empty" : "Atlas:Shared:FilterMiss"]</p> }
-            <footer class="atlas-native__footer"><span>@L["Atlas:Shared:Captured"]</span><time>@(_capturedAt?.ToLocalTime().ToString("HH:mm:ss") ?? L["Shared:Values:NotAvailable"].Value)</time></footer>
+            @if (_hasSnapshot && _filteredServices.Count == 0) { <MoContentState Compact="true"><p>@L[_allServices.Count == 0 ? "Atlas:Services:Empty" : "Atlas:Shared:FilterMiss"]</p></MoContentState> }
+            <footer class="atlas-native__footer"><span>@L["Atlas:Shared:Captured"]</span><time>@(UiTime.FormatTime(_capturedAt) ?? L["Shared:Values:NotAvailable"].Value)</time></footer>
         </section>
     </div>
     <div class="atlas-legend" aria-label="@L["Atlas:Shared:StatusLegend"]">

@@ -23,7 +23,7 @@
     <KnowledgeRagHeader Title="@L["KnowledgeWorkbench:Retrieval:Title"]" Description="@L["KnowledgeWorkbench:Retrieval:Description"]" CurrentRoute="@PAGE_URL" />
     @if (_isLoading)
     {
-        <div class="loading-state" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Retrieval:Loading"]</div>
+        <MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["KnowledgeWorkbench:Retrieval:Loading"]</MoContentState>
     }
     else if (!string.IsNullOrWhiteSpace(_loadError))
     {
@@ -31,7 +31,7 @@
     }
     else if (_knowledgeBases.Count == 0)
     {
-        <div class="empty-state"><MoIcon Icon="@MoIcons.Database" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:Retrieval:NoSources"]</h2><p>@L["KnowledgeWorkbench:Retrieval:NoSourcesHint"]</p><MudButton Href="/ai/knowledge-bases" Color="Color.Primary">@L["KnowledgeWorkbench:Retrieval:OpenSources"]</MudButton></div>
+        <div class="empty-state"><MoContentState><MoIcon Icon="@MoIcons.Database" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:Retrieval:NoSources"]</h2><p>@L["KnowledgeWorkbench:Retrieval:NoSourcesHint"]</p><MudButton Href="/ai/knowledge-bases" Color="Color.Primary">@L["KnowledgeWorkbench:Retrieval:OpenSources"]</MudButton></MoContentState></div>
     }
     else
     {
@@ -71,7 +71,7 @@
                         <div class="submitted-request"><h2>@L["KnowledgeWorkbench:Retrieval:SubmittedRequest"]</h2><p class="submitted-query">@_submitted.Query</p><p>@L["KnowledgeWorkbench:Retrieval:RequestedScope", _submitted.Ids.Length, string.Join(", ", _submitted.Names)]</p><p>@L["KnowledgeWorkbench:Retrieval:RequestSettings", _submitted.TopK, _submitted.ModelDisplay]</p></div>
                         @if (InputsChanged) { <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["KnowledgeWorkbench:Retrieval:InputsChanged"]</MudAlert> }
                     }
-                    @if (_isSearching) { <div class="loading-state" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["RAG:Search:Searching"]</div> }
+                    @if (_isSearching) { <MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" /> @L["RAG:Search:Searching"]</MoContentState> }
                     else if (!string.IsNullOrWhiteSpace(_searchErrorMessage)) { <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error">@_searchErrorMessage</MudAlert> }
                     else if (_searchResults.Count > 0)
                     {
@@ -84,8 +84,8 @@
                             }
                         </ol>
                     }
-                    else if (_submitted is not null) { <div class="empty-state"><h2>@L["KnowledgeWorkbench:Retrieval:NoChunks"]</h2><p>@L["KnowledgeWorkbench:Retrieval:NoChunksHint"]</p></div> }
-                    else { <div class="empty-state"><MoIcon Icon="@MoIcons.Search" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:Retrieval:InitialTitle"]</h2><p>@L["KnowledgeWorkbench:Retrieval:InitialHint"]</p></div> }
+                    else if (_submitted is not null) { <div class="empty-state"><MoContentState><h2>@L["KnowledgeWorkbench:Retrieval:NoChunks"]</h2><p>@L["KnowledgeWorkbench:Retrieval:NoChunksHint"]</p></MoContentState></div> }
+                    else { <div class="empty-state"><MoContentState><MoIcon Icon="@MoIcons.Search" Size="1.5rem" /><h2>@L["KnowledgeWorkbench:Retrieval:InitialTitle"]</h2><p>@L["KnowledgeWorkbench:Retrieval:InitialHint"]</p></MoContentState></div> }
                 </section>
             </main>
         </div>
@@ -110,7 +110,7 @@
                                     </MudCheckBox>
                                 </div>
                             }
-                            @if (!VisibleBases.Any()) { <p class="scope-empty">@L["KnowledgeWorkbench:Retrieval:NoScopeMatch"]</p> }
+                            @if (!VisibleBases.Any()) { <MoContentState Compact="true">@L["KnowledgeWorkbench:Retrieval:NoScopeMatch"]</MoContentState> }
                         </div>
                         <div class="scope-done"><MudButton Size="Size.Small" OnClick="CloseScope">@L["KnowledgeWorkbench:Retrieval:Done"]</MudButton></div>
                     </div>;

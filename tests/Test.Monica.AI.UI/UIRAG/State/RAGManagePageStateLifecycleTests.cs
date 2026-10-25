@@ -230,6 +230,9 @@ public sealed class RAGManagePageStateLifecycleTests
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
             // Exercise the production page owner against the real backend without composing shell endpoints.
             services.AddScoped<RAGManagePageStateFactory>();
+            services.AddOptions<ModuleShellUIOption>();
+            services.AddOptions<ModuleClockOption>();
+            services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         }
     }
 }

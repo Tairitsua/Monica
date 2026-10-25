@@ -1,14 +1,20 @@
 ---
 name: monica-ui-design
-description: Design or prototype a Monica UI before or alongside Blazor implementation. Use for layout, interaction flows, visual direction, or a browser-runnable mockup.
+description: Design or prototype a Monica UI before or alongside Blazor implementation. Use for page and page-family redesigns, new module pages in an existing prototype workspace, interaction flows, visual direction, design notes, and implementation handoff.
 ---
 
 # Monica UI Design
 
-Understand the UI's task, audience, information density, and key interactions. Inspect real data, actions, and runtime states before choosing the composition. For operational pages, apply the shared [visual language](../monica-ui-development/references/monica-visual-language.md) and [working-interface language](../monica-ui-development/references/monica-workbench-design-language.md); use [design guidance](references/aesthetics-guidelines.md) for prototype decisions and `$monica-ui-development`'s Precision Default or optional Grove contract for theme handoff. A page redesign does not replace the preserved Default palette.
+Design from the domain's real evidence. Before drawing, learn what the module's states, policies, retention and observations mean in source, read the shipped page for what it answers and what it leaves unanswered, and write the operator's question for each route. Every number, mark and sentence on the page traces back to that evidence.
 
-Every page gets a signature region built from real evidence, a multi-role color map, and clear scale contrast. Restraint is not the default; a neutral page with one accent is a defect, not a style.
+| Task | Read |
+| --- | --- |
+| Decide what a page shows: questions, judgments, display value, finding, scope, signature, states, actions | [Design method](references/design-method.md) |
+| Build and verify the prototype: workspace, fixtures, interactions, reflow, checks, design note, handoff | [Prototype practice](references/aesthetics-guidelines.md) |
+| Signature region, color role map, scale tiers and shared component vocabulary | [Visual language](../monica-ui-development/references/monica-visual-language.md) |
+| Evidence honesty, containment, scroll ownership, interaction state and page acceptance | [Working-interface language](../monica-ui-development/references/monica-workbench-design-language.md) |
+| Theme paint, fonts and shell geometry | [Precision Default](../monica-ui-development/references/monica-precision-design-language.md) or [Grove](../monica-ui-development/references/monica-grove-design-language.md) |
 
-Produce the artifact the user needs: a design note, wireframe, interactive prototype, or implementation-ready page specification. Use `.ui-design/{feature}/` for standalone prototype artifacts when the task has no other location. A small prototype may be one `index.html`; split CSS, JavaScript, and mock data only when it helps review. Make meaningful controls interactive and test responsive behavior in a browser. Keep assets local when the prototype is intended for offline or intranet use, and map color roles to MudBlazor palette or approved Monica tokens for an implementation handoff.
+Every page gets a signature region built from real evidence, a multi-role color map and clear scale contrast. A neutral page with one accent is a defect, not a style, and so is a page that fills space with tiles, rates or charts the domain does not define. A page redesign does not replace the preserved Default palette; a prototype's paint stays a proposal until a theme contract adopts it.
 
-If the user also requested implementation, continue with `$monica-ui-development` in the same task. A design direction does not require a separate approval ceremony unless a consequential choice remains unresolved.
+Produce the artifact the task needs: a design note, a wireframe, an interactive prototype or an implementation-ready page specification. When the repository already has a prototype workspace under `.ui-design/`, add pages to it and follow its README and agent guide, reusing its registry, shared vocabulary, page-family session and fixtures; otherwise use `.ui-design/{feature}/`. If the user also requested implementation, continue with `$monica-ui-development` in the same task. A design direction does not require a separate approval ceremony unless a consequential choice remains unresolved.

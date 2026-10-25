@@ -188,7 +188,7 @@
         "UnknownCount": "目标标识数：{0}"
       },
       "Scope": "主机快照 · 自进程启动以来",
-      "SnapshotTime": "采集于 {0} UTC",
+      "SnapshotTime": "采集于 {0}",
       "EvidenceNote": "这些计数描述 Monica 观察到的服务端到客户端发送任务。任务完成不代表客户端已收到消息。",
       "Loading": "正在加载发送证据…",
       "LoadFailed": "无法加载发送证据。请再次刷新。",
@@ -200,8 +200,7 @@
       "TargetPageInfo": "第 {first_item}–{last_item} 行，共 {all_items} 行",
       "LastStarted": "最近开始",
       "LastCompleted": "最近结束",
-      "NoTimestamp": "尚未观察到",
-      "UtcTime": "{0} UTC"
+      "NoTimestamp": "尚未观察到"
     },
     "MethodListener": {
       "Title": "浏览器回调",
@@ -325,5 +324,8 @@
       "ListenerToggleFailed": "更新监听器状态失败：{0}",
       "ConnectionStatusChanged": "连接状态已变更：{0}"
     }
+  },
+  "Navigation": {
+    "Category": "SignalR"
   }
 }

@@ -1,5 +1,7 @@
 # Compose a Monica host
 
+`AddClock(options => options.LocalTimeZone = CommonTimeZone.China)` selects deployment wall time for audit stamps and page timestamp display in `$monica-infra-ui` (`references/time-display.md`). Import `Monica.Core.Clock` for the enum. An unset Clock zone uses UTC; UI display does not use the server operating-system timezone. Service Discovery and observable-instance observation labels follow this same UI policy without changing lease or freshness calculations.
+
 Monica composes one host-owned module graph before the .NET host is built. A module registration declares dependencies and features, so select a public `monica.Add...()` extension for each capability and let composition validate its graph. Web endpoints belong to a Web host; generic hosts keep non-Web services without endpoint mapping.
 
 ## Start with the host boundary

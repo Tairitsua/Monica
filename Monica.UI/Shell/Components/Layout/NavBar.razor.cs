@@ -47,6 +47,7 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
     private int _navigationRefreshVersion;
     private bool _disposed;
     private NavigationCategoryId? _selectedCategoryId;
+    private NavigationCategoryId? _visibleCategoryTooltipId;
     private bool _mobileNavigationOpen;
     private bool _restoreMobileFocus;
     private bool _focusDesktopNavigation;
@@ -167,6 +168,7 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
     {
         QueueCallback(() =>
         {
+            _visibleCategoryTooltipId = null;
             _selectedCategoryId = ActiveCategory?.Id;
             _mobileNavigationOpen = false;
             _restoreMobileFocus = false;
@@ -181,13 +183,35 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
 
     private void HandleShellChanged() => QueueCallback(() =>
     {
+        _visibleCategoryTooltipId = null;
         _mobileNavigationOpen = false;
         CloseContextNavigationCore(restoreFocus: false);
         StateHasChanged();
         return Task.CompletedTask;
     });
 
-    private void SelectCategory(NavigationGroup category) => _selectedCategoryId = category.Id;
+    private void SetCategoryTooltipVisible(NavigationCategoryId categoryId, bool visible)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (visible)
+        {
+            _visibleCategoryTooltipId = categoryId;
+        }
+        else if (_visibleCategoryTooltipId == categoryId)
+        {
+            _visibleCategoryTooltipId = null;
+        }
+    }
+
+    private void SelectCategory(NavigationGroup category)
+    {
+        _visibleCategoryTooltipId = null;
+        _selectedCategoryId = category.Id;
+    }
     private void OpenMobileNavigation()
     {
         CloseContextNavigationCore(restoreFocus: false);
@@ -218,6 +242,7 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
 
     private void OpenContextNavigation(NavigationGroup category)
     {
+        _visibleCategoryTooltipId = null;
         if (_disposed || _isMobile || Shell.Layout != ShellNavigationLayout.Sidebar || !Shell.SidebarCollapsed)
         {
             return;
@@ -261,6 +286,7 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
     {
         if (args.Key == "Escape")
         {
+            _visibleCategoryTooltipId = null;
             CloseContextNavigation();
         }
     }
@@ -378,6 +404,7 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
 
             if (isMobile && !_isMobile)
             {
+                _visibleCategoryTooltipId = null;
                 _focusDesktopNavigation = false;
                 var contextWasOpen = _contextNavigationOpen;
                 CloseContextNavigationCore(restoreFocus: false);

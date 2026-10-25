@@ -11,9 +11,8 @@
 .runtime-config dl > div { display: grid; gap: 5px; min-width: 0; padding-block: 12px; border-block-start: 1px solid var(--mud-palette-lines-default); }
 .runtime-config dt { min-width: 0; color: var(--config-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .runtime-config dd { min-width: 0; margin: 0; font-size: 14px; font-weight: 500; line-height: 1.65; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.runtime-config__interval { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
-.runtime-config code { min-width: 0; color: var(--config-muted); font-family: var(--mo-font-family-mono); font-size: 12px; font-weight: 400; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
-.runtime-config__visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.runtime-config__interval { text-decoration: underline dotted var(--mud-palette-lines-default); text-underline-offset: .25em; cursor: help; }
+.runtime-config__interval:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
 @container runtime-config (max-width: 1100px) { .runtime-config__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container runtime-config (max-width: 600px) {
     .runtime-config__heading { padding: 16px; }

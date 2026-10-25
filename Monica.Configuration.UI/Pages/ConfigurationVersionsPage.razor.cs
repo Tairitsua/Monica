@@ -44,7 +44,7 @@ public partial class ConfigurationVersionsPage
     }
 
     private string SnapshotOption(ConfigurationUnifiedVersionSummary snapshot) =>
-        $"{ConfigurationUnifiedVersionDisplayFormatter.VersionLabel(snapshot)} · {ConfigurationUnifiedVersionDisplayFormatter.CreatedTimeText(snapshot)}";
+        $"{ConfigurationUnifiedVersionDisplayFormatter.VersionLabel(snapshot)} · {TimeDisplay.Format(snapshot.CreatedTime)}";
 
     private async Task SelectSnapshotAsync(long version)
     {

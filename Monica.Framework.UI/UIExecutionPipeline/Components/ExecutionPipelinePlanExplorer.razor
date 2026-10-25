@@ -2,9 +2,11 @@
 
 <div class="execution-pipeline-explorer" data-testid="execution-pipeline-plan-explorer">
     <div class="execution-pipeline-explorer__list">
-        <ExecutionPipelinePlanList Plans="@Plans"
-                                   SelectedPlan="@SelectedPlan"
-                                   PlanSelected="@PlanSelected" />
+        <div class="execution-pipeline-explorer__list-content">
+            <ExecutionPipelinePlanList Plans="@Plans"
+                                       SelectedPlan="@SelectedPlan"
+                                       PlanSelected="@PlanSelected" />
+        </div>
     </div>
     <section class="execution-pipeline-explorer__detail">
         <ExecutionPipelinePlanDetail Plan="@SelectedPlan" />

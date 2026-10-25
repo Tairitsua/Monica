@@ -42,11 +42,11 @@
                         <dl>
                             <div>
                                 <dt>@L["Runtime:Observation:Captured"]</dt>
-                                <dd><time datetime="@state.Overview?.CapturedAtUtc.ToString("O")" title="@TimePresentation.FormatUtcTimestamp(state.Overview?.CapturedAtUtc)">@TimePresentation.FormatTimestampWithOffset(state.Overview?.CapturedAtUtc)</time></dd>
+                                <dd><time datetime="@state.Overview?.CapturedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(state.Overview?.CapturedAtUtc)</time></dd>
                             </div>
                             <div>
                                 <dt>@L["Runtime:Observation:Accepted"]</dt>
-                                <dd><time datetime="@state.LastRefreshedUtc?.ToString("O")" title="@TimePresentation.FormatUtcTimestamp(state.LastRefreshedUtc)">@TimePresentation.FormatTimestampWithOffset(state.LastRefreshedUtc)</time></dd>
+                                <dd><time datetime="@state.LastRefreshedUtc?.ToString("O")">@TimePresentation.FormatTimestamp(state.LastRefreshedUtc)</time></dd>
                             </div>
                             <div>
                                 <dt>@L["Runtime:Observation:Cadence"]</dt>

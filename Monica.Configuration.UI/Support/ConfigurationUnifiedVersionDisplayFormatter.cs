@@ -4,26 +4,17 @@ namespace Monica.Configuration.UI.Support;
 
 internal static class ConfigurationUnifiedVersionDisplayFormatter
 {
-    public static string VersionText(ConfigurationUnifiedVersionSummary version)
-    {
-        return $"{VersionLabel(version)} · {CreatedTimeText(version)}";
-    }
-
     public static string VersionLabel(ConfigurationUnifiedVersionSummary version)
     {
         return ConfigurationUnifiedVersionJsonFormatter.VersionLabel(version.Version);
     }
 
-    public static string CreatedTimeText(ConfigurationUnifiedVersionSummary version)
+    public static string DefinitionLabel(string definitionKey)
     {
-        return version.CreatedTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fffffff zzz");
-    }
-
-    public static string DefinitionTooltip(ConfigurationUnifiedVersionSummary version, string emptyText)
-    {
-        return version.DefinitionKeys.Count == 0
-            ? emptyText
-            : string.Join(Environment.NewLine, version.DefinitionKeys);
+        var separator = definitionKey.LastIndexOf('.');
+        return separator < 0 || separator == definitionKey.Length - 1
+            ? definitionKey
+            : definitionKey[(separator + 1)..];
     }
 
     public static string OperatorText(ConfigurationUnifiedVersionSummary version, string emptyText)

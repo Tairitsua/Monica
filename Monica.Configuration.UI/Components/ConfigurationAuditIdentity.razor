@@ -1,0 +1,17 @@
+<details class="configuration-audit-identity">
+    <summary><span>@Label</span>@if (ShowPreview) { <code>@AbbreviatedValue</code> }<MoIcon Icon="@MoIcons.ChevronDown" Size=".875rem" /></summary>
+    <code class="configuration-audit-identity-full">@Value</code>
+</details>
+
+@code {
+    /// <summary>Gets or sets the localized identity role shown beside the shortened preview.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the complete identity; disclosure preserves its exact selectable value.</summary>
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets whether the collapsed control includes a shortened identity preview.</summary>
+    [Parameter] public bool ShowPreview { get; set; } = true;
+
+    private string AbbreviatedValue => Value.Length > 16 ? $"{Value[..8]}…{Value[^4..]}" : Value;
+}

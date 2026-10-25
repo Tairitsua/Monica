@@ -16,21 +16,21 @@
             @L["Session:NewChat"]
         </MudButton>
     </div>
-    <div class="session-list-content" aria-busy="@IsLoading.ToString().ToLowerInvariant()">
+    <div class="session-list-content @(IsLoading || Sessions.Count == 0 ? "is-empty" : null)" aria-busy="@IsLoading.ToString().ToLowerInvariant()">
         @if (IsLoading)
         {
-            <div class="session-loading" role="status">
+            <MoContentState Compact="true" Loading="true" Class="session-loading">
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
                 <span>@L["Chat:History:Loading"]</span>
-            </div>
+            </MoContentState>
         }
         else if (Sessions.Count == 0)
         {
-            <div class="empty-sessions">
+            <MoContentState Compact="true" Class="empty-sessions">
                 <MoIcon Icon="@MoIcons.Message" Size="1.5rem" />
                 <span>@L["Session:NoConversations"]</span>
                 <small>@L["Session:EmptyHint"]</small>
-            </div>
+            </MoContentState>
         }
         else
         {

@@ -187,8 +187,8 @@
       "Frozen": "This evidence is frozen from the selected view. Following or changing the file does not update it.",
       "Source": "Source file",
       "Generation": "Observed generation",
-      "ViewRead": "View read · UTC",
-      "InspectedAt": "Inspected · UTC",
+      "ViewRead": "View read",
+      "InspectedAt": "Inspected",
       "ParsedTitle": "Parsed fields",
       "PositionTitle": "Position in the selected view",
       "RawTitle": "Verbatim physical line",
@@ -200,5 +200,8 @@
       "Close": "Close",
       "CopyRaw": "Copy raw line"
     }
+  },
+  "Navigation": {
+    "Category": "Logging"
   }
 }

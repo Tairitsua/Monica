@@ -5,20 +5,22 @@ using Monica.JobScheduler.Models.Analytics;
 using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.UI.Localization;
 using Monica.Modules;
+using Monica.UI.Shared.Services;
 
 namespace Monica.JobScheduler.UI.UIJobScheduler.Support;
 
 /// <summary>
-/// Presents scheduler instants and elapsed durations consistently in the configured scheduler timezone.
+/// Presents instants through the shared UI clock and owns scheduler-specific calendar conversions and durations.
 /// </summary>
 /// <remarks>
-/// Persisted instants remain UTC. This service owns the UI projection into
-/// <see cref="ModuleJobSchedulerOption.CronTimeZone" /> so Blazor Server never silently falls back to the server's
-/// local timezone.
+/// Persisted instants remain UTC. Ordinary timestamps use <see cref="MoTimeFormatter" /> and the deployment's
+/// Clock timezone. Calendar filters and wall-clock inputs retain <see cref="ModuleJobSchedulerOption.CronTimeZone" />,
+/// independently of display formatting or the server's operating-system timezone.
 /// </remarks>
 internal sealed class SchedulerTimePresentation(
     IOptions<ModuleJobSchedulerOption> schedulerOptions,
-    IStringLocalizer<JobSchedulerResource> localizer)
+    IStringLocalizer<JobSchedulerResource> localizer,
+    MoTimeFormatter timeFormatter)
 {
     private readonly TimeZoneInfo _timeZone = schedulerOptions.Value.CronTimeZone;
 
@@ -64,21 +66,12 @@ internal sealed class SchedulerTimePresentation(
     }
 
     /// <summary>
-    /// Formats one durable UTC instant as scheduler-zone wall time with millisecond precision.
+    /// Formats one durable instant using the deployment's shared UI time policy.
     /// </summary>
-    internal string FormatTimestamp(DateTimeOffset? value) => value is { } instant
-        ? ToSchedulerWallTime(instant).ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.CurrentCulture)
-        : "—";
+    internal string FormatTimestamp(DateTimeOffset? value) => timeFormatter.Format(value);
 
-    /// <summary>Formats a scheduler-zone instant with its actual UTC offset, distinguishing repeated wall times.</summary>
-    internal string FormatTimestampWithOffset(DateTimeOffset? value) => value is { } instant
-        ? TimeZoneInfo.ConvertTime(instant, _timeZone).ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.CurrentCulture)
-        : "—";
-
-    /// <summary>Formats the complete normalized UTC instant used by an inclusive or exclusive analytics boundary.</summary>
-    internal string FormatUtcTimestamp(DateTimeOffset? value) => value is { } instant
-        ? instant.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
-        : "—";
+    /// <summary>Formats an interval without repeating its date when both endpoints share a display-calendar day.</summary>
+    internal string FormatRange(DateTimeOffset start, DateTimeOffset end) => timeFormatter.FormatRange(start, end);
 
     /// <summary>
     /// Projects an absolute instant into the configured scheduler-zone wall clock.
@@ -113,13 +106,13 @@ internal sealed class SchedulerTimePresentation(
     }
 
     /// <summary>
-    /// Formats a compact analytics-axis label after projecting the fixed UTC bucket into scheduler wall time.
+    /// Formats a compact analytics-axis label after projecting the fixed UTC bucket into the shared display timezone.
     /// </summary>
     internal string FormatBucketLabel(
         DateTimeOffset value,
         JobExecutionAnalyticsBucketSize bucketSize)
     {
-        var schedulerTime = ToSchedulerWallTime(value);
+        var schedulerTime = timeFormatter.ToDisplayTime(value);
         return bucketSize switch
         {
             JobExecutionAnalyticsBucketSize.Hour => schedulerTime.ToString("HH:mm", CultureInfo.CurrentCulture),

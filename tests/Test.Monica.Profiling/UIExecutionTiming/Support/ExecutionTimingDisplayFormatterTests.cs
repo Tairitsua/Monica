@@ -9,21 +9,18 @@ namespace Test.Monica.Profiling.UIExecutionTiming.Support;
 public sealed class ExecutionTimingDisplayFormatterTests
 {
     [Fact]
-    public void FormatDateTime_WhenTimestampExists_ShouldIdentifyHostLocalOffsetAndKeepMachineInstant()
+    public void MachineTime_WhenTimestampExists_ShouldKeepTheOriginalInstant()
     {
         var timestamp = new DateTimeOffset(2026, 10, 8, 9, 30, 15, TimeSpan.FromHours(-4));
 
-        ExecutionTimingDisplayFormatter.FormatDateTime(timestamp).Should().Be(
-            timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture));
         var machineTime = ExecutionTimingDisplayFormatter.FormatMachineDateTime(timestamp);
         DateTimeOffset.ParseExact(machineTime, "O", CultureInfo.InvariantCulture).Should().Be(timestamp);
         machineTime.Should().Be("2026-10-08T09:30:15.0000000-04:00");
     }
 
     [Fact]
-    public void FormatDateTime_WhenUnavailable_ShouldKeepMissingEvidenceDistinctFromAnInstant()
+    public void MachineTime_WhenUnavailable_ShouldKeepMissingEvidenceDistinctFromAnInstant()
     {
-        ExecutionTimingDisplayFormatter.FormatDateTime(null).Should().Be("—");
         ExecutionTimingDisplayFormatter.FormatMachineDateTime(null).Should().BeEmpty();
     }
 

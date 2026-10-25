@@ -2,7 +2,6 @@
 .knowledge-dialog-owner ::deep .knowledge-dialog-content { min-height:0; overflow:auto; }
 .vector-diagnostics-root { display:flex; flex-direction:column; gap:24px; min-width:0; padding:24px; }
 .dialog-header,.configuration-section,.connection-section,.test-result-copy { display:flex; flex-direction:column; gap:12px; min-width:0; }
-.diagnostics-loading { display:flex; align-items:center; gap:12px; padding-block:24px; }
 .diagnostics-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 24px; }
 .summary-item,.configuration-row { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .summary-item ::deep .mud-typography,.configuration-row ::deep .mud-typography { overflow-wrap:anywhere; font-size:13px; line-height:1.6; }

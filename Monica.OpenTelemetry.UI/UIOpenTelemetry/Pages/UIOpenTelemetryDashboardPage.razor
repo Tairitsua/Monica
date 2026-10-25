@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @using Monica.OpenTelemetry.UI.UIOpenTelemetry.Components
 @using Monica.OpenTelemetry.UI.UIOpenTelemetry.State
@@ -26,13 +27,13 @@
                     <MudButton @ref="_refreshButton" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" Disabled="_state.IsLoading">@L["Action:Refresh"]</MudButton>
                 </div>
                 <small>@L[_state.AutoRefreshInterval is null ? "Workbench:ReadingPaused" : "Workbench:ReadingActive"]</small>
-                @if (_state.SnapshotCapturedAt is { } adopted) { <small>@L["Workbench:ViewRead"] <time datetime="@adopted.ToString("O")">@adopted.ToLocalTime().ToString("HH:mm:ss")</time></small> }
+                @if (_state.SnapshotCapturedAt is { } adopted) { <small>@L["Workbench:ViewRead"] <time datetime="@adopted.ToString("O")">@UiTime.FormatTime(adopted)</time></small> }
             </div>
         }
     </header>
     @if (_state is null)
     {
-        <section class="telemetry-empty" role="status"><h2>@L["Workbench:UnavailableTitle"]</h2><p>@L["Workbench:Unavailable"]</p></section>
+        <section class="telemetry-empty"><MoContentState role="status"><h2>@L["Workbench:UnavailableTitle"]</h2><p>@L["Workbench:Unavailable"]</p></MoContentState></section>
     }
     else
     {
@@ -48,7 +49,7 @@
                     <div class="telemetry-resource-meta">@if (!string.IsNullOrEmpty(snapshot.ResourceServiceVersion)) { <span>@snapshot.ResourceServiceVersion</span> } @if (!string.IsNullOrEmpty(snapshot.DeploymentEnvironment)) { <span>@snapshot.DeploymentEnvironment</span> }</div>
                 </div>
                 <div class="telemetry-coverage">
-                    <div class="telemetry-coverage-heading"><span>@L["Workbench:WholeRegistry"]</span><span>@L["Workbench:SourceCapture"] <time datetime="@snapshot.TimestampUtc.ToString("O")" title="@snapshot.TimestampUtc.ToString("O")">@snapshot.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</time></span></div>
+                    <div class="telemetry-coverage-heading"><span>@L["Workbench:WholeRegistry"]</span><span>@L["Workbench:SourceCapture"] <time datetime="@snapshot.TimestampUtc.ToString("O")" title="@snapshot.TimestampUtc.ToString("O")">@UiTime.FormatTime(snapshot.TimestampUtc)</time></span></div>
                     <dl class="telemetry-counts"><div><dt>@L["Banner:Meters"]</dt><dd>@_state.GetMeterNames().Count</dd></div><div><dt>@L["Banner:Instruments"]</dt><dd>@snapshot.Instruments.Count</dd></div><div><dt>@L["Instrument:TagSets"]</dt><dd>@snapshot.Instruments.Sum(instrument => instrument.TagSets.Count)</dd></div></dl>
                     <div class="telemetry-retention"><span>@L["Workbench:SamplesPerSeries"] <code>@snapshot.SamplesPerSeries</code></span><span>@L["Workbench:SeriesPerInstrument"] <code>@snapshot.MaxTagSetsPerInstrument</code></span></div>
                 </div>
@@ -68,7 +69,7 @@
         }
         else if (_state.IsLoading)
         {
-            <section class="telemetry-empty" role="status"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /><p>@L["Status:Loading"]</p></section>
+            <section class="telemetry-empty"><MoContentState Loading="true"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /><p>@L["Status:Loading"]</p></MoContentState></section>
         }
     }
 </div>

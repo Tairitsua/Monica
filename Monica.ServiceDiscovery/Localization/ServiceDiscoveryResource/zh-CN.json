@@ -475,8 +475,8 @@
     "CurrentHostScope": "查看当前主机的身份、注册证据和本地选举状态，并对照应用在提供程序中的领导租约。",
     "CurrentHostReadFailed": "当前主机快照读取失败",
     "LastSuccessfulCapture": "下方保留上一次成功读取的快照。",
-    "CapturedUTC": "快照时间 · UTC",
-    "FrozenUTC": "固定时间 · UTC",
+    "CapturedUTC": "快照时间",
+    "FrozenUTC": "固定时间",
     "RegistrationEvidence": "注册证据",
     "LocalTimes": "事件时间以本地时区显示。",
     "HeartbeatAgeAtCapture": "快照时的心跳年龄",
@@ -609,5 +609,8 @@
       "Failure": "传输或解析失败",
       "Canceled": "已取消"
     }
+  },
+  "Navigation": {
+    "Category": "服务发现"
   }
 }

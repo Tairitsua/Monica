@@ -6,6 +6,32 @@ This project follows semantic versioning for public NuGet packages. Release cand
 
 ## [Unreleased]
 
+## [1.0.0-rc.15] - 2026-10-17
+
+### Added
+
+- A shared JSON viewer and editor with syntax colors, strict validation, explicit formatting and minification, original-source copying, optional line numbers, and theme-aware presentation across operational UIs.
+- Separate state-store provider and data workbenches, plus independently refreshed configuration source and storage pages.
+- Unified Monica Guide engine, wizard, and CLI bundles for Windows, Linux, and macOS, with immutable capability knowledge and verified skill installation.
+- Shared local SVG icons, Clock-based page time formatting, and consistent diagnostic instruments, content states, and responsive navigation.
+
+### Changed
+
+- JobScheduler now uses owner-local durable scheduling with unified store contracts, operational policy editing, and richer execution evidence.
+- Configuration revisions follow semantic state, and one host-owned disclosure setting controls sensitive-value presentation while preserving annotations and write validation.
+- ProjectUnit source analysis shares solution loading and compilation snapshots instead of repeating workspace work for individual inspections.
+- Module, AI, repository, messaging, and DevOps workbenches use the common Monica visual language and operational access boundary.
+
+### Fixed
+
+- Guide release smoke checks resolve the executable from the bundle manifest instead of assuming an obsolete directory, and retain failed command diagnostics.
+- Configuration source inspection retains sensitivity controls when moving into its own page; JSON drafts retain their analysis and apply gates.
+- Chat composer sizing, document navigation, empty-state alignment, provider selection, hover feedback, shell scroll containment, and built-in theme scrollbars are consistent across viewport sizes.
+
+### Migration
+
+This candidate includes breaking changes to scheduler ownership, configuration and state-store contracts, operational UI access, page time formatting, and ProjectUnit source analysis. Follow the current owning references under `skills/monica-infra-*/` and the generated release notes before upgrading a consumer; release candidates may change these contracts before `1.0.0` stabilizes.
+
 ## [1.0.0-rc.12] - 2026-08-08
 
 ### Added

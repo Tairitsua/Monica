@@ -70,6 +70,20 @@ public class K8SFacade(
         return TryMapResourceType(resourceType, parsedResourceType => ListResourcesAsync(namespaceName, parsedResourceType, cancellationToken));
     }
 
+    /// <summary>
+    /// Reads all supported kinds and their backing workload evidence using one runtime configuration snapshot.
+    /// A failed read returns a failure result without a partial inventory.
+    /// </summary>
+    public Task<Res<K8SNamespaceInventoryResult>> ListNamespaceInventoryAsync(
+        string namespaceName,
+        CancellationToken cancellationToken = default)
+    {
+        return ExecuteAsync(
+            () => clusterService.ListNamespaceInventoryAsync(namespaceName, cancellationToken),
+            ex => messageLocalizer.TranslateExceptionMessage(ex),
+            $"Failed to read K8S inventory for namespace {namespaceName}.");
+    }
+
     public Task<Res<K8SServiceDetails>> DescribeServiceAsync(
         string namespaceName,
         string serviceName,

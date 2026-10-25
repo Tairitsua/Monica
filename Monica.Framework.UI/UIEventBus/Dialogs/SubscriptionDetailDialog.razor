@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.States
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.State
 @using Monica.UI.Shared.Components.Dialogs
@@ -7,7 +8,7 @@
     <TitleContent><MoDialogHeading Text="@L["SubscriptionDetail:Title"]" /></TitleContent>
     <DialogContent>
         @if (_subscription != null) { <SubscriptionDetailPanel Subscription="_subscription" CapturedAt="_capturedAt" /> }
-        else { <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info">@L["SubscriptionDetail:States:NotSelected"]</MudAlert> }
+        else { <MoContentState Compact="true"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["SubscriptionDetail:States:NotSelected"]</p></MoContentState> }
     </DialogContent>
     <DialogActions><MudButton OnClick="Close" Color="Color.Primary">@L["Shared:Common:Close"]</MudButton></DialogActions>
 </MudDialog>

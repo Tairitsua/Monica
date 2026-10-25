@@ -12,7 +12,7 @@
     </ConfigurationPageHeader>
     <ConfigurationWorkbenchNavigation ActiveRoute="@PAGE_URL" />
     <section class="configuration-debug-feature">
-        <div class="configuration-debug-feature-context"><MoIcon Icon="@MoIcons.Braces" Size="1.5rem" /><p>@(Visibility.ShowSensitiveValues ? L["Debug:Workbench:FullVisibilityScope"] : L["Debug:Workbench:Scope"])</p>@if (_debugObservedAtUtc is { } observed) { <div class="configuration-debug-observation"><span>@L["Debug:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@observed.ToString("yyyy-MM-dd HH:mm:ss.fff zzz")</time></div> }</div>
+        <div class="configuration-debug-feature-context"><MoIcon Icon="@MoIcons.Braces" Size="1.5rem" /><p>@(Visibility.ShowSensitiveValues ? L["Debug:Workbench:FullVisibilityScope"] : L["Debug:Workbench:Scope"])</p>@if (_debugObservedAtUtc is { } observed) { <div class="configuration-debug-observation"><span>@L["Debug:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@TimeDisplay.Format(observed)</time></div> }</div>
         @if (_hasLoadedDebugView)
         {
             <dl class="configuration-debug-summary"><div><dt>@L["Debug:Workbench:LoadedLines"]</dt><dd>@_lines.Count</dd></div><div><dt>@L["Debug:Workbench:SensitiveLines"]</dt><dd>@SensitiveLineCount</dd></div><div><dt>@L["Debug:Workbench:MatchingLines"]</dt><dd>@FilteredLines.Count()</dd></div></dl>

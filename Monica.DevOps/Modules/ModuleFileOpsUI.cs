@@ -33,18 +33,23 @@ public class ModuleFileOpsUI : MonicaModule<ModuleFileOpsUIOption>, IUIModule
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<FileOpsResource>(
+                    "Monica.DevOps.FileOps", "Navigation:Category", 50,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Folder);
+
                 registry.RegisterLocalizedPage<UIFileOpsPage, FileOpsResource>(
                     UIFileOpsPage.PAGE_URL,
                     "Pages:FileOps:Title",
                     MoIcons.Folder,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 36);
                 registry.RegisterLocalizedPage<UIFileOpsPolicyPage, FileOpsResource>(
                     UIFileOpsPolicyPage.PAGE_URL,
                     "Pages:FileOpsPolicy:Title",
                     MoIcons.Sliders,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: false,
                     navOrder: 37);
             }));

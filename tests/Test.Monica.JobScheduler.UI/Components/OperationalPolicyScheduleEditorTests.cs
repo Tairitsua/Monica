@@ -1,7 +1,9 @@
 using AwesomeAssertions;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.JobScheduler.UI.UIJobScheduler.Components;
 using Monica.JobScheduler.UI.UIJobScheduler.Support;
+using Monica.UI.Shared.Services;
 using Test.Monica.JobScheduler.UI.Infrastructure;
 using Xunit;
 
@@ -37,12 +39,12 @@ public sealed class OperationalPolicyScheduleEditorTests
         cut.WaitForAssertion(() => cut.Markup.Should().Contain("Initial description"));
 
         draft.SetExpression("0 */10 * * * *");
-        cut.Instance.NotifyParametersChanged();
-        var drain = cut.Instance.RunDescriptionPassAsync();
+        await cut.InvokeAsync(cut.Instance.NotifyParametersChangedAsync);
+        var drain = cut.InvokeAsync(cut.Instance.RunDescriptionPassAsync);
         pending.Invocations.Should().ContainSingle();
 
         draft.SetExpression("0 */15 * * * *");
-        cut.Instance.NotifyParametersChanged();
+        await cut.InvokeAsync(cut.Instance.NotifyParametersChangedAsync);
         pending.SetResult([new("policy-draft", "Stale description", null)]);
         await drain.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -59,6 +61,8 @@ public sealed class OperationalPolicyScheduleEditorTests
     {
         var clock = new ControllableTimeProvider(OBSERVED_AT);
         await using var context = new JobSchedulerUiTestContext(timeProvider: clock);
+        // MudBlazor's context-owned popover service already owns a periodic timer.
+        var sharedTimerCount = clock.ActiveTimerCount;
         var module = context.JSInterop.SetupModule(MODULE_PATH);
         module.Setup<CronDescriptionResult[]>("describeCronExpressions")
             .SetResult([new("policy-draft", "Every five minutes", null)]);
@@ -68,7 +72,6 @@ public sealed class OperationalPolicyScheduleEditorTests
         cut.WaitForAssertion(() =>
         {
             draft.ProposedNextOccurrenceUtc.Should().Be(OBSERVED_AT.AddMinutes(5));
-            clock.ActiveTimerCount.Should().Be(1);
         });
 
         clock.Advance(TimeSpan.FromMinutes(6));
@@ -78,12 +81,14 @@ public sealed class OperationalPolicyScheduleEditorTests
             draft.ProposedNextOccurrenceUtc.Should().Be(OBSERVED_AT.AddMinutes(10));
             draft.ProposedNextOccurrenceUtc.Should().BeAfter(clock.GetUtcNow());
             cut.Find(".schedule-editor__preview-scroll tbody").TextContent.Should()
-                .Contain("2026-08-17 08:10:00 UTC");
+                .Contain(context.Services.GetRequiredService<MoTimeFormatter>()
+                    .FormatWallTime(draft.ToScheduleTime(OBSERVED_AT.AddMinutes(10))));
         });
 
         await cut.Instance.DisposeAsync();
+        cut.Dispose();
 
-        clock.ActiveTimerCount.Should().Be(0);
+        clock.ActiveTimerCount.Should().Be(sharedTimerCount);
     }
 
     [Fact]
@@ -130,7 +135,7 @@ public sealed class OperationalPolicyScheduleEditorTests
 
     private sealed class TestScheduleEditor : OperationalPolicyScheduleEditor
     {
-        internal void NotifyParametersChanged() => base.OnParametersSet();
+        internal Task NotifyParametersChangedAsync() => base.OnParametersSetAsync();
 
         internal Task RunDescriptionPassAsync() => base.OnAfterRenderAsync(false);
     }

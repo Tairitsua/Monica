@@ -78,7 +78,8 @@
                             <span class="di-type-name">@GetImplementationTitle(context.Item)</span>
                         </MudTooltip>
 
-                        @if (!string.IsNullOrWhiteSpace(context.Item.ImplementationAssemblyName))
+                        @if (!string.IsNullOrWhiteSpace(context.Item.ImplementationAssemblyName)
+                             && !string.Equals(context.Item.ImplementationAssemblyName, context.Item.ServiceAssemblyName, StringComparison.Ordinal))
                         {
                             <span class="di-assembly-name">@context.Item.ImplementationAssemblyName</span>
                         }

@@ -28,11 +28,16 @@ public class ModuleDataChannelUI : MonicaModule<ModuleDataChannelUIOption>, IUIM
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
             {
+                var category = registry.RegisterLocalizedCategory<DataChannelResource>(
+                    "Monica.DataChannel", "Navigation:Category", 80,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Route);
+
                 registry.RegisterLocalizedPage<UIDataChannelPage, DataChannelResource>(
                     UIDataChannelPage.PAGE_URL,
                     "Pages:DataChannelManage:Title",
                     MoIcons.Route,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 30,
                     descriptionKey: "Workbench:DirectoryDescription");
@@ -40,7 +45,7 @@ public class ModuleDataChannelUI : MonicaModule<ModuleDataChannelUIOption>, IUIM
                     UIDataChannelExceptionsPage.PAGE_URL,
                     "Pages:DataChannelExceptions:Title",
                     MoIcons.Warning,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 31,
                     descriptionKey: "Workbench:ExceptionsDescription");

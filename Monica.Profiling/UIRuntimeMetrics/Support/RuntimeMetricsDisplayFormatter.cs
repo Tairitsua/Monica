@@ -53,41 +53,11 @@ internal static class RuntimeMetricsDisplayFormatter
     }
 
     /// <summary>
-    /// Formats a sample's host-local time with milliseconds, or an unavailable marker.
-    /// Unspecified sample timestamps are interpreted as UTC, matching the collector contract.
-    /// </summary>
-    public static string LocalTime(DateTime? timestamp) =>
-        timestamp.HasValue
-            ? AsUtc(timestamp.Value).ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)
-            : UNAVAILABLE;
-
-    /// <summary>
-    /// Formats a host-local date, time and explicit UTC offset, or an unavailable marker.
-    /// </summary>
-    public static string LocalDateTime(DateTimeOffset? timestamp) =>
-        timestamp?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture) ?? UNAVAILABLE;
-
-    /// <summary>
     /// Formats the exact sample timestamp as round-trip UTC text.
     /// Unspecified sample timestamps are interpreted as UTC, matching the collector contract.
     /// </summary>
     public static string MachineTime(DateTime timestamp) =>
         AsUtc(timestamp).ToString("O", CultureInfo.InvariantCulture);
-
-    /// <summary>Formats a sample's UTC date and millisecond time for the exact plot readout.</summary>
-    public static string UtcDateTime(DateTime timestamp) =>
-        AsUtc(timestamp).ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'", CultureInfo.InvariantCulture);
-
-    /// <summary>Formats a UTC axis time with fractional seconds when a short span needs them.</summary>
-    public static string UtcAxisTime(DateTime timestamp, TimeSpan span) =>
-        AsUtc(timestamp).ToString(span.Ticks is > 0 and < 4 * TimeSpan.TicksPerMillisecond
-            ? "HH:mm:ss.fffffff"
-            : span.Ticks is > 0 and < 4 * TimeSpan.TicksPerSecond ? "HH:mm:ss.fff" : "HH:mm:ss",
-            CultureInfo.InvariantCulture);
-
-    /// <summary>Formats the UTC date shown at endpoints when the plotted window crosses midnight.</summary>
-    public static string UtcDate(DateTime timestamp) =>
-        AsUtc(timestamp).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>Preserves general numeric precision in the current culture and appends the metric's unit.</summary>
     public static string PlotValue(double value, RuntimeTrendMetric metric) =>
@@ -140,4 +110,7 @@ internal static class RuntimeMetricsDisplayFormatter
         timestamp.Kind == DateTimeKind.Unspecified
             ? DateTime.SpecifyKind(timestamp, DateTimeKind.Utc)
             : timestamp.ToUniversalTime();
+
+    /// <summary>Normalizes an optional collector instant without inventing a missing observation.</summary>
+    public static DateTime? AsUtc(DateTime? timestamp) => timestamp is { } value ? AsUtc(value) : null;
 }

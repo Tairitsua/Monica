@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Support
 @using Microsoft.Extensions.Logging
 @using Monica.UI.UIStackTrace.Support
 @implements IAsyncDisposable
@@ -46,17 +47,17 @@
     [Parameter]
     public string? Message { get; set; }
 
-    private StackTraceCopySession? _copy;
+    private TextCopySession? _copy;
     private string? _source;
     private IReadOnlyList<StackTraceSourceSpan> _spans = [];
     private bool _wrapLines = true;
     private bool _retired;
     private bool HasSource => !string.IsNullOrEmpty(_source);
-    private StackTraceCopyState CopyState => _copy?.State ?? default;
+    private TextCopyState CopyState => _copy?.State ?? default;
     private string CopyFeedback => CopyState.Feedback switch
     {
-        StackTraceCopyFeedback.Copied => L["StackTrace:Copied"],
-        StackTraceCopyFeedback.Failed => L["StackTrace:CopyFailed"],
+        TextCopyFeedback.Copied => L["StackTrace:Copied"],
+        TextCopyFeedback.Failed => L["StackTrace:CopyFailed"],
         _ => string.Empty
     };
 

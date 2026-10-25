@@ -1,11 +1,11 @@
 .toc-panel {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    padding: 16px;
+    padding: 18px 16px;
     color: var(--mud-palette-text-primary);
     font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
 }
@@ -13,69 +13,117 @@
 .toc-header {
     display: flex;
     flex-shrink: 0;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
+    min-width: 0;
+}
+
+.toc-header-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     min-width: 0;
 }
 
 .toc-title {
-    min-width: 0;
     margin: 0;
+    color: var(--mud-palette-text-primary);
     font-family: inherit;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.toc-description {
+    margin: 0;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 30%, var(--mud-palette-text-secondary));
+    font-size: 12.5px;
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
 
 .toc-header ::deep .toc-close-button {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    color: var(--mud-palette-text-primary);
+    width: 32px;
+    height: 32px;
+    color: var(--mud-palette-text-secondary);
 }
 
 .toc-list {
+    position: relative;
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    gap: 2px;
     min-width: 0;
     min-height: 0;
+    padding: 2px 4px 2px 0;
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 
+.toc-list::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 9px;
+    width: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--mud-palette-lines-default) 60%, transparent);
+    content: "";
+    pointer-events: none;
+}
+
 .toc-link {
+    position: relative;
     display: block;
+    flex-shrink: 0;
     width: 100%;
     min-width: 0;
     min-height: 36px;
-    margin: 0 0 3px;
-    padding: 8px 10px 8px 12px;
+    padding: 9px 12px 9px 26px;
     border: 0;
-    border-inline-start: 2px solid transparent;
-    border-radius: 0 6px 6px 0;
-    color: color-mix(in srgb, var(--mud-palette-text-primary) 85%, var(--mud-palette-text-secondary));
+    border-radius: 8px;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 30%, var(--mud-palette-text-secondary));
     background: transparent;
     font-family: inherit;
     font-size: 13px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 1.45;
     text-align: start;
     cursor: pointer;
 }
 
-.toc-link.level-2 { padding-inline-start: 24px; }
-.toc-link.level-3 { padding-inline-start: 36px; }
+.toc-link::before {
+    position: absolute;
+    inset-block: 8px;
+    inset-inline-start: 8px;
+    width: 4px;
+    border-radius: 4px;
+    background: var(--mud-palette-primary);
+    opacity: 0;
+    content: "";
+    pointer-events: none;
+}
+
+.toc-link.level-2 { padding-inline-start: 38px; }
+.toc-link.level-3 { padding-inline-start: 50px; }
 
 .toc-link:hover {
-    background: color-mix(in srgb, var(--mud-palette-primary) 6%, var(--mud-palette-surface));
+    color: var(--mud-palette-text-primary);
+    background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
 }
 
 .toc-link.is-active {
-    border-inline-start-color: var(--mud-palette-primary);
-    color: var(--mud-palette-text-primary);
-    background: color-mix(in srgb, var(--mud-palette-primary) 12%, var(--mud-palette-surface));
-    font-weight: 500;
+    color: color-mix(in srgb, var(--mud-palette-primary) 70%, var(--mud-palette-text-primary));
+    background: color-mix(in srgb, var(--mud-palette-primary) 10%, var(--mud-palette-surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-primary) 10%, transparent);
+    font-weight: 700;
+}
+
+.toc-link.is-active::before {
+    opacity: 1;
 }
 
 .toc-link:focus-visible {
@@ -84,6 +132,7 @@
 }
 
 .toc-link-text {
+    min-width: 0;
     overflow-wrap: anywhere;
 }
 
@@ -96,17 +145,17 @@
     gap: 12px;
     min-width: 0;
     min-height: 0;
-    padding: 16px 4px;
+    padding: 16px;
     overflow-y: auto;
 }
 
 .toc-empty-state ::deep .toc-empty-icon {
-    color: color-mix(in srgb, var(--mud-palette-text-primary) 70%, var(--mud-palette-text-secondary));
-    font-size: 32px;
+    color: var(--mud-palette-text-secondary);
 }
 
 .toc-empty-state ::deep .toc-empty-copy {
-    color: color-mix(in srgb, var(--mud-palette-text-primary) 80%, var(--mud-palette-text-secondary));
+    max-width: 15rem;
+    color: color-mix(in srgb, var(--mud-palette-text-primary) 30%, var(--mud-palette-text-secondary));
     font-size: 13px;
     line-height: 1.6;
 }

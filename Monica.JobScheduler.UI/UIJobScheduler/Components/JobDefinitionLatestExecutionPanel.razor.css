@@ -15,12 +15,12 @@
 .job-latest-panel code { font-family: var(--mo-font-family-mono); font-size: .8rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .job-latest-panel__instance ::deep .mud-button-root { min-width: 0; color: var(--latest-ink) !important; }
 .job-latest-panel__instance ::deep .mud-button-label { white-space: normal; }
-.job-latest-panel__empty { display: flex; align-items: flex-start; gap: 14px; padding: 20px; background: color-mix(in srgb, var(--mud-palette-primary) 4%, var(--mud-palette-surface)); }
-.job-latest-panel__empty ::deep :is(.mud-icon-root, .mo-icon) { color: var(--latest-ink); flex: 0 0 28px; }
+.job-latest-panel__empty { background: color-mix(in srgb, var(--mud-palette-primary) 4%, var(--mud-palette-surface)); }
+.job-latest-panel__empty ::deep :is(.mud-icon-root, .mo-icon) { color: var(--latest-ink); }
 .job-latest-panel__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; min-width: 0; }
 .job-latest-panel__facts > div { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 16px 0; border-top: 1px solid var(--mud-palette-lines-default); }
 .job-latest-panel__facts > div:nth-child(odd) { padding-inline-end: 16px; }
 .job-latest-panel__facts dt { color: var(--latest-muted); font-size: .79rem; }
 .job-latest-panel__facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-family: var(--mo-font-family-mono); font-size: .8rem; font-variant-numeric: tabular-nums; line-height: 1.5; }
-@container job-latest (max-width: 480px) { .job-latest-panel__heading, .job-latest-panel__instance { display: grid; } .job-latest-panel__facts { grid-template-columns: minmax(0, 1fr); } .job-latest-panel__instance, .job-latest-panel__empty { padding: 16px; } }
+@container job-latest (max-width: 480px) { .job-latest-panel__heading, .job-latest-panel__instance { display: grid; } .job-latest-panel__facts { grid-template-columns: minmax(0, 1fr); } .job-latest-panel__instance { padding: 16px; } }
 @media (max-width: 600px) { .job-latest-panel { padding: 16px; } }

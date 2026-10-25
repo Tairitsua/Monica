@@ -43,14 +43,21 @@ public class ModuleExecutionTimingUI : MonicaModule<ModuleExecutionTimingUIOptio
         });
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<ExecutionTimingResource>(
+                    "Monica.Profiling.ExecutionTiming", "Navigation:Category", 70,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Timer);
+
                 registry.RegisterLocalizedPage<UIExecutionTimingPage, ExecutionTimingResource>(
                     UIExecutionTimingPage.PAGE_URL,
                     "Pages:ExecutionTiming:Title",
                     MoIcons.Timer,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 30,
-                    descriptionKey: "Page:Subtitle")));
+                    descriptionKey: "Page:Subtitle");
+            }));
     }
 
     public override void ConfigureServices(ModuleContext<ModuleExecutionTimingUIOption> context)

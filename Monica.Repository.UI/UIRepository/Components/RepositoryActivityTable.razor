@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using System.Diagnostics.CodeAnalysis
 @using Microsoft.Extensions.Logging
@@ -30,11 +32,18 @@
         <MudAlert Severity="Severity.Error" Dense="true" Icon="@MoIcons.Error">@_dialogError</MudAlert>
     }
 
-    @if (IsLoading)
+    @if (IsLoading && _snapshot is null)
+    {
+        <MoContentState Loading="true">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
+            <span>@L["Activity:Loading"]</span>
+        </MoContentState>
+    }
+    else if (IsLoading)
     {
         <div class="activity-refresh" role="status">
             <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
-            <span>@(_snapshot is null ? L["Activity:Loading"] : L["Workbench:Activity:RetainedSnapshot"])</span>
+            <span>@L["Workbench:Activity:RetainedSnapshot"]</span>
         </div>
     }
 
@@ -345,7 +354,7 @@
     };
     private string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? L["Common:Values:Unavailable"] : value;
     private string CountValue(int? value) => value?.ToString("N0", CultureInfo.CurrentCulture) ?? L["Common:Values:Unavailable"];
-    private string FormatCapture(DateTimeOffset? value) => value?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? L["Common:Values:Unavailable"];
+    private string FormatCapture(DateTimeOffset? value) => UiTime.Format(value) ?? L["Common:Values:Unavailable"];
     private static bool Contains(string? value, string search) => !string.IsNullOrWhiteSpace(value) && value.Contains(search, StringComparison.OrdinalIgnoreCase);
 
     private Task ShowProviderGuideAsync()

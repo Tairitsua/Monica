@@ -46,12 +46,12 @@
     "Window": "观测跨度",
     "CollectorInterval": "快照间隔",
     "Seconds": "{0:0.##} 秒",
-    "CpuChart": "进程 CPU 历史，百分比，UTC 时间轴",
-    "MemoryChart": "工作集历史，十进制兆字节，UTC 时间轴",
-    "UtcPercent": "% · UTC",
-    "UtcMegabytes": "十进制 MB · UTC",
+    "CpuChart": "进程 CPU 历史，百分比，时间轴",
+    "MemoryChart": "工作集历史，十进制兆字节，时间轴",
+    "UtcPercent": "%",
+    "UtcMegabytes": "十进制 MB",
     "Plot": {
-      "Description": "按实际 UTC 采样时间展示测量值。可浏览保留的采样以查看精确数值。",
+      "Description": "按实际采样时间展示测量值。可浏览保留的采样以查看精确数值。",
       "BrowseSamples": "浏览保留的采样",
       "KeyboardHelp": "用方向键或 Home/End 选择采样，按 Escape 清除预览。",
       "Idle": "将指针移到采样上，或在下方浏览。",
@@ -102,7 +102,7 @@
     "Title": "运行时采样",
     "OpenFailed": "无法打开采样详情。",
     "Frozen": "页面与主机更新时，此采样仍保持不变。以下数值保留记录时的精度。",
-    "Timestamp": "采样时间 · UTC",
+    "Timestamp": "采样时间",
     "ViewCapture": "成功读取视图 · 本地时区偏移",
     "RecordedValues": "记录的计数器值",
     "Bytes": "字节",
@@ -123,5 +123,8 @@
     "LoadingValue": "正在读取观测记录…",
     "Unavailable": "—",
     "Close": "关闭"
+  },
+  "Navigation": {
+    "Category": "运行时指标"
   }
 }

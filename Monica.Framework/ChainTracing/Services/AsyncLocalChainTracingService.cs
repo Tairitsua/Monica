@@ -69,10 +69,12 @@ public class AsyncLocalChainTracingService(IOptions<ModuleChainTracingOption> op
 
             context.AddNode(node, _currentNode.Value);
 
-            // Label the chain root with this host's identity so multi-hop debug output is self-describing.
-            if (ReferenceEquals(context.Root, node) && !string.IsNullOrEmpty(_options.ServiceName))
+            // Capture origin and time once so later response projection preserves the request's provenance.
+            if (ReferenceEquals(context.Root, node))
             {
-                node.Service = _options.ServiceName;
+                node.Service = string.IsNullOrEmpty(_options.ServiceName) ? null : _options.ServiceName;
+                node.Timestamp = new DateTimeOffset(node.StartTime);
+                node.ServiceVersion = string.IsNullOrWhiteSpace(_options.ServiceVersion) ? null : _options.ServiceVersion;
             }
 
             if (ChainTraceContext.CanHaveChildOperations(type))

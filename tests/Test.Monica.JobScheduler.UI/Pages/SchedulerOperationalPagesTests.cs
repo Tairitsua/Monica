@@ -131,9 +131,9 @@ public sealed class SchedulerOperationalPagesTests
         {
             cut.Markup.Should().Contain("Catalog:Lifecycle:ManualSuppressed");
             var actions = cut.Find(".catalog-table__actions");
-            actions.QuerySelector("[aria-label='Catalog:Actions:Pause']")!
+            actions.QuerySelector("[aria-label^='Catalog:Actions:PolicyFor']")!
                 .HasAttribute("disabled").Should().BeFalse();
-            actions.QuerySelector("[aria-label='Catalog:Actions:Run']")!
+            actions.QuerySelector("[aria-label^='Catalog:Actions:RunFor']")!
                 .HasAttribute("disabled").Should().BeFalse();
         });
     }
@@ -243,7 +243,7 @@ public sealed class SchedulerOperationalPagesTests
             .Add(component => component.Executions, [execution])
             .Add(component => component.OnRefresh, () => refreshCount++));
 
-        var openTask = cut.Find(".recent-panel__event-link").ClickAsync();
+        var openTask = cut.Find($"button[aria-label*='{execution.InstanceId}']").ClickAsync();
         context.DialogProvider.WaitForAssertion(() =>
         {
             context.DialogProvider.Markup.Should().Contain(execution.InstanceId);
@@ -259,7 +259,7 @@ public sealed class SchedulerOperationalPagesTests
     }
 
     [Fact]
-    public async Task AnalyticsSlowExecution_ShouldOpenDetailsInPlace()
+    public async Task AnalyticsSlowExecution_ShouldReportTheExactDisplayedCaptureWithoutNavigating()
     {
         await using var context = new JobSchedulerUiTestContext();
         var execution = await context.Store.EnqueueAsync(new JobEnqueueRequest
@@ -298,10 +298,12 @@ public sealed class SchedulerOperationalPagesTests
         };
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         var originalUri = navigation.Uri;
-        var cut = context.Render<SchedulerAnalyticsDashboard>(parameters => parameters
-            .Add(component => component.Snapshot, snapshot));
+        JobExecutionAnalyticsSlowExecution? selected = null;
+        var cut = context.Render<SchedulerAnalyticsDurationEvidence>(parameters => parameters
+            .Add(component => component.Snapshot, snapshot)
+            .Add(component => component.InspectExecution, capture => selected = capture));
 
-        var activity = cut.Find(".analytics-dashboard__slow-list > button");
+        var activity = cut.Find($"button[aria-label*='{execution.InstanceId}']");
         activity.HasAttribute("href").Should().BeFalse();
         activity.GetAttribute("aria-label").Should().Contain(execution.InstanceId);
         activity.GetAttribute("aria-label").Should().Contain("4");
@@ -309,14 +311,8 @@ public sealed class SchedulerOperationalPagesTests
         activity.TextContent.Should().Contain(execution.Template.JobKey);
         await activity.ClickAsync();
 
-        context.DialogProvider.WaitForAssertion(() =>
-        {
-            context.DialogProvider.Markup.Should().Contain(execution.InstanceId);
-            navigation.Uri.Should().Be(originalUri);
-        });
-        await context.DialogProvider.FindAll("button")
-            .Single(button => button.TextContent.Contains("Common:Close", StringComparison.Ordinal))
-            .ClickAsync();
+        selected.Should().BeSameAs(snapshot.SlowestExecutions.Single());
+        navigation.Uri.Should().Be(originalUri);
     }
 
     [Fact]
@@ -521,12 +517,17 @@ public sealed class SchedulerOperationalPagesTests
             provider.Markup.Should().Contain("ExecutionDetail:PolicySnapshot");
             provider.Markup.Should().Contain("ExecutionDetail:Timing");
             provider.Markup.Should().Contain("ExecutionDetail:LeaseLosses");
-            provider.Markup.Should().Contain("execution-history__timeline");
-            provider.Markup.Should().Contain("ExecutionDetail:Actions:CopyDiagnostics");
-            provider.Markup.Should().Contain("ExecutionDetail:Actions:ViewCatalog");
+            provider.Markup.Should().Contain("ExecutionDetail:Actions:CopySnapshot");
         });
 
-        await provider.FindAll("button")
+        await provider.FindAll("[role='tab']")
+            .Single(tab => tab.TextContent.Contains("ExecutionDetail:Tabs:History", StringComparison.Ordinal))
+            .ClickAsync();
+        var stored = await context.Store.GetExecutionAsync(JobSchedulerUiTestContext.SCOPE,
+            execution.InstanceId, Xunit.TestContext.Current.CancellationToken);
+        provider.FindComponent<ExecutionHistoryLedger>().Instance.Entries.Should().BeEquivalentTo(stored!.History);
+        await provider.Find("button[aria-label='ExecutionDetail:Actions:More']").ClickAsync();
+        await context.PopoverProvider.FindAll("[role='menuitem']")
             .Single(button => button.TextContent.Contains("ExecutionDetail:Actions:ViewCatalog", StringComparison.Ordinal))
             .ClickAsync();
         navigation.Uri.Should().EndWith(
@@ -543,7 +544,9 @@ public sealed class SchedulerOperationalPagesTests
         var load = state.InitializeAsync();
         await context.Access.AuthorizationStarted.WaitAsync(Xunit.TestContext.Current.CancellationToken);
         await state.DisposeAsync();
-        await load;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => load);
+        state.IsDisposed.Should().BeTrue();
+        state.Executions.Should().BeEmpty();
     }
 
     [Fact]

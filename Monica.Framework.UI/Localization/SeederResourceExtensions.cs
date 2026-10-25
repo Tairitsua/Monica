@@ -164,15 +164,4 @@ public static class SeederResourceExtensions
         return localizer["Common:DurationHoursMinutes", (int)value.TotalHours, value.Minutes];
     }
 
-    /// <summary>Formats an optional timestamp as explicitly labelled UTC.</summary>
-    public static string FormatSeederTimestamp(
-        this IStringLocalizer<SeederResource> localizer,
-        DateTimeOffset? timestamp)
-    {
-        return timestamp is null
-            ? localizer["Common:NotAvailable"]
-            : localizer[
-                "Common:UtcTimestamp",
-                timestamp.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture)];
-    }
 }

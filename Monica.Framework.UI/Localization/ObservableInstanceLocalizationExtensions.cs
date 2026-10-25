@@ -96,7 +96,7 @@ public static class ObservableInstanceLocalizationExtensions
     /// <summary>
     /// Formats a relative timestamp with localized units.
     /// </summary>
-    public static string FormatRelativeTime(this IStringLocalizer localizer, DateTime timestamp)
+    public static string FormatRelativeTime(this IStringLocalizer localizer, DateTime timestamp, Monica.UI.Shared.Services.MoTimeFormatter time)
     {
         var elapsed = DateTime.UtcNow - timestamp;
         if (elapsed < TimeSpan.Zero)
@@ -113,7 +113,7 @@ public static class ObservableInstanceLocalizationExtensions
         if (elapsed.TotalDays < 7)
             return localizer["Shared:RelativeTime:DaysAgo", (int)elapsed.TotalDays].Value;
 
-        return timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff");
+        return time.Format(timestamp);
     }
 
     /// <summary>

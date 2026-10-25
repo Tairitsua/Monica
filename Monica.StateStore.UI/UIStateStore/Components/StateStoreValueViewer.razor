@@ -1,0 +1,67 @@
+@using Monica.UI.Shared.Components.Json
+@using System.Text.Json
+@inject IStringLocalizer<StateStoreResource> L
+
+<div class="value-viewer">
+    <header><strong>@L["KeyExplorer:Labels:ValuePreview"]</strong><div class="value-tools"><div class="view-switch" role="group" aria-label="@L["Workbench:ValueViews"]">
+        @foreach (var mode in new[] { (Id: "Formatted", Label: "JSON"), (Id: "Fields", Label: L["Workbench:Fields"]) })
+        {
+            <button type="button" disabled="@(mode.Id == "Fields" && !HasFields)" aria-pressed="@(_mode == mode.Id ? "true" : "false")" @onclick="() => _mode = mode.Id">@mode.Label</button>
+        }
+    </div>@if (_mode == "Fields") { <MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" OnClick="OnCopy" aria-label="@L["Workbench:CopyValue"]" /> }</div></header>
+    @if (_mode == "Fields" && HasFields)
+    {
+        <div class="json-fields">
+            @foreach (var field in Fields())
+            {
+                <div class="json-field"><code>@field.Name</code><div>
+                    @if (field.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                    {
+                        <details><summary>@L[field.Value.ValueKind == JsonValueKind.Object ? "Workbench:Object" : "Workbench:Array"]</summary><MoJson Value="@field.Value.GetRawText()" ShowToolbar="false" ShowLineNumbers="false" ShowStatus="false" MaxHeight="240px" /></details>
+                    }
+                    else { <code class="@ValueClass(field.Value.ValueKind)">@field.Value.GetRawText()</code> }
+                </div></div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="json-preview"><MoJson Value="@Value" AllowPlainText="true" ShowToolbar="true" /></div>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets the exact raw value. Untrusted content is rendered as encoded text.</summary>
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    /// <summary>Gets or sets the selected key identity; changing it resets the subordinate value view.</summary>
+    [Parameter] public string? Identity { get; set; }
+    /// <summary>Gets or sets the action that copies the original value rather than its formatted projection.</summary>
+    [Parameter] public EventCallback OnCopy { get; set; }
+    private string? _source, _identity;
+    private string _mode = "Formatted";
+    private JsonElement? _root;
+    private bool HasFields => _root?.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
+    protected override void OnParametersSet()
+    {
+        if (_identity != Identity) { _identity = Identity; _mode = "Formatted"; }
+        if (_source == Value) return;
+        _source = Value; _root = null;
+        try { using var json = JsonDocument.Parse(Value); _root = json.RootElement.Clone(); }
+        catch (JsonException) { }
+        if (_mode == "Fields" && !HasFields) _mode = "Formatted";
+    }
+    private IEnumerable<(string Name, JsonElement Value)> Fields()
+    {
+        if (_root?.ValueKind == JsonValueKind.Object)
+            foreach (var property in _root.Value.EnumerateObject()) yield return (property.Name, property.Value);
+        else if (_root?.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var value in _root.Value.EnumerateArray()) yield return ((index++).ToString(System.Globalization.CultureInfo.InvariantCulture), value);
+        }
+    }
+    private static string ValueClass(JsonValueKind kind) => kind switch
+    {
+        JsonValueKind.String => "json-string", JsonValueKind.Number => "json-number", _ => "json-literal"
+    };
+}

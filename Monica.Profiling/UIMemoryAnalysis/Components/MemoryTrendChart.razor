@@ -1,3 +1,5 @@
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Profiling.RuntimeMetrics.Models
 @using Monica.Profiling.UIRuntimeMetrics.Components
 @using Monica.Profiling.UIRuntimeMetrics.Support
@@ -9,7 +11,7 @@
         <header class="memory-history-heading"><div><span class="memory-history-eyebrow">@L["Trend:WindowEyebrow"]</span><h2>@L["Trend:WindowTitle"]</h2><p>@L["Trend:WindowHelp"]</p></div></header>
         <dl class="memory-history-summary">
             <div><dt>@L["Trend:Summary:Samples"]</dt><dd data-window-count="@Points.Count">@(TrendData is null ? L["Common:Unavailable"] : L["Trend:Capacity", Points.Count, TrendData.MaxHistoryPoints])</dd></div>
-            <div><dt>@L["Trend:Window"]</dt><dd>@WindowDuration</dd><small><time datetime="@MachineTime(TrendData?.StartTime)">@RuntimeMetricsDisplayFormatter.LocalTime(TrendData?.StartTime)</time><span aria-hidden="true"> → </span><time datetime="@MachineTime(TrendData?.EndTime)">@RuntimeMetricsDisplayFormatter.LocalTime(TrendData?.EndTime)</time></small></div>
+            <div><dt>@L["Trend:Window"]</dt><dd>@WindowDuration</dd><small><time datetime="@MachineTime(TrendData?.StartTime)">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(TrendData?.StartTime))</time><span aria-hidden="true"> → </span><time datetime="@MachineTime(TrendData?.EndTime)">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(TrendData?.EndTime))</time></small></div>
             <div><dt>@L["Trend:CollectorInterval"]</dt><dd data-sample-interval="@TrendData?.SampleIntervalMs">@(TrendData is null ? L["Common:Unavailable"] : L["Trend:Seconds", TrendData.SampleIntervalMs / 1000d])</dd></div>
         </dl>
         <dl class="memory-history-means">
@@ -34,7 +36,7 @@
     <p class="memory-history-note">@L["Trend:MeasurementHelp"]</p>
     <article class="memory-generation-lens">
         <header class="memory-history-heading"><div><span class="memory-history-eyebrow">@L["Trend:Generations:Eyebrow"]</span><h2>@L["Trend:Generations:Title"]</h2><p>@L["Trend:Generations:Help"]</p></div>
-            @if (Points.Count > 0) { <time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Points[^1].Timestamp)">@MemoryAnalysisDisplayFormatter.LocalSnapshotTime(Points[^1].Timestamp)</time> }</header>
+            @if (Points.Count > 0) { <time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(Points[^1].Timestamp)">@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(Points[^1].Timestamp))</time> }</header>
         @if (Points.Count > 0)
         {
             var latest = Points[^1];
@@ -46,7 +48,7 @@
                 <div><dt>@L["Gc:Generations:Names:Poh"]</dt><dd>@MemoryAnalysisDisplayFormatter.ReportedBytes(latest.PohSizeBytes)</dd></div>
             </dl>
         }
-        else { <p class="memory-generation-empty">@L["Trend:Recent:Empty"]</p> }
+        else { <MoContentState Compact="true">@L["Trend:Recent:Empty"]</MoContentState> }
     </article>
     <article class="memory-sample-ledger">
         <header class="memory-history-heading"><div><span class="memory-history-eyebrow">@L["Trend:Recent:Eyebrow"]</span><h2>@L["Trend:Recent:Title"]</h2></div><p>@L["Trend:Recent:Help"]</p></header>
@@ -57,7 +59,7 @@
                 <tbody>@foreach (var point in VisiblePoints)
                 {
                     <tr @key="point.Timestamp" data-sample-timestamp="@MemoryAnalysisDisplayFormatter.MachineTime(point.Timestamp)">
-                        <td data-label="@L["Trend:Recent:Columns:Time"]"><time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(point.Timestamp)" title="@MemoryAnalysisDisplayFormatter.LocalSnapshotTime(point.Timestamp)">@RuntimeMetricsDisplayFormatter.LocalTime(point.Timestamp)</time></td>
+                        <td data-label="@L["Trend:Recent:Columns:Time"]"><time datetime="@MemoryAnalysisDisplayFormatter.MachineTime(point.Timestamp)" title="@UiTime.Format(RuntimeMetricsDisplayFormatter.AsUtc(point.Timestamp))">@UiTime.FormatTime(RuntimeMetricsDisplayFormatter.AsUtc(point.Timestamp))</time></td>
                         <td data-label="@L["Trend:Recent:Columns:Heap"]">@RuntimeMetricsDisplayFormatter.Megabytes(point.GcHeapSizeMB)</td>
                         <td data-label="@L["Trend:Recent:Columns:Allocation"]">@RuntimeMetricsDisplayFormatter.ReportedAllocationRate(point.AllocationRateBps)</td>
                         <td data-label="@L["Trend:Recent:Columns:GcTime"]">@MemoryAnalysisDisplayFormatter.Percent(point.TimeInGcPercent)</td>
@@ -69,7 +71,7 @@
             <footer class="memory-ledger-footer"><span>@L["Trend:Recent:Range", (_page - 1) * PageSize + 1, Math.Min(_page * PageSize, Points.Count), Points.Count]</span>
                 @if (PageCount > 1) { <MudPagination Count="PageCount" Selected="_page" SelectedChanged="ChangePage" ShowFirstButton="true" ShowLastButton="true" Size="Size.Small" Color="Color.Default" aria-label="@L["Trend:Recent:Pagination"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /> }</footer>
         }
-        else { <div class="memory-ledger-empty">@L["Trend:Recent:Empty"]</div> }
+        else { <MoContentState Compact="true">@L["Trend:Recent:Empty"]</MoContentState> }
     </article>
 </section>
 

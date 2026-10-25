@@ -1,5 +1,9 @@
 {
-  "Pages": { "MapperDebug": { "Title": "对象映射调试" } },
+  "Pages": {
+    "MapperDebug": {
+      "Title": "对象映射调试"
+    }
+  },
   "Page": {
     "PageTitle": "对象映射注册表",
     "Header": {
@@ -54,5 +58,8 @@
       "LoadSucceeded": "已读取 {0} 个已注册类型对。",
       "LoadFailed": "读取注册表失败：{0}"
     }
+  },
+  "Navigation": {
+    "Category": "对象映射"
   }
 }

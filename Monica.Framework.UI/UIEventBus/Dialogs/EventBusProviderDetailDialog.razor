@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.Extensions.DependencyInjection
 @using Microsoft.Extensions.Logging
 @using Monica.EventBus.Abstractions
@@ -25,7 +26,7 @@
             {
                 <header class="provider-inspector-identity">
                     <div><span class="provider-inspector-kicker">@L.GetProviderModeText(_provider.IsDistributed)</span><h2>@L.GetProviderKindText(_provider.ProviderType)</h2><code>@ProviderKey</code><p>@_provider.ImplementationType</p></div>
-                    <div class="provider-inspector-capture"><span>@L["ProviderInspector:Captured"]</span><time>@_capturedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</time></div>
+                    <div class="provider-inspector-capture"><span>@L["ProviderInspector:Captured"]</span><time>@UiTime.Format(_capturedAt)</time></div>
                 </header>
                 <p class="provider-inspector-scope">@L["ProviderInspector:Scope"]</p>
                 <div class="provider-inspector-tabs">

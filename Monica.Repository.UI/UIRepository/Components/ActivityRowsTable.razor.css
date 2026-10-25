@@ -41,7 +41,6 @@
 .activity-query ::deep .mud-button-end-icon { margin-inline-start: 5px; }
 .activity-query ::deep .mud-button-end-icon > :is(.mud-icon-root, .mo-icon) { width: 15px; height: 15px; }
 .activity-age-value { font-family: var(--mo-font-family-mono, monospace); font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.activity-table-empty { padding: 30px 20px; color: var(--activity-muted); }
 .activity-rows-table ::deep .mud-table-pagination-toolbar { min-height: 56px; height: auto; padding: 8px 16px; gap: 4px 10px; flex-wrap: wrap; border-top: 1px solid var(--activity-line); }
 .activity-rows-table ::deep .mud-table-pagination-caption, .activity-rows-table ::deep .mud-table-page-number-information, .activity-rows-table ::deep .mud-table-pagination-information { font-size: 11px; color: var(--activity-muted); }
 .activity-rows-table ::deep .mud-table-pagination-actions { display: flex; margin-inline-start: 4px; }
@@ -61,4 +60,14 @@
     .activity-rows-table ::deep .mud-table-pagination-toolbar { justify-content: flex-start; padding: 12px 16px; }
     .activity-rows-table ::deep .mud-table-pagination-spacer { display: none; }
     .activity-rows-table ::deep .mud-table-pagination-actions { margin-inline-start: auto; }
+}
+
+.activity-rows-table ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) { display: block; width: 100%; min-width: 0; max-width: 100%; }
+.activity-rows-table ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: table; width: 100%; table-layout: fixed; }
+.activity-rows-table ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-body { display: block; width: 100%; }
+.activity-rows-table ::deep .mud-table-body > tr:has(> .mud-table-empty-row) { display: block; width: 100%; padding: 0; }
+.activity-rows-table ::deep .mud-table-root .mud-table-body .mud-table-empty-row { display: block; width: 100%; max-width: none; padding: 0; }
+.activity-rows-table ::deep .mud-table-empty-row::before { display: none; }
+@media (max-width: 600px) {
+    .activity-rows-table ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) > .mud-table-head { display: none; }
 }

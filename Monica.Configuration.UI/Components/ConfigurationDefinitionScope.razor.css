@@ -1,0 +1,18 @@
+.configuration-definition-scope { display: grid; gap: 10px; min-width: 0; width: 100%; }
+.configuration-definition-scope-count { font-size: 13px; font-weight: 600; line-height: 1.6; }
+.configuration-definition-scope-preview { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.configuration-definition-scope-preview > span { padding: 3px 8px; border-radius: 4px; background: color-mix(in srgb, var(--mud-palette-info) 8%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.configuration-definition-scope-details { min-width: 0; width: 100%; }
+.configuration-definition-scope-details summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 4px; color: color-mix(in srgb, var(--mud-palette-primary) 60%, var(--mud-palette-text-primary)); cursor: pointer; font-size: 12px; line-height: 1.7; list-style: none; }
+.configuration-definition-scope-details summary::-webkit-details-marker { display: none; }
+.configuration-definition-scope-details summary:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 4px; border-radius: 2px; }
+.configuration-definition-scope-details summary ::deep .mo-icon { flex-shrink: 0; transition: transform .15s ease; }
+.configuration-definition-scope-details[open] summary ::deep .mo-icon { transform: rotate(180deg); }
+.configuration-definition-scope-content { display: grid; gap: 12px; padding-top: 10px; min-width: 0; }
+.configuration-definition-scope-content ul { display: grid; gap: 0; padding: 0; margin: 0; list-style: none; }
+.configuration-definition-scope-content li { display: grid; justify-items: start; gap: 3px; min-width: 0; padding-block: 10px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+.configuration-definition-scope-content li:last-child { border-bottom: 0; padding-bottom: 0; }
+.configuration-definition-scope-content li > strong { font-size: 13px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+.configuration-definition-scope-content code, .configuration-definition-scope-content p, .configuration-definition-scope-empty { margin: 0; color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+.configuration-definition-scope ::deep .configuration-definition-scope-link { min-width: 0; max-width: 100%; padding: 3px 6px; font-size: 13px; line-height: 1.6; text-align: start; text-transform: none; overflow-wrap: anywhere; }
+.configuration-definition-scope ::deep .configuration-definition-scope-link .mud-button-label { white-space: normal; overflow-wrap: anywhere; }

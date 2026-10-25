@@ -1,0 +1,22 @@
+/* The native select popover is portaled outside the component's isolated DOM. */
+.state-store-provider-popover.mud-popover {
+    width:min(320px,calc(100vw - 40px));
+    margin-top:7px;
+    padding:6px;
+    border:1px solid color-mix(in srgb,var(--mud-palette-text-secondary) 30%,var(--mud-palette-lines-default));
+    border-radius:9px;
+    background:color-mix(in srgb,var(--mud-palette-text-primary) 4%,var(--mud-palette-surface));
+    box-shadow:0 12px 40px var(--mud-palette-overlay-dark);
+    color:var(--mud-palette-text-primary);
+    font-family:var(--mo-font-family-body);
+}
+.state-store-provider-popover .state-store-provider-options {padding:0;}
+.state-store-provider-popover .state-store-provider-options .mud-list-item {padding:10px;border-radius:5px;color:var(--mud-palette-text-primary);}
+.state-store-provider-popover .state-store-provider-options .mud-list-item-text {margin:0;min-width:0;}
+.state-store-provider-popover .state-store-provider-options .mud-typography {font-family:inherit;}
+.state-store-provider-popover .state-store-provider-options .provider-description {color:color-mix(in srgb,var(--mud-palette-text-secondary) 80%,var(--mud-palette-text-primary));}
+.state-store-provider-popover .state-store-provider-options .mud-list-item:hover {background:color-mix(in srgb,var(--mud-palette-text-primary) 7%,var(--mud-palette-surface));}
+/* The native selected-color utility uses an important background declaration. */
+.state-store-provider-popover .state-store-provider-options .mud-list-item[aria-selected="true"] {background:color-mix(in srgb,var(--mud-palette-primary) 15%,var(--mud-palette-surface)) !important;}
+.state-store-provider-popover .state-store-provider-options .mud-list-item:focus-visible {outline:2px solid var(--mud-palette-primary);outline-offset:-2px;}
+.state-store-provider-popover .state-store-provider-options .provider-selection-mark {display:inline-flex;}

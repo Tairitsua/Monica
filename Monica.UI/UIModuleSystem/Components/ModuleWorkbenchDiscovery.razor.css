@@ -28,7 +28,7 @@
 .discovery-stage-evidence summary { padding-block: 2px; color: var(--discovery-muted); font-size: 12px; line-height: 1.65; cursor: pointer; }
 .discovery-stage-evidence summary:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; border-radius: 3px; }
 .discovery-stage-evidence ::deep .identifier-value code { margin-top: 7px; color: var(--mud-palette-text-primary); font-size: 12px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
-.discovery-stage-empty { margin: 0; padding: 28px; color: var(--discovery-muted); font-size: 13px; line-height: 1.7; }
+
 .discovery-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(280px, .8fr); align-items: start; gap: 24px; min-width: 0; }
 .discovery-query-ledger, .discovery-commit { min-width: 0; border: 1px solid var(--mud-palette-divider); border-radius: 16px; background: var(--mud-palette-surface); }
 .discovery-evidence-heading { min-width: 0; padding: 24px; }
@@ -49,7 +49,7 @@
 .query-identity ::deep .identifier-value code { color: var(--mud-palette-text-primary); font-size: 12px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
 .query-consumers { display: block; min-width: 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .query-match-count { font-family: var(--mo-font-family-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
-.discovery-query-empty { margin: 0; padding: 24px; color: var(--discovery-muted); font-size: 13px; line-height: 1.7; }
+
 .discovery-commit { border-top: 3px solid color-mix(in srgb, var(--mud-palette-secondary) 55%, var(--mud-palette-divider)); }
 .discovery-commit-facts { margin: 0 24px 24px; min-width: 0; }
 .discovery-commit-facts ::deep .mo-vl-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -86,4 +86,24 @@
     .query-table-wrapper ::deep tbody td[colspan] { grid-column: 1 / -1; grid-row: auto; }
     .query-table-wrapper ::deep tbody td[colspan]::before { display: none; }
     .discovery-commit-facts { margin-inline: 20px; }
+}
+
+@container module-discovery (max-width: 600px) {
+    .query-table-wrapper ::deep .mud-table-root:has(> .mud-table-body > tr > .mud-table-empty-row) {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+    .query-table-wrapper ::deep tr:has(> .mud-table-empty-row) {
+        display: block;
+        width: 100%;
+    }
+    .query-table-wrapper ::deep .mud-table-empty-row {
+        display: flow-root;
+        width: 100%;
+        padding: 0;
+    }
+    .query-table-wrapper ::deep .mud-table-empty-row::before {
+        display: none;
+    }
 }

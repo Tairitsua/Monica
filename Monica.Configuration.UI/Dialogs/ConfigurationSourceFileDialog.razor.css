@@ -33,14 +33,6 @@
 }
 
 .configuration-source-file code,
-.configuration-source-json {
-    font-family: var(--mo-font-family-mono);
-    font-size: 12px;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
-
 .configuration-source-file-badges {
     display: flex;
     flex-wrap: wrap;
@@ -96,8 +88,7 @@
     grid-column: 1 / -1;
 }
 
-.configuration-source-file-redaction,
-.configuration-source-file-loading {
+.configuration-source-file-redaction {
     margin: 0;
     font-size: 13px;
     line-height: 1.65;
@@ -123,13 +114,6 @@
     font-size: 14px;
     font-weight: 550;
     line-height: 1.5;
-}
-
-.configuration-source-json {
-    margin: 0;
-    min-width: 0;
-    padding: 20px;
-    color: var(--mud-palette-text-primary);
 }
 
 .configuration-source-file-actions {
@@ -158,9 +142,6 @@
         grid-template-columns: minmax(0, 1fr);
     }
     .configuration-source-file-content > header {
-        padding: 16px;
-    }
-    .configuration-source-json {
         padding: 16px;
     }
     .configuration-source-file-actions {

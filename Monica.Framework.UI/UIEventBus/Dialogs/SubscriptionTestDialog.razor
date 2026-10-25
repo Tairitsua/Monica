@@ -1,3 +1,6 @@
+@using Monica.UI.Shared.Components.Json
+@using Monica.UI.Shared.Components.States
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Core.Results
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Models
@@ -15,7 +18,7 @@
         <div class="runtime-test">
             @if (_subscription is null || _subscriptionId is null)
             {
-                <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Variant="Variant.Outlined">@L["SubscriptionTestDialog:States:NotSelected"]</MudAlert>
+                <MoContentState Compact="true"><MoIcon Icon="@MoIcons.Info" Size="1.5rem" /><p>@L["SubscriptionTestDialog:States:NotSelected"]</p></MoContentState>
             }
             else
             {
@@ -33,7 +36,7 @@
                     <section class="runtime-test-publish">
                         <header class="runtime-test-heading"><span>01</span><div><h3>@L["RuntimeTest:Compose"]</h3><p>@L["RuntimeTest:ValidationHelp"]</p></div></header>
                         <div class="runtime-test-editor">
-                            <MudTextField T="string" @bind-Value="_jsonPayload" Label="@L["SubscriptionTestDialog:Fields:JsonSample"]" Variant="Variant.Outlined" Immediate="true" Lines="12" Class="runtime-test-json" Disabled="@(Inactive || _commandBusy || _replayLocalMessage)" />
+                            <MoJson @bind-Value="_jsonPayload" ReadOnly="false" Rows="12" Label="@L["SubscriptionTestDialog:Fields:JsonSample"]" Disabled="@(Inactive || _commandBusy || _replayLocalMessage)" />
                             @if (!string.IsNullOrWhiteSpace(_validationMessage))
                             {
                                 <p class="runtime-test-validation" data-error="@(_hasValidationError ? "true" : "false")" role="status">@_validationMessage</p>
@@ -63,7 +66,7 @@
                             <MudButton Variant="Variant.Outlined" Color="@(_listenerSnapshot.IsListening ? Color.Warning : Color.Primary)" StartIcon="@(_listenerSnapshot.IsListening ? MoIcons.StopCircle : MoIcons.Play)" OnClick="ToggleListeningAsync" Disabled="@(Inactive || (!_listenerSnapshot.IsListening && _subscription.Activation != Monica.Core.TypeDiscovery.Abstractions.ActivationMode.Automatic))" aria-disabled="@BusyAttribute" aria-busy="@(_listenerBusy ? "true" : "false")">@(_listenerSnapshot.IsListening ? L["SubscriptionTestDialog:Actions:StopListening"] : L["SubscriptionTestDialog:Actions:StartListening"])</MudButton>
                             <MudButton Color="Color.Default" OnClick="ClearMessages" Disabled="@Inactive" aria-disabled="@(_commandBusy || _listenerSnapshot.MessageCount == 0 ? "true" : "false")">@L["SubscriptionTestDialog:Actions:Clear"]</MudButton>
                         </div>
-                        <div class="runtime-test-retained"><strong>@L["TestBench:Retained", _listenerSnapshot.MessageCount]</strong>@if (_listenerSnapshot.StartedAt is { } startedAt) { <span>@L["RuntimeTest:Started", startedAt.ToString("HH:mm:ss")]</span> }</div>
+                        <div class="runtime-test-retained"><strong>@L["TestBench:Retained", _listenerSnapshot.MessageCount]</strong>@if (_listenerSnapshot.StartedAt is { } startedAt) { <span>@L["RuntimeTest:Started", UiTime.FormatTime(startedAt)]</span> }</div>
                         @if (_listenerSnapshot.MessageCount == 0)
                         {
                             <div class="runtime-test-empty"><MoIcon Icon="@MoIcons.Inbox" Size="1.5rem" /><h4>@L["SubscriptionTestDialog:States:NoMessages"]</h4><p>@L["RuntimeTest:EmptyHelp"]</p></div>
@@ -74,9 +77,9 @@
                                 @foreach (var message in _listenerSnapshot.Messages.Reverse())
                                 {
                                     <li @key="message">
-                                        <header><span><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="1.25rem" />@L["TestBench:Received"]</span><time>@message.ReceivedAt.ToString("HH:mm:ss.fff")</time></header>
+                                        <header><span><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="1.25rem" />@L["TestBench:Received"]</span><time>@UiTime.FormatTime(message.ReceivedAt)</time></header>
                                         <dl><div><dt>@L["SubscriptionTestDialog:Fields:TopicName"]</dt><dd><code>@message.TopicName</code></dd></div><div><dt>@L["SubscriptionTestDialog:Fields:EventType"]</dt><dd><code>@message.EventType</code></dd></div></dl>
-                                        <pre>@message.PayloadJson</pre>
+                                        <MoJson Value="@message.PayloadJson" ShowLineNumbers="false" />
                                     </li>
                                 }
                             </ol>

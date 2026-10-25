@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using System.Text.Json
 @using Monica.JobScheduler.UI.Localization
 
@@ -37,18 +38,9 @@
             <section class="trigger-dialog__payload" aria-labelledby="trigger-payload-heading">
                 <MudText Typo="Typo.subtitle2" id="trigger-payload-heading">@L["Trigger:PayloadSection"]</MudText>
                 <div class="trigger-dialog__json-field">
-                    <MudTextField T="string"
-                                  Value="@_jobArgs"
-                                  ValueChanged="SetJobArgs"
-                                  Label="@L["Trigger:Arguments"]"
-                                  HelperText="@GetArgumentsHelp()"
-                                  Error="@(_argumentsError is not null)"
-                                  ErrorText="@_argumentsError"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  Lines="7"
-                                  Immediate="true"
-                                  Disabled="@_isSubmitting" />
+                    <MoJson Value="@_jobArgs" ValueChanged="SetJobArgs" ReadOnly="false" Rows="7" Label="@L["Trigger:Arguments"]" Disabled="@_isSubmitting" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@GetArgumentsHelp()</MudText>
+                    @if (_argumentsError is not null) { <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@_argumentsError</MudText> }
                 </div>
             </section>
 

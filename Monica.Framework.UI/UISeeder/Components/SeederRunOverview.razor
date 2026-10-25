@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @inject IStringLocalizer<SeederResource> L
 
@@ -69,8 +70,8 @@
                     <dd>
                         @if (run.StartedAtUtc is { } startedAt)
                         {
-                            <time datetime="@startedAt.ToString("O")" title="@L.FormatSeederTimestamp(startedAt)">
-                                @L["Common:UtcTimestamp", startedAt.UtcDateTime.ToString("HH:mm:ss", CultureInfo.CurrentCulture)]
+                            <time datetime="@startedAt.ToString("O")" title="@UiTime.Format(startedAt)">
+                                @UiTime.FormatTime(startedAt)
                             </time>
                         }
                         else
@@ -84,8 +85,8 @@
                     <dd>
                         @if (run.CompletedAtUtc is { } completedAt)
                         {
-                            <time datetime="@completedAt.ToString("O")" title="@L.FormatSeederTimestamp(completedAt)">
-                                @L["Common:UtcTimestamp", completedAt.UtcDateTime.ToString("HH:mm:ss", CultureInfo.CurrentCulture)]
+                            <time datetime="@completedAt.ToString("O")" title="@UiTime.Format(completedAt)">
+                                @UiTime.FormatTime(completedAt)
                             </time>
                         }
                         else
@@ -111,7 +112,7 @@
             }
 
             <div class="seeder-run-captured">
-                @L["Overview:CapturedAt", L.FormatSeederTimestamp(run.CapturedAtUtc)]
+                @L["Overview:CapturedAt", UiTime.Format(run.CapturedAtUtc)]
             </div>
         </div>
 

@@ -258,6 +258,24 @@ public sealed class SharedTransactionTests
             TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task ValidateDatabaseAccess_WhenContextIsNotSelected_ShouldRejectNativeAccess()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(token);
+        using var host = CreateHost(connection, connection);
+        await using var operation = host.Services.CreateAsyncScope();
+        var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+        await manager.RunAsync(() =>
+        {
+            operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().ValidateDatabaseAccess();
+            var nonParticipant = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
+            Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
+            return Task.CompletedTask;
+        }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token);
+    }
+
     private static IHost CreateHost(SqliteConnection first, SqliteConnection second,
         DbContextProviderType secondParticipation = DbContextProviderType.UnitOfWork,
         bool withOutbox = false,

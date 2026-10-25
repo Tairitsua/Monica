@@ -154,7 +154,7 @@
                                                         @RevisionTransition(history)
                                                     </MudText>
                                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                        @history.PublishedTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                                                        @TimeDisplay.Format(history.PublishedTime)
                                                     </MudText>
                                                 </MudStack>
                                             </MudButton>
@@ -176,7 +176,7 @@
                                         <div class="configuration-definition-publication-identity">
                                             <MudText Typo="Typo.subtitle1">@ChangeKindText(_selectedHistory.ChangeKind)</MudText>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @_selectedHistory.PublishedTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
+                                                @TimeDisplay.Format(_selectedHistory.PublishedTime)
                                             </MudText>
                                         </div>
                                         <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">

@@ -1,0 +1,80 @@
+@inject IStringLocalizer<ConfigurationUIResource> L
+
+<div class="configuration-definition-scope">
+    @if ((DefinitionCount ?? DefinitionKeys.Count) != 1)
+    {
+        <strong class="configuration-definition-scope-count">@L["Versions:Current:DefinitionCount", DefinitionCount ?? DefinitionKeys.Count]</strong>
+    }
+    @if (DefinitionKeys.Count == 0)
+    {
+        <span class="configuration-definition-scope-empty">@L["Versions:Definitions:Empty"]</span>
+    }
+    else
+    {
+        <div class="configuration-definition-scope-preview">
+            @foreach (var key in DefinitionKeys.Take(3))
+            {
+                @if (OnDefinitionSelected.HasDelegate)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Class="configuration-definition-scope-link" OnClick="() => OnDefinitionSelected.InvokeAsync(key)">@DefinitionLabel(key)</MudButton>
+                }
+                else
+                {
+                    <span>@DefinitionLabel(key)</span>
+                }
+            }
+        </div>
+        <details class="configuration-definition-scope-details">
+            <summary><span>@L["Versions:Definitions:ViewAll"]</span><MoIcon Icon="@MoIcons.ChevronDown" Size="1rem" /></summary>
+            <div class="configuration-definition-scope-content">
+                <MudTextField T="string" @bind-Value="_search" Immediate="true" Label="@L["Versions:Definitions:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" />
+                @if (VisibleKeys.Count == 0)
+                {
+                    <p>@L["Versions:Definitions:NoMatches"]</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var key in VisibleKeys)
+                        {
+                            <li>
+                                @if (OnDefinitionSelected.HasDelegate)
+                                {
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Class="configuration-definition-scope-link" OnClick="() => OnDefinitionSelected.InvokeAsync(key)">@DefinitionLabel(key)</MudButton>
+                                }
+                                else
+                                {
+                                    <strong>@DefinitionLabel(key)</strong>
+                                }
+                                <code>@key</code>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </details>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets complete stable definition identities, retained for searching and disclosure.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> DefinitionKeys { get; set; } = [];
+
+    /// <summary>Gets or sets the facade's captured count when it differs from the supplied identity list.</summary>
+    [Parameter] public int? DefinitionCount { get; set; }
+
+    /// <summary>Gets or sets the optional navigation action for an exact definition identity.</summary>
+    [Parameter] public EventCallback<string> OnDefinitionSelected { get; set; }
+
+    /// <summary>Gets or sets an optional localized display-name resolver; identities remain unchanged.</summary>
+    [Parameter] public Func<string, string>? DisplayName { get; set; }
+
+    private string? _search;
+    private IReadOnlyList<string> VisibleKeys => string.IsNullOrWhiteSpace(_search)
+        ? DefinitionKeys
+        : DefinitionKeys.Where(key => key.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || DefinitionLabel(key).Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+
+    private string DefinitionLabel(string key) => DisplayName?.Invoke(key)
+        ?? ConfigurationUnifiedVersionDisplayFormatter.DefinitionLabel(key);
+}

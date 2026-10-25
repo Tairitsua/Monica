@@ -18,7 +18,7 @@
 .timing-active-age { display: grid; gap: 7px; min-width: 0; }
 .timing-active-age span, .timing-active-age small { font-size: 10px; color: var(--timing-muted-ink); line-height: 1.7; }
 .timing-active-age strong { font-family: var(--mo-font-family-mono); font-size: 24px; line-height: 1.25; font-weight: 400; overflow-wrap: anywhere; }
-.timing-running-empty { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.7; color: var(--timing-muted-ink); }
+.timing-running-empty { font-size: 13px; line-height: 1.7; color: var(--timing-muted-ink); }
 .timing-running-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; border-top: 1px solid var(--mud-palette-lines-default); margin-top: 18px; padding-top: 14px; font-size: 11px; line-height: 1.7; color: var(--timing-muted-ink); }
 @container timing-running (max-width: 650px) {
     .timing-active-operation { grid-template-columns: minmax(0, 1fr) 36px; gap: 18px; }

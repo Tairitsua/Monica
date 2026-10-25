@@ -81,15 +81,16 @@ MudBlazor start icons can retain a negative leading margin that assumes the butt
 
 ### Keep tab body padding off tab controls
 
-Inspect both the tab strip and content DOM before styling a generated panel class. In MudBlazor v9, `.mud-tab-panel` can appear on both the tab control and the content body. Applying body insets to that class alone also enlarges the tab strip. Scope content padding to the actual panel beneath its panels owner:
+Inspect both the tab strip and content DOM before styling a generated panel class. A native panel can use `display: contents`, as verified in MudBlazor 9.11.0: it then has no layout box, so even correctly computed padding on `[role="tabpanel"]` does not inset its children. Put a real HTML content wrapper inside each `MudTabPanel` and apply body insets to that component-owned wrapper:
 
 ```css
-.inspector-wrapper ::deep .mud-tabs-panels > [role="tabpanel"] {
+.inspector-panel-content {
+    min-width: 0;
     padding: 20px 22px 28px;
 }
 ```
 
-Set control padding separately on the actual tab controls. Verify computed padding and height on both regions, every opened tab's text-to-surface inset, and the phone layout. A correctly scoped `::deep` selector can still target the wrong generated elements.
+Set control padding separately on the actual tab controls. Verify the content wrapper's nonzero bounding rectangle and measure each opened tab's first and final content against its painted scroll owner, including loading and empty states and the phone layout. Computed padding alone does not prove a visible inset; a correctly scoped selector can still target a boxless element or the wrong generated control.
 
 ### Step 1: Read the component files
 

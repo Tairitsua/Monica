@@ -46,11 +46,11 @@ h2 { font-size: 18px; line-height: 1.4; font-weight: 500; margin: 0; }
 .compact-identity { flex: 1 1 auto; min-width: 0; }
 .compact-identity .entry-identity ::deep .entry-open { white-space: normal; }
 .entry-metadata { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-inline-start: 28px; font-size: 12px; line-height: 1.5; }
-.empty-state { display: grid; justify-items: start; gap: 12px; padding: 28px 24px; font-size: 13px; }
+.empty-state { font-size: 13px; }
 .empty-state h3 { font-size: 17px; line-height: 1.5; font-weight: 500; margin: 0; }
 .empty-state p { margin: 0; line-height: 1.65; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
-@container file-workspace (max-width:600px) { .inventory-toolbar { padding: 16px 20px; } .toolbar-actions { width: 100%; margin-inline-start: 0; } .empty-state { padding: 24px 20px; } .entry-metadata { margin-inline-start: 0; } .entry-identity { gap: 6px; } .entry-indicators { margin-inline-start: 0; } }
+@container file-workspace (max-width:600px) { .inventory-toolbar { padding: 16px 20px; } .toolbar-actions { width: 100%; margin-inline-start: 0; } .entry-metadata { margin-inline-start: 0; } .entry-identity { gap: 6px; } .entry-indicators { margin-inline-start: 0; } }
 
 .inventory-toolbar ::deep .inventory-sort .mud-button { min-width:44px; min-height:44px; padding:6px 8px; white-space:normal; font-size:12px; font-weight:500; }
 .inventory-toolbar ::deep .inventory-sort :is(.mud-icon-root, .mo-icon) { width:18px; height:18px; }

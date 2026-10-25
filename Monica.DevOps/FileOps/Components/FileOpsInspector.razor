@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.FileOps.Models
 @using Monica.DevOps.FileOps.State
 @using Monica.DevOps.Localization
@@ -53,7 +54,7 @@
             <div><dt>@L["Labels:Encoding"]</dt><dd>@file.EncodingName</dd></div>
             <div><dt>@L["Labels:Size"]</dt><dd title="@file.SizeBytes.ToString()">@file.SizeBytes.FormatByteSize()</dd></div>
             <div><dt>@L["Labels:LineCount"]</dt><dd>@file.LineCount</dd></div>
-            <div><dt>@L["Inspector:DiskModified"]</dt><dd><time datetime="@file.LastModifiedAt.ToString("O")">@file.LastModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</time></dd></div>
+            <div><dt>@L["Inspector:DiskModified"]</dt><dd><time datetime="@file.LastModifiedAt.ToString("O")">@UiTime.Format(file.LastModifiedAt)</time></dd></div>
         </dl></section>
         @if (!file.CanSave) { <p class="read-only-note"><MoIcon Size="1.25rem" Icon="@MoIcons.Lock" />@ReadOnlyReason</p> }
         <div class="text-editor"><MudTextField T="string" Value="@Controller.DraftText" ValueChanged="@((string value) => DraftChanged.InvokeAsync(value))" Label="@L["Inspector:Text"]" Variant="Variant.Outlined" Immediate="true" Lines="12" ReadOnly="@(!file.CanSave)" spellcheck="false" /></div>
@@ -61,7 +62,7 @@
     else
     {
         <div class="preview-unavailable"><MoIcon Icon="@MoIcons.FileText" Size="1.5rem" /><h3>@L["Inspector:Unavailable"]</h3><p>@L["Inspector:UnavailableHint"]</p></div>
-        @if (Entry is { } entry) { <dl class="entry-evidence"><div><dt>@L["Columns:Type"]</dt><dd>@(string.IsNullOrEmpty(entry.Extension) ? L["Labels:File"] : entry.Extension)</dd></div><div><dt>@L["Labels:Size"]</dt><dd>@entry.SizeDisplay</dd></div><div><dt>@L["Labels:LastModified"]</dt><dd>@entry.LastModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</dd></div></dl> }
+        @if (Entry is { } entry) { <dl class="entry-evidence"><div><dt>@L["Columns:Type"]</dt><dd>@(string.IsNullOrEmpty(entry.Extension) ? L["Labels:File"] : entry.Extension)</dd></div><div><dt>@L["Labels:Size"]</dt><dd>@entry.SizeDisplay</dd></div><div><dt>@L["Labels:LastModified"]</dt><dd>@UiTime.Format(entry.LastModifiedAt)</dd></div></dl> }
     }
     </div>
 </section>

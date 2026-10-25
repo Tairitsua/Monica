@@ -3,7 +3,7 @@
 .terminal-context header ::deep .mud-icon-button { order: 1; margin-inline-start: auto; }
 .terminal-context h2 { font-family: var(--mud-typography-default-family); font-size: 1rem; font-weight: 500; margin: 0; }
 .terminal-context__body { padding: 16px; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.terminal-context__intro, .terminal-context__empty { font-size: .78rem; line-height: 1.6; color: var(--mud-palette-text-secondary); margin: 0 0 16px; }
+.terminal-context__intro { font-size: .78rem; line-height: 1.6; color: var(--mud-palette-text-secondary); margin: 0 0 16px; }
 .terminal-history { display: flex; flex-direction: column; }
 .terminal-history ::deep .mud-button { width: 100%; padding: 12px 8px; border-bottom: 1px solid var(--mud-palette-lines-default); }
 .terminal-history ::deep .mud-button-label { width: 100%; }

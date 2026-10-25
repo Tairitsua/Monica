@@ -264,5 +264,8 @@
     "Messages": {
       "ReadFailed": "最新队列读取失败：{0}。继续显示先前捕获消息。"
     }
+  },
+  "Navigation": {
+    "Category": "数据通道"
   }
 }

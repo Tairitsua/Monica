@@ -34,10 +34,12 @@
                 <header class="provider-directory-group"><h3>@L[group.Key ? "ProviderDirectory:Keyed" : "ProviderDirectory:Default"]</h3><span>@L["Providers:Count", group.Count()]</span></header>
                 @foreach (var provider in group.OrderBy(provider => provider.ServiceKey, StringComparer.Ordinal).ThenBy(provider => provider.IsDistributed))
                 {
+                    var kind = L.GetProviderKindText(provider.ProviderType);
+                    var mode = L.GetProviderModeText(provider.IsDistributed);
                     <article class="provider-directory-record" @key="provider.UniqueId">
                         <div class="provider-directory-identity">
                             <span class="provider-directory-icon" data-mode="@(provider.IsDistributed ? "distributed" : "local")"><MoIcon Icon="@(provider.IsDistributed ? MoIcons.Cloud : MoIcons.Cpu)" Size="1.5rem" /></span>
-                            <div><h4>@L.GetProviderKindText(provider.ProviderType)<span class="provider-mode">@L.GetProviderModeText(provider.IsDistributed)</span></h4><code>@ProviderKey(provider)</code><p>@provider.ImplementationType</p></div>
+                            <div><h4 title="@provider.ImplementationType">@kind@if (kind != mode) { <span class="provider-mode">@mode</span> }</h4><code>@ProviderKey(provider)</code></div>
                         </div>
                         <dl class="provider-directory-counts">
                             <div><dt>@L["ProviderDirectory:Registrations"]</dt><dd>@provider.SubscriptionCount</dd></div>

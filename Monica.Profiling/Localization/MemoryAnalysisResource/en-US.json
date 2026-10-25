@@ -206,7 +206,7 @@
         "Fragmentation": "Fragmentation",
         "Inspect": "Inspect"
       },
-      "Help": "Newest first · all retained samples are reachable. Inspect a row for its original values and UTC timestamp.",
+      "Help": "Newest first · all retained samples are reachable. Inspect a row for its original values and timestamp.",
       "Inspect": "Inspect sample {0}",
       "Range": "Showing {0}–{1} of {2}",
       "Pagination": "Memory sample pages"
@@ -222,8 +222,8 @@
     "Window": "Observed span",
     "CollectorInterval": "Collector interval",
     "Seconds": "{0:0.##} s",
-    "HeapUnit": "Decimal MB · UTC time axis",
-    "AllocationUnit": "Reported rate · binary MiB/s · UTC time axis",
+    "HeapUnit": "Decimal MB · time axis",
+    "AllocationUnit": "Reported rate · binary MiB/s · time axis",
     "MeasurementHelp": "History belongs to the host collector. Pausing view reads does not stop collection. Separate plots preserve different units; cached counters may initially be zero.",
     "NoRetentionTitle": "History retention is disabled",
     "NoRetention": "The host retains no samples. Current process reads are still available.",
@@ -354,7 +354,7 @@
       "Frozen": "This type, source and its totals stay fixed while the page and live collector continue to update.",
       "FullName": "Complete type identity",
       "Source": "Evidence source",
-      "LastSeen": "Recorded type timestamp · UTC",
+      "LastSeen": "Recorded type timestamp",
       "CountShare": "Recorded count share · %",
       "ByteShare": "Recorded byte share · %",
       "SourceTicks": "Whole-source tick events",

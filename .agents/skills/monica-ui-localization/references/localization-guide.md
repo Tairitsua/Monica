@@ -333,7 +333,7 @@ python scripts/validate_localization.py --json
 
 ### Validation Checks
 
-Discovery excludes exact generated or archive directory names below the requested root, including `.evidence`.
+Discovery excludes exact generated or archive directory names below the requested root, including `.evidence`, `.tmp`, and `.pending`. Preserved baseline copies inside these scratch roots do not participate in resource resolution.
 An exact `evidence` directory beneath `.ui-design` is also an archive; its preserved projects, source files,
 and resources cannot define live resource identities or satisfy current key usages. Live `.ui-design` bridge
 projects remain in scope. Names such as `.evidence-copy` and `evidence-copy`, and production `Evidence`

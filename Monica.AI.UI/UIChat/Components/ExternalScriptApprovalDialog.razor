@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Json
 @using Monica.AI.Chat.Models
 @using Monica.AI.UI.Localization
 @using Microsoft.Extensions.Localization
@@ -14,7 +15,7 @@
                 <dt>@L["Chat:Approval:Script"]</dt><dd>@Request.ScriptName</dd>
                 <dt>@L["Chat:Approval:Source"]</dt><dd>@Request.Source</dd>
             </dl>
-            <div class="approval-arguments"><strong>@L["Chat:Approval:Arguments"]</strong><pre>@Request.Arguments</pre></div>
+            <div class="approval-arguments"><strong>@L["Chat:Approval:Arguments"]</strong><MoJson Value="@Request.Arguments" AllowPlainText="true" /></div>
         </div>
     </DialogContent>
     <DialogActions>

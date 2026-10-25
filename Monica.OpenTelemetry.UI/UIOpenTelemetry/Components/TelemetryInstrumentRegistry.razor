@@ -8,7 +8,7 @@
     </div>
     @if (Instruments.Count == 0)
     {
-        <div class="registry-empty" role="status"><h3>@L[MeterNames.Count == 0 ? "Registry:EmptyTitle" : "Registry:NoMatchesTitle"]</h3><p>@L[MeterNames.Count == 0 ? "Registry:Empty" : "Registry:NoMatches"]</p></div>
+        <div class="registry-empty"><MoContentState role="status" Compact="true"><h3>@L[MeterNames.Count == 0 ? "Registry:EmptyTitle" : "Registry:NoMatchesTitle"]</h3><p>@L[MeterNames.Count == 0 ? "Registry:Empty" : "Registry:NoMatches"]</p></MoContentState></div>
     }
     else
     {

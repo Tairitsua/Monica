@@ -147,5 +147,8 @@
   "ServiceMessages": {
     "ConnectivityProbeFailed": "Connectivity probe failed: {0}",
     "TextTransformFailed": "Text transformation failed: {0}"
+  },
+  "Navigation": {
+    "Category": "Utilities"
   }
 }

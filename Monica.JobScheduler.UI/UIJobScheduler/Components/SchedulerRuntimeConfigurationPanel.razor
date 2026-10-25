@@ -57,17 +57,16 @@
     /// <summary>Gets or sets all scalar effective options from one captured serving-host runtime snapshot.</summary>
     /// <remarks>
     /// Values remain read-only, including configured budgets while cleanup is disabled. Readable localized units
-    /// accompany each exact invariant interval; the caller owns authorization and snapshot refresh.
+    /// expose exact invariant intervals on hover or focus; the caller owns authorization and snapshot refresh.
     /// </remarks>
     [Parameter, EditorRequired]
     public JobSchedulerRuntimeOverview Overview { get; set; } = null!;
 
     private JobSchedulerRuntimeConfiguration c => Overview.Configuration;
 
-    private RenderFragment Interval(TimeSpan value) => @<span class="runtime-config__interval">
-        <span>@SchedulerRuntimePresentation.FormatInterval(value, L)</span>
-        <code><span class="runtime-config__visually-hidden">@L["Runtime:Config:ExactInterval"]: </span>@SchedulerRuntimePresentation.FormatExactInterval(value)</code>
-    </span>;
+    private RenderFragment Interval(TimeSpan value) => @<MudTooltip Text="@($"{L["Runtime:Config:ExactInterval"]}: {SchedulerRuntimePresentation.FormatExactInterval(value)}")">
+        <span class="runtime-config__interval" tabindex="0">@SchedulerRuntimePresentation.FormatInterval(value, L)</span>
+    </MudTooltip>;
 
     private string FormatFlag(bool value) => value ? L["Runtime:Config:Enabled"] : L["Runtime:Config:Disabled"];
 }

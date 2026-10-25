@@ -15,4 +15,11 @@ public sealed record NavigationGroup(
     IReadOnlyList<NavigationItem> Items,
     IReadOnlyList<NavigationGroup> Children,
     string? Icon = null,
-    string? Description = null);
+    string? Description = null)
+{
+    /// <summary>
+    /// Gets the number of authorized destinations in this category and all of its descendants.
+    /// Empty or unauthorized categories are removed before the resolved tree is constructed.
+    /// </summary>
+    public int DestinationCount => Items.Count + Children.Sum(child => child.DestinationCount);
+}

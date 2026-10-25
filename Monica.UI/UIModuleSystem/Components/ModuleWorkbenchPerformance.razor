@@ -193,7 +193,7 @@
                             </span>
                         </MudTd>
                     </RowTemplate>
-                    <NoRecordsContent><p class="performance-empty">@L["Performance:StartupWork:Empty"]</p></NoRecordsContent>
+                    <NoRecordsContent><MoContentState Compact="true"><p>@L["Performance:StartupWork:Empty"]</p></MoContentState></NoRecordsContent>
                     <PagerContent><MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Common:RowsPerPage"]" InfoFormat="@L["Common:PagerInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></PagerContent>
                 </MudTable>
             </div>

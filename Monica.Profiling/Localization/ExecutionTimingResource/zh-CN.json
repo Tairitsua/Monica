@@ -104,5 +104,8 @@
     "NoMatches": "没有匹配的证据。",
     "NoMatchesHelp": "修改或清除查询以查看已捕获记录。",
     "PageRange": "第 {0}–{1} 条，共 {2} 条"
+  },
+  "Navigation": {
+    "Category": "执行计时"
   }
 }

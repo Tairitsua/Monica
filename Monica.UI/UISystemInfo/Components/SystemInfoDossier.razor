@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
@@ -73,10 +74,10 @@
                             CountLabel="@L["Page:Sections:Endpoints:ListeningCount", Snapshot.Endpoints.Length]" />
             @if (Snapshot.Endpoints.Length == 0)
             {
-                <div class="system-info-empty-state">
+                <MoContentState Compact="true">
                     <strong>@L["Page:Sections:Endpoints:EmptyTitle"]</strong>
                     <p>@L["Page:Sections:Endpoints:EmptyDescription"]</p>
-                </div>
+                </MoContentState>
             }
             else
             {
@@ -114,7 +115,7 @@
                 <ArtifactCell Label="@L["Page:Sections:Artifact:Product"]" Value="@Display(Snapshot.Artifact.ProductName)" />
                 <ArtifactCell Label="@L["Page:Sections:Artifact:ProductVersion"]" Value="@Display(Snapshot.Artifact.ProductVersion)" />
                 <ArtifactCell Label="@L["Page:Sections:Artifact:FileVersion"]" Value="@Display(Snapshot.Artifact.FileVersion)" />
-                <ArtifactCell Label="@L["Page:Sections:Artifact:ArtifactTimestamp"]" Value="@SystemInfoDisplayFormatter.FormatDateTime(Snapshot.Artifact.ArtifactTimestampUtc, CultureInfo.CurrentCulture)" />
+                <ArtifactCell Label="@L["Page:Sections:Artifact:ArtifactTimestamp"]" Value="@UiTime.Format(Snapshot.Artifact.ArtifactTimestampUtc)" />
                 <ArtifactCell Label="@L["Page:Sections:Artifact:Company"]" Value="@Display(Snapshot.Artifact.CompanyName)" />
                 <ArtifactCell Label="@L["Page:Sections:Artifact:Legal"]" Value="@Display(Snapshot.Artifact.LegalCopyright)" />
             </dl>

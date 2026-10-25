@@ -32,8 +32,13 @@ public sealed class SeederOperationsComponentTests
 
         cut.Markup.Should().Contain("RunStatus:CompletedWithFailures");
         cut.Markup.Should().Contain("ReadinessStatus:Degraded");
-        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby")
-            .Should().Be("seeder-run-status-title seeder-run-progress-summary");
+        var labelIds = cut.Find("[role='progressbar']").GetAttribute("aria-labelledby")!
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        labelIds.Should().NotBeEmpty();
+        foreach (var id in labelIds)
+        {
+            cut.Find($"[id='{id}']").TextContent.Should().NotBeNullOrWhiteSpace();
+        }
     }
 
     [Fact]
@@ -140,6 +145,9 @@ public sealed class SeederOperationsComponentTests
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
+        context.Services.AddOptions<global::Monica.Modules.ModuleShellUIOption>();
+        context.Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
+        context.Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         context.Services.AddSingleton<IStringLocalizer<SeederResource>, EchoStringLocalizer<SeederResource>>();
         _ = context.Render<MudPopoverProvider>();
         return context;

@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Microsoft.JSInterop
 @using Monica.Utilities.Connectivity.Models
 @using Monica.Utilities.Localization
@@ -98,11 +99,11 @@
             </p>
             @if (State.LastResult is not { } result)
             {
-                <div class="connectivity-panel__empty">
+                <div class="connectivity-panel__empty"><MoContentState>
                     <MoIcon Icon="@MoIcons.Globe" aria-hidden="true" Size="1.5rem" />
                     <h3>@(State.ErrorMessage is null ? L["Connectivity:NoResultTitle"] : L["Connectivity:NoCompletedResult"])</h3>
                     <p>@(State.ErrorMessage is null ? L["Connectivity:NoResultSubtitle"] : L["Connectivity:NoCompletedResultHelper"])</p>
-                </div>
+                </MoContentState></div>
             }
             else
             {
@@ -120,7 +121,7 @@
                         <dt>@L["Connectivity:Host"]</dt><dd>@result.Host</dd>
                         <dt>@L["Connectivity:Port"]</dt><dd>@(result.Port?.ToString() ?? L["Connectivity:NoneReported"].Value)</dd>
                         <dt>@L["Connectivity:EffectiveTimeout"]</dt><dd>@FormatMilliseconds(result.TimeoutMilliseconds)</dd>
-                        <dt>@L["Connectivity:StartedAt"]</dt><dd>@result.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</dd>
+                        <dt>@L["Connectivity:StartedAt"]</dt><dd>@UiTime.Format(result.StartedAt)</dd>
                         <dt>@L["Connectivity:Duration"]</dt><dd>@FormatMilliseconds(result.TotalDurationMilliseconds)</dd>
                     </dl>
                     <section class="connectivity-panel__group">

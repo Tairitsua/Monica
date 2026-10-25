@@ -39,26 +39,31 @@ public class ModuleServiceDiscoveryUI : MonicaModule<ModuleServiceDiscoveryUIOpt
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static navigation =>
             {
+                var category = navigation.RegisterLocalizedCategory<ServiceDiscoveryResource>(
+                    "Monica.ServiceDiscovery", "Navigation:Category", 100,
+                    parentId: BuiltInNavigationCategoryIds.Monitor,
+                    icon: MoIcons.Cloud);
+
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryPage.SERVICE_DISCOVERY_DEBUG_URL,
                     "Pages:ServiceDiscovery:Title",
                     MoIcons.Cloud,
-                    BuiltInNavigationCategoryIds.Monitor,
+                    category,
                     addToNav: true,
                     navOrder: 40,
                     descriptionKey: "Workbench:Views:Registry:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryAtlasPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryAtlasPage.PAGE_URL, "Workbench:Views:Atlas:Title", MoIcons.ChartScatter,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 41, descriptionKey: "Workbench:Views:Atlas:Description");
+                    category, addToNav: true, navOrder: 41, descriptionKey: "Workbench:Views:Atlas:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryDependenciesPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryDependenciesPage.PAGE_URL, "Workbench:Views:Dependencies:Title", MoIcons.Workflow,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 42, descriptionKey: "Workbench:Views:Dependencies:Description");
+                    category, addToNav: true, navOrder: 42, descriptionKey: "Workbench:Views:Dependencies:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryDomainsPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryDomainsPage.PAGE_URL, "Workbench:Views:Domains:Title", MoIcons.Building,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 43, descriptionKey: "Workbench:Views:Domains:Description");
+                    category, addToNav: true, navOrder: 43, descriptionKey: "Workbench:Views:Domains:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryHostPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryHostPage.PAGE_URL, "Workbench:Views:Host:Title", MoIcons.Monitor,
-                    BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 44, descriptionKey: "Workbench:Views:Host:Description");
+                    category, addToNav: true, navOrder: 44, descriptionKey: "Workbench:Views:Host:Description");
             }));
     }
 

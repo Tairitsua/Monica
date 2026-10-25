@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Kafka.UIEventBusKafka.State
 @inject IStringLocalizer<EventBusKafkaResource> L
 
@@ -92,6 +93,6 @@
         { Config.HasDirectKafkaAccess: true } => Color.Default, not null => Color.Warning, _ => Color.Default };
     private string SamplingStatus => !State.CanAdminSelectedCluster ? L["Performance:Unavailable"] :
         State.IsPerformanceSampling ? L["Performance:Live:Sampling"] :
-        State.LastPerformanceCapturedAt is { } capturedAt ? L["Performance:Live:LastCapturedAt", capturedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")] :
+        State.LastPerformanceCapturedAt is { } capturedAt ? L["Performance:Live:LastCapturedAt", UiTime.Format(capturedAt)] :
         State.IsPerformanceAutoRefreshEnabled ? L["Performance:Live:WaitingForFirstSample"] : L["Performance:Live:Paused"];
 }

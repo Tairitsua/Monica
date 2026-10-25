@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
@@ -21,7 +22,7 @@
                 </div>
             </div>
             <dl class="system-info-identity__facts">
-                <div><dt>@L["Page:ServiceIdentity:ProcessStarted"]</dt><dd>@SystemInfoDisplayFormatter.FormatDateTime(Snapshot.Process.StartedAtUtc, CultureInfo.CurrentCulture)</dd></div>
+                <div><dt>@L["Page:ServiceIdentity:ProcessStarted"]</dt><dd>@UiTime.Format(Snapshot.Process.StartedAtUtc)</dd></div>
                 <div><dt>@L["Page:ServiceIdentity:ProductVersion"]</dt><dd>@(Snapshot.Artifact.ProductVersion ?? "—")</dd></div>
             </dl>
         </div>
@@ -35,8 +36,8 @@
                 <strong class="system-info-startup__duration">@L["Page:Startup:DurationValue", startup.DurationMs]</strong>
                 <p>@L["Page:Startup:Scope"]</p>
                 <dl>
-                    <div><dt>@L["Page:Startup:StartMarker"]</dt><dd>@SystemInfoDisplayFormatter.FormatTime(startup.StartedAtUtc, CultureInfo.CurrentCulture)</dd></div>
-                    <div><dt>@L["Page:Startup:ReadyAt"]</dt><dd>@SystemInfoDisplayFormatter.FormatTime(startup.ReadyAtUtc, CultureInfo.CurrentCulture)</dd></div>
+                    <div><dt>@L["Page:Startup:StartMarker"]</dt><dd>@UiTime.FormatTime(startup.StartedAtUtc)</dd></div>
+                    <div><dt>@L["Page:Startup:ReadyAt"]</dt><dd>@UiTime.FormatTime(startup.ReadyAtUtc)</dd></div>
                 </dl>
             </aside>
         }

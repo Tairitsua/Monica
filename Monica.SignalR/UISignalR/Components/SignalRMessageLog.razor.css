@@ -163,7 +163,7 @@
 }
 
 .signalr-trace-empty {
-    padding: 20px;
+
     font-size: .875rem;
     line-height: 1.6;
     border: 1px dashed var(--mud-palette-lines-default);

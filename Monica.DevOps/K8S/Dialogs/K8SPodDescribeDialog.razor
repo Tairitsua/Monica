@@ -1,3 +1,4 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.Localization
 @using Monica.DevOps.K8S.Models
 @using Monica.UI.Shared.Components.Dialogs
@@ -19,7 +20,7 @@
                             <dt>@L["PodDialog:Phase"]</dt><dd><MudChip T="string" Color="@GetPhaseColor()" Variant="Variant.Outlined" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@Details.Summary.PhaseDisplay</MudChip></dd>
                             <dt>@L["PodDialog:Ready"]</dt><dd><span>@Details.Summary.ReadyDisplay</span><MudChip T="string" Color="@(Details.Summary.IsReady ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@(Details.Summary.IsReady ? L["DescribeDialog:ReadyStateReady"] : L["DescribeDialog:ReadyStateNotReady"])</MudChip></dd>
                             <dt>@L["PodDialog:Restarts"]</dt><dd>@Details.Summary.RestartCount</dd>
-                            <dt>@L["PodDialog:Started"]</dt><dd>@Details.Summary.StartTimeDisplay</dd>
+                            <dt>@L["PodDialog:Started"]</dt><dd>@UiTime.Format(Details.Summary.StartTimeUtc)</dd>
                             <dt>@L["PodDialog:Node"]</dt><dd>@DisplayValue(Details.Summary.NodeName)</dd>
                             <dt>@L["PodDialog:PodIp"]</dt><dd>@DisplayValue(Details.Summary.PodIp)</dd>
                             <dt>@L["PodDialog:Issue"]</dt><dd>@DisplayValue(Details.Summary.IssueSummary)</dd>

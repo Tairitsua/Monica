@@ -14,6 +14,7 @@ Use `$DomainNamespace$` for the domain project namespace and `$RepositoryNamespa
 - Use native EF LINQ inside the persistence implementation and materialize reads before the scope ends. `IEfEntityStore` and any project-wide EF adapter contract belong to the technical view of that implementation.
 - Only a persistence-facing CRUD adapter in an approved/adopted pattern may consume the concrete repository or its wide EF contract. New concrete endpoints within that family are ordinary implementation. Handlers, jobs, and domain services use the narrow business interface; the exception does not authorize a new pattern or general concrete injection.
 - Inject the scoped context directly into `EfRepository`. Context, repository, and caller share the operation scope and tracked entity identity. Keep the established registration/discovery mechanism.
+- Put a canonical eager-loading graph in the concrete repository's `ApplyDetails` override and reuse native `Details` when needed; see the [default detail graph contract](../../monica-infra-persistence/references/repositories.md#configure-a-default-detail-graph).
 - A justified project-common base may specialize `EfRepository` under the [project-level extension rules](01-project-unit-naming-and-boundaries.md#project-level-extensions); the concrete repository stays with its domain and retains the `Repository*` name.
 - Use `$monica-infra-persistence` for save policies, operation scopes, transactions, and read-only request behavior.
 
@@ -40,8 +41,11 @@ public interface IRepositoryOrder : IRepository<Order, long>
 public sealed class RepositoryOrder(OrderingDbContext context)
     : EfRepository<OrderingDbContext, Order, long>(context), IRepositoryOrder
 {
+    public override IQueryable<Order> ApplyDetails(IQueryable<Order> query)
+        => query.Include(order => order.Lines);
+
     public Task<Order?> FindForApprovalAsync(string number, CancellationToken cancellationToken = default)
-        => DbContext.Orders.AsTracking().Include(order => order.Lines)
+        => Details.AsTracking()
             .SingleOrDefaultAsync(order => order.Number == number, cancellationToken);
 
     public Task<OrderSummary?> FindSummaryAsync(long id, CancellationToken cancellationToken = default)

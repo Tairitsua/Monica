@@ -49,6 +49,7 @@
       "DocumentTree": "文档树",
       "ShowOutline": "显示目录",
       "HideOutline": "隐藏目录",
+      "OutlineDescription": "快速定位当前文档中的章节。",
       "NoOutlineAvailable": "当前文档生成标题后，这里会显示目录。",
       "NoDocumentOutline": "请选择一个文档后再浏览目录。"
     },
@@ -71,16 +72,11 @@
       "LoadDataFailed": "加载 Markdown 数据失败：{0}"
     },
     "Metadata": {
-      "About": "关于此文档",
       "Author": "作者",
-      "Modified": "最后修改",
-      "Path": "文档路径",
-      "Language": "文档语言",
-      "Size": "文件大小",
-      "Bytes": "{0:N0} 字节",
-      "Fields": "文档元数据",
-      "NoFrontMatter": "此文档未提供元数据。",
-      "Library": "文档库"
+      "Modified": "最后修改"
     }
+  },
+  "Navigation": {
+    "Category": "Markdown 文档库"
   }
 }

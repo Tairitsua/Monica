@@ -1,5 +1,5 @@
 .rag-chunkers-page { padding: 24px; min-width: 0; color: var(--mud-palette-text-primary); container: chunking / inline-size; }
-.chunking-workspaces { display: grid; grid-template-columns: minmax(0,1.38fr) minmax(0,1fr); gap: 24px; align-items: start; }
+.chunking-workspaces { display: grid; grid-template-columns: minmax(0,1.38fr) minmax(0,1fr); gap: 24px; align-items: stretch; }
 .routing-panel, .test-panel, .registry-panel { padding: 24px; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); min-width: 0; }
 .test-panel { background: color-mix(in srgb,var(--mud-palette-primary) 5%,var(--mud-palette-surface)); border-color: color-mix(in srgb,var(--mud-palette-primary) 26%,var(--mud-palette-lines-default)); }
 h2 { margin: 0 0 10px; font-size: 18px; line-height: 1.35; font-weight: 500; }
@@ -18,7 +18,7 @@ code { font-family: var(--mo-font-family-mono); font-size: 12px; overflow-wrap: 
 .route-impact p { margin: 10px 0 6px; }
 .route-impact .zero-impact { margin: 0; }
 .affected-bases { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-.test-form { display: grid; gap: 12px; }
+.test-form { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; }
 .test-form ::deep .mud-input-control { min-width: 0; }
 .test-actions { display: flex; justify-content: flex-end; }
 .test-result { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--mud-palette-lines-default); display: grid; gap: 10px; overflow-wrap: anywhere; }
@@ -34,8 +34,7 @@ code { font-family: var(--mo-font-family-mono); font-size: 12px; overflow-wrap: 
 .registry-name strong { font-weight: 500; }
 .registry-extensions { display: flex; flex-wrap: wrap; gap: 6px; }
 .registry-extensions code { padding: 3px 6px; border: 1px solid var(--mud-palette-lines-default); border-radius: 4px; }
-.registry-empty { padding: 20px; }
-.loading-state, .inline-loading { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
+.inline-loading { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
 @container chunking (max-width: 1099px) { .chunking-workspaces { grid-template-columns: minmax(0,1fr); } }
 @container route (max-width: 380px) { .route-controls { grid-template-columns: minmax(0,1fr); } .route-controls ::deep .mud-button-root { justify-self: end; } }
 @media (max-width: 600px) { .rag-chunkers-page { padding: 20px; } .routing-panel, .test-panel, .registry-panel { padding: 18px 20px; } .route-editor { padding: 16px; } .registry-table-owner ::deep .mud-xs-table .mud-table-cell { padding-left: 16px; padding-right: 16px; } .registry-table-owner ::deep .mud-xs-table .mud-table-cell::before { padding-right: 12px; } }

@@ -38,14 +38,21 @@ public class ModuleDependencyInjectionUI : MonicaModule<ModuleDependencyInjectio
             static option => option.AddResource<DependencyInjectionResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static registry =>
+            {
+                var category = registry.RegisterLocalizedCategory<DependencyInjectionResource>(
+                    "Monica.Framework.UI.DependencyInjection", "Navigation:Category", 10,
+                    parentId: BuiltInNavigationCategoryIds.Infrastructure,
+                    icon: MoIcons.Workflow);
+
                 registry.RegisterLocalizedPage<UIDependencyInjectionPage, DependencyInjectionResource>(
                     UIDependencyInjectionPage.PAGE_URL,
                     "Pages:DependencyInjection:Title",
                     MoIcons.Workflow,
-                    BuiltInNavigationCategoryIds.Infrastructure,
+                    category,
                     addToNav: true,
                     navOrder: 10,
-                    descriptionKey: "Pages:DependencyInjection:Description")));
+                    descriptionKey: "Pages:DependencyInjection:Description");
+            }));
     }
 
     public override void ConfigureServices(ModuleContext<ModuleDependencyInjectionUIOption> context)

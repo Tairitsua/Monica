@@ -147,5 +147,8 @@
   "ServiceMessages": {
     "ConnectivityProbeFailed": "连通性探测失败：{0}",
     "TextTransformFailed": "文本转换失败：{0}"
+  },
+  "Navigation": {
+    "Category": "实用工具"
   }
 }

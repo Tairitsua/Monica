@@ -36,7 +36,7 @@ Monica 是面向 Agent 驱动开发的模块化 .NET 基础设施库。应用可
 - AI 可以很快产出代码，但如果没有统一规格，代码会在规模增长后变得脆弱且难以观测。
 - Monica 把基础设施本身变成规格：`AddMonica(...)` 先记录一个宿主的完整模块图，验证依赖与循环，再按确定性阶段应用注册。
 - 每个组合都属于具体宿主；同一进程中的多个宿主不共享模块注册表、选项或 ProjectUnit 目录。
-- 仓库以 `skills/` 作为 Monica Agent Skills 的唯一源码，并把每个受管 Monica Skill 按字节一致地投影到 `.claude/skills/` 与 `.agents/skills/`；不属于 Monica 的外部 Skill 会原样保留。
+- 仓库以 `skills/` 作为 Monica Agent Skills 的唯一源码；`.agents/` 与 `.claude/` 下的投影由 `python scripts/sync_agent_skills.py --write` 按需生成，属于本地 Agent 状态、不进入 git，生成器只接管受管 Monica 目录，外部 Skill 原样保留。
 
 ## 演示视频
 
@@ -131,7 +131,7 @@ Monica.UI 之上还提供多个运维型 Blazor UI：JobScheduler、Configuratio
 
 ## 随仓库交付的 Agent Skills
 
-Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.agents/skills/` 中对应的受管 Monica 子目录是面向仓库内发现的生成投影，不应直接编辑。
+Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.agents/skills/` 中对应的受管 Monica 子目录是面向仓库内发现的生成投影（本地按需生成、不进入 git），不应直接编辑或提交。
 
 九个 `monica-infra-*` Skill 是基础设施使用知识的唯一维护位置：[`persistence`](skills/monica-infra-persistence)、[`messaging`](skills/monica-infra-messaging)、[`jobs`](skills/monica-infra-jobs)、[`configuration`](skills/monica-infra-configuration)、[`hosting`](skills/monica-infra-hosting)、[`observability`](skills/monica-infra-observability)、[`ai`](skills/monica-infra-ai)、[`web`](skills/monica-infra-web) 和 [`ui`](skills/monica-infra-ui)。应用架构、框架开发、测试和 UI 实现分别由其他 Skill 负责。
 
