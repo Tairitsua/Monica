@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/agent-skill-catalog.schema.json",
   "schemaVersion": 2,
-  "catalogVersion": "2.1.0",
+  "catalogVersion": "2.2.0",
   "skills": {
     "monica-guide": {
       "path": "skills/monica-guide",
@@ -12,13 +12,39 @@
         "monica-application",
         "monica-framework",
         "monica-docs-authoring",
-        "monica-contribution"
+        "monica-contribution",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [],
         "recommended": [
           "monica-contribution"
         ],
+        "conditional": [],
+        "external": []
+      }
+    },
+    "monica-troubleshooting": {
+      "path": "skills/monica-troubleshooting",
+      "role": "router",
+      "ownership": "monica",
+      "managed": true,
+      "routes": [
+        "monica-guide",
+        "monica-infra-hosting",
+        "monica-infra-persistence",
+        "monica-infra-messaging",
+        "monica-infra-configuration",
+        "monica-infra-jobs",
+        "monica-infra-web",
+        "monica-infra-observability",
+        "monica-infra-ai",
+        "monica-infra-ui",
+        "monica-docs-authoring"
+      ],
+      "dependencies": {
+        "required": [],
+        "recommended": [],
         "conditional": [],
         "external": []
       }
@@ -60,7 +86,8 @@
         "monica-infra-web",
         "monica-infra-ui",
         "monica-application-ui",
-        "monica-application-ui-development"
+        "monica-application-ui-development",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [
@@ -194,7 +221,8 @@
         "monica-infra-observability",
         "monica-infra-ai",
         "monica-infra-web",
-        "monica-infra-ui"
+        "monica-infra-ui",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [
@@ -821,6 +849,7 @@
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-application",
           "monica-application-project-unit-development",
           "monica-infra-hosting",
@@ -875,6 +904,7 @@
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-architecture",
           "monica-development",
@@ -937,6 +967,7 @@
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-architecture",
           "monica-development",
@@ -1082,7 +1113,7 @@
     }
   },
   "managedInstructions": {
-    "version": 4,
+    "version": 5,
     "markers": {
       "start": "<!-- monica-guide:managed:start -->",
       "end": "<!-- monica-guide:managed:end -->"
@@ -1091,12 +1122,17 @@
       "application": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-application"
         ],
         "rules": [
           {
             "id": "monica-guide-routing",
             "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
           },
           {
             "id": "resolve-pinned-source",
@@ -1119,6 +1155,7 @@
       "extension-author": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-third-party-module-development"
         ],
@@ -1126,6 +1163,10 @@
           {
             "id": "monica-guide-routing",
             "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
           },
           {
             "id": "resolve-pinned-source",
@@ -1144,6 +1185,7 @@
       "framework-contributor": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-unit-testing"
         ],
@@ -1151,6 +1193,10 @@
           {
             "id": "monica-guide-routing",
             "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
           },
           {
             "id": "resolve-pinned-source",

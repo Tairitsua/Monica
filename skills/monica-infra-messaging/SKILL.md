@@ -17,6 +17,6 @@ Choose the communication boundary before the transport; database-coupled deliver
 | Send through or inspect a named bidirectional pipeline owned by one host | [DataChannel](references/data-channels.md) |
 | Invoke typed methods on connected Web clients or inspect a browser debug session | [SignalR](references/signalr.md) |
 
-For application contract placement, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md). For framework transport or module implementation, use `$monica-framework`, then `$monica-development`.
+For application contract placement, use ProjectUnit development in `$monica-application-project-unit-development`. For framework transport or module implementation, use `$monica-framework`, then `$monica-development`.
 
-If a routed authoring skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md`.
+If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.

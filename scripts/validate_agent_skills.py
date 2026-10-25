@@ -521,7 +521,7 @@ def validate_catalog(validation: Validation, catalog: dict[str, Any]) -> None:
         frontmatter_name, _ = parse_frontmatter(skill_file, validation)
         validation.check(frontmatter_name == skill_name, f"{skill_file}: name must match directory")
         parse_openai_yaml(skill_path / "agents" / "openai.yaml", skill_name, validation)
-        if skill_name.startswith("monica-infra-"):
+        if skill_name.startswith("monica-infra-") or skill_name == "monica-troubleshooting":
             validation.errors.extend(validate_entrypoint_budget(skill_file))
             validation.errors.extend(validate_reference_navigation(skill_path, REPOSITORY_ROOT))
 

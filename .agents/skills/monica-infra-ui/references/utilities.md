@@ -52,4 +52,4 @@ or facades. Canceled or reset work cannot publish a late result or error. A dire
 the usual new circuit; these drafts are not durable browser storage or a probe history.
 
 Use native sibling links for direct load, browser history, and shell search. Component authoring
-and responsive evidence review follow the [working-interface language](../../monica-ui-development/references/monica-workbench-design-language.md).
+and responsive evidence review follow the working-interface language in `$monica-ui-development` (`references/monica-workbench-design-language.md`).

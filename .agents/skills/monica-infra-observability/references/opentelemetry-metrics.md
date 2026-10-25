@@ -2,7 +2,7 @@
 
 Use SDK exporters for measurements leaving the process. Use Monica's in-process collector and `/opentelemetry-dashboard` to inspect exact instruments, normalized tag sets and their retained observations in the current host. These are separate consumers of published .NET instruments: SDK aggregation/export intervals and the local retained window do not share an aggregation contract. They can coexist. Neither the local page nor the snapshot endpoint provides durable or cross-instance storage.
 
-For process-counter history, use [Runtime Metrics](metrics.md); for adding module instruments, use [OpenTelemetry development](../../monica-opentelemetry/SKILL.md).
+For process-counter history, use [Runtime Metrics](metrics.md); for adding module instruments, use OpenTelemetry development in `$monica-opentelemetry`.
 
 ## Register the required consumer
 
@@ -41,7 +41,7 @@ app.UseMonica();
 app.MapMonica();
 ```
 
-Keep the host's normal Blazor setup; see [UI integration](../../monica-infra-ui/SKILL.md). `AddOpenTelemetryUI()` registers `/opentelemetry-dashboard` under Monitor. It does not assign a page access policy; the host owns authentication and any required access restriction. Local facade/page use does not depend on the HTTP snapshot route or an exporter.
+Keep the host's normal Blazor setup; see UI integration in `$monica-infra-ui`. `AddOpenTelemetryUI()` registers `/opentelemetry-dashboard` under Monitor. It does not assign a page access policy; the host owns authentication and any required access restriction. Local facade/page use does not depend on the HTTP snapshot route or an exporter.
 
 `UseInProcessCollector()` without the UI enables the singleton hosted collector and scoped `OpenTelemetryFacade`. `GetSnapshotAsync()` returns a `Res<OpenTelemetrySnapshot>`; check its status before reading the graph. Successful empty instruments or empty series are valid startup/admission states. It reads existing evidence and does not force observable callbacks. The optional Web route is `GET /opentelemetry/snapshot`. OpenTelemetry's mapped Web endpoints, including the SDK scrape endpoint, follow the module's `EnableMinimalApi` override or the host's `EnableMinimalApiByDefault`, which defaults to `false`. Keep `UseMonica()` and `MapMonica()` in the Web lifecycle.
 

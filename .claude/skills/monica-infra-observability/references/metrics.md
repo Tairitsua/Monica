@@ -58,4 +58,4 @@ Source ownership: `Monica.Profiling/Modules/ModuleRuntimeMetrics.cs`, `ModuleRun
 
 ## OpenTelemetry metrics
 
-Registration, exporters, local retained windows, exact series selection, histogram statistics and diagnostic copy formats are owned by [OpenTelemetry metrics](opentelemetry-metrics.md). For authoring module instruments rather than consuming them, use [OpenTelemetry development](../../monica-opentelemetry/SKILL.md).
+Registration, exporters, local retained windows, exact series selection, histogram statistics and diagnostic copy formats are owned by [OpenTelemetry metrics](opentelemetry-metrics.md). For authoring module instruments rather than consuming them, use OpenTelemetry development in `$monica-opentelemetry`.

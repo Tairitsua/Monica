@@ -1,6 +1,6 @@
 # Hosted services
 
-For application unit naming, role placement, queue ownership, scoped operations, and migration from Seeder-started loops, use the [hosted-service template](../../monica-application-project-unit-development/references/18-hosted-service-template.md). `HostedService` remains the existing ProjectUnit classification; work items are support types.
+For application unit naming, role placement, queue ownership, scoped operations, and migration from Seeder-started loops, use the hosted-service template in `$monica-application-project-unit-development` (`references/18-hosted-service-template.md`). `HostedService` remains the existing ProjectUnit classification; work items are support types.
 
 In a unified application, the [application model](application-model.md) removes concrete `IHostedService` registrations owned by inactive roles before `AddMonica` completes. Register those services before or during Monica composition. Opaque factories and registrations added later require explicit role selection from the same startup deployment snapshot; the framework never constructs a service just to discover its ownership.
 

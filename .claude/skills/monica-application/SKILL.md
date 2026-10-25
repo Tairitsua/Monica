@@ -11,9 +11,11 @@ Read [specification evolution](references/01-specification-evolution.md) when a 
 
 ## Routing
 
+- Runtime failures, missing routes, inactive UI, or unsuccessful infrastructure operations: use `$monica-troubleshooting` to select the failed boundary and its diagnostic guidance.
+
 - Business presentation layout, references, product navigation, or local/remote calls: use `$monica-application-ui`; implement its pages and state with `$monica-application-ui-development`.
 
-- Exact Monica framework source needed outside the active checkout: use `$monica-guide source resolve --repository monica --json` as a read-only locator.
+- Exact Monica source or an unavailable named skill/reference: use `$monica-guide source resolve --repository monica --json` as a read-only locator, then read canonical `skills/<name>/SKILL.md` and the specified reference.
 - Split role placement or migration from existing service hosts: use `$monica-application-microservice`.
 - Combined role placement or migration from merged monolith projects: use `$monica-application-modular-monolith`.
 - Feature implementation or review of handlers, entities, repositories, events, jobs, seeders, host services, CRUD adapters, controllers, Facades, and other support types: use `$monica-application-project-unit-development`.

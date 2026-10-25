@@ -19,4 +19,4 @@ Health, logging, execution timing, tracing, and metrics have independent registr
 
 For module-graph and worker-state diagnostics, use [hosting](../monica-infra-hosting/SKILL.md); for authoring module instruments, use `$monica-opentelemetry`.
 
-If a routed authoring skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md`.
+If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.
