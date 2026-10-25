@@ -1,4 +1,3 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
@@ -6,50 +5,44 @@
 @using Monica.UI.UISystemInfo.Support
 @inject IStringLocalizer<SystemInfoResource> L
 
-<section class="system-info-hero" aria-labelledby="system-info-service-name">
-    <div class="system-info-profile">
-        <div class="system-info-identity">
-            <div class="system-info-identity__meta">
-                <span class="system-info-process-state"><i></i>@L["Page:Status:Running"]</span>
-                <span>@Snapshot.Application.EnvironmentName</span>
-                <span class="system-info-version">@Snapshot.Application.Version</span>
+<section class="system-info-hero" aria-labelledby="system-info-uptime-title">
+    <div class="system-info-signature-top">
+        <div>
+            <p id="system-info-uptime-title" class="system-info-display-label">@L["Page:Pulse:ProcessUptime"]<span class="system-info-live"><i></i>@L["Page:Status:Live"]</span></p>
+            <div class="system-info-live-uptime" aria-label="@SystemInfoDisplayFormatter.FormatDuration(Uptime)">
+                @foreach (var part in DurationParts)
+                {
+                    <span>@part.Value<small>@L[part.UnitKey]</small></span>
+                }
             </div>
-            <div class="system-info-identity__heading">
-                <span class="system-info-identity__seal" aria-hidden="true">@Monogram</span>
-                <div>
-                    <h2 id="system-info-service-name">@Snapshot.Application.Name</h2>
-                    <p class="system-info-application-id">@Snapshot.Application.Id</p>
-                </div>
-            </div>
-            <dl class="system-info-identity__facts">
-                <div><dt>@L["Page:ServiceIdentity:ProcessStarted"]</dt><dd>@UiTime.Format(Snapshot.Process.StartedAtUtc)</dd></div>
-                <div><dt>@L["Page:ServiceIdentity:ProductVersion"]</dt><dd>@(Snapshot.Artifact.ProductVersion ?? "—")</dd></div>
-            </dl>
         </div>
-        @if (Snapshot.Startup is { } startup)
-        {
-            <aside class="system-info-startup" aria-label="@L["Page:Startup:AriaLabel"]">
-                <div class="system-info-startup__heading">
-                    <h3>@L["Page:Startup:Title"]</h3>
-                    <span>@L["Page:Status:Tracked"]</span>
-                </div>
-                <strong class="system-info-startup__duration">@L["Page:Startup:DurationValue", startup.DurationMs]</strong>
-                <p>@L["Page:Startup:Scope"]</p>
-                <dl>
-                    <div><dt>@L["Page:Startup:StartMarker"]</dt><dd>@UiTime.FormatTime(startup.StartedAtUtc)</dd></div>
-                    <div><dt>@L["Page:Startup:ReadyAt"]</dt><dd>@UiTime.FormatTime(startup.ReadyAtUtc)</dd></div>
-                </dl>
-            </aside>
-        }
+        <p class="system-info-lede">
+            @L["Page:Finding:On"] <mark class="mo-vl-mark mo-vl-role--neutral">@Snapshot.Host.MachineName</mark>
+            @L["Page:Finding:Running"] <mark class="mo-vl-mark mo-vl-role--info is-measure">@SystemInfoDisplayFormatter.FormatDuration(Uptime)</mark>@L["Page:Finding:RunningEnd"]
+            @if (Snapshot.Startup is { } startup)
+            {
+                @L["Page:Finding:Startup"] <mark class="mo-vl-mark mo-vl-role--primary is-measure">@((startup.DurationMs / 1000d).ToString("N2", CultureInfo.CurrentCulture)) s</mark>@L["Page:Finding:StartupEnd"]
+            }
+            @L["Page:Finding:Captured"] <mark class="mo-vl-mark mo-vl-role--neutral is-measure">@EvidenceAge</mark>@L["Page:Finding:Snapshot"]
+        </p>
     </div>
+    <SystemInfoLifeline Snapshot="@Snapshot" NowUtc="@NowUtc" />
     <SystemInfoPulseStrip Snapshot="@Snapshot" NowUtc="@NowUtc" />
 </section>
 
 @code {
     [Parameter, EditorRequired] public SystemInfoSnapshot Snapshot { get; set; } = null!;
     [Parameter] public DateTimeOffset NowUtc { get; set; }
-
-    private string Monogram => string.IsNullOrWhiteSpace(Snapshot.Application.Name)
-        ? "M"
-        : StringInfo.GetNextTextElement(Snapshot.Application.Name);
+    private TimeSpan Uptime => NowUtc > Snapshot.Process.StartedAtUtc ? NowUtc - Snapshot.Process.StartedAtUtc : TimeSpan.Zero;
+    private string EvidenceAge => L[(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds < 1 ? "Page:Status:JustNow" : "Page:Status:SecondsAgo", Math.Max(0, (int)(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds)].Value;
+    private IEnumerable<(string Value, string UnitKey)> DurationParts
+    {
+        get
+        {
+            if (Uptime.TotalDays >= 1) yield return (((int)Uptime.TotalDays).ToString(CultureInfo.CurrentCulture), "Page:Units:Day");
+            if (Uptime.TotalHours >= 1) yield return (Uptime.Hours.ToString(Uptime.TotalDays >= 1 ? "D2" : "D1", CultureInfo.CurrentCulture), "Page:Units:Hour");
+            yield return (Uptime.Minutes.ToString("D2", CultureInfo.CurrentCulture), "Page:Units:Minute");
+            yield return (Uptime.Seconds.ToString("D2", CultureInfo.CurrentCulture), "Page:Units:Second");
+        }
+    }
 }

@@ -1,0 +1,185 @@
+@using System.Globalization
+@using Microsoft.Extensions.Localization
+@using Monica.UI.Localization
+@using Monica.UI.Shell.Support
+@using Monica.UI.UISystemInfo.Models
+@using Monica.UI.UISystemInfo.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+@inject IStringLocalizer<SystemInfoResource> L
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="system-lifeline" @ref="_root">
+    <div class="lifeline-heading">
+        <h2>@L["Page:Lifeline:Title"]</h2>
+        <div class="lifeline-legend">
+            @if (ArtifactInLane) { <span><i class="is-artifact"></i>@L["Page:Lifeline:Artifact"]</span> }
+            @if (Snapshot.Startup is not null) { <span><i class="is-startup"></i>@L["Page:Startup:Title"]</span> }
+            <span><i class="is-running"></i>@L["Page:Lifeline:Observed"]</span>
+            <span><i class="is-unobserved"></i>@L["Page:Lifeline:Unobserved"]</span>
+        </div>
+    </div>
+    <div class="lifeline-lanes @(Snapshot.Startup is null ? "is-single" : null)">
+        @if (Snapshot.Startup is { } startup)
+        {
+            <div class="lifeline-zone lifeline-startup @(CompactStartup ? "is-compact" : null)">
+                <div class="lifeline-cap"><span><b>@L["Page:Lifeline:Startup"]</b>@L["Page:Lifeline:SecondsScale"]</span><strong>@Seconds(startup.DurationMs) s</strong></div>
+                @if (CompactStartup)
+                {
+                    <div class="lifeline-compact-labels"><span>@L["Page:ServiceIdentity:ProcessStarted"]<b>@UiTime.FormatTime(Snapshot.Process.StartedAtUtc)</b></span><span>@L["Page:Startup:ReadyAt"]<b>@UiTime.FormatTime(startup.ReadyAtUtc)</b></span></div>
+                }
+                <div class="lifeline-track" data-lifeline-lane="startup" tabindex="0" role="slider"
+                     aria-label="@L["Page:Startup:AriaLabel"]" aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="@CursorValue("startup")" aria-valuetext="@CursorText("startup")">
+                    <span class="lifeline-rule"></span>
+                    <span class="lifeline-bar is-neutral" style="@Segment(StartupX(Snapshot.Process.StartedAtUtc), StartupX(startup.StartedAtUtc))"></span>
+                    <span class="lifeline-bar is-startup" style="@Segment(StartupX(startup.StartedAtUtc), StartupX(startup.ReadyAtUtc))"></span>
+                    @if (ArtifactInLane && Snapshot.Artifact.ArtifactTimestampUtc is { } artifact)
+                    {
+                        <span class="lifeline-pin is-artifact" style="@Position(StartupX(artifact))" title="@UiTime.Format(artifact)"><i></i></span>
+                    }
+                    <span class="lifeline-pin is-process is-start" style="@Position(StartupX(Snapshot.Process.StartedAtUtc))" title="@UiTime.Format(Snapshot.Process.StartedAtUtc)"><i></i>@if (!CompactStartup) { <span>@L["Page:ServiceIdentity:ProcessStarted"]<b>@UiTime.FormatTime(Snapshot.Process.StartedAtUtc)</b></span> }</span>
+                    <span class="lifeline-pin is-ready is-end" style="@Position(StartupX(startup.ReadyAtUtc))" title="@UiTime.Format(startup.ReadyAtUtc)"><i></i>@if (!CompactStartup) { <span>@L["Page:Startup:ReadyAt"]<b>@UiTime.FormatTime(startup.ReadyAtUtc)</b></span> }</span>
+                    @if (_cursorLane == "startup") { <span class="lifeline-cross" style="@Position(_cursorPercent)"><span>@CursorShort</span></span> }
+                </div>
+                <div class="lifeline-ticks" aria-hidden="true">
+                    @foreach (var tick in StartupTicks)
+                    {
+                        <span style="@Position(StartupX(tick))">@Offset(tick)</span>
+                    }
+                </div>
+            </div>
+            <div class="lifeline-break" aria-hidden="true"><span></span></div>
+        }
+        <div class="lifeline-zone lifeline-running">
+            <div class="lifeline-cap"><span><b>@L["Page:Lifeline:Running"]</b>@L["Page:Lifeline:ClockScale"] · @Snapshot.Host.TimeZone.ToDisplayString()</span><strong>@SystemInfoDisplayFormatter.FormatDuration(EffectiveNow - RunningStart)</strong></div>
+            <div class="lifeline-track" data-lifeline-lane="running" tabindex="0" role="slider"
+                 aria-label="@L["Page:Lifeline:RunningAria", UiTime.Format(RunningStart), UiTime.Format(EffectiveNow)]"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="@CursorValue("running")" aria-valuetext="@CursorText("running")">
+                <span class="lifeline-rule"></span>
+                <span class="lifeline-bar is-running" style="@Segment(0, CapturePercent)"></span>
+                <span class="lifeline-bar is-unobserved" style="@Segment(CapturePercent, 100)"></span>
+                <span class="lifeline-pin @(Snapshot.Startup is null ? "is-process" : "is-ready") is-solid" style="left:0%" title="@UiTime.Format(RunningStart)"><i></i></span>
+                <span class="lifeline-flag @(CapturePercent > 72 ? "is-end" : null)" style="@Position(CapturePercent)"><span>@L["Page:Lifeline:Capture"] <b>@UiTime.FormatTime(Snapshot.CapturedAtUtc)</b></span></span>
+                <span class="lifeline-pin is-now" style="left:100%" title="@UiTime.Format(EffectiveNow)"><i></i></span>
+                @if (_cursorLane == "running") { <span class="lifeline-cross" style="@Position(_cursorPercent)"><span>@CursorShort</span></span> }
+            </div>
+            <div class="lifeline-ticks" aria-hidden="true">
+                @foreach (var tick in RunningTicks)
+                {
+                    <span style="@Position(RunningX(tick))">@UiTime.Format(tick, RunningSpanMs >= TimeSpan.FromDays(1).TotalMilliseconds ? "MM-dd HH:mm" : "HH:mm:ss")</span>
+                }
+                <span class="is-now" style="left:100%">@L["Page:Lifeline:Now"] @UiTime.FormatTime(EffectiveNow)</span>
+            </div>
+        </div>
+    </div>
+    <p class="lifeline-caption @(_cursorLane is not null ? "is-active" : null)" aria-live="polite">
+        <i aria-hidden="true"></i><span>@Caption</span>
+        @if (_cursorLane is null) { <small>@L[Snapshot.Startup is null ? "Page:Lifeline:Untracked" : "Page:Lifeline:Hint"]</small> }
+    </p>
+</div>
+
+@code {
+    private static readonly double[] TickStepsSeconds = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 604800];
+
+    /// <summary>The immutable host evidence; the interval after CapturedAtUtc is explicitly unobserved.</summary>
+    [Parameter, EditorRequired] public SystemInfoSnapshot Snapshot { get; set; } = null!;
+    /// <summary>The presentation clock used to extend uptime without resampling evidence.</summary>
+    [Parameter] public DateTimeOffset NowUtc { get; set; }
+
+    private ElementReference _root;
+    private JsModuleSession? _interop;
+    private DotNetObjectReference<SystemInfoLifeline>? _callback;
+    private Task? _initialization;
+    private bool _disposed;
+    private string? _cursorLane;
+    private double _cursorPercent = 50;
+    private DateTimeOffset _capture;
+
+    private DateTimeOffset EffectiveNow => NowUtc > Snapshot.CapturedAtUtc ? NowUtc : Snapshot.CapturedAtUtc;
+    private DateTimeOffset RunningStart => Snapshot.Startup?.ReadyAtUtc ?? Snapshot.Process.StartedAtUtc;
+    private double RunningSpanMs => Math.Max(1, (EffectiveNow - RunningStart).TotalMilliseconds);
+    private bool ArtifactInLane => Snapshot.Startup is { } startup && Snapshot.Artifact.ArtifactTimestampUtc is { } artifact && artifact > Snapshot.Process.StartedAtUtc.AddSeconds(-30) && artifact <= startup.ReadyAtUtc;
+    private DateTimeOffset StartupStart => new[] { Snapshot.Process.StartedAtUtc, Snapshot.Startup?.StartedAtUtc ?? Snapshot.Process.StartedAtUtc, ArtifactInLane ? Snapshot.Artifact.ArtifactTimestampUtc!.Value : Snapshot.Process.StartedAtUtc }.Min().AddMilliseconds(-900);
+    private DateTimeOffset StartupEnd => (Snapshot.Startup?.ReadyAtUtc ?? Snapshot.Process.StartedAtUtc).AddMilliseconds(1500);
+    private double CapturePercent => RunningX(Snapshot.CapturedAtUtc);
+    private bool CompactStartup => Snapshot.Startup is { } startup && StartupX(startup.ReadyAtUtc) - StartupX(Snapshot.Process.StartedAtUtc) < 42;
+    private double StartupX(DateTimeOffset instant) => Math.Clamp((instant - StartupStart).TotalMilliseconds / Math.Max(1, (StartupEnd - StartupStart).TotalMilliseconds) * 100, 0, 100);
+    private double RunningX(DateTimeOffset instant) => Math.Clamp((instant - RunningStart).TotalMilliseconds / RunningSpanMs * 100, 0, 100);
+    private static string Position(double percent) => $"left:{percent.ToString("0.###", CultureInfo.InvariantCulture)}%";
+    private static string Segment(double from, double to) => $"{Position(from)};width:{Math.Max(0, to - from).ToString("0.###", CultureInfo.InvariantCulture)}%";
+    private static string Seconds(double milliseconds) => (Math.Max(0, milliseconds) / 1000).ToString("N2", CultureInfo.CurrentCulture);
+    private string Offset(DateTimeOffset instant) => $"{((instant - Snapshot.Process.StartedAtUtc).TotalSeconds >= 0 ? "+" : "−")}{Math.Abs((instant - Snapshot.Process.StartedAtUtc).TotalSeconds).ToString("0.##", CultureInfo.CurrentCulture)} s";
+    private DateTimeOffset CursorInstant => _cursorLane == "startup" ? StartupStart.AddMilliseconds((StartupEnd - StartupStart).TotalMilliseconds * _cursorPercent / 100) : RunningStart.AddMilliseconds(RunningSpanMs * _cursorPercent / 100);
+    private string CursorShort => _cursorLane == "startup" ? Offset(CursorInstant) : UiTime.FormatTime(CursorInstant);
+    private double CursorValue(string lane) => _cursorLane == lane ? Math.Round(_cursorPercent) : 50;
+    private string CursorText(string lane) => _cursorLane == lane ? Caption : L["Page:Lifeline:Hint"].Value;
+    private string Caption => _cursorLane is not null
+        ? $"{L[_cursorLane == "startup" ? "Page:Lifeline:Startup" : "Page:Lifeline:Running"]} · {CursorShort} · {UiTime.Format(CursorInstant)}{(_cursorLane == "running" && CursorInstant > Snapshot.CapturedAtUtc ? $" · {L["Page:Lifeline:Unobserved"]}" : string.Empty)}"
+        : $"{(Snapshot.Startup is { } startup ? $"{L["Page:Lifeline:Startup"]} {Seconds(startup.DurationMs)} s · " : string.Empty)}{L["Page:Lifeline:Observed"]} {SystemInfoDisplayFormatter.FormatDuration(Snapshot.CapturedAtUtc - RunningStart)} · {L["Page:Lifeline:Unobserved"]} {SystemInfoDisplayFormatter.FormatDuration(EffectiveNow - Snapshot.CapturedAtUtc)}";
+
+    private IEnumerable<DateTimeOffset> StartupTicks
+    {
+        get
+        {
+            var seconds = Math.Max(1, (StartupEnd - Snapshot.Process.StartedAtUtc).TotalSeconds);
+            var step = TickStepsSeconds.FirstOrDefault(value => seconds / value <= 6, seconds / 5);
+            for (var index = 0; index < 7 && index * step <= seconds; index++)
+            {
+                var instant = Snapshot.Process.StartedAtUtc.AddSeconds(index * step);
+                if (StartupX(instant) is > 8 and < 88) yield return instant;
+            }
+        }
+    }
+    private IEnumerable<DateTimeOffset> RunningTicks => Ticks(RunningStart, EffectiveNow, RunningX);
+    private static IEnumerable<DateTimeOffset> Ticks(DateTimeOffset start, DateTimeOffset end, Func<DateTimeOffset, double> position)
+    {
+        var seconds = Math.Max(1, (end - start).TotalSeconds);
+        var step = TickStepsSeconds.FirstOrDefault(value => seconds / value <= 6, seconds / 5);
+        var tick = Math.Ceiling(start.ToUnixTimeMilliseconds() / (step * 1000)) * step * 1000;
+        for (var index = 0; index < 7 && tick < end.ToUnixTimeMilliseconds(); index++, tick += step * 1000)
+        {
+            var instant = DateTimeOffset.FromUnixTimeMilliseconds((long)tick);
+            if (position(instant) is > 12 and < 82) yield return instant;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_capture == Snapshot.CapturedAtUtc) return;
+        _capture = Snapshot.CapturedAtUtc;
+        _cursorLane = null;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => firstRender ? _initialization = InitializeAsync() : Task.CompletedTask;
+
+    private async Task InitializeAsync()
+    {
+        _interop = new JsModuleSession(JS, "./_content/Monica.UI/js/system-info-lifeline.js");
+        _callback = DotNetObjectReference.Create(this);
+        try { await _interop.InvokeVoidAsync("observe", _root, _callback); }
+        catch (JSDisconnectedException) { /* The circuit no longer owns browser interaction. */ }
+    }
+
+    /// <summary>Receives a clamped pointer or keyboard inspection position from the owned browser observer.</summary>
+    [JSInvokable]
+    public Task InspectLifeline(string? lane, double percent) => _disposed ? Task.CompletedTask : InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        _cursorLane = lane is "startup" or "running" ? lane : null;
+        _cursorPercent = double.IsFinite(percent) ? Math.Clamp(percent, 0, 100) : 50;
+        StateHasChanged();
+    });
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_initialization is { } initialization) await initialization;
+        if (_interop is { } interop)
+        {
+            try { await interop.InvokeVoidAsync("dispose", _root); }
+            catch (JSDisconnectedException) { /* Browser callbacks ended with the circuit. */ }
+            finally { _callback?.Dispose(); await interop.DisposeAsync(); }
+        }
+    }
+}

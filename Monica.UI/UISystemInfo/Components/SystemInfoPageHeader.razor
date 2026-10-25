@@ -3,14 +3,29 @@
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
-@using Monica.UI.UISystemInfo.Support
 @inject IStringLocalizer<SystemInfoResource> L
 
 <header class="system-info-masthead">
-    <div class="system-info-masthead__copy">
-        <span class="system-info-masthead__eyebrow">@L["Page:Eyebrow"]</span>
-        <h1>@L["Page:Title"]</h1>
-        <p>@L["Page:Summary"]</p>
+    <div class="system-info-masthead__identity">
+        @if (Snapshot is { } identity)
+        {
+            <span class="system-info-seal" aria-hidden="true">@Monogram</span>
+            <div class="system-info-masthead__copy">
+                <p class="system-info-eyebrow">@L["Page:Title"] · @L["Page:Eyebrow"]</p>
+                <h1>@identity.Application.Name</h1>
+                <div class="system-info-meta">
+                    <span class="system-info-status @(RestartRequested ? "is-stopping" : null)"><i></i>@L[RestartRequested ? "Page:Status:Stopping" : "Page:Status:Running"]</span>
+                    <span class="system-info-environment">@identity.Application.EnvironmentName</span>
+                    <span class="system-info-version" title="@identity.Application.Version">@identity.Application.Version.Split('+')[0]</span>
+                    <span class="system-info-dot" aria-hidden="true"></span>
+                    <SystemInfoCopyValue Value="@identity.Application.Id" />
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="system-info-masthead__copy"><p class="system-info-eyebrow">@L["Page:Eyebrow"]</p><h1>@L["Page:Title"]</h1></div>
+        }
     </div>
     <div class="system-info-masthead__actions">
         @if (Snapshot is { } snapshot)
@@ -20,17 +35,17 @@
                 <time datetime="@snapshot.CapturedAtUtc.ToString("O")" title="@UiTime.Format(snapshot.CapturedAtUtc)">@UiTime.FormatTime(snapshot.CapturedAtUtc)</time>
             </div>
         }
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh"
-                   Disabled="@IsRefreshing" OnClick="RefreshRequested" Class="system-info-action">
-            @L["Page:Actions:Refresh"]
-        </MudButton>
         @if (EnableRestart)
         {
-            <MudButton Variant="Variant.Text" Color="Color.Default" StartIcon="@MoIcons.Restart"
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Power"
                        Disabled="@RestartRequested" OnClick="RestartRequestedCallback" Class="system-info-action">
                 @L["Page:Actions:Restart"]
             </MudButton>
         }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh"
+                   Disabled="@IsRefreshing" OnClick="RefreshRequested" Class="system-info-action">
+            @L["Page:Actions:Refresh"]
+        </MudButton>
     </div>
 </header>
 
@@ -41,4 +56,6 @@
     [Parameter] public bool RestartRequested { get; set; }
     [Parameter] public EventCallback RefreshRequested { get; set; }
     [Parameter] public EventCallback RestartRequestedCallback { get; set; }
+
+    private string Monogram => string.IsNullOrWhiteSpace(Snapshot?.Application.Name) ? "M" : StringInfo.GetNextTextElement(Snapshot.Application.Name);
 }

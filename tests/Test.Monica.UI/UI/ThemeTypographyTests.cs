@@ -15,7 +15,7 @@ public sealed class ThemeTypographyTests
 
         typography.H1.FontSize.Should().Be("2.5rem");
         typography.Body1.FontSize.Should().Be("0.95rem");
-        AssertMonicaFontRoles(typography);
+        GetRoles(typography).Should().AllSatisfy(role => role.FontFamily.Should().StartWith("MoPrecision"));
     }
 
     [Fact]

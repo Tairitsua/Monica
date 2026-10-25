@@ -1,25 +1,24 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
-@using Monica.UI.UISystemInfo.Support
+@using Monica.UI.UISystemInfo.Components
+@using Monica.UI.Shared.Components.Dialogs
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<SystemInfoResource> L
 
 <MudDialog>
+    <TitleContent><MoDialogHeading Text="@L["Page:Dialogs:Endpoint:Title"]" /></TitleContent>
     <DialogContent>
         <div class="system-info-endpoint-dialog">
-            <p class="system-info-endpoint-dialog__eyebrow">@L["Page:Sections:Endpoints:ListeningAddress"]</p>
-            <h2>@Endpoint.Address</h2>
             <dl>
-                <div><dt>@L["Page:Dialogs:Endpoint:Transport"]</dt><dd>@Transport</dd></div>
-                <div><dt>@L["Page:Dialogs:Endpoint:ExactAddress"]</dt><dd>@Endpoint.Address</dd></div>
+                <div><dt>@L["Page:Dialogs:Endpoint:ExactAddress"]</dt><dd><SystemInfoCopyValue Value="@Endpoint.Address" Class="is-path" /></dd></div>
+                <div><dt>@L["Page:Dialogs:Endpoint:Transport"]</dt><dd><span class="endpoint-transport">@Transport</span></dd></div>
                 <div><dt>@L["Page:Dialogs:Endpoint:Captured"]</dt><dd>@UiTime.Format(CapturedAtUtc)</dd></div>
             </dl>
         </div>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Close">@L["Page:Dialogs:Endpoint:Close"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Close">@L["Page:Dialogs:Endpoint:Close"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -27,7 +26,6 @@
     [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
     [Parameter, EditorRequired] public SystemInfoEndpoint Endpoint { get; set; } = null!;
     [Parameter] public DateTimeOffset CapturedAtUtc { get; set; }
-
     private string Transport => string.IsNullOrWhiteSpace(Endpoint.Scheme) ? "—" : Endpoint.Scheme.ToUpperInvariant();
     private void Close() => MudDialog?.Close();
 }

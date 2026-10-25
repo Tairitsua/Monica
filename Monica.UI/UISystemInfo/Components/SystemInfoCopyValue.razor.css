@@ -1,0 +1,7 @@
+.system-info-copy { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 2px 8px; border: 1px solid var(--mud-palette-divider); border-radius: 999px; background: var(--mud-palette-surface); color: var(--mud-palette-text-secondary); font: 400 11.5px/1.5 var(--mo-font-family-mono); text-align: start; cursor: pointer; }
+.system-info-copy > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.system-info-copy ::deep .mo-icon { flex: none; }
+.system-info-copy:hover { border-color: var(--mud-palette-lines-inputs); color: var(--mud-palette-primary); }
+.system-info-copy:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
+.system-info-copy.is-path { width: 100%; justify-content: space-between; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--mud-palette-text-primary); font-size: 12px; }
+.system-info-copy.is-path > span { white-space: normal; overflow-wrap: anywhere; }

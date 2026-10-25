@@ -14,7 +14,7 @@
 {
     <section class="system-info-links" aria-labelledby="system-info-links-title">
         <header class="system-info-links__header">
-            <span class="system-info-links__signal"><MoIcon Size="1.5rem" Icon="@MoIcons.Route" /></span>
+            <span class="system-info-links__signal"><MoIcon Size="16px" Icon="@MoIcons.Link" /></span>
             <div>
                 <h2 id="system-info-links-title">@L["CustomLinks:Title"]</h2>
                 <p>@L["CustomLinks:Description"]</p>
@@ -52,7 +52,7 @@
                                         }
                                     </span>
                                     <span class="system-info-link__target">@TargetLabel(link.Target)</span>
-                                    <MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" />
+                                    <MoIcon Icon="@(link.Target == SystemInfoCustomLinkTarget.NewTab ? MoIcons.ArrowUpRight : MoIcons.ChevronRight)" Size="16px" />
                                 </a>
 
                                 @if (link.HasCredentials)

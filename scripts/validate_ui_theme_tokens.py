@@ -47,6 +47,7 @@ ALLOWED_SEMANTIC_TOKENS = {
     "--mo-color-shell-frame-text",
     "--mo-color-shell-frame-muted",
     "--mo-color-shell-frame-hover",
+    "--mo-color-role-third",
     "--mo-color-page-hero-background",
     "--mo-color-page-hero-text",
     "--mo-color-page-hero-action",

@@ -1,0 +1,45 @@
+@using Microsoft.Extensions.Localization
+@using Monica.UI.Localization
+@using Monica.UI.UISystemInfo.Dialogs
+@using Monica.UI.UISystemInfo.Models
+@inject IDialogService DialogService
+@inject IStringLocalizer<SystemInfoResource> L
+
+<section class="system-info-endpoints" aria-labelledby="system-info-endpoints-title">
+    <div class="endpoints-heading">
+        <EvidenceHeader Icon="@MoIcons.Network" HeadingId="system-info-endpoints-title" Title="@L["Page:Sections:Endpoints:Title"]"
+                        Description="@L["Page:Sections:Endpoints:Description"]" Count="@Snapshot.Endpoints.Length"
+                        CountLabel="@L["Page:Sections:Endpoints:ListeningCount", Snapshot.Endpoints.Length]" />
+    </div>
+    @if (Snapshot.Endpoints.Length == 0)
+    {
+        <MoContentState Compact="true"><strong>@L["Page:Sections:Endpoints:EmptyTitle"]</strong><p>@L["Page:Sections:Endpoints:EmptyDescription"]</p></MoContentState>
+    }
+    else
+    {
+        @foreach (var endpoint in Snapshot.Endpoints)
+        {
+            <button type="button" class="system-info-endpoint" @key="endpoint.Address"
+                    aria-label="@L["Page:Sections:Endpoints:InspectAria", endpoint.Address]" @onclick="@(() => InspectEndpointAsync(endpoint))">
+                <span class="endpoint-transport">@endpoint.Scheme.ToUpperInvariant()</span>
+                <span class="endpoint-address">@endpoint.Address</span>
+                <span class="endpoint-bound"><i></i>@L["Page:Status:Bound"]</span>
+                <MoIcon Icon="@MoIcons.ChevronRight" Size="16px" />
+            </button>
+        }
+    }
+</section>
+
+@code {
+    /// <summary>The snapshot containing normalized bound addresses and their evidence timestamp.</summary>
+    [Parameter, EditorRequired] public SystemInfoSnapshot Snapshot { get; set; } = null!;
+
+    private Task InspectEndpointAsync(SystemInfoEndpoint endpoint) => DialogService.ShowAsync<SystemInfoEndpointDialog>(
+        L["Page:Dialogs:Endpoint:Title"],
+        new DialogParameters<SystemInfoEndpointDialog>
+        {
+            { dialog => dialog.Endpoint, endpoint },
+            { dialog => dialog.CapturedAtUtc, Snapshot.CapturedAtUtc }
+        },
+        new DialogOptions { CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Small });
+}

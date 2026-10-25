@@ -1,6 +1,8 @@
 <header class="system-info-evidence-header">
     <div class="system-info-evidence-header__copy">
-        <span class="system-info-evidence-header__number" aria-hidden="true">@Number</span>
+        <span class="system-info-evidence-header__number @Tone" aria-hidden="true">
+            @if (Icon is not null) { <MoIcon Icon="@Icon" Size="16px" /> } else { @Number }
+        </span>
         <h2 id="@HeadingId">@Title</h2>
         <p>@Description</p>
     </div>
@@ -11,7 +13,11 @@
 </header>
 
 @code {
-    [Parameter, EditorRequired] public string Number { get; set; } = string.Empty;
+    [Parameter] public string Number { get; set; } = string.Empty;
+    /// <summary>The evidence category icon, used instead of the optional ordinal.</summary>
+    [Parameter] public string? Icon { get; set; }
+    /// <summary>The visual role: info, neutral, or artifact. Defaults to info.</summary>
+    [Parameter] public string Tone { get; set; } = "info";
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
     [Parameter] public string? HeadingId { get; set; }

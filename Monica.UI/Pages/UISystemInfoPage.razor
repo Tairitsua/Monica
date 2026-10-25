@@ -37,10 +37,13 @@
 
         <SystemInfoServiceHero Snapshot="@snapshot" NowUtc="@_session.NowUtc" />
 
-        @* Operational destinations stay near the top, before the detailed dossier. *@
-        <SystemInfoCustomLinkPanel Links="@SystemInfoUIOptions.Value.CustomLinks" />
-
-        <SystemInfoDossier Snapshot="@snapshot" />
+        <div class="system-info-lower">
+            <SystemInfoDossier Snapshot="@snapshot" />
+            <div class="system-info-side">
+                <SystemInfoCustomLinkPanel Links="@SystemInfoUIOptions.Value.CustomLinks" />
+                <SystemInfoEndpoints Snapshot="@snapshot" />
+            </div>
+        </div>
     }
 </div>
 

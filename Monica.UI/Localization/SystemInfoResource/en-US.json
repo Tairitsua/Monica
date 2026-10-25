@@ -15,23 +15,22 @@
     },
     "Status": {
       "Running": "Running",
-      "Tracked": "Tracked",
       "Snapshot": "Snapshot",
       "Bound": "Bound",
       "JustNow": "just now",
-      "SecondsAgo": "{0}s ago"
+      "SecondsAgo": "{0}s ago",
+      "Live": "Live",
+      "Stopping": "Shutdown requested"
     },
     "ServiceIdentity": {
-      "ProductVersion": "Product version",
       "ProcessStarted": "Process started"
     },
     "Startup": {
       "AriaLabel": "Application startup timing",
       "Title": "Application startup",
-      "Scope": "Completed host startup interval",
-      "StartMarker": "Start marker",
       "ReadyAt": "Host started at",
-      "DurationValue": "{0:N1} ms"
+      "DurationValue": "{0:N1} ms",
+      "DurationLabel": "Application startup"
     },
     "Pulse": {
       "AriaLabel": "Service evidence summary",
@@ -40,10 +39,6 @@
       "ProcessId": "Process ID",
       "EvidenceAge": "Evidence age",
       "CapturedAt": "Captured at"
-    },
-    "Index": {
-      "Hint": "Jump to section",
-      "AriaLabel": "System evidence sections"
     },
     "Sections": {
       "Runtime": {
@@ -82,9 +77,6 @@
       "Endpoints": {
         "Title": "Listening addresses",
         "Description": "Addresses currently bound by the host.",
-        "ListeningAddress": "Listening address",
-        "Transport": "Transport",
-        "Inspect": "Inspect",
         "InspectAria": "Inspect endpoint {0}",
         "ListeningCount": "{0} listening addresses",
         "EmptyTitle": "No listening endpoints captured",
@@ -98,7 +90,8 @@
         "FileVersion": "File version",
         "ArtifactTimestamp": "Artifact timestamp",
         "Company": "Company",
-        "Legal": "Legal"
+        "Legal": "Legal",
+        "BeforeProcess": "{0} before process start"
       }
     },
     "States": {
@@ -129,6 +122,41 @@
       "RefreshFailed": "Failed to refresh system evidence: {0}",
       "RestartFailed": "Failed to request service restart: {0}",
       "RestartRequestedFallback": "Graceful shutdown has been requested. The host will stop shortly."
+    },
+    "Copy": {
+      "Action": "Copy {0}",
+      "Succeeded": "Copied to clipboard.",
+      "Failed": "Could not copy. Try again."
+    },
+    "Units": {
+      "Day": "d",
+      "Hour": "h",
+      "Minute": "m",
+      "Second": "s"
+    },
+    "Finding": {
+      "On": "The process on",
+      "Running": "has run for",
+      "RunningEnd": ". ",
+      "Startup": "Host startup completed in",
+      "StartupEnd": ". ",
+      "Captured": "Evidence captured",
+      "Snapshot": "; working set and process facts are a snapshot."
+    },
+    "Lifeline": {
+      "Title": "Process lifeline",
+      "Artifact": "Artifact written",
+      "Observed": "Running (captured)",
+      "Unobserved": "Since capture (unobserved)",
+      "Startup": "Startup",
+      "SecondsScale": "seconds scale",
+      "Running": "Running",
+      "ClockScale": "clock scale",
+      "RunningAria": "Running: {0} to {1}",
+      "Now": "Now",
+      "Capture": "Capture",
+      "Hint": "Hover or use arrow keys to inspect",
+      "Untracked": "Startup timing is not enabled"
     }
   },
   "CustomLinks": {

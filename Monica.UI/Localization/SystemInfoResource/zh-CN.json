@@ -5,8 +5,8 @@
     }
   },
   "Page": {
-    "Title": "系统档案",
-    "Eyebrow": "主机信息",
+    "Title": "系统信息",
+    "Eyebrow": "主机档案",
     "Summary": "查看当前主机的应用身份、运行时与环境信息。",
     "Actions": {
       "Refresh": "刷新证据",
@@ -15,23 +15,22 @@
     },
     "Status": {
       "Running": "运行中",
-      "Tracked": "已记录",
       "Snapshot": "快照",
       "Bound": "已绑定",
       "JustNow": "刚刚",
-      "SecondsAgo": "{0} 秒前"
+      "SecondsAgo": "{0} 秒前",
+      "Live": "实时",
+      "Stopping": "已请求停止"
     },
     "ServiceIdentity": {
-      "ProductVersion": "产品版本",
       "ProcessStarted": "进程启动于"
     },
     "Startup": {
       "AriaLabel": "应用启动计时",
       "Title": "应用启动",
-      "Scope": "已完成的主机启动区间",
-      "StartMarker": "计时起点",
       "ReadyAt": "主机启动完成于",
-      "DurationValue": "{0:N1} 毫秒"
+      "DurationValue": "{0:N1} 毫秒",
+      "DurationLabel": "应用启动耗时"
     },
     "Pulse": {
       "AriaLabel": "服务证据摘要",
@@ -40,10 +39,6 @@
       "ProcessId": "进程 ID",
       "EvidenceAge": "证据时效",
       "CapturedAt": "采集于"
-    },
-    "Index": {
-      "Hint": "跳转分区",
-      "AriaLabel": "系统信息分区"
     },
     "Sections": {
       "Runtime": {
@@ -82,9 +77,6 @@
       "Endpoints": {
         "Title": "监听地址",
         "Description": "当前宿主已绑定的地址。",
-        "ListeningAddress": "监听地址",
-        "Transport": "传输协议",
-        "Inspect": "查看",
         "InspectAria": "查看端点 {0}",
         "ListeningCount": "{0} 个监听地址",
         "EmptyTitle": "未采集到监听端点",
@@ -98,7 +90,8 @@
         "FileVersion": "文件版本",
         "ArtifactTimestamp": "制品时间戳",
         "Company": "公司",
-        "Legal": "版权"
+        "Legal": "版权",
+        "BeforeProcess": "进程启动前 {0}"
       }
     },
     "States": {
@@ -129,6 +122,41 @@
       "RefreshFailed": "刷新系统证据失败: {0}",
       "RestartFailed": "请求重启服务失败: {0}",
       "RestartRequestedFallback": "已请求优雅关闭，服务很快会停止。"
+    },
+    "Copy": {
+      "Action": "复制 {0}",
+      "Succeeded": "已复制。",
+      "Failed": "无法复制，请重试。"
+    },
+    "Units": {
+      "Day": "天",
+      "Hour": "时",
+      "Minute": "分",
+      "Second": "秒"
+    },
+    "Finding": {
+      "On": "进程已在",
+      "Running": "上持续运行",
+      "RunningEnd": "。",
+      "Startup": "计时起点后",
+      "StartupEnd": "主机启动完成。",
+      "Captured": "证据采集于",
+      "Snapshot": "，工作集等读数是采集时的快照。"
+    },
+    "Lifeline": {
+      "Title": "进程生命线",
+      "Artifact": "制品写入",
+      "Observed": "运行（已采集）",
+      "Unobserved": "采集后（未观测）",
+      "Startup": "启动",
+      "SecondsScale": "秒级刻度",
+      "Running": "运行",
+      "ClockScale": "时钟刻度",
+      "RunningAria": "运行：{0} 至 {1}",
+      "Now": "现在",
+      "Capture": "采集",
+      "Hint": "悬停或使用方向键查看时刻",
+      "Untracked": "启动计时未启用"
     }
   },
   "CustomLinks": {

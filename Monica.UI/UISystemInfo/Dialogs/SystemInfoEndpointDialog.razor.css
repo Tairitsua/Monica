@@ -1,12 +1,8 @@
-.system-info-endpoint-dialog { display: grid; min-width: 0; gap: 20px; padding: 4px 0 8px; }
-.system-info-endpoint-dialog__eyebrow { margin: 0; color: var(--mud-palette-text-secondary); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; }
-.system-info-endpoint-dialog h2 { margin: 0; color: var(--mud-palette-text-primary); font-family: var(--mo-font-family-mono); font-size: 20px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.system-info-endpoint-dialog { min-width: 0; padding: 2px 0 4px; }
 .system-info-endpoint-dialog dl { min-width: 0; margin: 0; }
-.system-info-endpoint-dialog dl > div { display: grid; min-width: 0; grid-template-columns: 100px minmax(0, 1fr); align-items: baseline; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--mud-palette-divider); }
-.system-info-endpoint-dialog dl > div:first-child { border-top: 1px solid var(--mud-palette-divider); }
+.system-info-endpoint-dialog dl > div { display: grid; min-width: 0; grid-template-columns: 100px minmax(0, 1fr); align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px dashed var(--mud-palette-divider); }
 .system-info-endpoint-dialog dl > div:last-child { border-bottom: 0; }
 .system-info-endpoint-dialog dt { color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.7; }
-.system-info-endpoint-dialog dd { min-width: 0; margin: 0; color: var(--mud-palette-text-primary); font-family: var(--mo-font-family-mono); font-size: 12px; font-weight: 400; line-height: 1.7; overflow-wrap: anywhere; }
-@media (max-width: 450px) {
-    .system-info-endpoint-dialog dl > div { grid-template-columns: 1fr; gap: 5px; }
-}
+.system-info-endpoint-dialog dd { min-width: 0; margin: 0; color: var(--mud-palette-text-primary); font: 400 12px/1.7 var(--mo-font-family-mono); overflow-wrap: anywhere; }
+.endpoint-transport { padding: 3px 6px; border-radius: 4px; background: var(--mud-palette-background-gray); color: var(--mud-palette-text-secondary); font-size: 11.5px; font-weight: 600; }
+@media (max-width: 450px) { .system-info-endpoint-dialog dl > div { grid-template-columns: 1fr; gap: 5px; } }

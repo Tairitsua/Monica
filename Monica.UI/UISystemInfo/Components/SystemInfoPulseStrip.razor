@@ -3,44 +3,45 @@
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<SystemInfoResource> L
 
 <dl class="system-info-pulse" aria-label="@L["Page:Pulse:AriaLabel"]">
-    <div>
-        <dt><MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />@L["Page:Pulse:ProcessUptime"]</dt>
-        <dd class="system-info-live-uptime">@SystemInfoDisplayFormatter.FormatDuration(Uptime)</dd>
+    <div class="@(Snapshot.Startup is null ? null : "pulse-startup")">
+        @if (Snapshot.Startup is { } startup)
+        {
+            <dt><i></i>@L["Page:Startup:DurationLabel"]</dt>
+            <dd>@((startup.DurationMs / 1000d).ToString("N2", CultureInfo.CurrentCulture))<small>s</small></dd>
+            <small>@L["Page:Startup:DurationValue", startup.DurationMs]</small>
+        }
+        else
+        {
+            <dt><i></i>@L["Page:ServiceIdentity:ProcessStarted"]</dt>
+            <dd class="is-time">@UiTime.FormatTime(Snapshot.Process.StartedAtUtc)</dd>
+            <small>@UiTime.FormatDate(Snapshot.Process.StartedAtUtc)</small>
+        }
     </div>
     <div>
-        <dt><MoIcon Icon="@MoIcons.Cpu" Size="1.25rem" />@L["Page:Pulse:WorkingSet"] <span>@L["Page:Status:Snapshot"]</span></dt>
-        <dd class="system-info-working-set" title="@L["Page:Sections:Runtime:WorkingSetAtCapture"]">@SystemInfoDisplayFormatter.FormatScaledBytes(Snapshot.Process.WorkingSetBytes, CultureInfo.CurrentCulture)</dd>
+        <dt><i></i>@L["Page:Pulse:WorkingSet"] · @L["Page:Status:Snapshot"]</dt>
+        <dd class="system-info-working-set" title="@L["Page:Sections:Runtime:WorkingSetAtCapture"]">@( (Math.Max(0, Snapshot.Process.WorkingSetBytes) / 1048576d).ToString("N1", CultureInfo.CurrentCulture))<small>MiB</small></dd>
         <small>@SystemInfoDisplayFormatter.FormatByteCount(Snapshot.Process.WorkingSetBytes, CultureInfo.CurrentCulture)</small>
     </div>
     <div>
-        <dt><MoIcon Icon="@MoIcons.Hash" Size="1.25rem" />@L["Page:Pulse:ProcessId"]</dt>
-        <dd>@Snapshot.Process.ProcessId.ToString(CultureInfo.CurrentCulture)</dd>
+        <dt><i></i>@L["Page:Pulse:ProcessId"]</dt>
+        <dd>@Snapshot.Process.ProcessId</dd>
+        <small>@Snapshot.Process.Architecture · @L[Snapshot.Process.Is64BitProcess ? "Page:Sections:Runtime:Values:Process64Bit" : "Page:Sections:Runtime:Values:Process32Bit"]</small>
     </div>
-    <div>
-        <dt><MoIcon Icon="@MoIcons.History" Size="1.25rem" />@L["Page:Pulse:EvidenceAge"]</dt>
+    <div class="pulse-age">
+        <dt><i></i>@L["Page:Pulse:EvidenceAge"]</dt>
         <dd class="system-info-evidence-age">@EvidenceAge</dd>
+        <small>@L["Page:Pulse:CapturedAt"] @UiTime.FormatTime(Snapshot.CapturedAtUtc)</small>
     </div>
 </dl>
 
 @code {
     [Parameter, EditorRequired] public SystemInfoSnapshot Snapshot { get; set; } = null!;
     [Parameter] public DateTimeOffset NowUtc { get; set; }
-
-    private TimeSpan Uptime => NowUtc > Snapshot.Process.StartedAtUtc
-        ? NowUtc - Snapshot.Process.StartedAtUtc
-        : TimeSpan.Zero;
-
-    private string EvidenceAge
-    {
-        get
-        {
-            var seconds = Math.Max(0, (int)(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds);
-            return seconds == 0
-                ? L["Page:Status:JustNow"].Value
-                : L["Page:Status:SecondsAgo", seconds].Value;
-        }
-    }
+    private string EvidenceAge => (NowUtc - Snapshot.CapturedAtUtc).TotalSeconds < 1
+        ? L["Page:Status:JustNow"].Value
+        : L["Page:Status:SecondsAgo", Math.Max(0, (int)(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds)].Value;
 }
