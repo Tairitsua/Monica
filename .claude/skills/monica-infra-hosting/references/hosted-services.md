@@ -1,6 +1,6 @@
 # Hosted services
 
-For application unit naming, role placement, queue ownership, scoped operations, and migration from Seeder-started loops, use the [hosted-service template](../../monica-application-project-unit-development/references/18-hosted-service-template.md). `HostedService` remains the existing ProjectUnit classification; work items are support types.
+For application unit naming, role placement, queue ownership, scoped operations, and migration from Seeder-started loops, use the hosted-service template in `$monica-application-project-unit-development` (`references/18-hosted-service-template.md`). `HostedService` remains the existing ProjectUnit classification; work items are support types.
 
 The [application model](application-model.md) selects background ownership per resource. Core also supplies a standalone policy when no model is installed. `Application:AutonomousWork=false` holds product background services before construction; disabled owners remain excluded. Native domain/role registrations retain the owner of concrete and factory descriptors through deferred contributions. An opaque factory is never invoked to discover its type. Register product services before or during Monica composition; registrations added afterward are outside that gate and must enforce the same frozen policy.
 

@@ -51,4 +51,4 @@ Changed draft text or settings and re-enabling `AutoRefresh` request comparison.
 
 Disposal stops admission and drains already admitted noncancelable comparison work. The scoped facade remains borrowed. Page-only sample loading, draft editors and compact focus behavior belong to the workspace rather than the shared computing wrapper. The page compares both-empty drafts deliberately and distinguishes that accepted empty pair from an uncomputed state.
 
-For authoring a comparison UI, use the [UI development](../../monica-ui-development/SKILL.md) and [working-interface language](../../monica-ui-development/references/monica-workbench-design-language.md) contracts. Inspect accepted source/options separately from current drafts, and verify complete encoded line text and paired-row geometry in real consumers.
+For authoring a comparison UI, use the UI development in `$monica-ui-development` and working-interface language in `$monica-ui-development` (`references/monica-workbench-design-language.md`) contracts. Inspect accepted source/options separately from current drafts, and verify complete encoded line text and paired-row geometry in real consumers.

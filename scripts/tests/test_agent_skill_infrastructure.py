@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import re
+import shutil
 import sys
 import tempfile
 import tracemalloc
@@ -126,6 +127,63 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
         self.assertNotIn("monica-infra-ui", application_default)
         self.assertNotIn("monica-application-ui", application_default)
         self.assertNotIn("monica-framework", application_ui)
+
+    def test_troubleshooting_is_installed_without_forcing_optional_ui(self) -> None:
+        skills = self.catalog["skills"]
+        for profile_name, profile in self.catalog["profiles"].items():
+            with self.subTest(profile=profile_name):
+                selected = validator.profile_selection_closure(skills, profile)
+                self.assertIn("monica-troubleshooting", selected)
+
+        application = self.catalog["profiles"]["application"]
+        backend = validator.profile_selection_closure(skills, application)
+        with_ui = validator.profile_selection_closure(skills, application, capabilities=["ui"])
+        self.assertNotIn("monica-infra-ui", backend)
+        self.assertIn("monica-infra-ui", with_ui)
+        self.assertNotIn("monica-architecture", with_ui)
+        self.assertEqual(
+            {"monica-troubleshooting"},
+            validator.required_closure(skills, ["monica-troubleshooting"]),
+            "Symptom routing must not install every optional capability it can diagnose.",
+        )
+
+    def test_troubleshooting_router_can_be_read_without_optional_skill_files(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="monica-troubleshooting-install-") as temporary:
+            workspace = Path(temporary)
+            installed = workspace / "skills" / "monica-troubleshooting"
+            shutil.copytree(REPOSITORY_ROOT / "skills" / "monica-troubleshooting", installed)
+
+            errors = validator.validate_reference_navigation(installed, workspace)
+
+        self.assertEqual([], errors, "Optional capability routing must not leave broken Markdown links.")
+
+    def test_installed_profile_infrastructure_links_resolve_without_optional_dependencies(self) -> None:
+        skills = self.catalog["skills"]
+        for profile_name, profile in self.catalog["profiles"].items():
+            capabilities = [item["capability"] for item in profile["skills"]["conditional"]]
+            selections = [[], *[[capability] for capability in capabilities], capabilities]
+            for recommended in (False, True):
+                for active in selections:
+                    with self.subTest(profile=profile_name, recommended=recommended, capabilities=active):
+                        selected = validator.profile_selection_closure(
+                            skills, profile, include_recommended=recommended, capabilities=active
+                        )
+                        with tempfile.TemporaryDirectory(prefix="monica-profile-links-") as temporary:
+                            workspace = Path(temporary)
+                            for skill in selected:
+                                shutil.copytree(
+                                    REPOSITORY_ROOT / skills[skill]["path"],
+                                    workspace / "skills" / skill,
+                                )
+                            errors = [
+                                error
+                                for skill in selected
+                                if skill.startswith("monica-infra-") or skill == "monica-troubleshooting"
+                                for error in validator.validate_reference_navigation(
+                                    workspace / "skills" / skill, workspace
+                                )
+                            ]
+                        self.assertEqual([], errors)
 
     def test_bootstrap_prompt_manifest_has_one_universal_prompt_per_locale(self) -> None:
         bootstrap = json.loads(
@@ -287,7 +345,7 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
 
     def test_managed_instruction_rules_are_switchable_and_route_source_lookup_through_guide(self) -> None:
         instructions = self.catalog["managedInstructions"]
-        self.assertEqual(4, instructions["version"])
+        self.assertEqual(5, instructions["version"])
         for profile_name, template in instructions["templates"].items():
             rules = [rule["text"] for rule in template["rules"]]
             rule_ids = [rule["id"] for rule in template["rules"]]

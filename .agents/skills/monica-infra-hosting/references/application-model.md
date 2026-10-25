@@ -1,6 +1,6 @@
 # Unified application model
 
-`Monica.ApplicationModel` composes compiled business ownership, each artifact's actual local implementations, and startup placement. It depends on Core and does not require HTTP, persistence, or API. Use the shared [application specification](../../monica-application/SKILL.md) for the solution layout; this reference owns registration and runtime behavior.
+`Monica.ApplicationModel` composes compiled business ownership, each artifact's actual local implementations, and startup placement. It depends on Core and does not require HTTP, persistence, or API. Use the shared application specification in `$monica-application` for the solution layout; this reference owns registration and runtime behavior.
 
 ## Declare ownership once
 

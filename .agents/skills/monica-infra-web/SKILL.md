@@ -14,6 +14,6 @@ Choose host composition for the Web bundle or individual modules; choose endpoin
 | Configure JWT authentication, permission checks, or CORS | [Access control](references/access-control.md) |
 | Configure Swagger documents or control the visibility of module routes | [API documentation and visibility](references/api-documentation-and-visibility.md) |
 
-For application request and handler design, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md). For module implementation, use `$monica-framework`, then `$monica-development`.
+For application request and handler design, use ProjectUnit development in `$monica-application-project-unit-development`. For module implementation, use `$monica-framework`, then `$monica-development`.
 
-If a routed authoring skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md`.
+If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.

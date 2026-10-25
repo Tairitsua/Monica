@@ -1,6 +1,6 @@
 # Publish and receive events
 
-For application EventBus contracts and consumers, including outbox or inbox refactors, first follow the ProjectUnit [event contract](../../monica-application-project-unit-development/references/12-entity-request-event-template.md) and [handler](../../monica-application-project-unit-development/references/14-event-handler-template.md) templates. This reference owns transport capabilities and setup; the interface example below demonstrates the general EventBus API.
+For application EventBus contracts and consumers, including outbox or inbox refactors, first follow the ProjectUnit event contract in `$monica-application-project-unit-development` (`references/12-entity-request-event-template.md`) and handler in `$monica-application-project-unit-development` (`references/14-event-handler-template.md`) templates. This reference owns transport capabilities and setup; the interface example below demonstrates the general EventBus API.
 
 `monica.AddEventBus()` registers the local bus, scoped publishing gateway, handler discovery, subscription registry, and receive dispatcher. Use `ILocalEventBus` when publisher and handlers run in one process; implement `ILocalEventHandler<TEvent>` in the host's discovery scope, or use `IEventBus.SubscribeAsync<TEvent,...>` for an explicit subscription. `DisableAutoDiscovery` disables the scan. A handler receives a cancellation token and should pass it to its own I/O.
 

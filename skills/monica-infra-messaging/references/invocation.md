@@ -116,7 +116,7 @@ builder.AddMonica(monica =>
 });
 ```
 
-`domainProvider` is the application's existing IApiClientDomainInfoProvider. Local never needs its network destination. AddApplication supplies the operation boundary: independent outer calls have fresh scopes and trusted identity, nested Local calls share the active operation/UnitOfWork. A host deliberately using only ApiClient retains mediator dispatch in its caller-owned scope. UI composition and result/identity rules are detailed in [application invocation](../../monica-application-ui/references/application-invocation.md).
+`domainProvider` is the application's existing IApiClientDomainInfoProvider. Local never needs its network destination. AddApplication supplies the operation boundary: independent outer calls have fresh scopes and trusted identity, nested Local calls share the active operation/UnitOfWork. A host deliberately using only ApiClient retains mediator dispatch in its caller-owned scope. UI composition and result/identity rules are detailed in application invocation in `$monica-application-ui` (`references/application-invocation.md`).
 
 HTTP remains the default standalone transport. Configure `ConfigHttpClientRegisterProvider<TProvider>()` and `UseHttpTransport()`, or use Dapr's `UseDaprProvider()`. Providers implement IApiHttpClientRegisterProvider and configure named-client destinations from GetDomain; destination discovery is not automatic. Retain existing domain-to-app-ID mapping and ConfigHttpClientBuilder policies in standalone consumers. ApplicationHost clients use the operation/role map and local implementation availability described above. Standalone domain selection uses ConfigDomainInfoProvider; there is no ForDomains API.
 

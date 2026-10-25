@@ -1,31 +1,31 @@
 ---
 name: monica-infra-ui
-description: Register and use Monica Blazor UI modules, the shell, icons, Markdown viewer, themes, navigation, and localization in a host. Use monica-ui-development for building components and monica-ui-localization for authoring resources.
+description: Register and use Monica Blazor UI, shell, icons, Markdown, themes, navigation, and localization. Diagnose Blazor script or refresh 404s, empty stylesheets, and inactive pages; use monica-ui-development for components and monica-ui-localization for resources.
 ---
 
 # Monica UI hosting
 
-UI foundation, hosting, and the optional Shell compose independently; Markdown adds searchable documents.
-
 | Task | Read |
 | --- | --- |
-| Compose product layouts, routes, and application calls | [Application hosting](references/application-hosting.md) |
-| Compose the shell, add feature pages, configure navigation, or authorize operational pages | [Shell and access](references/shell-and-access.md) |
-| Render local SVG icons or supply icons to controls and navigation | [MoIcon and icon catalog](references/icons.md) |
-| Inspect host identity, process evidence, timing, or operational links | [System information](references/system-information.md) |
-| Inspect registered DbContexts, provider sessions, or migration outcomes | [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md) |
+| Select UI foundation, hosting, Shell, layouts, or application calls | [Application hosting](references/application-hosting.md) |
+| Diagnose Blazor script 404, empty CSS, or inactive controls | [Static assets](references/troubleshooting/static-assets.md) |
+| Diagnose direct-access or refresh 404s | [Routing and refresh](references/troubleshooting/routing-and-refresh.md) |
+| Add shell pages, navigation, or operational access | [Shell and access](references/shell-and-access.md) |
+| Render SVG icons in controls or navigation | [MoIcon and icon catalog](references/icons.md) |
+| Inspect host identity, process evidence, or timing | [System information](references/system-information.md) |
+| Inspect DbContexts, sessions, or migrations | [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md) |
 | Render Markdown and diagrams, search documents, or serve local images | [Markdown](references/markdown.md) |
-| Probe connectivity from a host or transform escaped text and JSON | [Utilities workspaces](references/utilities.md) |
-| Inspect registered object-mapping pairs and generated expressions | [Mapper workspace](references/mapper.md) |
+| Probe connectivity or transform escaped text and JSON | [Utilities workspaces](references/utilities.md) |
+| Inspect mapping pairs and expressions | [Mapper workspace](references/mapper.md) |
 | Inspect Git working copies and credentials | [Git workspace](references/git-workspace.md) |
-| Browse, edit, transfer host files or configure FileOps policy | [FileOps workspace](references/fileops-workspace.md) |
-| Execute host-local commands and inspect session, output, history and cancellation evidence | [Terminal workspace](references/terminal-workspace.md) |
-| Inspect Kubernetes resources, execute Service-backed operations, or publish the host's NodePort addresses | [K8S operations](references/k8s-workspace.md) |
-| Compare text or embed a Diff viewer with source-faithful line evidence | [Text comparison](references/diff.md) |
-| Read and copy captured exception or diagnostic text inside an existing UI | [Embedded diagnostic text](references/stack-trace.md) |
-| Theme the standalone Swagger reference or add application destinations to its toolbar | [Swagger workbench](references/swagger-ui.md) |
-| Set theme/language defaults or integrate custom page localization | [Theme and localization](references/theme-and-localization.md) |
+| Browse, edit, transfer files, or configure FileOps | [FileOps workspace](references/fileops-workspace.md) |
+| Execute commands and inspect sessions, output, or cancellation | [Terminal workspace](references/terminal-workspace.md) |
+| Inspect Kubernetes, operate Services, or publish NodePorts | [K8S operations](references/k8s-workspace.md) |
+| Compare text or embed a Diff viewer | [Text comparison](references/diff.md) |
+| Read and copy captured exceptions or diagnostics | [Embedded diagnostic text](references/stack-trace.md) |
+| Theme Swagger or add toolbar destinations | [Swagger workbench](references/swagger-ui.md) |
+| Set theme/language defaults or localize pages | [Theme and localization](references/theme-and-localization.md) |
 
 Use `$monica-ui-development` for components and `$monica-ui-localization` for translations; configure underlying services through their infrastructure skills.
 
-For unavailable authoring skills, resolve Monica with `$monica-guide` (`source resolve --repository monica --json`) and read canonical `skills/<name>/SKILL.md`.
+For unavailable named skills, resolve Monica with `$monica-guide` (`source resolve --repository monica --json`) and read canonical `skills/<name>/SKILL.md` and the specified reference.

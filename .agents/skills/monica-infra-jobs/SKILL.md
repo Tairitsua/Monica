@@ -13,6 +13,6 @@ Choose JobScheduler for recurring or on-demand work with managed execution histo
 | Inspect execution history, trigger or cancel work, change policy, or expose the operator UI | [Scheduler operations](references/scheduler-operations.md) |
 | Declare startup seeders, order dependencies, or diagnose readiness | [Startup seeding](references/startup-seeding.md) |
 
-For application job placement, use [ProjectUnit development](../monica-application-project-unit-development/SKILL.md). For framework module or worker implementation, use `$monica-framework`, then `$monica-development`.
+For application job placement, use ProjectUnit development in `$monica-application-project-unit-development`. For framework module or worker implementation, use `$monica-framework`, then `$monica-development`.
 
-If a routed authoring skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md`.
+If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.

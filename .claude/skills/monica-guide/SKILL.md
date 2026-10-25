@@ -68,6 +68,8 @@ Monica skills install **into the project by default**, never globally unless the
 
 ## Operating rules
 
+- Guide `status` and `doctor` inspect toolbox and installation state. For a failing application host, route, UI page, or infrastructure operation, use `$monica-troubleshooting` and its owning runtime guidance.
+
 - One active skill release per product, recorded in the unified guide ledger; installations are keyed by environment and target root, so many project directories coexist with the global catalogs, and each is removable through its own `unconfigure` preview.
 - Maintain at most one global binding per first-party repository. Bindings record exact provenance (ref, commit, resolver) and remain lookup-only locators; never treat them as permission for remote or repository mutations.
 - Keep `stable`-grade releases immutable: never replace an unavailable release asset with a branch or another version. Offline operation uses the installed bundle and local bindings only.

@@ -19,7 +19,7 @@ app.MapMonica();
 app.Run();
 ```
 
-`AddRepositoryUI()` requires Repository, module-local localization, and the shell. The host owns access to these diagnostics and to any exposed facade operations; navigation visibility and the migration-production option are not authorization. Configure the host through [shell and access](../../monica-infra-ui/references/shell-and-access.md).
+`AddRepositoryUI()` requires Repository, module-local localization, and the shell. The host owns access to these diagnostics and to any exposed facade operations; navigation visibility and the migration-production option are not authorization. Configure the host through shell and access in `$monica-infra-ui` (`references/shell-and-access.md`).
 
 ## Navigate by the exact context identity
 
@@ -107,6 +107,6 @@ Cancellation can interrupt observation after database changes committed. Provide
 
 `RepositoryDashboardState` is a scoped, circuit-owned service borrowed by the four routed workbenches. It serializes selection, reads, and commands through one gate and rechecks the caller's token before adopting results. This coordination is local to the circuit, not a distributed or cross-user migration lock.
 
-The consuming component owns its cancellation source and admitted operation, parameter synchronization, confirmation, and focus tasks. Retirement stops admission, cancels, closes or observes late native dialog references, drains all admitted tasks, and then disposes the component lifetime. A failure while draining one task does not excuse abandoning another. Session/guide dialogs own and drain their clipboard work. Do not dispose injected state during route retirement. The backend diagnostics service owns its separate async scopes and DbContexts; UI code does not retain or dispose those contexts. See [page-state ownership](../../monica-architecture/references/page-state-pattern.md) and [Blazor lifecycle mechanics](../../monica-ui-development/references/blazor-best-practices.md).
+The consuming component owns its cancellation source and admitted operation, parameter synchronization, confirmation, and focus tasks. Retirement stops admission, cancels, closes or observes late native dialog references, drains all admitted tasks, and then disposes the component lifetime. A failure while draining one task does not excuse abandoning another. Session/guide dialogs own and drain their clipboard work. Do not dispose injected state during route retirement. The backend diagnostics service owns its separate async scopes and DbContexts; UI code does not retain or dispose those contexts. See page-state ownership in `$monica-architecture` (`references/page-state-pattern.md`) and Blazor lifecycle mechanics in `$monica-ui-development` (`references/blazor-best-practices.md`).
 
 Source: `Monica.Repository.UI/Modules/ModuleRepositoryUI.cs`, its four `Pages/UIRepository*Page.razor` wrappers, `UIRepository/Components/RepositoryWorkbench.razor`, `RepositoryActivityTable.razor`, `RepositoryActivityDetailDialog.razor`, `UIRepository/State/RepositoryDashboardState.cs`, `Monica.Repository/Facades/RepositoryDiagnosticsFacade.cs`, `Persistence/Models/RepositoryDiagnosticsModels.cs`, and `Persistence/Services/RepositoryDbContextDiagnosticsService.cs` with its `Support/` activity queries, registry, guide catalog, and pool parser.

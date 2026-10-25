@@ -4,7 +4,7 @@
 
 ## Register the application context
 
-For the context and narrow repository class shapes, use the [application repository template](../../monica-application-project-unit-development/references/13-repository-and-persistence-template.md). In this example, `OrdersDbContext` is that application-owned context and `connectionString` selects its database. Register it inside the host's `AddMonica` callback:
+For the context and narrow repository class shapes, use the application repository template in `$monica-application-project-unit-development` (`references/13-repository-and-persistence-template.md`). In this example, `OrdersDbContext` is that application-owned context and `connectionString` selects its database. Register it inside the host's `AddMonica` callback:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;

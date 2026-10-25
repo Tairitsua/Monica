@@ -17,7 +17,7 @@ builder.AddMonica(monica =>
 });
 ```
 
-This is a module-composition fragment. The consuming ASP.NET Core host still owns its [UI setup](../../monica-infra-ui/SKILL.md), authentication, authorization, `app.UseMonica()`, and `app.MapMonica()` lifecycle.
+This is a module-composition fragment. The consuming ASP.NET Core host still owns its UI setup in `$monica-infra-ui`, authentication, authorization, `app.UseMonica()`, and `app.MapMonica()` lifecycle.
 
 ## Separate registered handlers from transport health
 
