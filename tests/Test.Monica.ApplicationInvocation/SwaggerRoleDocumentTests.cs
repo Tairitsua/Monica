@@ -190,7 +190,7 @@ public sealed class SwaggerRoleDocumentTests
                 builder.AddApplicationModel(options =>
                 {
                     options.ManifestType = typeof(InvocationScenarioManifest);
-                    options.Deployments = new Dictionary<string, ApplicationPlacement>
+                    options.Applications = new Dictionary<string, ApplicationPlacement>
                     {
                         ["local"] = new() { Roles = colocated ? ["ordering.worker", "ordering.invocation"] : ["ordering.worker"] },
                         ["remote"] = new() { Roles = colocated ? [] : ["ordering.invocation"] }

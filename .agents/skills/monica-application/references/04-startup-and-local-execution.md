@@ -1,6 +1,6 @@
 # Startup inputs and local execution
 
-Use the same host, domain/role declarations and application placement in deployment and local development. The [unified architecture](03-unified-architecture.md) owns code boundaries and the `Application:Deployments` map. This reference selects configuration ownership and the local profile; native capability references own their execution APIs.
+Use the same host, domain/role declarations and application placement in deployment and local development. The [unified architecture](03-unified-architecture.md) owns code boundaries and the `Deployment:Applications` map. This reference selects configuration ownership and the local profile; native capability references own their execution APIs.
 
 ## Give each setting one authority
 
@@ -31,7 +31,7 @@ When renaming an existing Managed type to `Options*`, pin its previous `SectionP
 
 The host environment name still controls Development features. Selecting a UAT resource file does not require changing `ASPNETCORE_ENVIRONMENT` from Development. Supply the list in existing host inputs or a launch profile; environment files cannot redefine it or recursively include files.
 
-Both the file list and `Application:Deployments` are complete structural inputs. The highest-priority provider that explicitly supplies either selects its entire list or map. A one-file override removes lower trailing entries; a local topology replaces every lower application and role array. Empty or invalid input does not request fallback. Use JSON for a complete topology and scalar environment variables for current AppId and AutonomousWork. The [deployment contract](03-unified-architecture.md#deployment-and-active-resources) defines validation and the alternative complete typed map.
+Both the file list and `Deployment:Applications` are complete structural inputs. The highest-priority provider that explicitly supplies either selects its entire list or map. A one-file override removes lower trailing entries; a local topology replaces every lower application and role array. Empty or invalid input does not request fallback. Use JSON for a complete topology and scalar environment variables for current AppId and AutonomousWork. The [deployment contract](03-unified-architecture.md#deployment-and-active-resources) defines validation and the alternative complete typed map.
 
 Environment files may contain Startup settings, Application keys other than EnvironmentFiles, and non-Monica sections such as Logging. They must not contain paths owned by Managed definitions, even when a higher source would hide them. Keep Managed seed defaults in their normal host inputs or managed input plan. Environment files remain deployment-owned and read-only in the configuration UI.
 
@@ -64,12 +64,15 @@ The private file supplies resource settings and this complete placement:
 
 ```json
 {
-  "Application": {
-    "DeploymentScope": "product-uat",
-    "Deployments": {
+  "Deployment": {
+    "Scope": "product-uat",
+    "Applications": {
       "product-local": {
         "AppName": "Product local development",
-        "Roles": ["ordering", "ordering.reporting"]
+        "Roles": [
+          "ordering",
+          "ordering.reporting"
+        ]
       }
     }
   }

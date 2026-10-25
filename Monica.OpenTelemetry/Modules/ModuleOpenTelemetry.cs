@@ -420,7 +420,7 @@ public class ModuleOpenTelemetryOption : MinimalApiModuleOptions<ModuleOpenTelem
     /// <summary>
     /// Gets or sets the optional deployment environment resource attribute, such as <c>Development</c> or <c>Production</c>.
     /// </summary>
-    /// <remarks>When omitted, defaults to Application:DeploymentScope.</remarks>
+    /// <remarks>When omitted, defaults to Deployment:Scope.</remarks>
     public string? DeploymentEnvironment { get; set; }
 
     /// <summary>Whether to register a tracing provider. Defaults to false; metrics remain enabled independently.</summary>

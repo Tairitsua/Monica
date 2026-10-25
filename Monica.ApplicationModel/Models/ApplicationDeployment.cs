@@ -6,11 +6,11 @@ namespace Monica.ApplicationModel.Models;
 /// <remarks>Replicas share an AppId and its roles. Role identifiers are exact, ordinal identifiers without inheritance.</remarks>
 public sealed class ApplicationDeployment
 {
-    private ApplicationDeployment(string appId, FrozenDictionary<string, ApplicationDeploymentEntry> deployments,
+    private ApplicationDeployment(string appId, FrozenDictionary<string, ApplicationDeploymentEntry> applications,
         FrozenDictionary<string, string> owners)
     {
         AppId = appId;
-        Deployments = deployments;
+        Applications = applications;
         RoleApplications = owners;
     }
 
@@ -18,10 +18,10 @@ public sealed class ApplicationDeployment
     public string AppId { get; }
 
     /// <summary>Gets the selected application's canonical display name.</summary>
-    public string AppName => Deployments[AppId].AppName;
+    public string AppName => Applications[AppId].AppName;
 
     /// <summary>Gets every explicitly declared application, including applications with no active roles.</summary>
-    public IReadOnlyDictionary<string, ApplicationDeploymentEntry> Deployments { get; }
+    public IReadOnlyDictionary<string, ApplicationDeploymentEntry> Applications { get; }
 
     /// <summary>Gets the unique logical owner of every configured role.</summary>
     public IReadOnlyDictionary<string, string> RoleApplications { get; }
@@ -31,17 +31,17 @@ public sealed class ApplicationDeployment
 
     /// <summary>Copies and validates configuration before either imperative role composition or model registration.</summary>
     /// <exception cref="InvalidOperationException">The current application is missing or a role has multiple owners.</exception>
-    public static ApplicationDeployment Create(string appId, IReadOnlyDictionary<string, ApplicationPlacement> deployments)
+    public static ApplicationDeployment Create(string appId, IReadOnlyDictionary<string, ApplicationPlacement> applications)
     {
         RequireIdentifier(appId, "AppId");
-        ArgumentNullException.ThrowIfNull(deployments);
-        if (!deployments.Keys.Contains(appId, StringComparer.Ordinal))
+        ArgumentNullException.ThrowIfNull(applications);
+        if (!applications.Keys.Contains(appId, StringComparer.Ordinal))
             throw new InvalidOperationException($"Current AppId '{appId}' is absent from the application deployment map.");
         var owners = new Dictionary<string, string>(StringComparer.Ordinal);
-        var applications = new Dictionary<string, ApplicationDeploymentEntry>(StringComparer.Ordinal);
+        var entries = new Dictionary<string, ApplicationDeploymentEntry>(StringComparer.Ordinal);
         var identifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var roleIdentifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (owner, placement) in deployments)
+        foreach (var (owner, placement) in applications)
         {
             RequireIdentifier(owner, "AppId");
             if (!identifiers.Add(owner))
@@ -58,9 +58,9 @@ public sealed class ApplicationDeployment
                 if (!roleIdentifiers.Add(role))
                     throw new InvalidOperationException($"Role '{role}' is ambiguous under case-insensitive configuration lookup.");
             }
-            applications.Add(owner, new ApplicationDeploymentEntry(appName, Array.AsReadOnly(placement.Roles.ToArray())));
+            entries.Add(owner, new ApplicationDeploymentEntry(appName, Array.AsReadOnly(placement.Roles.ToArray())));
         }
-        return new ApplicationDeployment(appId, applications.ToFrozenDictionary(StringComparer.Ordinal),
+        return new ApplicationDeployment(appId, entries.ToFrozenDictionary(StringComparer.Ordinal),
             owners.ToFrozenDictionary(StringComparer.Ordinal));
     }
 

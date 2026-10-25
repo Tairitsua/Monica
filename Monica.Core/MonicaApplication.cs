@@ -128,8 +128,10 @@ public sealed class MonicaApplication : IDisposable
 
     internal void ResolveApplicationInputs()
     {
+        RejectRetiredStartupInput("Application:Deployments", "Deployment:Applications");
+        RejectRetiredStartupInput("Application:DeploymentScope", "Deployment:Scope");
         _applicationOptions.AppId = ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
-        _applicationOptions.DeploymentScope = ResolveStartupIdentity("Application:DeploymentScope", _applicationOptions.DeploymentScope);
+        _applicationOptions.DeploymentScope = ResolveStartupIdentity("Deployment:Scope", _applicationOptions.DeploymentScope);
         var selected = Composition.StartupConfiguration.SelectCompleteSection("Application:AutonomousWork");
         if (selected is not null)
         {
@@ -141,6 +143,12 @@ public sealed class MonicaApplication : IDisposable
                 throw new InvalidOperationException("'Application:AutonomousWork' conflicts with explicitly configured execution policy.");
             _applicationOptions.AutonomousWork = value;
         }
+    }
+
+    private void RejectRetiredStartupInput(string retiredPath, string currentPath)
+    {
+        if (Composition.StartupConfiguration.Contributions.Any(provider => provider.Contains(retiredPath)))
+            throw new InvalidOperationException($"'{retiredPath}' has been retired. Move this input to '{currentPath}'; legacy inputs are not merged or used as fallbacks.");
     }
 
     private string? ResolveStartupIdentity(string path, string? configured)

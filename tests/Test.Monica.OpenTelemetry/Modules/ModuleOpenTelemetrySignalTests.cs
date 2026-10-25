@@ -132,7 +132,7 @@ public sealed class ModuleOpenTelemetrySignalTests
         {
             base.ConfigureHost(builder);
             builder.Configuration["Application:AutonomousWork"] = manual ? "false" : "true";
-            builder.Configuration["Application:DeploymentScope"] = "shared-uat";
+            builder.Configuration["Deployment:Scope"] = "shared-uat";
         }
 
         protected override void ConfigureMonica(IMonicaBuilder builder)

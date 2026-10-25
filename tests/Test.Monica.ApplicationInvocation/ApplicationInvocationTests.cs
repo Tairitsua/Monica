@@ -284,13 +284,13 @@ public sealed class ApplicationInvocationTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = remoteOnly ? typeof(RemoteOnlyInvocationManifest) : typeof(InvocationScenarioManifest);
-                options.Deployments = new Dictionary<string, ApplicationPlacement>(StringComparer.Ordinal)
+                options.Applications = new Dictionary<string, ApplicationPlacement>(StringComparer.Ordinal)
                 {
                     ["local"] = new() { Roles = colocated ? ["ordering.worker", "ordering.invocation"] : ["ordering.worker"] },
                     ["remote"] = new() { Roles = colocated ? [] : ["ordering.invocation"] }
                 };
                 if (remoteOnly)
-                    ((Dictionary<string, ApplicationPlacement>)options.Deployments)["external"] = new() { Roles = ["ordering.external"] };
+                    ((Dictionary<string, ApplicationPlacement>)options.Applications)["external"] = new() { Roles = ["ordering.external"] };
             });
             builder.AddApplication();
             builder.AddResultEnvelope().UseResultFieldNames(names => names.Status = "code");

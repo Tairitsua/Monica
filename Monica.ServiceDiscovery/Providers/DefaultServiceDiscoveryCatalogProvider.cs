@@ -20,7 +20,7 @@ public class DefaultServiceDiscoveryCatalogProvider(IOptions<ModuleServiceDiscov
         var configured = moduleOptions.PredefinedServices;
         var names = configured.ToDictionary(service => service.AppId, service => service.AppName, StringComparer.Ordinal);
         if (applicationModel is not null)
-            foreach (var (id, entry) in applicationModel.Deployment.Deployments) names[id] = entry.AppName;
+            foreach (var (id, entry) in applicationModel.Deployment.Applications) names[id] = entry.AppName;
         return Task.FromResult(names.Keys.Order(StringComparer.Ordinal)
             .Select(id => new PredefinedServiceInfo { AppId = id,
                 AppName = string.IsNullOrWhiteSpace(names[id]) ? id : names[id] }).ToList());

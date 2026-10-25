@@ -116,7 +116,7 @@ public sealed class OutboxContextOwnershipTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = _manifestType;
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["local"] = new() { Roles = ["orders.api"] },
                     ["remote"] = new() { Roles = ["orders.delivery"] }

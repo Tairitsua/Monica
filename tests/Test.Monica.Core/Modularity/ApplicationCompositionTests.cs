@@ -17,6 +17,23 @@ namespace Test.Monica.Core.Modularity;
 public sealed class ApplicationCompositionTests
 {
     [Theory]
+    [InlineData("Application:Deployments:old:Roles:0", "ordering", "Deployment:Applications")]
+    [InlineData("Application:DeploymentScope", "old-scope", "Deployment:Scope")]
+    public void Compose_WhenRetiredDeploymentInputExists_ShouldRequireMigration(string path, string value, string replacement)
+    {
+        var hostBuilder = NewBuilder();
+        hostBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [path] = value });
+        hostBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Application:AppId"] = "local", ["Deployment:Scope"] = "current-scope"
+        });
+
+        Action compose = () => hostBuilder.AddMonica(builder => builder.ConfigureTypeDiscovery(options => options.ExcludeDefault()));
+
+        compose.Should().Throw<InvalidOperationException>().WithMessage($"*has been retired*{replacement}*");
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void Compose_ShouldPrepareOnceAfterAllInputsAndAllowNewModuleDependencies(bool authorityFirst)
@@ -24,7 +41,7 @@ public sealed class ApplicationCompositionTests
         var hostBuilder = NewBuilder();
         hostBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Application:AppId"] = "local", ["Application:DeploymentScope"] = "test-site"
+            ["Application:AppId"] = "local", ["Deployment:Scope"] = "test-site"
         });
         var visits = new List<string>();
         MonicaApplicationOptions? retainedIdentity = null;

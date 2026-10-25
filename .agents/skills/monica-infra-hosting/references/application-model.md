@@ -61,11 +61,25 @@ Supply one complete application map in startup configuration:
 ```json
 {
   "Application": {
-    "AppId": "orders-api",
-    "Deployments": {
-      "orders-api": { "AppName": "Order API", "Roles": ["ordering"] },
-      "orders-reports": { "AppName": "Order reports", "Roles": ["ordering.reporting"] },
-      "orders-tools": { "Roles": [] }
+    "AppId": "orders-api"
+  },
+  "Deployment": {
+    "Applications": {
+      "orders-api": {
+        "AppName": "Order API",
+        "Roles": [
+          "ordering"
+        ]
+      },
+      "orders-reports": {
+        "AppName": "Order reports",
+        "Roles": [
+          "ordering.reporting"
+        ]
+      },
+      "orders-tools": {
+        "Roles": []
+      }
     }
   }
 }
@@ -81,9 +95,9 @@ builder.AddMonica(monica =>
 });
 ```
 
-Import `Monica.Modules`. `Application:Deployments` selects the highest-priority provider that supplies this structural value and reads that provider alone. Entries and indexed role arrays never merge with lower providers. Explicit null, an empty map, or an incomplete higher-priority map does not request fallback. An entry must explicitly supply `Roles`; `[]` is valid. Unknown fields, roles, missing owners, duplicate assignments, and case-ambiguous AppIds or role IDs fail composition. AppName defaults to the map key when omitted. The selected entry supplies Core identity and service discovery; a contradictory direct AppName fails.
+Import `Monica.Modules`. `Deployment:Applications` selects the highest-priority provider that supplies this structural value and reads that provider alone. Entries and indexed role arrays never merge with lower providers. Explicit null, an empty map, or an incomplete higher-priority map does not request fallback. An entry must explicitly supply `Roles`; `[]` is valid. Unknown fields, roles, missing owners, duplicate assignments, and case-ambiguous AppIds or role IDs fail composition. AppName defaults to the map key when omitted. The selected entry supplies Core identity and service discovery; a contradictory direct AppName fails.
 
-For code-defined topology, assign `ModuleApplicationModelOption.Deployments` using `ApplicationPlacement` from `Monica.ApplicationModel.Models`. Its null default selects configuration; even an explicitly empty code map conflicts with a configured map. Use one authority. `ApplicationDeployment.Create` remains available for standalone validation, but host composition prepares and publishes its own single immutable snapshot. `IApplicationModel.Deployment` and the DI-registered `ApplicationDeployment` are that same instance; `Deployments` includes all entries with copied, read-only role lists, while `RoleApplications` is the derived reverse index.
+For code-defined topology, assign `ModuleApplicationModelOption.Applications` using `ApplicationPlacement` from `Monica.ApplicationModel.Models`. Its null default selects configuration; even an explicitly empty code map conflicts with a configured map. Use one authority. `ApplicationDeployment.Create` remains available for standalone validation, but host composition prepares and publishes its own single immutable snapshot. `IApplicationModel.Deployment` and the DI-registered `ApplicationDeployment` are that same instance; `Applications` includes all entries with copied, read-only role lists, while `RoleApplications` is the derived reverse index.
 
 Every known product role has exactly one logical owning AppId in the deployment scope; every role assigned to the current AppId must have a local implementation in this artifact. The current AppId must have an entry, which may select no roles. Replicas share the same AppId and selected roles. A combined deployment places several included roles in one entry; there is no synthetic `all` role. A normal artifact can run under several AppIds, and a justified specialized host can omit other implementations. Project references select available code; deployment values select active roles and workload images. Configuration cannot activate an omitted implementation. Changing the map or its input collections after preparation cannot change the running model; restart to select a new topology.
 

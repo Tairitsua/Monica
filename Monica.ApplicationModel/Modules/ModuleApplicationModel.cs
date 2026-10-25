@@ -47,7 +47,7 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
             || provider.GetConstructor(Type.EmptyTypes) is null)
             throw new InvalidOperationException($"Manifest '{provider}' must be a concrete IApplicationManifest with a parameterless constructor.");
         var manifest = new ApplicationManifestSnapshot((IApplicationManifest)Activator.CreateInstance(provider)!);
-        var (deployment, deploymentSource) = ApplicationDeploymentReader.Read(Application.Application.ResolveAppId(), Option.Deployments,
+        var (deployment, deploymentSource) = ApplicationDeploymentReader.Read(Application.Application.ResolveAppId(), Option.Applications,
             builder.Composition.StartupConfiguration);
         CompiledApplicationModel model;
         try
@@ -103,16 +103,16 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
 /// <summary>Startup input for an application host. Changes require a host restart.</summary>
 public sealed class ModuleApplicationModelOption : ModuleOptions<ModuleApplicationModel>
 {
-    private IReadOnlyDictionary<string, ApplicationPlacement>? _deployments;
+    private IReadOnlyDictionary<string, ApplicationPlacement>? _applications;
     private Type? _manifestType;
     private bool _frozen;
 
-    /// <summary>Supplies the complete AppId map in code. Null selects Application:Deployments from startup configuration.</summary>
+    /// <summary>Supplies the complete AppId map in code. Null selects Deployment:Applications from startup configuration.</summary>
     /// <remarks>Code and configuration cannot both supply this value. Every catalog role needs one owner; selected roles must be implemented locally.</remarks>
-    public IReadOnlyDictionary<string, ApplicationPlacement>? Deployments
+    public IReadOnlyDictionary<string, ApplicationPlacement>? Applications
     {
-        get => _deployments;
-        set { EnsureOpen(); _deployments = value; }
+        get => _applications;
+        set { EnsureOpen(); _applications = value; }
     }
 
     /// <summary>Overrides generated-manifest discovery for an explicitly supplied compiled manifest. Null uses the host generator.</summary>

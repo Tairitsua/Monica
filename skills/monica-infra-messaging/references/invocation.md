@@ -39,7 +39,7 @@ Mark each executable `[assembly: ApplicationHost]` and reference only its includ
 builder.AddMonica(monica =>
 {
     monica.ConfigureApplication(options => options.AppId = "ordering-api");
-    monica.AddApplicationModel(options => options.Deployments = new Dictionary<string, ApplicationPlacement>
+    monica.AddApplicationModel(options => options.Applications = new Dictionary<string, ApplicationPlacement>
     {
         ["ordering-api"] = new() { Roles = ["Ordering"] },
         ["ordering-realtime"] = new() { Roles = ["Ordering.Realtime"] }

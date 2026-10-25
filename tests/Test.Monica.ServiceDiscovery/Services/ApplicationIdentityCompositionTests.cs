@@ -89,7 +89,7 @@ public sealed class ApplicationIdentityCompositionTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = typeof(EmptyManifest);
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["local"] = new() { AppName = "Local application", Roles = [] },
                     ["empty-remote"] = new() { AppName = "Remote maintenance", Roles = [] }

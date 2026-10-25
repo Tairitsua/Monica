@@ -18,8 +18,8 @@ namespace Test.Monica.ApplicationModel;
 
 public sealed class ApplicationDeploymentCompositionTests
 {
-    private const string SPLIT = """{"Application":{"Deployments":{"api":{"AppName":"Order API","Roles":["ordering.api"]},"worker":{"Roles":["ordering.worker"]},"idle":{"Roles":[]}}}}""";
-    private const string COMBINED = """{"Application":{"Deployments":{"api":{"AppName":"Combined orders","Roles":["ordering.api","ordering.worker"]},"idle":{"Roles":[]}}}}""";
+    private const string SPLIT = """{"Deployment":{"Applications":{"api":{"AppName":"Order API","Roles":["ordering.api"]},"worker":{"Roles":["ordering.worker"]},"idle":{"Roles":[]}}}}""";
+    private const string COMBINED = """{"Deployment":{"Applications":{"api":{"AppName":"Combined orders","Roles":["ordering.api","ordering.worker"]},"idle":{"Roles":[]}}}}""";
 
     [Fact]
     public async Task Configuration_WhenAHigherProviderSuppliesDeployments_ShouldSelectItsWholeMapAndProjectIdentity()
@@ -32,18 +32,18 @@ public sealed class ApplicationDeploymentCompositionTests
         Assert.Same(deployment, model.Deployment);
         Assert.Equal("Combined orders", deployment.AppName);
         Assert.Equal("Combined orders", app.Services.GetRequiredService<MonicaApplication>().Application.AppName);
-        Assert.Equal(new[] { "api", "idle" }, deployment.Deployments.Keys.Order(StringComparer.Ordinal));
-        Assert.Empty(deployment.Deployments["idle"].Roles);
-        Assert.Equal("idle", deployment.Deployments["idle"].AppName);
+        Assert.Equal(new[] { "api", "idle" }, deployment.Applications.Keys.Order(StringComparer.Ordinal));
+        Assert.Empty(deployment.Applications["idle"].Roles);
+        Assert.Equal("idle", deployment.Applications["idle"].AppName);
         Assert.Equal("api", model.ResolveRoleAppId("ordering.worker"));
-        Assert.Throws<NotSupportedException>(() => ((IList<string>)deployment.Deployments["api"].Roles)[0] = "changed");
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)deployment.Applications["api"].Roles)[0] = "changed");
     }
 
     [Fact]
     public async Task Configuration_WhenSelectedProviderIsIncomplete_ShouldFailWithoutMergingLowerEntries()
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(() => new DeploymentFactory([SPLIT,
-            """{"Application":{"Deployments":{"api":{"Roles":["ordering.api"]}}}}"""])
+            """{"Deployment":{"Applications":{"api":{"Roles":["ordering.api"]}}}}"""])
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("ordering.worker", error.ToString());
@@ -62,7 +62,7 @@ public sealed class ApplicationDeploymentCompositionTests
         try
         {
             await File.WriteAllTextAsync(path,
-                "{\"Credentials\":{\"Password\":\"do-not-disclose-input-values\"},\"Application\":{\"Deployments\":" + selected + "}}",
+                "{\"Credentials\":{\"Password\":\"do-not-disclose-input-values\"},\"Deployment\":{\"Applications\":" + selected + "}}",
                 TestContext.Current.CancellationToken);
             var factory = new DeploymentFactory([SPLIT], jsonFile: path);
             var error = await Assert.ThrowsAnyAsync<Exception>(() => factory
@@ -70,7 +70,7 @@ public sealed class ApplicationDeploymentCompositionTests
             var failure = Assert.Single(FailureChain(error).OfType<InvalidOperationException>(),
                 candidate => candidate.Message.StartsWith("Application model validation failed using deployment input", StringComparison.Ordinal));
 
-            Assert.Contains("Application:Deployments", failure.Message);
+            Assert.Contains("Deployment:Applications", failure.Message);
             Assert.Contains("JsonConfigurationProvider", failure.Message);
             Assert.Contains(Path.GetFileName(path), failure.Message);
             Assert.Contains($"at '{factory.SelectedProviderPath}'", failure.Message);
@@ -106,7 +106,7 @@ public sealed class ApplicationDeploymentCompositionTests
     public async Task Configuration_WhenSelectedValueIsInvalid_ShouldNotFallBack(string selected)
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(() => new DeploymentFactory([SPLIT,
-            "{\"Application\":{\"Deployments\":" + selected + "}}"])
+            "{\"Deployment\":{\"Applications\":" + selected + "}}"])
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("application", error.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -135,8 +135,8 @@ public sealed class ApplicationDeploymentCompositionTests
         var factory = new DeploymentFactory([], configure: options =>
         {
             calls++;
-            Assert.Equal("Default name", options.Deployments!["api"].AppName);
-            options.Deployments = Typed();
+            Assert.Equal("Default name", options.Applications!["api"].AppName);
+            options.Applications = Typed();
         }, useDependencyDefaults: true);
         await using var app = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
 
@@ -166,7 +166,7 @@ public sealed class ApplicationDeploymentCompositionTests
         Assert.Contains(expected, error.ToString());
         var failure = Assert.Single(FailureChain(error).OfType<InvalidOperationException>(),
             candidate => candidate.Message.StartsWith("Application model validation failed using deployment input", StringComparison.Ordinal));
-        Assert.Contains("ModuleApplicationModelOption.Deployments", failure.Message);
+        Assert.Contains("ModuleApplicationModelOption.Applications", failure.Message);
         Assert.NotNull(failure.InnerException);
     }
 
@@ -182,8 +182,8 @@ public sealed class ApplicationDeploymentCompositionTests
 
         var deployment = app.Services.GetRequiredService<ApplicationDeployment>();
         Assert.Equal("Typed name", deployment.AppName);
-        Assert.Equal(new[] { "ordering.api" }, deployment.Deployments["api"].Roles);
-        Assert.True(deployment.Deployments.ContainsKey("worker"));
+        Assert.Equal(new[] { "ordering.api" }, deployment.Applications["api"].Roles);
+        Assert.True(deployment.Applications.ContainsKey("worker"));
     }
 
     private static Dictionary<string, ApplicationPlacement> Typed() => new(StringComparer.Ordinal)
@@ -224,12 +224,12 @@ public sealed class ApplicationDeploymentCompositionTests
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
             SelectedProviderPath = builder.Composition.StartupConfiguration
-                .SelectCompleteSection("Application:Deployments")?.Origin.ProviderPath;
+                .SelectCompleteSection("Deployment:Applications")?.Origin.ProviderPath;
             if (directName is not null) builder.ConfigureApplication(options => options.AppName = directName);
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = typeof(ScenarioManifest);
-                if (typed is not null) options.Deployments = typed;
+                if (typed is not null) options.Applications = typed;
                 configure?.Invoke(options);
             });
             if (useDependencyDefaults) builder.AddModule<DefaultApplicationModule, DefaultApplicationOptions>();
@@ -242,7 +242,7 @@ public sealed class ApplicationDeploymentCompositionTests
         {
             var values = Typed();
             values["api"].AppName = "Default name";
-            options.Deployments = values;
+            options.Applications = values;
         });
     }
 

@@ -42,23 +42,23 @@ public sealed class ConfigurationSnapshotTests
     }
 
     [Theory]
-    [InlineData("{\"Application\":{\"Deployments\":{\"local\":{\"Roles\":[\"one\"]}}}}", ConfigurationValueShape.Object)]
-    [InlineData("{\"Application\":{\"Deployments\":{}}}", ConfigurationValueShape.Object)]
-    [InlineData("{\"Application\":{\"Deployments\":null}}", ConfigurationValueShape.Null)]
+    [InlineData("{\"Deployment\":{\"Applications\":{\"local\":{\"Roles\":[\"one\"]}}}}", ConfigurationValueShape.Object)]
+    [InlineData("{\"Deployment\":{\"Applications\":{}}}", ConfigurationValueShape.Object)]
+    [InlineData("{\"Deployment\":{\"Applications\":null}}", ConfigurationValueShape.Null)]
     public void SelectCompleteSection_ShouldReadOnlyTheSelectedProvider(string higherJson, ConfigurationValueShape expected)
     {
         using var configuration = CreateConfiguration();
-        AddJson(configuration, """{"Application":{"Deployments":{"remote":{"Roles":["one","two"]}}}}""");
+        AddJson(configuration, """{"Deployment":{"Applications":{"remote":{"Roles":["one","two"]}}}}""");
         AddJson(configuration, higherJson);
 
         var snapshot = ConfigurationSnapshot.Capture(configuration);
-        var selected = snapshot.SelectCompleteSection("Application:Deployments");
+        var selected = snapshot.SelectCompleteSection("Deployment:Applications");
         selected.Should().NotBeNull();
         selected!.Origin.PriorityIndex.Should().Be(1);
-        selected.TryGetShape("Application:Deployments", out var shape).Should().BeTrue();
+        selected.TryGetShape("Deployment:Applications", out var shape).Should().BeTrue();
         shape.Should().Be(expected);
-        selected.GetSection("Application:Deployments:remote").GetChildren().Should().BeEmpty();
-        selected.GetSection("Application:Deployments:local:Roles:1").Value.Should().BeNull();
+        selected.GetSection("Deployment:Applications:remote").GetChildren().Should().BeEmpty();
+        selected.GetSection("Deployment:Applications:local:Roles:1").Value.Should().BeNull();
     }
 
     [Theory]

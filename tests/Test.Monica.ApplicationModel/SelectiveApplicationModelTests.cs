@@ -67,7 +67,7 @@ public sealed class SelectiveApplicationModelTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = manifestType ?? typeof(SelectiveManifest);
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["api"] = new() { Roles = ["ordering.api"] },
                     ["worker"] = new() { Roles = ["ordering.worker"] },

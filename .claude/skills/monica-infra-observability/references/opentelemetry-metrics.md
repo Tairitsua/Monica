@@ -66,7 +66,7 @@ Keep the host's normal Blazor setup; see [UI integration](../../monica-infra-ui/
 
 `Application:AutonomousWork=false` holds Monica-configured OTLP export and reports that decision in resource diagnostics. In-process collection, local console output and explicitly requested Prometheus scraping remain available. Custom exporters registered outside Monica own their participation policy.
 
-`ResourceServiceName` and `ResourceServiceVersion` fall back to the application project name and version; `DeploymentEnvironment` defaults to `Application:DeploymentScope` and adds its resource attribute when nonempty. The three built-in instrumentation flags default to `true`. `UseInstrumentationMetersInProcessCollector(false)` changes only the local collector's extra subscriptions; SDK instrumentation remains enabled. Normalized non-empty custom patterns are used by both consumers. An empty normalized pattern list means **all published meters** to the local matcher; it does not mean disabled collection and does not add an equivalent SDK wildcard subscription.
+`ResourceServiceName` and `ResourceServiceVersion` fall back to the application project name and version; `DeploymentEnvironment` defaults to `Deployment:Scope` and adds its resource attribute when nonempty. The three built-in instrumentation flags default to `true`. `UseInstrumentationMetersInProcessCollector(false)` changes only the local collector's extra subscriptions; SDK instrumentation remains enabled. Normalized non-empty custom patterns are used by both consumers. An empty normalized pattern list means **all published meters** to the local matcher; it does not mean disabled collection and does not add an equivalent SDK wildcard subscription.
 
 ## Retention and measurement boundaries
 

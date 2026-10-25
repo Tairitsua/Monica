@@ -177,7 +177,7 @@ public sealed class SignalRSwaggerDocumentTests
                 builder.AddApplicationModel(options =>
                 {
                     options.ManifestType = available ? typeof(SwaggerManifest) : typeof(PartialSwaggerManifest);
-                    options.Deployments = new Dictionary<string, ApplicationPlacement>
+                    options.Applications = new Dictionary<string, ApplicationPlacement>
                     {
                         ["local"] = new() { Roles = active ? ["ordering.worker", "ordering.realtime"] : ["ordering.worker"] },
                         ["remote"] = new() { Roles = active ? [] : ["ordering.realtime"] }

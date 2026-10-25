@@ -12,9 +12,9 @@ internal static class ServiceDiscoveryApplicationIdentity
         if (MonicaApplicationOptions.Normalize(options.AppId) is { } appId && appId != deployment.AppId)
             throw new InvalidOperationException("Service discovery AppId must match Application:AppId.");
         if (MonicaApplicationOptions.Normalize(options.AppName) is { } appName && appName != deployment.AppName)
-            throw new InvalidOperationException("Service discovery AppName must match the current Application:Deployments entry.");
+            throw new InvalidOperationException("Service discovery AppName must match the current Deployment:Applications entry.");
 
-        var identities = deployment.Deployments.Keys.ToDictionary(id => id, StringComparer.OrdinalIgnoreCase);
+        var identities = deployment.Applications.Keys.ToDictionary(id => id, StringComparer.OrdinalIgnoreCase);
         var predefined = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var service in options.PredefinedServices)
         {
@@ -25,10 +25,10 @@ internal static class ServiceDiscoveryApplicationIdentity
             if (identities.TryGetValue(service.AppId, out var canonicalId) && canonicalId != service.AppId)
                 throw new InvalidOperationException(
                     $"Predefined service AppId '{service.AppId}' conflicts with deployment AppId '{canonicalId}' under case-insensitive configuration lookup.");
-            if (deployment.Deployments.TryGetValue(service.AppId, out var entry)
+            if (deployment.Applications.TryGetValue(service.AppId, out var entry)
                 && MonicaApplicationOptions.Normalize(service.AppName) is { } name && name != entry.AppName)
                 throw new InvalidOperationException(
-                    $"Predefined service '{service.AppId}' must use the AppName from Application:Deployments.");
+                    $"Predefined service '{service.AppId}' must use the AppName from Deployment:Applications.");
         }
     }
 }

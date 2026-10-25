@@ -88,7 +88,7 @@ When hosts include different implementation sets, generate an optional lightweig
 
 Each selective host references that catalog normally and only the implementations it can execute. Its generated manifest combines catalog ownership with `LocalAssemblies` from actual annotated implementation references. Published clients can describe remote operations without referencing their handler types; receivers and private operations come only from local implementations. The catalog contains no runtime role/core type references. Build-only metadata inputs may still require those projects to build; they must not copy their runtime or native assets into a host that omits them. Do not hand-edit metadata snapshots or introduce runtime assembly loading to satisfy missing implementations.
 
-Compose the native `WebApplication` lifecycle with `builder.AddMonica(...)`, `app.UseMonica()`, and `app.MapMonica()`. Register `AddApplicationModel()` and `AddApplicationInvocation()` in the callback, plus `AddWebApi()` where receivers are served. The canonical `Application` section owns current AppId and deployment placement. Keep product/assembly information such as ProjectName and AppVersion in `ConfigureApplication`. A complete typed `ModuleApplicationModelOption.Deployments` value is an alternative to file topology; supplying both fails instead of merging authorities. A custom callback runner is not another application lifecycle.
+Compose the native `WebApplication` lifecycle with `builder.AddMonica(...)`, `app.UseMonica()`, and `app.MapMonica()`. Register `AddApplicationModel()` and `AddApplicationInvocation()` in the callback, plus `AddWebApi()` where receivers are served. The canonical `Application` section selects the current AppId and execution policy. `Deployment` owns the shared Scope and complete Applications map. Keep product/assembly information such as ProjectName and AppVersion in `ConfigureApplication`. A complete typed `ModuleApplicationModelOption.Applications` value is an alternative to file topology; supplying both fails instead of merging authorities. A custom callback runner is not another application lifecycle.
 
 ## Deployment and active resources
 
@@ -98,19 +98,31 @@ The deployment map assigns each known product role to exactly one logical applic
 {
   "Application": {
     "AppId": "product-api",
-    "DeploymentScope": "product-uat",
-    "AutonomousWork": true,
-    "Deployments": {
-      "product-api": { "AppName": "Ordering API", "Roles": ["ordering"] },
-      "product-reporting": { "AppName": "Ordering reports", "Roles": ["ordering.reporting"] }
+    "AutonomousWork": true
+  },
+  "Deployment": {
+    "Scope": "product-uat",
+    "Applications": {
+      "product-api": {
+        "AppName": "Ordering API",
+        "Roles": [
+          "ordering"
+        ]
+      },
+      "product-reporting": {
+        "AppName": "Ordering reports",
+        "Roles": [
+          "ordering.reporting"
+        ]
+      }
     }
   }
 }
 ```
 
-A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list, default role owner or synthetic `all` role. Every compiled role has exactly one explicit owner. Startup rejects missing/unknown/duplicate roles, case-ambiguous identities, an absent current AppId and missing local implementations for roles assigned to that AppId. Every application entry declares Roles; an explicit empty array is valid, omission or null is not. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration. DeploymentScope supplies the default scheduler scope and telemetry deployment environment; preserve already issued resource keys when adopting it.
+A combined deployment assigns several included role IDs to one AppId. Split placement can run the same artifact under several AppIds or use justified specialized artifacts. There is no independently configured current-role list, default role owner or synthetic `all` role. Every compiled role has exactly one explicit owner. Startup rejects missing/unknown/duplicate roles, case-ambiguous identities, an absent current AppId and missing local implementations for roles assigned to that AppId. Every application entry declares Roles; an explicit empty array is valid, omission or null is not. A role known through the catalog can be placed remotely without its implementation being installed locally. An omitted implementation cannot be activated by configuration. `Deployment:Scope` supplies the default scheduler scope and telemetry deployment environment; preserve already issued resource keys when adopting it.
 
-AppName belongs to the same deployment entry and defaults to its AppId. Core identity, discovery and diagnostics use that name; conflicting direct identity or discovery overrides fail. The framework derives the reverse role-to-AppId index. `Deployments` is selected as one complete subtree from the highest-priority provider that explicitly supplies it. A higher source replaces all lower applications, names and role arrays. Partial environment-variable/command-line maps fail when incomplete; they do not inherit missing roles. Use JSON for complete topology and scalar environment variables for current AppId. Private environment JSON selection follows the [host input contract](../../monica-infra-hosting/references/host-composition.md); selected inputs and placement remain frozen until restart.
+AppName belongs to the same deployment entry and defaults to its AppId. Core identity, discovery and diagnostics use that name; conflicting direct identity or discovery overrides fail. The framework derives the reverse role-to-AppId index. `Applications` is selected as one complete subtree from the highest-priority provider that explicitly supplies it. A higher source replaces all lower applications, names and role arrays. Partial environment-variable/command-line maps fail when incomplete; they do not inherit missing roles. Use JSON for complete topology and scalar environment variables for current AppId. Private environment JSON selection follows the [host input contract](../../monica-infra-hosting/references/host-composition.md); selected inputs and placement remain frozen until restart.
 
 Project references own artifact composition; deployment values own AppId/role placement and the image used for each workload. Preserve this distinction instead of adding arbitrary profile manifests or another artifact identity registry. A fully combined process must use an artifact that actually contains all selected implementations and their dependencies. Do not create an additional combined executable unless that deployment is needed. Role placement is frozen until restart. Runtime discovery adds live instances and addresses; it does not redefine ownership or install code.
 

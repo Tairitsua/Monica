@@ -32,7 +32,7 @@ public static class ModuleJobSchedulerBuilderExtensions
         /// <summary>
         /// Adds the JobScheduler runtime for the host's selected logical owners. Automatic hosts require a store;
         /// Manual hosts use a fresh isolated memory store and execute only explicit work. The scheduler scope comes
-        /// from Application:DeploymentScope unless UseSchedulerScope overrides it. Application activation selects
+        /// from Deployment:Scope unless UseSchedulerScope overrides it. Application activation selects
         /// role-owned jobs before they enter the local catalog.
         /// </summary>
         public ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> AddJobScheduler(
@@ -151,7 +151,7 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
 
         if (string.IsNullOrWhiteSpace(options.SchedulerScopeKey))
         {
-            throw new InvalidOperationException("A scheduler scope requires Application:DeploymentScope or UseSchedulerScope(...).");
+            throw new InvalidOperationException("A scheduler scope requires Deployment:Scope or UseSchedulerScope(...).");
         }
 
         if (string.IsNullOrWhiteSpace(options.WorkerInstanceId))

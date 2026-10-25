@@ -176,7 +176,7 @@ public sealed class EventBusRegistrationOwnershipTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = _manifestType;
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["local"] = new() { Roles = _ownerLocal ? ["orders.worker", "orders.api"] : ["orders.api"] },
                     ["remote"] = new() { Roles = _ownerLocal ? [] : ["orders.worker"] }

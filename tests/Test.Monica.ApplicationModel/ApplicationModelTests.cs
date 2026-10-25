@@ -180,7 +180,7 @@ public sealed class ApplicationModelTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = typeof(ScenarioManifest);
-                options.Deployments = placements ?? Placements();
+                options.Applications = placements ?? Placements();
             });
             builder.AddMediator();
             builder.AddDependencyInjection();

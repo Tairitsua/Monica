@@ -72,7 +72,7 @@ public sealed class ApplicationRegistrationTests
                 case "identity": context.Monica.ConfigureApplication(options => options.AppId = "other"); break;
                 case "discovery": context.Monica.ConfigureTypeDiscovery(); break;
                 case "configuration": context.Configuration["Probe:Value"] = "changed"; break;
-                case "topology": factory.FinalOptions!.Deployments = new Dictionary<string, ApplicationPlacement>(); break;
+                case "topology": factory.FinalOptions!.Applications = new Dictionary<string, ApplicationPlacement>(); break;
                 case "recursive": context.Composition.RunRegistration(typeof(RecordingRegistration), () => { }); break;
             }
         };
@@ -185,7 +185,7 @@ public sealed class ApplicationRegistrationTests
                 OptionContributions++;
                 FinalOptions = options;
                 options.ManifestType = _manifest;
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["api"] = new() { Roles = ["orders.api"] },
                     ["worker"] = new() { Roles = ["orders.worker"] },

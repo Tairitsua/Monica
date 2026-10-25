@@ -8,18 +8,18 @@ namespace Monica.ApplicationModel.Services;
 /// <summary>Reads one authoritative deployment value without merging entries or indexed role arrays.</summary>
 internal static class ApplicationDeploymentReader
 {
-    private const string SECTION_PATH = "Application:Deployments";
+    private const string SECTION_PATH = "Deployment:Applications";
 
     internal static (ApplicationDeployment Deployment, string Source) Read(string appId,
         IReadOnlyDictionary<string, ApplicationPlacement>? configured, ConfigurationSnapshot configuration)
     {
         var selected = configuration.SelectCompleteSection(SECTION_PATH);
         if (configured is not null && selected is not null)
-            throw new InvalidOperationException($"'{SECTION_PATH}' cannot be supplied both through configuration ({Describe(selected.Origin)}) and ModuleApplicationModelOption.Deployments.");
+            throw new InvalidOperationException($"'{SECTION_PATH}' cannot be supplied both through configuration ({Describe(selected.Origin)}) and ModuleApplicationModelOption.Applications.");
         if (configured is null && selected is null)
-            throw new InvalidOperationException($"Supply a complete '{SECTION_PATH}' map or configure ModuleApplicationModelOption.Deployments.");
+            throw new InvalidOperationException($"Supply a complete '{SECTION_PATH}' map or configure ModuleApplicationModelOption.Applications.");
 
-        var source = configured is not null ? "ModuleApplicationModelOption.Deployments"
+        var source = configured is not null ? "ModuleApplicationModelOption.Applications"
             : $"'{SECTION_PATH}' from {Describe(selected!.Origin)}";
         try
         {
@@ -27,7 +27,7 @@ internal static class ApplicationDeploymentReader
             var provider = selected!;
             var root = provider.GetSection(SECTION_PATH);
             RequireShape(root, ConfigurationValueShape.Object);
-            var deployments = new Dictionary<string, ApplicationPlacement>(StringComparer.Ordinal);
+            var applications = new Dictionary<string, ApplicationPlacement>(StringComparer.Ordinal);
             foreach (var application in root.GetChildren())
             {
                 RequireShape(application, ConfigurationValueShape.Object);
@@ -49,9 +49,9 @@ internal static class ApplicationDeploymentReader
                     if (string.IsNullOrWhiteSpace(role.Value)) throw Invalid(role.Path, "must contain a nonempty role identifier");
                     roleIds.Add(role.Value);
                 }
-                deployments.Add(application.Key, new ApplicationPlacement { AppName = name.Value, Roles = roleIds.ToArray() });
+                applications.Add(application.Key, new ApplicationPlacement { AppName = name.Value, Roles = roleIds.ToArray() });
             }
-            return (ApplicationDeployment.Create(appId, deployments), source);
+            return (ApplicationDeployment.Create(appId, applications), source);
         }
         catch (InvalidOperationException error)
         {

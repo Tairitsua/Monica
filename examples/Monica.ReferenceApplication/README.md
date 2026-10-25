@@ -36,7 +36,7 @@ Create shared projects only when they contain real shared code. Protocol directl
 
 Each core/role assembly declares `ApplicationDomain` or `ApplicationRole`. The host's `[assembly: ApplicationHost]` generates its manifest and operation callers/receivers from the referenced implementations. Protocol independently generates the stable Ordering API interfaces. The host includes both roles; each role references only its own core and published contracts. The UI references Protocol and Monica.Application.UI.
 
-`Program.cs` keeps `AddMonica`, `Build`, `UseMonica`, `MapMonica` and `Run`. Its `Composition/ReferenceApplicationComposition.cs` owns the executable's module/provider choices and is reused by the host tests. Monica reads the canonical `Application` section, validates its complete `Deployments` map and projects the selected `AppName`. The reporting assembly's `RoleRegistration.ConfigureActive` contributes JobScheduler before the module graph closes. No host role-registration table is maintained. Scheduler scope defaults to `Application:DeploymentScope`; the issued workload owner remains `ordering.reporting` when placement changes.
+`Program.cs` keeps `AddMonica`, `Build`, `UseMonica`, `MapMonica` and `Run`. Its `Composition/ReferenceApplicationComposition.cs` owns the executable's module/provider choices and is reused by the host tests. Monica selects `Application:AppId`, validates the complete `Deployment:Applications` map and projects the selected `AppName`. The reporting assembly's `RoleRegistration.ConfigureActive` contributes JobScheduler before the module graph closes. No host role-registration table is maintained. Scheduler scope defaults to `Deployment:Scope`; the issued workload owner remains `ordering.reporting` when placement changes.
 
 ## Startup and Managed configuration
 
@@ -44,11 +44,11 @@ Each core/role assembly declares `ApplicationDomain` or `ApplicationRole`. The h
 
 `OptionsOrdering` is Managed configuration. Its section remains `Ordering` and its definition key remains `reference.ordering`, preserving the stored identity despite the CLR naming change. `MaximumOrdersReturned` limits collection queries and `BacklogWarningThreshold` controls reporting severity. An Automatic host publishes and seeds missing definitions into the local file store. A Manual host reads existing documents or uses validated, unpersisted appsettings defaults when they are absent; it does not create or publish a store just by starting. Configuration diagnostics explain read-only authority when an Automatic owner has not established the managed publication.
 
-For a private environment input, select `Application:EnvironmentFiles` before `AddMonica`. One file may supply Startup sections, the complete `Application:Deployments` map and connection data. It must not contain the Managed `Ordering` section. A higher-priority topology replaces the whole map, including names and roles. A listed file must exist; missing roles, unknown roles and an absent current AppId stop startup. The reference needs no external resources, so its ordinary local profile uses the complete topology already in appsettings.
+For a private environment input, select `Application:EnvironmentFiles` before `AddMonica`. One file may supply Startup sections, the complete `Deployment:Applications` map and connection data. It must not contain the Managed `Ordering` section. A higher-priority topology replaces the whole map, including names and roles. A listed file must exist; missing roles, unknown roles and an absent current AppId stop startup. The reference needs no external resources, so its ordinary local profile uses the complete topology already in appsettings.
 
 ## Combined and split placement
 
-The default topology assigns `ordering` and `ordering.reporting` to `monica-ordering-reference`. To inspect split activation, replace `Application:Deployments` in appsettings with:
+The default topology assigns `ordering` and `ordering.reporting` to `monica-ordering-reference`. To inspect split activation, replace `Deployment:Applications` in appsettings with:
 
 ```json
 {

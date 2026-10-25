@@ -44,7 +44,7 @@ public sealed class OperationPersistenceTests
             builder.AddApplicationModel(options =>
             {
                 options.ManifestType = typeof(PersistenceManifest);
-                options.Deployments = new Dictionary<string, ApplicationPlacement>
+                options.Applications = new Dictionary<string, ApplicationPlacement>
                 {
                     ["api"] = new() { Roles = ["ordering.api"] },
                     ["worker"] = new() { Roles = ["ordering.worker"] }

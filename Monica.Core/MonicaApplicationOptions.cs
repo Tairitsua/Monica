@@ -129,7 +129,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     public string? DomainName { get => _domainName; set => Set(ref _domainName, value); }
 
     /// <summary>
-    /// Gets or sets the shared deployment environment identity. Defaults to null; Application:DeploymentScope
+    /// Gets or sets the shared deployment environment identity. Defaults to null; Deployment:Scope
     /// supplies the canonical startup input. Conflicting code configuration fails composition.
     /// </summary>
     public string? DeploymentScope { get => _deploymentScope; set => Set(ref _deploymentScope, value); }
