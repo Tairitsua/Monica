@@ -10,6 +10,7 @@
     <PackageReference Include="SignalRSwaggerGen" Version="4.9.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Monica.ApplicationModel\Monica.ApplicationModel.csproj" />
     <ProjectReference Include="..\Monica.Authority\Monica.Authority.csproj" />
     <ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
     <ProjectReference Include="..\Monica.UI\Monica.UI.csproj" />

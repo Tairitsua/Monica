@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Authority.Identity.Abstractions;
 using Monica.Core;
 using Monica.Core.JsonSerialization.Extensions;
@@ -177,13 +178,32 @@ public static class ModuleSignalRRegistrationExtensions
     /// <summary>
     /// Configures SignalR Swagger generation.
     /// </summary>
+    /// <param name="module">The SignalR registration being configured.</param>
+    /// <param name="signalROption">Configures the package's scanned assemblies and documentation options.</param>
+    /// <returns>The same SignalR registration for fluent chaining.</returns>
+    /// <remarks>
+    /// With ApplicationModel, concrete hubs use native Swagger role routing and exclude disabled endpoints.
+    /// Explicit hub document names and recognized groups remain overrides, subject to the host's inclusion predicate.
+    /// A null hub selector uses native ownership; an explicit empty array retains the package's all-documents override.
+    /// Package-wide document selection narrows the candidate documents; it does not override role ownership.
+    /// Standalone hosts and package-only interface descriptions retain the package's document selection behavior.
+    /// </remarks>
     public static ModuleRegistration<ModuleSignalR, ModuleSignalROption> AddSignalRSwagger(this ModuleRegistration<ModuleSignalR, ModuleSignalROption> module, Action<SignalRSwaggerGenOptions> signalROption)
     {
         module.ConfigureServices(context =>
         {
             context.Services.ConfigureSwaggerGen(o =>
             {
-                o.AddSignalRSwaggerGen(signalROption);
+                o.AddSignalRSwaggerGen(options =>
+                {
+                    signalROption(options);
+                    if (context.Application.TypeActivation is IApplicationModel)
+                    {
+                        options.AddOperationFilter(new SignalRSwaggerDocumentRoutingFilter(
+                            context.Application.TypeActivation,
+                            (documentName, description) => o.SwaggerGeneratorOptions.DocInclusionPredicate(documentName, description)));
+                    }
+                });
             });
         });
         return module;

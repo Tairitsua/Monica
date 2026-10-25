@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 using Monica.ApplicationModel.Abstractions;
@@ -102,9 +103,10 @@ internal sealed class SwaggerDocumentCatalog
             ?? controller?.MethodInfo.GetCustomAttribute<ApplicationApiReceiverAttribute>();
         if (receiver is not null) return _model.GetOperation(receiver.RequestType).RoleId;
 
-        // CRUD actions can inherit framework methods. The concrete controller, not the method's declaring type,
-        // owns their application role. Minimal handlers use their actual method metadata when available.
+        // Inherited controller and hub methods belong to their concrete receiver's role.
+        // Minimal handlers use their actual method metadata when available.
         var assembly = controller?.ControllerTypeInfo.Assembly
+            ?? description.ActionDescriptor.EndpointMetadata.OfType<HubMetadata>().LastOrDefault()?.HubType.Assembly
             ?? description.ActionDescriptor.EndpointMetadata.OfType<MethodInfo>().LastOrDefault()?.DeclaringType?.Assembly;
         return assembly is null ? null : _model.FindRole(assembly)?.Id;
     }
