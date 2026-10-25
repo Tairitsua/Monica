@@ -4,7 +4,7 @@ Use the same host, domain/role declarations and application placement in deploym
 
 ## Give each setting one authority
 
-Application configuration ProjectUnits use `Options{Purpose}` and the matching filename. Keep each option beside its consumer: domain persistence in the domain core, role integration in its role, reusable product technical policy in Infrastructure, and whole-host choices in the host. Protocol contains no options or environment files. Monica and Microsoft option types keep their native names.
+Application configuration ProjectUnits use `Options{Purpose}` and the matching filename. Keep each option in its owner's single project-root `Configurations/` directory: domain persistence in the domain core, role integration in its role, reusable product technical policy in Infrastructure, and whole-host choices in the host. Use the attribute's `Kind` to distinguish Startup from Managed; do not create competing `Configuration/`, nested adapter configuration directories, or lifecycle subfolders. Runtime adapters stay in their feature folders. Protocol contains no configuration definitions or environment files; option-related published DTOs belong to their domain contracts, and shared constants belong with other constants. Monica and Microsoft option types keep their native names.
 
 | Kind | Use for | Authority and runtime behavior |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ Environment files may contain Startup settings, Application keys other than Envi
 
 Accepted file reloads can update live consumers and candidate diagnostics. Startup values, application identity, placement and the selected file list remain fixed until restart. A malformed, missing or ownership-invalid reload retains the last accepted contribution and reports a safe diagnostic. See [host input composition](../../monica-infra-hosting/references/host-composition.md#select-startup-inputs) for custom-builder insertion boundaries and the [store boundary](../../monica-infra-configuration/references/bootstrap-and-stores.md).
 
-Commit only safe templates. Each repository documents its private, gitignored local file location and deployment mounts; do not copy credential-bearing files from Protocol into every consumer's output or add a silent development fallback for a missing mount.
+Commit only safe templates. Keep host-local private JSON files in `Environments/`, separately from C# configuration definitions. Each repository documents its gitignore and output/publish exclusions and its deployment mounts; do not copy credential-bearing files from Protocol into every consumer's output or add a silent development fallback for a missing mount. Explicit deployment mounts may use deployment-owned absolute paths; the source directory convention does not rename them.
 
 ## One local host profile
 
@@ -51,7 +51,7 @@ For a host containing both example Ordering roles, a launch profile can select a
       "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Application__EnvironmentFiles__0": "Configurations/uat.local.json",
+        "Application__EnvironmentFiles__0": "Environments/uat.local.json",
         "Application__AppId": "product-local",
         "Application__AutonomousWork": "false"
       }
