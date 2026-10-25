@@ -73,10 +73,12 @@ var database = context.GetStartupOptions<OptionsOrderingDatabase>();
 // Use database.ConnectionString in this domain's existing provider registration.
 ```
 
-The value is validated immediately and shared with later default-name options injection. Consumers must not mutate it. Every discovered Startup definition is validated before composition completes, even when not explicitly read there. File reloads produce candidates for inspection, not a new running connection object. Keep canonical AppId, AppName, DeploymentScope and role placement in `Application` rather than duplicating them in an options class.
+The value is validated immediately and shared with later default-name options injection. Consumers must not mutate it. Every discovered Startup definition is validated before composition completes, even when not explicitly read there. File reloads produce candidates for inspection, not a new running connection object. Keep current-process selection in `Application` and canonical AppId, AppName, scope and role placement in `Deployment.Applications` / `Deployment.Scope` rather than duplicating them in an options class.
 
-## Preserve persisted identity during a rename
+## Choose the persisted identity migration explicitly
 
-Before renaming a Managed type or namespace, determine its previously resolved section path and definition key. Pin both explicitly using `[Configuration("<existing-section>", DefinitionKey = "<existing-key>")]`, then rename the type and file to the Options prefix. If the old key defaulted to the CLR full name, keep that old full name as the explicit key. Do not replace an issued identity with a cleaner new string as part of a naming change.
+Before renaming a Managed type or namespace, determine its previously resolved section path and definition key. When compatibility is required, pin both explicitly using `[Configuration("<existing-section>", DefinitionKey = "<existing-key>")]`; a type rename alone must not silently reset stored values.
 
-Converting Managed to Startup is a separate authority migration: move values into deployment inputs, migrate consumers, and preserve old metadata/history until the existing explicit maintenance flow can retire it. An Options rename alone changes neither value ownership nor reload behavior. Validate the same section and definition identity through configuration discovery, not only through a successful compile.
+When the project explicitly adopts a breaking identity migration, use its chosen current identity (the default is the CLR full name) and keep old-to-new mappings in a one-time migration script, not runtime aliases. Stop all old writers, back up current values, reject conflicting target values, migrate keys and normalized identities transactionally, and verify values after deployment. History may be cleared only within the approved maintenance scope. Record the chosen convention in the project specification.
+
+Converting Managed to Startup is a separate authority migration: move the effective values into explicit deployment inputs before removing their stored copies, then migrate consumers. An Options rename alone changes neither value ownership nor reload behavior. Validate discovery, persisted values and Startup inputs, not only compilation.
