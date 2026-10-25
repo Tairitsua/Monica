@@ -1,0 +1,46 @@
+@using Monica.UI.Shell.Models
+
+<div class="navigation-mega" style="@($"--navigation-columns:{ColumnCount}")">
+    <header class="navigation-mega__header">
+        <span class="navigation-mega__tile"><MoIcon Icon="@(Group.Icon ?? MoIcons.Shapes)" Size="20px" /></span>
+        <div>
+            <h2>@Group.DisplayName <span>@Group.DestinationCount</span></h2>
+            @if (!string.IsNullOrWhiteSpace(Group.Description))
+            {
+                <p>@Group.Description</p>
+            }
+        </div>
+    </header>
+    <div class="navigation-mega__columns">
+        @if (DirectDestinations.Items.Count > 0)
+        {
+            <div class="navigation-mega__singles">
+                <NavigationTree Group="@DirectDestinations" ActiveItem="@ActiveItem" />
+            </div>
+        }
+        @foreach (var child in CapabilityGroups)
+        {
+            <section class="navigation-mega__group">
+                <h3><MoIcon Icon="@(child.Icon ?? MoIcons.Shapes)" Size="16px" />@child.DisplayName <span>@child.DestinationCount</span></h3>
+                <NavigationTree Group="@child" ActiveItem="@ActiveItem" ShowPageIcons="false" />
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>The authorized category rendered as one width-aware menu with direct destinations and nested groups.</summary>
+    [Parameter, EditorRequired] public NavigationGroup Group { get; set; } = default!;
+
+    /// <summary>The single longest matching destination used for selection and ancestor disclosure.</summary>
+    [Parameter] public NavigationItem? ActiveItem { get; set; }
+
+    private static bool IsSingleDestination(NavigationGroup group) => group.Children.Count == 0 && group.Items.Count == 1;
+    private NavigationGroup DirectDestinations => Group with
+    {
+        Items = [.. Group.Items, .. Group.Children.Where(IsSingleDestination).SelectMany(child => child.Items)],
+        Children = []
+    };
+    private IEnumerable<NavigationGroup> CapabilityGroups => Group.Children.Where(child => !IsSingleDestination(child));
+    private int ColumnCount => Math.Clamp(CapabilityGroups.Count() + (DirectDestinations.Items.Count > 0 ? 1 : 0), 1, 4);
+}

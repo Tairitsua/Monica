@@ -18,7 +18,7 @@ public sealed class DefaultTheme : ThemeDefinitionBase
         LayoutProperties = new LayoutProperties
         {
             DefaultBorderRadius = "8px",
-            DrawerWidthLeft = "260px",
+            DrawerWidthLeft = "232px",
             DrawerWidthRight = "260px",
             DrawerMiniWidthLeft = "64px",
             DrawerMiniWidthRight = "64px",
@@ -31,9 +31,9 @@ public sealed class DefaultTheme : ThemeDefinitionBase
     private static MudMarkdownPaletteLight CreateLightPalette() => new()
     {
         CodeHighlight = MudCodeHighlightThemes.Light.GitHub,
-        Primary = "#7257f5",
-        PrimaryLighten = "#8b74ff",
-        PrimaryDarken = "#5841d2",
+        Primary = "#512BD4",
+        PrimaryLighten = "#6A4AE8",
+        PrimaryDarken = "#4220B8",
         PrimaryContrastText = "#ffffff",
 
         Secondary = "#3f779c",
@@ -44,9 +44,9 @@ public sealed class DefaultTheme : ThemeDefinitionBase
         Tertiary = "#eeeafd",
         TertiaryContrastText = "#4e3cb2",
 
-        Info = "#118fc9",
-        InfoLighten = "#3baddb",
-        InfoDarken = "#0b70a0",
+        Info = "#0891B2",
+        InfoLighten = "#20A7C7",
+        InfoDarken = "#08748E",
         InfoContrastText = "#ffffff",
 
         Success = "#0b9f73",
@@ -64,34 +64,34 @@ public sealed class DefaultTheme : ThemeDefinitionBase
         ErrorDarken = "#b1324b",
         ErrorContrastText = "#ffffff",
 
-        Dark = "#151b2b",
-        DarkLighten = "#293247",
-        DarkDarken = "#0d1220",
-        DarkContrastText = "#f4f6fb",
+        Dark = "#16161D",
+        DarkLighten = "#2B2B35",
+        DarkDarken = "#0B0B0F",
+        DarkContrastText = "#F6F6F9",
 
-        Background = "#f1f3f7",
-        BackgroundGray = "#eef1f6",
+        Background = "#F6F6F9",
+        BackgroundGray = "#F0F0F4",
         Surface = "#ffffff",
 
-        DrawerBackground = "#ffffff",
-        DrawerText = "#516078",
-        DrawerIcon = "#68768c",
+        DrawerBackground = "#ECECF1",
+        DrawerText = "#5C5D6B",
+        DrawerIcon = "#63778E",
 
-        AppbarBackground = "rgba(255, 255, 255, 0.94)",
-        AppbarText = "#151b2b",
+        AppbarBackground = "#ECECF1",
+        AppbarText = "#16161D",
 
-        TextPrimary = "#151b2b",
-        TextSecondary = "#516078",
-        TextDisabled = "#7f8ca2",
+        TextPrimary = "#16161D",
+        TextSecondary = "#5C5D6B",
+        TextDisabled = "#878896",
 
-        ActionDefault = "#68768c",
+        ActionDefault = "#5C5D6B",
         ActionDisabled = "#aeb7c6",
         ActionDisabledBackground = "#e8ecf2",
 
-        Divider = "#d9deea",
-        DividerLight = "#e8ebf1",
-        LinesDefault = "#d9deea",
-        LinesInputs = "#c3cada",
+        Divider = "#E3E3EA",
+        DividerLight = "#F0F0F4",
+        LinesDefault = "#E3E3EA",
+        LinesInputs = "#CFD0DA",
 
         TableStriped = "#f8f9fb",
         TableHover = "#f5f3ff",
@@ -100,93 +100,90 @@ public sealed class DefaultTheme : ThemeDefinitionBase
         OverlayLight = "rgba(255, 255, 255, 0.78)",
         HoverOpacity = 0.055,
 
-        GrayDefault = "#7f8ca2",
-        GrayLight = "#c3cada",
-        GrayLighter = "#eef1f6",
-        GrayDark = "#516078",
-        GrayDarker = "#303a4d"
+        GrayDefault = "#878896",
+        GrayLight = "#CFD0DA",
+        GrayLighter = "#F0F0F4",
+        GrayDark = "#5C5D6B",
+        GrayDarker = "#30303A"
     };
 
-    // Dark mode restores the deep Zinc + Indigo scheme of Monica's former default theme
-    // (demo.monica.dpdns.org): a near-black Zinc 950 canvas with Zinc 900 surfaces,
-    // Indigo primary, and Tailwind-scale signal colors.
     private static MudMarkdownPaletteDark CreateDarkPalette() => new()
     {
         CodeHighlight = MudCodeHighlightThemes.Dark.GitHub,
-        Primary = "#6366f1", // Indigo 500
-        PrimaryLighten = "#818cf8", // Indigo 400
-        PrimaryDarken = "#7579f4", // Hover fill retains contrast with the dark primary foreground.
-        PrimaryContrastText = "#000000",
+        Primary = "#8D7DFF",
+        PrimaryLighten = "#A597FF",
+        PrimaryDarken = "#A296FF",
+        PrimaryContrastText = "#0B0B0F",
 
-        Secondary = "#a1a1aa", // Zinc 400
-        SecondaryLighten = "#d4d4d8", // Zinc 300
-        SecondaryDarken = "#71717a", // Zinc 500
-        SecondaryContrastText = "#18181b", // Zinc 900
+        Secondary = "#a1a1aa",
+        SecondaryLighten = "#d4d4d8",
+        SecondaryDarken = "#71717a",
+        SecondaryContrastText = "#18181b",
 
-        Tertiary = "#27272a", // Zinc 800
-        TertiaryContrastText = "#f4f4f5", // Zinc 50
+        Tertiary = "#27272a",
+        TertiaryContrastText = "#f4f4f5",
 
-        Info = "#3b82f6", // Blue 500
-        InfoLighten = "#60a5fa", // Blue 400
-        InfoDarken = "#2563eb", // Blue 600
-        InfoContrastText = "#ffffff",
+        Info = "#1BA3C6",
+        InfoLighten = "#4DB7D2",
+        InfoDarken = "#1592B3",
+        InfoContrastText = "#0B0B0F",
 
-        Success = "#10b981", // Emerald 500
-        SuccessLighten = "#34d399", // Emerald 400
-        SuccessDarken = "#059669", // Emerald 600
-        SuccessContrastText = "#ffffff",
+        Success = "#2FBF86",
+        SuccessLighten = "#34d399",
+        SuccessDarken = "#059669",
+        SuccessContrastText = "#0B0B0F",
 
-        Warning = "#f59e0b", // Amber 500
-        WarningLighten = "#fbbf24", // Amber 400
-        WarningDarken = "#d97706", // Amber 600
-        WarningContrastText = "#18181b", // Zinc 900
+        Warning = "#E3A23B",
+        WarningLighten = "#fbbf24",
+        WarningDarken = "#d97706",
+        WarningContrastText = "#0B0B0F",
 
-        Error = "#ef4444", // Red 500
-        ErrorLighten = "#f87171", // Red 400
-        ErrorDarken = "#dc2626", // Red 600
-        ErrorContrastText = "#ffffff",
+        Error = "#F06A7D",
+        ErrorLighten = "#f87171",
+        ErrorDarken = "#dc2626",
+        ErrorContrastText = "#0B0B0F",
 
-        Dark = "#f4f4f5", // Zinc 50
-        DarkLighten = "#ffffff",
-        DarkDarken = "#d4d4d8", // Zinc 300
-        DarkContrastText = "#09090b", // Zinc 950
+        Dark = "#EDEDF2",
+        DarkLighten = "#FFFFFF",
+        DarkDarken = "#D5D5DF",
+        DarkContrastText = "#111116",
 
-        Background = "#09090b", // Zinc 950
-        BackgroundGray = "#18181b", // Zinc 900
-        Surface = "#18181b", // Zinc 900
+        Background = "#111116",
+        BackgroundGray = "#1F1F26",
+        Surface = "#18181E",
 
-        DrawerBackground = "#18181b",
-        DrawerText = "#e4e4e7", // Zinc 200
-        DrawerIcon = "#a1a1aa", // Zinc 400
+        DrawerBackground = "#0B0B0F",
+        DrawerText = "#A2A2B0",
+        DrawerIcon = "#8B9EB5",
 
-        AppbarBackground = "rgba(9, 9, 11, 0.94)",
-        AppbarText = "#f4f4f5", // Zinc 50
+        AppbarBackground = "#0B0B0F",
+        AppbarText = "#EDEDF2",
 
-        TextPrimary = "#f4f4f5", // Zinc 50
-        TextSecondary = "#a1a1aa", // Zinc 400
-        TextDisabled = "#52525b", // Zinc 600
+        TextPrimary = "#EDEDF2",
+        TextSecondary = "#A2A2B0",
+        TextDisabled = "#71717E",
 
-        ActionDefault = "#a1a1aa",
-        ActionDisabled = "#3f3f46", // Zinc 700
-        ActionDisabledBackground = "#27272a", // Zinc 800
+        ActionDefault = "#A2A2B0",
+        ActionDisabled = "#393944",
+        ActionDisabledBackground = "#27272F",
 
-        Divider = "#27272a", // Zinc 800
-        DividerLight = "#18181b", // Zinc 900
-        LinesDefault = "#27272a", // Zinc 800
-        LinesInputs = "#3f3f46", // Zinc 700
+        Divider = "#27272F",
+        DividerLight = "#1F1F26",
+        LinesDefault = "#27272F",
+        LinesInputs = "#393944",
 
-        TableStriped = "#09090b", // Zinc 950
-        TableHover = "#27272a", // Zinc 800
+        TableStriped = "#111116",
+        TableHover = "#27272F",
 
         OverlayDark = "rgba(0, 0, 0, 0.8)",
         OverlayLight = "rgba(24, 24, 27, 0.5)",
         HoverOpacity = 0.08,
 
-        GrayDefault = "#71717a", // Zinc 500
-        GrayLight = "#a1a1aa", // Zinc 400
-        GrayLighter = "#d4d4d8", // Zinc 300
-        GrayDark = "#52525b", // Zinc 600
-        GrayDarker = "#3f3f46" // Zinc 700
+        GrayDefault = "#71717E",
+        GrayLight = "#A2A2B0",
+        GrayLighter = "#EDEDF2",
+        GrayDark = "#5C5D6B",
+        GrayDarker = "#393944"
     };
 
 }

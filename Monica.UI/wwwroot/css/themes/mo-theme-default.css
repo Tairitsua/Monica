@@ -32,8 +32,8 @@
 
 :root[data-theme="default-light"],
 .mo-theme-default-light {
-    --mo-color-navigation-rail-background: var(--mud-palette-dark);
-    --mo-color-navigation-rail-text: var(--mud-palette-dark-text);
+    --mo-color-navigation-rail-background: var(--mud-palette-drawer-background);
+    --mo-color-navigation-rail-text: var(--mud-palette-text-secondary);
 }
 
 :root[data-theme="default-dark"],
@@ -41,7 +41,7 @@
     --mo-color-page-hero-background: var(--mud-palette-surface);
     --mo-color-page-hero-text: var(--mud-palette-text-primary);
     --mo-color-page-hero-action: var(--mud-palette-text-primary);
-    --mo-color-navigation-rail-background: var(--mud-palette-background);
+    --mo-color-navigation-rail-background: var(--mud-palette-drawer-background);
     --mo-color-navigation-rail-text: var(--mud-palette-text-secondary);
 }
 

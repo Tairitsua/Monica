@@ -1,6 +1,6 @@
 .mo-layout {
     --mo-appbar-height: 56px;
-    --mo-shell-sidebar-width: 290px;
+    --mo-shell-sidebar-width: 296px;
     display: grid;
     grid-template-columns: var(--mo-shell-sidebar-width) minmax(0, 1fr);
     grid-template-rows: 56px minmax(0, 1fr);
@@ -8,7 +8,7 @@
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
-    background: var(--mud-palette-background);
+    background: var(--mo-color-shell-frame);
     color: var(--mud-palette-text-primary);
 }
 .mo-layout[data-sidebar-collapsed="true"] { --mo-shell-sidebar-width: 64px; }
@@ -21,7 +21,13 @@
     display: flex;
     min-width: 0;
     min-height: 0;
+    margin: 0 8px 8px 0;
+    overflow: hidden;
+    border-radius: 14px;
+    background: var(--mud-palette-background);
+    box-shadow: 0 0 0 1px var(--mud-palette-divider), var(--mud-elevation-1);
 }
+.mo-layout[data-layout="topbar"] .mo-main-content { margin-left: 8px; }
 .mo-body-content {
     /* Anchor absolute page content inside its scroll owner. */
     position: relative;
@@ -30,10 +36,12 @@
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
+    container: page / inline-size;
 }
 @media (max-width: 929px) {
     .mo-layout {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: "header" "main";
     }
+    .mo-layout[data-layout] .mo-main-content { margin: 0; border-radius: 0; box-shadow: none; }
 }

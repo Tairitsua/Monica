@@ -9,8 +9,12 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<MudIconButton Icon="@MoIcons.Search" Color="Color.Default" Size="Size.Medium" Class="action-button"
-               OnClick="RequestSearchAsync" aria-label="@L["Search:Action"]" title="@L["Search:Action"]" />
+<button type="button" class="navigation-search-trigger" @onclick="RequestSearchAsync"
+        aria-label="@L["Search:Action"]" title="@L["Search:Action"]">
+    <MoIcon Icon="@MoIcons.Search" Size="16px" />
+    <span>@L["Search:Action"]</span>
+    <kbd>Ctrl K</kbd>
+</button>
 
 @code {
     private readonly object _disposeSync = new();

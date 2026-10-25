@@ -68,6 +68,22 @@ public partial class NavBar : IAsyncDisposable, INavigationEventReceiver
     private NavigationGroup? ActiveCategory => _navigationGroups.FirstOrDefault(
         group => ActiveItem is { } active && NavigationTreeBuilder.Flatten([group]).Contains(active));
 
+    private IEnumerable<NavigationGroup> ActiveAncestors
+    {
+        get
+        {
+            var parent = ActiveCategory;
+            while (parent is not null && ActiveItem is { } active)
+            {
+                parent = parent.Children.FirstOrDefault(child => NavigationTreeBuilder.Flatten([child]).Contains(active));
+                if (parent is not null && (parent.Children.Count > 0 || parent.Items.Count > 1))
+                {
+                    yield return parent;
+                }
+            }
+        }
+    }
+
     private NavigationGroup? SelectedCategory => _navigationGroups.FirstOrDefault(
         group => group.Id == _selectedCategoryId) ?? ActiveCategory ?? _navigationGroups.FirstOrDefault();
 

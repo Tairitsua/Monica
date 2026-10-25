@@ -6,15 +6,15 @@
 
 .mo-navigation-popover.navbar-link ::deep .mud-menu-button-activator {
     min-width: 0;
-    height: 36px;
-    padding: 0 12px;
+    height: 34px;
+    padding: 0 9px 0 10px;
     border: 0;
-    border-radius: 6px;
-    color: var(--mud-palette-text-secondary);
+    border-radius: 8px;
+    color: var(--mo-color-shell-frame-muted);
     background: transparent;
     box-shadow: none;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 500;
     line-height: 1.4;
     text-transform: none;
@@ -22,10 +22,10 @@
     white-space: nowrap;
 }
 
-.mo-navigation-popover.navbar-link ::deep .mud-button-label { gap: 8px; }
+.mo-navigation-popover.navbar-link ::deep .mud-button-label { gap: 7px; }
 .mo-navigation-popover.navbar-link ::deep :is(.mud-button-icon-start, .mud-button-icon-end) { margin: 0; }
-.mo-navigation-popover.navbar-link ::deep .mud-button-icon-start :is(.mud-icon-root, .mo-icon) { width: 18px; height: 18px; font-size: 18px; }
-.mo-navigation-popover.navbar-link ::deep .mud-button-icon-end :is(.mud-icon-root, .mo-icon) { width: 14px; height: 14px; font-size: 14px; }
+.mo-navigation-popover.navbar-link ::deep .mud-button-icon-start :is(.mud-icon-root, .mo-icon) { width: 16px; height: 16px; font-size: 16px; }
+.mo-navigation-popover.navbar-link ::deep .mud-button-icon-end :is(.mud-icon-root, .mo-icon) { width: 13px; height: 13px; font-size: 13px; }
 
 .mo-navigation-popover.navbar-link ::deep .mud-menu-button-activator:hover,
 .mo-navigation-popover.navbar-link ::deep .mud-menu-button-activator[aria-expanded="true"] {
@@ -35,7 +35,8 @@
 
 .mo-navigation-popover.navbar-link.is-active ::deep .mud-menu-button-activator {
     color: var(--mud-palette-primary);
-    background: var(--mud-palette-primary-hover);
+    background: var(--mud-palette-surface);
+    box-shadow: var(--mo-shell-selected-shadow);
 }
 
 .mo-navigation-popover ::deep :is(.mud-menu-button-activator, .mud-menu-icon-button-activator):focus-visible {
@@ -66,8 +67,9 @@
 }
 
 .mo-navigation-popover__surface--overview {
-    width: min(380px, calc(100vw - 24px));
-    max-height: min(600px, calc(100dvh - 88px));
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 88px);
     padding: 0;
     border-radius: 12px;
 }

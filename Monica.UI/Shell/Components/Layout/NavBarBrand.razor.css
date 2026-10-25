@@ -1,51 +1,18 @@
-.navbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; border-radius: 8px; }
+.navbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--mo-color-shell-frame-text); text-decoration: none; border-radius: 8px; }
 .navbar-brand:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 4px; }
-.brand-logo { width: 32px; height: 32px; display: grid; place-items: center; flex-shrink: 0; }
+.brand-logo { width: 32px; height: 32px; display: grid; place-items: center; flex: none; }
 .brand-logo ::deep .mo-brand-icon { width: 100%; height: 100%; }
-.brand-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.brand-name { font-size: 15px; font-weight: 600; line-height: 1.15; color: var(--mud-palette-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.brand-text { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand-name { font-size: 14px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
 .brand-version-container { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.brand-appid { color: var(--mud-palette-text-secondary); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand-version { color: var(--mud-palette-text-secondary); font-family: var(--mo-font-family-mono); font-size: 9px; flex-shrink: 0; }
-.navbar-brand--contextual { width: 100%; align-items: flex-start; }
-.navbar-brand--contextual .brand-text { width: 100%; gap: 9px; }
-.navbar-brand--contextual .brand-name {
-    max-width: 100%;
-    font-size: 22px;
-    font-weight: 550;
-    line-height: 1.25;
-    letter-spacing: -.02em;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-.navbar-brand--contextual .brand-version-container { flex-wrap: wrap; gap: 5px 7px; }
-.navbar-brand--contextual .brand-appid {
-    width: 100%;
-    font-family: var(--mo-font-family-mono);
-    font-size: 11px;
-    line-height: 1.5;
-}
-.navbar-brand--contextual .brand-version,
-.navbar-brand--contextual .brand-environment {
-    color: var(--mud-palette-text-secondary);
-    font-family: inherit;
-    font-size: 11px;
-    line-height: 1.5;
-}
-.navbar-brand--contextual .brand-version { min-width: 0; flex-shrink: 1; overflow-wrap: anywhere; }
-.navbar-brand--contextual :is(.brand-appid, .brand-version, .brand-environment) { color: color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary)); }
-.brand-environment::before { content: "\00b7"; margin-right: 7px; }
-@media (max-width: 929px) {
-    .brand-name { max-width: min(160px, 26vw); font-size: 14px; }
-    .brand-appid { display: none; }
-    .navbar-brand:not(.navbar-brand--contextual) .brand-version {
-        min-width: 0;
-        flex-shrink: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
+.brand-version { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mo-color-shell-frame-muted); font: 400 11px var(--mo-font-family-mono); }
+.navbar-brand:not(.navbar-brand--contextual) .brand-version { max-width: 112px; }
+.navbar-brand--contextual { width: 100%; }
+.navbar-brand--contextual .brand-text { flex-direction: column; align-items: stretch; width: 100%; gap: 4px; }
+.navbar-brand--contextual .brand-name { max-width: 100%; font-size: 14.5px; }
+.navbar-brand--contextual .brand-version-container { gap: 4px 6px; }
+.navbar-brand--contextual .brand-version { flex: 1; }
+.brand-environment { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 1px 7px 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--mud-palette-info) 10%, var(--mo-color-shell-frame)); color: color-mix(in srgb, var(--mud-palette-info) 48%, var(--mo-color-shell-frame-text)); font-size: 11.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.brand-environment::before { content: ''; flex: none; width: 5px; height: 5px; border-radius: 1.5px; background: var(--mud-palette-info); }
+@media (max-width: 929px) { .brand-name { max-width: min(180px, 34vw); } }
+@media (max-width: 420px) { .navbar-brand:not(.navbar-brand--contextual) .brand-version-container { display: none; } }

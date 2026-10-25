@@ -87,6 +87,11 @@
     --mo-color-navigation-rail-background: var(--mud-palette-background-gray);
     --mo-color-navigation-rail-text: var(--mud-palette-text-secondary);
     --mo-color-navigation-context-background: var(--mud-palette-drawer-background);
+    --mo-color-shell-frame: var(--mo-color-navigation-context-background);
+    --mo-color-shell-frame-text: var(--mud-palette-text-primary);
+    --mo-color-shell-frame-muted: var(--mud-palette-text-secondary);
+    --mo-color-shell-frame-hover: var(--mud-palette-action-default-hover);
+    --mo-shell-selected-shadow: 0 0 0 1px color-mix(in srgb, var(--mud-palette-text-primary) 7%, transparent), 0 1px 2px color-mix(in srgb, var(--mud-palette-text-primary) 7%, transparent);
 
     --mo-color-page-hero-background: color-mix(in srgb, var(--mud-palette-primary) 12%, var(--mud-palette-surface));
     --mo-color-page-hero-text: var(--mud-palette-text-primary);

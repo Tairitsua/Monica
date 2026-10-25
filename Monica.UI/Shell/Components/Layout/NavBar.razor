@@ -9,7 +9,13 @@
     </div>
     <div class="topbar-brand"><NavBarBrand /></div>
     <div class="sidebar-breadcrumb">
+        <MoIcon Icon="@(ActiveCategory?.Icon ?? MoIcons.Shapes)" Size="16px" />
         <span class="breadcrumb-category">@ActiveCategory?.DisplayName</span>
+        @foreach (var ancestor in ActiveAncestors)
+        {
+            <span class="breadcrumb-divider" aria-hidden="true">/</span>
+            <span class="breadcrumb-category">@ancestor.DisplayName</span>
+        }
         @if (ActiveItem is not null)
         {
             <span class="breadcrumb-divider" aria-hidden="true">/</span>
@@ -87,12 +93,11 @@
     <div class="sidebar-context">
         <div class="sidebar-identity"><NavBarBrand ShowIcon="false" Contextual="true" /></div>
         <div class="sidebar-pages">
-        <div class="sidebar-navigation-label">@L["NavBar:Explore"]</div>
         @if (SelectedCategory is { } selected)
         {
-            <h2 class="sidebar-category-title">@selected.DisplayName</h2>
+            <NavigationCategoryHeader Group="@selected" />
             <MudNavMenu Class="sidebar-tree">
-                <NavigationTree @key="selected.Id" Group="@selected" ActiveItem="@ActiveItem" ShowPageIcons="false" />
+                <NavigationTree @key="selected.Id" Group="@selected" ActiveItem="@ActiveItem" />
             </MudNavMenu>
         }
         </div>
@@ -107,7 +112,7 @@
 
 <div class="context-navigation-host">
 <MudDrawer id="mo-context-navigation" Open="@IsContextNavigationOpen" OpenChanged="ContextNavigationChanged"
-           Variant="DrawerVariant.Temporary" Width="226px" Elevation="0" Overlay="false"
+           Variant="DrawerVariant.Temporary" Width="248px" Elevation="0" Overlay="false"
            Class="mo-context-navigation" aria-label="@(ContextCategory?.DisplayName ?? L["NavBar:Navigation"])">
     @if (IsContextNavigationOpen && ContextCategory is { } contextCategory)
     {
@@ -117,8 +122,7 @@
                 <MudIconButton Icon="@MoIcons.Close" OnClick="CloseContextNavigation" Size="Size.Small"
                                aria-label="@L["NavBar:CloseNavigation"]" />
             </div>
-            <div class="sidebar-navigation-label">@L["NavBar:Explore"]</div>
-            <h2 class="sidebar-category-title">@contextCategory.DisplayName</h2>
+            <NavigationCategoryHeader Group="@contextCategory" />
             <CascadingValue Value="@((MudBlazor.Interfaces.INavigationEventReceiver)this)" IsFixed="true">
                 <ContextNavigationTree @key="contextCategory.Id" Group="@contextCategory" ActiveItem="@ActiveItem" />
             </CascadingValue>

@@ -13,8 +13,8 @@
     overflow-y: auto;
     overscroll-behavior: contain;
 }
-.mud-popover.mo-navbar-menu-popover--overview { border-radius: 12px; margin-top: 8px; }
-.mo-mobile-navigation { background: var(--mo-color-navigation-context-background); }
+.mud-popover.mo-navbar-menu-popover--overview { min-width: 0; max-width: calc(100vw - 24px); border-radius: 12px; margin-top: 8px; box-shadow: var(--mud-elevation-8); }
+.mo-mobile-navigation { background: var(--mo-color-shell-frame); color: var(--mo-color-shell-frame-text); }
 
 /* Category hints use a surface popover beside the scrolling icon rail. */
 :root .mud-tooltip.mo-navigation-rail-tooltip,
