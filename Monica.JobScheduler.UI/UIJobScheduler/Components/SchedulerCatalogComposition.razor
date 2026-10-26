@@ -1,0 +1,54 @@
+@inject NavigationManager Navigation
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<JobSchedulerResource> L
+
+<section class="catalog-composition" aria-labelledby="catalog-composition-title">
+    <div class="catalog-composition__decision">
+        <div><p id="catalog-composition-title">@L["Workspace:Inventory"]</p><MoDisplayValue Value="@_present.Count.ToString()" Unit="@L["Workspace:PublishedDefinitions"]" /><small>@L["Workspace:DefinitionBreakdown", _recurring, _present.Count - _recurring, Definitions.Count - _present.Count]</small></div>
+        <p class="catalog-composition__finding">@L["Workspace:CatalogFinding", _present.Count, _present.Select(definition => definition.OwnerKey).Distinct(StringComparer.Ordinal).Count()] <text> </text>@if (_largestOwner is { } largest) { <span>@L["Workspace:LargestOwner"] <a href="@OwnerUrl(largest)">@largest</a> <MoValueMark>@_present.Count(d => d.OwnerKey == largest)</MoValueMark></span> }</p>
+    </div>
+    @if (!_expanded)
+    {
+        <div class="catalog-composition__cadences">@foreach (var bucket in SchedulerCadence.Buckets)
+        {
+            var definitions = Definitions.Where(d => _buckets.GetValueOrDefault(d.Id) == bucket).ToArray();
+            @if (definitions.Length > 0)
+            {
+                <div><p>@L[$"Workspace:Cadences:{bucket}"] <b>@definitions.Length</b></p><div class="catalog-composition__marks">@foreach (var definition in definitions) { <a class="catalog-composition__mark" data-tone="@Tone(definition)" href="@JobSchedulerUiUrls.JobDefinition(definition.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)" title="@Label(definition)" aria-label="@Label(definition)"></a> }</div></div>
+            }
+        }</div>
+    }
+    <button class="catalog-composition__toggle" type="button" aria-expanded="@_expanded" @onclick="@(() => _expanded = !_expanded)"><span><MoIcon Icon="@MoIcons.Grid" Size="1rem" />@L["Workspace:OwnerCadence"]</span><span>@L[_expanded ? "Workspace:CollapseMap" : "Workspace:ExpandMap"] <MoIcon Icon="@(_expanded ? MoIcons.ChevronUp : MoIcons.ChevronDown)" Size="1rem" /></span></button>
+    @if (_expanded)
+    {
+        <div class="catalog-composition__matrix"><table><thead><tr><th>@L["Catalog:Columns:Owner"]</th>@foreach (var bucket in SchedulerCadence.Buckets) { <th>@L[$"Workspace:Cadences:{bucket}"]</th> }</tr></thead><tbody>@foreach (var owner in _owners)
+        {
+            <tr><th><a href="@OwnerUrl(owner)">@owner</a></th>@foreach (var bucket in SchedulerCadence.Buckets) { <td><div class="catalog-composition__marks">@foreach (var definition in Definitions.Where(d => d.OwnerKey == owner && _buckets.GetValueOrDefault(d.Id) == bucket)) { <a class="catalog-composition__mark" data-tone="@Tone(definition)" href="@JobSchedulerUiUrls.JobDefinition(definition.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)" title="@Label(definition)" aria-label="@Label(definition)"></a> }</div></td> }</tr>
+        }</tbody></table></div>
+    }
+    <footer>@L["Workspace:DefinitionMapScope"] <span><i data-tone="success"></i>@L["Catalog:Policy:Enabled"]</span><span><i data-tone="paused"></i>@L["Catalog:Policy:Paused"]</span><span><i data-tone="absent"></i>@L["Catalog:AbsentDefinition"]</span></footer>
+</section>
+
+@code {
+    /// <summary>Gets the accepted bounded definition snapshot used for all composition counts and marks.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobDefinition> Definitions { get; set; } = [];
+    /// <summary>Gets the snapshot instant used for calendar-aware cadence projection.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    private bool _expanded;
+    private int _recurring;
+    private List<JobDefinition> _present = [];
+    private string[] _owners = [];
+    private string? _largestOwner;
+    private Dictionary<JobId, string> _buckets = [];
+    protected override void OnParametersSet()
+    {
+        _present = Definitions.Where(d => d.IsPresent).ToList();
+        _recurring = _present.Count(d => d.Declaration.JobType == JobType.Recurring);
+        _largestOwner = _present.GroupBy(definition => definition.OwnerKey, StringComparer.Ordinal).OrderByDescending(group => group.Count()).ThenBy(group => group.Key, StringComparer.Ordinal).Select(group => group.Key).FirstOrDefault();
+        _owners = Definitions.GroupBy(d => d.OwnerKey, StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => g.Key).ToArray();
+        _buckets = Definitions.ToDictionary(d => d.Id, d => SchedulerCadence.Bucket(d, ObservedAtUtc));
+    }
+    private static string Tone(JobDefinition definition) => !definition.IsPresent ? "absent" : definition.IsDisabled ? "paused" : definition.Declaration.JobType == JobType.Triggered ? "primary" : "success";
+    private string Label(JobDefinition definition) => $"{definition.EffectiveConfiguration.JobName} · {definition.OwnerKey} · {L[!definition.IsPresent ? "Catalog:AbsentDefinition" : definition.IsDisabled ? "Catalog:Policy:Paused" : "Catalog:Policy:Enabled"]}";
+    private static string OwnerUrl(string owner) => $"/job-scheduler/catalog?owner={Uri.EscapeDataString(owner)}";
+}

@@ -1,61 +1,19 @@
-@using Monica.JobScheduler.UI.Localization
 @using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
-
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 
-<section class="execution-detail-hero" data-state="@Execution.State.ToString().ToLowerInvariant()"
-         aria-label="@L["ExecutionDetail:Identity"]">
-    <header class="execution-detail-hero__header">
-        <div class="execution-detail-hero__state">
-            <MoIcon Icon="@ExecutionUiPresentation.GetStateIcon(Execution.State)" Size="1.25rem" />
-            <span>@L[$"ExecutionStates:{Execution.State}"]</span>
-        </div>
-        <h2>@JobSchedulerUiPresentation.GetJobDisplayName(Execution.Template)</h2>
-        <dl class="execution-detail-hero__identifiers">
-            <div>
-                <dt>@L["ExecutionDetail:Instance"]</dt>
-                <dd><code>@Execution.InstanceId</code></dd>
-            </div>
-            <div>
-                <dt>@L["ExecutionDetail:Job"]</dt>
-                <dd><code>@Execution.Template.JobKey</code></dd>
-            </div>
-        </dl>
-    </header>
-    <dl class="execution-detail-hero__metrics">
-        <div>
-            <dt>@L["ExecutionDetail:Duration"]</dt>
-            <dd>@TimePresentation.FormatExecutionDuration(Execution, ObservedAtUtc)</dd>
-        </div>
-        <div>
-            <dt>@L["Executions:Evidence:Claims"]</dt>
-            <dd>@Execution.ExecutionAttempt</dd>
-        </div>
-        <div>
-            <dt>@L["Executions:Evidence:ConsumedFailures"]</dt>
-            <dd>@Execution.RetryAttempt</dd>
-        </div>
-        <div>
-            <dt>@L["ExecutionDetail:Origin"]</dt>
-            <dd class="execution-detail-hero__origin">@L[$"ExecutionOrigins:{Execution.Origin}"]</dd>
-        </div>
-    </dl>
+<section class="execution-detail-hero" data-state="@Execution.State.ToString().ToLowerInvariant()" aria-label="@L["ExecutionDetail:Identity"]">
+    <p class="execution-detail-hero__label">@L["ExecutionDetail:Duration"]</p>
+    <strong class="execution-detail-hero__duration">@Duration.Value <small>@Duration.Unit</small></strong>
+    <p class="execution-detail-hero__note">@L["ExecutionDetail:EvidenceScope"]</p>
     @if (Execution.SkipReason is { } skipReason)
-    {
-        <div class="execution-detail-hero__notice">
-            <MoIcon Icon="@MoIcons.SkipNext" Size="1.25rem" />
-            <div><strong>@L["ExecutionDetail:SkipReason"]</strong><span>@L[$"ExecutionSkipReasons:{skipReason}"]</span></div>
-        </div>
-    }
+    { <p class="execution-detail-hero__skip"><MoIcon Icon="@MoIcons.SkipNext" Size="1rem" />@L["ExecutionDetail:SkipReason"] · @L[$"ExecutionSkipReasons:{skipReason}"]</p> }
 </section>
 
 @code {
-    /// <summary>Gets or sets the durable execution summarized by the hero.</summary>
-    [Parameter, EditorRequired]
-    public JobExecutionInstance Execution { get; set; } = null!;
-
-    /// <summary>Gets or sets the observation instant used only for a running, noncompleted attempt's duration.</summary>
-    [Parameter]
-    public DateTimeOffset ObservedAtUtc { get; set; }
+    /// <summary>Gets the immutable durable execution captured by the current inspector owner.</summary>
+    [Parameter, EditorRequired] public JobExecutionInstance Execution { get; set; } = null!;
+    /// <summary>Gets the accepted observation instant used only for a running execution's elapsed duration.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    private (string Value, string Unit) Duration => TimePresentation.PreciseDurationParts(SchedulerTimePresentation.GetExecutionDuration(Execution, ObservedAtUtc));
 }

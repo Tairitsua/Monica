@@ -70,6 +70,46 @@ internal sealed class SchedulerTimePresentation(
     /// </summary>
     internal string FormatTimestamp(DateTimeOffset? value) => timeFormatter.Format(value);
 
+    /// <summary>Formats execution-detail evidence with three millisecond digits in the deployment Clock zone.</summary>
+    internal string FormatExecutionTimestamp(DateTimeOffset? value) => timeFormatter.Format(value, "yyyy-MM-dd HH:mm:ss.fff");
+
+    /// <summary>Formats the compact execution-history clock with three millisecond digits.</summary>
+    internal string FormatExecutionClock(DateTimeOffset? value) => timeFormatter.Format(value, "HH:mm:ss.fff");
+
+    /// <summary>Formats a compact ordinary observation time through the host-owned display policy.</summary>
+    internal string FormatClock(DateTimeOffset? value) => timeFormatter.FormatTime(value);
+
+    /// <summary>Uses the host clock on the observation day and retains a date for records on other display days.</summary>
+    internal string FormatListTimestamp(DateTimeOffset value, DateTimeOffset observedAtUtc) =>
+        timeFormatter.ToDisplayTime(value).Date == timeFormatter.ToDisplayTime(observedAtUtc).Date
+            ? timeFormatter.FormatTime(value) : timeFormatter.Format(value);
+
+    /// <summary>Formats an explicitly projected schedule-calendar instant without applying the deployment Clock zone again.</summary>
+    internal string FormatScheduleTimestamp(DateTimeOffset value) => timeFormatter.FormatWallTime(TimeZoneInfo.ConvertTime(value, _timeZone));
+
+    /// <summary>Formats exact elapsed execution evidence; ordinary list durations retain their compact scale.</summary>
+    internal string FormatPreciseDuration(TimeSpan? duration)
+    {
+        var parts = PreciseDurationParts(duration);
+        return string.IsNullOrEmpty(parts.Unit) ? parts.Value : $"{parts.Value} {parts.Unit}";
+    }
+
+    /// <summary>Separates exact elapsed evidence from its localized unit for the drawer's display-scale reading.</summary>
+    internal (string Value, string Unit) PreciseDurationParts(TimeSpan? duration)
+    {
+        if (duration is null) return ("—", string.Empty);
+        var value = TimeSpan.FromMilliseconds(Math.Max(0, Math.Round(duration.Value.TotalMilliseconds)));
+        if (value.TotalMinutes < 1) return (value.TotalSeconds.ToString("F3", CultureInfo.CurrentCulture), localizer["Common:Duration:Seconds", ""].Value.Trim());
+        var prefix = value.TotalHours >= 1
+            ? $"{(long)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}.{value.Milliseconds:000}"
+            : $"{value.Minutes}:{value.Seconds:00}.{value.Milliseconds:000}";
+        return (prefix, localizer[value.TotalHours >= 1 ? "Workspace:ClockHours" : "Workspace:ClockMinutes"]);
+    }
+
+    /// <summary>Formats the recorded duration of the selected execution at the accepted observation instant.</summary>
+    internal string FormatPreciseExecutionDuration(JobExecutionInstance execution, DateTimeOffset observedAtUtc) =>
+        FormatPreciseDuration(GetExecutionDuration(execution, observedAtUtc));
+
     /// <summary>Formats an interval without repeating its date when both endpoints share a display-calendar day.</summary>
     internal string FormatRange(DateTimeOffset start, DateTimeOffset end) => timeFormatter.FormatRange(start, end);
 

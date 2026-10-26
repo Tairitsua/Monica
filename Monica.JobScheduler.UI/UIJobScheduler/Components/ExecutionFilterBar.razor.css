@@ -14,10 +14,10 @@
 .execution-filter__label { margin-inline-end: 4px; color: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.5; }
 .execution-filter__state { --state-tone: var(--mud-palette-info); display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid color-mix(in srgb, var(--state-tone) 35%, var(--mud-palette-lines-default)); border-radius: 6px; background: var(--mud-palette-surface); color: color-mix(in srgb, var(--state-tone) 25%, var(--mud-palette-text-primary)); font: inherit; font-size: 13px; font-weight: 400; line-height: 1.5; cursor: pointer; }
 .execution-filter__state[data-state="all"] { --state-tone: var(--mud-palette-text-secondary); }
-.execution-filter__state[data-state="running"] { --state-tone: var(--mud-palette-primary); }
+.execution-filter__state[data-state="running"] { --state-tone: var(--mud-palette-info); }
 .execution-filter__state[data-state="succeeded"] { --state-tone: var(--mud-palette-success); }
 .execution-filter__state[data-state="failed"] { --state-tone: var(--mud-palette-error); }
-.execution-filter__state[data-state="cancelled"] { --state-tone: var(--mud-palette-secondary); }
+.execution-filter__state[data-state="cancelled"] { --state-tone: var(--mud-palette-text-secondary); }
 .execution-filter__state[data-state="skipped"] { --state-tone: var(--mud-palette-warning); }
 .execution-filter__state[aria-pressed="true"] { border-color: color-mix(in srgb, var(--state-tone) 55%, var(--mud-palette-text-primary)); background-color: color-mix(in srgb, var(--state-tone) 12%, var(--mud-palette-surface)); font-weight: 500; }
 .execution-filter__state:hover:not(:disabled) { border-color: color-mix(in srgb, var(--state-tone) 45%, var(--mud-palette-text-primary)); background-color: color-mix(in srgb, var(--state-tone) 8%, var(--mud-palette-surface)); }

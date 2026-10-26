@@ -8,7 +8,7 @@
                 <MoIcon Icon="@MoIcons.Sliders" Size="1.5rem" />
             </div>
             <div>
-                <MoDialogHeading Text="@L["Policy:Title"]" />
+                <MoDialogHeading Text="@L[ScheduleOnly ? "Workspace:EditCron" : "Policy:Title"]" />
                 <MudText Typo="Typo.body2">
                     @(_state?.EffectiveDisplayName ?? Definition.Declaration.JobName)
                 </MudText>
@@ -59,10 +59,12 @@
                                StartIcon="@MoIcons.FileRestore"
                                Disabled="@_isSaving"
                                OnClick="ResetAll">
-                        @L["Policy:Actions:ResetAll"]
+                        @L[ScheduleOnly ? "Workspace:RestoreCron" : "Policy:Actions:ResetAll"]
                     </MudButton>
                 </div>
 
+                @if (!ScheduleOnly)
+                {
                 <section class="policy-section" aria-labelledby="policy-general-heading">
                     <OperationalPolicySectionHeading HeadingId="policy-general-heading"
                                                      Icon="@MoIcons.BadgeId"
@@ -149,6 +151,7 @@
                     </div>
                 </section>
 
+                }
                 @if (_state.Schedule is { } schedule)
                 {
                     <section class="policy-section" aria-labelledby="policy-schedule-heading">
@@ -177,6 +180,8 @@
                     </MudAlert>
                 }
 
+                @if (!ScheduleOnly)
+                {
                 <section class="policy-section" aria-labelledby="policy-execution-heading">
                     <OperationalPolicySectionHeading HeadingId="policy-execution-heading"
                                                      Icon="@MoIcons.Gauge"
@@ -288,6 +293,7 @@
                     </div>
                 </section>
 
+                }
                 @if (_error is not null)
                 {
                     <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@_error</MudAlert>
@@ -307,7 +313,7 @@
                 <span class="policy-workbench__primary-action">
                     <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.Save"
                                Disabled="@(_isSaving || _state is null || !_state.CanSave)" OnClick="SaveAsync">
-                        @(_isSaving ? L["Common:Saving"] : L["Common:Save"])
+                        @(_isSaving ? L["Common:Saving"] : L[ScheduleOnly ? "Workspace:SaveCron" : "Common:Save"])
                     </MudButton>
                 </span>
             </div>

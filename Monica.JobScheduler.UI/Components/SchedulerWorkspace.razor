@@ -1,32 +1,24 @@
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.Visual
+@using Microsoft.AspNetCore.Components.Sections
 
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 @inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
 
+<CascadingValue Value="@_actionsKey" Name="SchedulerWorkspaceActions" IsFixed="true">
 <div class="scheduler-workspace mo-page-shell mo-page-shell--full-width">
-    <header class="scheduler-workspace__header">
-        <div class="scheduler-workspace__heading">
-            <MudText Typo="Typo.overline" Class="scheduler-workspace__eyebrow">@L["Workspace:Eyebrow"]</MudText>
-            <MudText Typo="Typo.h4" HtmlTag="h1" Class="scheduler-workspace__title">@Title</MudText>
-            <MudText Typo="Typo.body1" Class="scheduler-workspace__description">@Description</MudText>
-        </div>
-        <div class="scheduler-workspace__metadata">
-            <div class="scheduler-workspace__context">
-                <MoIcon Icon="@MoIcons.Layers" aria-hidden="true" Size="1.5rem" />
-                <span title="@SchedulerOptions.Value.SchedulerScopeKey">
-                    @L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]
-                </span>
-            </div>
-            <div class="scheduler-workspace__context">
-                <MoIcon Icon="@MoIcons.Clock" aria-hidden="true" Size="1.5rem" />
-                <span title="@TimePresentation.TimeZoneDisplayName">
-                    @L["Workspace:TimeZone", TimePresentation.TimeZoneId]
-                </span>
-            </div>
-        </div>
-    </header>
+    <div class="scheduler-workspace__header">
+        <span class="scheduler-workspace__seal" aria-hidden="true"><MoIcon Icon="@CurrentIcon" Size="1.5rem" /></span>
+        <MoPageMasthead Title="@Title" Crumb="@L["Workspace:Eyebrow"]">
+            <Meta>
+                <span class="scheduler-workspace__scope" title="@Description"><i aria-hidden="true"></i>@L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]</span>
+                <span class="scheduler-workspace__zone" title="@TimePresentation.TimeZoneDisplayName">@L["Workspace:TimeZone", TimePresentation.TimeZoneId]</span>
+            </Meta>
+            <Actions><SectionOutlet SectionId="@_actionsKey" /></Actions>
+        </MoPageMasthead>
+    </div>
 
     <MoWorkbenchNavigation Label="@L["Workspace:Navigation:AriaLabel"]">
         @foreach (var route in ROUTES)
@@ -36,12 +28,17 @@
                 <span>@L[route.LabelKey]</span>
             </a>
         }
+        @if (Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.StartsWith("/job-scheduler/jobs/", StringComparison.OrdinalIgnoreCase))
+        {
+            <a href="@Navigation.Uri" aria-current="page"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><span>@L["JobDetail:PageTitle"]</span></a>
+        }
     </MoWorkbenchNavigation>
 
     <div class="scheduler-workspace__content">
         @ChildContent
     </div>
 </div>
+</CascadingValue>
 
 @code {
     private static readonly (string Url, string LabelKey, string Icon)[] ROUTES =
@@ -77,6 +74,9 @@
     /// </summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
+
+    private readonly object _actionsKey = new();
+    private string CurrentIcon => ROUTES[Math.Clamp(ActivePanelIndex, 0, ROUTES.Length - 1)].Icon;
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;

@@ -1,0 +1,9 @@
+.snapshot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.snapshot-actions__stamp { display: grid; gap: 3px; text-align: end; margin-right: 2px; }
+.snapshot-actions__stamp span { color: var(--mud-palette-text-secondary); font-size: 10px; }
+.snapshot-actions__stamp time { font: 11.5px var(--mo-font-family-mono); }
+.snapshot-actions ::deep .mud-button-root { min-height: 34px; padding: 6px 12px; font-size: 12px; border-radius: 6px; box-shadow: none; }
+.snapshot-actions__auto { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 12px; border: 1px solid var(--mud-palette-lines-default); border-radius: 6px; background: var(--mud-palette-surface); color: var(--mud-palette-text-secondary); font-size: 11.5px; }
+.snapshot-actions__auto i { width: 6px; height: 6px; border-radius: 50%; background: var(--mud-palette-text-secondary); }
+.snapshot-actions__auto i.is-live { background: var(--mud-palette-info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mud-palette-info) 10%, transparent); }
+@media (max-width: 600px) { .snapshot-actions__stamp { text-align: start; margin-right: 6px; } }

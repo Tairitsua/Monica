@@ -139,12 +139,39 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
     {
         if (_lifetime.IsRetired) return;
         var template = _state?.Execution?.Template;
+        var returnUrl = Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery;
         MudDialog.Close();
         Navigation.NavigateTo(template is null ? JobCatalogPage.PAGE_URL
-            : JobSchedulerUiUrls.JobDefinition(new JobId(template.OwnerKey, template.JobKey)));
+            : JobSchedulerUiUrls.JobDefinition(new JobId(template.OwnerKey, template.JobKey), returnUrl));
     }
 
     private void Close() => MudDialog.Close();
+
+    private void OpenExecutionLedger()
+    {
+        if (_lifetime.IsRetired || _state?.Execution is not { } execution) return;
+        var url = $"{JobExecutionsPage.PAGE_URL}?instanceId={Uri.EscapeDataString(execution.InstanceId)}&owner={Uri.EscapeDataString(execution.Template.OwnerKey)}&job={Uri.EscapeDataString(execution.Template.JobKey)}";
+        MudDialog.Close();
+        Navigation.NavigateTo(url);
+    }
+
+    private async Task CopyInstanceIdAsync()
+    {
+        if (_state is not { } state || _lifetime.IsRetired) return;
+        var exactId = InstanceId;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                if (!await state.ReauthorizeAsync() || _lifetime.IsRetired) return;
+                var copied = await JsRuntime.InvokeAsync<bool>("MoClipboard.copyText", token, exactId);
+                if (!_lifetime.IsRetired)
+                    Snackbar.Add(L[copied ? "Workspace:IdCopied" : "ExecutionDetail:CopyFailed"], copied ? Severity.Success : Severity.Warning);
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired || state.IsDisposed) { }
+        catch (JSException) { if (!_lifetime.IsRetired) Snackbar.Add(L["ExecutionDetail:CopyFailed"], Severity.Warning); }
+    }
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()

@@ -1,0 +1,85 @@
+@using System.Globalization
+@using Monica.UI.Shared.Components.Visual
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+@inject TimeProvider TimeProvider
+@implements IAsyncDisposable
+
+<section class="ledger-trajectory" aria-labelledby="ledger-trajectory-title">
+    <div class="ledger-trajectory__decision"><div><p id="ledger-trajectory-title">@L["Workspace:MatchingExecutions"]</p><MoDisplayValue Value="@(_sample is null ? "—" : _sample.TotalCount.ToString("N0"))" Unit="@L["Workspace:RecordsUnit"]" /></div><p>@L["Workspace:LedgerFinding"] @if (Query.OwnerKey is not null) { <code>@Query.OwnerKey</code> } @if (Query.JobKey is not null) { <code>@Query.JobKey</code> }</p></div>
+    @if (_error is not null) { <div class="ledger-trajectory__error"><MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">@_error</MudAlert></div> }
+    @if (_sample is not null)
+    {
+        <header><div><h2>@L["Workspace:TrajectoryTitle"]</h2><p>@L["Workspace:TrajectoryDescription"]</p></div><span>@L["Workspace:SampleScope", _sample.Records.Count, _sample.TotalCount]</span></header>
+        @if (_sample.IsTruncated) { <p class="ledger-trajectory__limit">@L["Workspace:SampleTruncated"]</p> }
+        <div class="ledger-trajectory__lanes">@foreach (var state in States)
+        {
+            var counts = _counts[state];
+            var peak = counts.Max();
+            <div class="ledger-trajectory__lane" data-state="@state.ToString().ToLowerInvariant()"><button type="button" aria-pressed="@(Query.States?.Contains(state) == true)" @onclick="@(() => StateSelected.InvokeAsync(state))"><i></i>@L[$"ExecutionStates:{state}"]<b>@counts.Sum().ToString("N0")</b></button><div class="ledger-trajectory__bars">@for (var index = 0; index < BucketCount; index++)
+            {
+                var count = counts[index]; var start = At(index); var end = At(index + 1);
+                <a href="@SchedulerRouteBuilder.Ledger(Query with { States = new[] { state } }, start, end)" style="@($"--bar-height:{(count == 0 ? 0 : Math.Max(5,count * 28d / peak)).ToString("0.###",CultureInfo.InvariantCulture)}px")" title="@L["Workspace:BucketDetails", L[$"ExecutionStates:{state}"], count, TimePresentation.FormatRange(start, end)]" aria-label="@L["Workspace:BucketDetails", L[$"ExecutionStates:{state}"], count, TimePresentation.FormatRange(start, end)]"><i></i></a>
+            }</div><small>@peak</small></div>
+        }</div>
+        <div class="ledger-trajectory__axis"><time>@TimePresentation.FormatTimestamp(_start)</time><time>@TimePresentation.FormatTimestamp(_end)</time></div>
+        <footer>@L["Workspace:TrajectoryCaptured", TimePresentation.FormatTimestamp(_observedAt)]</footer>
+    }
+</section>
+
+@code {
+    /// <summary>Gets the exact accepted list query. The trajectory uses identical identity, search, state and creation filters.</summary>
+    [Parameter, EditorRequired] public JobExecutionQuery Query { get; set; } = null!;
+    /// <summary>Gets the accepted list observation used to bound otherwise open-ended creation queries.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    /// <summary>Gets the callback toggling a state in the native list filter.</summary>
+    [Parameter] public EventCallback<JobExecutionState> StateSelected { get; set; }
+    private const int BucketCount = 48;
+    private static readonly JobExecutionState[] States = Enum.GetValues<JobExecutionState>();
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private JobExecutionQuery? _acceptedQuery;
+    private SchedulerExecutionSample? _sample;
+    private Dictionary<JobExecutionState, int[]> _counts = [];
+    private DateTimeOffset _start, _end, _observedAt;
+    private string? _error;
+    private int _version;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_lifetime.IsRetired || ReferenceEquals(Query, _acceptedQuery)) return;
+        _acceptedQuery = Query;
+        var query = Query;
+        var version = ++_version;
+        var capture = ObservedAtUtc;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                if (!await Access.IsAuthorizedAsync(token))
+                {
+                    _lifetime.TryApply(() => { if (version == _version) { _sample = null; _error = L["Access:DeniedDescription"]; } });
+                    return;
+                }
+                var sample = await SchedulerExecutionSample.LoadAsync(Facade, query with { CreatedBeforeUtc = query.CreatedBeforeUtc ?? capture }, token);
+                token.ThrowIfCancellationRequested();
+                var end = query.CreatedBeforeUtc ?? capture;
+                var start = query.CreatedAfterUtc ?? (sample.Records.Count > 0 ? sample.Records.Min(record => record.CreatedAtUtc) : end.AddHours(-1));
+                if (end <= start) end = start.AddSeconds(1);
+                var counts = States.ToDictionary(state => state, _ => new int[BucketCount]);
+                foreach (var record in sample.Records)
+                {
+                    var bucket = Math.Clamp((int)((record.CreatedAtUtc - start).TotalMilliseconds / (end - start).TotalMilliseconds * BucketCount), 0, BucketCount - 1);
+                    counts[record.State][bucket]++;
+                }
+                var observed = TimeProvider.GetUtcNow();
+                _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _counts = counts; _start = start; _end = end; _observedAt = observed; _error = null; } });
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) _error = exception.Message; }); }
+    }
+    private DateTimeOffset At(int bucket) => _start.AddTicks((long)((_end - _start).Ticks * (bucket / (double)BucketCount)));
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+}

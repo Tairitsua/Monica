@@ -1,0 +1,165 @@
+@inject NavigationManager Navigation
+@using System.Globalization
+@using Monica.UI.Shared.Components.Visual
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.State
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@inject IDialogService DialogService
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+@implements IAsyncDisposable
+
+<section class="scheduler-pulse" aria-labelledby="scheduler-pulse-title">
+    <div class="scheduler-pulse__decision">
+        <div><p>@L["Workspace:AttentionJobs"]</p><MoDisplayValue Value="@(_sample is null ? "—" : _jobs.Count(job => job.NeedsAttention).ToString())" Unit="@L["Workspace:JobsUnit"]" /><div class="scheduler-pulse__reasons"><span data-tone="error">@L["Workspace:FailureSignal"] <b>@_jobs.Count(job => job.FailureStreak > 0 || job.IsIntermittent)</b></span><span data-tone="warning">@L["Workspace:OverrunSignal"] <b>@_jobs.Count(job => job.IsOverrun)</b></span><span data-tone="warning">@L["Workspace:SkipSignal"] <b>@_jobs.Count(job => job.IsSkipping)</b></span></div></div>
+        <p class="scheduler-pulse__finding">@if (_sample is null) { @L["Common:Loading"] }
+        else if (_jobs.Any(job => job.NeedsAttention))
+        {
+            @L["Workspace:AttentionFinding"] @foreach (var job in _jobs.Where(job => job.NeedsAttention).Take(2)) { <a href="@JobSchedulerUiUrls.JobDefinition(job.Definition.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)">@job.Definition.EffectiveConfiguration.JobName</a> }
+        }
+        else { @L["Workspace:CalmFinding"] }
+        </p>
+    </div>
+    <div class="scheduler-pulse__scope"><span>@(_sample is null ? L["Common:Loading"] : L["Workspace:SampleScope", _sample.Records.Count, _sample.TotalCount])</span><div role="group" aria-label="@L["Analytics:Range:Title"]">@foreach (var minutes in new[] { 15, 60, 1440 }) { <button type="button" aria-pressed="@(_minutes == minutes)" @onclick="@(() => ChangeRangeAsync(minutes))">@L[$"Workspace:Windows:{minutes}"]</button> }</div></div>
+    <dl class="scheduler-pulse__facts"><div><dt>@L["Workspace:PublishedDefinitions"]</dt><dd>@Definitions.Count(definition => definition.IsPresent)</dd></div><div><dt>@L["ExecutionStates:Running"]</dt><dd data-tone="info">@StateCounts.GetValueOrDefault(JobExecutionState.Running)</dd></div><div><dt>@L["ExecutionStates:Queued"]</dt><dd>@StateCounts.GetValueOrDefault(JobExecutionState.Queued)</dd></div><div><dt>@L["Workspace:SampleFailures"]</dt><dd data-tone="error">@_jobs.Sum(job => job.FailedCount)</dd></div></dl>
+    <div class="scheduler-pulse__instrument">
+        <header><div><h2 id="scheduler-pulse-title">@L["Workspace:PulseTitle"]</h2><p>@L["Workspace:PulseDescription"]</p></div><label><span class="visually-hidden">@L["Catalog:Filters:Search"]</span><input type="search" placeholder="@L["Catalog:Filters:Search"]" value="@_filter" @oninput="ChangeSearchAsync" /></label></header>
+        @if (_error is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined">@_error</MudAlert> }
+        @if (_sample?.IsTruncated == true) { <p class="scheduler-pulse__limit">@L["Workspace:SampleTruncated"]</p> }
+        <div class="scheduler-pulse__legend">@foreach (var state in new[] { JobExecutionState.Succeeded, JobExecutionState.Failed, JobExecutionState.Running, JobExecutionState.Skipped }) { <span data-state="@state.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{state}"]</span> }<span><i class="is-plan"></i>@L["Workspace:Planned"]</span></div>
+        <div class="scheduler-pulse__lanes" aria-busy="@_loading">
+            @foreach (var job in VisibleJobs)
+            {
+                <div class="scheduler-pulse__row">
+                    <a class="scheduler-pulse__job" href="@JobSchedulerUiUrls.JobDefinition(job.Definition.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)" title="@job.Definition.OwnerKey"><b>@job.Definition.EffectiveConfiguration.JobName</b><small><i data-tone="@job.Tone"></i>@job.Definition.OwnerKey</small></a>
+                    <div class="scheduler-pulse__track">
+                        <span class="scheduler-pulse__future" aria-hidden="true"></span><span class="scheduler-pulse__now" aria-hidden="true"></span>
+                        @foreach (var record in job.Records)
+                        {
+                            <button type="button" class="scheduler-pulse__mark" data-state="@record.State.ToString().ToLowerInvariant()" style="@MarkStyle(record)" title="@RecordLabel(record)" aria-label="@RecordLabel(record)" @onclick="@(() => InspectAsync(record.InstanceId))"></button>
+                        }
+                        @foreach (var at in Plans(job.Definition)) { <span class="scheduler-pulse__plan" style="@($"left:{Position(at)}%")" title="@TimePresentation.FormatScheduleTimestamp(at)"></span> }
+                    </div>
+                    <span class="scheduler-pulse__tail">@if (job.Records.FirstOrDefault() is { } latest) { <b>@L[$"ExecutionStates:{latest.State}"]</b><small>@TimePresentation.FormatClock(latest.CreatedAtUtc)</small> } else { <small>@L["Catalog:History:NeverRun"]</small> }</span>
+                </div>
+            }
+            @if (!VisibleJobs.Any()) { <p class="scheduler-pulse__empty">@L["Catalog:Empty"]</p> }
+            <div class="scheduler-pulse__axis"><span>@TimePresentation.FormatClock(Start)</span><span>@L["Workspace:Now"] · @TimePresentation.FormatClock(_acceptedAt)</span><span>@TimePresentation.FormatClock(End)</span></div>
+        </div>
+        @if (FilteredJobs.Count() > 12) { <button type="button" class="scheduler-pulse__more" @onclick="@(() => _all = !_all)">@L[_all ? "Workspace:CollapseJobs" : "Workspace:ShowAllJobs", FilteredJobs.Count()]</button> }
+    </div>
+</section>
+
+@code {
+    /// <summary>Gets the caller's accepted definition sample. Definition publication is not a worker heartbeat.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobDefinition> Definitions { get; set; } = [];
+    /// <summary>Gets the parent's accepted observation instant; a failed parent refresh leaves it frozen.</summary>
+    [Parameter] public DateTimeOffset CapturedAtUtc { get; set; }
+    /// <summary>Gets whole-scope state counts from the same accepted overview, independently of timeline sample bounds.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<JobExecutionState, int> StateCounts { get; set; } = new Dictionary<JobExecutionState, int>();
+    /// <summary>Gets the route-held window size in minutes.</summary>
+    [Parameter] public int WindowMinutes { get; set; } = 60;
+    /// <summary>Gets the callback persisting the selected range in the route.</summary>
+    [Parameter] public EventCallback<int> WindowChanged { get; set; }
+    /// <summary>Gets the route-held name, key or owner search.</summary>
+    [Parameter] public string? Search { get; set; }
+    /// <summary>Gets the callback persisting the search without adding a history entry for every keystroke.</summary>
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private ExecutionDialogSession? _inspectors;
+    private SchedulerExecutionSample? _sample;
+    private IReadOnlyList<SchedulerJobEvidence> _jobs = [];
+    private int _minutes = 60, _acceptedMinutes = 60, _version;
+    private bool _loading, _all;
+    private string _filter = string.Empty;
+    private string? _error;
+    private DateTimeOffset _requestedAt, _acceptedAt;
+    private DateTimeOffset Start => _acceptedAt.AddMinutes(-_acceptedMinutes);
+    private DateTimeOffset End => _acceptedAt.AddMinutes(_acceptedMinutes / 3d);
+    private IEnumerable<SchedulerJobEvidence> FilteredJobs => _jobs.Where(job => string.IsNullOrEmpty(_filter)
+        || job.Definition.EffectiveConfiguration.JobName.Contains(_filter, StringComparison.CurrentCultureIgnoreCase)
+        || job.Definition.OwnerKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+        || job.Definition.Declaration.JobKey.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<SchedulerJobEvidence> VisibleJobs => FilteredJobs.Take(_all ? int.MaxValue : 12);
+    protected override void OnInitialized() => _inspectors = new(id => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, id), LoadAsync);
+    protected override Task OnParametersSetAsync()
+    {
+        _filter = Search ?? string.Empty;
+        var minutes = WindowMinutes is 15 or 60 or 1440 ? WindowMinutes : 60;
+        if (_requestedAt == CapturedAtUtc && _minutes == minutes) return Task.CompletedTask;
+        _minutes = minutes;
+        _requestedAt = CapturedAtUtc;
+        return LoadAsync();
+    }
+    private Task ChangeRangeAsync(int minutes) => WindowChanged.HasDelegate ? WindowChanged.InvokeAsync(minutes) : ChangeLocalRangeAsync(minutes);
+    private Task ChangeLocalRangeAsync(int minutes) { _minutes = minutes; return LoadAsync(); }
+    private Task ChangeSearchAsync(ChangeEventArgs args) { _filter = args.Value?.ToString() ?? string.Empty; return SearchChanged.InvokeAsync(_filter); }
+    private async Task LoadAsync()
+    {
+        if (_lifetime.IsRetired) return;
+        var version = ++_version;
+        var at = CapturedAtUtc;
+        var minutes = _minutes;
+        var definitions = Definitions.ToArray();
+        if (_sample is null) _acceptedAt = at;
+        _loading = true;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                if (!await Access.IsAuthorizedAsync(token))
+                {
+                    _lifetime.TryApply(() => { if (version == _version) { _jobs = []; _sample = null; _error = L["Access:DeniedDescription"]; } });
+                    return;
+                }
+                var sample = await SchedulerExecutionSample.LoadAsync(Facade, new JobExecutionQuery
+                {
+                    SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
+                }, token);
+                var activeResult = await Facade.QueryExecutionsAsync(new JobExecutionQuery { SchedulerScopeKey = string.Empty, States = [JobExecutionState.Queued, JobExecutionState.Running], CreatedBeforeUtc = at, PageSize = 200 }, token);
+                if (activeResult.IsFailed(out var activeError, out var active)) throw new InvalidOperationException(activeError.Message);
+                token.ThrowIfCancellationRequested();
+                var records = sample.Records.Concat(active.Items).DistinctBy(record => record.InstanceId, StringComparer.Ordinal).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+                var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at))
+                    .OrderByDescending(job => job.NeedsAttention).ThenByDescending(job => job.FailureStreak).ThenBy(job => job.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture).ToArray();
+                _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _jobs = jobs; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) _error = exception.Message; }); }
+        finally { _lifetime.TryApply(() => { if (version == _version) _loading = false; }); }
+    }
+    private async Task InspectAsync(string id)
+    {
+        if (_lifetime.IsRetired || _inspectors is not { } inspectors) return;
+        try { await _lifetime.RunAsync(async token => { if (await Access.IsAuthorizedAsync(token) && !_lifetime.IsRetired) await inspectors.OpenAsync(id); }); }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+    }
+    private string Position(DateTimeOffset at) => Math.Clamp((at - Start).TotalMilliseconds / (End - Start).TotalMilliseconds * 100, 0, 100).ToString("0.###", CultureInfo.InvariantCulture);
+    private string MarkStyle(JobExecutionInstance record)
+    {
+        var begin = record.StartedAtUtc ?? record.RecurringOccurrenceUtc ?? record.CreatedAtUtc;
+        var end = record.CompletedAtUtc ?? (record.State == JobExecutionState.Running ? _acceptedAt : begin);
+        var width = Math.Max(0, Math.Clamp((end - Start).TotalMilliseconds / (End - Start).TotalMilliseconds * 100, 0, 100) - double.Parse(Position(begin), CultureInfo.InvariantCulture));
+        return $"left:{Position(begin)}%;width:max(3px,{width.ToString("0.###", CultureInfo.InvariantCulture)}%);";
+    }
+    private IEnumerable<DateTimeOffset> Plans(JobDefinition definition)
+    {
+        if (!definition.IsPresent || definition.IsDisabled || definition.EffectiveConfiguration.Schedule is not { } schedule) return [];
+        return CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId, schedule.StartTimeUtc, schedule.EndTimeUtc, _acceptedAt).Occurrences.Select(item => item.Utc).Where(at => at <= End);
+    }
+    private string RecordLabel(JobExecutionInstance record) => $"{JobSchedulerUiPresentation.GetJobDisplayName(record.Template)} · {L[$"ExecutionStates:{record.State}"]} · {TimePresentation.FormatTimestamp(record.CreatedAtUtc)} · {TimePresentation.FormatExecutionDuration(record, _acceptedAt)}";
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        var inspectors = _inspectors?.DisposeAsync() ?? ValueTask.CompletedTask;
+        var operations = _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+        var failures = new List<Exception>();
+        foreach (var retirement in new[] { inspectors, operations })
+        {
+            try { await retirement; } catch (Exception exception) { failures.Add(exception); }
+        }
+        if (failures.Count > 0) throw new AggregateException("Scheduler pulse retirement failed.", failures);
+    }
+}

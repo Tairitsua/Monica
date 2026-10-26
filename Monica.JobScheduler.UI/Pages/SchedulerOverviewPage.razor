@@ -9,6 +9,7 @@
 @inject IOptions<ModuleJobSchedulerUIOption> UiOptions
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
+@inject NavigationManager Navigation
 
 @implements IAsyncDisposable
 
@@ -39,19 +40,7 @@
                 }
                 else if (_state.Overview is { } overview)
                 {
-                    <header class="overview-page__snapshot">
-                        <div class="overview-page__snapshot-time">
-                            <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" aria-hidden="true" />
-                            <time datetime="@((_state.LastRefreshedUtc ?? overview.CapturedAtUtc).ToString("O"))">
-                                @L["Overview:LastRefreshed", TimePresentation.FormatTimestamp(_state.LastRefreshedUtc ?? overview.CapturedAtUtc)]
-                            </time>
-                        </div>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                   StartIcon="@MoIcons.Refresh"
-                                   Disabled="@_state.IsLoading" OnClick="RefreshAsync">
-                            @L["Common:Refresh"]
-                        </MudButton>
-                    </header>
+                    <SchedulerSnapshotActions CapturedAtUtc="@(_state.LastRefreshedUtc ?? overview.CapturedAtUtc)" IsLoading="@_state.IsLoading" RefreshRequested="RefreshAsync" AutoRefreshEnabled="@(UiOptions.Value.AutoRefreshInterval > TimeSpan.Zero ? _state.AutoRefreshEnabled : (bool?)null)" AutoRefreshChanged="SetAutoRefresh" />
 
                     @if (_state.Error is not null)
                     {
@@ -60,12 +49,8 @@
                         </MudAlert>
                     }
 
-                    <SchedulerWorkloadSummary Overview="@overview" />
-
-                    <div class="overview-page__review">
-                        <SchedulerAttentionPanel Overview="@overview" />
-                        <ExecutionStateFlow Counts="@overview.ExecutionStateCounts" />
-                    </div>
+                    <SchedulerPulse Definitions="@overview.Definitions" CapturedAtUtc="@overview.CapturedAtUtc" StateCounts="@overview.ExecutionStateCounts"
+                                    WindowMinutes="@WindowMinutes" WindowChanged="SetWindow" Search="@Search" SearchChanged="SetSearch" />
 
                     <RecentExecutionsPanel Executions="@overview.RecentExecutions"
                                            IsRefreshing="@_state.IsLoading"
@@ -103,6 +88,15 @@
     private volatile bool _disposed;
     private readonly object _lifetimeGate = new();
     private TaskCompletionSource? _retirement;
+
+    /// <summary>Gets the route-held diagnostic window (15m, 1h, 24h).</summary>
+    [SupplyParameterFromQuery(Name = "window")] public string? Window { get; set; }
+    /// <summary>Gets the route-held pulse name, key or owner filter.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    private int WindowMinutes => Window switch { "15m" => 15, "24h" => 1440, _ => 60 };
+    private void SetWindow(int minutes) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("window", minutes == 15 ? "15m" : minutes == 1440 ? "24h" : "1h"));
+    private void SetSearch(string value) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", string.IsNullOrEmpty(value) ? null : value), replace: true);
+    private void SetAutoRefresh(bool enabled) { if (_state is { } state && !_disposed) state.SetAutoRefreshEnabled(enabled); }
 
     protected override async Task OnInitializedAsync()
     {

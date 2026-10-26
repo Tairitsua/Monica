@@ -1,0 +1,88 @@
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@inject IStringLocalizer<JobSchedulerResource> L
+@implements IAsyncDisposable
+
+<div class="analytics-scope">
+    <div class="analytics-scope__controls">
+        <MudSelect T="string" Value="@(Owner ?? string.Empty)" ValueChanged="SelectOwnerAsync"
+                   Label="@L["Catalog:Columns:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Disabled="@(_loading || CapturedAtUtc is null)" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+            <MudSelectItem T="string" Value="@string.Empty">@L["Catalog:Filters:AnyOwner"]</MudSelectItem>
+            @foreach (var owner in Owners)
+            {
+                <MudSelectItem T="string" Value="@owner">@owner</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" Value="@(Job ?? string.Empty)" ValueChanged="SelectJobAsync"
+                   Label="@L["Executions:Columns:Definition"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Disabled="@(_loading || CapturedAtUtc is null)" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+            <MudSelectItem T="string" Value="@string.Empty">@L["Workspace:AllJobs"]</MudSelectItem>
+            @foreach (var definition in Jobs)
+            {
+                <MudSelectItem T="string" Value="@definition.Declaration.JobKey">@definition.EffectiveConfiguration.JobName</MudSelectItem>
+            }
+            @if (Job is not null && !Jobs.Any(definition => definition.Declaration.JobKey == Job))
+            {
+                <MudSelectItem T="string" Value="@Job">@Job</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+    <p>@(_loading ? L["Common:Loading"] : _error ?? (_hasLoadedChoices ? L["Workspace:ScopeChoices", _definitions.Count, _total] : L["Common:NotAvailable"]))</p>
+</div>
+
+@code {
+    /// <summary>Gets the exact route-selected owner, which can be outside the bounded choice sample.</summary>
+    [Parameter] public string? Owner { get; set; }
+    /// <summary>Gets the exact route-selected job key.</summary>
+    [Parameter] public string? Job { get; set; }
+    /// <summary>Gets the callback that changes owner and clears its dependent job selection.</summary>
+    [Parameter] public EventCallback<string?> OwnerChanged { get; set; }
+    /// <summary>Gets the callback that persists an exact logical job key.</summary>
+    [Parameter] public EventCallback<string?> JobChanged { get; set; }
+    /// <summary>Gets the accepted analytics observation that requests fresh, independently sampled definition choices.</summary>
+    [Parameter] public DateTimeOffset? CapturedAtUtc { get; set; }
+
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private IReadOnlyList<JobDefinition> _definitions = [];
+    private DateTimeOffset? _requestedAt;
+    private int _total, _version;
+    private bool _loading, _hasLoadedChoices;
+    private string? _error;
+    private IEnumerable<string> Owners => _definitions.Select(definition => definition.OwnerKey)
+        .Concat(Owner is null ? [] : new[] { Owner }).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+    private IEnumerable<JobDefinition> Jobs => _definitions.Where(definition => Owner is null || definition.OwnerKey == Owner)
+        .DistinctBy(definition => definition.Declaration.JobKey, StringComparer.Ordinal)
+        .OrderBy(definition => definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_lifetime.IsRetired || CapturedAtUtc is null || CapturedAtUtc == _requestedAt) return;
+        _requestedAt = CapturedAtUtc;
+        var version = ++_version;
+        _loading = true;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                if (!await Access.IsAuthorizedAsync(token))
+                {
+                    _lifetime.TryApply(() => { if (version == _version) { _definitions = []; _error = L["Access:DeniedDescription"]; } });
+                    return;
+                }
+                var result = await Facade.QueryDefinitionsAsync(new JobDefinitionQuery { PageSize = 200, SortField = JobDefinitionSortField.OwnerKey }, token);
+                token.ThrowIfCancellationRequested();
+                if (result.IsFailed(out var error, out var page)) throw new InvalidOperationException(error.Message);
+                _lifetime.TryApply(() => { if (version == _version) { _definitions = page.Items; _total = page.TotalCount; _hasLoadedChoices = true; _error = null; } });
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) _error = exception.Message; }); }
+        finally { _lifetime.TryApply(() => { if (version == _version) _loading = false; }); }
+    }
+
+    private Task SelectOwnerAsync(string value) => OwnerChanged.InvokeAsync(string.IsNullOrEmpty(value) ? null : value);
+    private Task SelectJobAsync(string value) => JobChanged.InvokeAsync(string.IsNullOrEmpty(value) ? null : value);
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+}

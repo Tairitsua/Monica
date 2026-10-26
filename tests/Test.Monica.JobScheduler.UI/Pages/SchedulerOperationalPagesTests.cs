@@ -486,7 +486,7 @@ public sealed class SchedulerOperationalPagesTests
     }
 
     [Fact]
-    public async Task ExecutionDetail_ShouldRenderTimingPolicyLeaseHistoryAndDiagnosticActions()
+    public async Task ExecutionDetail_ShouldPreserveRetainedEvidenceAndOpenIndependentJob()
     {
         await using var context = new JobSchedulerUiTestContext();
         var execution = await context.Store.EnqueueAsync(new JobEnqueueRequest
@@ -510,19 +510,10 @@ public sealed class SchedulerOperationalPagesTests
         var provider = context.DialogProvider;
         provider.WaitForAssertion(() =>
         {
-            provider.Markup.Should().Contain(execution.InstanceId);
-            provider.Find(".execution-detail__viewport").Should().NotBeNull();
-            provider.Find(".execution-detail-hero").Should().NotBeNull();
-            provider.FindAll(".execution-evidence__panel").Should().HaveCount(5);
-            provider.Markup.Should().Contain("ExecutionDetail:PolicySnapshot");
-            provider.Markup.Should().Contain("ExecutionDetail:Timing");
-            provider.Markup.Should().Contain("ExecutionDetail:LeaseLosses");
-            provider.Markup.Should().Contain("ExecutionDetail:Actions:CopySnapshot");
+            provider.FindComponent<ExecutionEvidenceFacts>().Instance.Execution.InstanceId.Should().Be(execution.InstanceId);
+            provider.FindComponent<ExecutionDetailHero>().Instance.Execution.Template.Should().BeEquivalentTo(execution.Template);
         });
 
-        await provider.FindAll("[role='tab']")
-            .Single(tab => tab.TextContent.Contains("ExecutionDetail:Tabs:History", StringComparison.Ordinal))
-            .ClickAsync();
         var stored = await context.Store.GetExecutionAsync(JobSchedulerUiTestContext.SCOPE,
             execution.InstanceId, Xunit.TestContext.Current.CancellationToken);
         provider.FindComponent<ExecutionHistoryLedger>().Instance.Entries.Should().BeEquivalentTo(stored!.History);
@@ -530,8 +521,8 @@ public sealed class SchedulerOperationalPagesTests
         await context.PopoverProvider.FindAll("[role='menuitem']")
             .Single(button => button.TextContent.Contains("ExecutionDetail:Actions:ViewCatalog", StringComparison.Ordinal))
             .ClickAsync();
-        navigation.Uri.Should().EndWith(
-            $"/job-scheduler/catalog/{Uri.EscapeDataString(execution.Template.OwnerKey)}/{Uri.EscapeDataString(execution.Template.JobKey)}");
+        new Uri(navigation.Uri).AbsolutePath.Should().Be(
+            $"/job-scheduler/jobs/{Uri.EscapeDataString(execution.Template.OwnerKey)}/{Uri.EscapeDataString(execution.Template.JobKey)}");
     }
 
     [Fact]

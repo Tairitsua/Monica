@@ -1,11 +1,19 @@
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Components.Dialogs
 
-<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
+<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0"
+           Style="position:fixed;inset-block:0;inset-inline-end:0;width:min(520px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;">
     <TitleContent>
         <div class="execution-detail__dialog-title">
             <MoIcon Icon="@MoIcons.ClipboardCheck" Size="1.5rem" />
-            <MoDialogHeading Text="@L["ExecutionDetail:Title"]" />
+            <div class="execution-detail__identity">
+                <p>@L["ExecutionDetail:Title"] · @(_state?.Execution is { } selected ? JobSchedulerUiPresentation.GetJobDisplayName(selected.Template) : "—")</p>
+                <MoDialogHeading Text="@($"#{JobSchedulerUiPresentation.ShortIdentity(InstanceId)}")" />
+                @if (_state?.Execution is { } headerExecution)
+                {
+                    <div class="execution-detail__flags"><span data-state="@headerExecution.State.ToString().ToLowerInvariant()">@L[$"ExecutionStates:{headerExecution.State}"]</span><small>@L[$"ExecutionOrigins:{headerExecution.Origin}"]</small></div>
+                }
+            </div>
             <MudTooltip Text="@L["Common:Refresh"]">
                 <MudIconButton Icon="@MoIcons.Refresh" aria-disabled="@(_state is null || _state.IsLoading ? "true" : "false")"
                                OnClick="RefreshAsync" aria-label="@L["Common:Refresh"]" />
@@ -57,20 +65,20 @@
                     @if (execution.CancellationRequestedAtUtc.HasValue && !execution.IsTerminal)
                     {
                         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Warning">
-                            @L["ExecutionDetail:CancellationPending", TimePresentation.FormatTimestamp(execution.CancellationRequestedAtUtc)]
+                            @L["ExecutionDetail:CancellationPending", TimePresentation.FormatExecutionTimestamp(execution.CancellationRequestedAtUtc)]
                         </MudAlert>
                     }
-                    <ExecutionDetailHero Execution="@execution" ObservedAtUtc="@observedAtUtc" />
-                    <div class="execution-detail__tabs">
-                        <MudTabs Elevation="0" Rounded="false" Border="false" MinimumTabWidth="120px" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
-                            <MudTabPanel Text="@L["ExecutionDetail:Tabs:Evidence"]">
-                                <ExecutionEvidenceFacts Execution="@execution" ObservedAtUtc="@observedAtUtc" />
-                            </MudTabPanel>
-                            <MudTabPanel Text="@L["ExecutionDetail:Tabs:History", execution.History.Count]">
-                                <ExecutionHistoryLedger Entries="@execution.History" />
-                            </MudTabPanel>
-                        </MudTabs>
+                    <div class="execution-detail__destinations">
+                        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="CopyInstanceIdAsync">@L["Workspace:CopyId"]</MudButton>
+                        @if (!Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.StartsWith(JobExecutionsPage.PAGE_URL, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.ArrowRight" OnClick="OpenExecutionLedger">@L["Workspace:OpenLedger"]</MudButton>
+                        }
+                        <MudButton Variant="Variant.Text" StartIcon="@MoIcons.ArrowUpRight" OnClick="OpenJobDetails">@L["ExecutionDetail:Actions:ViewCatalog"]</MudButton>
                     </div>
+                    <ExecutionDetailHero Execution="@execution" ObservedAtUtc="@observedAtUtc" />
+                    <ExecutionHistoryLedger Entries="@execution.History" />
+                    <ExecutionEvidenceFacts Execution="@execution" ObservedAtUtc="@observedAtUtc" />
                 </div>
             }
             else

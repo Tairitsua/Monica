@@ -44,7 +44,9 @@ internal sealed class SchedulerStatisticsPageStateFactory(
     /// <summary>
     /// Creates a fresh cross-job analytics session.
     /// </summary>
-    public SchedulerStatisticsPageState Create() => new(facade, access, timeProvider, timePresentation);
+    public SchedulerStatisticsPageState Create(string? ownerKey = null, string? jobKey = null,
+        SchedulerAnalyticsTimeRange range = SchedulerAnalyticsTimeRange.Last24Hours) =>
+        new(facade, access, timeProvider, timePresentation, ownerKey, jobKey, range);
 }
 
 /// <summary>
@@ -65,17 +67,22 @@ public sealed class SchedulerStatisticsPageState : IAsyncDisposable
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private int _loadVersion;
     private int _accessVersion;
+    private string? _ownerKey, _jobKey;
 
     internal SchedulerStatisticsPageState(
         JobSchedulerFacade facade,
         IJobSchedulerUiAccess access,
         TimeProvider timeProvider,
-        SchedulerTimePresentation timePresentation)
+        SchedulerTimePresentation timePresentation, string? ownerKey = null, string? jobKey = null,
+        SchedulerAnalyticsTimeRange range = SchedulerAnalyticsTimeRange.Last24Hours)
     {
         _facade = facade;
         _access = access;
         _timeProvider = timeProvider;
         _timePresentation = timePresentation;
+        _ownerKey = ownerKey;
+        _jobKey = jobKey;
+        TimeRange = range;
     }
 
     /// <summary>
@@ -164,6 +171,16 @@ public sealed class SchedulerStatisticsPageState : IAsyncDisposable
     /// <exception cref="OperationCanceledException">The session has retired or its read is canceled.</exception>
     public Task RefreshAsync() => _lifetime.RunAsync(token => AdmitRefresh(TimeRange, token));
 
+    /// <summary>Replaces the exact owner/job and preset intent, clearing evidence from the previous scope.</summary>
+    /// <remarks>Owner and job identities remain opaque. Each replacement is captured before asynchronous authorization.</remarks>
+    public Task SetQueryAsync(string? ownerKey, string? jobKey, SchedulerAnalyticsTimeRange range) =>
+        _lifetime.RunAsync(token =>
+        {
+            if (!Enum.IsDefined(range)) throw new ArgumentOutOfRangeException(nameof(range));
+            if (!_lifetime.TryApply(() => { _ownerKey = ownerKey; _jobKey = jobKey; ClearSnapshot(); })) throw new OperationCanceledException(token);
+            return AdmitRefresh(range, token);
+        });
+
     /// <summary>Checks current access before opening native inspection without loading analytics.</summary>
     /// <remarks>Denial or provider failure invalidates earlier authorized reads and clears inaccessible evidence.</remarks>
     /// <exception cref="OperationCanceledException">The session has retired or its check is canceled.</exception>
@@ -190,7 +207,7 @@ public sealed class SchedulerStatisticsPageState : IAsyncDisposable
             })) throw new OperationCanceledException(token);
         if (version == 0) return Task.CompletedTask;
         JobExecutionAnalyticsQuery query;
-        try { query = CreateQuery(range, _timeProvider.GetUtcNow(), _timePresentation); }
+        try { query = CreateQuery(range, _timeProvider.GetUtcNow(), _timePresentation, _jobKey, _ownerKey); }
         catch (Exception exception)
         {
             if (!_lifetime.TryApply(() =>

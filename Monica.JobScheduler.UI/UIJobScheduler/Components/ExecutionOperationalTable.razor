@@ -1,3 +1,4 @@
+@inject NavigationManager Navigation
 @using Monica.JobScheduler.UI.Localization
 
 <section class="execution-ledger @(HasLoadedSnapshot ? null : "execution-ledger--unavailable")" aria-labelledby="execution-ledger-title">
@@ -8,23 +9,13 @@
             @if (HasLoadedSnapshot)
             {
                 <p>@L["Executions:Count", TotalCount]</p>
-                @if (ObservedAtUtc.HasValue)
-                {
-                    <p class="execution-ledger__observation">@L["Executions:LastRefreshed", TimePresentation.FormatTimestamp(ObservedAtUtc)]</p>
-                }
             }
             else
             {
                 <p>@L[IsQueryFailed ? "Executions:SnapshotUnavailable" : "Executions:SnapshotPending"]</p>
             }
         </div>
-        <div class="execution-ledger__heading-actions">
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       StartIcon="@MoIcons.Refresh"
-                       Disabled="@(IsLoading || CommandsDisabled)"
-                       OnClick="ReloadAsync">@L["Common:Refresh"]</MudButton>
-        </div>
+
     </header>
 
     @if (FilterContent is not null)
@@ -68,89 +59,32 @@
                   T="ExecutionPresentationRow"
                   ServerData="LoadServerDataAsync"
                   RowsPerPage="@PageSize"
-                  Dense="false"
+                  Dense="true"
                   Hover="true"
                   Breakpoint="Breakpoint.Xs"
                   TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Executions:Title"].Value })"
-                  HorizontalScrollbar="true"
+                  HorizontalScrollbar="false"
                   Elevation="0"
                   Square="true">
-            <ColGroup>
-                <col class="execution-ledger__identity-column" />
-                <col class="execution-ledger__state-column" />
-                <col class="execution-ledger__evidence-column" />
-                <col class="execution-ledger__actions-column" />
-            </ColGroup>
+            <ColGroup><col class="execution-ledger__state-column" /><col class="execution-ledger__identity-column" /><col class="execution-ledger__recorded-column" /><col class="execution-ledger__duration-column" /><col class="execution-ledger__attempt-column" /><col class="execution-ledger__instance-column" /></ColGroup>
             <HeaderContent>
-                <MudTh>@L["Executions:Columns:Definition"]</MudTh>
-                <MudTh>@L["Executions:Columns:StateAndRecorded"]</MudTh>
-                <MudTh>@L["Executions:Columns:AttemptEvidence"]</MudTh>
-                <MudTh Class="execution-ledger__actions-heading">@L["Executions:Columns:Actions"]</MudTh>
+                <MudTh>@L["Executions:Columns:State"]</MudTh><MudTh>@L["Executions:Columns:Definition"]</MudTh><MudTh>@L["Executions:Columns:Created"]</MudTh><MudTh>@L["Executions:Columns:Duration"]</MudTh><MudTh>@L["Workspace:ClaimsAndFailures"]</MudTh><MudTh>@L["ExecutionDetail:Instance"]</MudTh>
             </HeaderContent>
             <RowTemplate>
                 @if (HasLoadedSnapshot)
                 {
-                var execution = context.Capture;
-                <MudTd Class="execution-ledger__identity-cell" DataLabel="@L["Executions:Columns:Definition"]">
-                    <div class="execution-ledger__identity">
-                        <button type="button"
-                                class="execution-ledger__name"
-                                disabled="@CommandsDisabled"
-                                aria-label="@L["Executions:Actions:OpenDetailsFor", JobSchedulerUiPresentation.GetJobDisplayName(execution.Template), execution.InstanceId]"
-                                @onclick="@(() => InspectAsync(execution))">@JobSchedulerUiPresentation.GetJobDisplayName(execution.Template)</button>
-                        <code class="execution-ledger__instance" title="@execution.InstanceId">@execution.InstanceId</code>
-                        <dl class="execution-ledger__identity-facts">
-                            <div><dt>@L["ExecutionDetail:Job"]</dt><dd><code>@execution.Template.JobKey</code></dd></div>
-                            <div><dt>@L["ExecutionDetail:Owner"]</dt><dd><code>@execution.Template.OwnerKey</code></dd></div>
-                        </dl>
-                    </div>
-                </MudTd>
-                <MudTd Class="execution-ledger__state-cell" DataLabel="@L["Executions:Columns:StateAndRecorded"]">
-                    <div class="execution-ledger__state-evidence">
-                        <span class="execution-ledger__state" data-state="@execution.State.ToString().ToLowerInvariant()">
-                            <MoIcon Icon="@GetStateIcon(execution.State)" Size="1.25rem" />
-                            @L[$"ExecutionStates:{execution.State}"]
-                        </span>
-                        <dl class="execution-ledger__facts">
-                            <div><dt>@L["Executions:Columns:Created"]</dt><dd><time datetime="@execution.CreatedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(execution.CreatedAtUtc)</time></dd></div>
-                            <div><dt>@L["ExecutionDetail:Origin"]</dt><dd>@L[$"ExecutionOrigins:{execution.Origin}"]</dd></div>
-                        </dl>
-                    </div>
-                </MudTd>
-                <MudTd Class="execution-ledger__evidence-cell" DataLabel="@L["Executions:Columns:AttemptEvidence"]">
-                    <div class="execution-ledger__claim-counts">
-                        <dl><dt>@L["Executions:Evidence:Claims"]</dt><dd class="execution-ledger__count">@execution.ExecutionAttempt</dd></dl>
-                        <dl><dt>@L["Executions:Evidence:ConsumedFailures"]</dt><dd class="execution-ledger__count">@execution.RetryAttempt</dd></dl>
-                    </div>
-                    <dl class="execution-ledger__facts">
-                        <div><dt>@L["Executions:Columns:Worker"]</dt><dd><code>@(execution.RunningWorkerInstanceId ?? L["Executions:Evidence:NoCurrentWorker"])</code></dd></div>
-                        <div><dt>@L["Executions:Columns:Duration"]</dt><dd>@FormatDuration(execution)</dd></div>
-                    </dl>
-                </MudTd>
-                <MudTd Class="execution-ledger__actions-cell" DataLabel="@L["Executions:Columns:Actions"]">
-                    <div class="execution-ledger__actions">
-                        <MudTooltip Text="@L["Executions:Actions:Details"]">
-                            <MudIconButton Icon="@MoIcons.Info"
-                                           Color="Color.Primary"
-                                           Size="Size.Small"
-                                           Disabled="@CommandsDisabled"
-                                           OnClick="@(() => InspectAsync(execution))"
-                                           aria-label="@L["Executions:Actions:OpenDetailsFor", JobSchedulerUiPresentation.GetJobDisplayName(execution.Template), execution.InstanceId]" />
-                        </MudTooltip>
+                    var execution = context.Capture;
+                    <MudTd DataLabel="@L["Executions:Columns:State"]"><button type="button" class="execution-ledger__state" data-state="@execution.State.ToString().ToLowerInvariant()" disabled="@CommandsDisabled" aria-label="@L["Executions:Actions:OpenDetailsFor", JobSchedulerUiPresentation.GetJobDisplayName(execution.Template), execution.InstanceId]" @onclick="@(() => InspectAsync(execution))"><i></i>@L[$"ExecutionStates:{execution.State}"]</button></MudTd>
+                    <MudTd DataLabel="@L["Executions:Columns:Definition"]"><div class="execution-ledger__identity"><a class="execution-ledger__name" href="@JobSchedulerUiUrls.JobDefinition(new JobId(execution.Template.OwnerKey, execution.Template.JobKey), Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)">@JobSchedulerUiPresentation.GetJobDisplayName(execution.Template)</a><small class="execution-ledger__owner">@execution.Template.OwnerKey</small></div></MudTd>
+                    <MudTd DataLabel="@L["Executions:Columns:Created"]"><div class="execution-ledger__recorded"><time datetime="@execution.CreatedAtUtc.ToString("O")" title="@TimePresentation.FormatTimestamp(execution.CreatedAtUtc)">@(ObservedAtUtc is { } at ? TimePresentation.FormatListTimestamp(execution.CreatedAtUtc, at) : TimePresentation.FormatTimestamp(execution.CreatedAtUtc))</time><small>@L[$"ExecutionOrigins:{execution.Origin}"]</small></div></MudTd>
+                    <MudTd Class="execution-ledger__number" DataLabel="@L["Executions:Columns:Duration"]">@FormatDuration(execution)</MudTd>
+                    <MudTd Class="execution-ledger__number" DataLabel="@L["Workspace:ClaimsAndFailures"]"><span title="@($"{L["Executions:Evidence:Claims"]}: {execution.ExecutionAttempt} · {L["Executions:Evidence:ConsumedFailures"]}: {execution.RetryAttempt}")">@execution.ExecutionAttempt / @execution.RetryAttempt</span></MudTd>
+                    <MudTd DataLabel="@L["ExecutionDetail:Instance"]"><div class="execution-ledger__actions"><button type="button" class="execution-ledger__instance" title="@execution.InstanceId" disabled="@CommandsDisabled" aria-label="@L["Executions:Actions:OpenDetailsFor", JobSchedulerUiPresentation.GetJobDisplayName(execution.Template), execution.InstanceId]" @onclick="@(() => InspectAsync(execution))">@JobSchedulerUiPresentation.ShortIdentity(execution.InstanceId)</button>
                         @if (!execution.IsTerminal || context.RetainCancellationOpener)
                         {
-                            <MudTooltip Text="@L["Executions:Actions:Cancel"]">
-                                <MudIconButton Icon="@MoIcons.StopCircle"
-                                               Color="Color.Warning"
-                                               Size="Size.Small"
-                                               Disabled="@CommandsDisabled"
-                                               aria-disabled="@((CommandsDisabled || execution.IsTerminal) ? "true" : "false")"
-                                               OnClick="@(() => RequestCancellationAsync(context, execution))"
-                                               aria-label="@L["Executions:Actions:CancelFor", execution.InstanceId]" />
-                            </MudTooltip>
+                            <MudTooltip Text="@L["Executions:Actions:Cancel"]"><MudIconButton Icon="@MoIcons.StopCircle" Color="Color.Warning" Size="Size.Small" Disabled="@CommandsDisabled" aria-disabled="@((CommandsDisabled || execution.IsTerminal) ? "true" : "false")" OnClick="@(() => RequestCancellationAsync(context, execution))" aria-label="@L["Executions:Actions:CancelFor", execution.InstanceId]" /></MudTooltip>
                         }
-                    </div>
-                </MudTd>
+                    </div></MudTd>
                 }
             </RowTemplate>
             <LoadingContent>

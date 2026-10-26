@@ -38,35 +38,18 @@
             else
             {
                 <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
-                    <section class="runtime-observation" aria-label="@L["Runtime:Observation:Title"]" aria-busy="@(state.IsLoading ? "true" : "false")">
-                        <dl>
-                            <div>
-                                <dt>@L["Runtime:Observation:Captured"]</dt>
-                                <dd><time datetime="@state.Overview?.CapturedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(state.Overview?.CapturedAtUtc)</time></dd>
-                            </div>
-                            <div>
-                                <dt>@L["Runtime:Observation:Accepted"]</dt>
-                                <dd><time datetime="@state.LastRefreshedUtc?.ToString("O")">@TimePresentation.FormatTimestamp(state.LastRefreshedUtc)</time></dd>
-                            </div>
-                            <div>
-                                <dt>@L["Runtime:Observation:Cadence"]</dt>
-                                <dd>@(UiOptions.Value.AutoRefreshInterval > TimeSpan.Zero ? SchedulerRuntimePresentation.FormatInterval(UiOptions.Value.AutoRefreshInterval, L) : L["Runtime:Observation:Manual"])</dd>
-                            </div>
-                        </dl>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@state.IsLoading" OnClick="RefreshAsync">@L["Common:Refresh"]</MudButton>
-                    </section>
+                    <SchedulerSnapshotActions CapturedAtUtc="@state.Overview?.CapturedAtUtc" IsLoading="@state.IsLoading" RefreshRequested="RefreshAsync" />
+
                     @if (state.IsLoading)
                     {
                         <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="@L["Common:Loading"]" />
                     }
                     @if (state.Overview is { } overview)
                     {
-                        <div class="runtime-page__host-grid">
-                            <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
-                            <SchedulerRuntimeIdentityCard Overview="@overview" />
-                        </div>
+                        <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
                         <SchedulerOwnerInsightTable Overview="@overview" />
                         <SchedulerCoordinatorTable Snapshot="@overview.Coordination" />
+                        <details class="runtime-page__identity"><summary>@L["Runtime:Identity:Title"]</summary><SchedulerRuntimeIdentityCard Overview="@overview" /></details>
                     }
                     else if (state.IsQueryFailed && !state.IsLoading)
                     {
@@ -106,7 +89,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var state = PageStateFactory.Create(UiOptions.Value.AutoRefreshInterval);
+        var state = PageStateFactory.Create(TimeSpan.Zero);
         _state = state;
         state.Changed += OnStateChangedAsync;
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }

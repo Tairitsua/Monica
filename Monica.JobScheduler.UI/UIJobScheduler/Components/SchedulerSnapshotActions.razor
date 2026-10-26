@@ -1,0 +1,29 @@
+@using Microsoft.AspNetCore.Components.Sections
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+
+<SectionContent SectionId="@ActionsKey">
+    <div class="snapshot-actions">
+        <div class="snapshot-actions__stamp"><span>@L["Workspace:Captured"]</span><time datetime="@CapturedAtUtc?.ToString("O")" title="@TimePresentation.FormatTimestamp(CapturedAtUtc)">@TimePresentation.FormatClock(CapturedAtUtc)</time></div>
+        @if (AutoRefreshEnabled is { } automatic)
+        {
+            <button type="button" class="snapshot-actions__auto" aria-pressed="@automatic" @onclick="@(() => AutoRefreshChanged.InvokeAsync(!automatic))"><i class="@(automatic ? "is-live" : null)"></i>@L[automatic ? "Workspace:AutoRefresh" : "Workspace:AutoPaused"]</button>
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@IsLoading" OnClick="RefreshRequested">@L["Common:Refresh"]</MudButton>
+    </div>
+</SectionContent>
+
+@code {
+    /// <summary>Gets the workspace-owned section identity; a snapshot action group is owned by its containing SchedulerWorkspace.</summary>
+    [CascadingParameter(Name = "SchedulerWorkspaceActions")] public object ActionsKey { get; set; } = new();
+    /// <summary>Gets the instant belonging to accepted evidence, rather than the last attempted refresh.</summary>
+    [Parameter] public DateTimeOffset? CapturedAtUtc { get; set; }
+    /// <summary>Gets whether refresh admission is currently pending.</summary>
+    [Parameter] public bool IsLoading { get; set; }
+    /// <summary>Gets the callback for manually refreshing the current route owner.</summary>
+    [Parameter] public EventCallback RefreshRequested { get; set; }
+    /// <summary>Gets optional automatic-refresh state; null hides a control on manually refreshed routes.</summary>
+    [Parameter] public bool? AutoRefreshEnabled { get; set; }
+    /// <summary>Gets the callback for pausing or resuming future timer refreshes.</summary>
+    [Parameter] public EventCallback<bool> AutoRefreshChanged { get; set; }
+}

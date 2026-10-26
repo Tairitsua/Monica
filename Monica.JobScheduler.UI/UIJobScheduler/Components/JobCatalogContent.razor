@@ -5,12 +5,16 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<JobSchedulerResource> L
+@inject NavigationManager Navigation
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.State
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
 
 @implements IAsyncDisposable
 
     @if (_state is not null)
     {
         <SchedulerAccessBoundary AccessChecked="@_state.AccessChecked" IsAuthorized="@_state.IsAuthorized">
+            <SchedulerSnapshotActions CapturedAtUtc="@_state.ObservedAtUtc" IsLoading="@(_state.IsLoading || _state.IsMutating)" RefreshRequested="RefreshCatalogAsync" />
             <div class="catalog-page">
                 @if (_state.Error is not null)
                 {
@@ -23,6 +27,10 @@
                 @if (_state.PresentFilter == false)
                 {
                     <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Catalog:AbsentViewNotice"]</MudAlert>
+                }
+                @if (_state.HasLoadedFacets)
+                {
+                    <SchedulerCatalogComposition Definitions="@_state.Definitions" ObservedAtUtc="@_state.ObservedAtUtc.GetValueOrDefault()" />
                 }
                 <JobCatalogOperationalTable @ref="_catalogTable"
                                             ServerData="@_state.LoadTableAsync"
@@ -37,7 +45,7 @@
                                             AllRecurringSelectionChanged="SetAllRecurringSelection"
                                             SelectionToggled="ToggleSelection"
                                             DisabledStateToggled="ToggleDisabledAsync"
-                                            RunRequested="RunJobAsync">
+                                            RunRequested="RunJobAsync" ExecutionSelected="OpenExecution">
                     <FilterContent>
                         <CatalogFilterBar SearchText="@_state.SearchText"
                                           SearchTextChanged="@(value => _state.SearchText = value)"
@@ -60,8 +68,8 @@
     }
 @code {
     /// <summary>
-    /// Gets or sets the optional presence deep-link filter. The catalog defaults to definitions their owners
-    /// currently publish; <c>?present=false</c> initially lists all job types whose owners no longer publish them,
+    /// Gets or sets the optional presence deep-link filter. The catalog includes published and retained definitions;
+    /// <c>?present=false</c> initially lists all job types whose owners no longer publish them,
     /// as linked from the overview attention panel.
     /// </summary>
     [Parameter]
@@ -73,6 +81,15 @@
     [Parameter]
     public string? Owner { get; set; }
 
+    /// <summary>Gets the initial route-held job type.</summary>
+    [Parameter] public string? InitialType { get; set; }
+    /// <summary>Gets the initial route-held effective disabled state.</summary>
+    [Parameter] public bool? InitialDisabled { get; set; }
+    /// <summary>Gets the initial route-held definition search.</summary>
+    [Parameter] public string? InitialSearch { get; set; }
+    /// <summary>Gets the route-owned exact execution selection; changing it preserves the current catalog state.</summary>
+    [Parameter] public string? InitialInstanceId { get; set; }
+
     private JobCatalogPageState? _state;
     private JobCatalogOperationalTable? _catalogTable;
     private readonly object _lifetimeGate = new();
@@ -80,6 +97,9 @@
     private volatile bool _disposed;
     private SchedulerDialogSession<CatalogBatchRequest>? _batchDialogs;
     private SchedulerDialogSession<CatalogTriggerRequest>? _triggerDialogs;
+    private ExecutionDialogSession? _inspectors;
+    private string? _requestedInstanceId;
+    private int _inspectorVersion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,7 +108,39 @@
         _state = PageStateFactory.Create(UiOptions.Value.DefaultPageSize);
         _state.Changed += OnStateChangedAsync;
         _state.ApplyInitialQuery(Present, Owner);
+        _state.SelectedJobType = Enum.TryParse<JobType>(InitialType, true, out var type) && Enum.IsDefined(type) ? type : null;
+        _state.SelectedDisabledState = InitialDisabled;
+        _state.SearchText = InitialSearch;
         await _state.InitializeAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_disposed || _requestedInstanceId == InitialInstanceId || _state is not { } state) return;
+        var id = InitialInstanceId;
+        _requestedInstanceId = id;
+        var version = ++_inspectorVersion;
+        var previous = _inspectors;
+        _inspectors = null;
+        if (previous is not null) await previous.DisposeAsync();
+        if (_disposed || version != _inspectorVersion || string.IsNullOrWhiteSpace(id)) return;
+        var inspectors = new ExecutionDialogSession(exactId => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, exactId),
+            () => InspectorClosedAsync(id, version));
+        _inspectors = inspectors;
+        try
+        {
+            if (await state.ReauthorizeAsync() && !_disposed && version == _inspectorVersion) await inspectors.OpenAsync(id);
+        }
+        catch (OperationCanceledException) when (_disposed || state.IsDisposed) { }
+    }
+
+    private void OpenExecution(string id) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("instanceId", id));
+
+    private async Task InspectorClosedAsync(string id, int version)
+    {
+        if (_disposed || version != _inspectorVersion || _requestedInstanceId != id) return;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("instanceId", (string?)null), replace: true);
+        await ReloadTableAsync();
     }
 
     private Task OnStateChangedAsync() => _disposed ? Task.CompletedTask : InvokeAsync(() =>
@@ -120,11 +172,28 @@
     private async Task SearchAsync()
     {
         _state?.Search();
+        if (_state is { } state)
+        {
+            var url = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+            {
+                ["owner"] = state.OwnerId, ["type"] = state.SelectedJobType?.ToString(), ["paused"] = state.SelectedDisabledState,
+                ["q"] = string.IsNullOrEmpty(state.SearchText) ? null : state.SearchText
+            });
+            if (url != Navigation.Uri) { Navigation.NavigateTo(url); return; }
+        }
         await ReloadFromFirstPageAsync();
+    }
+
+    private async Task RefreshCatalogAsync()
+    {
+        if (_state is not { } state || _disposed) return;
+        try { await state.RefreshCompositionAsync(); await ReloadTableAsync(); }
+        catch (OperationCanceledException) when (_disposed || state.IsDisposed) { }
     }
 
     private async Task ResetAsync()
     {
+        if (Navigation.ToAbsoluteUri(Navigation.Uri).Query.Length > 0) { Navigation.NavigateTo(JobCatalogPage.PAGE_URL); return; }
         _state?.Reset();
         await ReloadFromFirstPageAsync();
     }
@@ -132,13 +201,13 @@
     private async Task SelectJobTypeAsync(JobType? jobType)
     {
         _state?.SelectJobType(jobType);
-        await ReloadFromFirstPageAsync();
+        await SearchAsync();
     }
 
     private async Task SelectDisabledStateAsync(bool? disabled)
     {
         _state?.SelectDisabledState(disabled);
-        await ReloadFromFirstPageAsync();
+        await SearchAsync();
     }
 
     private Task ReloadFromFirstPageAsync() =>
@@ -353,12 +422,13 @@
         }
         var batchRetirement = _batchDialogs?.DisposeAsync() ?? ValueTask.CompletedTask;
         var triggerRetirement = _triggerDialogs?.DisposeAsync() ?? ValueTask.CompletedTask;
-        _ = CompleteRetirementAsync(state, batchRetirement, triggerRetirement, completion);
+        var inspectorRetirement = _inspectors?.DisposeAsync() ?? ValueTask.CompletedTask;
+        _ = CompleteRetirementAsync(state, batchRetirement, triggerRetirement, inspectorRetirement, completion);
         return new(completion.Task);
     }
 
     private async Task CompleteRetirementAsync(JobCatalogPageState? state, ValueTask batches,
-        ValueTask triggers, TaskCompletionSource completion)
+        ValueTask triggers, ValueTask inspectors, TaskCompletionSource completion)
     {
         var failures = new List<Exception>();
         // Start state retirement before joining native results so admitted authorization and mutation can cancel.
@@ -366,6 +436,7 @@
         var stateRetirement = state?.DisposeAsync() ?? ValueTask.CompletedTask;
         try { await batches; } catch (Exception exception) { failures.Add(exception); }
         try { await triggers; } catch (Exception exception) { failures.Add(exception); }
+        try { await inspectors; } catch (Exception exception) { failures.Add(exception); }
         try { await stateRetirement; } catch (Exception exception) { failures.Add(exception); }
         if (failures.Count == 0) completion.TrySetResult();
         else completion.TrySetException(new AggregateException("Catalog page retirement failed.", failures));

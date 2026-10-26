@@ -25,3 +25,15 @@
     .execution-evidence__arguments, .execution-evidence__empty { padding: 16px; }
     .execution-evidence__help { padding: 16px 16px 0; }
 }
+.execution-evidence { gap: 18px; }
+.execution-evidence__grid, .execution-evidence__grid--contract { grid-template-columns: minmax(0,1fr); gap: 18px; }
+.execution-evidence__panel { border: 0; border-radius: 0; background: transparent; }
+.execution-evidence__heading { padding: 8px 0 10px; gap: 8px; border-bottom: 0; }
+.execution-evidence__heading > span { display: none; }
+.execution-evidence__heading ::deep h3 { font-size: 13px; }
+.execution-evidence__facts { padding: 0; }
+.execution-evidence__facts > div { grid-template-columns: minmax(95px,.9fr) minmax(0,1.4fr); padding: 10px 0; gap: 16px; }
+.execution-evidence__facts > div + div { border-top: 1px dashed var(--mud-palette-divider); }
+.execution-evidence__facts dt { font-size: 11px; color: var(--mud-palette-text-secondary); }
+.execution-evidence__facts dd { font-size: 10.5px; text-align: end; }
+.execution-evidence__help, .execution-evidence__scope { padding: 0; font-size: 10.5px; color: var(--mud-palette-text-secondary); }

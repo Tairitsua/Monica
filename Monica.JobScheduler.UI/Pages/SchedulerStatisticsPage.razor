@@ -9,6 +9,7 @@
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 @inject IDialogService DialogService
+@inject NavigationManager Navigation
 
 @implements IAsyncDisposable
 
@@ -38,12 +39,13 @@
             else
             {
                 <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
+                    <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@state.IsLoading" RefreshRequested="RefreshAsync" />
                     <section class="statistics-window" aria-labelledby="statistics-window-heading" aria-busy="@(state.IsLoading ? "true" : "false")">
                         <div class="statistics-window__summary">
                             <div class="statistics-window__completion">
-                                <span class="statistics-window__eyebrow" id="statistics-window-heading">@L["Analytics:Window:Completed"]</span>
-                                <strong>@(state.Snapshot is { } result ? result.CompletedTerminalCount.ToString("N0", CultureInfo.CurrentCulture) : "—")</strong>
-                                <span>@L["Analytics:Window:CompletedDescription"]</span>
+                                <span class="statistics-window__eyebrow" id="statistics-window-heading">@L["Workspace:FailedCompletions"]</span>
+                                <strong>@(state.Snapshot is { } result ? result.Trend.Sum(bucket => bucket.FailedCount).ToString("N0", CultureInfo.CurrentCulture) : "—")</strong>
+                                <span>@L["Workspace:FailedCompletionsScope"]</span>
                             </div>
                             <div class="statistics-window__evidence">
                                 @if ((state.LoadedQuery ?? state.RequestedQuery) is { } query)
@@ -56,12 +58,9 @@
                                 }
                                 @if (state.Snapshot is { } snapshot)
                                 {
-                                    <dl class="statistics-window__facts">
-                                        <div><dt>@L["Analytics:Window:Resolved"]</dt><dd>@snapshot.Trend.Sum(bucket => bucket.SucceededCount + bucket.FailedCount).ToString("N0", CultureInfo.CurrentCulture)</dd></div>
-                                        <div><dt>@L["Analytics:Window:Measured"]</dt><dd>@snapshot.Duration.Count.ToString("N0", CultureInfo.CurrentCulture)</dd></div>
-                                        <div><dt>@L["Analytics:Window:Observed"]</dt><dd>@TimePresentation.FormatTimestamp(state.ObservedAtUtc)</dd></div>
-                                    </dl>
+                                    <p class="statistics-window__finding">@L["Workspace:AnalyticsFinding", snapshot.CompletedTerminalCount, snapshot.Trend.Sum(bucket => bucket.FailedCount)]</p>
                                 }
+                                @if (Owner is not null || Job is not null) { <p class="statistics-window__scope"><code>@Owner</code><code>@Job</code><a href="/job-scheduler/statistics">@L["Catalog:Actions:Reset"]</a></p> }
                             </div>
                         </div>
                         <div class="statistics-window__controls">
@@ -76,10 +75,8 @@
                                     <MudIconButton Icon="@MoIcons.Info" Size="Size.Small" Color="Color.Inherit" aria-label="@L["Analytics:Range:Title"]" aria-description="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]" />
                                 </MudTooltip>
                             </div>
-                            <button type="button" class="statistics-window__refresh" disabled="@state.IsLoading" @onclick="RefreshAsync">
-                                <MoIcon Icon="@MoIcons.Refresh" Size="1.25rem" aria-hidden="true" />
-                                <span>@L["Common:Refresh"]</span>
-                            </button>
+
+                            <SchedulerAnalyticsScopeSelector Owner="@Owner" Job="@Job" OwnerChanged="SelectOwner" JobChanged="SelectJob" CapturedAtUtc="@state.ObservedAtUtc" />
                         </div>
                     </section>
                     @if (state.IsLoading && !state.HasLoadedSnapshot)
@@ -125,15 +122,41 @@
     private TaskCompletionSource? _retirement;
     private SchedulerStatisticsPageState? _state;
     private ExecutionDialogSession? _inspectors;
+    private (string? Owner, string? Job, SchedulerAnalyticsTimeRange Range) _routeQuery;
+    private int _queryVersion;
+
+    /// <summary>Gets the exact owner carried by a job or runtime drilldown.</summary>
+    [SupplyParameterFromQuery(Name = "owner")] public string? Owner { get; set; }
+    /// <summary>Gets the exact job carried by an entity drilldown.</summary>
+    [SupplyParameterFromQuery(Name = "job")] public string? Job { get; set; }
+    /// <summary>Gets the route-held 24h, 7d or 30d preset.</summary>
+    [SupplyParameterFromQuery(Name = "range")] public string? Range { get; set; }
+
+    private SchedulerAnalyticsTimeRange RouteRange => Range switch { "7d" => SchedulerAnalyticsTimeRange.Last7Days, "30d" => SchedulerAnalyticsTimeRange.Last30Days, "today" => SchedulerAnalyticsTimeRange.Today, _ => SchedulerAnalyticsTimeRange.Last24Hours };
 
     protected override async Task OnInitializedAsync()
     {
         _inspectors = new(id => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, id), RefreshAsync);
-        var state = PageStateFactory.Create();
+        _routeQuery = (Owner, Job, RouteRange);
+        var state = PageStateFactory.Create(Owner, Job, RouteRange);
         _state = state;
         state.Changed += OnStateChangedAsync;
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }
         catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var query = (Owner, Job, RouteRange);
+        if (_state is not { } state || query == _routeQuery || _lifetime.IsRetired) return;
+        _routeQuery = query;
+        var version = ++_queryVersion;
+        var previous = _inspectors;
+        _inspectors = null;
+        if (previous is not null) await previous.DisposeAsync();
+        if (version != _queryVersion || _lifetime.IsRetired) return;
+        _inspectors = new(id => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, id), RefreshAsync);
+        await RunStateAsync(current => current.SetQueryAsync(query.Owner, query.Job, query.RouteRange));
     }
 
     private Task OnStateChangedAsync() => _lifetime.IsRetired ? Task.CompletedTask : InvokeAsync(() =>
@@ -141,10 +164,14 @@
         if (!_lifetime.IsRetired) StateHasChanged();
     });
 
-    private Task SelectRangeAsync(SchedulerAnalyticsTimeRange range) =>
-        RunStateAsync(state => state.SetTimeRangeAsync(range));
+    private void SelectRangeAsync(SchedulerAnalyticsTimeRange range) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("range",
+        range switch { SchedulerAnalyticsTimeRange.Last7Days => "7d", SchedulerAnalyticsTimeRange.Last30Days => "30d", SchedulerAnalyticsTimeRange.Today => "today", _ => "24h" }));
 
     private Task RefreshAsync() => RunStateAsync(state => state.RefreshAsync());
+
+    private void SelectOwner(string? owner) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(
+        new Dictionary<string, object?> { ["owner"] = owner, ["job"] = null }));
+    private void SelectJob(string? job) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("job", job));
 
     private async Task RunStateAsync(Func<SchedulerStatisticsPageState, Task> operation)
     {

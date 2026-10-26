@@ -1,6 +1,17 @@
 .execution-detail__dialog-title, .execution-detail__viewport, .execution-detail__actions { --execution-muted: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); --execution-primary-ink: color-mix(in srgb, var(--mud-palette-primary) 25%, var(--mud-palette-text-primary)); color: var(--mud-palette-text-primary); }
 .execution-detail__dialog-title { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px 60px 16px 24px; border-bottom: 1px solid var(--mud-palette-lines-default); }
 .execution-detail__dialog-title > :first-child { flex: none; color: var(--execution-primary-ink); }
+.execution-detail__identity { flex: 1; min-width: 0; }
+.execution-detail__identity p { margin: 0 0 5px; font-size: 11px; color: var(--mud-palette-text-secondary); overflow-wrap: anywhere; }
+.execution-detail__flags { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.execution-detail__flags > span { --flag-tone: var(--mud-palette-text-secondary); color: color-mix(in srgb,var(--flag-tone) 65%,var(--mud-palette-text-primary)); background: color-mix(in srgb,var(--flag-tone) 8%,var(--mud-palette-surface)); padding: 3px 8px; border-radius: 99px; font-size: 10.5px; }
+.execution-detail__flags [data-state="running"] { --flag-tone: var(--mud-palette-info); }
+.execution-detail__flags [data-state="succeeded"] { --flag-tone: var(--mud-palette-success); }
+.execution-detail__flags [data-state="failed"] { --flag-tone: var(--mud-palette-error); }
+.execution-detail__flags [data-state="skipped"] { --flag-tone: var(--mud-palette-warning); }
+.execution-detail__flags small { font-size: 10.5px; padding: 3px 8px; border-radius: 99px; color: var(--mud-palette-text-secondary); background: var(--mud-palette-background-gray); }
+.execution-detail__destinations { display: flex; flex-wrap: wrap; gap: 8px; }
+.execution-detail__destinations ::deep .mud-button-root { font-size: 11.5px; }
 .execution-detail__dialog-title ::deep .mo-dialog-heading { flex: 1; min-width: 0; font-size: 1.25rem; font-weight: 500; }
 .execution-detail__dialog-title ::deep .mud-icon-button:not(:disabled) { color: var(--execution-primary-ink); }
 .execution-detail__viewport { container: execution-inspector / inline-size; width: 100%; min-width: 0; padding: 24px; }

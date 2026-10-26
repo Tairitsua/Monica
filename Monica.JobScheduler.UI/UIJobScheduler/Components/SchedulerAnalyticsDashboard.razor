@@ -1,3 +1,4 @@
+@inject NavigationManager Navigation
 @using System.Globalization
 @using Monica.JobScheduler.UI.Localization
 
@@ -32,25 +33,7 @@
         </section>
     </div>
 
-    <section class="analytics-dashboard__cohort" aria-labelledby="@_cohortHeadingId">
-        <header class="analytics-dashboard__heading analytics-dashboard__heading--cohort">
-            <div>
-                <h2 id="@_cohortHeadingId">@L["Analytics:Cohort:Title"]</h2>
-                <p>@L["Analytics:Cohort:Description"]</p>
-            </div>
-            <span class="analytics-dashboard__population">@L["Analytics:Cohort:Total", FormatCount(CreatedCount)]</span>
-        </header>
-        <dl class="analytics-dashboard__states">
-            @foreach (var state in Enum.GetValues<JobExecutionState>())
-            {
-                var count = GetCreatedCount(state);
-                <div data-state="@state.ToString().ToLowerInvariant()" data-zero="@(count == 0 ? "true" : "false")">
-                    <dt><span class="analytics-dashboard__state-mark" aria-hidden="true"></span>@L[$"ExecutionStates:{state}"]</dt>
-                    <dd>@FormatCount(count)</dd>
-                </div>
-            }
-        </dl>
-    </section>
+    <SchedulerExecutionStateShare Snapshot="@Snapshot" />
 
     <SchedulerAnalyticsDurationEvidence Snapshot="@Snapshot" InspectExecution="@InspectExecution" />
 
@@ -81,7 +64,7 @@
                             var item = group.Items[index];
                             var value = group.GetValue(item);
                             <li @key="new JobId(item.OwnerKey, item.JobKey)">
-                                <a href="@JobSchedulerUiUrls.JobDefinition(new JobId(item.OwnerKey, item.JobKey))"
+                                <a href="@JobSchedulerUiUrls.JobDefinition(new JobId(item.OwnerKey, item.JobKey), Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)"
                                    aria-label="@L["Analytics:Rankings:OpenJobWithMetric", index + 1, item.JobName, group.Label, value, FormatShare(value, group.TotalValue)]">
                                     <span class="analytics-dashboard__rank-number">@(index + 1)</span>
                                     <span class="analytics-dashboard__rank-copy">
@@ -110,7 +93,6 @@
 
 @code {
     private readonly string _summaryHeadingId = $"analytics-summary-{Guid.NewGuid():N}";
-    private readonly string _cohortHeadingId = $"analytics-cohort-{Guid.NewGuid():N}";
     private readonly string _volumeHeadingId = $"analytics-volume-{Guid.NewGuid():N}";
     private readonly string _failuresHeadingId = $"analytics-failures-{Guid.NewGuid():N}";
 
@@ -131,9 +113,6 @@
     private long FailedCount => Snapshot.Trend.Sum(static bucket => bucket.FailedCount);
     private long DecidedCount => Snapshot.Trend.Sum(static bucket => bucket.SucceededCount + bucket.FailedCount);
     private string WindowHours => (Snapshot.EndTimeUtc - Snapshot.StartTimeUtc).TotalHours.ToString("G6", CultureInfo.CurrentCulture);
-    private long? GetCreatedCount(JobExecutionState state) => Snapshot.StateTotals.TryGetValue(state, out var value) ? value : null;
-    private long? CreatedCount => Enum.GetValues<JobExecutionState>().All(Snapshot.StateTotals.ContainsKey) ? Snapshot.StateTotals.Values.Sum() : null;
-    private string FormatCount(long? value) => value?.ToString("N0", CultureInfo.CurrentCulture) ?? L["Common:NotAvailable"];
     private static string FormatRatio(double value, long denominator) => denominator > 0 ? value.ToString("P1", CultureInfo.CurrentCulture) : "—";
     private static string FormatShare(long value, long total) => total > 0 ? (value / (double)total).ToString("P1", CultureInfo.CurrentCulture) : "—";
 

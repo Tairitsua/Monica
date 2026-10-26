@@ -56,7 +56,92 @@
         "Description": "Inspect this host's local cycles and effective options, definition-backed owners in the shared scope, and optional service-registry observations."
       }
     },
-    "Scope": "Configured scope · {0}"
+    "Scope": "Configured scope · {0}",
+    "CopyId": "Copy instance ID",
+    "OpenLedger": "Open in execution ledger",
+    "EditCron": "Edit Cron",
+    "RestoreCron": "Restore declared expression",
+    "SaveCron": "Save schedule",
+    "Views": {
+      "evidence": "Execution evidence",
+      "schedule": "Schedule",
+      "policy": "Declaration and policy"
+    },
+    "NextFive": "Next planned occurrences",
+    "PlanNotice": "Plans use the declared schedule timezone. Suspension, boundaries and capacity can still affect admission.",
+    "Next": "Next",
+    "Planned": "Planned",
+    "Inventory": "Job composition",
+    "PublishedDefinitions": "published definitions",
+    "DefinitionBreakdown": "{0} recurring · {1} triggered · {2} additional unpublished definitions",
+    "CatalogFinding": "The loaded snapshot has {0} published jobs across {1} owners.",
+    "LargestOwner": "Largest owner:",
+    "OwnerCadence": "Owner × cadence",
+    "CollapseMap": "Collapse map",
+    "ExpandMap": "Expand map",
+    "Cadences": {
+      "sub": "Sub-minute",
+      "1m": "1-minute",
+      "5m": "5-minute",
+      "30m": "30-minute",
+      "1h": "Hourly",
+      "hours": "Multi-hour",
+      "1d": "Daily",
+      "1mo": "Calendar / rare",
+      "demand": "On demand"
+    },
+    "DefinitionMapScope": "Loaded definition snapshot; each mark opens one job.",
+    "Standing": "Standing",
+    "LatestFailed": "Latest execution failed",
+    "AttentionJobs": "Jobs needing attention",
+    "JobsUnit": "jobs",
+    "FailureSignal": "Failure signals",
+    "OverrunSignal": "Above sampled baseline",
+    "SkipSignal": "Frequent skips",
+    "AttentionFinding": "Review recent executions and policy before acting on these jobs:",
+    "CalmFinding": "No listed attention signals appear in the loaded window. Retained history and future plans remain visible for review.",
+    "SampleScope": "Loaded {0} of {1} records in the interval",
+    "Windows": {
+      "15": "15 min",
+      "60": "1 hour",
+      "1440": "24 hours"
+    },
+    "SampleFailures": "Sampled failures in window",
+    "PulseTitle": "Scheduler pulse",
+    "PulseDescription": "Signals use the loaded execution window. Future marks are the next five planned occurrences, not guaranteed admissions.",
+    "SampleTruncated": "This interval exceeds 2,000 records. Marks and signals use the loaded sample; older records remain searchable through ledger pagination.",
+    "Now": "Now",
+    "CollapseJobs": "Collapse jobs",
+    "ShowAllJobs": "Show all {0} jobs",
+    "Captured": "Captured",
+    "AutoRefresh": "Auto refresh",
+    "AutoPaused": "Refresh paused",
+    "RuntimeFinding": "This decision describes the serving host: whether its scheduling and execution cycles are ready. Review definition publication, remote registration and individual outcomes separately below.",
+    "FailedCompletions": "Failed completions",
+    "FailedCompletionsScope": "Retained completions in the selected interval",
+    "AnalyticsFinding": "The interval contains {0} retained completions, including {1} failures. Review the distribution, then inspect the responsible job or execution.",
+    "CohortNote": "Counted by creation time, including queued and running work. This differs from the completion-time population above.",
+    "ClaimsAndFailures": "Claims / failures",
+    "MatchingExecutions": "Matching execution records",
+    "RecordsUnit": "records",
+    "LedgerFinding": "Inspect executions by scope, interval and state. Each lane uses its own peak. Select a time bucket to narrow the interval; an instance ID opens execution evidence.",
+    "TrajectoryTitle": "Execution trajectory",
+    "TrajectoryDescription": "Bucketed by creation time, with a separate scale for each state. Select a row label to filter that state.",
+    "BucketDetails": "{0} · {1} records · {2}",
+    "TrajectoryCaptured": "Trajectory captured separately at {0}; the paged table shows retained records for its current query.",
+    "JobFailedFinding": "The latest execution failed. Inspect its error, claims and retries before running it manually or changing the future schedule.",
+    "JobPausedFinding": "The recurring plan is paused. Existing executions retain their captured configuration; editing Cron does not resume scheduling.",
+    "JobFinding": "Execution evidence, future plans and policy share this independent job page. Every operation uses the exact owner and job identity.",
+    "BackToSource": "Back to source list",
+    "ClockHours": "h:mm:ss",
+    "ClockMinutes": "m:ss",
+    "TrendScale": "Each outcome uses its own peak scale",
+    "TrendPeak": "Maximum completions in one bucket",
+    "CopyJobKey": "Copy job key",
+    "IdCopied": "Instance ID copied",
+    "AllJobs": "All jobs",
+    "ScopeChoices": "Choices use {0} of {1} retained definitions; exact route scopes remain available.",
+    "SelectRow": "Select"
   },
   "Access": {
     "Checking": "Checking scheduler access…",
@@ -149,8 +234,7 @@
       "Empty": "No ledger records were found in this snapshot.",
       "AllRecords": "Browse execution ledger"
     },
-    "RefreshFailed": "Showing the last accepted snapshot. The latest refresh failed: {0}",
-    "LastRefreshed": "Last refreshed {0}"
+    "RefreshFailed": "Showing the last accepted snapshot. The latest refresh failed: {0}"
   },
   "Catalog": {
     "PageTitle": "Job Scheduler · Catalog",
@@ -196,11 +280,7 @@
       "ResumeSelected": "Resume selected",
       "Reset": "Reset filters",
       "CopiedKey": "Job key copied",
-      "CopyKeyFailed": "Failed to copy job key",
-      "CopyKeyFor": "Copy full job key: {0}",
-      "RunFor": "Run {0} now · {1}",
-      "DetailsFor": "Inspect {0} · {1}",
-      "PolicyFor": "{0}: {1} · {2}"
+      "CopyKeyFailed": "Failed to copy job key"
     },
     "ScheduleStatus": {
       "Awaiting": "Awaiting synchronization",
@@ -267,7 +347,6 @@
       "Result": "{0} policy update(s) succeeded; {1} failed.",
       "ResultManualRemains": "{0} operator pause update(s) succeeded; {1} failed. Manual mode still suppresses automatic materialization where configured."
     },
-    "RegistryEyebrow": "DEFINITION REGISTRY",
     "NoDefinitions": "No definitions were found in the loaded presence snapshot.",
     "QueryUnavailable": "Definition results are unavailable. Review the query error and refresh.",
     "AbsentDefinition": "No longer published",
@@ -479,15 +558,10 @@
       "InspectSchedule": "Review schedule / policy"
     },
     "Header": {
-      "EvidenceAriaLabel": "Current job operational evidence",
       "ActiveExecutions": "Active executions",
       "QueuedExecutions": "Queued executions",
-      "RunningExecutions": "Running executions",
       "OwnerAbsent": "Absent",
-      "OwnerPresence": "Declaration presence",
-      "OwnerPresent": "Present",
-      "Eyebrow": "OWNER-SCOPED DEFINITION",
-      "LedgerScope": "Recorded queued and running executions for this owner and job."
+      "Eyebrow": "OWNER-SCOPED DEFINITION"
     },
     "Activity": {
       "Eyebrow": "LIVE EXECUTION EVIDENCE",
@@ -626,20 +700,14 @@
     },
     "Trend": {
       "Title": "Completions by interval",
-      "Description": "Outcome counts per interval. Lines connect counts, not rates.",
-      "LegendAriaLabel": "Outcome chart legend",
-      "ViewAriaLabel": "Outcome chart display",
-      "Bars": "Bars",
-      "Lines": "Lines",
-      "Unit": "Completions per bucket",
+      "Description": "Retained completions in each fixed interval, separated by outcome.",
       "HourBuckets": "1-hour intervals",
       "DayBuckets": "24-hour intervals",
       "NoCompletions": "No completed outcomes in this window. The returned intervals remain available below.",
       "ViewData": "View interval data",
       "DataAriaLabel": "Completion counts for every returned interval",
       "Interval": "Interval",
-      "PartialBucket": "Partial final bucket",
-      "ChartWindowLabel": "{0}; {1} → {2}; {3}"
+      "PartialBucket": "Partial final bucket"
     },
     "Duration": {
       "Title": "Recorded elapsed duration",
@@ -679,13 +747,9 @@
     },
     "Window": {
       "Completed": "Completed outcomes",
-      "CompletedDescription": "Recorded terminal outcomes in this interval",
       "Accepted": "Accepted analysis window",
       "Requested": "Requested analysis window",
       "Bounds": "Start included · End excluded",
-      "Resolved": "Succeeded + failed",
-      "Measured": "Measured completions",
-      "Observed": "Observed",
       "Unavailable": "Analysis is unavailable",
       "UnavailableDescription": "This window has no accepted result yet. Retry the actual store read.",
       "Retained": "Showing the last accepted window: {0}. Its bounds and observation remain unchanged."
@@ -694,7 +758,7 @@
       "Title": "Completion summary"
     },
     "Cohort": {
-      "Title": "Created in this window",
+      "Title": "Execution state share",
       "Description": "Current states of records created in the accepted window; this is a separate population from completions.",
       "Total": "{0} created records"
     }
@@ -703,7 +767,6 @@
     "PageTitle": "Job Scheduler · Executions",
     "Title": "Execution ledger",
     "Count": "{0} matching records",
-    "LastRefreshed": "Observed {0}",
     "Empty": "No durable executions match the current filters.",
     "Filters": {
       "AriaLabel": "Execution search and filters",
@@ -723,7 +786,8 @@
       "Last24Hours": "Last 24 hours",
       "Last7Days": "Last 7 days",
       "Last30Days": "Last 30 days",
-      "Custom": "Custom range"
+      "Custom": "Custom range",
+      "Exact": "Exact interval"
     },
     "Columns": {
       "Definition": "Definition",
@@ -734,9 +798,7 @@
       "Duration": "Duration",
       "Attempts": "Attempts / retries",
       "Worker": "Lease owner",
-      "Actions": "Actions",
-      "StateAndRecorded": "State and recorded time",
-      "AttemptEvidence": "Attempt and lease evidence"
+      "State": "State"
     },
     "Actions": {
       "Details": "Inspect execution",
@@ -770,8 +832,7 @@
     },
     "Evidence": {
       "Claims": "Worker claims",
-      "ConsumedFailures": "Consumed retry failures",
-      "NoCurrentWorker": "No current worker lease"
+      "ConsumedFailures": "Consumed retry failures"
     },
     "RecordedTimeNotice": "Includes all created records, including skipped occurrences.",
     "AcceptedQuery": "Retained snapshot filters: {0}",
@@ -784,7 +845,6 @@
     "NotFound": "The execution no longer exists.",
     "Job": "Job key",
     "Owner": "Owner",
-    "Origin": "Admission",
     "Available": "Available at",
     "Worker": "Running worker",
     "Arguments": "Serialized arguments",
@@ -812,7 +872,6 @@
     "NoArguments": "No serialized arguments were captured.",
     "SkipReason": "Skip reason",
     "HistoryCount": "{0} retained entries",
-    "HistoryDescription": "Chronological state changes, cancellation, and logs still retained for this execution.",
     "EmptyHistory": "No retained history entries are available.",
     "CancellationPending": "A cooperative cancellation request has been pending since {0}.",
     "Copied": "Diagnostics copied to the clipboard.",
@@ -821,10 +880,6 @@
       "ViewCatalog": "Open job details",
       "CopySnapshot": "Copy snapshot",
       "More": "More execution actions"
-    },
-    "Tabs": {
-      "Evidence": "Recorded evidence",
-      "History": "Retained history · {0}"
     },
     "RefreshFailed": "Showing the last accepted inspection. Refresh failed: {0}",
     "EvidenceScope": "Claims, failed retries, and recovered leases are separate recorded facts.",
@@ -963,11 +1018,6 @@
       "NotLeader": "Not service leader"
     },
     "Observation": {
-      "Title": "Runtime observation",
-      "Captured": "Runtime captured",
-      "Accepted": "Read accepted",
-      "Cadence": "Page refresh cadence",
-      "Manual": "Manual refresh",
       "Unavailable": "Runtime evidence unavailable",
       "UnavailableDescription": "No valid runtime snapshot has been accepted. Retry the read to inspect this host; an unavailable snapshot does not establish an empty or healthy scheduler.",
       "NoDiagnostic": "No diagnostic message was supplied."

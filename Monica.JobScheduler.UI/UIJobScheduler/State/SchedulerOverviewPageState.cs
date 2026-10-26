@@ -54,6 +54,7 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
         _authorize = authorize;
         _timeProvider = timeProvider;
         _refreshInterval = refreshInterval;
+        AutoRefreshEnabled = refreshInterval > TimeSpan.Zero;
         _lifetimeToken = _lifetimeCancellation.Token;
     }
 
@@ -70,6 +71,19 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
     /// Gets the latest bounded scheduler overview.
     /// </summary>
     public JobSchedulerOverview? Overview { get; private set; }
+
+    /// <summary>Gets whether future timer ticks may admit a refresh. An already admitted read is allowed to finish.</summary>
+    public bool AutoRefreshEnabled { get; private set; } = true;
+
+    /// <summary>Pauses or resumes timer-triggered refreshes without changing the accepted snapshot or timer ownership.</summary>
+    public void SetAutoRefreshEnabled(bool enabled)
+    {
+        lock (_admissionGate)
+        {
+            ObjectDisposedException.ThrowIf(_retired, this);
+            AutoRefreshEnabled = enabled && _refreshInterval > TimeSpan.Zero;
+        }
+    }
 
     /// <summary>
     /// Gets whether the first access check completed.
@@ -301,7 +315,9 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
             _lifetimeToken.ThrowIfCancellationRequested();
             while (await timer.WaitForNextTickAsync(_lifetimeToken))
             {
-                await RefreshAsync();
+                bool enabled;
+                lock (_admissionGate) enabled = AutoRefreshEnabled;
+                if (enabled) await RefreshAsync();
             }
         }
         catch (OperationCanceledException) when (_lifetimeToken.IsCancellationRequested)

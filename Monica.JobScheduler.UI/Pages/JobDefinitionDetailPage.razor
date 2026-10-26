@@ -1,5 +1,6 @@
 @using Monica.UI.Shared.Components.States
 @attribute [Route(PAGE_URL)]
+@attribute [Route("/job-scheduler/catalog/{OwnerKey}/{JobKey}")]
 
 @using Monica.JobScheduler.UI.Localization
 @using Monica.JobScheduler.UI.UIJobScheduler.Components
@@ -9,11 +10,12 @@
 <SchedulerWorkspace Title="@L["Workspace:Pages:JobDetail:Title"]" Description="@L["Workspace:Pages:JobDetail:Description"]" ActivePanelIndex="1">
     <div class="job-detail-page">
         <nav class="job-detail-page__breadcrumb" aria-label="@L["JobDetail:BreadcrumbAriaLabel"]">
-            <MudButton Variant="Variant.Text" StartIcon="@MoIcons.ArrowLeft" Href="@JobCatalogPage.PAGE_URL">@L["JobDetail:Actions:BackToCatalog"]</MudButton>
+            <MudButton Variant="Variant.Text" StartIcon="@MoIcons.ArrowLeft" Href="@ReturnUrl">@L[Return is null ? "JobDetail:Actions:BackToCatalog" : "Workspace:BackToSource"]</MudButton>
         </nav>
         @if (PageState is { } state)
         {
             <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
+                <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@(state.IsLoading || state.IsMutating)" RefreshRequested="RefreshAsync" />
                 @if (state.IsLoading && state.Summary is null)
                 {
                     <MoContentState Loading="true">
@@ -43,16 +45,35 @@
                         {
                             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Warning">@L["JobDetail:RefreshFailed", state.Error]</MudAlert>
                         }
-                        <JobDefinitionDetailHeader Summary="@summary" IsRefreshing="@(state.IsLoading || _commandAdmission is not null)" IsMutating="@(state.IsMutating || _commandAdmission is not null)"
+                        <section class="job-detail-page__signature"><JobDefinitionDetailHeader Summary="@summary" IsRefreshing="@(state.IsLoading || _commandAdmission is not null)" IsMutating="@(state.IsMutating || _commandAdmission is not null)"
                                                    OnRefresh="RefreshAsync" OnInspectSchedule="OpenScheduleInspectorAsync" OnEditPolicy="OpenPolicyAsync"
                                                    OnToggleDisabled="ToggleDisabledAsync" OnRunNow="RunRecurringNowAsync" OnTrigger="OpenTriggerAsync" />
-                        <div class="job-detail-page__evidence-grid">
+                        <SchedulerJobFinding Summary="@summary" Snapshot="@state.Analytics" /></section>
+                        <div class="job-detail-page__viewbar">
+                            <div role="group" aria-label="@L["JobDetail:PageTitle"]" class="job-detail-page__views">
+                                @foreach (var view in new[] { "evidence", "schedule", "policy" })
+                                {
+                                    <button type="button" aria-pressed="@(SelectedView == view)" @onclick="@(() => SelectView(view))">@L[$"Workspace:Views:{view}"]</button>
+                                }
+                            </div>
+                            <a href="@($"/job-scheduler/statistics?owner={Uri.EscapeDataString(summary.Definition.OwnerKey)}&job={Uri.EscapeDataString(summary.Definition.Declaration.JobKey)}")">@L["Workspace:Navigation:Statistics"] <MoIcon Icon="@MoIcons.ArrowUpRight" Size="1rem" /></a>
+                        </div>
+                        @if (SelectedView == "schedule")
+                        {
                             <JobDefinitionSchedulePanel Summary="@summary" OnInspectSchedule="OpenScheduleInspectorAsync" />
+                            <SchedulerSchedulePreview Definition="@summary.Definition" ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())" />
+                        }
+                        else if (SelectedView == "policy")
+                        {
+                            <JobDefinitionContractPanel Definition="@summary.Definition" />
+                        }
+                        else
+                        {
+                        <div class="job-detail-page__evidence-grid">
                             <JobDefinitionLatestExecutionPanel Execution="@summary.LatestExecution"
                                                                ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())"
                                                                ExecutionSelected="OpenExecutionDetailsAsync" />
                         </div>
-                        <JobDefinitionContractPanel Definition="@summary.Definition" />
                         @if (state.AnalyticsError is not null)
                         {
                             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Warning">@L["JobDetail:Health:LoadFailed", state.AnalyticsError]</MudAlert>
@@ -64,6 +85,7 @@
                         <JobExecutionActivityPanel Running="@state.RunningActivity" Failures="@state.RecentFailureActivity"
                                                    ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())"
                                                    ExecutionSelected="OpenExecutionDetailsAsync" />
+                        }
                         @if (state.ObservedAtUtc is { } observedAtUtc)
                         {
                             <footer class="job-detail-page__freshness">

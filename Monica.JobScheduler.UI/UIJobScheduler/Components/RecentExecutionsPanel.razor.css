@@ -26,7 +26,7 @@
 .recent-panel__timeline { margin: 0; padding: 0; list-style: none; }
 .recent-panel__event { --event-tone: var(--mud-palette-info); min-width: 0; }
 .recent-panel__event + .recent-panel__event { border-top: 1px solid var(--mud-palette-lines-default); }
-.recent-panel__event[data-state="running"] { --event-tone: var(--mud-palette-primary); }
+.recent-panel__event[data-state="running"] { --event-tone: var(--mud-palette-info); }
 .recent-panel__event[data-state="succeeded"] { --event-tone: var(--mud-palette-success); }
 .recent-panel__event[data-state="failed"] { --event-tone: var(--mud-palette-error); }
 .recent-panel__event[data-state="cancelled"] { --event-tone: var(--mud-palette-text-secondary); }

@@ -1,0 +1,28 @@
+.catalog-composition { min-width: 0; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); overflow: hidden; }
+.catalog-composition__decision { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr); gap: 24px; align-items: center; padding: 26px 28px 22px; }
+.catalog-composition__decision > div > p { color: var(--mud-palette-text-secondary); font-size: 12px; }
+.catalog-composition__decision ::deep .mo-vl-display { margin-block: 5px 8px; }
+.catalog-composition__decision small { color: var(--mud-palette-text-secondary); font-size: 11.5px; }
+.catalog-composition__finding { max-width: 62ch; font-size: 15px; line-height: 1.85; }
+.catalog-composition__finding a { display: inline; overflow-wrap: anywhere; color: color-mix(in srgb, var(--mud-palette-primary) 60%, var(--mud-palette-text-primary)); }
+.catalog-composition__cadences { display: flex; flex-wrap: wrap; gap: 16px 28px; padding: 4px 28px 24px; }
+.catalog-composition__cadences > div { min-width: 74px; max-width: 160px; }
+.catalog-composition__cadences p { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--mud-palette-text-secondary); font-size: 11px; }
+.catalog-composition__cadences b { color: var(--mud-palette-text-primary); font: 11px var(--mo-font-family-mono); }
+.catalog-composition__marks { display: flex; flex-wrap: wrap; align-content: start; gap: 4px; min-width: 0; }
+.catalog-composition__mark, .catalog-composition footer i { --mark-role: var(--mud-palette-success); display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--mark-role); }
+.catalog-composition [data-tone="primary"] { --mark-role: var(--mud-palette-primary); }
+.catalog-composition [data-tone="paused"] { --mark-role: var(--mud-palette-text-secondary); opacity: .65; }
+.catalog-composition [data-tone="absent"] { --mark-role: var(--mud-palette-text-secondary); background: repeating-linear-gradient(135deg, transparent 0 2px, var(--mark-role) 2px 3px); outline: 1px solid var(--mud-palette-lines-default); }
+.catalog-composition__mark:hover { outline: 2px solid var(--mud-palette-text-primary); outline-offset: 2px; }
+.catalog-composition__toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 13px 28px; border-top: 1px solid var(--mud-palette-divider); color: var(--mud-palette-text-secondary); font-size: 11.5px; background: transparent; text-align: start; }
+.catalog-composition__toggle > span { display: flex; align-items: center; gap: 8px; }
+.catalog-composition__toggle:hover { color: var(--mud-palette-text-primary); background: var(--mud-palette-action-default-hover); }
+.catalog-composition__matrix { max-width: 100%; overflow-x: auto; padding: 6px 28px 16px; border-top: 1px solid var(--mud-palette-divider); }
+.catalog-composition table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.catalog-composition th { font-weight: 400; color: var(--mud-palette-text-secondary); padding: 12px 8px; text-align: start; white-space: nowrap; }
+.catalog-composition th:first-child { min-width: 150px; }
+.catalog-composition td { min-width: 52px; padding: 8px; border-top: 1px solid var(--mud-palette-divider); vertical-align: top; }
+.catalog-composition footer { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 28px; border-top: 1px solid var(--mud-palette-divider); background: color-mix(in srgb, var(--mud-palette-text-primary) 2%, var(--mud-palette-surface)); color: var(--mud-palette-text-secondary); font-size: 10.5px; }
+.catalog-composition footer span { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 760px) { .catalog-composition__decision { grid-template-columns: minmax(0, 1fr); padding: 22px 20px 18px; gap: 14px; } .catalog-composition__finding { font-size: 13px; } .catalog-composition__cadences { padding-inline: 20px; gap: 16px 24px; } .catalog-composition__toggle, .catalog-composition footer { padding-inline: 20px; } .catalog-composition__matrix { padding-inline: 16px; } }

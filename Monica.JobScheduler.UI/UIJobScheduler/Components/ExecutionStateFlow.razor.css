@@ -203,7 +203,7 @@
 
 .execution-flow__state[data-state="running"],
 .execution-flow__total--detail[data-state="running"] {
-    --state-tone: var(--mud-palette-primary);
+    --state-tone: var(--mud-palette-info);
 }
 
 .execution-flow__state[data-state="succeeded"],

@@ -1,0 +1,35 @@
+.state-share { min-width: 0; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); overflow: hidden; }
+.state-share > header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--mud-palette-divider); }
+.state-share h2 { font-size: 15px; font-weight: 500; }
+.state-share header p { margin-top: 5px; color: var(--mud-palette-text-secondary); font-size: 11.5px; }
+.state-share__count { align-self: center; padding: 4px 8px; border-radius: 5px; background: var(--mud-palette-background-gray); color: var(--mud-palette-text-secondary); font: 10.5px var(--mo-font-family-mono); }
+.state-share__body { display: grid; grid-template-columns: minmax(230px, .85fr) minmax(0, 1.25fr); gap: 24px 44px; align-items: center; padding: 26px 32px 24px; }
+.state-share figure { min-width: 0; margin: 0; }
+.state-share__ring { position: relative; width: min(100%, 300px); margin-inline: auto; }
+.state-share svg { display: block; width: 100%; height: auto; overflow: visible; }
+.state-share [data-state] { --state-tone: var(--mud-palette-text-secondary); }
+.state-share [data-state="running"] { --state-tone: var(--mud-palette-info); }
+.state-share [data-state="succeeded"] { --state-tone: var(--mud-palette-success); }
+.state-share [data-state="failed"] { --state-tone: var(--mud-palette-error); }
+.state-share [data-state="skipped"] { --state-tone: var(--mud-palette-warning); }
+.state-share__segment { outline: none; opacity: 1; transition: opacity 140ms ease; }
+.state-share__segment.is-muted { opacity: .4; }
+.state-share__segment path { fill: color-mix(in srgb, var(--state-tone) 78%, var(--mud-palette-text-primary)); }
+.state-share__segment:focus-visible path { stroke: var(--mud-palette-text-primary); stroke-width: 2px; }
+.state-share__empty { fill: none; stroke: var(--mud-palette-lines-default); stroke-width: 1; stroke-dasharray: 3 4; }
+.state-share__center { position: absolute; inset: 25%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; pointer-events: none; }
+.state-share__center > span { display: flex; align-items: center; gap: 7px; font-size: 13px; color: color-mix(in srgb, var(--state-tone) 70%, var(--mud-palette-text-primary)); }
+.state-share i { width: 7px; height: 7px; flex: none; border-radius: 2px; background: var(--state-tone); }
+.state-share__center strong { font: 450 36px/1.1 var(--mo-font-family-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.state-share__center small { font-size: 13px; color: var(--mud-palette-text-secondary); }
+.state-share figcaption { max-width: 32ch; margin: 10px auto 0; font-size: 11.5px; color: var(--mud-palette-text-secondary); text-align: center; line-height: 1.7; }
+.state-share__legend { display: grid; gap: 8px; min-width: 0; }
+.state-share__state { display: grid; grid-template-columns: minmax(0, 1fr) auto 66px 14px; align-items: center; gap: 12px; min-height: 45px; padding: 10px 16px; border: 1px solid color-mix(in srgb, var(--state-tone) 26%, var(--mud-palette-lines-default)); border-radius: 6px; background: color-mix(in srgb, var(--state-tone) 3%, var(--mud-palette-surface)); }
+.state-share__state.is-selected { background: color-mix(in srgb, var(--state-tone) 9%, var(--mud-palette-surface)); border-color: color-mix(in srgb, var(--state-tone) 72%, var(--mud-palette-text-primary)); }
+.state-share__state > span { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.state-share__state b { font: 500 17px var(--mo-font-family-mono); color: color-mix(in srgb, var(--state-tone) 72%, var(--mud-palette-text-primary)); }
+.state-share__state small { text-align: end; color: var(--mud-palette-text-secondary); font: 11.5px var(--mo-font-family-mono); }
+.state-share footer { display: grid; gap: 7px; padding: 15px 24px 18px; border-top: 1px solid var(--mud-palette-divider); font-size: 11.5px; color: var(--mud-palette-text-secondary); }
+.state-share footer > span { font-family: var(--mo-font-family-mono); overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .state-share__segment { transition: none; } }
+@media (max-width: 1050px) { .state-share__body { grid-template-columns: minmax(0, 1fr); padding: 20px 18px; gap: 20px; } .state-share__ring { width: min(100%, 250px); } .state-share__state { padding: 10px 12px; gap: 8px; grid-template-columns: minmax(0, 1fr) auto 58px 12px; } }

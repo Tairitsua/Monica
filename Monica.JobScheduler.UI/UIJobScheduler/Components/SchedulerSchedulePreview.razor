@@ -1,0 +1,28 @@
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+
+<section class="schedule-preview" aria-labelledby="schedule-preview-title">
+    <header><div><h2 id="schedule-preview-title">@L["Workspace:NextFive"]</h2><p>@L["Workspace:PlanNotice"]</p></div><span>@Definition.EffectiveConfiguration.Schedule?.TimeZoneId</span></header>
+    @if (_preview is { Occurrences.Count: > 0 })
+    {
+        <ol>@foreach (var (occurrence, index) in _preview.Occurrences.Select((value, index) => (value, index)))
+        {
+            <li><span class="schedule-preview__ordinal">@(index + 1)</span><span>@L[index == 0 ? "Workspace:Next" : "Workspace:Planned"]</span><time datetime="@occurrence.Utc.ToString("O")">@TimePresentation.FormatScheduleTimestamp(occurrence.Utc)</time></li>
+        }</ol>
+    }
+    else { <p class="schedule-preview__empty">@L["JobDetail:Schedule:NoNextOccurrence"]</p> }
+</section>
+
+@code {
+    /// <summary>Gets the accepted immutable definition whose effective schedule is projected.</summary>
+    [Parameter, EditorRequired] public JobDefinition Definition { get; set; } = null!;
+    /// <summary>Gets the observation instant from which prospective occurrences are calculated.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    private CronPolicyEvaluation? _preview;
+    protected override void OnParametersSet()
+    {
+        _preview = Definition.EffectiveConfiguration.Schedule is { } schedule
+            ? CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId, schedule.StartTimeUtc, schedule.EndTimeUtc, ObservedAtUtc)
+            : null;
+    }
+}

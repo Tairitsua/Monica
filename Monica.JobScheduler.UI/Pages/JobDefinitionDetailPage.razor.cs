@@ -23,7 +23,7 @@ namespace Monica.JobScheduler.UI.Pages;
 public partial class JobDefinitionDetailPage : IAsyncDisposable
 {
     /// <summary>Gets the route pattern for one owner-scoped job definition.</summary>
-    public const string PAGE_URL = "/job-scheduler/catalog/{OwnerKey}/{JobKey}";
+    public const string PAGE_URL = "/job-scheduler/jobs/{OwnerKey}/{JobKey}";
 
     /// <summary>Gets or sets the exact route-provided owner key without trimming or case normalization.</summary>
     [Parameter] public string OwnerKey { get; set; } = string.Empty;
@@ -31,12 +31,21 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
     /// <summary>Gets or sets the exact route-provided logical job key without trimming or case normalization.</summary>
     [Parameter] public string JobKey { get; set; } = string.Empty;
 
+    /// <summary>Gets the route-held evidence, schedule or policy workspace selection.</summary>
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
+    /// <summary>Gets the optional schedule-editor deep link.</summary>
+    [SupplyParameterFromQuery(Name = "edit")] public string? Edit { get; set; }
+    /// <summary>Gets the internal scheduler route whose filters are restored by the dossier's back link.</summary>
+    [SupplyParameterFromQuery(Name = "return")] public string? Return { get; set; }
+
     [Inject] private JobDefinitionDetailPageStateFactory PageStateFactory { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private IStringLocalizer<JobSchedulerResource> L { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private SchedulerTimePresentation TimePresentation { get; set; } = null!;
     [Inject] private TimeProvider TimeProvider { get; set; } = null!;
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
 
     private readonly SchedulerOperationLifetime _lifetime = new();
     private readonly object _disposeGate = new();
@@ -47,20 +56,48 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
     private int _stateVersion;
     private bool _disposed;
     private object? _commandAdmission;
+    private bool _initialScheduleOpened;
+    private string? _appliedEditor;
+    private string ReturnUrl => Return is { } value && (value == "/job-scheduler" || value.StartsWith("/job-scheduler/", StringComparison.Ordinal)) ? value : JobCatalogPage.PAGE_URL;
+    private string SelectedView => View is "schedule" or "policy" ? View : "evidence";
+
+    private void SelectView(string view) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("view", view == "evidence" ? null : view));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_initialScheduleOpened || Edit != "cron" || PageState?.Summary is null || _dialogs is null || _disposed) return;
+        _initialScheduleOpened = true;
+        await OpenDialogAsync(DetailDialogKind.Schedule);
+    }
 
     private string PageTitleText => PageState?.Summary?.Definition.EffectiveConfiguration.JobName ?? L["JobDetail:PageTitle"];
 
     protected override async Task OnParametersSetAsync()
     {
         if (_disposed) return;
+        var closeSchedule = _appliedEditor == "cron" && Edit != "cron";
+        if (_appliedEditor != Edit) { _appliedEditor = Edit; _initialScheduleOpened = false; }
         var jobId = new JobId(OwnerKey, JobKey);
-        if (PageState?.JobId == jobId) return;
+        if (PageState?.JobId == jobId)
+        {
+            if (closeSchedule)
+            {
+                var state = PageState;
+                var previous = _dialogs;
+                _dialogs = null;
+                if (previous is not null) await previous.DisposeAsync();
+                if (!_disposed && ReferenceEquals(PageState, state) && _dialogs is null)
+                    _dialogs = new(ProduceDialogAsync, CompleteDialogAsync);
+            }
+            return;
+        }
         try { await _lifetime.RunAsync(_ => ReplaceStateAsync(jobId)); }
         catch (OperationCanceledException) when (_disposed) { }
     }
 
     private async Task ReplaceStateAsync(JobId jobId)
     {
+        _initialScheduleOpened = false;
         var version = Interlocked.Increment(ref _stateVersion);
         var previousState = PageState;
         var previousHandler = _stateChangedHandler;
@@ -98,7 +135,13 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
         }
     }
 
-    private Task OpenScheduleInspectorAsync() => OpenPolicyAsync();
+    private Task OpenScheduleInspectorAsync()
+    {
+        if (_disposed) return Task.CompletedTask;
+        var url = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["view"] = "schedule", ["edit"] = "cron" });
+        if (url != Navigation.Uri) { Navigation.NavigateTo(url); return Task.CompletedTask; }
+        return OpenDialogAsync(DetailDialogKind.Schedule);
+    }
     private Task OpenPolicyAsync() => OpenDialogAsync(DetailDialogKind.Policy);
     private Task OpenTriggerAsync() => OpenDialogAsync(DetailDialogKind.Trigger);
     private Task OpenExecutionDetailsAsync(string instanceId) => string.IsNullOrWhiteSpace(instanceId)
@@ -111,18 +154,20 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
         if (_disposed || state?.Summary is not { } summary || dialogs is null || state.IsMutating || _commandAdmission is not null)
             return Task.CompletedTask;
         if (kind == DetailDialogKind.Trigger && (!summary.Definition.IsPresent || summary.Definition.IsDisabled)) return Task.CompletedTask;
+        if (kind == DetailDialogKind.Schedule && summary.Definition.Declaration.JobType != JobType.Recurring) return Task.CompletedTask;
         return dialogs.OpenAsync(new(state, _stateVersion, summary, state.ObservedAtUtc, kind, instanceId));
     }
 
     private Task<IDialogReference> ProduceDialogAsync(DetailDialogRequest request) => request.Kind switch
     {
         DetailDialogKind.Execution => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, request.InstanceId!),
-        DetailDialogKind.Policy => DialogService.ShowAsync<JobPolicyDialog>(L["Policy:Title"],
+        DetailDialogKind.Policy or DetailDialogKind.Schedule => DialogService.ShowAsync<JobPolicyDialog>(L[request.Kind == DetailDialogKind.Schedule ? "Workspace:EditCron" : "Policy:Title"],
             new DialogParameters<JobPolicyDialog>
             {
                 { dialog => dialog.Definition, request.Summary.Definition },
                 { dialog => dialog.OperationalSummary, request.Summary },
-                { dialog => dialog.ObservedAtUtc, request.ObservedAtUtc }
+                { dialog => dialog.ObservedAtUtc, request.ObservedAtUtc },
+                { dialog => dialog.ScheduleOnly, request.Kind == DetailDialogKind.Schedule }
             }, WorkbenchDialogOptions),
         DetailDialogKind.Trigger => DialogService.ShowAsync<JobTriggerDialog>(L["Trigger:Title"],
             new DialogParameters<JobTriggerDialog> { { dialog => dialog.Definition, request.Summary.Definition } }, SmallDialogOptions),
@@ -132,8 +177,9 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
     private async Task CompleteDialogAsync(DetailDialogRequest request, DialogResult? result)
     {
         if (!IsCurrentStateVersion(request.Version) || !ReferenceEquals(PageState, request.State)) return;
+        if (request.Kind == DetailDialogKind.Schedule && Edit == "cron") Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("edit", (string?)null), replace: true);
         var refresh = request.Kind == DetailDialogKind.Execution;
-        if (request.Kind == DetailDialogKind.Policy && result is { Canceled: false, Data: not null })
+        if (request.Kind is DetailDialogKind.Policy or DetailDialogKind.Schedule && result is { Canceled: false, Data: not null })
         {
             Snackbar.Add(L["Policy:Saved"], Severity.Success);
             refresh = true;
@@ -281,7 +327,7 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
         else completion.TrySetException(new AggregateException("Job definition page retirement failed.", failures));
     }
 
-    private enum DetailDialogKind { Policy, Trigger, Execution }
+    private enum DetailDialogKind { Policy, Schedule, Trigger, Execution }
     private sealed record DetailDialogRequest(JobDefinitionDetailPageState State, int Version,
         JobOperationalSummary Summary, DateTimeOffset? ObservedAtUtc, DetailDialogKind Kind, string? InstanceId);
 }

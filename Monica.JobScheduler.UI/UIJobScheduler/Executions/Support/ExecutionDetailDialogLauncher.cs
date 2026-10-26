@@ -15,7 +15,8 @@ internal static class ExecutionDetailDialogLauncher
         CloseButton = true,
         CloseOnEscapeKey = true,
         FullWidth = true,
-        MaxWidth = MaxWidth.ExtraLarge
+        MaxWidth = MaxWidth.False,
+        Position = DialogPosition.CenterRight
     };
 
     /// <summary>

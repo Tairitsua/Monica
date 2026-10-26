@@ -44,10 +44,10 @@
 .analytics-duration__fact code,
 .analytics-duration__fact time { min-width: 0; color: var(--duration-muted); font-family: var(--mo-font-family-mono); font-size: 12px; font-weight: 400; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .analytics-duration__state { --state-tone: var(--mud-palette-info); display: inline-flex; align-items: center; justify-self: start; gap: 6px; max-width: 100%; padding: 4px 8px; border-radius: 5px; background: color-mix(in srgb, var(--state-tone) 8%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--state-tone) 25%, var(--mud-palette-text-primary)); font-family: var(--mo-font-family-body); font-size: 12px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
-.analytics-duration__state[data-state="running"] { --state-tone: var(--mud-palette-primary); }
+.analytics-duration__state[data-state="running"] { --state-tone: var(--mud-palette-info); }
 .analytics-duration__state[data-state="succeeded"] { --state-tone: var(--mud-palette-success); }
 .analytics-duration__state[data-state="failed"] { --state-tone: var(--mud-palette-error); }
-.analytics-duration__state[data-state="cancelled"] { --state-tone: var(--mud-palette-secondary); }
+.analytics-duration__state[data-state="cancelled"] { --state-tone: var(--mud-palette-text-secondary); }
 .analytics-duration__state[data-state="skipped"] { --state-tone: var(--mud-palette-warning); }
 .analytics-duration__state ::deep :is(.mud-icon-root, .mo-icon) { flex: none; width: 15px; height: 15px; color: inherit; }
 .analytics-duration__value { display: grid; justify-items: end; gap: 12px; min-width: 0; }

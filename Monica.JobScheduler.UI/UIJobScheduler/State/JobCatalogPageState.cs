@@ -50,6 +50,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal event Func<Task>? Changed;
 
     internal IReadOnlyList<JobOperationalSummary> Summaries { get; private set; } = [];
+    internal IReadOnlyList<JobDefinition> Definitions { get; private set; } = [];
+    internal DateTimeOffset? ObservedAtUtc { get; private set; }
     internal IReadOnlyList<KeyValuePair<string, int>> OwnerFacets { get; private set; } = [];
     internal IReadOnlyDictionary<JobType, int> JobTypeCounts { get; private set; } =
         new Dictionary<JobType, int>();
@@ -62,15 +64,15 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal string? SearchText { get; set; }
     internal string? OwnerId { get; set; }
 
-    /// <summary>Gets or sets the selected job type. A null value includes all types; ordinary entry defaults to recurring jobs.</summary>
-    internal JobType? SelectedJobType { get; set; } = JobType.Recurring;
+    /// <summary>Gets or sets the selected job type. Ordinary entry includes recurring and triggered definitions.</summary>
+    internal JobType? SelectedJobType { get; set; }
     internal bool? SelectedDisabledState { get; set; }
 
     /// <summary>
-    /// Gets the presence scope applied to every catalog query. Defaults to definitions their owners currently
-    /// publish; the overview attention panel deep-links an absent-only audit view through the page query parameter.
+    /// Gets the optional presence scope applied to every catalog query. Ordinary entry includes both published
+    /// and retained unpublished definitions; explicit true or false selects one population.
     /// </summary>
-    internal bool? PresentFilter { get; private set; } = true;
+    internal bool? PresentFilter { get; private set; }
 
     internal bool AccessChecked { get; private set; }
     internal bool IsAuthorized { get; private set; }
@@ -94,16 +96,22 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         SelectedRecurringSummaries.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed);
     internal bool IsDisposed => _lifetime.IsRetired;
 
+    internal Task RefreshCompositionAsync() => _lifetime.RunAsync(async token =>
+    {
+        if ((await EnsureAuthorizedAsync(token)).IsAuthorized) await LoadFacetsAsync(token);
+        await NotifyChangedAsync();
+    });
+
     /// <summary>
-    /// Applies the page's deep-link filters before the first load. Omitted values keep the present-only recurring
-    /// default and the unfiltered owner scope. An absent-only entry includes all job types.
+    /// Applies the page's exact deep-link filters before the first load. Omitted values include every retained
+    /// definition and job type. Explicit presence and owner filters narrow that population.
     /// </summary>
     internal void ApplyInitialQuery(bool? present, string? owner)
     {
         if (present is { } value)
         {
             PresentFilter = value;
-            SelectedJobType = value ? JobType.Recurring : null;
+            SelectedJobType = null;
         }
 
         if (!string.IsNullOrWhiteSpace(owner))
@@ -159,7 +167,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     {
         SearchText = null;
         OwnerId = null;
-        SelectedJobType = PresentFilter == false ? null : JobType.Recurring;
+        SelectedJobType = null;
         SelectedDisabledState = null;
         _selectedJobIds.Clear();
     }
@@ -281,6 +289,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             NextOccurrenceUtc = isRecurring ? null : items[index].NextOccurrenceUtc
         };
         Summaries = items;
+        Definitions = Definitions.Select(definition => definition.Id == jobId ? definition with { Policy = policy } : definition).ToArray();
     }
 
     internal Task<Res<JobPolicy>> SetDisabledAsync(JobOperationalSummary summary, bool disabled) =>
@@ -522,6 +531,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         _lifetime.TryApply(() =>
         {
             OwnerFacets = ownerFacets;
+            Definitions = overview.Definitions;
+            ObservedAtUtc = overview.CapturedAtUtc;
             JobTypeCounts = jobTypeCounts;
             HasLoadedFacets = true;
             FacetsError = null;
@@ -536,6 +547,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         Error = null;
         _selectedJobIds.Clear();
         OwnerFacets = [];
+        Definitions = [];
+        ObservedAtUtc = null;
         JobTypeCounts = new Dictionary<JobType, int>();
         HasLoadedFacets = false;
         FacetsError = null;

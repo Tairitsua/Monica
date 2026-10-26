@@ -45,6 +45,9 @@ public partial class JobPolicyDialog : IAsyncDisposable
     /// <summary>Gets or sets when the caller accepted the projection; omission uses the injected clock on initialization.</summary>
     [Parameter] public DateTimeOffset? ObservedAtUtc { get; set; }
 
+    /// <summary>Gets whether this editor presents only the recurring schedule while preserving every other policy override.</summary>
+    [Parameter] public bool ScheduleOnly { get; set; }
+
     private bool IsDisposed => _lifetime.IsRetired;
 
     private IReadOnlyList<IdentityFact> IdentityFacts => _state is null ? [] :
@@ -161,7 +164,11 @@ public partial class JobPolicyDialog : IAsyncDisposable
     private void SetTimeoutHours(int value) => UpdateDraft(state => state.TimeoutHours = value);
     private void SetTimeoutMinutes(int value) => UpdateDraft(state => state.TimeoutMinutes = value);
     private void SetTimeoutSeconds(int value) => UpdateDraft(state => state.TimeoutSeconds = value);
-    private void ResetAll() => UpdateDraft(static state => state.ResetAll());
+    private void ResetAll() => UpdateDraft(state =>
+    {
+        if (ScheduleOnly) state.Schedule?.ResetExpression();
+        else state.ResetAll();
+    });
     private void DraftChanged() => UpdateDraft(static _ => { });
     private void DiscardScheduleDraft() => UpdateDraft(static state => state.DiscardScheduleDraft());
 

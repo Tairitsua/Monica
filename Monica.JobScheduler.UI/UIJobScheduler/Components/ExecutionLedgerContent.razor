@@ -7,10 +7,16 @@
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
+@inject NavigationManager Navigation
 
 @implements IAsyncDisposable
 
-@if (_state is { } state)
+@if (_routeError)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">@L["Executions:Filters:InvalidRange"]</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick="ResetAsync">@L["Catalog:Actions:Reset"]</MudButton>
+}
+else if (_state is { } state)
 {
     <div class="execution-ledger-content">
         @if (state.Error is not null)
@@ -20,6 +26,11 @@
             </MudAlert>
         }
         <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
+            <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@(state.IsLoading || state.IsMutating)" RefreshRequested="RefreshAsync" />
+            @if (state.HasLoadedSnapshot && state.LoadedQuery is { } acceptedQuery && state.ObservedAtUtc is { } acceptedAt)
+            {
+                <SchedulerLedgerTrajectory Query="@acceptedQuery" ObservedAtUtc="@acceptedAt" StateSelected="SelectTrajectoryStateAsync" />
+            }
             <ExecutionOperationalTable @ref="_table" ServerData="@state.LoadTableAsync"
                                        TotalCount="@state.TotalCount" HasLoadedSnapshot="@state.HasLoadedSnapshot"
                                        IsQueryFailed="@state.IsQueryFailed" ObservedAtUtc="@state.ObservedAtUtc"
@@ -66,7 +77,20 @@
     [Parameter]
     public string? InitialInstanceId { get; set; }
 
-    private static readonly ExecutionTimeRange[] TimeRanges = Enum.GetValues<ExecutionTimeRange>();
+    /// <summary>Gets the exact owner selected by the entry route.</summary>
+    [Parameter] public string? InitialOwner { get; set; }
+    /// <summary>Gets the exact job selected by the entry route.</summary>
+    [Parameter] public string? InitialJob { get; set; }
+    /// <summary>Gets the exact inclusive creation bound, preserving ISO fractional precision and offsets.</summary>
+    [Parameter] public string? InitialFrom { get; set; }
+    /// <summary>Gets the exact exclusive creation bound, preserving ISO fractional precision and offsets.</summary>
+    [Parameter] public string? InitialTo { get; set; }
+    /// <summary>Gets the initial route-held identifier search.</summary>
+    [Parameter] public string? InitialSearch { get; set; }
+    /// <summary>Gets the initial route-held rolling preset.</summary>
+    [Parameter] public string? InitialRange { get; set; }
+
+    private ExecutionTimeRange[] TimeRanges => Enum.GetValues<ExecutionTimeRange>().Where(range => range != ExecutionTimeRange.Exact || _state?.HasExactRange == true).ToArray();
     private readonly SchedulerOperationLifetime _lifetime = new();
     private readonly object _retirementGate = new();
     private TaskCompletionSource? _retirement;
@@ -75,6 +99,7 @@
     private ExecutionDialogSession? _inspectors;
     private SchedulerDialogSession<CancellationRequest>? _confirmations;
     private bool _initialInspectorOpened;
+    private bool _routeError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,7 +108,13 @@
         var state = PageStateFactory.CreatePageState();
         _state = state;
         state.StateChanged += OnStateChangedAsync;
-        state.ApplyInitialQuery(InitialStates, InitialInstanceId);
+        if (!TryParseBound(InitialFrom, out var from) || !TryParseBound(InitialTo, out var to)
+            || to == DateTimeOffset.MinValue || (from.HasValue && to.HasValue && to <= from))
+        {
+            _routeError = true;
+            return;
+        }
+        state.ApplyInitialQuery(InitialStates, InitialInstanceId, InitialOwner, InitialJob, from, to, InitialSearch, InitialRange);
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }
         catch (OperationCanceledException) when (_lifetime.IsRetired) { }
     }
@@ -103,6 +134,21 @@
 
     private string FormatTimeRange(ExecutionTimeRange range) => L[$"Executions:TimeRanges:{range}"];
 
+    private static bool TryParseBound(string? value, out DateTimeOffset? bound)
+    {
+        bound = null;
+        if (value is null) return true;
+        if (long.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var milliseconds))
+        {
+            try { bound = DateTimeOffset.FromUnixTimeMilliseconds(milliseconds); return true; }
+            catch (ArgumentOutOfRangeException) { return false; }
+        }
+        if (!DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed)) return false;
+        bound = parsed;
+        return true;
+    }
+
     private string FormatAcceptedQuery(JobExecutionQuery query)
     {
         var states = query.States is { Count: > 0 }
@@ -121,11 +167,34 @@
         await ApplyAsync();
     }
 
-    private Task ApplyAsync() => _table is null || _lifetime.IsRetired ? Task.CompletedTask : _table.ReloadFromFirstPageAsync();
+    private Task SelectTrajectoryStateAsync(JobExecutionState state) => SelectStatesAsync(_state?.SelectedStates.Count == 1 && _state.SelectedStates.Contains(state) ? [] : new[] { state });
+
+    private Task ApplyAsync()
+    {
+        if (_table is null || _lifetime.IsRetired || _state is not { } state || state.HasInvalidCustomRange) return Task.CompletedTask;
+        string? from = state.TimeRange == ExecutionTimeRange.Exact ? InitialFrom : null;
+        string? to = state.TimeRange == ExecutionTimeRange.Exact ? InitialTo : null;
+        if (state.TimeRange == ExecutionTimeRange.Custom)
+        {
+            from = state.CustomStartDate is { } start ? TimePresentation.GetStartOfSchedulerCalendarDayUtc(start).ToString("O") : null;
+            to = state.CustomEndDate is { } end ? TimePresentation.GetStartOfSchedulerCalendarDayUtc(end.AddDays(1)).ToString("O") : null;
+        }
+        var range = state.TimeRange switch { ExecutionTimeRange.LastHour => "1h", ExecutionTimeRange.Last24Hours => "24h", ExecutionTimeRange.Last7Days => "7d", ExecutionTimeRange.Last30Days => "30d", _ => null };
+        var url = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = string.IsNullOrEmpty(state.SearchText) ? null : state.SearchText,
+            ["states"] = state.SelectedStates.Count == 0 ? null : string.Join(',', state.SelectedStates),
+            ["range"] = range, ["from"] = from, ["to"] = to, ["instanceId"] = null
+        });
+        if (url == Navigation.Uri) return _table.ReloadFromFirstPageAsync();
+        Navigation.NavigateTo(url);
+        return Task.CompletedTask;
+    }
 
     private async Task ResetAsync()
     {
         if (_lifetime.IsRetired) return;
+        if (Navigation.ToAbsoluteUri(Navigation.Uri).Query.Length > 0) { Navigation.NavigateTo(JobExecutionsPage.PAGE_URL); return; }
         _state?.ResetFilters();
         await ApplyAsync();
     }

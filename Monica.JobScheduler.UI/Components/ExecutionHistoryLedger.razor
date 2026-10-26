@@ -1,124 +1,30 @@
-@using Monica.JobScheduler.UI.Localization
 @using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
-
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 
 <section class="execution-history" aria-labelledby="execution-history-heading">
-    <div class="execution-history__heading">
-        <div>
-            <MudText Typo="Typo.subtitle1" HtmlTag="h3" id="execution-history-heading">
-                @L["ExecutionDetail:History"]
-            </MudText>
-            <MudText Typo="Typo.caption">
-                @L["ExecutionDetail:HistoryDescription"]
-            </MudText>
-        </div>
-        <span class="execution-history__count">
-            @L["ExecutionDetail:HistoryCount", Entries.Count]
-        </span>
-    </div>
-    @if (Entries.Count == 0)
-    {
-        <div class="execution-history__empty">
-            <MoIcon Icon="@MoIcons.ClockFading" Size="1.5rem" />
-            <MudText Typo="Typo.body2">@L["ExecutionDetail:EmptyHistory"]</MudText>
-        </div>
-    }
+    <header class="execution-history__heading"><h3 id="execution-history-heading">@L["ExecutionDetail:History"]</h3><small>@L["ExecutionDetail:HistoryCount", Entries.Count]</small></header>
+    @if (Entries.Count == 0) { <p class="execution-history__empty">@L["ExecutionDetail:EmptyHistory"]</p> }
     else
     {
-        <ol class="execution-history__timeline">
-            @foreach (var entry in Entries.OrderBy(entry => entry.TimestampUtc))
-            {
-                <li class="execution-history__entry" data-state="@entry.NewState?.ToString().ToLowerInvariant()">
-                    <span class="execution-history__rail" aria-hidden="true">
-                        <span class="execution-history__node">
-                            <MoIcon Icon="@GetEntryIcon(entry)"
-                                     Size="1.25rem" Style="@GetEntryIconStyle(entry)" />
-                        </span>
-                    </span>
-                    <article>
-                        <header class="execution-history__entry-heading">
-                            <div>
-                                <strong>@L[$"ExecutionHistoryKinds:{entry.Kind}"]</strong>
-                                <time datetime="@entry.TimestampUtc.ToString("O")">@TimePresentation.FormatTimestamp(entry.TimestampUtc)</time>
-                            </div>
-                            <span class="execution-history__level" data-level="@entry.LogLevel.ToString().ToLowerInvariant()">
-                                @L[$"LogLevels:{entry.LogLevel}"]
-                            </span>
-                        </header>
-
-                        <p class="execution-history__message">@entry.Message</p>
-
-                        <footer class="execution-history__metadata">
-                            @if (entry.PreviousState is not null || entry.NewState is not null)
-                            {
-                                <span>
-                                    <MoIcon Icon="@MoIcons.ArrowLeftRight" Size="1.25rem" />
-                                    <span>@GetTransition(entry)</span>
-                                </span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(entry.WorkerInstanceId))
-                            {
-                                <span>
-                                    <MoIcon Icon="@MoIcons.Monitor" Size="1.25rem" />
-                                    <code title="@entry.WorkerInstanceId">@entry.WorkerInstanceId</code>
-                                </span>
-                            }
-                        </footer>
-                    </article>
-                </li>
-            }
-        </ol>
+        var ordered = Entries.OrderBy(entry => entry.TimestampUtc).ToArray();
+        <ol class="execution-history__timeline">@for (var index = 0; index < ordered.Length; index++)
+        {
+            var entry = ordered[index];
+            @if (index > 0) { <li class="execution-history__gap" aria-hidden="true">+@TimePresentation.FormatPreciseDuration(entry.TimestampUtc - ordered[index - 1].TimestampUtc)</li> }
+            <li class="execution-history__entry" data-state="@entry.NewState?.ToString().ToLowerInvariant()">
+                <i class="execution-history__node" aria-hidden="true"></i>
+                <div class="execution-history__body"><strong>@L[$"ExecutionHistoryKinds:{entry.Kind}"] @if (entry.NewState is { } state) { <span>· @L[$"ExecutionStates:{state}"]</span> }</strong><p>@entry.Message</p>
+                    @if (!string.IsNullOrEmpty(entry.WorkerInstanceId)) { <small class="execution-history__worker" title="@entry.WorkerInstanceId">@JobSchedulerUiPresentation.ShortIdentity(entry.WorkerInstanceId)</small> }
+                    <small class="execution-history__level" data-level="@entry.LogLevel.ToString().ToLowerInvariant()">@L[$"LogLevels:{entry.LogLevel}"]</small>
+                </div>
+                <time title="@TimePresentation.FormatExecutionTimestamp(entry.TimestampUtc)" datetime="@entry.TimestampUtc.ToString("O")">@TimePresentation.FormatExecutionClock(entry.TimestampUtc)</time>
+            </li>
+        }</ol>
     }
 </section>
 
 @code {
-    /// <summary>
-    /// Gets or sets the complete retained append-only history to render.
-    /// </summary>
-    [Parameter, EditorRequired]
-    public IReadOnlyList<JobExecutionHistoryEntry> Entries { get; set; } = [];
-
-    private string GetTransition(JobExecutionHistoryEntry entry)
-    {
-        if (entry.PreviousState is null && entry.NewState is null)
-        {
-            return "—";
-        }
-
-        var previous = entry.PreviousState.HasValue
-            ? L[$"ExecutionStates:{entry.PreviousState.Value}"].Value
-            : "∅";
-        var next = entry.NewState.HasValue
-            ? L[$"ExecutionStates:{entry.NewState.Value}"].Value
-            : "∅";
-        return $"{previous} → {next}";
-    }
-
-    private static string GetEntryIcon(JobExecutionHistoryEntry entry) => entry.Kind switch
-    {
-        JobExecutionHistoryKind.ExecutionLog => MoIcons.Terminal,
-        JobExecutionHistoryKind.Cancellation => MoIcons.CancelSchedule,
-        _ => entry.NewState switch
-        {
-            { } state => ExecutionUiPresentation.GetStateIcon(state),
-            _ => MoIcons.Circle
-        }
-    };
-
-    private static Color GetEntryColor(JobExecutionHistoryEntry entry) => entry.NewState is { } state
-        ? JobSchedulerUiPresentation.GetStateColor(state)
-        : ExecutionUiPresentation.GetLogLevelColor(entry.LogLevel);
-
-    private static string GetEntryIconStyle(JobExecutionHistoryEntry entry) => GetEntryColor(entry) switch
-    {
-        Color.Primary => "color:var(--mud-palette-primary);",
-        Color.Secondary => "color:var(--mud-palette-secondary);",
-        Color.Info => "color:var(--mud-palette-info);",
-        Color.Success => "color:var(--mud-palette-success);",
-        Color.Warning => "color:var(--mud-palette-warning);",
-        Color.Error => "color:var(--mud-palette-error);",
-        _ => "color:inherit;"
-    };
+    /// <summary>Gets the complete retained append-only execution history. Display sorting never modifies the source.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobExecutionHistoryEntry> Entries { get; set; } = [];
 }

@@ -33,5 +33,8 @@ internal enum ExecutionTimeRange
     /// <summary>
     /// Uses operator-selected local calendar boundaries.
     /// </summary>
-    Custom
+    Custom,
+
+    /// <summary>Uses an exact route-provided creation interval, with an exclusive end, from an analytics drilldown.</summary>
+    Exact
 }

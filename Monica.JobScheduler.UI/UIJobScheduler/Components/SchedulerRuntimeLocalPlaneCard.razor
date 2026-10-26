@@ -13,6 +13,10 @@
         </div>
     </header>
 
+    <div class="runtime-plane__decision" data-ready="@(Overview.LocalPlane.SchedulingReady && Overview.LocalPlane.WorkerReady)">
+        <strong>@L[Overview.LocalPlane.SchedulingReady && Overview.LocalPlane.WorkerReady ? "Runtime:Plane:Ready" : "Runtime:Plane:NotReady"]</strong>
+        <p>@L["Workspace:RuntimeFinding"]</p>
+    </div>
     <div class="runtime-plane__channels">
         <section class="runtime-plane__channel" aria-labelledby="runtime-scheduling-heading">
             <header>

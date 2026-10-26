@@ -76,7 +76,7 @@
                         </span>
                     </MudTooltip>
                     <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.CalendarSync"
-                               Disabled="@IsMutating" OnClick="OnInspectSchedule">@L["JobDetail:Actions:InspectSchedule"]</MudButton>
+                               Disabled="@IsMutating" OnClick="OnInspectSchedule">@L["Workspace:EditCron"]</MudButton>
                 }
                 <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Sliders"
                            Disabled="@IsMutating" OnClick="OnEditPolicy">@L["Catalog:Actions:Policy"]</MudButton>
@@ -87,15 +87,7 @@
             </div>
         </div>
     </div>
-    <div class="job-detail-header__evidence-band">
-        <p>@L["JobDetail:Header:LedgerScope"]</p>
-        <dl class="job-detail-header__evidence" aria-label="@L["JobDetail:Header:EvidenceAriaLabel"]">
-            <div data-metric="active"><dt>@L["JobDetail:Header:ActiveExecutions"]</dt><dd>@Summary.ActiveExecutionCount</dd></div>
-            <div data-metric="queued" data-tone="info"><dt><MoIcon Icon="@MoIcons.Hourglass" Size="1.5rem" />@L["JobDetail:Header:QueuedExecutions"]</dt><dd>@Summary.QueuedExecutionCount</dd></div>
-            <div data-metric="running" data-tone="primary"><dt><MoIcon Icon="@MoIcons.PlayCircle" Size="1.5rem" />@L["JobDetail:Header:RunningExecutions"]</dt><dd>@Summary.RunningExecutionCount</dd></div>
-            <div data-metric="presence" data-tone="@(Definition.IsPresent ? "success" : "warning")"><dt><MoIcon Icon="@MoIcons.Server" Size="1.5rem" />@L["JobDetail:Header:OwnerPresence"]</dt><dd>@(Definition.IsPresent ? L["JobDetail:Header:OwnerPresent"] : L["JobDetail:Header:OwnerAbsent"])</dd></div>
-        </dl>
-    </div>
+
 </header>
 
 @code {

@@ -6,3 +6,18 @@
 .job-detail-page__freshness { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; color: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); font-size: .8rem; line-height: 1.5; }
 .job-detail-page__freshness > span { overflow-wrap: anywhere; }
 @container job-detail-page (max-width: 900px) { .job-detail-page__evidence-grid { grid-template-columns: minmax(0, 1fr); } }
+.job-detail-page__viewbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.job-detail-page__views { display: flex; padding: 3px; border: 1px solid var(--mud-palette-lines-default); border-radius: 7px; background: var(--mud-palette-surface); }
+.job-detail-page__views button { padding: 7px 12px; border-radius: 4px; color: var(--mud-palette-text-secondary); font-size: 12px; background: transparent; }
+.job-detail-page__views button[aria-pressed="true"] { color: var(--mud-palette-text-primary); background: var(--mud-palette-background-gray); box-shadow: 0 1px 3px color-mix(in srgb, var(--mud-palette-text-primary) 10%, transparent); }
+.job-detail-page__viewbar > a { display: inline-flex; align-items: center; gap: 6px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.job-detail-page__signature { min-width: 0; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); overflow: hidden; }
+.job-detail-page__signature ::deep .job-detail-header { padding: 22px 24px; border: 0; border-radius: 0; background: transparent; }
+.job-detail-page__signature ::deep .job-detail-header__main { padding: 0; }
+.job-detail-page__signature ::deep .job-detail-header__title-row h2 { font: 500 25px var(--mo-font-family-display); }
+.job-detail-page__signature ::deep .job-detail-header__description { font-size: 12px; }
+.job-detail-page__signature ::deep .job-detail-header__eyebrow { font-size: 10.5px; }
+.job-detail-page__signature ::deep .job-detail-header__identity-facts { gap: 8px; }
+.job-detail-page__signature ::deep .job-detail-header__identity-facts code { font-size: 10.5px; }
+.job-detail-page__signature ::deep .job-detail-header__actions .mud-button-root { font-size: 11.5px; }
+@media (max-width:600px) { .job-detail-page__signature ::deep .job-detail-header { padding:20px; } }

@@ -1,0 +1,6 @@
+.analytics-scope { min-width: 0; width: min(100%, 460px); }
+.analytics-scope__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.analytics-scope__controls ::deep .mud-input-control { min-width: 0; margin-block: 0; }
+.analytics-scope__controls ::deep .mud-input { font-size: 12px; }
+.analytics-scope p { margin-top: 7px; color: var(--mud-palette-text-secondary); font-size: 10.5px; line-height: 1.7; }
+@media (max-width: 500px) { .analytics-scope__controls { grid-template-columns: minmax(0, 1fr); } }

@@ -6,7 +6,7 @@
 <SchedulerWorkspace Title="@L["Workspace:Pages:Catalog:Title"]"
                     Description="@L["Workspace:Pages:Catalog:Description"]"
                     ActivePanelIndex="1">
-    <JobCatalogContent @key="(Present, Owner)" Present="@Present" Owner="@Owner" />
+    <JobCatalogContent @key="(Present, Owner, Type, Disabled, Search)" Present="@Present" Owner="@Owner" InitialType="@Type" InitialDisabled="@Disabled" InitialSearch="@Search" InitialInstanceId="@InstanceId" />
 </SchedulerWorkspace>
 
 @code {
@@ -25,4 +25,13 @@
     /// </summary>
     [SupplyParameterFromQuery(Name = "owner")]
     public string? Owner { get; set; }
+
+    /// <summary>Gets the route-held recurring or triggered type selection.</summary>
+    [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    /// <summary>Gets the route-held effective disabled-policy filter.</summary>
+    [SupplyParameterFromQuery(Name = "paused")] public bool? Disabled { get; set; }
+    /// <summary>Gets the route-held definition name or key search.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    /// <summary>Gets the route-owned execution drawer selection without replacing the catalog's filters or batch selection.</summary>
+    [SupplyParameterFromQuery(Name = "instanceId")] public string? InstanceId { get; set; }
 }

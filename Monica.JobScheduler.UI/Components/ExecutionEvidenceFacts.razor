@@ -17,34 +17,34 @@
             <dl class="execution-evidence__facts">
                 <div>
                     <dt>@L["ExecutionDetail:Created"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.CreatedAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CreatedAtUtc)</time></dd>
                 </div>
                 <div>
                     <dt>@L["ExecutionDetail:Available"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.AvailableAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.AvailableAtUtc)</time></dd>
                 </div>
                 @if (Execution.RecurringOccurrenceUtc is { } recurringOccurrenceUtc)
                 {
                     <div>
                         <dt>@L["ExecutionDetail:ScheduledOccurrence"]</dt>
-                        <dd><time>@TimePresentation.FormatTimestamp(recurringOccurrenceUtc)</time></dd>
+                        <dd><time>@TimePresentation.FormatExecutionTimestamp(recurringOccurrenceUtc)</time></dd>
                     </div>
                 }
                 <div>
                     <dt>@L["ExecutionDetail:Started"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.StartedAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.StartedAtUtc)</time></dd>
                 </div>
                 <div>
                     <dt>@L["ExecutionDetail:Completed"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.CompletedAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CompletedAtUtc)</time></dd>
                 </div>
                 <div>
                     <dt>@L["ExecutionDetail:CancellationRequested"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.CancellationRequestedAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CancellationRequestedAtUtc)</time></dd>
                 </div>
                 <div>
                     <dt>@L["ExecutionDetail:Observed"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(ObservedAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(ObservedAtUtc)</time></dd>
                 </div>
             </dl>
         </section>
@@ -75,7 +75,7 @@
                 </div>
                 <div>
                     <dt>@L["ExecutionDetail:LeaseExpires"]</dt>
-                    <dd><time>@TimePresentation.FormatTimestamp(Execution.LeaseExpiresAtUtc)</time></dd>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.LeaseExpiresAtUtc)</time></dd>
                 </div>
             </dl>
         </section>

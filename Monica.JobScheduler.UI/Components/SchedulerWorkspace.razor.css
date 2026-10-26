@@ -1,95 +1,19 @@
-.scheduler-workspace {
-    display: grid;
-    gap: var(--mo-page-section-gap);
-    width: 100%;
-    min-width: 0;
+.scheduler-workspace { display: grid; gap: 22px; width: 100%; min-width: 0; }
+.scheduler-workspace__header { display: flex; align-items: start; gap: 16px; min-width: 0; }
+.scheduler-workspace__seal { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-top: 4px; border-radius: var(--mo-radius-control, 9px); color: var(--mud-palette-surface); background: var(--mud-palette-text-primary); box-shadow: 0 3px 6px color-mix(in srgb, var(--mud-palette-text-primary) 12%, transparent); }
+.scheduler-workspace__header ::deep .mo-vl-masthead { flex: 1; min-width: 0; }
+.scheduler-workspace__header ::deep .mo-vl-title { font-size: 30px; line-height: 1.2; }
+.scheduler-workspace__header ::deep .mo-vl-crumb { font-size: 10.5px; }
+.scheduler-workspace__scope { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: color-mix(in srgb, var(--mud-palette-success) 55%, var(--mud-palette-text-primary)); }
+.scheduler-workspace__scope i { width: 6px; height: 6px; border-radius: 50%; background: var(--mud-palette-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mud-palette-success) 10%, transparent); }
+.scheduler-workspace__zone { padding: 3px 8px; border: 1px solid var(--mud-palette-lines-default); border-radius: 5px; font-size: 10.5px; color: var(--mud-palette-text-secondary); }
+.scheduler-workspace__content { min-width: 0; }
+@media (max-width: 600px) {
+    .scheduler-workspace { gap: 18px; }
+    .scheduler-workspace__header { gap: 12px; }
+    .scheduler-workspace__seal { width: 36px; height: 36px; }
+    .scheduler-workspace__header ::deep .mo-vl-title { font-size: 25px; }
 }
-
-.scheduler-workspace__header {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
-    align-items: end;
-    gap: 24px;
-    min-width: 0;
-    padding: 4px;
-}
-
-.scheduler-workspace__heading {
-    min-width: 0;
-}
-
-.scheduler-workspace ::deep .scheduler-workspace__eyebrow {
-    color: color-mix(in srgb, var(--mud-palette-primary) 45%, var(--mud-palette-text-primary));
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    line-height: 1.5;
-}
-
-.scheduler-workspace ::deep .scheduler-workspace__title {
-    margin-top: 8px;
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mo-font-family-display);
-    font-size: clamp(1.875rem, 2.4vw, 2.125rem);
-    font-weight: 500;
-    letter-spacing: -0.025em;
-    line-height: 1.18;
-    overflow-wrap: anywhere;
-}
-
-.scheduler-workspace ::deep .scheduler-workspace__description {
-    max-width: 78ch;
-    margin-top: 10px;
-    color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary));
-    font-size: 0.875rem;
-    line-height: 1.65;
-    overflow-wrap: anywhere;
-}
-
-.scheduler-workspace__metadata {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-    padding-left: 24px;
-    border-left: 1px solid var(--mud-palette-lines-default);
-}
-
-.scheduler-workspace__context {
-    display: flex;
-    align-items: start;
-    gap: 8px;
-    min-width: 0;
-    color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary));
-    font-size: 0.8125rem;
-    line-height: 1.6;
-}
-
-.scheduler-workspace__context > span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.scheduler-workspace__context ::deep :is(.mud-icon-root, .mo-icon) {
-    width: 17px;
-    height: 17px;
-    margin-top: 2px;
-    flex: 0 0 auto;
-    color: inherit;
-}
-
-.scheduler-workspace__content {
-    min-width: 0;
-}
-
-@media (max-width: 900px) {
-    .scheduler-workspace__header {
-        grid-template-columns: minmax(0, 1fr);
-        align-items: start;
-        gap: 16px;
-    }
-
-    .scheduler-workspace__metadata {
-        padding-left: 0;
-        border-left: 0;
-    }
-}
+.scheduler-workspace ::deep .mo-workbench-navigation { margin-top: -4px; gap: 4px; padding-bottom: 10px; }
+.scheduler-workspace ::deep .mo-workbench-navigation a { min-height: 32px; padding: 6px 12px; font-size: 12px; gap: 7px; }
+.scheduler-workspace ::deep .mo-workbench-navigation :is(.mud-icon-root,.mo-icon) { width: 15px; height: 15px; }
