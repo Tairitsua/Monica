@@ -24,6 +24,38 @@ Register `AddOutbox<TDbContext>` once per context; repeated declarations fail be
 
 Entity event projections are optional: `AddEntityEventProjections<TContext>` stages projection events during save and also requires outbox on the primary context. Projection callbacks should be side-effect-free. When several contexts share one physical database, exactly one (the transaction owner) keeps default migration ownership of the shared tables; every other context sets `ExcludeFromMigrations = true` on its outbox and inbox options so its migrations and snapshots never touch them. Because `ExcludeFromMigrations` also removes a table from `EnsureCreated`, apply it only in the composition used to generate migrations, never in runtime hosts.
 
+## Outbox delivery and maintenance
+
+The worker runs delivery, retention cleanup, and backlog sampling independently for each registered store, using separate scopes. A slow cleanup, status query, or another store's transport does not serialize delivery. Host shutdown cancels and awaits these loops. Delivery starts immediately; maintenance waits for its first interval. Failed operations retry on their own interval.
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| `BatchSize` | 100 | Maximum messages selected per delivery pass; full successful batches continue immediately |
+| `PollInterval` | 5 seconds | Delivery delay after an incomplete batch or scan failure |
+| `CleanupBatchSize` | 1,000 | Maximum expired, acknowledged rows deleted by one SQL statement |
+| `CleanupInterval` | 1 minute | Delay before the first cleanup and after each cleanup pass |
+| `CleanupTimeBudget` | 2 seconds | Elapsed-time budget checked between independently committed cleanup batches |
+| `StatusInterval` | 1 minute | Delay before the first backlog query and after each status sample |
+| `DeliveredRetention` | 7 days | Time acknowledged rows remain available; pending rows never expire |
+
+Cleanup selects keys inside the `DELETE` statement, ordered by `DeliveredAtUtc`, using the leading column of the existing `(DeliveredAtUtc, NextAttemptAtUtc, LeaseUntilUtc, Sequence)` index. It does not load message payloads or transfer a key list to the application. A pass fixes its cutoff once, deletes successive batches until a partial batch or the time budget, and retains completed batches if a later command fails or cancellation occurs. The budget does not cancel an in-flight command: use the provider's command timeout to bound individual SQL operations. This query change requires no new columns or indexes on an already migrated Outbox table; check the actual provider execution plan if cleanup remains expensive.
+
+Size retention from diagnostic needs and event volume: roughly daily delivered volume multiplied by retention days remains in the table even when cleanup keeps up. For a host that needs only one day of delivered-message history, configure the existing registration explicitly:
+
+```csharp
+repository.AddOutbox<OrdersDbContext>(options =>
+{
+    options.DeliveredRetention = TimeSpan.FromDays(1);
+    options.CleanupBatchSize = 1000;
+    options.CleanupInterval = TimeSpan.FromMinutes(1);
+    options.CleanupTimeBudget = TimeSpan.FromSeconds(2);
+});
+```
+
+Reducing retention makes previously retained acknowledgments eligible for deletion. Adjust cleanup batch size and budget to the database's write capacity; changing delivery `BatchSize` or `PollInterval` no longer tunes retention throughput. `tests/Test.Monica.Repository/Outbox/OutboxCleanupTests.cs` protects retention boundaries, bounded server-side batches, the SQLite index access path, and partial progress. `OutboxWorkerTests.cs` covers independent maintenance cadence, continuous delivery, failure recovery, and shutdown.
+
+## Inbox and timestamp behavior
+
 For an EventBus handler with durable deduplication, enable `AddInbox<OrdersDbContext>()`, migrate `MonicaInbox`, and mark the handler class or method `[Inbox("stable.consumer.name")]`. The receipt, business writes, and outgoing events share the primary context's transaction. Keep the consumer name stable across deployments. Missing message identity or missing active inbox transaction fails; duplicate delivery for the same consumer/source/message ID is suppressed. Concurrent contenders may surface a database conflict; let the transport redeliver into a fresh scope.
 
 Durable EventBus delivery can retry across process restarts without a separate job. Choose JobScheduler only when the work needs the independent execution lifecycle of a job in `$monica-application-project-unit-development` (`references/15-job-template.md`); its [store and admission semantics](../../monica-infra-jobs/references/scheduler.md) own durability of admitted job executions.

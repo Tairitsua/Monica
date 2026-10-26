@@ -7,3 +7,10 @@ The single ApiEndpoint owns each operation's HTTP mapping. Protocol emits stable
 Ordinary operations prefer Local when their implementation is included. Otherwise a published operation uses its catalog owner and placement. RunOnRole belongs on the request only when execution requires that role's resources or authority; do not add it merely because another artifact omits the implementation. Its owner must agree with the handler role. HTTP ingress requires an included handler and active role; the receiver executes locally without forwarding. Required receivers remain available in Release builds.
 
 An independently hosted server UI can use the build-generated catalog without backend implementation references, or retain supported explicit HTTP client generation. Define authentication propagation explicitly. Catalog generation is a build-time source-owned contract, not arbitrary runtime manifest loading. Private multipart ingress remains with its implementation and existing gateway route. gRPC is unsupported. See [API registration](../../monica-infra-messaging/references/invocation.md) and [application invocation](../../monica-application-ui/references/application-invocation.md).
+
+## JSON Member Presence
+
+- A `required` member is wire-mandatory: the canonical JSON contract always emits it, even when the host selects a null-omitting `DefaultIgnoreCondition`, and a nullable `required` member is transmitted as an explicit `null` so strict consumers can always bind it.
+- A member without `required` follows the host's ignore condition. When the host omits nulls, consumers must treat an absent optional member and an explicit `null` as equivalent.
+- Choose semantics deliberately: `required` marks "always present on the wire" and never needs to be removed to avoid serialization errors; a member that may legitimately be absent is optional and must not carry business meaning through omission alone.
+

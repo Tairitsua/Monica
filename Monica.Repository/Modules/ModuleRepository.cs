@@ -174,6 +174,10 @@ public static class ModuleRepositoryRegistrationExtensions
         if (options.DeliveryLease <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery lease must be positive.");
         if (options.PollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Poll interval must be positive.");
         if (options.BatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Batch size must be positive.");
+        if (options.CleanupBatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup batch size must be positive.");
+        if (options.CleanupInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup interval must be positive.");
+        if (options.CleanupTimeBudget <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup time budget must be positive.");
+        if (options.StatusInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Status interval must be positive.");
         if (options.RetryBaseDelay <= TimeSpan.Zero || options.RetryMaxDelay < options.RetryBaseDelay)
             throw new ArgumentOutOfRangeException(nameof(configure), "Retry delays must be positive and ordered.");
         if (options.DeliveredRetention <= TimeSpan.Zero)

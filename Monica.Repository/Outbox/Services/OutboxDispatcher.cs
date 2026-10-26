@@ -13,6 +13,8 @@ internal interface IOutboxStore
     string StoreName { get; }
     TimeSpan PollInterval { get; }
     int BatchSize { get; }
+    TimeSpan CleanupInterval { get; }
+    TimeSpan StatusInterval { get; }
     Task<int> DrainAsync(int maximumMessages, CancellationToken cancellationToken);
     Task<int> CleanupAsync(CancellationToken cancellationToken);
     Task<OutboxStoreStatus> GetStatusAsync(CancellationToken cancellationToken);
@@ -28,6 +30,8 @@ public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, Ti
     string IOutboxStore.StoreName => typeof(TDbContext).Name;
     TimeSpan IOutboxStore.PollInterval => registration.Options.PollInterval;
     int IOutboxStore.BatchSize => registration.Options.BatchSize;
+    TimeSpan IOutboxStore.CleanupInterval => registration.Options.CleanupInterval;
+    TimeSpan IOutboxStore.StatusInterval => registration.Options.StatusInterval;
 
     /// <summary>Runs one bounded pass. A failed message remains due and does not block unrelated messages.</summary>
     public async Task<int> DrainAsync(int maximumMessages = 100, CancellationToken cancellationToken = default)
@@ -131,18 +135,36 @@ public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, Ti
         return delivered;
     }
 
-    /// <summary>Deletes only acknowledged rows beyond the configured replay and diagnostic retention period.</summary>
+    /// <summary>
+    /// Deletes acknowledged rows beyond retention in independently committed, bounded SQL batches.
+    /// Stops after a partial batch or when the cleanup time budget is exhausted between statements.
+    /// Pending rows are never deleted. Cancellation and database failures propagate to the caller;
+    /// batches already committed remain deleted.
+    /// </summary>
     public async Task<int> CleanupAsync(CancellationToken cancellationToken = default)
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
-        var cutoff = time.GetUtcNow().UtcDateTime - registration.Options.DeliveredRetention;
-        var keys = await db.Set<OutboxMessage>().AsNoTracking()
+        var options = registration.Options;
+        var cutoff = time.GetUtcNow().UtcDateTime - options.DeliveredRetention;
+        var rows = db.Set<OutboxMessage>();
+        // The existing delivery index starts with DeliveredAtUtc. Ordering by Sequence instead
+        // can force primary-key scans through retained rows or an extra sort of expired rows.
+        var keys = rows
             .Where(x => x.DeliveredAtUtc != null && x.DeliveredAtUtc < cutoff)
-            .OrderBy(x => x.Sequence).Select(x => x.Sequence)
-            .Take(registration.Options.BatchSize).ToListAsync(cancellationToken);
-        if (keys.Count == 0) return 0;
-        return await db.Set<OutboxMessage>().Where(x => keys.Contains(x.Sequence)).ExecuteDeleteAsync(cancellationToken);
+            .OrderBy(x => x.DeliveredAtUtc).Select(x => x.Sequence)
+            .Take(options.CleanupBatchSize);
+        var started = time.GetTimestamp();
+        var deleted = 0;
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Keep selection on the server: one round trip and one transaction per batch.
+            var count = await rows.Where(x => keys.Contains(x.Sequence)).ExecuteDeleteAsync(cancellationToken);
+            deleted += count;
+            if (count < options.CleanupBatchSize) break;
+        } while (time.GetElapsedTime(started) < options.CleanupTimeBudget);
+        return deleted;
     }
 
     async Task<OutboxStoreStatus> IOutboxStore.GetStatusAsync(CancellationToken cancellationToken)

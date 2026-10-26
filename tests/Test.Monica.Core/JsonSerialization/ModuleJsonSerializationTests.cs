@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -99,5 +100,61 @@ public sealed class ModuleJsonSerializationTests
 
         mutate.Should().Throw<InvalidOperationException>()
             .WithMessage("*already been compiled*late contributions*");
+    }
+
+    private sealed class WireDto
+    {
+        public required bool? IsFiled { get; init; }
+
+        public required string? OriginADES { get; init; }
+
+        public string? OptionalNote { get; init; }
+    }
+
+    private static IJsonSerializerOptionsProvider BuildProvider(
+        Action<ModuleJsonSerializationOption> configure)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddMonica(monica =>
+        {
+            monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
+            monica.AddJsonSerialization(configure);
+        });
+        var host = builder.Build();
+        return host.Services.GetRequiredService<IJsonSerializerOptionsProvider>();
+    }
+
+    [Fact]
+    public void Serialize_WhenIgnoreConditionOmitsNulls_ShouldStillEmitRequiredMembers()
+    {
+        var provider = BuildProvider(static options =>
+            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull);
+
+        var json = JsonSerializer.Serialize(
+            new WireDto { IsFiled = null, OriginADES = null, OptionalNote = null },
+            provider.SerializerOptions);
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        root.TryGetProperty("isFiled", out var isFiled).Should().BeTrue();
+        isFiled.ValueKind.Should().Be(JsonValueKind.Null);
+        root.TryGetProperty("originADES", out var originADES).Should().BeTrue();
+        originADES.ValueKind.Should().Be(JsonValueKind.Null);
+        root.TryGetProperty("optionalNote", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RoundTrip_WhenRequiredNullableMembersAreNull_ShouldSatisfyStrictDeserialization()
+    {
+        var provider = BuildProvider(static options =>
+            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull);
+
+        var payload = new WireDto { IsFiled = null, OriginADES = null, OptionalNote = null };
+        var json = JsonSerializer.Serialize(payload, provider.SerializerOptions);
+
+        var roundTrip = JsonSerializer.Deserialize<WireDto>(json, provider.SerializerOptions);
+
+        roundTrip!.IsFiled.Should().BeNull();
+        roundTrip.OriginADES.Should().BeNull();
     }
 }

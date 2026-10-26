@@ -18,7 +18,7 @@ builder.AddMonica(monica =>
 });
 ```
 
-`UseDaprStateStoreProvider(options => options.StateStoreName = "app-state")` instead uses the Dapr sidecar and requires a state-store component with the same name. Dapr's client module brings in sidecar readiness monitoring. Redis also supports Sentinel and cluster connection methods. Configure credentials and endpoints from host configuration. Typed distributed values follow the host's canonical JSON contract; changing that contract can make persisted values unreadable.
+`UseDaprStateStoreProvider(options => options.StateStoreName = "app-state")` instead uses the Dapr sidecar and requires a state-store component with the same name. Dapr's client module brings in sidecar readiness monitoring. Redis also supports Sentinel and cluster connection methods. Configure credentials and endpoints from host configuration. Typed distributed values follow the host's canonical JSON contract; changing that contract can make persisted values unreadable. The canonical contract always emits `required` members, including nullable ones written as an explicit `null`, so required-marked typed values round-trip even when the host omits nulls for optional members.
 
 Redis appends `:` between a nonempty `KeyPrefix` and each logical key; `my-app` therefore stores `my-app:<key>`. The provider does not add an application ID. Use the same connection, database, prefix and JSON contract for every participant that shares state, and an independent namespace for another environment or persistence format. Redis hashes use `data` and `version` fields; selecting this provider does not migrate existing Dapr state.
 

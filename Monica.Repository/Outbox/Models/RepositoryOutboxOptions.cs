@@ -6,11 +6,27 @@ public sealed class RepositoryOutboxOptions
     /// <summary>Claim duration, five minutes by default. Configure above the transport's normal send timeout.</summary>
     public TimeSpan DeliveryLease { get; set; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Maximum due rows each store scans per worker pass; defaults to 100.</summary>
+    /// <summary>Maximum due rows each delivery pass scans; defaults to 100. Does not limit cleanup.</summary>
     public int BatchSize { get; set; } = 100;
 
-    /// <summary>Delay between worker passes; defaults to five seconds.</summary>
+    /// <summary>Delay after an incomplete delivery batch or a failed scan; defaults to five seconds. Full successful batches continue immediately.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Maximum acknowledged rows deleted by one cleanup statement; defaults to 1,000.</summary>
+    public int CleanupBatchSize { get; set; } = 1000;
+
+    /// <summary>Delay before the first cleanup and between cleanup passes; defaults to one minute, independently of delivery.</summary>
+    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Maximum elapsed time before starting another cleanup batch; defaults to two seconds.
+    /// Each statement commits independently. This budget does not interrupt an in-flight database command;
+    /// configure the provider's command timeout to bound individual commands.
+    /// </summary>
+    public TimeSpan CleanupTimeBudget { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Delay before the first backlog query and between status samples; defaults to one minute, independently of delivery.</summary>
+    public TimeSpan StatusInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Enables the host-owned delivery worker; disable only when another host drains this store or in deterministic tests.</summary>
     public bool EnableWorker { get; set; } = true;
