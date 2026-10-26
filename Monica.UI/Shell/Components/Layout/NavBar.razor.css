@@ -30,10 +30,11 @@
 .rail-brand { display: grid; place-items: center; width: 100%; height: 56px; flex: none; }
 .rail-categories { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-height: 0; padding: 8px 12px 0; overflow-y: auto; scrollbar-width: none; }
 .rail-category { display: grid; place-items: center; flex: none; width: 40px; min-height: 40px; border-radius: 10px; position: relative; color: var(--mo-color-shell-frame-muted); }
-.rail-category ::deep .mud-icon-button { width: 40px; height: 40px; padding: 10px; color: inherit; border-radius: 10px; }
+.rail-category ::deep .mud-icon-button { width: 40px; height: 40px; padding: 10px; color: inherit; border-radius: 10px; background: transparent; transition: none; }
+.rail-category ::deep .mud-icon-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: -2px; }
 .rail-category ::deep :is(.mud-icon-root, .mo-icon), .rail-collapse ::deep :is(.mud-icon-root, .mo-icon) { width: 20px; height: 20px; font-size: 20px; }
 .rail-category:hover { color: var(--mo-color-shell-frame-text); background: var(--mo-color-shell-frame-hover); }
-.rail-category.selected { color: var(--mud-palette-primary); background: var(--mud-palette-surface); box-shadow: var(--mo-shell-selected-shadow); }
+.rail-category.selected { color: var(--mud-palette-primary); background: var(--mud-palette-surface); }
 .rail-category.selected::before { content: ''; position: absolute; left: -12px; top: 11px; bottom: 11px; width: 3px; background: var(--mud-palette-primary); border-radius: 0 3px 3px 0; }
 .rail-collapse { margin-top: auto; padding-top: 10px; }
 .rail-collapse ::deep .mud-icon-button { width: 40px; height: 40px; color: var(--mo-color-shell-frame-muted); }

@@ -67,7 +67,7 @@
                                 VisibleChanged="@((bool visible) => SetCategoryTooltipVisible(category.Id, visible))">
                         @if (Shell.SidebarCollapsed)
                         {
-                            <MudIconButton @ref="_contextNavigationTriggers[category.Id]" Icon="@GetCategoryIcon(category)"
+                            <MudIconButton @ref="_contextNavigationTriggers[category.Id]" Icon="@GetCategoryIcon(category)" Ripple="false"
                                            OnClick="@(() => OpenContextNavigation(category))"
                                            aria-label="@category.DisplayName"
                                            aria-expanded="@(IsContextCategoryOpen(category) ? "true" : "false")"
@@ -75,7 +75,7 @@
                         }
                         else
                         {
-                            <MudIconButton Icon="@GetCategoryIcon(category)" OnClick="@(() => SelectCategory(category))"
+                            <MudIconButton Icon="@GetCategoryIcon(category)" OnClick="@(() => SelectCategory(category))" Ripple="false"
                                            aria-label="@category.DisplayName"
                                            aria-pressed="@(category == SelectedCategory ? "true" : "false")" />
                         }
