@@ -432,6 +432,14 @@ public sealed partial class EfCoreJobSchedulerStore
             {
                 var batch = await WriteAsync(async (context, token) =>
                 {
+                    var gate = await LockClaimGateAsync(context, request, afterJob ?? string.Empty, visited, token);
+                    if (gate is null)
+                    {
+                        return Array.Empty<JobExecutionLease>();
+                    }
+                    // Publication locks every existing Gate before replacing the manifest. Reading it after this
+                    // lock prevents a claim that observed an old manifest from granting work after replacement.
+                    // This is an MVCC read, not an Owner lock, so publication's Owner-to-Gate order cannot invert.
                     if (request.OwnerManifestHash is { } expectedManifest)
                     {
                         var accepted = await context.SchedulerOwners.AsNoTracking()
@@ -439,15 +447,9 @@ public sealed partial class EfCoreJobSchedulerStore
                             .Select(row => row.ManifestHash).SingleOrDefaultAsync(token);
                         if (accepted != expectedManifest) return Array.Empty<JobExecutionLease>();
                     }
-                    var now = await GetUtcNowAsync(context, token);
-                    var gate = await LockClaimGateAsync(context, request, afterJob ?? string.Empty, visited, now, token);
-                    if (gate is null)
-                    {
-                        return Array.Empty<JobExecutionLease>();
-                    }
                     afterJob = gate.JobKey;
                     visited.Add(gate.JobKey);
-                    now = await GetUtcNowAsync(context, token);
+                    var now = await GetUtcNowAsync(context, token);
                     var nowTicks = ToTicks(now);
                     var available = Math.Min(request.MaxCount - leases.Count, gate.MaxConcurrency - gate.ActiveCount);
                     var candidates = await context.Executions
@@ -517,9 +519,9 @@ public sealed partial class EfCoreJobSchedulerStore
         ValidatePositiveDuration(leaseDuration, nameof(leaseDuration));
         return WriteAsync(async (dbContext, token) =>
         {
-            await LockExecutionAsync(dbContext, leaseKey.SchedulerScopeKey, leaseKey.InstanceId, token);
+            var lockedExecution = await LockExecutionAsync(dbContext, leaseKey.SchedulerScopeKey, leaseKey.InstanceId, token);
             var now = await GetUtcNowAsync(dbContext, token);
-            var execution = await LoadCurrentExecutionLeaseAsync(dbContext, leaseKey, now, token);
+            var execution = MatchCurrentExecutionLease(lockedExecution, leaseKey, now);
             if (execution is null)
             {
                 return new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Lost };
@@ -549,8 +551,9 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(completion);
         completion.Validate();
-        return WriteExecutionAsync(completion.LeaseKey.SchedulerScopeKey, completion.LeaseKey.InstanceId, async (dbContext, token) =>
-            await CompleteAttemptAsync(dbContext, completion, await GetUtcNowAsync(dbContext, token), token),
+        return WriteExecutionAsync(completion.LeaseKey.SchedulerScopeKey, completion.LeaseKey.InstanceId,
+            async (dbContext, execution, gate, token) =>
+                CompleteAttempt(execution, gate, completion, await GetUtcNowAsync(dbContext, token)),
             cancellationToken);
     }
 
@@ -578,15 +581,8 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ValidateIdentity(schedulerScopeKey, nameof(schedulerScopeKey));
         ValidateIdentity(instanceId, nameof(instanceId));
-        return WriteExecutionAsync(schedulerScopeKey, instanceId, async (dbContext, token) =>
+        return WriteExecutionAsync(schedulerScopeKey, instanceId, async (dbContext, execution, gate, token) =>
         {
-            var execution = await LoadExecutionAsync(
-                dbContext,
-                schedulerScopeKey,
-                instanceId,
-                true,
-                false,
-                token);
             if (execution is null)
             {
                 return new JobCancellationResult { Status = JobCancellationStatus.NotFound };
@@ -609,7 +605,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 var worker = execution.RunningWorkerInstanceId;
                 if (execution.State == JobExecutionState.Running)
                 {
-                    await ReleaseExecutionGateAsync(dbContext, execution, token);
+                    ReleaseExecutionGate(gate, execution);
                 }
                 var previous = execution.State;
                 execution.State = JobExecutionState.Cancelled;
@@ -656,9 +652,9 @@ public sealed partial class EfCoreJobSchedulerStore
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.Message);
         return WriteAsync(async (dbContext, token) =>
         {
-            await LockExecutionAsync(dbContext, entry.LeaseKey.SchedulerScopeKey, entry.LeaseKey.InstanceId, token);
+            var lockedExecution = await LockExecutionAsync(dbContext, entry.LeaseKey.SchedulerScopeKey, entry.LeaseKey.InstanceId, token);
             var now = await GetUtcNowAsync(dbContext, token);
-            var execution = await LoadCurrentExecutionLeaseAsync(dbContext, entry.LeaseKey, now, token);
+            var execution = MatchCurrentExecutionLease(lockedExecution, entry.LeaseKey, now);
             if (execution is null)
             {
                 return JobLeaseMutationStatus.Lost;
@@ -701,19 +697,17 @@ public sealed partial class EfCoreJobSchedulerStore
         var recovered = new List<JobExecutionInstance>();
         foreach (var instance in candidates)
         {
-            var result = await WriteExecutionAsync(request.SchedulerScopeKey, instance, async (dbContext, token) =>
+            var result = await WriteExecutionAsync(request.SchedulerScopeKey, instance, async (dbContext, execution, gate, token) =>
             {
                 var now = await GetUtcNowAsync(dbContext, token);
                 var nowTicks = ToTicks(now);
-                var execution = await dbContext.Executions.SingleOrDefaultAsync(row =>
-                    row.SchedulerScopeKey == request.SchedulerScopeKey && row.InstanceId == instance
-                    && row.State == JobExecutionState.Running && row.LeaseExpiresAtUtcTicks <= nowTicks, token);
-                if (execution is null)
+                if (execution is null || execution.State != JobExecutionState.Running
+                    || execution.LeaseExpiresAtUtcTicks is not { } expiryTicks || expiryTicks > nowTicks)
                 {
                     return null;
                 }
                 var worker = execution.RunningWorkerInstanceId;
-                await ReleaseExecutionGateAsync(dbContext, execution, token);
+                ReleaseExecutionGate(gate, execution);
                 if (execution.CancellationRequestedAtUtcTicks.HasValue)
                 {
                     execution.State = JobExecutionState.Cancelled;
@@ -961,20 +955,20 @@ public sealed partial class EfCoreJobSchedulerStore
         return ToExecution(existing);
     }
 
-    private async Task<JobAttemptCompletionResult> CompleteAttemptAsync(
-        JobSchedulerDbContext dbContext,
+    private JobAttemptCompletionResult CompleteAttempt(
+        JobExecutionEntity? lockedExecution,
+        JobExecutionGateEntity? gate,
         JobAttemptCompletion completion,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
+        DateTimeOffset now)
     {
-        var execution = await LoadCurrentExecutionLeaseAsync(dbContext, completion.LeaseKey, now, cancellationToken);
+        var execution = MatchCurrentExecutionLease(lockedExecution, completion.LeaseKey, now);
         if (execution is null)
         {
             return new JobAttemptCompletionResult { Status = JobAttemptCompletionStatus.Lost };
         }
 
         var worker = execution.RunningWorkerInstanceId;
-        await ReleaseExecutionGateAsync(dbContext, execution, cancellationToken);
+        ReleaseExecutionGate(gate, execution);
         var outcome = execution.CancellationRequestedAtUtcTicks.HasValue ? JobAttemptOutcome.Cancelled : completion.Outcome;
         var nowTicks = ToTicks(now);
         switch (outcome)
@@ -1033,18 +1027,17 @@ public sealed partial class EfCoreJobSchedulerStore
         };
     }
 
-    private static Task<JobExecutionEntity?> LoadCurrentExecutionLeaseAsync(
-        JobSchedulerDbContext dbContext,
+    private static JobExecutionEntity? MatchCurrentExecutionLease(
+        JobExecutionEntity? execution,
         JobLeaseKey key,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        dbContext.Executions.SingleOrDefaultAsync(item =>
-            item.SchedulerScopeKey == key.SchedulerScopeKey
-            && item.InstanceId == key.InstanceId
-            && item.State == JobExecutionState.Running
-            && item.RunningWorkerInstanceId == key.WorkerInstanceId
-            && item.ExecutionLeaseToken == key.LeaseToken
-            && item.LeaseExpiresAtUtcTicks > ToTicks(now), cancellationToken);
+        DateTimeOffset now) =>
+        execution is { State: JobExecutionState.Running, LeaseExpiresAtUtcTicks: { } expiresAt }
+        && execution.SchedulerScopeKey == key.SchedulerScopeKey
+        && execution.InstanceId == key.InstanceId
+        && execution.RunningWorkerInstanceId == key.WorkerInstanceId
+        && execution.ExecutionLeaseToken == key.LeaseToken
+        && expiresAt > ToTicks(now)
+            ? execution : null;
 
     private static Task<JobExecutionEntity?> LoadExecutionAsync(
         JobSchedulerDbContext dbContext,
@@ -1067,17 +1060,13 @@ public sealed partial class EfCoreJobSchedulerStore
             item.SchedulerScopeKey == schedulerScopeKey && item.InstanceId == instanceId, cancellationToken);
     }
 
-    private static async Task ReleaseExecutionGateAsync(
-        JobSchedulerDbContext dbContext,
-        JobExecutionEntity execution,
-        CancellationToken cancellationToken)
+    private static void ReleaseExecutionGate(JobExecutionGateEntity? gate, JobExecutionEntity execution)
     {
-        var gate = await dbContext.ExecutionGates.SingleOrDefaultAsync(item =>
-                item.SchedulerScopeKey == execution.SchedulerScopeKey
-                && item.OwnerKey == execution.OwnerKey
-                && item.JobKey == execution.JobKey, cancellationToken)
-            ?? throw new InvalidOperationException(
+        if (gate is null)
+        {
+            throw new InvalidOperationException(
                 $"Execution gate '{execution.OwnerKey}/{execution.JobKey}' does not exist.");
+        }
         if (gate.ActiveCount < 1)
         {
             throw new InvalidOperationException(

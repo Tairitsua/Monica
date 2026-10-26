@@ -45,18 +45,18 @@ public sealed partial class EfCoreJobSchedulerStore
         return await context.Database.SqlQueryRaw<bool>(sql, parameters.ToArray()).SingleAsync(token);
     }
 
-    private static async Task<JobExecutionGateEntity?> LockClaimGateAsync(
+    private async Task<JobExecutionGateEntity?> LockClaimGateAsync(
         JobSchedulerDbContext context, JobClaimRequest request, string afterJob, IReadOnlySet<string> visited,
-        DateTimeOffset observedAt, CancellationToken token)
+        CancellationToken token)
     {
         var keys = request.JobKeys.Where(key => !visited.Contains(key)).ToArray();
         if (keys.Length == 0)
         {
             return null;
         }
-        var ticks = ToTicks(observedAt);
         if (!UsesNativeRowLocks(context))
         {
+            var ticks = ToTicks(await GetUtcNowAsync(context, token));
             return await context.ExecutionGates
                 .Where(gate => gate.SchedulerScopeKey == request.SchedulerScopeKey && gate.OwnerKey == request.OwnerKey
                                && keys.Contains(gate.JobKey) && gate.ActiveCount < gate.MaxConcurrency
@@ -69,7 +69,7 @@ public sealed partial class EfCoreJobSchedulerStore
 
         // Values, including job keys, are parameters. Eligibility and physical-lock skipping precede LIMIT;
         // sixty-four saturated or locked jobs therefore cannot hide the next runnable job.
-        var parameters = new List<object> { request.SchedulerScopeKey, request.OwnerKey, ticks, afterJob };
+        var parameters = new List<object> { request.SchedulerScopeKey, request.OwnerKey, afterJob };
         var placeholders = new List<string>();
         foreach (var key in keys)
         {
@@ -81,8 +81,9 @@ public sealed partial class EfCoreJobSchedulerStore
                   + "AND g.\"ActiveCount\" < g.\"MaxConcurrency\" AND g.\"JobKey\" IN (" + string.Join(",", placeholders) + ") "
                   + "AND EXISTS (SELECT 1 FROM \"JobExecutions\" e WHERE e.\"SchedulerScopeKey\" = g.\"SchedulerScopeKey\" "
                   + "AND e.\"OwnerKey\" = g.\"OwnerKey\" AND e.\"JobKey\" = g.\"JobKey\" "
-                  + "AND e.\"State\" = 'Queued' AND e.\"AvailableAtUtcTicks\" <= {2}) "
-                  + "ORDER BY CASE WHEN g.\"JobKey\" > {3} THEN 0 ELSE 1 END, g.\"JobKey\" LIMIT 1 FOR UPDATE SKIP LOCKED";
+                  + "AND e.\"State\" = 'Queued' AND e.\"AvailableAtUtcTicks\" <= "
+                  + DATABASE_STATEMENT_TICKS_SQL + ") "
+                  + "ORDER BY CASE WHEN g.\"JobKey\" > {2} THEN 0 ELSE 1 END, g.\"JobKey\" LIMIT 1 FOR UPDATE SKIP LOCKED";
         return (await context.ExecutionGates.FromSqlRaw(sql, parameters.ToArray()).ToListAsync(token)).SingleOrDefault();
     }
 
@@ -133,7 +134,8 @@ public sealed partial class EfCoreJobSchedulerStore
         }, cancellationToken, coordinatorLease, operationName);
 
     private Task<TResult> WriteExecutionAsync<TResult>(string scope, string instance,
-        Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken,
+        Func<JobSchedulerDbContext, JobExecutionEntity?, JobExecutionGateEntity?, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken,
         JobCoordinatorLeaseKey? coordinatorLease = null, [CallerMemberName] string operationName = "") =>
         WriteAsync(async (context, token) =>
         {
@@ -141,11 +143,22 @@ public sealed partial class EfCoreJobSchedulerStore
             var identity = await context.Executions.AsNoTracking()
                 .Where(row => row.SchedulerScopeKey == scope && row.InstanceId == instance)
                 .Select(row => new { row.OwnerKey, row.JobKey }).SingleOrDefaultAsync(token);
+            JobExecutionGateEntity? gate = null;
+            JobExecutionEntity? execution = null;
             if (identity is not null)
             {
-                await LockGateAsync(context, scope, identity.OwnerKey, identity.JobKey, token);
-                await LockExecutionAsync(context, scope, instance, token);
+                gate = await LockGateAsync(context, scope, identity.OwnerKey, identity.JobKey, token);
+                execution = await LockExecutionAsync(context, scope, instance, token);
+                if (execution is not null
+                    && (execution.OwnerKey != identity.OwnerKey || execution.JobKey != identity.JobKey))
+                {
+                    // Cleanup and a later enqueue may reuse an instance ID. Never mutate its replacement while
+                    // holding the former job's Gate; the caller must observe the changed identity explicitly.
+                    throw new InvalidOperationException("Execution identity changed while acquiring its gate and execution locks.");
+                }
             }
-            return await operation(context, token);
+            // The returned rows remain locked and tracked until this transaction ends. Pass them explicitly so
+            // mutations do not issue another SELECT or accidentally use a row read before its lock was acquired.
+            return await operation(context, execution, gate, token);
         }, cancellationToken, coordinatorLease, operationName);
 }

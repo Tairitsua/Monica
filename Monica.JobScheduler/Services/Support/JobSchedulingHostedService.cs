@@ -332,6 +332,12 @@ internal sealed class JobSchedulingHostedService(
         _cleanupAfterJob = result.CompletedScan ? null : result.LastScannedJob;
         runtimeState.RecordHistoryCleanupWork(timeProvider.GetUtcNow());
         _nextCleanupUtc = result.CompletedScan ? now.Add(_options.HistoryCleanupInterval) : now;
+        if (result.CompletedScan)
+        {
+            Logger.LogInformation(
+                "Scheduler history cleanup scan completed for scope {SchedulerScopeKey} by {WorkerInstanceId}; next scan at {NextCleanupUtc}.",
+                _options.SchedulerScopeKey, _options.WorkerInstanceId, _nextCleanupUtc);
+        }
     }
 
     internal static string CreateRecurringInstanceId(
