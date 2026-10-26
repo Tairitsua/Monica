@@ -23,9 +23,10 @@
     min-height: 0;
     margin: 0 8px 8px 0;
     overflow: hidden;
+    border: 1px solid var(--mud-palette-divider);
     border-radius: 14px;
     background: var(--mud-palette-background);
-    box-shadow: 0 0 0 1px var(--mud-palette-divider), var(--mud-elevation-1);
+    box-shadow: var(--mud-elevation-1);
 }
 .mo-layout[data-layout="topbar"] .mo-main-content { margin-left: 8px; }
 .mo-body-content {
@@ -43,5 +44,5 @@
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: "header" "main";
     }
-    .mo-layout[data-layout] .mo-main-content { margin: 0; border-radius: 0; box-shadow: none; }
+    .mo-layout[data-layout] .mo-main-content { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 }
