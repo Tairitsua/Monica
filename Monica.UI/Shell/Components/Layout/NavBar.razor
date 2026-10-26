@@ -135,7 +135,7 @@
 
 <MudDrawer Open="@_mobileNavigationOpen" OpenChanged="MobileNavigationChanged"
            Variant="DrawerVariant.Temporary" Width="min(320px, 90vw)" Elevation="0"
-           Class="mo-mobile-navigation" aria-label="@L["NavBar:Navigation"]">
+           Class="mo-mobile-navigation mo-viewport-drawer" aria-label="@L["NavBar:Navigation"]">
     <div class="mobile-navigation-content" @onkeydown="HandleDrawerKeyDown">
         @if (_mobileNavigationOpen)
         {

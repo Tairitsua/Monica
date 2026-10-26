@@ -176,7 +176,9 @@ Pair filled action and identity-surface paint with the palette's corresponding c
 
 Theme surface rules may paint drawers, but must preserve their fixed or absolute positioning. A broad `position: relative` rule can bring even a closed temporary drawer into the shell grid, consume a content row, and collapse the page. Keep decorative positioning separate from shared paint and exclude `.mud-drawer` from every matching branch. Excluding only an explicit drawer selector is insufficient: a drawer also matches elevated `.mud-paper` selectors.
 
-Verify open and closed temporary drawers, both shell layouts, and a narrow viewport. Inspect computed drawer positioning and the main content height on more than one page; a visible shell with an empty content area can be a layout regression rather than a page loading failure.
+MudBlazor v9 computes a drawer as fixed only when `Fixed` is true and its cascading drawer container is a `MudLayout`. A page-owned `MudDrawerContainer`, or the custom shell without that native layout, leaves it absolutely positioned. Full-window inspectors and mobile shell navigation use `Class="mo-viewport-drawer"` on the native drawer; `layout/mo-page-shell.css` owns that explicit fixed-position contract. Do not remove the shell scroll owner's `position: relative` to make an absolute drawer appear viewport-bound. Keep intentionally page-local drawers inside their deliberate local container, and retain component-specific positioning for panels with measured owner bounds.
+
+Verify open and closed temporary drawers, both shell layouts, and a narrow viewport. Scroll the page before opening an inspector and scroll its content afterwards; the title, Close action and tab strip must remain within the viewport, with one local body scroll owner. Inspect computed drawer positioning, its viewport bounds, and the main content height on more than one page; a visible shell with an empty content area can be a layout regression rather than a page loading failure. Verify Escape, overlay dismissal, focus return and closed-drawer document overflow alongside the geometry.
 
 ### Hidden measurement elements can enlarge the document
 
