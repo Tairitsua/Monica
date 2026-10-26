@@ -185,6 +185,10 @@ public sealed class JobSchedulerFacadeTests
         harness.RuntimeState.SetScheduling(true, "Scheduling is active.");
         harness.RuntimeState.SetWorker(true, "Worker is active.");
         harness.RuntimeState.SetInFlightExecutions(2);
+        harness.RuntimeState.RecordOwnerSchedulingWork(NOW);
+        harness.RuntimeState.RecordLeaseRecoveryWork(NOW.AddSeconds(-1));
+        await harness.Store.TryAcquireCoordinatorLeaseAsync(StoreFixture.SCOPE, "maintenance", "diagnostic-holder",
+            TimeSpan.FromSeconds(30), cancellationToken: TestContext.Current.CancellationToken);
 
         var result = await harness.Facade.GetRuntimeOverviewAsync(TestContext.Current.CancellationToken);
 
@@ -203,6 +207,13 @@ public sealed class JobSchedulerFacadeTests
         overview.LocalPlane.SchedulingMessage.Should().Be("Scheduling is active.");
         overview.LocalPlane.WorkerReady.Should().BeTrue();
         overview.LocalPlane.InFlightExecutions.Should().Be(2);
+        overview.LocalPlane.LastOwnerSchedulingWorkAtUtc.Should().Be(NOW);
+        overview.LocalPlane.LastLeaseRecoveryWorkAtUtc.Should().Be(NOW.AddSeconds(-1));
+        overview.LocalPlane.LastHistoryCleanupWorkAtUtc.Should().BeNull();
+        overview.Configuration.MaxConcurrentStoreOperations.Should().Be(8);
+        overview.Configuration.ReservedLeaseStoreOperations.Should().Be(2);
+        overview.Configuration.StoreOperationTimeout.Should().Be(TimeSpan.FromSeconds(5));
+        overview.Coordination!.Coordinators.Should().ContainSingle().Which.WorkerInstanceId.Should().Be("diagnostic-holder");
         var owner = overview.Owners.Should().ContainSingle().Subject;
         owner.OwnerKey.Should().Be(StoreFixture.OWNER_A);
         owner.PresentCount.Should().Be(1);

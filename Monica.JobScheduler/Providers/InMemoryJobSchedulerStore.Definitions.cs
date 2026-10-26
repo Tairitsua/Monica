@@ -19,11 +19,28 @@ public sealed partial class InMemoryJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var normalized = snapshot.NormalizeAndValidate();
+        normalized.CoordinatorLease?.ValidatePartition(normalized.SchedulerScopeKey, "owner:" + normalized.OwnerKey);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
+            ValidateCoordinatorLeaseUnsafe(normalized.CoordinatorLease);
             var now = UtcNow;
+            var identity = (normalized.SchedulerScopeKey, normalized.OwnerKey);
+            var manifestHash = normalized.ComputeManifestHash();
+            var hasOwner = _owners.TryGetValue(identity, out var owner);
+            if (hasOwner && owner.Hash != manifestHash && owner.Hash != normalized.ExpectedPreviousManifestHash)
+                throw new InvalidOperationException($"Owner '{normalized.OwnerKey}' rejected an incompatible declaration manifest.");
+            _owners[identity] = (manifestHash, now,
+                hasOwner && owner.Hash == manifestHash ? owner.Published : now);
+            if (hasOwner && owner.Hash == manifestHash)
+            {
+                return Task.FromResult(new JobDefinitionSyncResult
+                {
+                    ManifestHash = manifestHash, ContentChanged = false,
+                    PresentCount = normalized.Declarations.Count, ObservedAtUtc = now
+                });
+            }
             var presentKeys = normalized.Declarations
                 .Select(static declaration => declaration.JobKey)
                 .ToHashSet(StringComparer.Ordinal);
@@ -84,6 +101,8 @@ public sealed partial class InMemoryJobSchedulerStore
 
             return Task.FromResult(new JobDefinitionSyncResult
             {
+                ManifestHash = manifestHash,
+                ContentChanged = true,
                 PresentCount = normalized.Declarations.Count,
                 MarkedAbsentCount = markedAbsent,
                 ObservedAtUtc = now
@@ -105,8 +124,8 @@ public sealed partial class InMemoryJobSchedulerStore
 
         lock (_gate)
         {
-            return Task.FromResult(_definitions.GetValueOrDefault(
-                new DefinitionKey(schedulerScopeKey, ownerKey, jobKey)));
+            var definition = _definitions.GetValueOrDefault(new DefinitionKey(schedulerScopeKey, ownerKey, jobKey));
+            return Task.FromResult(definition is null ? null : WithOwnerObservationUnsafe(definition));
         }
     }
 
@@ -216,7 +235,7 @@ public sealed partial class InMemoryJobSchedulerStore
         return _definitions.Values.Where(definition => string.Equals(
             definition.SchedulerScopeKey,
             schedulerScopeKey,
-            StringComparison.Ordinal));
+            StringComparison.Ordinal)).Select(WithOwnerObservationUnsafe);
     }
 
     private static IEnumerable<JobDefinition> FilterDefinitions(
@@ -262,4 +281,8 @@ public sealed partial class InMemoryJobSchedulerStore
         new(definition.SchedulerScopeKey, definition.OwnerKey, definition.Declaration.JobKey);
 
     internal readonly record struct DefinitionKey(string SchedulerScopeKey, string OwnerKey, string JobKey);
+    private JobDefinition WithOwnerObservationUnsafe(JobDefinition definition) =>
+        _owners.TryGetValue((definition.SchedulerScopeKey, definition.OwnerKey), out var owner)
+            ? definition with { LastObservedAtUtc = owner.Observed } : definition;
+
 }

@@ -65,8 +65,16 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         ValidatePositive(options.SchedulingPollInterval, nameof(options.SchedulingPollInterval));
         ValidatePositive(options.WorkerPollInterval, nameof(options.WorkerPollInterval));
         ValidatePositive(options.SnapshotSyncInterval, nameof(options.SnapshotSyncInterval));
+        ValidatePositive(options.CoordinatorLeaseDuration, nameof(options.CoordinatorLeaseDuration));
+        ValidatePositive(options.StoreOperationTimeout, nameof(options.StoreOperationTimeout));
+        if (options.MaxConcurrentStoreOperations < 2 || options.ReservedLeaseStoreOperations < 1
+            || options.ReservedLeaseStoreOperations >= options.MaxConcurrentStoreOperations)
+            throw new InvalidOperationException("Store admission must reserve at least one slot for leases and one for other operations.");
         ValidatePositive(options.ExecutionLeaseDuration, nameof(options.ExecutionLeaseDuration));
         ValidatePositive(options.ExecutionLeaseRenewInterval, nameof(options.ExecutionLeaseRenewInterval));
+        ValidatePositive(options.ExecutionLeaseSafetyMargin, nameof(options.ExecutionLeaseSafetyMargin));
+        ValidatePositive(options.ExecutionLeaseRenewalTimeout, nameof(options.ExecutionLeaseRenewalTimeout));
+        ValidatePositive(options.ExecutionFinalizationTimeout, nameof(options.ExecutionFinalizationTimeout));
         ValidatePositive(options.ExecutionRetryDelay, nameof(options.ExecutionRetryDelay));
         ValidatePositive(options.ExecutionCancellationGracePeriod, nameof(options.ExecutionCancellationGracePeriod));
         ValidatePositive(options.WorkerShutdownGracePeriod, nameof(options.WorkerShutdownGracePeriod));
@@ -77,6 +85,14 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             throw new InvalidOperationException(
                 $"{nameof(options.ExecutionLeaseRenewInterval)} must be shorter than " +
                 $"{nameof(options.ExecutionLeaseDuration)}.");
+        }
+
+        if (options.ExecutionLeaseRenewInterval + options.ExecutionCancellationGracePeriod
+            + options.ExecutionLeaseSafetyMargin >= options.ExecutionLeaseDuration)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(options.ExecutionLeaseDuration)} must exceed {nameof(options.ExecutionLeaseRenewInterval)} + " +
+                $"{nameof(options.ExecutionCancellationGracePeriod)} + {nameof(options.ExecutionLeaseSafetyMargin)}.");
         }
 
         // Grace-period waits stop lease renewal, so a grace period at or beyond the lease duration could let another
@@ -467,6 +483,27 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public TimeSpan SnapshotSyncInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Gets or sets the grant duration for owner scheduling and scope maintenance coordinators. The default is
+    /// 30 seconds. Coordinated mutations recheck the grant under its row lock before touching job state.
+    /// </summary>
+    public TimeSpan CoordinatorLeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets explicit previous-manifest hashes authorized for replacement, indexed by logical owner. Configure this
+    /// only during a drained, all-writers-stopped deployment. Empty by default; incompatible manifests fail closed.
+    /// </summary>
+    public Dictionary<string, string> OwnerManifestReplacements { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets or sets the total per-process relational store concurrency limit. The default is eight.</summary>
+    public int MaxConcurrentStoreOperations { get; set; } = 8;
+
+    /// <summary>Gets or sets slots reserved from ordinary reads, admission and maintenance for renewal/completion. The default is two.</summary>
+    public int ReservedLeaseStoreOperations { get; set; } = 2;
+
+    /// <summary>Gets or sets the total local admission, transaction and retry budget for a relational store operation. The default is five seconds.</summary>
+    public TimeSpan StoreOperationTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Gets or sets the duration of each fenced execution lease. It must exceed
     /// <see cref="ExecutionLeaseRenewInterval"/>, <see cref="ExecutionCancellationGracePeriod"/>, and
     /// <see cref="WorkerShutdownGracePeriod"/> so a grace-period wait never outlives the lease that fences the
@@ -479,6 +516,24 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     /// default is 10 seconds.
     /// </summary>
     public TimeSpan ExecutionLeaseRenewInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Gets or sets the time reserved before a conservatively estimated lease expiration. The watchdog starts
+    /// cancellation one cancellation grace period before this boundary. The default is two seconds.
+    /// </summary>
+    public TimeSpan ExecutionLeaseSafetyMargin { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Gets or sets the independent deadline of a renewal request. An unresponsive request never blocks the lease
+    /// watchdog and no second renewal is started until the first request exits. The default is five seconds.
+    /// </summary>
+    public TimeSpan ExecutionLeaseRenewalTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets or sets the maximum wait for recording completion or releasing a stopped attempt. Expired finalization
+    /// is observed in the background and durable recovery remains authoritative. The default is five seconds.
+    /// </summary>
+    public TimeSpan ExecutionFinalizationTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Gets or sets the delay applied by the durable store before a failed attempt becomes retryable. The default is

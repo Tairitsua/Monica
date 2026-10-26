@@ -135,6 +135,12 @@ public sealed record JobLeaseKey
 public sealed record JobExecutionLease
 {
     /// <summary>
+    /// Gets the authoritative store time when this lease was granted. Workers use the duration between this
+    /// value and the expiration with their local monotonic request-start timestamp, never a cross-host clock comparison.
+    /// </summary>
+    public required DateTimeOffset GrantedAtUtc { get; init; }
+
+    /// <summary>
     /// Gets the claimed execution snapshot.
     /// </summary>
     public required JobExecutionInstance Execution { get; init; }
@@ -171,6 +177,12 @@ public enum JobLeaseRenewalStatus
 /// </summary>
 public sealed record JobLeaseRenewalResult
 {
+    /// <summary>
+    /// Gets the authoritative store time used to grant the renewal. Successful results must supply this value
+    /// and <see cref="LeaseExpiresAtUtc"/>; lost leases supply neither.
+    /// </summary>
+    public DateTimeOffset? GrantedAtUtc { get; init; }
+
     /// <summary>
     /// Gets the renewal status.
     /// </summary>

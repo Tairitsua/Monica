@@ -59,9 +59,10 @@ public sealed class ManualJobSchedulerTests
         var time = new StoreFixture.ManualTimeProvider(new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.Zero));
         await using var host = await new ManualFactory(probe, time, polling: false).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var store = host.Services.GetRequiredService<IJobSchedulerStore>();
-        var worker = host.Services.GetRequiredService<JobExecutionWorkerHostedService>();
-        // Drive native claims explicitly so the background loop cannot race the controlled clock.
-        await worker.StopAsync(TestContext.Current.CancellationToken);
+        // Use a fresh worker after stopping background polling; a stopped worker must reject new execution.
+        await host.Services.GetRequiredService<JobExecutionWorkerHostedService>()
+            .StopAsync(TestContext.Current.CancellationToken);
+        using var worker = ActivatorUtilities.CreateInstance<JobExecutionWorkerHostedService>(host.Services);
         var instance = await host.Services.GetRequiredService<ITriggeredJobManager>().EnqueueAsync(new Arguments(7),
             delay: TimeSpan.FromHours(1), cancellationToken: TestContext.Current.CancellationToken);
         async Task<IReadOnlyList<JobExecutionLease>> Claim() => await store.ClaimAsync(new JobClaimRequest

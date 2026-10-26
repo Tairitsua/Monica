@@ -45,9 +45,18 @@
                             @ObservationText(freshness)
                         </span>
                         <div class="runtime-owners__time">
+                            <span>@L["Runtime:Owners:ManifestPublished"]</span>
+                            <time datetime="@context.ManifestPublishedAtUtc?.ToString("O")">@TimePresentation.FormatTimestamp(context.ManifestPublishedAtUtc)</time>
                             <span>@L["Runtime:Owners:LastObserved"]</span>
                             <time datetime="@context.LastObservedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(context.LastObservedAtUtc)</time>
                         </div>
+                        @if (context.ManifestHash is { } hash)
+                        {
+                            <details>
+                                <summary>@L["Runtime:Owners:ManifestHash"]</summary>
+                                <code>@hash</code>
+                            </details>
+                        }
                     </div>
                 </MudTd>
                 <MudTd DataLabel="@L["Runtime:Owners:Jobs"]">

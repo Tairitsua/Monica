@@ -56,6 +56,7 @@ public sealed class JobSchedulerFacade(
         {
             var option = options.Value;
             var owners = await store.QueryOwnerSummariesAsync(_schedulerScopeKey, cancellationToken);
+            var coordination = await store.GetCoordinatorSnapshotAsync(_schedulerScopeKey, cancellationToken);
             return new JobSchedulerRuntimeOverview
             {
                 Configuration = new JobSchedulerRuntimeConfiguration
@@ -69,6 +70,10 @@ public sealed class JobSchedulerFacade(
                     SchedulingPollInterval = option.SchedulingPollInterval,
                     WorkerPollInterval = option.WorkerPollInterval,
                     SnapshotSyncInterval = option.SnapshotSyncInterval,
+                    CoordinatorLeaseDuration = option.CoordinatorLeaseDuration,
+                    MaxConcurrentStoreOperations = option.MaxConcurrentStoreOperations,
+                    ReservedLeaseStoreOperations = option.ReservedLeaseStoreOperations,
+                    StoreOperationTimeout = option.StoreOperationTimeout,
                     ExecutionLeaseDuration = option.ExecutionLeaseDuration,
                     ExecutionLeaseRenewInterval = option.ExecutionLeaseRenewInterval,
                     ExecutionRetryDelay = option.ExecutionRetryDelay,
@@ -92,9 +97,13 @@ public sealed class JobSchedulerFacade(
                     SchedulingMessage = runtimeState.SchedulingMessage,
                     WorkerReady = runtimeState.WorkerReady,
                     WorkerMessage = runtimeState.WorkerMessage,
-                    InFlightExecutions = runtimeState.InFlightExecutions
+                    InFlightExecutions = runtimeState.InFlightExecutions,
+                    LastOwnerSchedulingWorkAtUtc = runtimeState.LastOwnerSchedulingWorkAtUtc,
+                    LastLeaseRecoveryWorkAtUtc = runtimeState.LastLeaseRecoveryWorkAtUtc,
+                    LastHistoryCleanupWorkAtUtc = runtimeState.LastHistoryCleanupWorkAtUtc
                 },
                 Owners = owners,
+                Coordination = coordination,
                 OwnerOnlineThreshold = option.SnapshotSyncInterval * OWNER_ONLINE_THRESHOLD_SNAPSHOT_MULTIPLIER,
                 CapturedAtUtc = timeProvider.GetUtcNow()
             };

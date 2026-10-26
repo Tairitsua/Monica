@@ -896,7 +896,11 @@
       "MaxRetainedOrphanedExecutions": "Retained orphans",
       "Enabled": "Enabled",
       "Disabled": "Disabled",
-      "ExactInterval": "Exact interval"
+      "ExactInterval": "Exact interval",
+      "CoordinatorLeaseDuration": "Coordinator lease",
+      "MaxConcurrentStoreOperations": "Concurrent store operations",
+      "ReservedLeaseStoreOperations": "Reserved lease operation slots",
+      "StoreOperationTimeout": "Store operation budget"
     },
     "Plane": {
       "Title": "Local cycles",
@@ -907,7 +911,11 @@
       "NotReady": "Not ready",
       "NoMessage": "No cycle message was reported.",
       "InFlight": "Local in-flight / configured limit",
-      "LocalOnly": "Local cycle evidence does not establish the readiness of other replicas or the outcome of individual jobs."
+      "LocalOnly": "Local cycle evidence does not establish the readiness of other replicas or the outcome of individual jobs.",
+      "LastOwnerWork": "Owner work last completed",
+      "LastRecoveryWork": "Recovery pass last completed",
+      "LastCleanupWork": "Cleanup pass last completed",
+      "WorkTimeHelp": "Times describe completed local work, including empty passes. Standby-only cycles do not advance them; a healthy standby may have no work time. A cleanup pass may cover only part of the scope."
     },
     "Owners": {
       "Title": "Durable owner observations",
@@ -924,7 +932,9 @@
       "Empty": "No definition-backed owner is recorded in this scope.",
       "RecentObservation": "Recent observation",
       "StaleObservation": "Stale observation",
-      "AheadOfCapture": "Ahead of capture"
+      "AheadOfCapture": "Ahead of capture",
+      "ManifestPublished": "Manifest content accepted",
+      "ManifestHash": "Accepted manifest hash"
     },
     "Workers": {
       "Title": "Service-registry observations",
@@ -961,6 +971,19 @@
       "Unavailable": "Runtime evidence unavailable",
       "UnavailableDescription": "No valid runtime snapshot has been accepted. Retry the read to inspect this host; an unavailable snapshot does not establish an empty or healthy scheduler.",
       "NoDiagnostic": "No diagnostic message was supplied."
+    },
+    "Coordinators": {
+      "Title": "Durable coordinator grants",
+      "Description": "Recorded owner scheduling and scope maintenance holders. Expiry is compared with the store clock; an active grant does not prove process health. Fencing tokens are not exposed.",
+      "Observed": "Store observation time",
+      "Unavailable": "Coordinator ownership has not been observed.",
+      "Empty": "No coordinator grant is recorded in this scope.",
+      "Partition": "Partition",
+      "Holder": "Recorded worker instance",
+      "Expiry": "Lease expires",
+      "State": "At observation",
+      "Active": "Active grant",
+      "Expired": "Expired grant"
     }
   }
 }

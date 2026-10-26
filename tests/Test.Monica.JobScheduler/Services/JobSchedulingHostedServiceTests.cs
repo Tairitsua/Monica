@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Services;
 using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Operations;
 using Monica.JobScheduler.Models.Definitions;
@@ -12,6 +13,7 @@ using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.Providers;
 using Monica.JobScheduler.Services.Support;
 using Monica.Modules;
+using NSubstitute;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 
@@ -26,11 +28,18 @@ public sealed class JobSchedulingHostedServiceTests
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
-        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
+        var previous = await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
             [StoreFixture.RecurringDeclaration("removed")]), TestContext.Current.CancellationToken);
         await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B,
             [StoreFixture.RecurringDeclaration("foreign")]), TestContext.Current.CancellationToken);
-        using var service = CreateService(store, [], time, activation: new EmptySelectedRole());
+        var options = new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            EnableHistoryCleanup = false,
+            OwnerManifestReplacements = new(StringComparer.Ordinal) { [StoreFixture.OWNER_A] = previous.ManifestHash }
+        };
+        using var service = CreateService(store, [], time, configuredOptions: options, activation: new EmptySelectedRole());
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
         Assert.False((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "removed", TestContext.Current.CancellationToken))!.IsPresent);
         Assert.True((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "foreign", TestContext.Current.CancellationToken))!.IsPresent);
@@ -51,9 +60,17 @@ public sealed class JobSchedulingHostedServiceTests
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
-        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
+        var previous = await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_A,
             [StoreFixture.TriggeredDeclaration("previous")]), TestContext.Current.CancellationToken);
-        using var service = CreateService(store, [], time, activation: new EmptyInventory(applicationInventory));
+        var options = new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            EnableHistoryCleanup = false,
+            OwnerManifestReplacements = new(StringComparer.Ordinal) { [StoreFixture.OWNER_A] = previous.ManifestHash }
+        };
+        using var service = CreateService(store, [], time, configuredOptions: options,
+            activation: new EmptyInventory(applicationInventory));
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(applicationInventory, (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A,
             "previous", TestContext.Current.CancellationToken))!.IsPresent);
@@ -91,11 +108,19 @@ public sealed class JobSchedulingHostedServiceTests
         {
             SchedulerScopeKey = StoreFixture.SCOPE,
             ProjectName = "combined-host",
+            WorkerInstanceId = "combined-first-replica",
             MaxRecurringMaterializationsPerCycle = 1,
             EnableHistoryCleanup = false
         };
         using var firstReplica = CreateService(store, definitions, time, configuredOptions: options);
-        using var secondReplica = CreateService(store, definitions, time, configuredOptions: options);
+        using var secondReplica = CreateService(store, definitions, time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = "combined-host",
+            WorkerInstanceId = "combined-second-replica",
+            MaxRecurringMaterializationsPerCycle = 1,
+            EnableHistoryCleanup = false
+        });
         await firstReplica.ScheduleAsync(TestContext.Current.CancellationToken);
         await secondReplica.ScheduleAsync(TestContext.Current.CancellationToken);
         (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "jobs.alpha",
@@ -111,7 +136,8 @@ public sealed class JobSchedulingHostedServiceTests
         {
             SchedulerScopeKey = StoreFixture.SCOPE
         }, TestContext.Current.CancellationToken);
-        firstCycle.Items.Should().ContainSingle().Which.Template.OwnerKey.Should().Be(StoreFixture.OWNER_A);
+        firstCycle.Items.Should().ContainSingle().Which.Template.OwnerKey
+            .Should().BeOneOf(StoreFixture.OWNER_A, StoreFixture.OWNER_B);
 
         await firstReplica.ScheduleAsync(TestContext.Current.CancellationToken);
         await secondReplica.ScheduleAsync(TestContext.Current.CancellationToken);
@@ -189,7 +215,7 @@ public sealed class JobSchedulingHostedServiceTests
     }
 
     [Fact]
-    public async Task ScheduleAsync_ShouldNotResynchronizeRecurringCursorsBeforeSnapshotInterval()
+    public async Task ScheduleAsync_WhenTheManifestIsUnchangedAtTheSnapshotInterval_ShouldPreserveCursorState()
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
@@ -202,12 +228,14 @@ public sealed class JobSchedulingHostedServiceTests
         {
             SchedulerScopeKey = StoreFixture.SCOPE,
             ProjectName = StoreFixture.OWNER_A,
+            SnapshotSyncInterval = TimeSpan.FromSeconds(5),
+            CoordinatorLeaseDuration = TimeSpan.FromMinutes(1),
             EnableHistoryCleanup = false
         };
         using var service = CreateService(store, [definition], time, configuredOptions: options);
 
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
-        await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
+        var suspension = new RecurringScheduleSynchronization
         {
             CursorKey = new RecurringScheduleCursorKey
             {
@@ -215,7 +243,8 @@ public sealed class JobSchedulingHostedServiceTests
                 JobKey = definition.Declaration.JobKey
             },
             HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
-        }, TestContext.Current.CancellationToken);
+        };
+        var suspended = await store.SynchronizeRecurringScheduleAsync(suspension, TestContext.Current.CancellationToken);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
 
         var beforeInterval = await store.GetOperationalSummaryAsync(
@@ -232,8 +261,69 @@ public sealed class JobSchedulingHostedServiceTests
             StoreFixture.SCOPE,
             new JobId(StoreFixture.OWNER_A, definition.Declaration.JobKey),
             TestContext.Current.CancellationToken);
-        afterInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Scheduled);
-        afterInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.None);
+        afterInterval!.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Suspended);
+        afterInterval.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
+        var unchanged = await store.SynchronizeRecurringScheduleAsync(suspension, TestContext.Current.CancellationToken);
+        unchanged.Status.Should().Be(RecurringScheduleSynchronizationStatus.Unchanged);
+        unchanged.Cursor!.Version.Should().Be(suspended.Cursor!.Version);
+        var owners = await store.QueryOwnerSummariesAsync(StoreFixture.SCOPE, TestContext.Current.CancellationToken);
+        owners.Should().ContainSingle().Which.LastObservedAtUtc.Should().Be(NOW.Add(options.SnapshotSyncInterval));
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_WhenCoordinatorRenewalFails_ShouldRetryUsingTheLastSuccessfulGrantTiming()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = Substitute.For<IJobSchedulerStore>();
+        var acquireCalls = 0;
+        store.TryAcquireCoordinatorLeaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<TimeSpan>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            acquireCalls++;
+            if (acquireCalls == 2)
+            {
+                throw new TimeoutException("The coordinator renewal request did not complete.");
+            }
+
+            return Task.FromResult<JobCoordinatorLease?>(new JobCoordinatorLease
+            {
+                Key = new JobCoordinatorLeaseKey
+                {
+                    SchedulerScopeKey = StoreFixture.SCOPE,
+                    CoordinatorKey = "owner:" + StoreFixture.OWNER_A,
+                    WorkerInstanceId = "renewal-worker",
+                    LeaseToken = "original-coordinator-token"
+                },
+                GrantedAtUtc = time.GetUtcNow(),
+                ExpiresAtUtc = time.GetUtcNow().AddSeconds(30)
+            });
+        });
+        store.SyncOwnerSnapshotAsync(Arg.Any<JobOwnerSnapshot>(), Arg.Any<CancellationToken>()).Returns(call =>
+            Task.FromResult(new JobDefinitionSyncResult
+            {
+                ManifestHash = call.Arg<JobOwnerSnapshot>().ComputeManifestHash(),
+                ObservedAtUtc = time.GetUtcNow()
+            }));
+        store.GetDueRecurringSchedulesAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(),
+            Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<RecurringScheduleCursor>>([]));
+        using var service = CreateService(store, [], time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            WorkerInstanceId = "renewal-worker",
+            CoordinatorLeaseDuration = TimeSpan.FromSeconds(30),
+            EnableHistoryCleanup = false
+        });
+        await service.ScheduleAsync(token);
+        time.Advance(TimeSpan.FromSeconds(20));
+        Func<Task> failedRenewal = () => service.ScheduleAsync(token);
+        await failedRenewal.Should().ThrowAsync<TimeoutException>();
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        await service.ScheduleAsync(token);
+
+        acquireCalls.Should().Be(3, "a failed renewal must not make the last successful grant appear newly acquired");
     }
 
     [Fact]
@@ -268,7 +358,7 @@ public sealed class JobSchedulingHostedServiceTests
     }
 
     [Fact]
-    public async Task ScheduleAsync_WithExpiredLease_ShouldRecoverAcrossOwners()
+    public async Task RecoverAsync_WhenAnotherOwnersLeaseExpires_ShouldRecoverAcrossOwners()
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
@@ -294,9 +384,11 @@ public sealed class JobSchedulingHostedServiceTests
         }, TestContext.Current.CancellationToken)).Single();
 
         time.Advance(TimeSpan.FromSeconds(31));
-        // The scheduling host of owner A recovers the expired lease of owner B.
         using var service = CreateService(store, [], time);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
+        (await store.GetExecutionAsync(StoreFixture.SCOPE, "other-owner-exec", TestContext.Current.CancellationToken))!
+            .State.Should().Be(JobExecutionState.Running);
+        await service.RecoverAsync(TestContext.Current.CancellationToken);
 
         var recovered = await store.GetExecutionAsync(StoreFixture.SCOPE, "other-owner-exec", TestContext.Current.CancellationToken);
         recovered!.State.Should().Be(JobExecutionState.Queued);
@@ -305,7 +397,7 @@ public sealed class JobSchedulingHostedServiceTests
     }
 
     [Fact]
-    public async Task ScheduleAsync_ShouldRecoverExpiredCancelledLeasesBeforeMaterializingDueOccurrences()
+    public async Task RecoverAsync_WhenAnExpiredCancelledLeaseIsReleased_ShouldAllowTheNextSchedulingCycleToAdmitWork()
     {
         var time = new StoreFixture.ManualTimeProvider(NOW);
         var store = new InMemoryJobSchedulerStore(time);
@@ -337,9 +429,10 @@ public sealed class JobSchedulingHostedServiceTests
             cancellationToken: TestContext.Current.CancellationToken)).Status
             .Should().Be(JobCancellationStatus.CancellationRequested);
 
-        // The lease is expired and the next hourly occurrence is due at the same time. Recovery must release the
-        // cancelled attempt before recurring admission evaluates the capacity gate.
+        // Recovery and materialization are independent cycles. Once recovery releases the cancelled attempt,
+        // the following scheduling cycle can use its capacity for the due occurrence.
         time.Advance(TimeSpan.FromHours(1).Add(TimeSpan.FromMinutes(1)));
+        await service.RecoverAsync(TestContext.Current.CancellationToken);
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
 
         var executions = await store.QueryExecutionsAsync(new JobExecutionQuery
@@ -354,8 +447,253 @@ public sealed class JobSchedulingHostedServiceTests
             && item.RecurringOccurrenceUtc == NOW.AddHours(2));
     }
 
+    [Fact]
+    public async Task ScheduleAsync_WhenTwoReplicasShareAnOwner_ShouldScheduleExclusivelyWhileTheStandbyMaintainsRemovedOwnerWork()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        var removedOwner = await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B,
+            [StoreFixture.TriggeredDeclaration("removed-owner-job")]), token);
+        await store.EnqueueAsync(new JobEnqueueRequest
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_B,
+            JobKey = "removed-owner-job",
+            InstanceId = "removed-owner-execution",
+            JobArgs = "{}"
+        }, token);
+        var executionLease = (await store.ClaimAsync(new JobClaimRequest
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_B,
+            WorkerInstanceId = "removed-owner-worker",
+            JobKeys = ["removed-owner-job"],
+            LeaseDuration = TimeSpan.FromSeconds(10)
+        }, token)).Should().ContainSingle().Subject;
+        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B, [])
+        {
+            ExpectedPreviousManifestHash = removedOwner.ManifestHash
+        }, token);
+        LocalJobDefinition[] definitions =
+        [
+            new()
+            {
+                OwnerKey = StoreFixture.OWNER_A,
+                Declaration = StoreFixture.RecurringDeclaration("local-job", cron: "*/10 * * * * *"),
+                JobClrType = typeof(object)
+            }
+        ];
+        using var first = CreateService(store, definitions, time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            WorkerInstanceId = "first-replica",
+            EnableHistoryCleanup = false
+        });
+        using var second = CreateService(store, definitions, time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            WorkerInstanceId = "second-replica",
+            EnableHistoryCleanup = false
+        });
+        await first.ScheduleAsync(token);
+        await second.ScheduleAsync(token);
+        time.Advance(TimeSpan.FromSeconds(11));
+
+        await second.ScheduleAsync(token);
+        var beforeHolder = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_A
+        }, token);
+        beforeHolder.TotalCount.Should().Be(0);
+        await first.ScheduleAsync(token);
+        await second.ScheduleAsync(token);
+        var afterHolder = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_A
+        }, token);
+        afterHolder.Items.Should().ContainSingle().Which.RecurringOccurrenceUtc.Should().Be(NOW.AddSeconds(10));
+        (await store.GetExecutionAsync(StoreFixture.SCOPE, executionLease.Execution.InstanceId, token))!
+            .State.Should().Be(JobExecutionState.Running);
+
+        // The standby for owner scheduling can independently hold scope maintenance, including retired owners.
+        await second.RecoverAsync(token);
+        await first.RecoverAsync(token);
+        var recovered = await store.GetExecutionAsync(StoreFixture.SCOPE, executionLease.Execution.InstanceId, token);
+        recovered!.State.Should().Be(JobExecutionState.Queued);
+        recovered.LeaseLossCount.Should().Be(1);
+        (await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "removed-owner-job", token))!
+            .IsPresent.Should().BeFalse();
+        (await store.RenewLeaseAsync(executionLease.LeaseKey, TimeSpan.FromSeconds(30), token))
+            .Status.Should().Be(JobLeaseRenewalStatus.Lost);
+    }
+
+    [Fact]
+    public async Task CleanupHistoryAsync_WhenEnabled_ShouldCleanRemovedOwnerHistoryIndependentlyOfScheduling()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        var published = await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B,
+            [StoreFixture.TriggeredDeclaration("history-job")]), token);
+        var definition = await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "history-job", token);
+        await store.UpdatePolicyAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "history-job", new JobPolicyChange
+        {
+            ExpectedConcurrencyStamp = definition!.Policy.ConcurrencyStamp,
+            Overrides = new JobPolicyOverrides { MaxRetainedHistoryRecords = 1 }
+        }, token);
+        for (var index = 0; index < 2; index++)
+        {
+            await store.EnqueueAsync(new JobEnqueueRequest
+            {
+                SchedulerScopeKey = StoreFixture.SCOPE,
+                OwnerKey = StoreFixture.OWNER_B,
+                JobKey = "history-job",
+                InstanceId = $"history-{index}",
+                JobArgs = "{}"
+            }, token);
+            var lease = (await store.ClaimAsync(new JobClaimRequest
+            {
+                SchedulerScopeKey = StoreFixture.SCOPE,
+                OwnerKey = StoreFixture.OWNER_B,
+                WorkerInstanceId = "history-worker",
+                JobKeys = ["history-job"],
+                LeaseDuration = TimeSpan.FromSeconds(30)
+            }, token)).Should().ContainSingle().Subject;
+            (await store.CompleteAttemptAsync(new JobAttemptCompletion
+            {
+                LeaseKey = lease.LeaseKey,
+                Outcome = JobAttemptOutcome.Succeeded
+            }, token)).Status.Should().Be(JobAttemptCompletionStatus.Applied);
+            time.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B, [])
+        {
+            ExpectedPreviousManifestHash = published.ManifestHash
+        }, token);
+        using var service = CreateService(store, [], time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            ProjectName = StoreFixture.OWNER_A,
+            EnableHistoryCleanup = true
+        });
+        await service.ScheduleAsync(token);
+        var beforeCleanup = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_B
+        }, token);
+        beforeCleanup.TotalCount.Should().Be(2);
+
+        await service.CleanupHistoryAsync(token);
+
+        var afterCleanup = await store.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE,
+            OwnerKey = StoreFixture.OWNER_B
+        }, token);
+        afterCleanup.Items.Should().ContainSingle().Which.InstanceId.Should().Be("history-1");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScheduleAsync_WhenOneOwnerCycleCrossesGrantWindows_ShouldContinueOnlyWithTheOriginalGeneration(bool expiresBeforeRenewal)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var durable = new InMemoryJobSchedulerStore(time);
+        var boundary = Substitute.For<IJobSchedulerStore>();
+        var grantedTokens = new List<string>();
+        var mutationTokens = new List<string>();
+        var synchronized = new List<string>();
+        boundary.TryAcquireCoordinatorLeaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<TimeSpan>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                if (expiresBeforeRenewal && grantedTokens.Count == 1)
+                {
+                    time.Advance(TimeSpan.FromSeconds(31));
+                }
+
+                var grant = await durable.TryAcquireCoordinatorLeaseAsync(call.ArgAt<string>(0), call.ArgAt<string>(1),
+                    call.ArgAt<string>(2), call.Arg<TimeSpan>(), call.ArgAt<string?>(4), call.Arg<CancellationToken>());
+                if (grant is not null) grantedTokens.Add(grant.Key.LeaseToken);
+                return grant;
+            });
+        boundary.SyncOwnerSnapshotAsync(Arg.Any<JobOwnerSnapshot>(), Arg.Any<CancellationToken>())
+            .Returns(call => durable.SyncOwnerSnapshotAsync(call.Arg<JobOwnerSnapshot>(), call.Arg<CancellationToken>()));
+        boundary.SynchronizeRecurringScheduleAsync(Arg.Any<RecurringScheduleSynchronization>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var command = call.Arg<RecurringScheduleSynchronization>();
+                time.Advance(TimeSpan.FromSeconds(20));
+                var result = await durable.SynchronizeRecurringScheduleAsync(command, call.Arg<CancellationToken>());
+                mutationTokens.Add(command.CoordinatorLease!.LeaseToken);
+                synchronized.Add(command.CursorKey.JobKey);
+                return result;
+            });
+        boundary.GetDueRecurringSchedulesAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(call => durable.GetDueRecurringSchedulesAsync(call.ArgAt<string>(0), call.ArgAt<string>(1),
+                call.Arg<int>(), call.Arg<CancellationToken>()));
+        boundary.TryMaterializeRecurringOccurrenceAsync(Arg.Any<RecurringOccurrenceMaterialization>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var command = call.Arg<RecurringOccurrenceMaterialization>();
+                time.Advance(TimeSpan.FromSeconds(20));
+                var result = await durable.TryMaterializeRecurringOccurrenceAsync(command, call.Arg<CancellationToken>());
+                mutationTokens.Add(command.CoordinatorLease!.LeaseToken);
+                return result;
+            });
+        var definitions = Enumerable.Range(0, 3).Select(index => new LocalJobDefinition
+        {
+            OwnerKey = StoreFixture.OWNER_A,
+            Declaration = StoreFixture.RecurringDeclaration($"long-cycle-{index}", cron: "*/10 * * * * *"),
+            JobClrType = typeof(object)
+        }).ToArray();
+        using var service = CreateService(boundary, definitions, time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE, ProjectName = StoreFixture.OWNER_A,
+            WorkerInstanceId = "long-cycle-worker", CoordinatorLeaseDuration = TimeSpan.FromSeconds(30),
+            MaxRecurringMaterializationsPerCycle = 2, EnableHistoryCleanup = false
+        });
+
+        if (expiresBeforeRenewal)
+        {
+            Func<Task> cycle = () => service.ScheduleAsync(token);
+            await cycle.Should().ThrowAsync<InvalidOperationException>();
+            synchronized.Should().ContainSingle();
+            mutationTokens.Should().ContainSingle().Which.Should().Be(grantedTokens[0]);
+            grantedTokens.Distinct(StringComparer.Ordinal).Should().HaveCount(2);
+            (await durable.QueryExecutionsAsync(new JobExecutionQuery
+            {
+                SchedulerScopeKey = StoreFixture.SCOPE, OwnerKey = StoreFixture.OWNER_A
+            }, token)).Items.Should().BeEmpty();
+            return;
+        }
+
+        await service.ScheduleAsync(token);
+
+        synchronized.Should().HaveCount(3).And.OnlyHaveUniqueItems();
+        grantedTokens.Should().HaveCountGreaterThan(1);
+        grantedTokens.Distinct(StringComparer.Ordinal).Should().ContainSingle();
+        mutationTokens.Should().HaveCount(5).And.AllBeEquivalentTo(grantedTokens[0]);
+        time.GetUtcNow().Should().Be(NOW.AddSeconds(100));
+        (await durable.QueryExecutionsAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE, OwnerKey = StoreFixture.OWNER_A
+        }, token)).Items.Should().HaveCount(2);
+        (await durable.GetCoordinatorSnapshotAsync(StoreFixture.SCOPE, token)).Coordinators
+            .Should().ContainSingle().Which.ExpiresAtUtc.Should().BeAfter(time.GetUtcNow());
+    }
+
     private static JobSchedulingHostedService CreateService(
-        InMemoryJobSchedulerStore store,
+        IJobSchedulerStore store,
         IReadOnlyList<LocalJobDefinition> definitions,
         StoreFixture.ManualTimeProvider time,
         bool manualMode = false,

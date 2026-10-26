@@ -7,6 +7,12 @@ namespace Monica.JobScheduler.Models.Execution;
 public sealed record JobClaimRequest
 {
     /// <summary>
+    /// Gets the local owner's declaration hash. Automatic workers supply it on every claim; a different accepted
+    /// manifest prevents admission. Explicit store callers may omit it for administrative or fixture operations.
+    /// </summary>
+    public string? OwnerManifestHash { get; init; }
+
+    /// <summary>
     /// Defines the hard upper bound for one atomic store claim.
     /// </summary>
     public const int MAX_COUNT = 256;

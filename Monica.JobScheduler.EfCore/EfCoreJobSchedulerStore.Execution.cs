@@ -19,7 +19,7 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(request);
         request.Validate();
-        return WriteAsync(async (dbContext, token) =>
+        return WriteJobAsync(request.SchedulerScopeKey, request.OwnerKey, request.JobKey, async (dbContext, token) =>
         {
             var existing = await LoadExecutionAsync(
                 dbContext,
@@ -52,7 +52,7 @@ public sealed partial class EfCoreJobSchedulerStore
         ArgumentNullException.ThrowIfNull(command);
         command.Validate();
         var request = JobExecutionAdmission.CreateRecurringRunNowRequest(command);
-        return WriteAsync(async (dbContext, token) =>
+        return WriteJobAsync(command.SchedulerScopeKey, command.OwnerKey, command.JobKey, async (dbContext, token) =>
         {
             var existing = await LoadExecutionAsync(
                 dbContext,
@@ -404,120 +404,106 @@ public sealed partial class EfCoreJobSchedulerStore
         return ClaimCoreAsync(request, cancellationToken);
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string Scope, string Owner), string> _claimPositions = new();
+
     private async Task<IReadOnlyList<JobExecutionLease>> ClaimCoreAsync(
         JobClaimRequest request,
         CancellationToken cancellationToken)
     {
-        // Workers poll the queue aggressively (default 250 ms), so a fully idle poll must not open a serializable
-        // write transaction. The liberal read ignores availability time and concurrency gates; the claim
-        // transaction below re-evaluates both.
-        var jobKeys = request.JobKeys.ToArray();
-        var hasCandidates = await ReadAsync((dbContext, token) => dbContext.Executions.AsNoTracking()
-            .AnyAsync(item => item.SchedulerScopeKey == request.SchedulerScopeKey
-                              && item.OwnerKey == request.OwnerKey
-                              && item.State == JobExecutionState.Queued
-                              && jobKeys.Contains(item.JobKey), token), cancellationToken);
-        if (!hasCandidates)
+        // The eligibility hint and every per-job transaction share one request budget; moving to another Gate
+        // must not reset the deadline while earlier grants are already aging.
+        var callerToken = cancellationToken;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_operationTimeout);
+        cancellationToken = deadline.Token;
+        // A read-only eligibility hint keeps empty, future-only and fully saturated queues out of write
+        // transactions. The claim transaction still rechecks eligibility and its manifest under the Gate protocol.
+        var hasDueCapacity = await ReadAsync((context, token) => HasDueClaimCapacityAsync(context, request, token),
+            cancellationToken, nameof(ClaimAsync));
+        if (!hasDueCapacity) return [];
+
+        var leases = new List<JobExecutionLease>(request.MaxCount);
+        var positionKey = (request.SchedulerScopeKey, request.OwnerKey);
+        _claimPositions.TryGetValue(positionKey, out var afterJob);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        try
         {
-            return [];
-        }
-
-        return await WriteAsync(async (dbContext, token) =>
-        {
-            var now = await GetUtcNowAsync(dbContext, token);
-            var nowTicks = ToTicks(now);
-            var eligibleExecutions = dbContext.Executions
-                .Where(item => item.SchedulerScopeKey == request.SchedulerScopeKey
-                               && item.State == JobExecutionState.Queued
-                               && item.AvailableAtUtcTicks <= nowTicks
-                               && item.OwnerKey == request.OwnerKey
-                               && jobKeys.Contains(item.JobKey));
-            var candidateBudget = request.GetCandidateBudget();
-
-            // The fair pass takes only the oldest eligible row for each logical job. Consequently a deep queue for
-            // one saturated gate consumes one candidate, leaving other job keys visible within the fixed budget.
-            var fairCandidates = await eligibleExecutions
-                .Where(candidate => candidate.InstanceId == eligibleExecutions
-                    .Where(item => item.JobKey == candidate.JobKey)
-                    .OrderBy(item => item.AvailableAtUtcTicks)
-                    .ThenBy(item => item.CreatedAtUtcTicks)
-                    .ThenBy(item => item.InstanceId)
-                    .Select(item => item.InstanceId)
-                    .First())
-                .OrderBy(item => item.AvailableAtUtcTicks)
-                .ThenBy(item => item.CreatedAtUtcTicks)
-                .ThenBy(item => item.InstanceId)
-                .Take(candidateBudget)
-                .ToArrayAsync(token);
-
-            // Spend the remaining budget on globally oldest rows. This preserves batch throughput for jobs whose
-            // concurrency limit is greater than one without allowing backlog depth to increase work per claim.
-            var remainingCandidateBudget = candidateBudget - fairCandidates.Length;
-            var fairCandidateIds = fairCandidates.Select(item => item.InstanceId).ToArray();
-            var fillCandidates = remainingCandidateBudget > 0 && fairCandidates.Length > 0
-                ? await eligibleExecutions
-                    .Where(item => !fairCandidateIds.Contains(item.InstanceId))
-                    .OrderBy(item => item.AvailableAtUtcTicks)
-                    .ThenBy(item => item.CreatedAtUtcTicks)
-                    .ThenBy(item => item.InstanceId)
-                    .Take(remainingCandidateBudget)
-                    .ToArrayAsync(token)
-                : [];
-            var candidates = fairCandidates.Concat(fillCandidates).ToArray();
-
-
-            var gates = await dbContext.ExecutionGates
-                .Where(item => item.SchedulerScopeKey == request.SchedulerScopeKey
-                               && item.OwnerKey == request.OwnerKey)
-                .ToArrayAsync(token);
-            var gatesByJobKey = gates.ToDictionary(static item => item.JobKey, StringComparer.Ordinal);
-            var leases = new List<JobExecutionLease>(request.MaxCount);
-            foreach (var execution in candidates)
+            while (leases.Count < request.MaxCount && visited.Count < request.GetCandidateBudget())
             {
-                if (leases.Count == request.MaxCount)
+                var batch = await WriteAsync(async (context, token) =>
+                {
+                    if (request.OwnerManifestHash is { } expectedManifest)
+                    {
+                        var accepted = await context.SchedulerOwners.AsNoTracking()
+                            .Where(row => row.SchedulerScopeKey == request.SchedulerScopeKey && row.OwnerKey == request.OwnerKey)
+                            .Select(row => row.ManifestHash).SingleOrDefaultAsync(token);
+                        if (accepted != expectedManifest) return Array.Empty<JobExecutionLease>();
+                    }
+                    var now = await GetUtcNowAsync(context, token);
+                    var gate = await LockClaimGateAsync(context, request, afterJob ?? string.Empty, visited, now, token);
+                    if (gate is null)
+                    {
+                        return Array.Empty<JobExecutionLease>();
+                    }
+                    afterJob = gate.JobKey;
+                    visited.Add(gate.JobKey);
+                    now = await GetUtcNowAsync(context, token);
+                    var nowTicks = ToTicks(now);
+                    var available = Math.Min(request.MaxCount - leases.Count, gate.MaxConcurrency - gate.ActiveCount);
+                    var candidates = await context.Executions
+                        .Where(row => row.SchedulerScopeKey == request.SchedulerScopeKey && row.OwnerKey == request.OwnerKey
+                                      && row.JobKey == gate.JobKey && row.State == JobExecutionState.Queued
+                                      && row.AvailableAtUtcTicks <= nowTicks)
+                        .OrderBy(row => row.AvailableAtUtcTicks).ThenBy(row => row.CreatedAtUtcTicks).ThenBy(row => row.InstanceId)
+                        .Take(available).ToListAsync(token);
+                    var claimed = new List<JobExecutionLease>(candidates.Count);
+                    foreach (var execution in candidates)
+                    {
+                        gate.ActiveCount++;
+                        execution.State = JobExecutionState.Running;
+                        execution.StartedAtUtcTicks = nowTicks;
+                        execution.CompletedAtUtcTicks = null;
+                        execution.ExecutionAttempt++;
+                        execution.RunningWorkerInstanceId = request.WorkerInstanceId;
+                        execution.ExecutionLeaseToken = NewToken();
+                        execution.LeaseExpiresAtUtcTicks = ToTicks(now.Add(request.LeaseDuration));
+                        execution.CancellationRequestedAtUtcTicks = null;
+                        AddHistory(execution, now, JobExecutionHistoryKind.StateTransition,
+                            $"Claimed by worker '{request.WorkerInstanceId}'", request.WorkerInstanceId,
+                            JobExecutionState.Queued, JobExecutionState.Running);
+                        claimed.Add(new JobExecutionLease
+                        {
+                            GrantedAtUtc = now,
+                            Execution = ToExecution(execution),
+                            LeaseKey = new JobLeaseKey
+                            {
+                                SchedulerScopeKey = execution.SchedulerScopeKey,
+                                InstanceId = execution.InstanceId,
+                                WorkerInstanceId = request.WorkerInstanceId,
+                                LeaseToken = execution.ExecutionLeaseToken
+                            }
+                        });
+                    }
+                    return claimed.ToArray();
+                }, cancellationToken);
+                if (afterJob is not null)
+                {
+                    _claimPositions[positionKey] = afterJob;
+                }
+                if (batch.Length == 0)
                 {
                     break;
                 }
-
-                if (!gatesByJobKey.TryGetValue(execution.JobKey, out var gate))
-                {
-                    throw new InvalidOperationException(
-                        $"Execution gate '{execution.OwnerKey}/{execution.JobKey}' has no concurrency-gate projection.");
-                }
-                if (gate.ActiveCount >= gate.MaxConcurrency)
-                {
-                    continue;
-                }
-
-                gate.ActiveCount++;
-                gate.ConcurrencyToken = NewVersion();
-                execution.State = JobExecutionState.Running;
-                execution.StartedAtUtcTicks = nowTicks;
-                execution.CompletedAtUtcTicks = null;
-                execution.ExecutionAttempt++;
-                execution.RunningWorkerInstanceId = request.WorkerInstanceId;
-                execution.ExecutionLeaseToken = NewToken();
-                execution.LeaseExpiresAtUtcTicks = ToTicks(now.Add(request.LeaseDuration));
-                execution.CancellationRequestedAtUtcTicks = null;
-                execution.ConcurrencyToken = NewVersion();
-                AddHistory(execution, now, JobExecutionHistoryKind.StateTransition,
-                    $"Claimed by worker '{request.WorkerInstanceId}'", request.WorkerInstanceId,
-                    JobExecutionState.Queued, JobExecutionState.Running);
-                leases.Add(new JobExecutionLease
-                {
-                    Execution = ToExecution(execution),
-                    LeaseKey = new JobLeaseKey
-                    {
-                        SchedulerScopeKey = execution.SchedulerScopeKey,
-                        InstanceId = execution.InstanceId,
-                        WorkerInstanceId = request.WorkerInstanceId,
-                        LeaseToken = execution.ExecutionLeaseToken
-                    }
-                });
+                leases.AddRange(batch);
             }
-
-            return (IReadOnlyList<JobExecutionLease>)leases;
-        }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested
+                                                  && !callerToken.IsCancellationRequested && leases.Count > 0)
+        {
+            // Earlier batches are confirmed commits and can still be supervised. Never include the interrupted
+            // batch: an unknown commit is left for lease recovery. Caller cancellation still aborts delivery.
+        }
+        return leases;
     }
 
     /// <inheritdoc />
@@ -531,6 +517,7 @@ public sealed partial class EfCoreJobSchedulerStore
         ValidatePositiveDuration(leaseDuration, nameof(leaseDuration));
         return WriteAsync(async (dbContext, token) =>
         {
+            await LockExecutionAsync(dbContext, leaseKey.SchedulerScopeKey, leaseKey.InstanceId, token);
             var now = await GetUtcNowAsync(dbContext, token);
             var execution = await LoadCurrentExecutionLeaseAsync(dbContext, leaseKey, now, token);
             if (execution is null)
@@ -538,15 +525,20 @@ public sealed partial class EfCoreJobSchedulerStore
                 return new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Lost };
             }
 
-            execution.LeaseExpiresAtUtcTicks = ToTicks(now.Add(leaseDuration));
-            execution.ConcurrencyToken = NewVersion();
-            return new JobLeaseRenewalResult
-            {
-                Status = execution.CancellationRequestedAtUtcTicks.HasValue
-                    ? JobLeaseRenewalStatus.CancellationRequested
-                    : JobLeaseRenewalStatus.Active,
-                LeaseExpiresAtUtc = FromTicks(execution.LeaseExpiresAtUtcTicks)
-            };
+            var expiryTicks = ToTicks(now.Add(leaseDuration));
+            var changed = await dbContext.Executions
+                .Where(row => row.SchedulerScopeKey == leaseKey.SchedulerScopeKey && row.InstanceId == leaseKey.InstanceId
+                              && row.State == JobExecutionState.Running && row.RunningWorkerInstanceId == leaseKey.WorkerInstanceId
+                              && row.ExecutionLeaseToken == leaseKey.LeaseToken && row.LeaseExpiresAtUtcTicks > ToTicks(now))
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.LeaseExpiresAtUtcTicks, expiryTicks), token);
+            return changed == 0 ? new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Lost }
+                : new JobLeaseRenewalResult
+                {
+                    Status = execution.CancellationRequestedAtUtcTicks.HasValue
+                        ? JobLeaseRenewalStatus.CancellationRequested : JobLeaseRenewalStatus.Active,
+                    GrantedAtUtc = now,
+                    LeaseExpiresAtUtc = FromTicks(expiryTicks)
+                };
         }, cancellationToken);
     }
 
@@ -557,7 +549,7 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(completion);
         completion.Validate();
-        return WriteAsync(async (dbContext, token) =>
+        return WriteExecutionAsync(completion.LeaseKey.SchedulerScopeKey, completion.LeaseKey.InstanceId, async (dbContext, token) =>
             await CompleteAttemptAsync(dbContext, completion, await GetUtcNowAsync(dbContext, token), token),
             cancellationToken);
     }
@@ -586,7 +578,7 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ValidateIdentity(schedulerScopeKey, nameof(schedulerScopeKey));
         ValidateIdentity(instanceId, nameof(instanceId));
-        return WriteAsync(async (dbContext, token) =>
+        return WriteExecutionAsync(schedulerScopeKey, instanceId, async (dbContext, token) =>
         {
             var execution = await LoadExecutionAsync(
                 dbContext,
@@ -664,6 +656,7 @@ public sealed partial class EfCoreJobSchedulerStore
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.Message);
         return WriteAsync(async (dbContext, token) =>
         {
+            await LockExecutionAsync(dbContext, entry.LeaseKey.SchedulerScopeKey, entry.LeaseKey.InstanceId, token);
             var now = await GetUtcNowAsync(dbContext, token);
             var execution = await LoadCurrentExecutionLeaseAsync(dbContext, entry.LeaseKey, now, token);
             if (execution is null)
@@ -685,6 +678,7 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(request);
         request.Validate();
+        request.CoordinatorLease?.ValidatePartition(request.SchedulerScopeKey, "maintenance");
         return RecoverExpiredLeasesCoreAsync(request, cancellationToken);
     }
 
@@ -692,32 +686,32 @@ public sealed partial class EfCoreJobSchedulerStore
         ExpiredLeaseRecoveryRequest request,
         CancellationToken cancellationToken)
     {
-        // Every host runs this recovery each scheduling cycle (default one second), so a healthy scope must not
-        // open a serializable write transaction. The process-clock snapshot is a liberal pre-filter; the
-        // transaction below re-evaluates expiry against the authoritative store clock.
-        var hasExpired = await ReadAsync((dbContext, token) => dbContext.Executions.AsNoTracking()
-            .AnyAsync(item => item.SchedulerScopeKey == request.SchedulerScopeKey
-                              && item.State == JobExecutionState.Running
-                              && item.LeaseExpiresAtUtcTicks <= ToTicks(UtcNow), token), cancellationToken);
-        if (!hasExpired)
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_operationTimeout);
+        cancellationToken = deadline.Token;
+        var candidates = await ReadAsync(async (context, token) =>
         {
-            return [];
-        }
-
-        return await WriteAsync(async (dbContext, token) =>
+            var nowTicks = ToTicks(await GetUtcNowAsync(context, token));
+            return await context.Executions.AsNoTracking()
+                .Where(row => row.SchedulerScopeKey == request.SchedulerScopeKey && row.State == JobExecutionState.Running
+                              && row.LeaseExpiresAtUtcTicks <= nowTicks)
+                .OrderBy(row => row.LeaseExpiresAtUtcTicks).ThenBy(row => row.InstanceId)
+                .Select(row => row.InstanceId).Take(request.MaxCount).ToArrayAsync(token);
+        }, cancellationToken);
+        var recovered = new List<JobExecutionInstance>();
+        foreach (var instance in candidates)
         {
-            var now = await GetUtcNowAsync(dbContext, token);
-            var nowTicks = ToTicks(now);
-            var expired = await dbContext.Executions
-                .Where(item => item.SchedulerScopeKey == request.SchedulerScopeKey
-                               && item.State == JobExecutionState.Running
-                               && item.LeaseExpiresAtUtcTicks <= nowTicks)
-                .OrderBy(item => item.LeaseExpiresAtUtcTicks)
-                .ThenBy(item => item.InstanceId)
-                .Take(request.MaxCount)
-                .ToArrayAsync(token);
-            foreach (var execution in expired)
+            var result = await WriteExecutionAsync(request.SchedulerScopeKey, instance, async (dbContext, token) =>
             {
+                var now = await GetUtcNowAsync(dbContext, token);
+                var nowTicks = ToTicks(now);
+                var execution = await dbContext.Executions.SingleOrDefaultAsync(row =>
+                    row.SchedulerScopeKey == request.SchedulerScopeKey && row.InstanceId == instance
+                    && row.State == JobExecutionState.Running && row.LeaseExpiresAtUtcTicks <= nowTicks, token);
+                if (execution is null)
+                {
+                    return null;
+                }
                 var worker = execution.RunningWorkerInstanceId;
                 await ReleaseExecutionGateAsync(dbContext, execution, token);
                 if (execution.CancellationRequestedAtUtcTicks.HasValue)
@@ -763,10 +757,16 @@ public sealed partial class EfCoreJobSchedulerStore
                 }
                 ClearExecutionLease(execution);
                 execution.ConcurrencyToken = NewVersion();
-            }
 
-            return (IReadOnlyList<JobExecutionInstance>)expired.Select(ToExecution).ToArray();
-        }, cancellationToken);
+
+                return ToExecution(execution);
+            }, cancellationToken, request.CoordinatorLease);
+            if (result is not null)
+            {
+                recovered.Add(result);
+            }
+        }
+        return recovered;
     }
 
     internal async Task<JobDefinition> ResolvePresentDefinitionAsync(
@@ -915,13 +915,15 @@ public sealed partial class EfCoreJobSchedulerStore
     internal async Task<int> CountOutstandingExecutionsAsync(
         JobSchedulerDbContext dbContext,
         JobExecutionTemplate template,
-        CancellationToken cancellationToken) =>
-        await dbContext.Executions.AsNoTracking()
-            .CountAsync(item => item.SchedulerScopeKey == template.SchedulerScopeKey
-                                && item.OwnerKey == template.OwnerKey
-                                && item.JobKey == template.JobKey
-                                && (item.State == JobExecutionState.Queued
-                                    || item.State == JobExecutionState.Running), cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var capacity = await ResolveCurrentMaxConcurrencyAsync(dbContext, template, cancellationToken);
+        return await dbContext.Executions.AsNoTracking()
+            .Where(item => item.SchedulerScopeKey == template.SchedulerScopeKey && item.OwnerKey == template.OwnerKey
+                           && item.JobKey == template.JobKey
+                           && (item.State == JobExecutionState.Queued || item.State == JobExecutionState.Running))
+            .Select(item => item.InstanceId).Take(capacity).CountAsync(cancellationToken);
+    }
 
     internal async Task<int> ResolveCurrentMaxConcurrencyAsync(
         JobSchedulerDbContext dbContext,

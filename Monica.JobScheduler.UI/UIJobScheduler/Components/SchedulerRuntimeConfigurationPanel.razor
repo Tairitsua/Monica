@@ -18,6 +18,7 @@
                 <div><dt>@L["Runtime:Config:SchedulingPollInterval"]</dt><dd>@Interval(c.SchedulingPollInterval)</dd></div>
                 <div><dt>@L["Runtime:Config:WorkerPollInterval"]</dt><dd>@Interval(c.WorkerPollInterval)</dd></div>
                 <div><dt>@L["Runtime:Config:SnapshotSyncInterval"]</dt><dd>@Interval(c.SnapshotSyncInterval)</dd></div>
+                <div><dt>@L["Runtime:Config:CoordinatorLeaseDuration"]</dt><dd>@Interval(c.CoordinatorLeaseDuration)</dd></div>
             </dl>
         </section>
         <section class="runtime-config__group" aria-labelledby="runtime-config-lease-heading">
@@ -37,6 +38,9 @@
                 <div><dt>@L["Runtime:Config:MaxClaimBatchSize"]</dt><dd>@c.MaxClaimBatchSize</dd></div>
                 <div><dt>@L["Runtime:Config:MaxRecurringMaterializationsPerCycle"]</dt><dd>@c.MaxRecurringMaterializationsPerCycle</dd></div>
                 <div><dt>@L["Runtime:Config:MaxExpiredLeaseRecoveriesPerCycle"]</dt><dd>@c.MaxExpiredLeaseRecoveriesPerCycle</dd></div>
+                <div><dt>@L["Runtime:Config:MaxConcurrentStoreOperations"]</dt><dd>@c.MaxConcurrentStoreOperations</dd></div>
+                <div><dt>@L["Runtime:Config:ReservedLeaseStoreOperations"]</dt><dd>@c.ReservedLeaseStoreOperations</dd></div>
+                <div><dt>@L["Runtime:Config:StoreOperationTimeout"]</dt><dd>@Interval(c.StoreOperationTimeout)</dd></div>
             </dl>
         </section>
         <section class="runtime-config__group" aria-labelledby="runtime-config-history-heading">

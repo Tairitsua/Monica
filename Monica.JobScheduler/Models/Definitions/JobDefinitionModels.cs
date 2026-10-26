@@ -25,8 +25,8 @@ public sealed record JobDefinition
     public bool IsPresent { get; init; }
 
     /// <summary>
-    /// Gets when the owner last published a snapshot in UTC. A timestamp older than a few sync intervals indicates
-    /// the owner is offline; this is operational evidence only and never blocks scheduling or recovery.
+    /// Gets when the owner's coordinator last confirmed its manifest in UTC. Stale observation indicates missing
+    /// publication evidence, not proven process failure, and never blocks lease recovery by itself.
     /// </summary>
     public DateTimeOffset LastObservedAtUtc { get; init; }
 
@@ -80,6 +80,24 @@ public sealed record JobOwnerSnapshot(
     string OwnerKey,
     IReadOnlyList<JobDeclaration> Declarations)
 {
+    /// <summary>
+    /// Gets the persisted manifest hash explicitly authorized for replacement. Changed declarations are rejected
+    /// unless this matches the current hash. Identical publication and first publication need no replacement hash.
+    /// Set this only after incompatible writers have been drained and stopped.
+    /// </summary>
+    public string? ExpectedPreviousManifestHash { get; init; }
+
+    /// <summary>Gets the automatic owner's coordinator grant, when published by the scheduling host.</summary>
+    public JobCoordinatorLeaseKey? CoordinatorLease { get; init; }
+
+    /// <summary>Computes a stable hash over the normalized, job-key-ordered complete declaration manifest.</summary>
+    public string ComputeManifestHash()
+    {
+        var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            NormalizeAndValidate().Declarations, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+    }
+
     internal JobOwnerSnapshot NormalizeAndValidate()
     {
         JobSchedulerIdentity.ValidateStandard(SchedulerScopeKey, nameof(SchedulerScopeKey));
@@ -99,7 +117,7 @@ public sealed record JobOwnerSnapshot(
                 nameof(Declarations));
         }
 
-        return new JobOwnerSnapshot(SchedulerScopeKey, OwnerKey, normalized);
+        return this with { Declarations = normalized };
     }
 }
 
@@ -108,6 +126,10 @@ public sealed record JobOwnerSnapshot(
 /// </summary>
 public sealed record JobDefinitionSyncResult
 {
+    /// <summary>Gets the accepted declaration manifest hash.</summary>
+    public string ManifestHash { get; init; } = string.Empty;
+    /// <summary>Gets whether declaration or presence content changed, independently of owner liveness.</summary>
+    public bool ContentChanged { get; init; }
     /// <summary>
     /// Gets the number of definitions present in the latest snapshot, including previously absent definitions that
     /// returned.
@@ -121,7 +143,7 @@ public sealed record JobDefinitionSyncResult
     public int MarkedAbsentCount { get; init; }
 
     /// <summary>
-    /// Gets the store's authoritative observation timestamp applied to every affected definition.
+    /// Gets the store's authoritative owner observation timestamp projected onto its definitions.
     /// </summary>
     public DateTimeOffset ObservedAtUtc { get; init; }
 }

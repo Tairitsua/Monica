@@ -11,6 +11,18 @@ public sealed class JobSchedulerRuntimeState
     private int _inFlightExecutions;
     private string? _schedulingMessage;
     private string? _workerMessage;
+    private long _lastOwnerSchedulingWorkUtcTicks;
+    private long _lastLeaseRecoveryWorkUtcTicks;
+    private long _lastHistoryCleanupWorkUtcTicks;
+
+    /// <summary>Gets the last successful local owner pass, excluding standby-only cycles.</summary>
+    public DateTimeOffset? LastOwnerSchedulingWorkAtUtc => ReadTimestamp(ref _lastOwnerSchedulingWorkUtcTicks);
+
+    /// <summary>Gets the last successful local lease-recovery pass, including an empty pass.</summary>
+    public DateTimeOffset? LastLeaseRecoveryWorkAtUtc => ReadTimestamp(ref _lastLeaseRecoveryWorkUtcTicks);
+
+    /// <summary>Gets the last successful local bounded cleanup pass, including an empty pass.</summary>
+    public DateTimeOffset? LastHistoryCleanupWorkAtUtc => ReadTimestamp(ref _lastHistoryCleanupWorkUtcTicks);
 
     /// <summary>
     /// Gets whether the local scheduling plane's last cycle succeeded. Stays <see langword="false"/> until the
@@ -42,6 +54,21 @@ public sealed class JobSchedulerRuntimeState
         SetState(ref _workerReady, ref _workerMessage, ready, message);
 
     internal void SetInFlightExecutions(int count) => Volatile.Write(ref _inFlightExecutions, count);
+
+    internal void RecordOwnerSchedulingWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastOwnerSchedulingWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    internal void RecordLeaseRecoveryWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastLeaseRecoveryWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    internal void RecordHistoryCleanupWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastHistoryCleanupWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    private static DateTimeOffset? ReadTimestamp(ref long ticks)
+    {
+        var value = Interlocked.Read(ref ticks);
+        return value == 0 ? null : new DateTimeOffset(value, TimeSpan.Zero);
+    }
 
     private static bool SetState(ref int state, ref string? currentMessage, bool ready, string message)
     {

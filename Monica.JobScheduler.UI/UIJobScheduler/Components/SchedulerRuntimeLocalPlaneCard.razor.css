@@ -18,6 +18,9 @@
 .runtime-plane__capacity dt { font-size: 13px; line-height: 1.6; }
 .runtime-plane__capacity dd { margin: 0; font-family: var(--mo-font-family-display); font-size: 38px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.3; }
 .runtime-plane__capacity dd span { font-size: 21px; font-weight: 400; }
+.runtime-plane__work { display: grid; gap: 10px; margin: 0; font-size: 12px; line-height: 1.6; }
+.runtime-plane__work > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.runtime-plane__work dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .runtime-plane__scope-note { display: flex; align-items: start; gap: 7px; }
 .runtime-plane__scope-note ::deep :is(.mud-icon-root, .mo-icon) { flex: none; width: 18px; height: 18px; margin-block-start: 2px; color: inherit !important; }
 @container runtime-plane (max-width: 460px) {

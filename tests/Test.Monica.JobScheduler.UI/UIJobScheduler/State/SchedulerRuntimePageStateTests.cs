@@ -595,6 +595,8 @@ public sealed class SchedulerRuntimePageStateTests
             SchedulerScopeKey = " runtime/上海?scope=one ", OwnerKey = "owner", WorkerInstanceId = "worker",
             AutonomousWork = true, CronTimeZoneId = "UTC", SchedulingPollInterval = TimeSpan.FromSeconds(1),
             WorkerPollInterval = TimeSpan.FromSeconds(1), SnapshotSyncInterval = TimeSpan.FromSeconds(5),
+            CoordinatorLeaseDuration = TimeSpan.FromSeconds(30), MaxConcurrentStoreOperations = 8,
+            ReservedLeaseStoreOperations = 2, StoreOperationTimeout = TimeSpan.FromSeconds(5),
             ExecutionLeaseDuration = TimeSpan.FromSeconds(30), ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(5),
             ExecutionRetryDelay = TimeSpan.FromSeconds(1), ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(2),
             WorkerShutdownGracePeriod = TimeSpan.FromSeconds(3), MaxWorkerExecutionThreads = 4, MaxClaimBatchSize = 4,

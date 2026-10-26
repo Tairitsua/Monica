@@ -1,6 +1,7 @@
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Operations;
+using Monica.JobScheduler.Models.Execution;
 
 namespace Monica.JobScheduler.Abstractions;
 
@@ -9,6 +10,23 @@ namespace Monica.JobScheduler.Abstractions;
 /// </summary>
 public interface IJobSchedulerStore : IJobDefinitionStore, IJobExecutionStore, IJobSchedulerAnalyticsStore
 {
+    /// <summary>Observes retained coordinator holders and expiries in one exact scope without exposing tokens.</summary>
+    /// <remarks>This read does not acquire or renew any lease. Expired records remain visible for diagnosis.</remarks>
+    Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Acquires or renews a coordinator grant. Renewal requires its current token; an expired grant always gets a
+    /// new token. Returns null while a different active grant owns the partition. Store time is authoritative.
+    /// </summary>
+    Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
+        string workerInstanceId, TimeSpan leaseDuration, string? currentToken = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Runs one bounded history pass, returning a keyset continuation instead of rescanning the scope.</summary>
+    Task<JobHistoryCleanupResult> CleanupHistoryAsync(JobHistoryCleanupRequest request,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Gets the operational projection for one exact job definition.
     /// </summary>

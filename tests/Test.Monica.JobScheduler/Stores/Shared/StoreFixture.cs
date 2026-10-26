@@ -3,6 +3,7 @@ using Monica.Core.Modularity.Extensions;
 using Monica.Testing.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Monica.DependencyInjection.Abstractions;
@@ -14,6 +15,7 @@ using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.Providers;
 using Monica.Modules;
 using Monica.Repository.Persistence.Services;
+using Xunit;
 
 namespace Test.Monica.JobScheduler.Stores.Shared;
 
@@ -36,20 +38,31 @@ internal abstract class StoreFixture : IAsyncDisposable
     internal ManualTimeProvider Time { get; }
     internal string Scope => SCOPE;
 
-    internal static async Task<StoreFixture> CreateAsync(bool useEfCore, DateTimeOffset now)
+    internal static async Task<StoreFixture> CreateAsync(bool useEfCore, DateTimeOffset now, params IInterceptor[] interceptors)
     {
         return useEfCore
-            ? await EfCoreStoreFixture.CreateAsync(now)
+            ? await EfCoreStoreFixture.CreateAsync(now, interceptors)
             : new InMemoryStoreFixture(now);
     }
 
+    internal static async Task<StoreFixture> CreateEfCoreAsync(
+        DateTimeOffset now, ModuleJobSchedulerOption options, params IInterceptor[] interceptors) =>
+        await EfCoreStoreFixture.CreateAsync(now, interceptors, options);
+
     /// <summary>
-    /// Publishes one owner snapshot containing the supplied declarations.
+    /// Publishes one owner snapshot, explicitly authorizing replacement for scenarios that change declarations.
     /// </summary>
-    internal Task<JobDefinitionSyncResult> SyncAsync(
+    internal async Task<JobDefinitionSyncResult> SyncAsync(
         string ownerKey,
-        params JobDeclaration[] declarations) =>
-        Store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(SCOPE, ownerKey, declarations));
+        params JobDeclaration[] declarations)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var previousHash = await Store.GetOwnerManifestHashAsync(SCOPE, ownerKey, token);
+        return await Store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(SCOPE, ownerKey, declarations)
+        {
+            ExpectedPreviousManifestHash = previousHash
+        }, token);
+    }
 
     internal static JobDeclaration RecurringDeclaration(
         string jobKey,
@@ -199,7 +212,8 @@ file sealed class EfCoreStoreFixture : StoreFixture
         _connection = connection;
     }
 
-    internal static async Task<EfCoreStoreFixture> CreateAsync(DateTimeOffset now)
+    internal static async Task<EfCoreStoreFixture> CreateAsync(
+        DateTimeOffset now, IInterceptor[] interceptors, ModuleJobSchedulerOption? options = null)
     {
         var time = new ManualTimeProvider(now);
         var connection = new SqliteConnection(
@@ -208,7 +222,7 @@ file sealed class EfCoreStoreFixture : StoreFixture
         var builder = Host.CreateApplicationBuilder();
         builder.AddMonica(monica => monica.AddRepository()
             .AddRepositoryDbContext<JobSchedulerDbContext>(
-                (_, options) => options.UseSqlite(connection.ConnectionString), DbContextProviderType.Default));
+                (_, options) => options.UseSqlite(connection.ConnectionString).AddInterceptors(interceptors), DbContextProviderType.Default));
         builder.Services.AddMonicaTestSeams();
         builder.Services.AddSingleton<TimeProvider>(time);
         var host = builder.Build();
@@ -219,7 +233,7 @@ file sealed class EfCoreStoreFixture : StoreFixture
         }
 
         return new EfCoreStoreFixture(
-            new EfCoreJobSchedulerStore(factory, time),
+            new EfCoreJobSchedulerStore(factory, time, options is null ? null : Options.Create(options)),
             time,
             host,
             connection);

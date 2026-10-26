@@ -18,7 +18,9 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(synchronization);
         synchronization.Validate();
-        return WriteAsync(async (dbContext, token) =>
+        synchronization.CoordinatorLease?.ValidatePartition(synchronization.CursorKey.SchedulerScopeKey, "owner:" + synchronization.CursorKey.OwnerKey);
+        return WriteJobAsync(synchronization.CursorKey.SchedulerScopeKey, synchronization.CursorKey.OwnerKey,
+            synchronization.CursorKey.JobKey, async (dbContext, token) =>
         {
             var now = await GetUtcNowAsync(dbContext, token);
             var cursorEntity = await LoadCursorAsync(dbContext, synchronization.CursorKey, true, token);
@@ -116,7 +118,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 Status = RecurringScheduleSynchronizationStatus.Created,
                 Cursor = ToCursor(created, template, schedule)
             };
-        }, cancellationToken);
+        }, cancellationToken, synchronization.CoordinatorLease);
     }
 
     /// <inheritdoc />
@@ -156,7 +158,9 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(materialization);
         materialization.Validate();
-        return WriteAsync(async (dbContext, token) =>
+        materialization.CoordinatorLease?.ValidatePartition(materialization.CursorKey.SchedulerScopeKey, "owner:" + materialization.CursorKey.OwnerKey);
+        return WriteJobAsync(materialization.CursorKey.SchedulerScopeKey, materialization.CursorKey.OwnerKey,
+            materialization.CursorKey.JobKey, async (dbContext, token) =>
         {
             var now = await GetUtcNowAsync(dbContext, token);
             var cursor = await LoadCursorAsync(dbContext, materialization.CursorKey, true, token);
@@ -274,7 +278,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 Execution = execution,
                 Cursor = ToCursor(cursor, template)
             };
-        }, cancellationToken);
+        }, cancellationToken, materialization.CoordinatorLease);
     }
 
     private static Task<JobRecurringCursorEntity?> LoadCursorAsync(

@@ -362,6 +362,10 @@ public sealed partial class InMemoryJobSchedulerStore
 
         lock (_gate)
         {
+            if (request.OwnerManifestHash is { } expectedManifest
+                && (!_owners.TryGetValue((request.SchedulerScopeKey, request.OwnerKey), out var owner)
+                    || owner.Hash != expectedManifest))
+                return Task.FromResult<IReadOnlyList<JobExecutionLease>>([]);
             var now = UtcNow;
             var executableKeys = request.JobKeys.ToHashSet(StringComparer.Ordinal);
             var eligibleExecutions = _executionInstances.Values
@@ -370,7 +374,9 @@ public sealed partial class InMemoryJobSchedulerStore
                     && execution.AvailableAtUtc <= now
                     && string.Equals(execution.Template.SchedulerScopeKey, request.SchedulerScopeKey, StringComparison.Ordinal)
                     && string.Equals(execution.Template.OwnerKey, request.OwnerKey, StringComparison.Ordinal)
-                    && executableKeys.Contains(execution.Template.JobKey))
+                    && executableKeys.Contains(execution.Template.JobKey)
+                    && _executionGates.TryGetValue(GetExecutionGateKey(execution.Template), out var eligibleGate)
+                    && eligibleGate.ActiveCount < eligibleGate.MaxConcurrency)
                 .OrderBy(execution => execution.AvailableAtUtc)
                 .ThenBy(execution => execution.CreatedAtUtc)
                 .ThenBy(execution => execution.InstanceId, StringComparer.Ordinal);
@@ -427,6 +433,7 @@ public sealed partial class InMemoryJobSchedulerStore
 
                 leases.Add(new JobExecutionLease
                 {
+                    GrantedAtUtc = now,
                     Execution = ToSummary(execution),
                     LeaseKey = new JobLeaseKey
                     {
@@ -467,6 +474,7 @@ public sealed partial class InMemoryJobSchedulerStore
                 Status = execution.CancellationRequestedAtUtc.HasValue
                     ? JobLeaseRenewalStatus.CancellationRequested
                     : JobLeaseRenewalStatus.Active,
+                GrantedAtUtc = now,
                 LeaseExpiresAtUtc = execution.LeaseExpiresAtUtc
             });
         }
@@ -624,10 +632,12 @@ public sealed partial class InMemoryJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(request);
         request.Validate();
+        request.CoordinatorLease?.ValidatePartition(request.SchedulerScopeKey, "maintenance");
 
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
+            ValidateCoordinatorLeaseUnsafe(request.CoordinatorLease);
             var now = UtcNow;
             var expired = _executionInstances.Values
                 .Where(execution =>

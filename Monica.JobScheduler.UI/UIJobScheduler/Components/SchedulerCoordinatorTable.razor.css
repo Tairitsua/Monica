@@ -1,0 +1,9 @@
+.runtime-coordinators { min-width: 0; overflow: clip; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; background: var(--mud-palette-surface); }
+.runtime-coordinators header { padding: 20px; }
+.runtime-coordinators h2 { margin: 0 0 6px; font-size: 20px; font-weight: 500; line-height: 1.4; }
+.runtime-coordinators p { margin: 4px 0 0; font-size: 13px; line-height: 1.65; color: var(--mud-palette-text-secondary); overflow-wrap: anywhere; }
+.runtime-coordinators__table { min-width: 0; border-block-start: 1px solid var(--mud-palette-lines-default); }
+.runtime-coordinators__table ::deep .mud-table-root { table-layout: fixed; }
+.runtime-coordinators__table ::deep .mud-table-cell { overflow-wrap: anywhere; }
+.runtime-coordinators code { font-family: var(--mo-font-family-mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .runtime-coordinators header { padding: 16px; } }

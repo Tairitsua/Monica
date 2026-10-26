@@ -90,6 +90,40 @@ public sealed class JobExecutionWorkerHostedServiceTests
     }
 
     [Fact]
+    public async Task ClaimAvailableWorkAsync_WhenMultipleOwnersAreLocal_ShouldSendEachOwnersDeclarationManifest()
+    {
+        using var host = Host.CreateApplicationBuilder().Build();
+        var first = CreateDefinition<CancellationObservingRecurringJob>() with { OwnerKey = OWNER };
+        var second = CreateDefinition<CancellationIgnoringRecurringJob>() with { OwnerKey = StoreFixture.OWNER_B };
+        var store = Substitute.For<IJobSchedulerStore>();
+        store.ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<JobExecutionLease>>([]));
+        var (worker, _) = CreateWorker(
+            store,
+            [first, second],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            configure: null);
+        var firstManifest = new JobOwnerSnapshot(StoreFixture.SCOPE, OWNER, [first.Declaration]).ComputeManifestHash();
+        var secondManifest = new JobOwnerSnapshot(StoreFixture.SCOPE, StoreFixture.OWNER_B, [second.Declaration])
+            .ComputeManifestHash();
+
+        await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+
+        await store.Received(1).ClaimAsync(
+            Arg.Is<JobClaimRequest>(request => request.OwnerKey == OWNER
+                                              && request.OwnerManifestHash == firstManifest
+                                              && request.JobKeys.Count == 1
+                                              && request.JobKeys.Contains(first.Declaration.JobKey)),
+            Arg.Any<CancellationToken>());
+        await store.Received(1).ClaimAsync(
+            Arg.Is<JobClaimRequest>(request => request.OwnerKey == StoreFixture.OWNER_B
+                                              && request.OwnerManifestHash == secondManifest
+                                              && request.JobKeys.Count == 1
+                                              && request.JobKeys.Contains(second.Declaration.JobKey)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteLease_WhenLeaseRenewalIsLost_ShouldCancelCooperativeJobWithoutCompletion()
     {
         var probe = new CancellationProbe();
@@ -165,7 +199,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
                 }
 
                 probe.Completion.TrySetResult();
-                return Task.FromResult(new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Active });
+                return Task.FromResult(CreateActiveRenewal());
             });
         store.CompleteAttemptAsync(
                 Arg.Any<JobAttemptCompletion>(),
@@ -250,8 +284,8 @@ public sealed class JobExecutionWorkerHostedServiceTests
                 Arg.Any<JobLeaseKey>(),
                 Arg.Any<TimeSpan>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Active });
-        var applicationLifetime = Substitute.For<IHostApplicationLifetime>();
+            .Returns(CreateActiveRenewal());
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
         var (worker, options) = CreateWorker(
             store,
             [definition],
@@ -266,19 +300,26 @@ public sealed class JobExecutionWorkerHostedServiceTests
         var attempt = worker.ExecuteLeaseAsync(
             CreateLease(definition.Declaration.JobKey, executionTimeout),
             TestContext.Current.CancellationToken);
-        await probe.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
-        await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        applicationLifetime.Received(1).StopApplication();
-        await store.DidNotReceive().CompleteAttemptAsync(
-            Arg.Any<JobAttemptCompletion>(),
-            Arg.Any<CancellationToken>());
-        await store.DidNotReceive().ReleaseLeaseAsync(
-            Arg.Any<JobLeaseKey>(),
-            Arg.Any<CancellationToken>());
-
-        probe.Release.TrySetResult();
-        await probe.Exited.Task.WaitAsync(TestContext.Current.CancellationToken);
+            applicationLifetime.Received(1).StopApplication();
+            attempt.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(),
+                Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -303,7 +344,8 @@ public sealed class JobExecutionWorkerHostedServiceTests
                 Arg.Any<JobLeaseKey>(),
                 Arg.Any<TimeSpan>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Active });
+            .Returns(CreateActiveRenewal());
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
         var (worker, options) = CreateWorker(
             store,
             [definition],
@@ -312,26 +354,33 @@ public sealed class JobExecutionWorkerHostedServiceTests
             {
                 schedulerOptions.ExecutionCancellationGracePeriod = TimeSpan.FromMilliseconds(30);
                 schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromMilliseconds(5);
-            });
+            },
+            applicationLifetime);
 
         using var workerStop = new CancellationTokenSource();
         var attempt = worker.ExecuteLeaseAsync(
             CreateLease(definition.Declaration.JobKey, options.Value.ExecutionLeaseDuration),
             workerStop.Token);
-        await probe.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await workerStop.CancelAsync();
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        await workerStop.CancelAsync();
-        await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        await store.DidNotReceive().CompleteAttemptAsync(
-            Arg.Any<JobAttemptCompletion>(),
-            Arg.Any<CancellationToken>());
-        await store.DidNotReceive().ReleaseLeaseAsync(
-            Arg.Any<JobLeaseKey>(),
-            Arg.Any<CancellationToken>());
-
-        probe.Release.TrySetResult();
-        await probe.Exited.Task.WaitAsync(TestContext.Current.CancellationToken);
+            attempt.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(),
+                Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -352,35 +401,29 @@ public sealed class JobExecutionWorkerHostedServiceTests
         };
         var store = Substitute.For<IJobSchedulerStore>();
         using var workerStop = new CancellationTokenSource();
-        store.RenewLeaseAsync(
-                Arg.Any<JobLeaseKey>(),
-                Arg.Any<TimeSpan>(),
-                Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                // Complete the user task inline before requesting shutdown. The worker is still awaiting this store
-                // operation, which deterministically exercises the completion/shutdown ordering boundary.
-                probe.Completion.TrySetResult();
-                workerStop.Cancel();
-                return Task.FromResult(new JobLeaseRenewalResult { Status = JobLeaseRenewalStatus.Active });
-            });
         store.CompleteAttemptAsync(
                 Arg.Any<JobAttemptCompletion>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new JobAttemptCompletionResult
+            .Returns(_ =>
             {
-                Status = JobAttemptCompletionStatus.Applied
-            }));
+                // Shutdown starts only once the worker has observed the successful user-code outcome.
+                workerStop.Cancel();
+                return Task.FromResult(new JobAttemptCompletionResult
+                {
+                    Status = JobAttemptCompletionStatus.Applied
+                });
+            });
         var (worker, options) = CreateWorker(
             store,
             [definition],
             host.Services.GetRequiredService<IServiceScopeFactory>(),
-            configure: schedulerOptions => schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromMilliseconds(5));
+            configure: schedulerOptions => schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(30));
 
         var attempt = worker.ExecuteLeaseAsync(
             CreateLease(definition.Declaration.JobKey, options.Value.ExecutionLeaseDuration),
             workerStop.Token);
         await probe.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        probe.Completion.TrySetResult();
         await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         await store.Received(1).CompleteAttemptAsync(
@@ -391,13 +434,630 @@ public sealed class JobExecutionWorkerHostedServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenRenewalNeverReturns_ShouldCancelAtTheLastConfirmedLeaseDeadline()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationObservingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var renewalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renewal = new TaskCompletionSource<JobLeaseRenewalResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renewalToken = CancellationToken.None;
+        store.RenewLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                renewalToken = call.Arg<CancellationToken>();
+                renewalStarted.TrySetResult();
+                return renewal.Task;
+            });
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            applicationLifetime,
+            timeProvider: time);
+        using var workerStop = new CancellationTokenSource();
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            workerStop.Token);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(7), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
+            await renewalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(3));
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(33), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(23));
+
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            renewalToken.CanBeCanceled.Should().BeTrue();
+            renewalToken.IsCancellationRequested.Should().BeTrue();
+            probe.Exited.Task.IsCompletedSuccessfully.Should().BeTrue();
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+            _ = store.Received(1).RenewLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            renewal.TrySetException(new InvalidOperationException("The stalled renewal failed after retirement."));
+            await workerStop.CancelAsync();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenRenewalsKeepFailing_ShouldRetryWithoutExtendingTheLeaseDeadline()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationObservingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var renewals = Enumerable.Range(0, 3)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var renewalCount = 0;
+        store.RenewLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                var index = Interlocked.Increment(ref renewalCount) - 1;
+                if (index < renewals.Length)
+                {
+                    renewals[index].TrySetResult();
+                }
+
+                return Task.FromException<JobLeaseRenewalResult>(
+                    new InvalidOperationException("The store is temporarily unavailable."));
+            });
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            timeProvider: time);
+        using var workerStop = new CancellationTokenSource();
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            workerStop.Token);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(7), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
+            await renewals[0].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(14), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
+            await renewals[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(21), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
+            await renewals[2].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(28), TestContext.Current.CancellationToken);
+
+            probe.Exited.Task.IsCompleted.Should().BeFalse();
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(33), TestContext.Current.CancellationToken);
+            time.AdvanceAfterPause(TimeSpan.FromSeconds(12));
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            renewalCount.Should().BeGreaterThanOrEqualTo(3);
+            probe.Exited.Task.IsCompletedSuccessfully.Should().BeTrue();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            await workerStop.CancelAsync();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenRenewalSucceedsAfterCancellation_ShouldKeepTheOriginalStopDeadline()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var renewalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Inline continuations deliver the late response before the test advances the stopping deadline.
+        var renewal = new TaskCompletionSource<JobLeaseRenewalResult>();
+        store.RenewLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                renewalStarted.TrySetResult();
+                return renewal.Task;
+            });
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            applicationLifetime,
+            time);
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(7), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
+            await renewalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(33), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(26));
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(38), TestContext.Current.CancellationToken);
+
+            renewal.SetResult(CreateActiveRenewal(TimeSpan.FromHours(1)));
+            time.Advance(TimeSpan.FromSeconds(5));
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            applicationLifetime.Received(1).StopApplication();
+            attempt.IsCompleted.Should().BeFalse();
+            probe.Exited.Task.IsCompleted.Should().BeFalse();
+            _ = store.Received(1).RenewLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            renewal.TrySetResult(CreateActiveRenewal());
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenCompletionNeverReturns_ShouldCancelTheIndependentFinalizationBudget()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CompletionProbe();
+        using var host = CreateJobHost<CompletingRecurringJob, CompletionProbe>(probe);
+        var definition = CreateDefinition<CompletingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var completionStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<JobAttemptCompletionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completionToken = CancellationToken.None;
+        store.CompleteAttemptAsync(Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                completionToken = call.Arg<CancellationToken>();
+                completionStarted.TrySetResult();
+                return completion.Task;
+            });
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            applicationLifetime,
+            timeProvider: time);
+        using var workerStop = new CancellationTokenSource();
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            workerStop.Token);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            probe.Completion.TrySetResult();
+            await completionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await workerStop.CancelAsync();
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
+
+            completionToken.CanBeCanceled.Should().BeTrue();
+            completionToken.IsCancellationRequested.Should().BeFalse();
+            time.Advance(TimeSpan.FromSeconds(3));
+            attempt.IsCompleted.Should().BeFalse();
+            completionToken.IsCancellationRequested.Should().BeFalse();
+            time.Advance(TimeSpan.FromSeconds(1));
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            completionToken.IsCancellationRequested.Should().BeTrue();
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+            await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+            _ = store.Received(1).CompleteAttemptAsync(
+                Arg.Is<JobAttemptCompletion>(value => value.Outcome == JobAttemptOutcome.Succeeded),
+                Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            completion.TrySetException(new InvalidOperationException("Completion failed after its local deadline."));
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenShutdownReleaseNeverReturns_ShouldCancelTheIndependentFinalizationBudget()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationObservingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var releaseStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<JobAttemptCompletionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseToken = CancellationToken.None;
+        store.ReleaseLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                releaseToken = call.Arg<CancellationToken>();
+                releaseStarted.TrySetResult();
+                return release.Task;
+            });
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            applicationLifetime,
+            timeProvider: time);
+        using var workerStop = new CancellationTokenSource();
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            workerStop.Token);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await workerStop.CancelAsync();
+            await releaseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
+
+            releaseToken.CanBeCanceled.Should().BeTrue();
+            releaseToken.IsCancellationRequested.Should().BeFalse();
+            time.Advance(TimeSpan.FromSeconds(4));
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            releaseToken.IsCancellationRequested.Should().BeTrue();
+            probe.Exited.Task.IsCompletedSuccessfully.Should().BeTrue();
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+            await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+            _ = store.Received(1).ReleaseLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            release.TrySetException(new InvalidOperationException("Release failed after its local deadline."));
+            await workerStop.CancelAsync();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenClaimResponseExhaustsTheStoppingRunway_ShouldNotStartUserCode()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationObservingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        store.ReleaseLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>())
+            .Returns(new JobAttemptCompletionResult { Status = JobAttemptCompletionStatus.Applied });
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            timeProvider: time);
+        var requestStarted = time.GetTimestamp();
+        time.Advance(TimeSpan.FromSeconds(34));
+
+        await worker.ExecuteLeaseAsync(
+                CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+                TestContext.Current.CancellationToken,
+                requestStarted)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        probe.Started.Task.IsCompleted.Should().BeFalse();
+        await store.DidNotReceive().RenewLeaseAsync(
+            Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().CompleteAttemptAsync(
+            Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ClaimAvailableWorkAsync_WhenClaimResponseIsDelayed_ShouldCountTheStoreWaitAgainstTheLease()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationObservingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var releaseStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        store.ReleaseLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                releaseStarted.TrySetResult();
+                return Task.FromResult(new JobAttemptCompletionResult { Status = JobAttemptCompletionStatus.Applied });
+            });
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            timeProvider: time);
+        store.ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                time.Advance(TimeSpan.FromSeconds(34));
+                return Task.FromResult<IReadOnlyList<JobExecutionLease>>(
+                    [CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration)]);
+            });
+
+        await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+        await releaseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        probe.Started.Task.IsCompleted.Should().BeFalse();
+        await store.DidNotReceive().RenewLeaseAsync(
+            Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().CompleteAttemptAsync(
+            Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenProcessPauseExhaustsLeaseSafety_ShouldRequestRestartWithoutAnotherGracePeriod()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            ConfigureDeadlineOptions,
+            applicationLifetime,
+            time);
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(33), TestContext.Current.CancellationToken);
+            time.AdvanceAfterPause(TimeSpan.FromSeconds(50));
+
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            attempt.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenUserCodeBlocksBeforeReturningATask_ShouldStartTheWatchdogBeforeDispatch()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<SynchronouslyBlockingRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<SynchronouslyBlockingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, options) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            schedulerOptions =>
+            {
+                ConfigureDeadlineOptions(schedulerOptions);
+                schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(30);
+            },
+            applicationLifetime,
+            time);
+        var attempt = Task.Run(() => worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromSeconds(11), options.Value.ExecutionLeaseDuration),
+            TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(11), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(11));
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(16), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(5));
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            applicationLifetime.Received(1).StopApplication();
+            attempt.IsCompleted.Should().BeFalse();
+            probe.Exited.Task.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteLeaseAsync_WhenCancellationCallbackBlocks_ShouldRequestRestartAtTheGraceDeadline()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new BlockingCancellationProbe();
+        using var host = CreateJobHost<BlockingCancellationRecurringJob, BlockingCancellationProbe>(probe);
+        var definition = CreateDefinition<BlockingCancellationRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var applicationLifetime = CreateApplicationLifetime(out var restartRequested);
+        var (worker, _) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            schedulerOptions =>
+            {
+                schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(30);
+                schedulerOptions.ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(5);
+            },
+            applicationLifetime,
+            time);
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromSeconds(11)),
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(11), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(11));
+            await probe.CallbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(16), TestContext.Current.CancellationToken);
+
+            time.Advance(TimeSpan.FromSeconds(5));
+            await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            applicationLifetime.Received(1).StopApplication();
+            attempt.IsCompleted.Should().BeFalse();
+            probe.CallbackExited.Task.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(),
+                Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.ReleaseCallback.TrySetResult();
+            await probe.CallbackExited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ClaimAvailableWorkAsync_WhenAnAttemptIgnoresCancellation_ShouldStopNewClaimsWithoutReleasingTheLease()
+    {
+        var time = new WorkerTestTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        store.ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<JobExecutionLease>>(
+                [CreateLease(definition.Declaration.JobKey, TimeSpan.FromSeconds(11))]));
+        var restartRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var applicationLifetime = Substitute.For<IHostApplicationLifetime>();
+        applicationLifetime.When(lifetime => lifetime.StopApplication())
+            .Do(_ => restartRequested.TrySetResult());
+        var (worker, _) = CreateWorker(
+            store,
+            [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            schedulerOptions =>
+            {
+                schedulerOptions.MaxWorkerExecutionThreads = 2;
+                schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(30);
+                schedulerOptions.ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(5);
+            },
+            applicationLifetime,
+            time);
+
+        try
+        {
+            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(11), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(11));
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(16), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(5));
+            await restartRequested.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+
+            await store.Received(1).ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+            probe.Exited.Task.IsCompleted.Should().BeFalse();
+            await store.DidNotReceive().CompleteAttemptAsync(
+                Arg.Any<JobAttemptCompletion>(),
+                Arg.Any<CancellationToken>());
+            await store.DidNotReceive().ReleaseLeaseAsync(
+                Arg.Any<JobLeaseKey>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    private static IHostApplicationLifetime CreateApplicationLifetime(out Task restartRequested)
+    {
+        var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var applicationLifetime = Substitute.For<IHostApplicationLifetime>();
+        applicationLifetime.When(lifetime => lifetime.StopApplication()).Do(_ => signal.TrySetResult());
+        restartRequested = signal.Task;
+        return applicationLifetime;
+    }
+
+    private static IHost CreateJobHost<TJob, TProbe>(TProbe probe)
+        where TJob : class, IRecurringJob
+        where TProbe : class
+    {
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Services.AddSingleton(probe);
+        hostBuilder.Services.AddScoped<TJob>();
+        hostBuilder.AddMonica(monica => monica.AddExecutionPipeline());
+        return hostBuilder.Build();
+    }
+
+    private static LocalJobDefinition CreateDefinition<TJob>() where TJob : IRecurringJob => new()
+    {
+        JobClrType = typeof(TJob),
+        Declaration = StoreFixture.RecurringDeclaration(typeof(TJob).FullName!)
+    };
+
     private static (JobExecutionWorkerHostedService Worker, OptionsWrapper<ModuleJobSchedulerOption> Options)
         CreateWorker(
             IJobSchedulerStore store,
             IReadOnlyList<LocalJobDefinition> definitions,
             IServiceScopeFactory scopeFactory,
             Action<ModuleJobSchedulerOption>? configure,
-            IHostApplicationLifetime? applicationLifetime = null)
+            IHostApplicationLifetime? applicationLifetime = null,
+            TimeProvider? timeProvider = null)
     {
         var options = new OptionsWrapper<ModuleJobSchedulerOption>(new ModuleJobSchedulerOption
         {
@@ -422,7 +1082,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
             definitions,
             orchestrator,
             new JobSchedulerRuntimeState(),
-            TimeProvider.System,
+            timeProvider ?? TimeProvider.System,
             applicationLifetime ?? Substitute.For<IHostApplicationLifetime>(),
             schedulerOptions,
             new ObservableInstanceRegistry(Options.Create(new ModuleObservableInstanceOption())),
@@ -432,7 +1092,27 @@ public sealed class JobExecutionWorkerHostedServiceTests
         return (worker, options);
     }
 
-    private static JobExecutionLease CreateLease(string jobKey, TimeSpan executionTimeout)
+    private static JobLeaseRenewalResult CreateActiveRenewal(TimeSpan? leaseDuration = null) => new()
+    {
+        Status = JobLeaseRenewalStatus.Active,
+        GrantedAtUtc = NOW,
+        LeaseExpiresAtUtc = NOW.Add(leaseDuration ?? TimeSpan.FromMinutes(1))
+    };
+
+    private static void ConfigureDeadlineOptions(ModuleJobSchedulerOption schedulerOptions)
+    {
+        schedulerOptions.ExecutionLeaseDuration = TimeSpan.FromSeconds(40);
+        schedulerOptions.ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(7);
+        schedulerOptions.ExecutionLeaseSafetyMargin = TimeSpan.FromSeconds(2);
+        schedulerOptions.ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(5);
+        schedulerOptions.ExecutionLeaseRenewalTimeout = TimeSpan.FromSeconds(3);
+        schedulerOptions.ExecutionFinalizationTimeout = TimeSpan.FromSeconds(4);
+    }
+
+    private static JobExecutionLease CreateLease(
+        string jobKey,
+        TimeSpan executionTimeout,
+        TimeSpan? leaseDuration = null)
     {
         return new JobExecutionLease
         {
@@ -451,8 +1131,11 @@ public sealed class JobExecutionWorkerHostedServiceTests
                 },
                 AvailableAtUtc = NOW,
                 State = JobExecutionState.Running,
-                CreatedAtUtc = NOW
+                CreatedAtUtc = NOW,
+                StartedAtUtc = NOW,
+                LeaseExpiresAtUtc = NOW.Add(leaseDuration ?? TimeSpan.FromMinutes(1))
             },
+            GrantedAtUtc = NOW,
             LeaseKey = new JobLeaseKey
             {
                 SchedulerScopeKey = StoreFixture.SCOPE,
@@ -477,6 +1160,41 @@ public sealed class JobExecutionWorkerHostedServiceTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource Completion { get; } = new();
+    }
+
+    private sealed class BlockingCancellationProbe
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource CallbackEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource CallbackExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseCallback { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Exited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class BlockingCancellationRecurringJob(BlockingCancellationProbe probe) : IRecurringJob
+    {
+        public async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            using var registration = cancellationToken.Register(() =>
+            {
+                probe.CallbackEntered.TrySetResult();
+                probe.ReleaseCallback.Task.GetAwaiter().GetResult();
+                probe.CallbackExited.TrySetResult();
+            });
+            probe.Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            finally
+            {
+                probe.Exited.TrySetResult();
+            }
+        }
     }
 
     private sealed class CompletingRecurringJob(CompletionProbe probe) : IRecurringJob
@@ -512,6 +1230,23 @@ public sealed class JobExecutionWorkerHostedServiceTests
             try
             {
                 await probe.Release.Task;
+            }
+            finally
+            {
+                probe.Exited.TrySetResult();
+            }
+        }
+    }
+
+    private sealed class SynchronouslyBlockingRecurringJob(CancellationProbe probe) : IRecurringJob
+    {
+        public Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            probe.Started.TrySetResult();
+            try
+            {
+                probe.Release.Task.GetAwaiter().GetResult();
+                return Task.CompletedTask;
             }
             finally
             {

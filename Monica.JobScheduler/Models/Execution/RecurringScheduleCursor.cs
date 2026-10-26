@@ -158,6 +158,9 @@ public sealed record RecurringScheduleCursorKey
 /// </remarks>
 public sealed record RecurringScheduleSynchronization
 {
+    /// <summary>Gets the automatic owner coordinator grant, when invoked by a hosted coordinator.</summary>
+    public JobCoordinatorLeaseKey? CoordinatorLease { get; init; }
+
     /// <summary>
     /// Gets the recurring job whose cursor is reconciled.
     /// </summary>
@@ -279,6 +282,9 @@ public sealed record RecurringScheduleCursor
 /// </summary>
 public sealed record RecurringOccurrenceMaterialization
 {
+    /// <summary>Gets the automatic owner coordinator grant, when invoked by a hosted coordinator.</summary>
+    public JobCoordinatorLeaseKey? CoordinatorLease { get; init; }
+
     /// <summary>
     /// Gets the cursor being advanced.
     /// </summary>

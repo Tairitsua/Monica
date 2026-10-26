@@ -6,9 +6,9 @@ namespace Monica.JobScheduler.Models.Operations;
 /// </summary>
 /// <remarks>
 /// The configuration and local-plane sections describe the host that served the request; the owner section is
-    /// read from the shared durable store and contains definition-backed owners in the exact scope. An owner
-    /// with only execution records is not included. Neither definition presence nor observation freshness
-    /// establishes that owner's process or worker readiness.
+/// read from the shared durable store and contains definition-backed owners in the exact scope. An owner
+/// with only execution records is not included. Neither definition presence nor observation freshness
+/// establishes that owner's process or worker readiness.
 /// </remarks>
 public sealed record JobSchedulerRuntimeOverview
 {
@@ -31,6 +31,9 @@ public sealed record JobSchedulerRuntimeOverview
     /// Gets definition-backed owners' durable footprints in the configured scope, ordered by exact owner key.
     /// </summary>
     public required IReadOnlyList<JobOwnerSummary> Owners { get; init; }
+
+    /// <summary>Gets the independently captured durable coordinator evidence, or null when not observed.</summary>
+    public JobCoordinatorSnapshot? Coordination { get; init; }
 
     /// <summary>
     /// Gets the definition-observation freshness threshold, derived as three times <c>SnapshotSyncInterval</c>.
@@ -77,8 +80,20 @@ public sealed record JobSchedulerRuntimeConfiguration
     /// <summary>Gets the worker plane's claim poll cadence.</summary>
     public required TimeSpan WorkerPollInterval { get; init; }
 
-    /// <summary>Gets how often a host republishes its complete local definition snapshot.</summary>
+    /// <summary>Gets how often the owner coordinator confirms its declaration manifest.</summary>
     public required TimeSpan SnapshotSyncInterval { get; init; }
+
+    /// <summary>Gets the owner and maintenance coordinator lease duration.</summary>
+    public required TimeSpan CoordinatorLeaseDuration { get; init; }
+
+    /// <summary>Gets the EF store's process-local limit for all concurrent operations.</summary>
+    public required int MaxConcurrentStoreOperations { get; init; }
+
+    /// <summary>Gets the operation slots reserved for execution renewal and finalization.</summary>
+    public required int ReservedLeaseStoreOperations { get; init; }
+
+    /// <summary>Gets the EF store operation budget, including admission and transaction retries.</summary>
+    public required TimeSpan StoreOperationTimeout { get; init; }
 
     /// <summary>Gets the duration of each fenced execution lease.</summary>
     public required TimeSpan ExecutionLeaseDuration { get; init; }
@@ -146,6 +161,15 @@ public sealed record JobSchedulerStoreInfo
 /// </summary>
 public sealed record JobSchedulerLocalPlaneSnapshot
 {
+    /// <summary>Gets the last local owner work completion, excluding cycles that only stood by.</summary>
+    public DateTimeOffset? LastOwnerSchedulingWorkAtUtc { get; init; }
+
+    /// <summary>Gets the last local recovery pass completion, including a pass with no expired leases.</summary>
+    public DateTimeOffset? LastLeaseRecoveryWorkAtUtc { get; init; }
+
+    /// <summary>Gets the last local bounded cleanup pass completion, not necessarily a full scope scan.</summary>
+    public DateTimeOffset? LastHistoryCleanupWorkAtUtc { get; init; }
+
     /// <summary>Gets whether the scheduling plane's last cycle succeeded.</summary>
     public required bool SchedulingReady { get; init; }
 

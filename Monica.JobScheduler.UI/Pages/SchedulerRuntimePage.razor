@@ -66,6 +66,7 @@
                             <SchedulerRuntimeIdentityCard Overview="@overview" />
                         </div>
                         <SchedulerOwnerInsightTable Overview="@overview" />
+                        <SchedulerCoordinatorTable Snapshot="@overview.Coordination" />
                     }
                     else if (state.IsQueryFailed && !state.IsLoading)
                     {

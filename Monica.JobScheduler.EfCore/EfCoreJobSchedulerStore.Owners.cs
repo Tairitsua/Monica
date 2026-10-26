@@ -41,6 +41,19 @@ public sealed partial class EfCoreJobSchedulerStore
                 },
                 StringComparer.Ordinal);
 
+            var ownerRows = await dbContext.SchedulerOwners.AsNoTracking()
+                .Where(row => row.SchedulerScopeKey == schedulerScopeKey).ToListAsync(token);
+            foreach (var owner in ownerRows)
+            {
+                if (summaries.TryGetValue(owner.OwnerKey, out var summary))
+                    summaries[owner.OwnerKey] = summary with
+                    {
+                        LastObservedAtUtc = FromTicks(owner.LastObservedAtUtcTicks),
+                        ManifestHash = owner.ManifestHash,
+                        ManifestPublishedAtUtc = FromTicks(owner.ManifestPublishedAtUtcTicks)
+                    };
+            }
+
             var executionRows = await dbContext.Executions.AsNoTracking()
                 .Where(execution => execution.SchedulerScopeKey == schedulerScopeKey
                                     && (execution.State == JobExecutionState.Queued

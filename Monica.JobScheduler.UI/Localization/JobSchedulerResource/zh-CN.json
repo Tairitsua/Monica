@@ -896,7 +896,11 @@
       "MaxRetainedOrphanedExecutions": "孤立执行保留数",
       "Enabled": "已启用",
       "Disabled": "已停用",
-      "ExactInterval": "精确间隔"
+      "ExactInterval": "精确间隔",
+      "CoordinatorLeaseDuration": "协调者租约",
+      "MaxConcurrentStoreOperations": "存储操作并发上限",
+      "ReservedLeaseStoreOperations": "续租与收尾预留槽位",
+      "StoreOperationTimeout": "存储操作时间预算"
     },
     "Plane": {
       "Title": "本地循环",
@@ -907,7 +911,11 @@
       "NotReady": "未就绪",
       "NoMessage": "未报告循环消息。",
       "InFlight": "本机执行中数量 / 配置上限",
-      "LocalOnly": "本地循环证据不能说明其他副本是否就绪，也不能说明单个作业的执行结果。"
+      "LocalOnly": "本地循环证据不能说明其他副本是否就绪，也不能说明单个作业的执行结果。",
+      "LastOwnerWork": "最近完成 owner 工作",
+      "LastRecoveryWork": "最近完成恢复扫描",
+      "LastCleanupWork": "最近完成清理扫描",
+      "WorkTimeHelp": "时间仅记录本机已完成的实际工作，包含空扫描。仅待机的轮次不会更新时间；健康待机副本可以没有工作时间。一次清理扫描可能只覆盖部分范围。"
     },
     "Owners": {
       "Title": "持久化所有者观测",
@@ -924,7 +932,9 @@
       "Empty": "当前范围内没有记录任何有定义记录的所有者。",
       "RecentObservation": "较新观测",
       "StaleObservation": "陈旧观测",
-      "AheadOfCapture": "晚于采集时间"
+      "AheadOfCapture": "晚于采集时间",
+      "ManifestPublished": "声明内容接收时间",
+      "ManifestHash": "已接收声明摘要"
     },
     "Workers": {
       "Title": "服务注册中心观测",
@@ -961,6 +971,19 @@
       "Unavailable": "运行时证据暂不可用",
       "UnavailableDescription": "尚未接受有效的运行时快照。请重新读取以查看当前宿主；快照不可用不能说明调度器为空或健康。",
       "NoDiagnostic": "未提供诊断消息。"
+    },
+    "Coordinators": {
+      "Title": "持久化协调租约",
+      "Description": "记录 owner 调度与范围维护的持有者。有效期使用存储时钟判断；租约有效不能证明进程健康。此处不暴露隔离令牌。",
+      "Observed": "存储观察时间",
+      "Unavailable": "尚未观察协调租约归属。",
+      "Empty": "当前范围尚无协调租约记录。",
+      "Partition": "协调分区",
+      "Holder": "记录的 Worker 实例",
+      "Expiry": "租约到期时间",
+      "State": "观察时状态",
+      "Active": "租约有效",
+      "Expired": "租约已过期"
     }
   }
 }

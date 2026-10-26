@@ -1,6 +1,8 @@
 @using Monica.JobScheduler.Models.Operations
 @using Monica.JobScheduler.UI.Localization
+@using Monica.JobScheduler.UI.UIJobScheduler.Support
 @inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
 
 <section class="runtime-plane" aria-labelledby="runtime-plane-heading">
     <header class="runtime-plane__heading">
@@ -54,6 +56,12 @@
             <dd>@Overview.LocalPlane.InFlightExecutions <span>/ @Overview.Configuration.MaxWorkerExecutionThreads</span></dd>
         </div>
     </dl>
+    <dl class="runtime-plane__work">
+        <div><dt>@L["Runtime:Plane:LastOwnerWork"]</dt><dd>@TimePresentation.FormatTimestamp(Overview.LocalPlane.LastOwnerSchedulingWorkAtUtc)</dd></div>
+        <div><dt>@L["Runtime:Plane:LastRecoveryWork"]</dt><dd>@TimePresentation.FormatTimestamp(Overview.LocalPlane.LastLeaseRecoveryWorkAtUtc)</dd></div>
+        <div><dt>@L["Runtime:Plane:LastCleanupWork"]</dt><dd>@TimePresentation.FormatTimestamp(Overview.LocalPlane.LastHistoryCleanupWorkAtUtc)</dd></div>
+    </dl>
+    <p>@L["Runtime:Plane:WorkTimeHelp"]</p>
     <footer class="runtime-plane__scope-note">
         <MoIcon Icon="@MoIcons.Info" aria-hidden="true" Size="1.5rem" />
         <p>@L["Runtime:Plane:LocalOnly"]</p>

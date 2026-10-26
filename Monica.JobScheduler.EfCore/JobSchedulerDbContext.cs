@@ -20,6 +20,8 @@ public sealed class JobSchedulerDbContext(
     internal DbSet<JobExecutionHistoryEntity> ExecutionHistory => Set<JobExecutionHistoryEntity>();
     internal DbSet<JobExecutionGateEntity> ExecutionGates => Set<JobExecutionGateEntity>();
     internal DbSet<JobRecurringCursorEntity> RecurringCursors => Set<JobRecurringCursorEntity>();
+    internal DbSet<JobSchedulerOwnerEntity> SchedulerOwners => Set<JobSchedulerOwnerEntity>();
+    internal DbSet<JobSchedulerCoordinatorEntity> Coordinators => Set<JobSchedulerCoordinatorEntity>();
 
     protected override void OnModelCreatingExtend(ModelBuilder modelBuilder)
     {
@@ -31,6 +33,24 @@ public sealed class JobSchedulerDbContext(
 
     private static void ConfigureDefinitions(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<JobSchedulerOwnerEntity>(entity =>
+        {
+            entity.ToTable("JobSchedulerOwners");
+            entity.HasKey(row => new { row.SchedulerScopeKey, row.OwnerKey });
+            entity.Property(row => row.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.ManifestHash).HasMaxLength(64);
+        });
+        modelBuilder.Entity<JobSchedulerCoordinatorEntity>(entity =>
+        {
+            entity.ToTable("JobSchedulerCoordinators");
+            entity.HasKey(row => new { row.SchedulerScopeKey, row.CoordinatorKey });
+            entity.Property(row => row.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.CoordinatorKey).HasMaxLength(256);
+            entity.Property(row => row.WorkerInstanceId).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.LeaseToken).HasMaxLength(32);
+        });
+
         modelBuilder.Entity<JobDefinitionEntity>(entity =>
         {
             entity.ToTable("JobDefinitions");
@@ -99,6 +119,9 @@ public sealed class JobSchedulerDbContext(
                 item.OwnerKey
             });
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.State });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.State, item.LeaseExpiresAtUtcTicks, item.InstanceId });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.State,
+                item.AvailableAtUtcTicks, item.CreatedAtUtcTicks, item.InstanceId });
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.CreatedAtUtcTicks });
             entity.HasMany(item => item.History)
                 .WithOne(item => item.Execution)
