@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Split Deployment"
-  short_description: "Place roles across AppIds and migrate service hosts"
-  default_prompt: "Use $monica-application-microservice after loading $monica-application and the project specification to plan split role placement or migrate existing service hosts."

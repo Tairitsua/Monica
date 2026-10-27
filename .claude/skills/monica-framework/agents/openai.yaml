@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Framework"
-  short_description: "Router for Monica framework development skills"
-  default_prompt: "Use $monica-framework to choose the right Monica framework skill for module, UI, docs, requirement, audit, or testing work."

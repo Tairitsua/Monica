@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Combined Deployment"
-  short_description: "Combine roles and migrate merged application projects"
-  default_prompt: "Use $monica-application-modular-monolith after loading $monica-application and the project specification to plan combined role placement or migrate merged contexts."

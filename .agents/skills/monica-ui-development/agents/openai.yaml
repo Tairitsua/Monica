@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica UI Development"
-  short_description: "Build precise Monica Blazor and MudBlazor UI"
-  default_prompt: "Use $monica-ui-development to implement a precise Monica UI with full-width operational layouts, responsive surfaces, purposeful motion, local fonts, and prototype fidelity."

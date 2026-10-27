@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Architecture"
-  short_description: "Monica module structure and boundary rules"
-  default_prompt: "Use $monica-architecture to design or review Monica module structure, boundaries, Facades, Providers, and page decomposition."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Web"
-  short_description: "Web API, controllers, and authority"
-  default_prompt: "Use $monica-infra-web to compose this Monica Web API and its authorization boundary."

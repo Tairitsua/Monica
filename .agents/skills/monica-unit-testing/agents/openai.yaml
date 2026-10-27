@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Unit Testing"
-  short_description: "Monica host and generator test standards"
-  default_prompt: "Use $monica-unit-testing to choose and implement the correct Monica host, ProjectUnit, UI, or Roslyn generator test boundary."

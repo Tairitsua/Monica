@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Configuration"
-  short_description: "Managed configuration, stores, and reload"
-  default_prompt: "Use $monica-infra-configuration to set up Monica managed configuration for this host."

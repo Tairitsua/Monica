@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica UI Bridge Debug"
-  short_description: "Bridge-based Monica UI debug with simple or delegated modes"
-  default_prompt: "Use $monica-ui-bridge-debug to inspect and refine a Monica UI module through a bridge service, select an appropriate execution mode, and save verifiable browser artifacts."

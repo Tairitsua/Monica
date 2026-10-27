@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Guide"
-  short_description: "Explore and manage the Monica toolbox safely"
-  default_prompt: "Use $monica-guide to show me the Monica toolbox and ask what I want to do next."

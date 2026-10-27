@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica UI Localization"
-  short_description: "Monica UI i18n resources and validation"
-  default_prompt: "Use $monica-ui-localization to add, review, or validate Monica UI localization resources and i18n keys."

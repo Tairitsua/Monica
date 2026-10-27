@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Observability"
-  short_description: "Health, logs, timing, and metrics"
-  default_prompt: "Use $monica-infra-observability to configure health, logging, timing, and metrics for this Monica host."

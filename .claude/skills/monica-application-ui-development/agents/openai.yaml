@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Application UI Development"
-  short_description: "Build business UI through application use cases"
-  default_prompt: "Use $monica-application-ui-development with the repository application specification to implement pages, UI state, forms, and scoped application calls."

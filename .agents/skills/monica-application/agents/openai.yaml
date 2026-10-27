@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Application"
-  short_description: "Apply shared and project application specifications"
-  default_prompt: "Use $monica-application and this repository's project specification to implement or review the requested feature within its approved architecture."

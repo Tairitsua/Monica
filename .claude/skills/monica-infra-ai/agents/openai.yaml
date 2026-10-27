@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure AI"
-  short_description: "AI chat, RAG, skills, and MCP"
-  default_prompt: "Use $monica-infra-ai to configure AI providers and capabilities in this Monica application."

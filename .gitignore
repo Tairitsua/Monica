@@ -369,7 +369,9 @@ FodyWeavers.xsd
 /rules/mudblazor/src
 .auto-claude
 
-.claude/worktrees/
+# Agent state and generated skill projections; regenerate locally with scripts/sync_agent_skills.py
+.agents/
+.claude/
 
 .playwright-cli
 temp/

@@ -1,6 +1,6 @@
 # Monica documentation ownership and placement
 
-Canonical Monica Agent Skills and their technical references live in the Monica repository under `skills/<name>/`. Edit them there, then let the repository's projection workflow update installed skill copies and any website-facing skill view. A rendered website page is not an independent copy to maintain by hand.
+Canonical Monica Agent Skills and their technical references live in the Monica repository under `skills/<name>/`. Edit them there, then let the repository's projection workflow update installed skill copies and any website-facing skill view. The repository-local `.agents/` and `.claude/` roots are ignored agent state, never committed sources, even when a merge or mirror supplies them. Follow the contributor workflow in the repository's `CONTRIBUTING.md` for local generation, validation, and conflict recovery. A rendered website page is not an independent copy to maintain by hand.
 
 Stable human-facing guides live in a Monica.Docs checkout under `docs/`. Resolve that checkout from the current task or local filesystem; it has no Monica.Guide source binding or docs-contributor profile. Its current navigation and routes decide the final path. The page families are `getting-started/`, `concepts/`, `guides/`, `scenarios/`, `packages/`, and `ecosystem/`, with `en-US/` and `zh-CN/` language trees. Keep paired localized pages at corresponding paths where the site supports alternates.
 

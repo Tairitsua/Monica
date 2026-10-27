@@ -320,6 +320,7 @@ jobs:
         run: |
           python3 scripts/validate_agent_skills.py
           python3 scripts/sync_agent_skills.py --write
+          python3 scripts/sync_agent_skills.py --check
           python3 -m unittest discover -s scripts/tests -p "test*.py"
 
       - name: Validate portable Agent Skills

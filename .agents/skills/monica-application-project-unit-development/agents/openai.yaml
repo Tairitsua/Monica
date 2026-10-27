@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Application ProjectUnit Development"
-  short_description: "Implement and review approved application unit shapes"
-  default_prompt: "Use $monica-application-project-unit-development with $monica-application and the project specification to implement the requested use case with the right state owner and units."

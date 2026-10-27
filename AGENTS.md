@@ -42,8 +42,8 @@ powershell -File scripts/run-tests.ps1 -NoBuild
 
 ## Knowledge ownership
 
-- Edit Monica skills only in `skills/<name>/`. `.agents/skills/` and `.claude/skills/` are generated projections. Regenerate with `python scripts/sync_agent_skills.py --write` and include canonical and generated changes together.
-- Before completing a skill change, run `python scripts/validate_agent_skills.py`, `python scripts/sync_agent_skills.py --check`, and `python scripts/test_agent_skills.py`.
+- Edit Monica skills only in `skills/<name>/`. `.agents/` and `.claude/` are ignored local agent state; their `skills/` subdirectories are generated projections. Regenerate with `python scripts/sync_agent_skills.py --write` after cloning or changing skills, and never commit either root, including during merges or synchronization.
+- Before completing a skill change, run `python scripts/validate_agent_skills.py`, `python scripts/sync_agent_skills.py --write`, `python scripts/sync_agent_skills.py --check`, and `python scripts/test_agent_skills.py`.
 - When implementation changes public behavior or yields verified reusable guidance, update the owning task reference, its routing when needed, and the relevant example or behavioral check in the same change. Follow `monica-docs-authoring` for topic boundaries; replace obsolete guidance rather than appending session notes.
 - Run `python scripts/check_knowledge_impact.py --base <base-ref>` for infrastructure changes. If guidance is unaffected, pass `--no-impact "<concrete reason>"` and record that rationale in the PR's Knowledge impact section.
 - The catalog at `.monica/agent-skill-catalog.json` owns skill routing, source ownership, and release projections. Monica.Docs owns stable editorial guides and renders published skills; do not create parallel module manuals here.
