@@ -1,6 +1,7 @@
 @using System.Globalization
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
+@using Monica.UI.Shared.Components.Visual
 @using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Support
 @inject IStringLocalizer<SystemInfoResource> L
@@ -17,13 +18,18 @@
             </div>
         </div>
         <p class="system-info-lede">
-            @L["Page:Finding:On"] <mark class="mo-vl-mark mo-vl-role--neutral">@Snapshot.Host.MachineName</mark>
-            @L["Page:Finding:Running"] <mark class="mo-vl-mark mo-vl-role--info is-measure">@SystemInfoDisplayFormatter.FormatDuration(Uptime)</mark>@L["Page:Finding:RunningEnd"]
+            <MoRichFinding Template="@L["Page:Finding:Running"].Value"
+                           Values="@([ValueMark(Snapshot.Host.MachineName, MoVisualRole.Neutral),
+                                      ValueMark(SystemInfoDisplayFormatter.FormatDuration(Uptime), MoVisualRole.Info)])" />
             @if (Snapshot.Startup is { } startup)
             {
-                @L["Page:Finding:Startup"] <mark class="mo-vl-mark mo-vl-role--primary is-measure">@((startup.DurationMs / 1000d).ToString("N2", CultureInfo.CurrentCulture)) s</mark>@L["Page:Finding:StartupEnd"]
+                @(" ")
+                <MoRichFinding Template="@L["Page:Finding:Startup"].Value"
+                               Values="@([ValueMark($"{(startup.DurationMs / 1000d).ToString("N2", CultureInfo.CurrentCulture)} s", MoVisualRole.Primary)])" />
             }
-            @L["Page:Finding:Captured"] <mark class="mo-vl-mark mo-vl-role--neutral is-measure">@EvidenceAge</mark>@L["Page:Finding:Snapshot"]
+            @(" ")
+            <MoRichFinding Template="@L["Page:Finding:Snapshot"].Value"
+                           Values="@([ValueMark(EvidenceAge, MoVisualRole.Neutral)])" />
         </p>
     </div>
     <SystemInfoLifeline Snapshot="@Snapshot" NowUtc="@NowUtc" />
@@ -35,6 +41,10 @@
     [Parameter] public DateTimeOffset NowUtc { get; set; }
     private TimeSpan Uptime => NowUtc > Snapshot.Process.StartedAtUtc ? NowUtc - Snapshot.Process.StartedAtUtc : TimeSpan.Zero;
     private string EvidenceAge => L[(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds < 1 ? "Page:Status:JustNow" : "Page:Status:SecondsAgo", Math.Max(0, (int)(NowUtc - Snapshot.CapturedAtUtc).TotalSeconds)].Value;
+
+    private RenderFragment ValueMark(string value, MoVisualRole role) =>
+        @<MoValueMark Role="@role">@value</MoValueMark>;
+
     private IEnumerable<(string Value, string UnitKey)> DurationParts
     {
         get

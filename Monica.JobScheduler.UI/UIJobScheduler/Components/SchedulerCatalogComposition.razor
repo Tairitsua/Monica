@@ -5,22 +5,22 @@
     <div class="catalog-composition__decision">
         <div><p id="catalog-composition-title">@L["Workspace:Inventory"]</p><MoDisplayValue Value="@_present.Count.ToString()" Unit="@L["Workspace:PublishedDefinitions"]" /><small>@L["Workspace:DefinitionBreakdown", _recurring, _present.Count - _recurring, Definitions.Count - _present.Count]</small></div>
         <p class="catalog-composition__finding">
-            @CountMark(_present.Count, "primary")@(" ")<SchedulerRichFinding Template="@L["Workspace:CatalogOwners"].Value" Values="@([CountMark(_owners.Length)])" />@(" ")
+            <MoRichFinding Template="@L["Workspace:CatalogOwners"].Value" Values="@([CountMark(_present.Count, MoVisualRole.Primary), CountMark(_owners.Length)])" />@(" ")
             @if (_largestOwner is { } largest)
             {
-                <a class="catalog-composition__value" data-role="neutral" href="@FilterUrl("owner", largest)">@largest</a>@(" ")<SchedulerRichFinding Template="@L["Workspace:CatalogOwnerCount"].Value" Values="@([CountMark(_present.Count(d => d.OwnerKey == largest))])" />@(" ")
+                <MoRichFinding Template="@L["Workspace:CatalogOwnerCount"].Value" Values="@([OwnerMark(largest), CountMark(_present.Count(d => d.OwnerKey == largest))])" />@(" ")
             }
             @if (_failures > 0)
             {
-                <SchedulerRichFinding Template="@L["Workspace:CatalogFailures"].Value" Values="@([CountMark(_failures, "error")])" />@(" ")
+                <MoRichFinding Template="@L["Workspace:CatalogFailures"].Value" Values="@([CountMark(_failures, MoVisualRole.Error)])" />@(" ")
             }
             @if (_slow > 0)
             {
-                <SchedulerRichFinding Template="@L["Workspace:CatalogSlow"].Value" Values="@([CountMark(_slow, "error")])" />@(" ")
+                <MoRichFinding Template="@L["Workspace:CatalogSlow"].Value" Values="@([CountMark(_slow, MoVisualRole.Error)])" />@(" ")
             }
             @if (_never > 0)
             {
-                <SchedulerRichFinding Template="@L["Workspace:CatalogNever"].Value" Values="@([CountMark(_never, "primary")])" />
+                <MoRichFinding Template="@L["Workspace:CatalogNever"].Value" Values="@([CountMark(_never, MoVisualRole.Primary)])" />
             }
         </p>
     </div>
@@ -81,6 +81,9 @@
     private string Tone(JobDefinition definition) => !definition.IsPresent ? "absent" : definition.IsDisabled ? "paused" : Tones.GetValueOrDefault(definition.Id) ?? (definition.Declaration.JobType == JobType.Triggered ? "primary" : "success");
     private string Label(JobDefinition definition) => $"{definition.EffectiveConfiguration.JobName} · {definition.OwnerKey}";
     private string FilterUrl(string key,string? value) => Navigation.GetUriWithQueryParameters(new Dictionary<string,object?> { [key] = value, ["instanceId"] = null });
-    private RenderFragment CountMark(int value, string role = "neutral") => @<span class="catalog-composition__value" data-role="@role">@value</span>;
+    private RenderFragment CountMark(int value, MoVisualRole role = MoVisualRole.Neutral) =>
+        @<MoValueMark Role="@(value == 0 ? MoVisualRole.Neutral : role)">@value.ToString("N0")</MoValueMark>;
+    private RenderFragment OwnerMark(string owner) =>
+        @<MoValueMark Role="MoVisualRole.Neutral" Href="@FilterUrl("owner", owner)">@owner</MoValueMark>;
     private RenderFragment Mark(JobDefinition definition) => @<a class="catalog-composition__mark" data-tone="@Tone(definition)" href="@JobSchedulerUiUrls.JobDefinition(definition.Id,Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)" title="@Label(definition)" aria-label="@Label(definition)"></a>;
 }

@@ -4,7 +4,7 @@
 <section class="rt-signature" aria-labelledby="rt-readiness">
     <div class="rt-decision" data-role="@(!Autonomous ? "neutral" : Ready ? "success" : "warning")">
         <div><p class="display-label">@L["Workspace:ServingHost"]</p><h2 id="rt-readiness" class="rt-statement">@L[!Autonomous ? "Runtime:Identity:ManualMode" : Ready ? "Workspace:LocallyReady" : "Runtime:Finding:Attention"]</h2><p class="rt-host-key">@Overview.Configuration.OwnerKey</p></div>
-        <div class="rt-finding"><p class="lede"><SchedulerRichFinding Template="@L[Autonomous ? "Runtime:Finding:Automatic" : "Runtime:Finding:Manual"]" Values="@FindingValues" /></p>
+        <div class="rt-finding"><p class="lede"><MoRichFinding Template="@L[Autonomous ? "Runtime:Finding:Automatic" : "Runtime:Finding:Manual"]" Values="@FindingValues" /></p>
             <p class="rt-finding-note"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@L[Autonomous ? "Runtime:Plane:LocalOnly" : "Runtime:Finding:ManualNote"]</span></p></div>
     </div>
     <SchedulerRuntimeResponsibilities Overview="@Overview" />

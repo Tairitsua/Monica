@@ -31,9 +31,9 @@
                 }
                 <p class="mo-vl-lede score-finding">
                     @L["Overview:Score:Lede:OfWhich"]
-                    <MoValueMark Role="MoVisualRole.Primary">@L["Overview:Score:Mark:Composition", ModuleDiagnosticsDisplay.Duration(snapshot.Summary.TotalCompositionDurationMs)]</MoValueMark>
+                    <strong>@L["Overview:Score:Mark:Composition", ModuleDiagnosticsDisplay.Duration(snapshot.Summary.TotalCompositionDurationMs)]</strong>
                     <span>@L["Overview:Score:Lede:Joiner"]</span>
-                    <MoValueMark Role="MoVisualRole.Info">@L["Overview:Score:Mark:Work", ModuleDiagnosticsDisplay.Duration(startupWorkMs)]</MoValueMark>
+                    <strong>@L["Overview:Score:Mark:Work", ModuleDiagnosticsDisplay.Duration(startupWorkMs)]</strong>
                     @if (longestWorkModule is { } longest)
                     {
                         <span>@L["Overview:Score:Longest:Prefix"]</span>

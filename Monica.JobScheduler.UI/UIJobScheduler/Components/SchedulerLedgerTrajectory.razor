@@ -15,7 +15,7 @@
         <p>
             @if (_distribution is { } distribution)
             {
-                <SchedulerRichFinding Template="@L["Workspace:LedgerCountFinding"].Value"
+                <MoRichFinding Template="@L["Workspace:LedgerCountFinding"].Value"
                                       Values="@([CountMark(MatchingCount, MoVisualRole.Primary),
                                                   CountMark(distribution.StateTotals[JobExecutionState.Failed], MoVisualRole.Error),
                                                   CountMark(distribution.StateTotals[JobExecutionState.Skipped], MoVisualRole.Warning)])" />

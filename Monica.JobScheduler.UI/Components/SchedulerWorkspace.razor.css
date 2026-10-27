@@ -33,6 +33,5 @@
 .scheduler-workspace ::deep h1 { scroll-margin-block-start: 36px; }
 .scheduler-page-frame { container:scheduler-page / inline-size; width:100%; min-width:0; }
 
-.scheduler-workspace ::deep .mo-vl-mark { display:inline-block; padding:0 6px; margin:0 1px; border-radius:5px; background:color-mix(in srgb,var(--mo-vl-role) 12%,var(--mud-palette-surface)); color:color-mix(in srgb,var(--mo-vl-role) 72%,var(--mud-palette-text-primary)); font-weight:600; line-height:1.6; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
 .scheduler-workspace ::deep .mo-vl-display__value { font-size:inherit; font-weight:inherit; line-height:inherit; letter-spacing:inherit; }

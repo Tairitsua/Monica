@@ -137,8 +137,10 @@ Indicators:
 - Custom CSS classes on menu surfaces, row items, or overlay panels (e.g. `.my-dropdown`, `.custom-flyout-item`) that are also targeted in theme files
 - Theme files containing selectors for these private component classes
 - Grep theme files for the private class name to confirm coupling
+- Pages reproduce a shared value mark, filter, or other visual primitive with local CSS, or consume the shared component and override its internal geometry or paint through broad descendant selectors
+- An extraction adds a shared wrapper while leaving duplicate render helpers and retired styles in callers
 
-Fix: remove theme coupling. If the class is only used by the owning component, keep it in the component's `.razor.css`. Promote a hook to shared CSS only when multiple components intentionally share the same layout contract.
+Fix: remove theme coupling. If the class is only used by the owning component, keep it in the component's `.razor.css`. Promote a hook to shared CSS only when multiple components intentionally share the same layout contract. Consult the [shared component selection guide](../../monica-infra-ui/references/visual-components.md) and verify that equivalent callers use the owner without restyling its internals. Complete extraction by removing replaced implementations; follow the [consolidation workflow](../../monica-ui-development/references/prototype-replication.md) and verify representative callers when a shared default changes.
 
 ### P5 — Duplicate utility or raw CLR type-display logic
 

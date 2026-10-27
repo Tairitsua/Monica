@@ -23,8 +23,6 @@
 .scheduler-pulse__reasons .is-zero, .scheduler-pulse__reasons .is-zero b { color: color-mix(in srgb, var(--mud-palette-text-secondary) 87%, var(--mud-palette-surface)); }
 .scheduler-pulse__reasons .is-zero i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--tone); }
 .scheduler-pulse__finding { justify-self: end; max-width: 68ch; margin: 0 0 4px; color: var(--mud-palette-text-secondary); font-size: 14px; line-height: 1.8; }
-.scheduler-pulse__finding a { display: inline-block; padding: 0 6px; margin: 0 1px; border-radius: 5px; background: color-mix(in srgb, var(--tone) 12%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--tone) 72%, var(--mud-palette-text-primary)); font-weight: 600; line-height: 1.6; font-variant-numeric: tabular-nums; text-decoration: none; white-space: normal; transition: box-shadow var(--mo-duration-fast) var(--mo-ease); }
-.scheduler-pulse__finding a:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 48%, transparent); text-decoration: underline; text-underline-offset: 2px; }
 .scheduler-pulse__scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 28px; background: color-mix(in srgb, var(--mud-palette-text-primary) 2%, var(--mud-palette-surface)); box-shadow: inset 0 1px 0 var(--mud-palette-divider), inset 0 -1px 0 var(--mud-palette-divider); color: var(--mud-palette-text-secondary); font-size: 12.5px; }
 .scheduler-pulse__scope > span { display: inline-flex; align-items: center; gap: 8px; }
 .pulse-seg { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 9px; background: var(--mud-palette-background-gray); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default); }

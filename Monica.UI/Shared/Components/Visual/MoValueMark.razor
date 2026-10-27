@@ -1,5 +1,11 @@
-@* Inline value mark: a compact soft-fill chip with role ink around a key number inside a finding sentence. *@
-<mark class="mo-vl-mark @Role.ToCssClass() @Class">@ChildContent</mark>
+@if (string.IsNullOrWhiteSpace(Href))
+{
+    <mark class="mo-vl-mark @Role.ToCssClass() @Class">@ChildContent</mark>
+}
+else
+{
+    <a class="mo-vl-mark @Role.ToCssClass() @Class" href="@Href">@ChildContent</a>
+}
 
 @code {
     /// <summary>Gets or sets the palette role whose soft fill and ink carry this mark.</summary>
@@ -7,6 +13,12 @@
 
     /// <summary>Gets or sets the marked value or phrase.</summary>
     [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+
+    /// <summary>
+    /// Gets or sets an optional navigation destination. A nonblank value renders a native link;
+    /// otherwise the component renders noninteractive emphasis. Defaults to no navigation.
+    /// </summary>
+    [Parameter] public string? Href { get; set; }
 
     /// <summary>Gets or sets an optional identification class.</summary>
     [Parameter] public string? Class { get; set; }

@@ -7,6 +7,5 @@
 .system-info-live-uptime > span { white-space: nowrap; }
 .system-info-live-uptime small { margin-left: 3px; color: var(--mud-palette-text-secondary); font-size: 20px; font-weight: 400; letter-spacing: -.02em; }
 .system-info-lede { justify-self: end; max-width: 570px; margin: 0 0 6px; color: var(--mud-palette-text-secondary); font-size: 13px; line-height: 1.85; }
-.system-info-lede .is-measure { white-space: nowrap; }
 @container page (max-width: 1040px) { .system-info-signature-top { grid-template-columns: minmax(0, 1fr); align-items: start; } .system-info-lede { justify-self: start; } }
 @container page (max-width: 620px) { .system-info-signature-top { padding: 22px 18px 0; gap: 18px; } .system-info-live-uptime { font-size: 48px; } .system-info-live-uptime small { font-size: 16px; } }

@@ -135,13 +135,9 @@
       "Second": "s"
     },
     "Finding": {
-      "On": "The process on",
-      "Running": "has run for",
-      "RunningEnd": ". ",
-      "Startup": "Host startup completed in",
-      "StartupEnd": ". ",
-      "Captured": "Evidence captured",
-      "Snapshot": "; working set and process facts are a snapshot."
+      "Running": "The process on {0} has run for {1}.",
+      "Startup": "Host startup completed in {0}.",
+      "Snapshot": "Evidence captured {0}; working set and process facts are a snapshot."
     },
     "Lifeline": {
       "Title": "Process lifeline",

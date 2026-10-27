@@ -135,13 +135,9 @@
       "Second": "秒"
     },
     "Finding": {
-      "On": "进程已在",
-      "Running": "上持续运行",
-      "RunningEnd": "。",
-      "Startup": "计时起点后",
-      "StartupEnd": "主机启动完成。",
-      "Captured": "证据采集于",
-      "Snapshot": "，工作集等读数是采集时的快照。"
+      "Running": "进程已在 {0} 上持续运行 {1}。",
+      "Startup": "计时起点后 {0} 主机启动完成。",
+      "Snapshot": "证据采集于 {0}，工作集等读数是采集时的快照。"
     },
     "Lifeline": {
       "Title": "进程生命线",

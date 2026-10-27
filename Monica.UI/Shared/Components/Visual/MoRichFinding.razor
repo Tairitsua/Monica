@@ -1,0 +1,34 @@
+@using System.Globalization
+@using System.Text.RegularExpressions
+
+@foreach (var part in SlotPattern.Split(Template))
+{
+    if (part.Length > 2 && part[0] == '{' && part[^1] == '}' &&
+        int.TryParse(part.AsSpan(1, part.Length - 2), NumberStyles.None, CultureInfo.InvariantCulture, out var index) &&
+        index < Values.Count)
+    {
+        @Values[index]
+    }
+    else
+    {
+        @part
+    }
+}
+
+@code {
+    private static readonly Regex SlotPattern = new(@"(?<!\{)(\{[0-9]+\})(?!\})", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Gets or sets localized text containing isolated numbered slots such as <c>{0}</c>.
+    /// Slots may be reordered or repeated. Surrounding text is HTML encoded; unresolved slots,
+    /// doubled braces, and format or alignment expressions remain literal. This is not a
+    /// composite-format or HTML template engine.
+    /// </summary>
+    [Parameter, EditorRequired] public string Template { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets trusted render fragments substituted for numbered slots. The caller owns
+    /// localization, value formatting, semantic roles, and any navigation destinations.
+    /// </summary>
+    [Parameter, EditorRequired] public IReadOnlyList<RenderFragment> Values { get; set; } = [];
+}

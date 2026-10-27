@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Monica.UI.Shared.Components.Visual
 @inject NavigationManager Navigation
 @inject SchedulerTimePresentation TimePresentation
 @inject IStringLocalizer<JobSchedulerResource> L
@@ -7,7 +8,16 @@
     <section class="an-signature" data-calm="@((FailedCount == 0).ToString().ToLowerInvariant())">
         <div class="an-band">@FilterContent</div>
         <div class="an-decision"><div><p class="display-label">@L["Workspace:FailedCompletions"]</p><div class="display">@FailedCount.ToString("N0")</div></div>
-            <div class="an-finding"><p class="lede">@L["Workspace:AnalyticsSummary", Snapshot.CompletedTerminalCount, FailedCount] @if (Snapshot.TopJobsByFailures.FirstOrDefault() is { } top) { <a class="vmark" href="@JobUrl(top)">@top.JobName</a> <span>@L["Workspace:FailureShare", FormatShare(top.FailedCount,FailedCount)]</span> }</p><a class="an-open" href="@LedgerUrl(FailedCount > 0 ? JobExecutionState.Failed : null)">@L[FailedCount > 0 ? "Workspace:OpenFailures" : "Workspace:OpenRecords"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a></div>
+            <div class="an-finding">
+                <p class="lede">
+                    <MoRichFinding Template="@L["Workspace:AnalyticsSummary"].Value" Values="@([CountMark(Snapshot.CompletedTerminalCount, MoVisualRole.Primary), CountMark(FailedCount, MoVisualRole.Error)])" />
+                    @if (Snapshot.TopJobsByFailures.FirstOrDefault() is { } top)
+                    {
+                        @(" ")<MoRichFinding Template="@L["Workspace:AnalyticsFailureFinding"].Value" Values="@([JobMark(top), ShareMark(top.FailedCount, FailedCount)])" />
+                    }
+                </p>
+                <a class="an-open" href="@LedgerUrl(FailedCount > 0 ? JobExecutionState.Failed : null)">@L[FailedCount > 0 ? "Workspace:OpenFailures" : "Workspace:OpenRecords"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a>
+            </div>
         </div>
         <p class="an-window" data-start="@Snapshot.StartTimeUtc.ToString("O")" data-end="@Snapshot.EndTimeUtc.ToString("O")">@TimePresentation.FormatRange(Snapshot.StartTimeUtc,Snapshot.EndTimeUtc) · @L["Analytics:Window:Bounds"]</p>
         <SchedulerCompletionTrend Snapshot="@Snapshot" Owner="@Owner" Job="@Job" />
@@ -51,6 +61,12 @@
     protected override void OnParametersSet() => _volume = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query).TryGetValue("rank",out var rank) && rank == "volume";
     private void SetRank(bool volume) { _volume=volume; _expanded=false; Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("rank",volume ? "volume" : null),replace:true); }
     private string JobUrl(JobExecutionAnalyticsJobRank job) => JobSchedulerUiUrls.JobDefinition(new JobId(job.OwnerKey,job.JobKey),Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
+    private RenderFragment CountMark(long value, MoVisualRole role) =>
+        @<MoValueMark Role="@(value == 0 ? MoVisualRole.Neutral : role)">@value.ToString("N0")</MoValueMark>;
+    private RenderFragment JobMark(JobExecutionAnalyticsJobRank job) =>
+        @<MoValueMark Role="@(job.FailedCount == 0 ? MoVisualRole.Neutral : MoVisualRole.Error)" Href="@JobUrl(job)">@job.JobName</MoValueMark>;
+    private RenderFragment ShareMark(long value, long total) =>
+        @<MoValueMark Role="@(value == 0 || total == 0 ? MoVisualRole.Neutral : MoVisualRole.Error)">@FormatShare(value, total)</MoValueMark>;
     private string LedgerUrl(JobExecutionState? state,string? owner=null,string? job=null) => SchedulerRouteBuilder.Ledger(new JobExecutionQuery { SchedulerScopeKey=string.Empty, OwnerKey=owner??Owner,JobKey=job??Job,States=state is {} value ? new[]{value}:null,CompletedAfterUtc=Snapshot.StartTimeUtc,CompletedBeforeUtc=Snapshot.EndTimeUtc.AddTicks(-1) },Snapshot.StartTimeUtc,Snapshot.EndTimeUtc);
     private static string FormatRatio(double value,long total) => total > 0 ? value.ToString("P1",CultureInfo.CurrentCulture) : "—";
     private static string FormatShare(long value,long total) => total > 0 ? (value/(double)total).ToString("P1",CultureInfo.CurrentCulture) : "—";

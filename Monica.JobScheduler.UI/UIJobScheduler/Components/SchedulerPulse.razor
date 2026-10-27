@@ -1,5 +1,6 @@
 @inject NavigationManager Navigation
 @using System.Globalization
+@using Monica.UI.Shared.Components.Visual
 @using Monica.JobScheduler.UI.UIJobScheduler.Executions.State
 @using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
 @inject JobSchedulerFacade Facade
@@ -28,10 +29,10 @@
             @if (_sample is null) { @L["Common:Loading"] }
             else if (_jobs.FirstOrDefault(job => job.NeedsAttention) is {} worst)
             {
-                <a data-tone="@worst.Tone" href="@JobUrl(worst.Definition)">@worst.Definition.EffectiveConfiguration.JobName</a><span> @Reason(worst)@L["Workspace:FindingPeriod"] </span>
+                @AttentionFinding(worst)@(" ")
                 @foreach (var job in _jobs.Where(job => job.NeedsAttention && job != worst).Take(2))
                 {
-                    <a data-tone="@job.Tone" href="@JobUrl(job.Definition)">@job.Definition.EffectiveConfiguration.JobName</a><span> @Reason(job)@L["Workspace:FindingPeriod"] </span>
+                    @AttentionFinding(job)@(" ")
                 }
             }
             else if (_jobs.Any(job => !job.IsAssessed)) { @L["Architecture:UnknownNote"] }
@@ -353,6 +354,11 @@
     private void Toggle(string key) => _expanded[$"{_byOwner}:{key}"] = !Expanded(key);
     private string GroupLabel(string key) => _byOwner ? key : L[$"Workspace:PulseGroups:{key}"];
     private string JobUrl(JobDefinition job) => JobSchedulerUiUrls.JobDefinition(job.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
+    private RenderFragment AttentionFinding(SchedulerJobEvidence job) =>
+        @<MoRichFinding Template="@L["Workspace:JobAttentionFinding"].Value" Values="@([JobMark(job), ReasonText(job)])" />;
+    private RenderFragment JobMark(SchedulerJobEvidence job) =>
+        @<MoValueMark Role="@(job.Tone switch { "error" => MoVisualRole.Error, "warning" => MoVisualRole.Warning, _ => MoVisualRole.Neutral })" Href="@JobUrl(job.Definition)">@job.Definition.EffectiveConfiguration.JobName</MoValueMark>;
+    private RenderFragment ReasonText(SchedulerJobEvidence job) => @<text>@Reason(job)</text>;
     private long Count(JobExecutionState state) => _analytics?.Trend.Sum(bucket => state switch { JobExecutionState.Succeeded => bucket.SucceededCount, JobExecutionState.Failed => bucket.FailedCount, JobExecutionState.Skipped => bucket.SkippedCount, _ => 0 }) ?? 0;
     private string Reliability => Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed) > 0 ? (Count(JobExecutionState.Succeeded) / (double)(Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed))).ToString("P1") : "—";
     private IEnumerable<JobExecutionInstance> Active => _jobs.SelectMany(job => job.Records).Where(record => record.State is JobExecutionState.Running or JobExecutionState.Queued).DistinctBy(record => record.InstanceId);

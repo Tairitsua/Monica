@@ -8,7 +8,6 @@
 .display small { font-size:16px; color:var(--mud-palette-text-secondary); letter-spacing:0; margin-left:6px; }
 .an-finding { max-width:72ch; justify-self:end; }
 .lede { font-size:14px; line-height:1.8; color:var(--mud-palette-text-secondary); }
-.vmark { display:inline-block; padding:0 6px; margin:0 1px; border-radius:5px; line-height:1.6; font-variant-numeric:tabular-nums; white-space:nowrap; color:color-mix(in srgb,var(--mud-palette-error) 72%,var(--mud-palette-text-primary)); background:color-mix(in srgb,var(--mud-palette-error) 12%,var(--mud-palette-surface)); font-weight:600; }
 .an-open { display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:6px; margin-top:12px; color:color-mix(in srgb,var(--mud-palette-error) 72%,var(--mud-palette-text-primary)); background:color-mix(in srgb,var(--mud-palette-error) 12%,var(--mud-palette-surface)); font-size:12px; font-weight:500; }
 .an-window { padding:0 28px 16px; color:var(--mud-palette-text-secondary); font:11.5px var(--mo-font-family-mono); overflow-wrap:anywhere; }
 .an-facts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid var(--mud-palette-divider); }

@@ -1,6 +1,6 @@
 ---
 name: monica-infra-ui
-description: Register and use Monica Blazor UI, shell, icons, Markdown, themes, navigation, and localization. Diagnose Blazor script or refresh 404s, empty stylesheets, and inactive pages; use monica-ui-development for components and monica-ui-localization for resources.
+description: Register and use Monica Blazor UI, shared visual components, shell, icons, Markdown, themes, navigation, and localization. Diagnose script or refresh 404s, empty stylesheets, and inactive pages; use monica-ui-development for authoring and monica-ui-localization for resources.
 ---
 
 # Monica Infrastructure UI
@@ -12,6 +12,7 @@ Select native UI composition and the task below. Read the owning capability befo
 | Choose hosting, Shell, layouts, pages, or navigation | [Application hosting](references/application-hosting.md), [Shell and access](references/shell-and-access.md) |
 | Diagnose scripts, styles, inactive controls, or refresh 404s | [Static assets](references/troubleshooting/static-assets.md), [Routing and refresh](references/troubleshooting/routing-and-refresh.md) |
 | Configure icons, themes, languages, or localization | [Icons](references/icons.md), [Theme and localization](references/theme-and-localization.md) |
+| Reuse emphasized findings, filters, fact grids, or evidence instruments | [Shared visual components](references/visual-components.md) |
 | Inspect host identity, timing, DbContexts, sessions, or migrations | [System information](references/system-information.md), [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md) |
 | Render Markdown, diagrams, document search, or local images | [Markdown](references/markdown.md) |
 | Probe connectivity, transform text, or view and edit JSON | [Utilities](references/utilities.md), [JSON](references/json.md) |
