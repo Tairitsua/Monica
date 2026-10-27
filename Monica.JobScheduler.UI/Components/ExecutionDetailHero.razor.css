@@ -1,6 +1,9 @@
-.execution-detail-hero { display: grid; gap: 8px; min-width: 0; padding: 6px 0 0; }
-.execution-detail-hero__label, .execution-detail-hero__note { margin: 0; color: var(--mud-palette-text-secondary); font-size: 11.5px; line-height: 1.7; }
-.execution-detail-hero__duration { min-width: 0; font: 400 36px/1.2 var(--mo-font-family-display); letter-spacing: -.03em; overflow-wrap: anywhere; }
+.execution-detail-hero { display: grid; gap: 8px; min-width: 0; }
+.execution-detail-hero__label, .execution-detail-hero__note { margin: 0; color: var(--mud-palette-text-secondary); font-size: 12.5px; line-height: 1.65; }
+.execution-detail-hero__duration { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 10px; min-width: 0; font: 400 clamp(30px,8vw,42px)/1.1 var(--mo-font-family-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.execution-detail-hero__duration > span { display: inline-flex; align-items: baseline; gap: 6px; }
 .execution-detail-hero__duration small { color: var(--mud-palette-text-secondary); font-size: 12px; letter-spacing: 0; }
-.execution-detail-hero__skip { display: flex; align-items: start; gap: 7px; margin: 12px 0 0; padding: 12px; background: color-mix(in srgb,var(--mud-palette-warning) 8%,var(--mud-palette-surface)); color: color-mix(in srgb,var(--mud-palette-warning) 55%,var(--mud-palette-text-primary)); border-radius: 6px; font-size: 11.5px; }
-@media (max-width:600px) { .execution-detail-hero__duration { font-size: 32px; } }
+.execution-detail-hero__skip { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid color-mix(in srgb,var(--mud-palette-warning) 25%,var(--mud-palette-divider)); border-radius: 8px; background: color-mix(in srgb,var(--mud-palette-warning) 7%,var(--mud-palette-surface)); font-size: 12px; }
+.execution-detail-hero__skip > span { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 6px; background: color-mix(in srgb,var(--mud-palette-warning) 10%,transparent); color: color-mix(in srgb,var(--mud-palette-warning) 78%,var(--mud-palette-text-primary)); }
+.execution-detail-hero__skip b { font-size: 13px; font-weight: 600; }
+.execution-detail-hero__skip p { margin: 3px 0 0; line-height: 1.65; color: var(--mud-palette-text-secondary); }

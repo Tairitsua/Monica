@@ -1,11 +1,10 @@
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Components.Dialogs
 
-<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0"
-           Style="position:fixed;inset-block:0;inset-inline-end:0;width:min(520px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;">
+<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" Class="scheduler-execution-sheet">
     <TitleContent>
-        <div class="execution-detail__dialog-title">
-            <MoIcon Icon="@MoIcons.ClipboardCheck" Size="1.5rem" />
+        <div class="execution-detail__dialog-title" data-state="@_state?.Execution?.State.ToString().ToLowerInvariant()">
+            <span class="execution-detail__seal"><MoIcon Icon="@MoIcons.ClipboardCheck" Size="18px" /></span>
             <div class="execution-detail__identity">
                 <p>@L["ExecutionDetail:Title"] · @(_state?.Execution is { } selected ? JobSchedulerUiPresentation.GetJobDisplayName(selected.Template) : "—")</p>
                 <MoDialogHeading Text="@($"#{JobSchedulerUiPresentation.ShortIdentity(InstanceId)}")" />
@@ -14,10 +13,6 @@
                     <div class="execution-detail__flags"><span data-state="@headerExecution.State.ToString().ToLowerInvariant()">@L[$"ExecutionStates:{headerExecution.State}"]</span><small>@L[$"ExecutionOrigins:{headerExecution.Origin}"]</small></div>
                 }
             </div>
-            <MudTooltip Text="@L["Common:Refresh"]">
-                <MudIconButton Icon="@MoIcons.Refresh" aria-disabled="@(_state is null || _state.IsLoading ? "true" : "false")"
-                               OnClick="RefreshAsync" aria-label="@L["Common:Refresh"]" />
-            </MudTooltip>
         </div>
     </TitleContent>
     <DialogContent>
@@ -54,7 +49,7 @@
             else if (state.Execution is { } execution && state.ObservedAtUtc is { } observedAtUtc)
             {
                 <div class="execution-detail">
-                    @if (state.IsLoading)
+                    @if (state.IsLoading && !_refreshingAutomatically)
                     {
                         <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="@L["Common:Loading"]" />
                     }
@@ -69,6 +64,13 @@
                         </MudAlert>
                     }
                     <div class="execution-detail__destinations">
+                        @if (!execution.IsTerminal || _retainCancellationOpener)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@MoIcons.StopCircle" Class="execution-detail__cancel"
+                                       aria-disabled="@(state.IsMutating || execution.IsTerminal || execution.CancellationRequestedAtUtc.HasValue ? "true" : "false")" OnClick="@(() => CancelAsync(execution))">
+                                @L[execution.CancellationRequestedAtUtc.HasValue ? "Executions:Cancel:Pending" : "Executions:Actions:Cancel"]
+                            </MudButton>
+                        }
                         <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="CopyInstanceIdAsync">@L["Workspace:CopyId"]</MudButton>
                         @if (!Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.StartsWith(JobExecutionsPage.PAGE_URL, StringComparison.OrdinalIgnoreCase))
                         {
@@ -79,6 +81,14 @@
                     <ExecutionDetailHero Execution="@execution" ObservedAtUtc="@observedAtUtc" />
                     <ExecutionHistoryLedger Entries="@execution.History" />
                     <ExecutionEvidenceFacts Execution="@execution" ObservedAtUtc="@observedAtUtc" />
+                    <details class="execution-detail__tools">
+                        <summary>@L["ExecutionDetail:Diagnostics"]</summary>
+                        <p>@L["ExecutionDetail:Observed"] <time>@TimePresentation.FormatExecutionTimestamp(observedAtUtc)</time></p>
+                        <div class="execution-detail__destinations">
+                            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="CopyDiagnosticsAsync">@L["ExecutionDetail:Actions:CopySnapshot"]</MudButton>
+                            <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Refresh" aria-disabled="@(state.IsLoading ? "true" : "false")" OnClick="RefreshAsync">@L["Common:Refresh"]</MudButton>
+                        </div>
+                    </details>
                 </div>
             }
             else
@@ -87,32 +97,4 @@
             }
         </div>
     </DialogContent>
-    <DialogActions>
-        <div class="execution-detail__actions">
-            <div class="execution-detail__secondary-actions">
-                <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Copy"
-                           Disabled="@(_state?.Execution is null)" OnClick="CopyDiagnosticsAsync">
-                    @L["ExecutionDetail:Actions:CopySnapshot"]
-                </MudButton>
-                <MudMenu Icon="@MoIcons.MoreHorizontal" AriaLabel="@L["ExecutionDetail:Actions:More"]">
-                    <MudMenuItem Icon="@MoIcons.Refresh" Disabled="@(_state is null || _state.IsLoading)" OnClick="RefreshAsync">
-                        @L["Common:Refresh"]
-                    </MudMenuItem>
-                    <MudMenuItem Icon="@MoIcons.Package" OnClick="OpenJobDetails">
-                        @L["ExecutionDetail:Actions:ViewCatalog"]
-                    </MudMenuItem>
-                </MudMenu>
-            </div>
-            <div class="execution-detail__primary-actions">
-                @if (_state?.Execution is { } execution && (!execution.IsTerminal || _retainCancellationOpener))
-                {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Warning"
-                               aria-disabled="@(_state.IsMutating || execution.IsTerminal ? "true" : "false")" OnClick="@(() => CancelAsync(execution))">
-                        @L["Executions:Actions:Cancel"]
-                    </MudButton>
-                }
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">@L["Common:Close"]</MudButton>
-            </div>
-        </div>
-    </DialogActions>
 </MudDialog>

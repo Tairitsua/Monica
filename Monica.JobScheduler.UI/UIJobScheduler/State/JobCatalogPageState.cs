@@ -57,11 +57,23 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal string? Cadence { get; set; }
     internal string CatalogSort { get; set; } = "attention";
     internal bool IsCatalogTruncated { get; private set; }
-    internal IReadOnlyDictionary<string, int> StandingCounts => new[] { "all", "attention", "healthy", "ondemand", "paused", "absent" }
+    internal IReadOnlyDictionary<string, int> StandingCounts => new[] { "all", "attention", "unknown", "healthy", "ondemand", "paused", "absent" }
         .ToDictionary(key => key, key => Catalog.Count(row => Matches(row, exceptStanding: true) && (key == "all" || StandingOf(row) == key)));
     internal string StandingOf(JobOperationalSummary row) => !row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused"
         : Evidence.GetValueOrDefault(row.Definition.Id)?.NeedsAttention == true || row.LatestExecution?.State == JobExecutionState.Failed ? "attention"
+        : Evidence.GetValueOrDefault(row.Definition.Id)?.IsAssessed != true ? "unknown"
         : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    internal string StandingToneOf(JobOperationalSummary row) => Evidence.GetValueOrDefault(row.Definition.Id)?.Tone ?? "neutral";
+    internal string? StandingDetailOf(JobOperationalSummary row)
+    {
+        if (!row.Definition.IsPresent || row.Definition.IsDisabled) return null;
+        var evidence = Evidence.GetValueOrDefault(row.Definition.Id);
+        if (evidence?.FailureStreak > 0) return _localizer[evidence.FailureStreakIsLowerBound ? "Architecture:AtLeastStreak" : "Workspace:FailureStreak", evidence.FailureStreak];
+        if (evidence?.IsOverrun == true) return _localizer["Workspace:OverrunSignal"];
+        if (evidence?.IsSkipping == true) return _localizer["Workspace:SkipSignal"];
+        if (evidence?.IsIntermittent == true) return _localizer["Workspace:Intermittent"];
+        return evidence?.IsAssessed != true ? _localizer["Architecture:UnknownReason"].Value : null;
+    }
     private bool Matches(JobOperationalSummary row, bool exceptStanding = false) => Matches(row,
         new JobDefinitionQuery
         {
@@ -507,7 +519,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                 "name" => candidates.OrderBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
                 "owner" => candidates.OrderBy(row => row.Definition.OwnerKey, StringComparer.Ordinal).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
                 "next" => candidates.OrderBy(row => row.NextOccurrenceUtc ?? DateTimeOffset.MaxValue),
-                _ => candidates.OrderBy(row => Array.IndexOf(new[] { "attention", "healthy", "ondemand", "paused", "absent" }, StandingOf(row))).ThenByDescending(row => Evidence.GetValueOrDefault(row.Definition.Id)?.FailureStreak ?? 0).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture)
+                _ => candidates.OrderBy(row => Array.IndexOf(new[] { "attention", "unknown", "healthy", "ondemand", "paused", "absent" }, StandingOf(row))).ThenByDescending(row => Evidence.GetValueOrDefault(row.Definition.Id)?.FailureStreak ?? 0).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture)
             };
             var matches = ordered.ToArray();
             var page = new QueryResult<JobOperationalSummary>(matches.Skip((query.PageNumber - 1) * query.PageSize).Take(query.PageSize).ToList(), matches.Length);
@@ -564,10 +576,18 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             catalog.AddRange(page.Items); total = page.TotalCount;
             if (catalog.Count >= total || page.Items.Count == 0) break;
         }
-        var sample = await SchedulerExecutionSample.LoadAsync(_facade, new JobExecutionQuery
-        { SchedulerScopeKey = string.Empty, CreatedAfterUtc = overview.CapturedAtUtc.AddHours(-1), CreatedBeforeUtc = overview.CapturedAtUtc }, cancellationToken);
-        var records = sample.Records.Concat(catalog.Select(row => row.LatestExecution).OfType<JobExecutionInstance>()).DistinctBy(record => record.InstanceId).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
-        var evidence = catalog.ToDictionary(row => row.Definition.Id, row => SchedulerJobEvidence.Create(row.Definition, records[row.Definition.Id], overview.CapturedAtUtc));
+        SchedulerExecutionSample? sample = null;
+        try
+        {
+            sample = await SchedulerExecutionSample.LoadAsync(_facade, new JobExecutionQuery
+            { SchedulerScopeKey = string.Empty, CreatedAfterUtc = overview.CapturedAtUtc.AddHours(-1), CreatedBeforeUtc = overview.CapturedAtUtc }, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A failed historical sample does not erase independently accepted definitions or latest executions.
+        }
+        var records = (sample?.Records ?? []).Concat(catalog.Select(row => row.LatestExecution).OfType<JobExecutionInstance>()).DistinctBy(record => record.InstanceId).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+        var evidence = catalog.ToDictionary(row => row.Definition.Id, row => SchedulerJobEvidence.Create(row.Definition, records[row.Definition.Id], overview.CapturedAtUtc, sample is { IsTruncated: false }));
         var scopedDefinitions = catalog.Select(row => row.Definition)
             .Where(definition => PresentFilter is null || definition.IsPresent == PresentFilter)
             .ToArray();

@@ -264,7 +264,7 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
     private static DialogOptions SmallDialogOptions { get; } = new()
     { CloseButton = true, CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Small };
     private static DialogOptions WorkbenchDialogOptions { get; } = new()
-    { CloseButton = true, CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.ExtraLarge };
+    { CloseButton = true, CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.ExtraLarge, BackgroundClass = "scheduler-schedule-backdrop" };
 
     private static async Task RetireRouteAsync(JobDefinitionDetailPageState? state, Func<Task>? changed,
         SchedulerDialogSession<DetailDialogRequest>? dialogs)

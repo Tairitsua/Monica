@@ -16,7 +16,8 @@ internal static class ExecutionDetailDialogLauncher
         CloseOnEscapeKey = true,
         FullWidth = true,
         MaxWidth = MaxWidth.False,
-        Position = DialogPosition.CenterRight
+        Position = DialogPosition.CenterRight,
+        BackgroundClass = "scheduler-execution-backdrop"
     };
 
     /// <summary>

@@ -1,0 +1,20 @@
+@inject IStringLocalizer<JobSchedulerResource> L
+<section class="rt-responsibilities" aria-labelledby="rt-duties-title">
+    <h3 id="rt-duties-title">@L["Runtime:Coordination:DutiesTitle"]</h3>
+    <div class="rt-duty-grid">
+        @Duty("ScheduleDuty", MoIcons.CalendarCheck, OwnerDuty.State,
+            L[$"Runtime:Coordination:OwnerDuty:{OwnerDuty.State}", OwnerDuty.Count, Overview.Configuration.OwnerKeys.Count])
+        @Duty("MaintenanceDuty", MoIcons.Wrench, MaintenanceDuty,
+            L[$"Runtime:Coordination:MaintenanceDutyNote:{MaintenanceDuty}"])
+    </div>
+</section>
+@code {
+    /// <summary>Gets the accepted host snapshot used to describe local work without implying remote liveness.</summary>
+    [Parameter, EditorRequired] public JobSchedulerRuntimeOverview Overview { get; set; } = null!;
+    private (string State, int Count) OwnerDuty => SchedulerCoordinationPresentation.OwnerDuty(Overview);
+    private string MaintenanceDuty => SchedulerCoordinationPresentation.MaintenanceDuty(Overview);
+    private RenderFragment Duty(string title, string icon, string state, string note) => @<article class="rt-duty" data-role="@SchedulerCoordinationPresentation.Role(state)">
+        <span class="tile"><MoIcon Icon="@icon" Size="17px" /></span>
+        <div class="rt-duty-copy"><div class="rt-duty-heading"><h4>@L[$"Runtime:Coordination:{title}"]</h4><span class="chip">@L[$"Runtime:Coordination:DutyStates:{state}"]</span></div><p>@note</p></div>
+    </article>;
+}

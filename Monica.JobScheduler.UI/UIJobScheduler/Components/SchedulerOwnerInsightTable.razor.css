@@ -80,3 +80,10 @@ a{text-decoration:none;color:inherit}
 .rt-freshness>div:first-child{flex-wrap:wrap}
 .rt-owner-name{font-size:11px}
 }
+
+.rt-manifest { margin-top:7px;max-width:100%; }
+.rt-manifest summary { cursor:pointer;color:var(--mud-palette-text-secondary);font-size:12px; }
+.rt-manifest dl { display:grid;gap:5px;margin:10px 0;font-size:12px; }
+.rt-manifest dt,.rt-manifest p { color:var(--mud-palette-text-secondary); }
+.rt-manifest dd { margin:0 0 5px;overflow-wrap:anywhere;font-family:var(--mo-font-family-mono); }
+.rt-manifest p { font-size:12px;line-height:1.65; }

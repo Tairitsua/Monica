@@ -122,6 +122,11 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
 
     /// <summary>Gets the standing derived from the accepted catalog capture.</summary>
     [Parameter] public Func<JobOperationalSummary, string>? StandingResolver { get; set; }
+    /// <summary>Gets the bounded evidence explanation displayed beneath a row's standing.</summary>
+    [Parameter] public Func<JobOperationalSummary, string?>? StandingDetailResolver { get; set; }
+    /// <summary>Gets the semantic tone of the accepted finding, including warning-level overrun and skip signals.</summary>
+    [Parameter] public Func<JobOperationalSummary, string>? StandingToneResolver { get; set; }
+    private string RowTone(JobOperationalSummary row) => StandingToneResolver?.Invoke(row) ?? StandingTone(CatalogStanding(row));
     private string CatalogStanding(JobOperationalSummary row) => StandingResolver?.Invoke(row) ?? (!row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused" : row.LatestExecution?.State == JobExecutionState.Failed ? "attention" : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy");
     private static string StandingTone(string standing) => standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => "neutral" };
     private readonly Dictionary<string, string?> _cronDescriptions = new(StringComparer.Ordinal);

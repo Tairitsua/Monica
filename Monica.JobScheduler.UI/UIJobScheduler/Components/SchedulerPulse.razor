@@ -7,14 +7,16 @@
 @inject IDialogService DialogService
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
+@inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
 @implements IAsyncDisposable
 
+<SchedulerHistoryCoverage />
 <section class="scheduler-pulse" aria-labelledby="scheduler-pulse-title">
     <div class="scheduler-pulse__decision">
         <div><p>@L["Workspace:AttentionJobs"]</p><div class="scheduler-pulse__value">@(_sample is null ? "—" : _jobs.Count(job => job.NeedsAttention && job.Definition.IsPresent && !job.Definition.IsDisabled).ToString())<small>/ @Definitions.Count(job => job.IsPresent) @L["Workspace:PresentUnit"]</small></div>
             <div class="scheduler-pulse__reasons"><span data-tone="error"><i></i>@L["Workspace:FailureSignal"] <b>@_jobs.Count(job => job.FailureStreak > 0)</b></span><span data-tone="error"><i></i>@L["Workspace:Intermittent"] <b>@_jobs.Count(job => job.IsIntermittent)</b></span><span data-tone="warning"><i></i>@L["Workspace:OverrunSignal"] <b>@_jobs.Count(job => job.IsOverrun)</b></span><span data-tone="warning"><i></i>@L["Workspace:SkipSignal"] <b>@_jobs.Count(job => job.IsSkipping)</b></span></div>
         </div>
-        <p class="scheduler-pulse__finding">@if (_sample is null) { @L["Common:Loading"] } else if (_jobs.FirstOrDefault(job => job.NeedsAttention) is {} worst) { <a data-tone="@worst.Tone" href="@JobUrl(worst.Definition)">@worst.Definition.EffectiveConfiguration.JobName</a><span> @Reason(worst)@L["Workspace:FindingPeriod"] </span>@foreach (var job in _jobs.Where(job => job.NeedsAttention && job != worst).Take(2)) { <a data-tone="@job.Tone" href="@JobUrl(job.Definition)">@job.Definition.EffectiveConfiguration.JobName</a><span> @Reason(job)@L["Workspace:FindingPeriod"] </span> } } else { @L["Workspace:CalmFinding"] }</p>
+        <p class="scheduler-pulse__finding">@if (_sample is null) { @L["Common:Loading"] } else if (_jobs.FirstOrDefault(job => job.NeedsAttention) is {} worst) { <a data-tone="@worst.Tone" href="@JobUrl(worst.Definition)">@worst.Definition.EffectiveConfiguration.JobName</a><span> @Reason(worst)@L["Workspace:FindingPeriod"] </span>@foreach (var job in _jobs.Where(job => job.NeedsAttention && job != worst).Take(2)) { <a data-tone="@job.Tone" href="@JobUrl(job.Definition)">@job.Definition.EffectiveConfiguration.JobName</a><span> @Reason(job)@L["Workspace:FindingPeriod"] </span> } } else if (_jobs.Any(job => !job.IsAssessed)) { @L["Architecture:UnknownNote"] } else { @L["Workspace:CalmFinding"] }</p>
     </div>
     <div class="scheduler-pulse__scope"><span><MoIcon Icon="@MoIcons.Clock" Size=".875rem" /> @L["Workspace:PulseWindow",L[$"Workspace:Windows:{_minutes}"]]</span><div class="pulse-seg" role="group" aria-label="@L["Analytics:Range:Title"]">@foreach (var minutes in new[] { 15, 60, 360 }) { <button type="button" aria-pressed="@((_minutes == minutes).ToString().ToLowerInvariant())" @onclick="@(() => ChangeRangeAsync(minutes))">@L[$"Workspace:Windows:{minutes}"]</button> }</div></div>
     <dl class="scheduler-pulse__facts"><div data-tone="success"><dt><i></i>@L["ExecutionStates:Succeeded"]</dt><dd>@Count(JobExecutionState.Succeeded).ToString("N0")</dd><small>@L["Workspace:DecidedReliability",Reliability]</small></div><div data-tone="error"><dt><i></i>@L["ExecutionStates:Failed"]</dt><dd>@Count(JobExecutionState.Failed).ToString("N0")</dd><small>@L["Workspace:FailureJobs",_analytics?.TopJobsByFailures.Count ?? 0]</small></div><div data-tone="warning"><dt><i></i>@L["ExecutionStates:Skipped"]</dt><dd>@Count(JobExecutionState.Skipped).ToString("N0")</dd><small>@L["Workspace:SkipFact"]</small></div><div data-tone="info"><dt><i></i>@L["ExecutionStates:Running"]</dt><dd>@StateCounts.GetValueOrDefault(JobExecutionState.Running)</dd><small>@L["Workspace:LiveFact",StateCounts.GetValueOrDefault(JobExecutionState.Queued),Active.Where(record => record.State == JobExecutionState.Running).Select(record => record.RunningWorkerInstanceId).Distinct().Count()]</small></div></dl>
@@ -45,7 +47,7 @@
 </section>
 <div class="scheduler-pulse__lower">
     <section class="pulse-panel"><header><div><h2><MoIcon Icon="@MoIcons.Pulse" Size="1rem"/> @L["Workspace:RunningNow"]</h2><p>@L["Workspace:RunningNowDescription"]</p></div><b class="pulse-count">@Active.Count()</b></header><ul class="pulse-running">@foreach(var record in Active) { <li><button type="button" @onclick="@(() => InspectAsync(record.InstanceId))"><span class="pulse-running__id"><b>@JobSchedulerUiPresentation.GetJobDisplayName(record.Template)</b><small>@record.Template.OwnerKey · @record.RunningWorkerInstanceId</small></span><strong>@(record.State == JobExecutionState.Running ? Elapsed(record) : L["ExecutionStates:Queued"])</strong><span class="pulse-running__track"><i style="@($"width:{Progress(record)}")"></i></span><span class="pulse-running__caption">P50 @TimePresentation.FormatDuration(Quantile(record,.5)) · P95 @TimePresentation.FormatDuration(Quantile(record,.95)) @if(record.LeaseExpiresAtUtc is {} lease) { <span> · @L["Workspace:LeaseUntil",TimePresentation.FormatClock(lease)]</span> }</span></button></li> }</ul>@if(!Active.Any()) { <p class="pulse-empty">@L["Workspace:NoLive"]</p> }</section>
-    <section class="pulse-panel"><header><div><h2><MoIcon Icon="@MoIcons.CalendarDays" Size="1rem"/> @L["Workspace:ArrivalBoard"]</h2><p>@L["Workspace:ArrivalDescription"]</p></div></header>@if(Definitions.Any(job => job.IsPresent && !job.IsDisabled && SchedulerCadence.Bucket(job,_acceptedAt) == "sub")) { <div class="pulse-steady"><span>@L["Workspace:SteadyJobs"]</span>@foreach(var job in Definitions.Where(job => job.IsPresent && !job.IsDisabled && SchedulerCadence.Bucket(job,_acceptedAt) == "sub")) { <a href="@JobUrl(job)">@job.EffectiveConfiguration.JobName</a> }</div> }<ol class="pulse-arrivals">@foreach(var arrival in Arrivals) { <li><b>@TimePresentation.FormatClock(arrival.Key)</b><small>@L["Workspace:DueIn",TimePresentation.FormatDuration(arrival.Key-_acceptedAt)]</small><span>@foreach(var item in arrival.Take(3)) { <a href="@JobUrl(item.Job)">@item.Job.EffectiveConfiguration.JobName</a> }@if(arrival.Count()>3) { <small>+@(arrival.Count()-3)</small> }</span></li> }</ol>@if(!Arrivals.Any()) { <p class="pulse-empty">@L["Workspace:NoArrivals"]</p> }</section>
+    <section class="pulse-panel"><header><div><h2><MoIcon Icon="@MoIcons.CalendarDays" Size="1rem"/> @L["Workspace:ArrivalBoard"]</h2><p>@L["Workspace:ArrivalDescription"]</p></div></header>@if(Definitions.Any(job => NextPlans(job).Any() && SchedulerCadence.Bucket(job,_acceptedAt) == "sub")) { <div class="pulse-steady"><span>@L["Workspace:SteadyJobs"]</span>@foreach(var job in Definitions.Where(job => NextPlans(job).Any() && SchedulerCadence.Bucket(job,_acceptedAt) == "sub")) { <a href="@JobUrl(job)">@job.EffectiveConfiguration.JobName</a> }</div> }<ol class="pulse-arrivals">@foreach(var arrival in Arrivals) { <li><b>@TimePresentation.FormatClock(arrival.Key)</b><small>@L["Workspace:DueIn",TimePresentation.FormatDuration(arrival.Key-_acceptedAt)]</small><span>@foreach(var item in arrival.Take(3)) { <a href="@JobUrl(item.Job)">@item.Job.EffectiveConfiguration.JobName</a> }@if(arrival.Count()>3) { <small>+@(arrival.Count()-3)</small> }</span></li> }</ol>@if(!Arrivals.Any()) { <p class="pulse-empty">@L["Workspace:NoArrivals"]</p> }</section>
 </div>
 @code {
     /// <summary>Gets the caller's accepted definition sample. Definition publication is not a worker heartbeat.</summary>
@@ -66,6 +68,7 @@
     private ExecutionDialogSession? _inspectors;
     private SchedulerExecutionSample? _sample;
     private IReadOnlyList<SchedulerJobEvidence> _jobs = [];
+    private IReadOnlyDictionary<JobId, JobOperationalSummary> _cursors = new Dictionary<JobId, JobOperationalSummary>();
     private int _minutes = 60, _acceptedMinutes = 60, _version;
     private bool _loading, _byOwner;
     private JobExecutionInstance? _hovered;
@@ -120,11 +123,19 @@
                 if (activeResult.IsFailed(out var activeError, out var active)) throw new InvalidOperationException(activeError.Message);
                 var analyticsResult = await Facade.GetExecutionAnalyticsAsync(new JobExecutionAnalyticsQuery { StartTimeUtc = at.AddMinutes(-minutes), EndTimeUtc = at }, token);
                 if (analyticsResult.IsFailed(out var analyticsError, out var analytics)) throw new InvalidOperationException(analyticsError.Message);
+                var cursors = new Dictionary<JobId, JobOperationalSummary>();
+                for (var page = 1; page <= Math.Ceiling(definitions.Length / 200d); page++)
+                {
+                    var response = await Facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = page, PageSize = 200 }, token);
+                    if (response.IsFailed(out var cursorError, out var cursorPage)) throw new InvalidOperationException(cursorError.Message);
+                    foreach (var summary in cursorPage.Items) cursors[summary.Definition.Id] = summary;
+                    if (page * 200 >= cursorPage.TotalCount) break;
+                }
                 token.ThrowIfCancellationRequested();
                 var records = sample.Records.Concat(active.Items).DistinctBy(record => record.InstanceId, StringComparer.Ordinal).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
-                var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at))
+                var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at, !sample.IsTruncated))
                     .OrderByDescending(job => job.NeedsAttention).ThenByDescending(job => job.FailureStreak).ThenBy(job => job.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture).ToArray();
-                _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _analytics = analytics; _jobs = jobs; _hovered = null; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
+                _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _analytics = analytics; _jobs = jobs; _cursors = cursors; _hovered = null; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
             });
         }
         catch (OperationCanceledException) when (_lifetime.IsRetired) { }
@@ -145,15 +156,11 @@
         var width = Math.Max(0, Math.Clamp((end - Start).TotalMilliseconds / (End - Start).TotalMilliseconds * 100, 0, 100) - double.Parse(Position(begin), CultureInfo.InvariantCulture));
         return $"left:{Position(begin)}%;width:{(Kind(record) == "bar" ? $"max(3px,{width.ToString("0.###", CultureInfo.InvariantCulture)}%)" : "2px")};";
     }
-    private IEnumerable<DateTimeOffset> Plans(JobDefinition definition)
-    {
-        if (!definition.IsPresent || definition.IsDisabled || definition.EffectiveConfiguration.Schedule is not { } schedule) return [];
-        return CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId, schedule.StartTimeUtc, schedule.EndTimeUtc, _acceptedAt).Occurrences.Select(item => item.Utc).Where(at => at <= End);
-    }
+    private IEnumerable<DateTimeOffset> Plans(JobDefinition definition) => NextPlans(definition).Where(at => at <= End);
     private string RecordLabel(JobExecutionInstance record) => $"{JobSchedulerUiPresentation.GetJobDisplayName(record.Template)} · {L[$"ExecutionStates:{record.State}"]} · {TimePresentation.FormatTimestamp(record.CreatedAtUtc)} · {TimePresentation.FormatExecutionDuration(record, _acceptedAt)}";
     private IEnumerable<IGrouping<string, SchedulerJobEvidence>> Groups => FilteredJobs.GroupBy(job => _byOwner ? job.Definition.OwnerKey : Standing(job));
-    private static string Standing(SchedulerJobEvidence job) => !job.Definition.IsPresent || job.Definition.IsDisabled ? "inactive" : job.NeedsAttention ? "attention" : job.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
-    private bool Expanded(string key) => _expanded.GetValueOrDefault($"{_byOwner}:{key}", _byOwner || key is "attention" or "inactive");
+    private static string Standing(SchedulerJobEvidence job) => !job.Definition.IsPresent || job.Definition.IsDisabled ? "inactive" : job.NeedsAttention ? "attention" : !job.IsAssessed ? "unknown" : job.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    private bool Expanded(string key) => _expanded.GetValueOrDefault($"{_byOwner}:{key}", _byOwner || key is "attention" or "unknown" or "inactive");
     private void Toggle(string key) => _expanded[$"{_byOwner}:{key}"] = !Expanded(key);
     private string GroupLabel(string key) => _byOwner ? key : L[$"Workspace:PulseGroups:{key}"];
     private string JobUrl(JobDefinition job) => JobSchedulerUiUrls.JobDefinition(job.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
@@ -161,12 +168,22 @@
     private string Reliability => Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed) > 0 ? (Count(JobExecutionState.Succeeded) / (double)(Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed))).ToString("P1") : "—";
     private IEnumerable<JobExecutionInstance> Active => _jobs.SelectMany(job => job.Records).Where(record => record.State is JobExecutionState.Running or JobExecutionState.Queued).DistinctBy(record => record.InstanceId);
     private string Kind(JobExecutionInstance record) => record.State == JobExecutionState.Skipped ? "skip" : record.State == JobExecutionState.Running || SchedulerTimePresentation.GetExecutionDuration(record, _acceptedAt)?.TotalMinutes > _acceptedMinutes / 250d ? "bar" : "tick";
-    private string Reason(SchedulerJobEvidence job) => job.FailureStreak > 0 ? L["Workspace:FailureStreak", job.FailureStreak] : job.IsOverrun ? L["Workspace:OverrunSignal"] : job.IsSkipping ? L["Workspace:SkipSignal"] : job.IsIntermittent ? L["Workspace:Intermittent"] : !job.Definition.IsPresent ? L["Workspace:Standings:absent"] : job.Definition.IsDisabled ? L["Workspace:Standings:paused"] : job.Definition.EffectiveConfiguration.Schedule?.CronExpression ?? L["Workspace:Standings:ondemand"];
-    private IEnumerable<DateTimeOffset> NextPlans(JobDefinition definition) => !definition.IsPresent || definition.IsDisabled || definition.EffectiveConfiguration.Schedule is not {} schedule ? [] : CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId, schedule.StartTimeUtc, schedule.EndTimeUtc, _acceptedAt).Occurrences.Select(item => item.Utc);
+    private string Reason(SchedulerJobEvidence job) => job.FailureStreak > 0 ? L[job.FailureStreakIsLowerBound ? "Architecture:AtLeastStreak" : "Workspace:FailureStreak", job.FailureStreak] : job.IsOverrun ? L["Workspace:OverrunSignal"] : job.IsSkipping ? L["Workspace:SkipSignal"] : job.IsIntermittent ? L["Workspace:Intermittent"] : !job.Definition.IsPresent ? L["Workspace:Standings:absent"] : job.Definition.IsDisabled ? L["Workspace:Standings:paused"] : !job.IsAssessed ? L["Architecture:UnknownReason"] : job.Definition.EffectiveConfiguration.Schedule?.CronExpression ?? L["Workspace:Standings:ondemand"];
+    private IEnumerable<DateTimeOffset> NextPlans(JobDefinition definition)
+    {
+        if (!SchedulerOptions.Value.AutonomousWork || !definition.IsPresent || definition.IsDisabled
+            || definition.EffectiveConfiguration.Schedule is not {} schedule
+            || !_cursors.TryGetValue(definition.Id, out var summary)
+            || summary.RecurringScheduleStatus != JobRecurringScheduleStatus.Scheduled
+            || summary.NextOccurrenceUtc is not {} next) return [];
+        // The persisted cursor authorizes the forecast. Cron math only extends that accepted schedule.
+        return new[] { next }.Concat(CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId,
+            schedule.StartTimeUtc, schedule.EndTimeUtc, next).Occurrences.Select(item => item.Utc)).Distinct();
+    }
     private IEnumerable<IGrouping<DateTimeOffset, (JobDefinition Job, DateTimeOffset At)>> Arrivals => Definitions.Where(job => SchedulerCadence.Bucket(job, _acceptedAt) != "sub").SelectMany(job => NextPlans(job).Select(at => (Job: job, At: at))).OrderBy(item => item.At).GroupBy(item => item.At).Take(5);
-    private string Elapsed(JobExecutionInstance record) => SchedulerTimePresentation.GetExecutionDuration(record, _acceptedAt) is {} duration ? duration.ToString(duration.TotalHours >= 1 ? @"hh\:mm\:ss" : @"mm\:ss") : "—";
+    private string Elapsed(JobExecutionInstance record) => SchedulerTimePresentation.GetExecutionDuration(record, _acceptedAt) is {} duration ? TimePresentation.FormatDuration(duration) : "—";
     private IReadOnlyList<TimeSpan> Durations(JobExecutionInstance record) => _jobs.FirstOrDefault(job => job.Definition.Id == new JobId(record.Template.OwnerKey,record.Template.JobKey))?.Records.Where(item => item.IsTerminal).Select(item => SchedulerTimePresentation.GetExecutionDuration(item, _acceptedAt)).OfType<TimeSpan>().Order().ToArray() ?? [];
-    private TimeSpan? Quantile(JobExecutionInstance record, double quantile) { var values = Durations(record); return values.Count == 0 ? null : values[Math.Clamp((int)Math.Ceiling(values.Count * quantile)-1,0,values.Count-1)]; }
+    private TimeSpan? Quantile(JobExecutionInstance record, double quantile) { var values = Durations(record); return _sample?.IsTruncated != false || values.Count < 3 ? null : values[Math.Clamp((int)Math.Ceiling(values.Count * quantile)-1,0,values.Count-1)]; }
     private string Progress(JobExecutionInstance record) { var elapsed = SchedulerTimePresentation.GetExecutionDuration(record,_acceptedAt)?.TotalMilliseconds ?? 0; var max = Math.Max(elapsed,Quantile(record,.95)?.TotalMilliseconds ?? 0)*1.2; return (max > 0 ? elapsed/max*100 : 0).ToString("0.##",CultureInfo.InvariantCulture)+"%"; }
     /// <inheritdoc />
     public async ValueTask DisposeAsync()

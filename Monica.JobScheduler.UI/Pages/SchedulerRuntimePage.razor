@@ -47,9 +47,9 @@
                     @if (state.Overview is { } overview)
                     {
                         <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
+                        <SchedulerCoordinationPanel Overview="@overview" />
                         <SchedulerOwnerInsightTable Overview="@overview" />
                         <SchedulerRuntimeConfigurationPanel Overview="@overview" />
-                        <details class="runtime-page__identity"><summary>@L["Workspace:CoordinationEvidence"]</summary><SchedulerCoordinatorTable Snapshot="@overview.Coordination" /></details>
                     }
                     else if (state.IsQueryFailed && !state.IsLoading)
                     {
@@ -80,6 +80,10 @@
     [SupplyParameterFromQuery(Name="q")] public string? Search { get; set; }
     /// <summary>Gets the publication-freshness filter preserved in the runtime route.</summary>
     [SupplyParameterFromQuery(Name="freshness")] public string? Freshness { get; set; }
+    /// <summary>Gets the logical owner used to focus the coordination evidence table.</summary>
+    [SupplyParameterFromQuery(Name="coordinator")] public string? Coordinator { get; set; }
+    /// <summary>Gets the coordination relation filter, evaluated at the accepted store observation.</summary>
+    [SupplyParameterFromQuery(Name="lease")] public string? Lease { get; set; }
     /// <summary>Gets the route for serving-host runtime and separately sourced registry observations.</summary>
     public const string PAGE_URL = "/job-scheduler/runtime";
 

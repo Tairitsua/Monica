@@ -1,14 +1,14 @@
 @using Monica.UI.Shared.Components.Dialogs
 @using Monica.JobScheduler.UI.Localization
 
-<MudDialog Style="@(ScheduleOnly ? "width:760px;max-width:calc(100vw - 32px)" : null)" Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
+<MudDialog Class="@(ScheduleOnly ? "scheduler-schedule-dialog" : null)" Style="@(ScheduleOnly ? "width:760px;max-width:calc(100vw - 32px)" : null)" Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
     <TitleContent>
         <div class="policy-workbench__title @(ScheduleOnly ? "policy-workbench__title--cron" : null)">
             <div class="policy-workbench__title-icon">
                 <MoIcon Icon="@(ScheduleOnly ? MoIcons.CalendarDays : MoIcons.Sliders)" Size="1.5rem" />
             </div>
             <div>
-                <MoDialogHeading Text="@L[ScheduleOnly ? "Workspace:EditCron" : "Policy:Title"]" />
+                <MoDialogHeading Text="@L[ScheduleOnly ? "Workspace:CronEditor:Title" : "Policy:Title"]" />
                 <MudText Typo="Typo.body2">
                     @(_state?.EffectiveDisplayName ?? Definition.Declaration.JobName)
                 </MudText>

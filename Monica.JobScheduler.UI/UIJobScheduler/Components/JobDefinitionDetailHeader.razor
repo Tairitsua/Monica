@@ -12,11 +12,7 @@
             <h2>@Definition.EffectiveConfiguration.JobName</h2>
             <div class="job-detail-header__key"><code>@Definition.Declaration.JobKey</code><SchedulerCopyButton Value="@Definition.Declaration.JobKey" /></div>
             <div class="job-detail-header__chips">
-                <span class="job-detail-header__status" data-tone="primary">@L[$"JobTypes:{Definition.Declaration.JobType}"]</span>
-                <span class="job-detail-header__status" data-tone="@(IsPolicyDisabled ? "warning" : "success")">
-                    <MoIcon Icon="@(IsPolicyDisabled ? MoIcons.PauseCircle : MoIcons.Success)" Size="1.5rem" />
-                    @(IsPolicyDisabled ? L["Catalog:Policy:Paused"] : L["Catalog:Policy:Enabled"])
-                </span>
+                <span class="job-detail-header__status" data-tone="@StandingTone"><i></i>@L[$"Workspace:Standings:{Standing}"]</span>
                 @if (IsManualSuppressed)
                 {
                     <MudTooltip Text="@L["Catalog:Lifecycle:ManualSuppressedDescription"]" Placement="Placement.Top" Arrow="true">
@@ -74,6 +70,16 @@
 </header>
 
 @code {
+    /// <summary>Gets retained execution evidence for the same standing vocabulary as the catalog.</summary>
+    [Parameter] public JobExecutionActivitySlice RecentActivity { get; set; } = JobExecutionActivitySlice.Empty;
+    /// <summary>Gets the accepted observation instant used to assess running durations.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    private SchedulerJobEvidence Evidence => SchedulerJobEvidence.Create(Definition, RecentActivity.Items, ObservedAtUtc,
+        RecentActivity.Error is null && RecentActivity.Items.Count >= RecentActivity.TotalCount);
+    private string Standing => !Definition.IsPresent ? "absent" : IsPolicyDisabled ? "paused" : Evidence.NeedsAttention ? "attention"
+        : !Evidence.IsAssessed ? "unknown" : Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    private string StandingTone => Evidence.Tone;
+
     /// <summary>
     /// Gets the operational snapshot rendered by this header.
     /// </summary>

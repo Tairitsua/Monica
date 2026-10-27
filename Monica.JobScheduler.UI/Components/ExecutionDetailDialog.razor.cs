@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Execution;
@@ -11,6 +12,7 @@ using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support;
 using Monica.JobScheduler.UI.UIJobScheduler.Shared;
 using Monica.JobScheduler.UI.UIJobScheduler.Support;
 using MudBlazor;
+using Monica.Modules;
 
 namespace Monica.JobScheduler.UI.Components;
 
@@ -24,6 +26,8 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Inject] private SchedulerTimePresentation TimePresentation { get; set; } = null!;
+    [Inject] private TimeProvider TimeProvider { get; set; } = null!;
+    [Inject] private IOptions<ModuleJobSchedulerUIOption> Options { get; set; } = null!;
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
     /// <summary>
@@ -39,6 +43,8 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
     private ExecutionDetailState? _state;
     private SchedulerDialogSession<CancellationRequest>? _confirmations;
     private bool _retainCancellationOpener;
+    private bool _refreshingAutomatically;
+    private Task _activeRefresh = Task.CompletedTask;
 
     protected override async Task OnInitializedAsync()
     {
@@ -48,11 +54,38 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
         state.StateChanged += OnStateChangedAsync;
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }
         catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        if (!_lifetime.IsRetired && state.Execution is { IsTerminal: false } && Options.Value.AutoRefreshInterval > TimeSpan.Zero)
+            _activeRefresh = ObserveActiveExecutionAsync(state);
+    }
+
+    private async Task ObserveActiveExecutionAsync(ExecutionDetailState state)
+    {
+        try
+        {
+            await _lifetime.RunAsync(async cancellationToken =>
+            {
+                using var timer = new PeriodicTimer(Options.Value.AutoRefreshInterval, TimeProvider);
+                while (state.Execution is { IsTerminal: false } && await timer.WaitForNextTickAsync(cancellationToken))
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        if (state.IsMutating || _lifetime.IsRetired) return;
+                        _refreshingAutomatically = true;
+                        try { await RefreshAsync(); }
+                        finally { _refreshingAutomatically = false; }
+                    });
+                }
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired || state.IsDisposed) { }
     }
 
     private Task OnStateChangedAsync() => _lifetime.IsRetired ? Task.CompletedTask : InvokeAsync(() =>
     {
-        if (!_lifetime.IsRetired) StateHasChanged();
+        if (_lifetime.IsRetired) return;
+        StateHasChanged();
+        // MudBlazor renders TitleContent in the owning container, outside this component's render tree.
+        MudDialog.StateHasChanged();
     });
 
     private async Task RefreshAsync()
@@ -91,7 +124,7 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
     {
         var state = _state;
         var exactId = execution.InstanceId;
-        if (state is null || state.IsMutating || execution.IsTerminal || _confirmations is null || _lifetime.IsRetired) return;
+        if (state is null || state.IsMutating || execution.IsTerminal || execution.CancellationRequestedAtUtc.HasValue || _confirmations is null || _lifetime.IsRetired) return;
         // Keep the actual native confirmation opener available when cancellation makes the record terminal.
         _retainCancellationOpener = true;
         try
@@ -150,7 +183,7 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
     private void OpenExecutionLedger()
     {
         if (_lifetime.IsRetired || _state?.Execution is not { } execution) return;
-        var url = $"{JobExecutionsPage.PAGE_URL}?instanceId={Uri.EscapeDataString(execution.InstanceId)}&owner={Uri.EscapeDataString(execution.Template.OwnerKey)}&job={Uri.EscapeDataString(execution.Template.JobKey)}";
+        var url = $"{JobExecutionsPage.PAGE_URL}?q={Uri.EscapeDataString(execution.InstanceId)}&owner={Uri.EscapeDataString(execution.Template.OwnerKey)}&job={Uri.EscapeDataString(execution.Template.JobKey)}&range=all";
         MudDialog.Close();
         Navigation.NavigateTo(url);
     }
@@ -188,7 +221,7 @@ public partial class ExecutionDetailDialog : IAsyncDisposable
         var operations = _lifetime.RetireAsync(() => ValueTask.CompletedTask);
         var confirmations = _confirmations?.DisposeAsync() ?? ValueTask.CompletedTask;
         var stateRetirement = state?.DisposeAsync() ?? ValueTask.CompletedTask;
-        _ = CompleteRetirementAsync([operations, confirmations, stateRetirement], completion);
+        _ = CompleteRetirementAsync([operations, confirmations, stateRetirement, new ValueTask(_activeRefresh)], completion);
         return new(completion.Task);
     }
 

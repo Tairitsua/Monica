@@ -127,7 +127,8 @@ public sealed class ModuleJobSchedulerUIOption : ModuleOptions<ModuleJobSchedule
     public string? AuthorizationPolicyOverride { get; set; }
 
     /// <summary>
-    /// Gets or sets the overview refresh interval. The default is five seconds.
+    /// Gets or sets the overview and active execution inspector refresh interval. The default is five seconds.
+    /// A non-positive value disables automatic refresh. Inspectors stop polling when the execution is terminal.
     /// </summary>
     public TimeSpan AutoRefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
 

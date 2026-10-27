@@ -18,6 +18,10 @@
             <p class="ce-hint">@L["Workspace:CronEditor:Syntax"]</p>
             <div class="ce-presets"><h3>@L["Workspace:CronEditor:Presets"]</h3><div>@for(var i=0;i<CompactPresets.Length;i++) { var index=i;var expression=PresetExpression(index);<button type="button" disabled="@Disabled" aria-pressed="@((Draft.EffectiveExpression == expression).ToString().ToLowerInvariant())" @onclick="@(() => SetExpressionAsync(expression))">@L[$"Workspace:CronEditor:PresetNames:{index}"]</button> }</div></div>
             <div class="ce-inherit"><MudButton Variant="Variant.Text" StartIcon="@MoIcons.Restore" Disabled="@(Disabled || Draft.OverrideExpression is null)" OnClick="ResetExpressionAsync">@L["Workspace:RestoreCron"]</MudButton><p>@L[Draft.OverrideExpression is null ? "Workspace:CronEditor:InheritedHint" : "Workspace:CronEditor:OverrideHint"]</p></div>
+            <fieldset class="ce-boundaries"><legend>@L["Architecture:BoundaryTitle"]</legend><p>@L["Architecture:BoundaryHelp"]</p>
+                <OperationalPolicyBoundaryEditor Compact="true" Label="@L["Policy:Schedule:StartBoundary"]" DeclaredUtc="@Draft.DeclaredStartTimeUtc" Draft="@Draft.StartBoundary" TimeZoneId="@Draft.TimeZoneId" Disabled="@Disabled" Changed="StartBoundaryChangedAsync" />
+                <OperationalPolicyBoundaryEditor Compact="true" Label="@L["Policy:Schedule:EndBoundary"]" DeclaredUtc="@Draft.DeclaredEndTimeUtc" Draft="@Draft.EndBoundary" TimeZoneId="@Draft.TimeZoneId" Disabled="@Disabled" Changed="EndBoundaryChangedAsync" />
+            </fieldset>
         </section>
         <section class="ce-preview">
             <div class="ce-zone"><MoIcon Icon="@MoIcons.Globe" Size="16px"/><div><span>@L["Policy:Schedule:ConfiguredTimeZone"]</span><b>@Draft.TimeZoneId</b><small>@L["Workspace:CronEditor:ZoneHelp"]</small></div></div>

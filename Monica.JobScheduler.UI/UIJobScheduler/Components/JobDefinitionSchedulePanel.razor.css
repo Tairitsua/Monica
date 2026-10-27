@@ -13,3 +13,5 @@
 .job-schedule-panel header{flex-wrap:wrap}
 .job-schedule-panel dl{grid-template-columns:1fr}
 }
+
+.job-schedule-panel__cursor{padding:0 24px 16px;}

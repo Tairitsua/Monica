@@ -11,3 +11,7 @@
 .job-finding__value{font-size:48px}
 .job-finding__lede{justify-self:start}
 }
+.job-finding__coverage { display:flex;align-items:start;gap:8px;margin-top:12px;padding:12px 16px;border:1px solid var(--mud-palette-lines-default);border-radius:8px;font-size:12px;line-height:1.7;color:var(--mud-palette-text-secondary);background:var(--mud-palette-surface); }
+.job-finding__coverage p { margin:0; }
+.job-finding__coverage b { color:var(--mud-palette-text-primary);font-weight:600; }
+.job-finding__coverage ::deep .mo-icon { flex:none;margin-top:3px; }

@@ -27,6 +27,7 @@ else if (_state is { } state)
         }
         <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
             <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@(state.IsLoading || state.IsMutating)" RefreshRequested="RefreshAsync" />
+            <SchedulerHistoryCoverage />
             @if (state.HasLoadedSnapshot && state.LoadedQuery is { } acceptedQuery && state.ObservedAtUtc is { } acceptedAt)
             {
                 <SchedulerLedgerTrajectory Query="@acceptedQuery" ObservedAtUtc="@acceptedAt" StateSelected="SelectTrajectoryStateAsync" AllStatesSelected="@(() => SelectStatesAsync([]))" FilterContent="@LedgerFilters" />
@@ -35,7 +36,7 @@ else if (_state is { } state)
                                        TotalCount="@state.TotalCount" HasLoadedSnapshot="@state.HasLoadedSnapshot"
                                        IsQueryFailed="@state.IsQueryFailed" ObservedAtUtc="@state.ObservedAtUtc"
                                        PageSize="@state.PageSize" PageSizeOptions="@state.PageSizeOptions"
-                                       IsLoading="@state.IsLoading"
+                                       IsLoading="@state.IsLoading" ShowCompletedTime="@(state.LoadedQuery?.CompletedAfterUtc is not null || state.LoadedQuery?.CompletedBeforeUtc is not null || InitialTime == "completed")"
                                        InspectRequested="InspectAsync" RequestCancellation="RequestCancellationAsync">
 
             </ExecutionOperationalTable>

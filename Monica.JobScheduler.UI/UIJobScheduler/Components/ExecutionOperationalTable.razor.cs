@@ -21,6 +21,14 @@ namespace Monica.JobScheduler.UI.UIJobScheduler.Components;
 /// </remarks>
 public partial class ExecutionOperationalTable : IAsyncDisposable
 {
+    /// <summary>Gets whether the accepted query uses terminal completion rather than planned or recorded time.</summary>
+    [Parameter] public bool ShowCompletedTime { get; set; }
+
+    private string TimeColumn => L[ShowCompletedTime ? "Workspace:CompletedTime" : "Executions:Columns:PlannedOrRecorded"];
+
+    private DateTimeOffset? RowTimestamp(JobExecutionInstance execution) => ShowCompletedTime
+        ? execution.CompletedAtUtc : execution.RecurringOccurrenceUtc ?? execution.CreatedAtUtc;
+
     [Inject] private IStringLocalizer<JobSchedulerResource> L { get; set; } = null!;
     [Inject] private SchedulerTimePresentation TimePresentation { get; set; } = null!;
 

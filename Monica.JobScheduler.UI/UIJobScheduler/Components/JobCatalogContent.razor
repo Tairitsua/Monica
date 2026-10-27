@@ -32,11 +32,16 @@
                 {
                     <SchedulerCatalogComposition Definitions="@_state.Definitions" Tones="@_state.Evidence.ToDictionary(pair => pair.Key, pair => pair.Value.Tone)" Catalog="@_state.Catalog" Truncated="@_state.IsCatalogTruncated" Standing="@_state.Standing" Cadence="@_state.Cadence" ObservedAtUtc="@_state.ObservedAtUtc.GetValueOrDefault()" />
                 }
+                @if (_state.StandingCounts.GetValueOrDefault("unknown") > 0)
+                {
+                    <div class="catalog-evidence-notice"><MoIcon Icon="@MoIcons.Info" Size="17px" /><div><b>@L["Architecture:EvidenceTitle"]</b><p>@L["Architecture:EvidenceBody", _state.StandingCounts.GetValueOrDefault("unknown")]</p><a href="/job-scheduler/catalog?standing=unknown">@L["Architecture:InspectUnknown"] <MoIcon Icon="@MoIcons.ArrowRight" Size="13px" /></a></div></div>
+                }
                 <JobCatalogOperationalTable @ref="_catalogTable"
                                             ServerData="@_state.LoadTableAsync"
                                             SelectedJobIds="@_state.SelectedJobIds"
                                             TotalCount="@_state.TotalCount"
                                             PageSize="@_state.PageSize" StandingResolver="@_state.StandingOf"
+                                            StandingDetailResolver="@_state.StandingDetailOf" StandingToneResolver="@_state.StandingToneOf"
                                             PageSizeOptions="@_state.PageSizeOptions"
                                             IsMutating="@_state.IsMutating"
                                             IsQueryFailed="@(_state.Error is not null)"

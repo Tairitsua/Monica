@@ -18,7 +18,7 @@
     @if (_expanded)
     {
         <div class="catalog-composition__matrix">
-            <div class="catalog-composition__legend">@foreach(var standing in new[] { "attention", "healthy", "ondemand", "paused", "absent" }) { <span><i data-tone="@(standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => standing })"></i>@L[$"Workspace:Standings:{standing}"]</span> }</div>
+            <div class="catalog-composition__legend">@foreach(var standing in new[] { "attention", "unknown", "healthy", "ondemand", "paused", "absent" }) { <span><i data-tone="@(standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => standing })"></i>@L[$"Workspace:Standings:{standing}"]</span> }</div>
             <table><thead><tr><th>@L["Catalog:Columns:Owner"]</th>@foreach(var bucket in SchedulerCadence.Buckets) { <th><a href="@FilterUrl("cadence", Cadence == bucket ? null : bucket)" aria-pressed="@((Cadence == bucket).ToString().ToLowerInvariant())">@L[$"Workspace:Cadences:{bucket}"]</a></th> }<th></th></tr></thead><tbody>@foreach(var owner in _owners)
             {
                 <tr><th><a href="@FilterUrl("owner", owner)">@owner</a></th>@foreach(var bucket in SchedulerCadence.Buckets) { <td data-label="@L[$"Workspace:Cadences:{bucket}"]"><div class="catalog-composition__marks">@foreach(var definition in Definitions.Where(d => d.OwnerKey == owner && _buckets.GetValueOrDefault(d.Id) == bucket)) { @Mark(definition) }</div></td> }<td class="catalog-composition__total">@Definitions.Count(d => d.OwnerKey == owner)</td></tr>

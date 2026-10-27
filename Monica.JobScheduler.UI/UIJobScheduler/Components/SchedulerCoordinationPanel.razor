@@ -1,0 +1,67 @@
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+@inject NavigationManager Navigation
+
+<section class="rt-coordination" aria-labelledby="rt-coordination-title">
+    <header class="rt-heading"><span class="tile"><MoIcon Icon="@MoIcons.Network" Size="18px" /></span><div><h2 id="rt-coordination-title">@L["Runtime:Coordination:Title"]</h2>@if (Overview.Configuration.AutonomousWork) { <p>@L["Runtime:Coordination:Description"]</p> }</div></header>
+    @if (!Overview.Configuration.AutonomousWork || Overview.Coordination is null)
+    {
+        <div class="rt-coordination-note"><MoIcon Icon="@MoIcons.Info" Size="18px" /><div><h3>@L[!Overview.Configuration.AutonomousWork ? "Runtime:Coordination:ManualTitle" : "Runtime:Coordination:MissingTitle"]</h3><p>@L[!Overview.Configuration.AutonomousWork ? "Runtime:Coordination:ManualNote" : "Runtime:Coordination:MissingNote"]</p></div></div>
+    }
+    else
+    {
+        <div class="rt-toolbar"><div class="fchips" role="group" aria-label="@L["Runtime:Coordination:Filter"]">
+            @foreach (var key in new[] { "all", "local", "remote", "expired" })
+            {
+                <button type="button" class="fchip" data-role="@(key == "local" ? "info" : key == "expired" ? "warning" : "neutral")" aria-pressed="@((_filter == key).ToString().ToLowerInvariant())" @onclick="@(() => SetFilter(key))">@L[$"Runtime:Coordination:Filters:{key}"] <span>@Count(key)</span></button>
+            }
+        </div>@if (_owner is not null) { <button type="button" class="rt-owner-filter" @onclick="ClearOwner" aria-label="@L["Runtime:Coordination:Clear"]">@_owner <MoIcon Icon="@MoIcons.Close" Size="12px" /></button> }</div>
+        @if (Rows.Any())
+        {
+            <table class="rt-coordinator-table"><thead><tr><th>@L["Runtime:Coordinators:Partition"]</th><th>@L["Runtime:Coordinators:Holder"]</th><th>@L["Runtime:Coordinators:Expiry"]</th><th>@L["Runtime:Coordinators:State"]</th></tr></thead><tbody>
+                @foreach (var row in Rows.Take(_expanded ? int.MaxValue : 5))
+                {
+                    var owner = SchedulerCoordinationPresentation.Owner(row);
+                    var state = State(row);
+                    <tr><td data-label="@L["Runtime:Coordinators:Partition"]">
+                        @if (owner is not null) { <a class="mono" href="@($"/job-scheduler/catalog?owner={Uri.EscapeDataString(owner)}")">@owner <MoIcon Icon="@MoIcons.ArrowRight" Size="12px" /></a><small>@L["Runtime:Coordination:OwnerRole"]</small> }
+                        else { <b>@L["Runtime:Coordination:MaintenanceRole"]</b><small class="mono">@row.CoordinatorKey</small> }
+                    </td><td data-label="@L["Runtime:Coordinators:Holder"]"><span class="mono rt-holder">@row.WorkerInstanceId <SchedulerCopyButton Value="@row.WorkerInstanceId" /></span>@if (state == "expired") { <small>@L["Runtime:Coordination:PreviousHolder"]</small> }</td>
+                    <td data-label="@L["Runtime:Coordinators:Expiry"]"><time class="mono" datetime="@row.ExpiresAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(row.ExpiresAtUtc)</time><small>@L[state == "expired" ? "Runtime:Coordination:Elapsed" : "Runtime:Coordination:Remaining", TimePresentation.FormatDuration((row.ExpiresAtUtc - Overview.Coordination.ObservedAtUtc).Duration())]</small></td>
+                    <td data-label="@L["Runtime:Coordinators:State"]"><span class="status" data-role="@SchedulerCoordinationPresentation.Role(state)"><i></i>@L[$"Runtime:Coordination:States:{state}"]</span></td></tr>
+                }
+            </tbody></table>
+        }
+        else { <p class="rt-empty">@L[_owner is not null || _filter != "all" ? "Runtime:Coordination:NoMatch" : "Runtime:Coordinators:Empty"]</p> }
+        @if (Rows.Count() > 5) { <button type="button" class="rt-show-coordinators" aria-expanded="@_expanded" @onclick="@(() => _expanded = !_expanded)">@L[_expanded ? "Runtime:Coordination:Collapse" : "Runtime:Coordination:ShowAll", Rows.Count()] <MoIcon Icon="@(_expanded ? MoIcons.ChevronUp : MoIcons.ChevronDown)" Size="14px" /></button> }
+        <footer class="rt-coordination-foot"><span>@L["Runtime:Coordinators:Observed"]<time class="mono">@TimePresentation.FormatTimestamp(Overview.Coordination.ObservedAtUtc)</time></span><p>@L["Runtime:Coordination:ObservationNote"]</p></footer>
+    }
+    <details class="rt-work"><summary>@L["Runtime:Coordination:LastWork"]<MoIcon Icon="@MoIcons.ChevronDown" Size="14px" /></summary><div>
+        @Work("LastOwnerWork", Overview.LocalPlane.LastOwnerSchedulingWorkAtUtc)
+        @Work("LastRecoveryWork", Overview.LocalPlane.LastLeaseRecoveryWorkAtUtc)
+        @Work("LastCleanupWork", Overview.LocalPlane.LastHistoryCleanupWorkAtUtc)
+        <small>@L["Runtime:Coordination:CleanupNote"]</small>
+    </div></details>
+</section>
+
+@code {
+    /// <summary>Gets the accepted local configuration, store-clock coordination observation and completed-work evidence.</summary>
+    [Parameter, EditorRequired] public JobSchedulerRuntimeOverview Overview { get; set; } = null!;
+    private string _filter = "all";
+    private string? _owner;
+    private bool _expanded;
+    private IEnumerable<JobCoordinatorSummary> All => Overview.Coordination?.Coordinators ?? [];
+    private IEnumerable<JobCoordinatorSummary> Rows => All.Where(row => (_owner is null || SchedulerCoordinationPresentation.Owner(row) == _owner) && Matches(row, _filter));
+    private string State(JobCoordinatorSummary row) => SchedulerCoordinationPresentation.State(row, Overview);
+    private bool Matches(JobCoordinatorSummary row, string filter) => filter == "all" || State(row) == (filter == "local" ? "active" : filter == "remote" ? "standby" : "expired");
+    private int Count(string filter) => All.Count(row => Matches(row, filter));
+    protected override void OnParametersSet()
+    {
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+        _filter = query.TryGetValue("lease", out var lease) && lease.ToString() is "local" or "remote" or "expired" ? lease.ToString() : "all";
+        _owner = query.TryGetValue("coordinator", out var owner) ? owner.ToString() : null;
+    }
+    private void SetFilter(string filter) { _expanded = false; Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("lease", filter == "all" ? null : filter), replace: true); }
+    private void ClearOwner() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("coordinator", (string?)null), replace: true);
+    private RenderFragment Work(string key, DateTimeOffset? at) => @<p><span>@L[$"Runtime:Plane:{key}"]</span><b class="mono">@(at is null ? L["Runtime:Coordination:NoWork"] : TimePresentation.FormatTimestamp(at))</b></p>;
+}

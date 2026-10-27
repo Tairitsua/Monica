@@ -1,19 +1,19 @@
 .job-detail-header{padding:24px 28px 20px;border-bottom:1px solid var(--mud-palette-lines-default)}
 .job-detail-header__main{display:flex;justify-content:space-between;gap:24px}
 .job-detail-header__identity{min-width:0}
-.job-detail-header__eyebrow{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mud-palette-text-secondary)}
+.job-detail-header__eyebrow{margin:0;font-size:11px;color:var(--mud-palette-text-secondary)}
 .job-detail-header h2{margin:6px 0 0;font-size:25px;line-height:1.35;font-weight:650;letter-spacing:-.03em;overflow-wrap:anywhere}
 .job-detail-header__key{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--mud-palette-text-secondary);font-size:12px}
 .job-detail-header__key code{font-family:var(--mo-font-family-mono);overflow-wrap:anywhere}
 .job-detail-header__chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.job-detail-header__status{--tone:var(--mud-palette-text-secondary);display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:5px;font-size:10.5px;background:color-mix(in srgb,var(--tone) 8%,var(--mud-palette-surface));color:color-mix(in srgb,var(--tone) 75%,var(--mud-palette-text-primary))}
+.job-detail-header__status{--tone:var(--mud-palette-text-secondary);display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:99px;font-size:12px;background:color-mix(in srgb,var(--tone) 8%,var(--mud-palette-surface));color:color-mix(in srgb,var(--tone) 75%,var(--mud-palette-text-primary))}
 .job-detail-header__status[data-tone=success]{--tone:var(--mud-palette-success)}
 .job-detail-header__status[data-tone=warning]{--tone:var(--mud-palette-warning)}
 .job-detail-header__status[data-tone=info]{--tone:var(--mud-palette-info)}
 .job-detail-header__status[data-tone=primary]{--tone:var(--mud-palette-primary)}
 .job-detail-header__status ::deep .mo-icon{width:12px;height:12px}
 .job-detail-header__actions{display:flex;align-items:start;justify-content:end;flex-wrap:wrap;gap:8px;max-width:410px}
-.job-detail-header__actions ::deep .mud-button-root{min-height:32px;padding:5px 10px;font-size:11.5px;font-weight:500;text-transform:none;border-radius:7px;box-shadow:none}
+.job-detail-header__actions ::deep .mud-button-root{min-height:32px;padding:5px 10px;font-size:12px;font-weight:500;text-transform:none;border-radius:7px;box-shadow:none}
 .job-detail-header__actions ::deep .mud-button-icon-start>*{width:14px;height:14px}
 @container scheduler (max-width:1050px){.job-detail-header__main{flex-direction:column;gap:16px}
 .job-detail-header__actions{justify-content:start;max-width:none}
@@ -21,3 +21,7 @@
 @container scheduler (max-width:620px){.job-detail-header{padding:18px 16px}
 .job-detail-header h2{font-size:22px}
 }
+
+.job-detail-header__status[data-tone=error]{--tone:var(--mud-palette-error)}
+.job-detail-header__status>i{width:6px;height:6px;background:var(--tone);border-radius:2px}
+.job-detail-header__actions ::deep .mud-button-outlined{border-color:var(--mud-palette-lines-inputs)}

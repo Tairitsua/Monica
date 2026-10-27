@@ -1,7 +1,7 @@
 @inject IStringLocalizer<JobSchedulerResource> L
 <section class="catalog-filter" aria-label="@L["Catalog:Filters:AriaLabel"]">
     <div class="catalog-filter__states" role="group" aria-label="@L["Workspace:Standing"]">
-        @foreach (var standing in new[] { "all", "attention", "healthy", "ondemand", "paused", "absent" })
+        @foreach (var standing in new[] { "all", "attention", "unknown", "healthy", "ondemand", "paused", "absent" })
         {
             <button type="button" class="catalog-filter__state" data-tone="@Tone(standing)" data-standing="@standing" data-zero="@((StandingCounts.GetValueOrDefault(standing) == 0).ToString().ToLowerInvariant())" aria-pressed="@(((Standing ?? "all") == standing).ToString().ToLowerInvariant())" @onclick="@(() => StandingSelected.InvokeAsync(standing == "all" ? null : standing))">
                 @if (standing != "all") { <i aria-hidden="true"></i> }<span>@L[$"Workspace:Standings:{standing}"]</span><small>@StandingCounts.GetValueOrDefault(standing)</small>

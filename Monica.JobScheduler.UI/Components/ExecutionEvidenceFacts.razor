@@ -15,20 +15,20 @@
                 </MudText>
             </header>
             <dl class="execution-evidence__facts">
-                <div>
-                    <dt>@L["ExecutionDetail:Created"]</dt>
-                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CreatedAtUtc)</time></dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:Available"]</dt>
-                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.AvailableAtUtc)</time></dd>
-                </div>
                 @if (Execution.RecurringOccurrenceUtc is { } recurringOccurrenceUtc)
                 {
                     <div>
                         <dt>@L["ExecutionDetail:ScheduledOccurrence"]</dt>
                         <dd><time>@TimePresentation.FormatExecutionTimestamp(recurringOccurrenceUtc)</time></dd>
                     </div>
+                }
+                <div>
+                    <dt>@L["ExecutionDetail:Created"]</dt>
+                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CreatedAtUtc)</time></dd>
+                </div>
+                @if (Execution.State != JobExecutionState.Skipped)
+                {
+                    <div><dt>@L["ExecutionDetail:Available"]</dt><dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.AvailableAtUtc)</time></dd></div>
                 }
                 <div>
                     <dt>@L["ExecutionDetail:Started"]</dt>
@@ -38,17 +38,15 @@
                     <dt>@L["ExecutionDetail:Completed"]</dt>
                     <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CompletedAtUtc)</time></dd>
                 </div>
-                <div>
-                    <dt>@L["ExecutionDetail:CancellationRequested"]</dt>
-                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.CancellationRequestedAtUtc)</time></dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:Observed"]</dt>
-                    <dd><time>@TimePresentation.FormatExecutionTimestamp(ObservedAtUtc)</time></dd>
-                </div>
+                @if (Execution.CancellationRequestedAtUtc is {} requested)
+                {
+                    <div><dt>@L["ExecutionDetail:CancellationRequested"]</dt><dd><time>@TimePresentation.FormatExecutionTimestamp(requested)</time></dd></div>
+                }
             </dl>
         </section>
 
+        @if (Execution.State != JobExecutionState.Skipped)
+        {
         <section class="execution-evidence__panel" aria-labelledby="execution-runtime-heading">
             <header class="execution-evidence__heading">
                 <span><MoIcon Icon="@MoIcons.Cpu" Size="1.25rem" /></span>
@@ -73,15 +71,14 @@
                     <dt>@L["ExecutionDetail:LeaseLosses"]</dt>
                     <dd>@Execution.LeaseLossCount</dd>
                 </div>
-                <div>
-                    <dt>@L["ExecutionDetail:LeaseExpires"]</dt>
-                    <dd><time>@TimePresentation.FormatExecutionTimestamp(Execution.LeaseExpiresAtUtc)</time></dd>
-                </div>
+                @if (Execution.LeaseExpiresAtUtc is {} lease)
+                {
+                    <div><dt>@L["ExecutionDetail:LeaseExpires"]</dt><dd><time>@TimePresentation.FormatExecutionTimestamp(lease)</time></dd></div>
+                }
             </dl>
         </section>
+        }
     </div>
-
-    <p class="execution-evidence__scope">@L["ExecutionDetail:EvidenceScope"]</p>
 
     <div class="execution-evidence__grid execution-evidence__grid--contract">
         <section class="execution-evidence__panel" aria-labelledby="execution-policy-heading">
@@ -91,7 +88,6 @@
                     @L["ExecutionDetail:PolicySnapshot"]
                 </MudText>
             </header>
-            <p class="execution-evidence__help">@L["ExecutionDetail:CapturedPolicyNotice"]</p>
             <dl class="execution-evidence__facts">
                 <div>
                     <dt>@L["ExecutionDetail:MaxConcurrency"]</dt>
@@ -106,58 +102,29 @@
                     <dd><code>@TimePresentation.FormatDuration(Execution.Template.MaxExecutionTimeout)</code></dd>
                 </div>
             </dl>
-        </section>
-
-        <section class="execution-evidence__panel" aria-labelledby="execution-identity-heading">
-            <header class="execution-evidence__heading">
-                <span><MoIcon Icon="@MoIcons.Fingerprint" Size="1.25rem" /></span>
-                <MudText Typo="Typo.subtitle1" HtmlTag="h3" id="execution-identity-heading">
-                    @L["ExecutionDetail:Identity"]
-                </MudText>
-            </header>
-            <dl class="execution-evidence__facts">
-                <div>
-                    <dt>@L["ExecutionDetail:Scope"]</dt>
-                    <dd><code>@Execution.Template.SchedulerScopeKey</code></dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:JobType"]</dt>
-                    <dd>@L[$"JobTypes:{Execution.Template.JobType}"]</dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:ArgumentsType"]</dt>
-                    <dd><code>@(Execution.Template.JobArgsKey ?? "—")</code></dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:Owner"]</dt>
-                    <dd><code>@Execution.Template.OwnerKey</code></dd>
-                </div>
-                <div>
-                    <dt>@L["ExecutionDetail:Job"]</dt>
-                    <dd><code>@Execution.Template.JobKey</code></dd>
-                </div>
-            </dl>
+            <p class="execution-evidence__help">@L["ExecutionDetail:CapturedPolicyNotice"]</p>
         </section>
     </div>
-
-    <section class="execution-evidence__panel" aria-labelledby="execution-arguments-heading">
-        <header class="execution-evidence__heading">
-            <span><MoIcon Icon="@MoIcons.Braces" Size="1.25rem" /></span>
-            <MudText Typo="Typo.subtitle1" HtmlTag="h3" id="execution-arguments-heading">
-                @L["ExecutionDetail:Arguments"]
-            </MudText>
-        </header>
-        @if (string.IsNullOrWhiteSpace(Execution.JobArgs))
-        {
-            <div class="execution-evidence__empty">@L["ExecutionDetail:NoArguments"]</div>
-        }
-        else
-        {
-            <MoJson Value="@Execution.JobArgs" AllowPlainText="true" />
-        }
-    </section>
+    @if (Execution.Template.JobType == JobType.Triggered)
+    {
+        <section class="execution-evidence__panel" aria-labelledby="execution-arguments-heading">
+            <header class="execution-evidence__heading"><h3 id="execution-arguments-heading">@L["ExecutionDetail:Arguments"]</h3></header>
+            @if (string.IsNullOrWhiteSpace(Execution.JobArgs)) { <p class="execution-evidence__empty">@L["ExecutionDetail:NoArguments"]</p> }
+            else { <MoJson Value="@Execution.JobArgs" AllowPlainText="true" /> }
+        </section>
+    }
+    <details class="execution-evidence__identity">
+        <summary>@L["ExecutionDetail:Identity"]</summary>
+        <dl class="execution-evidence__facts">
+            <div><dt>@L["ExecutionDetail:Scope"]</dt><dd><code>@Execution.Template.SchedulerScopeKey</code></dd></div>
+            <div><dt>@L["ExecutionDetail:Owner"]</dt><dd><code>@Execution.Template.OwnerKey</code></dd></div>
+            <div><dt>@L["ExecutionDetail:Job"]</dt><dd><code>@Execution.Template.JobKey</code></dd></div>
+            <div><dt>@L["ExecutionDetail:JobType"]</dt><dd>@L[$"JobTypes:{Execution.Template.JobType}"]</dd></div>
+            <div><dt>@L["ExecutionDetail:ArgumentsType"]</dt><dd><code>@(Execution.Template.JobArgsKey ?? "—")</code></dd></div>
+        </dl>
+        <p class="execution-evidence__help">@L["ExecutionDetail:EvidenceScope"]</p>
+    </details>
 </div>
-
 @code {
     /// <summary>
     /// Gets or sets the durable execution evidence snapshot to render.

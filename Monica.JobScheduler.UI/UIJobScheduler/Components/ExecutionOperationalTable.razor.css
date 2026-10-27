@@ -55,7 +55,7 @@
 .execution-ledger__ordering>div{display:flex;gap:2px;padding:3px;border:1px solid var(--mud-palette-lines-default);border-radius:7px}
 .execution-ledger__ordering button{display:flex;align-items:center;gap:5px;padding:4px 9px;font-size:11px;border:0;border-radius:4px;background:transparent;color:var(--mud-palette-text-secondary);cursor:pointer}
 .execution-ledger__ordering button[aria-pressed=true i]{background:var(--mud-palette-background-gray);color:var(--mud-palette-text-primary)}
-.execution-ledger__data ::deep .mud-table-head .mud-table-cell{font-size:11.5px;padding:10px 16px}
+.execution-ledger__data ::deep .mud-table-head .mud-table-cell{font-size:12px;font-weight:500;padding:9px 14px;background:var(--mud-palette-background-gray)}
 .execution-ledger__data ::deep .mud-table-body .mud-table-cell{font-size:12.5px;padding:12px 16px;vertical-align:middle}
 .execution-ledger__name{font-size:13px;color:var(--mud-palette-text-primary)}
 .execution-ledger__owner,.execution-ledger__recorded time,.execution-ledger__instance{font-size:11px}
@@ -66,3 +66,8 @@
 .execution-ledger__ordering button{padding-inline:6px}
 }
 ::deep .mud-table-body .mud-table-row:nth-of-type(even){background:transparent;}
+
+.execution-ledger__recorded time { white-space:nowrap; }
+.execution-ledger__cancel { display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:0;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;color:color-mix(in srgb,var(--mud-palette-error) 72%,var(--mud-palette-text-primary));background:color-mix(in srgb,var(--mud-palette-error) 8%,var(--mud-palette-surface)); }
+.execution-ledger__cancel[aria-disabled=true] { opacity:.5;cursor:default; }
+@media(max-width:600px) { .execution-ledger__recorded time { white-space:normal;overflow-wrap:normal; } }

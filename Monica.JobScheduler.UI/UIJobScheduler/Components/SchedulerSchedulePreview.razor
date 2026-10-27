@@ -2,6 +2,8 @@
 @inject SchedulerTimePresentation TimePresentation
 
 <section class="schedule-preview" aria-label="@L["Workspace:NextFive"]">
+    <h3>@L["Architecture:Preview"]</h3>
+    <p class="schedule-preview__notice">@L["Architecture:PreviewNote"]</p>
 
     @if (_preview is { Occurrences.Count: > 0 })
     {

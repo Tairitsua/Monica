@@ -2,14 +2,17 @@
 @inject SchedulerTimePresentation TimePresentation
 <div class="job-finding" data-tone="@Tone">
     <div><p>@L[Streak > 0 ? "Workspace:ConsecutiveFailures" : Summary.ActiveExecutionCount > 0 ? "JobDetail:Header:ActiveExecutions" : "Workspace:RetainedRecords"]</p><div class="job-finding__value">@Value<small>@L[Streak > 0 ? "Workspace:AttemptsUnit" : Summary.ActiveExecutionCount > 0 ? "Workspace:ActiveUnit" : "Workspace:RecordsUnit"]</small></div></div>
-    <p class="job-finding__lede">@if (!Summary.Definition.IsPresent) { @L["Workspace:AbsentFinding"] } else if(Summary.Definition.IsDisabled) { @L["Workspace:JobPausedFinding"] } else if(Streak > 0) { @L["Workspace:StreakFinding",Streak,Summary.Definition.EffectiveConfiguration.RetryCount,Summary.NextOccurrenceUtc is {} next ? TimePresentation.FormatScheduleTimestamp(next) : "—"] } else { @L[Summary.ActiveExecutionCount > 0 ? "Workspace:JobActiveFinding" : "Workspace:JobFinding", Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Recent.TotalCount] }</p>
+    <p class="job-finding__lede">@if (!Summary.Definition.IsPresent) { @L["Workspace:AbsentFinding"] } else if(Summary.Definition.IsDisabled) { @L["Workspace:JobPausedFinding"] } else if(Streak > 0 && IsStreakLowerBound) { @L["Architecture:AtLeastStreak",Streak] } else if(Streak > 0) { @L["Workspace:StreakFinding",Streak,Summary.Definition.EffectiveConfiguration.RetryCount,Summary.NextOccurrenceUtc is {} next ? TimePresentation.FormatScheduleTimestamp(next) : "—"] } else if (Summary.ActiveExecutionCount == 0 && (IsPartial || Recent.Items.Count == 0)) { @L["Architecture:UnknownNote"] } else { @L[Summary.ActiveExecutionCount > 0 ? "Workspace:JobActiveFinding" : "Workspace:JobFinding", Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Recent.TotalCount] }</p>
 </div>
+@if (IsPartial) { <div class="job-finding__coverage"><MoIcon Icon="@MoIcons.Info" Size="15px" /><p><b>@L["Architecture:Unknown"]</b> @L[Recent.Error is null ? "Architecture:SampleLimited" : "Architecture:SampleUnavailable"]. @L["Architecture:SampleNote"]</p></div> }
 @code {
     /// <summary>Gets the accepted operational definition.</summary>
     [Parameter,EditorRequired] public JobOperationalSummary Summary { get; set; } = null!;
     /// <summary>Gets the latest retained evidence, ordered newest first.</summary>
     [Parameter,EditorRequired] public JobExecutionActivitySlice Recent { get; set; } = JobExecutionActivitySlice.Empty;
-    private int Streak => Recent.Items.Where(record => record.State is JobExecutionState.Succeeded or JobExecutionState.Failed).TakeWhile(record => record.State == JobExecutionState.Failed).Count();
-    private string Tone => Summary.Definition.IsDisabled || !Summary.Definition.IsPresent ? "neutral" : Streak > 0 ? "error" : Summary.ActiveExecutionCount > 0 ? "info" : "success";
+    private int Streak => Recent.Items.Where(record => record.State is JobExecutionState.Succeeded or JobExecutionState.Failed or JobExecutionState.Cancelled).TakeWhile(record => record.State == JobExecutionState.Failed).Count();
+    private bool IsStreakLowerBound => IsPartial || !Recent.Items.Any(record => record.State is JobExecutionState.Succeeded or JobExecutionState.Cancelled);
+    private bool IsPartial => Recent.Items.Count < Recent.TotalCount || Recent.Error is not null;
+    private string Tone => Summary.Definition.IsDisabled || !Summary.Definition.IsPresent ? "neutral" : Streak > 0 ? "error" : Summary.ActiveExecutionCount > 0 ? "info" : IsPartial || Recent.Items.Count == 0 ? "neutral" : "success";
     private int Value => Streak > 0 ? Streak : Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Recent.TotalCount;
 }

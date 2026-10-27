@@ -10,6 +10,7 @@
 @inject IJobSchedulerUiAccess Access
 @implements IAsyncDisposable
 
+<HeadContent><link rel="stylesheet" href="@Assets["_content/Monica.JobScheduler.UI/css/execution-inspector.css"]" /></HeadContent>
 <CascadingValue Value="@this" IsFixed="true">
 <CascadingValue Value="@_actionsKey" Name="SchedulerWorkspaceActions" IsFixed="true">
 <div class="scheduler-workspace mo-page-shell mo-page-shell--full-width">
@@ -17,7 +18,7 @@
         <span class="scheduler-workspace__seal" aria-hidden="true"><MoIcon Icon="@CurrentIcon" Size="1.5rem" /></span>
         <MoPageMasthead Title="@Title" Crumb="@L["Workspace:Eyebrow"]">
             <Meta>
-                <span class="scheduler-workspace__readiness" data-ready="@(_ready?.ToString().ToLowerInvariant())" title="@L["Runtime:Plane:LocalOnly"]"><i aria-hidden="true"></i>@L[_ready is true ? "Workspace:LoopsReady" : _ready is false ? "Workspace:LoopsPending" : "Workspace:ReadinessUnknown"]</span>
+                <span class="scheduler-workspace__readiness" data-manual="@((!SchedulerOptions.Value.AutonomousWork).ToString().ToLowerInvariant())" data-ready="@(_ready?.ToString().ToLowerInvariant())" title="@L["Runtime:Plane:LocalOnly"]"><i aria-hidden="true"></i>@L[!SchedulerOptions.Value.AutonomousWork ? "Runtime:Identity:ManualMode" : _ready is true ? ActivePanelIndex == 4 ? "Workspace:LocalLoopsReady" : "Workspace:LoopsReady" : _ready is false ? "Workspace:LoopsPending" : "Workspace:ReadinessUnknown"]</span>
                 <span class="scheduler-workspace__scope">@L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]</span>
                 <span class="scheduler-workspace__zone" title="@TimePresentation.TimeZoneDisplayName">@L["Workspace:TimeZone", TimePresentation.TimeZoneId]</span>
             </Meta>
@@ -40,6 +41,10 @@
     </MoWorkbenchNavigation>
 
     <div class="scheduler-workspace__content">
+        @if (!SchedulerOptions.Value.AutonomousWork)
+        {
+            <div class="scheduler-workspace__manual"><MoIcon Icon="@MoIcons.Info" Size="18px" /><div><b>@L["Runtime:Identity:ManualMode"]</b><p>@L["Architecture:ManualNote"]</p></div></div>
+        }
         @ChildContent
     </div>
 </div>

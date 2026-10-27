@@ -45,9 +45,10 @@
                         {
                             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Warning">@L["JobDetail:RefreshFailed", state.Error]</MudAlert>
                         }
-                        <section class="job-detail-page__signature"><JobDefinitionDetailHeader Summary="@summary" IsRefreshing="@(state.IsLoading || _commandAdmission is not null)" IsMutating="@(state.IsMutating || _commandAdmission is not null)"
+                        <section class="job-detail-page__signature"><JobDefinitionDetailHeader Summary="@summary" RecentActivity="@state.RecentActivity" ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())" IsRefreshing="@(state.IsLoading || _commandAdmission is not null)" IsMutating="@(state.IsMutating || _commandAdmission is not null)"
                                                    OnRefresh="RefreshAsync" OnInspectSchedule="OpenScheduleInspectorAsync" OnEditPolicy="OpenPolicyAsync"
                                                    OnToggleDisabled="ToggleDisabledAsync" OnRunNow="RunRecurringNowAsync" OnTrigger="OpenTriggerAsync" />
+                        <SchedulerHistoryCoverage />
                         <SchedulerJobFinding Summary="@summary" Recent="@state.RecentActivity" />
                         <SchedulerJobTrajectory Recent="@state.RecentActivity" ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())" LedgerUrl="@LedgerUrl(summary.Definition)" ExecutionSelected="OpenExecutionDetailsAsync" /></section>
                         <div class="job-detail-page__viewbar">
@@ -85,7 +86,7 @@
                             <aside class="job-detail-page__side-evidence">
                                 <section class="job-detail-page__reading"><p>@L["Workspace:TypicalDuration"]</p><strong>@TimePresentation.FormatDuration(state.Analytics?.Duration.P50)</strong><small>@L["Workspace:DurationSample",state.Analytics?.Duration.Count ?? 0]</small><div><span>P95</span><b>@TimePresentation.FormatDuration(state.Analytics?.Duration.P95)</b></div>@if(state.AnalyticsError is {} analyticsError) { <MudAlert Severity="Severity.Warning" Dense="true">@analyticsError</MudAlert> }</section>
                                 <section class="job-detail-page__reading"><p>@L["Workspace:RetainedHistory"]</p><b>@state.RecentActivity.TotalCount.ToString("N0") @L["Workspace:RecordsUnit"]</b><small>@L["Workspace:RetainedHistoryDescription"]</small><div><span>@L["Policy:Fields:MaxRecords"]</span><b>@(summary.Definition.EffectiveConfiguration.MaxRetainedHistoryRecords == 0 ? L["Policy:Values:NoLimit"] : summary.Definition.EffectiveConfiguration.MaxRetainedHistoryRecords.ToString())</b></div><div><span>@L["Policy:Fields:MaxDays"]</span><b>@(summary.Definition.EffectiveConfiguration.MaxRetentionDays is {} days ? L["Policy:Values:Days",days] : L["Policy:Values:NoLimit"])</b></div></section>
-                                <section class="job-detail-page__reading"><p>@L["JobDetail:Contract:OwnerObserved"]</p><b>@TimePresentation.FormatTimestamp(summary.Definition.LastObservedAtUtc)</b><small>@L["Workspace:PublicationNotHeartbeat"]</small><a href="@($"/job-scheduler/runtime?q={Uri.EscapeDataString(summary.Definition.OwnerKey)}")">@L["Workspace:Navigation:Runtime"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px"/></a></section>
+                                <section class="job-detail-page__reading"><p>@L["JobDetail:Contract:DefinitionObserved"]</p><b>@TimePresentation.FormatTimestamp(summary.Definition.LastObservedAtUtc)</b><small>@L["Workspace:DefinitionObservationNote"]</small><a href="@($"/job-scheduler/runtime?q={Uri.EscapeDataString(summary.Definition.OwnerKey)}")">@L["Workspace:Navigation:Runtime"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px"/></a></section>
                             </aside>
                         </div>
                         }

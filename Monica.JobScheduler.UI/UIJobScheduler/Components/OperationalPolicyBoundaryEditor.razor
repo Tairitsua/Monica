@@ -5,6 +5,23 @@
 @inject TimeProvider TimeProvider
 @inject MoTimeFormatter UiTime
 
+@if (Compact)
+{
+    <div class="boundary-compact">
+        <label><span>@Label</span><select value="@Draft.Mode" disabled="@Disabled" @onchange="SetCompactModeAsync">
+            @foreach (var mode in Enum.GetValues<CronBoundaryOverrideMode>()) { <option value="@mode">@L[$"Policy:BoundaryModes:{mode}"]</option> }
+        </select></label>
+        @if (Draft.Mode == CronBoundaryOverrideMode.Value)
+        {
+            <input type="datetime-local" step="1" value="@LocalValue" disabled="@Disabled" aria-label="@Label" @onchange="SetLocalValueAsync" />
+            @if (Draft.ValidationFailure != CronBoundaryValidationFailure.None) { <p class="boundary-compact__error" role="alert">@L[$"Policy:Schedule:BoundaryFailures:{Draft.ValidationFailure}"]</p> }
+            else if (Draft.IsAmbiguousLocalTime) { <p class="boundary-compact__warning">@L["Policy:Schedule:AmbiguousBoundary"]</p> }
+        }
+        else { <p>@FormatScheduleTime(EffectiveUtc)</p> }
+    </div>
+}
+else
+{
 <article class="boundary-editor">
     <div class="boundary-editor__heading">
         <MudText Typo="Typo.subtitle2" HtmlTag="h5">@Label</MudText>
@@ -74,8 +91,12 @@
         </div>
     </div>
 </article>
+}
 
 @code {
+    /// <summary>Gets whether to show the compact three-state control used by the schedule dialog.</summary>
+    [Parameter] public bool Compact { get; set; }
+
     /// <summary>Gets or sets the localized start or end boundary label.</summary>
     [Parameter, EditorRequired]
     public string Label { get; set; } = string.Empty;
@@ -101,6 +122,21 @@
     public EventCallback Changed { get; set; }
 
     private DateTimeOffset? EffectiveUtc => Draft.HasOverride ? Draft.OverrideUtc : DeclaredUtc;
+
+    private string? LocalValue => Draft.LocalDate is {} date && Draft.LocalTime is {} time
+        ? date.Date.Add(time).ToString("yyyy-MM-dd'T'HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    private Task SetCompactModeAsync(ChangeEventArgs args) => Enum.TryParse<CronBoundaryOverrideMode>(args.Value?.ToString(), out var mode)
+        ? SetModeAsync(mode) : Task.CompletedTask;
+
+    private async Task SetLocalValueAsync(ChangeEventArgs args)
+    {
+        var valid = DateTime.TryParseExact(args.Value?.ToString(), ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss"],
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var local);
+        Draft.LocalDate = valid ? local.Date : null;
+        Draft.LocalTime = valid ? local.TimeOfDay : null;
+        await Changed.InvokeAsync();
+    }
 
     private async Task SetModeAsync(CronBoundaryOverrideMode mode)
     {

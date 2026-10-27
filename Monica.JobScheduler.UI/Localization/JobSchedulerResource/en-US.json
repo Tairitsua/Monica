@@ -59,13 +59,13 @@
     "Scope": "Scope · {0}",
     "CopyId": "Copy instance ID",
     "OpenLedger": "Open in execution ledger",
-    "EditCron": "Edit Cron",
-    "RestoreCron": "Restore declared expression",
+    "EditCron": "Edit schedule",
+    "RestoreCron": "Restore declaration",
     "SaveCron": "Save schedule",
     "Views": {
       "evidence": "Execution evidence",
       "schedule": "Schedule",
-      "policy": "Declaration and policy"
+      "policy": "Definition & policy"
     },
     "NextFive": "Next planned occurrences",
     "PlanNotice": "Plans use the declared schedule timezone. Suspension, boundaries and capacity can still affect admission.",
@@ -98,8 +98,8 @@
     "Windows": {
       "15": "15 min",
       "60": "1 hour",
-      "1440": "24 hours",
-      "360": "6 hours"
+      "360": "6 hours",
+      "1440": "24 hours"
     },
     "PulseTitle": "Scheduler pulse",
     "PulseDescription": "Signals use the loaded execution window. Future marks are the next five planned occurrences, not guaranteed admissions.",
@@ -119,8 +119,6 @@
     "JobPausedFinding": "The recurring plan is paused. Existing executions retain their captured configuration; editing Cron does not resume scheduling.",
     "JobFinding": "The latest result does not form a failure streak. {0} retained records are available to inspect; retention determines how much earlier history remains.",
     "BackToSource": "Back to source list",
-    "ClockHours": "h:mm:ss",
-    "ClockMinutes": "m:ss",
     "CopyJobKey": "Copy job key",
     "IdCopied": "Instance ID copied",
     "AllJobs": "All jobs",
@@ -132,10 +130,11 @@
     "Standings": {
       "all": "All",
       "attention": "Needs attention",
-      "healthy": "Healthy",
+      "healthy": "No issue observed",
       "ondemand": "On demand",
       "paused": "Paused",
-      "absent": "Unpublished"
+      "absent": "Unpublished",
+      "unknown": "Insufficient evidence"
     },
     "Sorts": {
       "attention": "Attention first",
@@ -189,9 +188,10 @@
     "NoArrivals": "No enabled recurring schedules in this scope.",
     "PulseGroups": {
       "attention": "Needs attention",
-      "healthy": "Healthy",
+      "healthy": "No issue observed",
       "ondemand": "On demand",
-      "inactive": "Inactive"
+      "inactive": "Inactive",
+      "unknown": "Insufficient evidence"
     },
     "ConsecutiveFailures": "Consecutive failures",
     "RetainedRecords": "Retained executions",
@@ -208,17 +208,14 @@
     "DurationSample": "{0} measured completions in the past 30 days",
     "RetainedHistory": "Retained history",
     "RetainedHistoryDescription": "Current durable records. Retention limits apply to terminal history.",
-    "PublicationNotHeartbeat": "Definition publication time, not a worker heartbeat.",
     "ServingHost": "Serving host",
     "LocallyReady": "Locally ready",
-    "LocalReadyFinding": "Scheduling and worker cycles are ready. This host publishes {0} present definitions; claims, leases and outcomes pass through the shared durable store.",
-    "LocalUnreadyFinding": "One or more local cycles are not ready. Inspect their current diagnostics before admitting more work.",
     "RuntimePath": "Local scheduling and execution path",
-    "MaterializeDescription": "Materialize recurring occurrences",
-    "DurableDescription": "Queue, leases and retained evidence",
-    "ClaimDescription": "Claim compatible queued work",
-    "Poll": "Poll interval",
-    "ViewQueue": "View queue",
+    "MaterializeDescription": "Advance owner schedules under a lease",
+    "DurableDescription": "Shared queue & definitions",
+    "ClaimDescription": "Claim executions · renew leases",
+    "Poll": "Poll",
+    "ViewQueue": "View scope queue",
     "Slots": "{0} of {1} worker slots in use",
     "PublicationsDescription": "Durable definition footprints across this scheduler scope.",
     "StalePublications": "{0} owner publications are stale",
@@ -228,7 +225,6 @@
     "RunningQueued": "Running / queued",
     "PublicationCount": "{0} of {1} owners",
     "PublicationAge": "Observation age · threshold {0}",
-    "CoordinationEvidence": "Coordinator leases and maintenance evidence",
     "PublicationFilters": {
       "Title": "Publication freshness",
       "all": "All",
@@ -262,7 +258,7 @@
     "RunNow": "Run now",
     "PauseSchedule": "Pause schedule",
     "ResumeSchedule": "Resume schedule",
-    "EditPolicy": "Edit operator policy",
+    "EditPolicy": "Edit operational policy",
     "AttemptsUnit": "attempts",
     "ActiveUnit": "active",
     "JobActiveFinding": "{0} executions are active. Check their elapsed duration and leases below; future occurrences remain governed by the current schedule and policy.",
@@ -290,12 +286,15 @@
       "ZoneHelp": "The scheduler owns this time zone. All planned occurrences use it.",
       "Paused": "Scheduling is paused. Preview shows matching occurrences; saving does not resume scheduling.",
       "Absent": "This definition is no longer published. Saving an override does not republish it or start executions.",
-      "Note": "Saving affects future scheduling. Existing executions and history stay intact. Capacity may still skip a planned occurrence."
+      "Note": "Saving affects future scheduling. Existing executions and history stay intact. Capacity may still skip a planned occurrence.",
+      "Title": "Edit schedule"
     },
     "ElapsedDuration": "Elapsed time",
     "RunningDurationNote": "Timeout {0} · lease until {1}",
-    "RecordedDurationNote": "Recorded elapsed interval between start and completion.",
-    "ReadinessUnknown": "Local readiness unavailable"
+    "RecordedDurationNote": "From the retained start time to completion; may include retry waits.",
+    "ReadinessUnknown": "Local readiness unavailable",
+    "LocalLoopsReady": "Local loops ready",
+    "DefinitionObservationNote": "When this definition record was last written or confirmed. See runtime for the latest owner manifest observation."
   },
   "Access": {
     "Checking": "Checking scheduler access…",
@@ -310,7 +309,6 @@
     "Save": "Save policy",
     "Saving": "Saving…",
     "Submitting": "Submitting…",
-    "Close": "Close",
     "Keep": "Keep execution",
     "NotAvailable": "Not available",
     "RunningDuration": "{0} and running",
@@ -404,19 +402,18 @@
       "PageSize": "Rows per page"
     },
     "Columns": {
-      "Definition": "Definition",
+      "Definition": "Job / owner",
       "Owner": "Owner",
       "Schedule": "Schedule",
-      "NextRun": "Next run",
-      "LastRun": "Last run",
+      "NextRun": "Next planned",
+      "LastRun": "Latest execution",
       "Actions": "Actions"
     },
     "Actions": {
-      "Run": "Run job now",
+      "Run": "Run",
       "Trigger": "Run through the active job definition",
-      "Details": "Open job details",
-      "Pause": "Pause recurring materialization",
-      "Resume": "Resume recurring materialization",
+      "Pause": "Pause",
+      "Resume": "Resume",
       "PauseUnavailableManual": "Automatic materialization is already suppressed by Manual mode. Use Run job now for an explicit execution.",
       "RunDuringManual": "Run job now remains available because explicit admission does not advance the recurring cursor.",
       "PauseSelected": "Pause selected",
@@ -430,7 +427,6 @@
       "Exhausted": "Schedule exhausted"
     },
     "Policy": {
-      "Enabled": "Policy enabled",
       "Paused": "Policy paused"
     },
     "Lifecycle": {
@@ -509,7 +505,7 @@
     "MaxDaysHelp": "Leave empty to inherit no age limit.",
     "Saved": "Operational policy saved.",
     "UnsavedChanges": "Unsaved operator changes",
-    "NoChanges": "No policy changes",
+    "NoChanges": "No changes",
     "Provenance": {
       "Declared": "Declared / scheduler default",
       "Override": "Operator override",
@@ -755,7 +751,8 @@
       "JobKey": "Job key",
       "OwnerObserved": "Owner last observed",
       "Presence": "Declaration presence",
-      "Present": "Present"
+      "Present": "Present",
+      "DefinitionObserved": "Definition record confirmed"
     },
     "LatestExecution": {
       "Title": "Latest execution",
@@ -902,7 +899,8 @@
       "Duration": "Duration",
       "Attempts": "Attempts / retries",
       "Worker": "Lease owner",
-      "State": "State"
+      "State": "State",
+      "PlannedOrRecorded": "Planned / recorded"
     },
     "Actions": {
       "Details": "Inspect execution",
@@ -919,7 +917,8 @@
       "Failed": "Cancellation could not be persisted.",
       "Cancelled": "The queued execution was cancelled.",
       "AlreadyTerminal": "The execution was already terminal.",
-      "NotFound": "The execution no longer exists."
+      "NotFound": "The execution no longer exists.",
+      "Pending": "Cancellation requested"
     },
     "SnapshotUnavailable": "Execution records are unavailable. Refresh to try again.",
     "SnapshotPending": "Loading execution records…",
@@ -964,7 +963,7 @@
     "Created": "Recorded time",
     "Started": "Started at",
     "Completed": "Completed at",
-    "Duration": "Latest attempt duration",
+    "Duration": "Recorded duration",
     "ScheduledOccurrence": "Scheduled occurrence",
     "CancellationRequested": "Cancellation requested",
     "Runtime": "Claims and lease",
@@ -979,12 +978,12 @@
     "CopyFailed": "Diagnostics could not be copied.",
     "Actions": {
       "ViewCatalog": "Open job details",
-      "CopySnapshot": "Copy snapshot",
-      "More": "More execution actions"
+      "CopySnapshot": "Copy snapshot"
     },
     "RefreshFailed": "Showing the last accepted inspection. Refresh failed: {0}",
     "EvidenceScope": "Claims, failed retries, and recovered leases are separate recorded facts.",
-    "CapturedPolicyNotice": "These settings were captured at admission. Later definition or policy edits do not change this execution."
+    "CapturedPolicyNotice": "These settings were captured at admission. Later definition or policy edits do not change this execution.",
+    "Diagnostics": "Diagnostic tools"
   },
   "ExecutionHistoryKinds": {
     "StateTransition": "State transition",
@@ -1011,9 +1010,9 @@
       "Milliseconds": "{0} ms"
     },
     "Identity": {
-      "Title": "Serving host",
+      "Title": "Host identity & storage",
       "Description": "Exact identities and storage reported by the host that captured this runtime snapshot.",
-      "ManualMode": "Manual execution",
+      "ManualMode": "Local manual mode",
       "Scope": "Scheduler scope",
       "Owner": "Active workload owners",
       "WorkerInstanceId": "Worker instance",
@@ -1021,7 +1020,7 @@
       "ManualModeHelp": "Only explicitly requested work runs here. Definitions, execution history and retries use an isolated local memory store."
     },
     "Store": {
-      "Title": "Storage",
+      "Title": "Durable store",
       "Provider": "Provider",
       "NoProvider": "none"
     },
@@ -1034,7 +1033,7 @@
       "Group:History": "History cleanup and retention",
       "SchedulingPollInterval": "Scheduling poll",
       "WorkerPollInterval": "Worker poll",
-      "SnapshotSyncInterval": "Snapshot sync",
+      "SnapshotSyncInterval": "Manifest confirmation",
       "ExecutionLeaseDuration": "Execution lease",
       "ExecutionLeaseRenewInterval": "Lease renewal",
       "ExecutionRetryDelay": "Retry delay",
@@ -1056,7 +1055,10 @@
       "CoordinatorLeaseDuration": "Coordinator lease",
       "MaxConcurrentStoreOperations": "Concurrent store operations",
       "ReservedLeaseStoreOperations": "Reserved lease operation slots",
-      "StoreOperationTimeout": "Store operation budget"
+      "StoreOperationTimeout": "Store operation budget",
+      "Group": {
+        "Store": "Store operation budget"
+      }
     },
     "Plane": {
       "Scheduling": "Scheduling cycle",
@@ -1065,17 +1067,17 @@
       "NotReady": "Not ready",
       "NoMessage": "No cycle message was reported.",
       "InFlight": "Local in-flight / configured limit",
-      "LocalOnly": "Local cycle evidence does not establish the readiness of other replicas or the outcome of individual jobs.",
+      "LocalOnly": "Local readiness establishes neither owner-process liveness nor successful job outcomes.",
       "LastOwnerWork": "Owner work last completed",
       "LastRecoveryWork": "Recovery pass last completed",
       "LastCleanupWork": "Cleanup pass last completed",
       "WorkTimeHelp": "Times describe completed local work, including empty passes. Standby-only cycles do not advance them; a healthy standby may have no work time. A cleanup pass may cover only part of the scope."
     },
     "Owners": {
-      "Title": "Durable owner observations",
+      "Title": "Definition publications",
       "Description": "Definition-backed owners in this scope. A latest definition observation older than {0} is stale; this is not a process heartbeat.",
       "Owner": "Owner",
-      "Liveness": "Snapshot observation",
+      "Liveness": "Latest definition observation",
       "Empty": "No definition-backed owner is recorded in this scope.",
       "RecentObservation": "Recent observation",
       "StaleObservation": "Stale observation",
@@ -1118,12 +1120,137 @@
       "Observed": "Store observation time",
       "Unavailable": "Coordinator ownership has not been observed.",
       "Empty": "No coordinator grant is recorded in this scope.",
-      "Partition": "Partition",
-      "Holder": "Recorded worker instance",
-      "Expiry": "Lease expires",
-      "State": "At observation",
+      "Partition": "Coordination partition",
+      "Holder": "Recorded holder",
+      "Expiry": "Lease expiry",
+      "State": "State at observation",
       "Active": "Active grant",
       "Expired": "Expired grant"
+    },
+    "Coordination": {
+      "Title": "Who advances this scope",
+      "Description": "Owner coordinators advance recurring schedules. The maintenance coordinator recovers leases and runs bounded cleanup. Workers claim executions independently.",
+      "Filter": "Coordination lease filters",
+      "Clear": "Clear partition filter",
+      "OwnerRole": "Owner scheduling",
+      "MaintenanceRole": "Scope maintenance",
+      "PreviousHolder": "Historical holder; no current grant",
+      "Elapsed": "Expired {0} before observation",
+      "Remaining": "{0} remaining at observation",
+      "Collapse": "Collapse other partitions",
+      "ShowAll": "Show all {0} partitions",
+      "LastWork": "Last work completed locally",
+      "CleanupNote": "A cleanup timestamp records one bounded pass. This interface does not report completion of the whole-scope scan.",
+      "NoWork": "No local completion evidence",
+      "Manual": "Automatic work held",
+      "ManualTitle": "Isolated local execution",
+      "ManualNote": "A local in-memory store does not join shared-scope coordination. Automatic scheduling and maintenance are held.",
+      "MissingTitle": "Coordinator evidence unavailable",
+      "MissingNote": "The replica advancing schedules cannot be determined. Local cycle readiness remains independent evidence.",
+      "ManualAdmission": "Explicit requests create executions",
+      "ManualStore": "Local in-memory store",
+      "ManualQueue": "Local definitions and explicit runs",
+      "DutiesTitle": "Work assigned to this host",
+      "ScheduleDuty": "Recurring schedules",
+      "MaintenanceDuty": "Recovery & cleanup",
+      "DutyStates": {
+        "active": "This host",
+        "standby": "Another replica",
+        "expired": "Lease expired",
+        "none": "No local publication",
+        "unobserved": "Not yet known",
+        "manual": "Disabled"
+      },
+      "OwnerDuty": {
+        "active": "Advances {0} of {1} owners, adding due recurring work to the execution queue.",
+        "standby": "Other replicas advance recurring schedules. This host is on standby.",
+        "expired": "{0} of {1} owner leases have expired. No valid local grant was observed.",
+        "none": "This host publishes no job definitions and does not advance recurring schedules.",
+        "unobserved": "No coordination observation is available to identify who advances recurring schedules.",
+        "manual": "Automatic schedules are disabled. Run now remains available in the job catalog."
+      },
+      "MaintenanceDutyNote": {
+        "active": "This host recovers expired execution leases and cleans history in bounded passes.",
+        "standby": "Another replica handles recovery and cleanup. This host is on standby.",
+        "expired": "The maintenance lease has expired. No valid holder was observed.",
+        "unobserved": "No maintenance lease observation is available to identify the responsible replica.",
+        "manual": "Lease recovery and history cleanup are disabled. Execution records stay in local memory."
+      },
+      "Publication": "Declaration manifest",
+      "PublishedAt": "Current manifest first published",
+      "ManifestHash": "Manifest fingerprint",
+      "Unavailable": "Unavailable",
+      "PublicationNote": "Confirming an unchanged manifest updates its observation only. Its original publication time and fingerprint remain unchanged.",
+      "OwnerKeys": "Logical owners published here",
+      "FallbackOwner": "Fallback owner",
+      "NotOwnerProcess": "Logical ownership is independent of process identity; one host can publish several owners.",
+      "ManualOwners": "Published owners in this isolated local store. Names open their local jobs.",
+      "StoreBudget": "Store operation budgets",
+      "StoreBudgetNote": "These limits apply to this process. Reserved slots protect renewal and finalization; they are not free-connection counts or measured throughput.",
+      "Filters": {
+        "all": "All",
+        "local": "Held locally",
+        "remote": "Held elsewhere",
+        "expired": "Expired"
+      },
+      "States": {
+        "active": "Held locally",
+        "standby": "Held by another replica",
+        "expired": "Expired"
+      },
+      "ObservationNote": "Validity is evaluated at this store observation, without a browser countdown. Refresh for new evidence.",
+      "NoMatch": "No matching coordination partitions"
+    },
+    "Finding": {
+      "Automatic": "On the latest cycle, scheduling is {0} and execution is {1}. This host publishes {2} job definitions.",
+      "Manual": "Using a {0}, execution is {1}. This host publishes {2} job definitions for explicit execution only.",
+      "Ready": "ready",
+      "NotReady": "not ready",
+      "Attention": "Inspect local cycles",
+      "ManualNote": "Execution affects this local environment only. Automatic recurring schedules and maintenance are disabled."
     }
+  },
+  "Architecture": {
+    "Unknown": "Insufficient evidence",
+    "UnknownReason": "The sample does not cover the required evidence",
+    "EvidenceTitle": "Some jobs cannot be fully assessed",
+    "EvidenceBody": "{0} present jobs lack sufficient evidence for assessment. Confirmed failures and active executions remain visible.",
+    "InspectUnknown": "Inspect unassessed jobs",
+    "SampleLimited": "Only part of the retained query was returned",
+    "SampleUnavailable": "Historical assessment sample unavailable",
+    "SampleNote": "Query coverage and complete historical retention are different. No issue observed does not establish success across all history.",
+    "HistoryTitle": "History completeness unverified",
+    "HistoryNote": "Counts include retained records only. No verified history boundary is available; an empty interval does not establish that no execution occurred.",
+    "Cursor": "Durable schedule",
+    "Preview": "Cron occurrence preview",
+    "PreviewNote": "These occurrences are calculated from the effective expression and time bounds, not queued executions. Coordination, suspension and capacity still govern admission.",
+    "Schedule": {
+      "Scheduled": "Scheduled",
+      "AwaitingSynchronization": "Awaiting synchronization",
+      "Suspended": "Automatic scheduling suspended",
+      "Exhausted": "Schedule exhausted",
+      "NotRecurring": "On demand",
+      "Unpublished": "Unpublished"
+    },
+    "ScheduleHelp": {
+      "Scheduled": "From the durable cursor; coordinator progress and capacity checks still govern admission.",
+      "AwaitingSynchronization": "The definition is published, but its durable cursor has not been created. Inspect its owner coordinator.",
+      "Suspended": "Automatic recurring admission is suspended. An explicit execution can still be requested.",
+      "Exhausted": "No later occurrence exists within the current expression and time bounds. Inspect the schedule.",
+      "NotRecurring": "An explicit trigger creates an execution.",
+      "Unpublished": "New admission is rejected; existing policy and history remain available."
+    },
+    "OperatorPause": "Operator policy",
+    "ManualPause": "Local manual mode",
+    "InspectCoordinator": "Inspect coordination",
+    "StartBound": "Start bound",
+    "EndBound": "End bound",
+    "Unbounded": "Not set",
+    "ManualNote": "This is an isolated local in-memory store. Automatic scheduling, lease recovery and history cleanup are held. Explicit execution affects this local environment only.",
+    "AtLeastStreak": "At least {0} consecutive failures",
+    "UnknownNote": "Some jobs have insufficient retained execution evidence to assess their standing.",
+    "BoundaryTitle": "Schedule time boundaries",
+    "BoundaryHelp": "Enter times in the scheduler time zone. Inherit, remove, and explicit time are distinct overrides.",
+    "CursorNote": "Current state and the next occurrence come from the stored snapshot. Cron previews are calculated separately."
   }
 }

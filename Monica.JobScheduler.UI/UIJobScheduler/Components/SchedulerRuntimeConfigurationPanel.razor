@@ -38,6 +38,11 @@
                 <div><dt>@L["Runtime:Config:MaxClaimBatchSize"]</dt><dd>@c.MaxClaimBatchSize</dd></div>
                 <div><dt>@L["Runtime:Config:MaxRecurringMaterializationsPerCycle"]</dt><dd>@c.MaxRecurringMaterializationsPerCycle</dd></div>
                 <div><dt>@L["Runtime:Config:MaxExpiredLeaseRecoveriesPerCycle"]</dt><dd>@c.MaxExpiredLeaseRecoveriesPerCycle</dd></div>
+            </dl>
+        </section>
+        <section class="runtime-config__group" aria-labelledby="runtime-config-store-heading">
+            <h3 id="runtime-config-store-heading">@L["Runtime:Config:Group:Store"]</h3>
+            <dl>
                 <div><dt>@L["Runtime:Config:MaxConcurrentStoreOperations"]</dt><dd>@c.MaxConcurrentStoreOperations</dd></div>
                 <div><dt>@L["Runtime:Config:ReservedLeaseStoreOperations"]</dt><dd>@c.ReservedLeaseStoreOperations</dd></div>
                 <div><dt>@L["Runtime:Config:StoreOperationTimeout"]</dt><dd>@Interval(c.StoreOperationTimeout)</dd></div>
@@ -46,7 +51,7 @@
         <section class="runtime-config__group" aria-labelledby="runtime-config-history-heading">
             <h3 id="runtime-config-history-heading">@L["Runtime:Config:Group:History"]</h3>
             <dl>
-                <div><dt>@L["Runtime:Config:EnableHistoryCleanup"]</dt><dd>@FormatFlag(c.EnableHistoryCleanup)</dd></div>
+                <div><dt>@L["Runtime:Config:EnableHistoryCleanup"]</dt><dd>@(c.AutonomousWork ? FormatFlag(c.EnableHistoryCleanup) : L["Runtime:Coordination:Manual"])</dd></div>
                 <div><dt>@L["Runtime:Config:HistoryCleanupInterval"]</dt><dd>@Interval(c.HistoryCleanupInterval)</dd></div>
                 <div><dt>@L["Runtime:Config:MaxHistoryDeletionsPerCycle"]</dt><dd>@c.MaxHistoryDeletionsPerCycle</dd></div>
                 <div><dt>@L["Runtime:Config:MaxExecutionHistoryEntriesPerExecution"]</dt><dd>@c.MaxExecutionHistoryEntriesPerExecution</dd></div>
@@ -55,6 +60,7 @@
             </dl>
         </section>
     </div>
+    <p class="runtime-config__note"><MoIcon Icon="@MoIcons.Info" Size="16px" />@L["Runtime:Coordination:StoreBudgetNote"]</p>
 </section>
 
 @code {
