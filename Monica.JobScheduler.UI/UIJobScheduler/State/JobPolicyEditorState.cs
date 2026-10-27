@@ -41,15 +41,7 @@ internal sealed class JobPolicyEditorState
     {
         Definition = definition;
         DisabledOverride = definition.Policy.Overrides.DisabledOverride;
-        IsDisplayNameInherited = definition.Policy.Overrides.DisplayNameOverride is null;
-        DisplayNameDraft = definition.Policy.Overrides.DisplayNameOverride ?? string.Empty;
-        DescriptionMode = definition.Policy.Overrides.DescriptionOverride switch
-        {
-            null => JobDescriptionOverrideMode.Inherit,
-            { Value: null } => JobDescriptionOverrideMode.Clear,
-            _ => JobDescriptionOverrideMode.Value
-        };
-        DescriptionDraft = definition.Policy.Overrides.DescriptionOverride?.Value ?? string.Empty;
+        LoadIdentityDrafts(definition.Policy.Overrides);
         MaxConcurrencyOverride = definition.Policy.Overrides.MaxConcurrencyOverride;
         RetryCountOverride = definition.Policy.Overrides.RetryCountOverride;
         HasTimeoutOverride = definition.Policy.Overrides.MaxExecutionTimeoutOverride is not null;
@@ -69,11 +61,11 @@ internal sealed class JobPolicyEditorState
 
     internal bool IsDisplayNameInherited { get; private set; }
 
-    internal string DisplayNameDraft { get; private set; }
+    internal string DisplayNameDraft { get; private set; } = string.Empty;
 
     internal JobDescriptionOverrideMode DescriptionMode { get; set; }
 
-    internal string DescriptionDraft { get; set; }
+    internal string DescriptionDraft { get; set; } = string.Empty;
 
     internal int? MaxConcurrencyOverride { get; set; }
 
@@ -148,11 +140,7 @@ internal sealed class JobPolicyEditorState
         && (DescriptionMode != JobDescriptionOverrideMode.Value
             || !string.IsNullOrWhiteSpace(DescriptionDraft)
             && DescriptionDraft.Length <= JobDeclaration.DESCRIPTION_MAX_LENGTH)
-        && MaxConcurrencyOverride is null or >= 1
-        && RetryCountOverride is null or >= 0
-        && IsTimeoutValid
-        && MaxRetainedHistoryRecords is null or >= 0
-        && MaxRetentionDays is null or >= 1
+        && IsOperationalPolicyValid
         && (Schedule?.OverrideExpression is null
             || Schedule.OverrideExpression.Length <= JobDeclaration.CRON_EXPRESSION_MAX_LENGTH)
         && (Schedule is null || Schedule.AreBoundariesValid && Schedule.Evaluation.IsValid);
@@ -162,6 +150,31 @@ internal sealed class JobPolicyEditorState
                                 || CreateOverrides() != Definition.Policy.Overrides;
 
     internal bool CanSave => IsValid && HasChanges && !HasScheduleTypeConflict;
+
+    /// <summary>Counts changes to the six execution and retention fields exposed by the policy-only editor.</summary>
+    internal int OperationalPolicyChangeCount
+    {
+        get
+        {
+            var baseline = Definition.Policy.Overrides;
+            return (DisabledOverride != baseline.DisabledOverride ? 1 : 0)
+                   + (MaxConcurrencyOverride != baseline.MaxConcurrencyOverride ? 1 : 0)
+                   + (RetryCountOverride != baseline.RetryCountOverride ? 1 : 0)
+                   + ((HasTimeoutOverride ? EffectiveTimeout : (TimeSpan?)null) != baseline.MaxExecutionTimeoutOverride ? 1 : 0)
+                   + (MaxRetainedHistoryRecords != baseline.MaxRetainedHistoryRecords ? 1 : 0)
+                   + (MaxRetentionDays != baseline.MaxRetentionDays ? 1 : 0);
+        }
+    }
+
+    /// <summary>Ignores hidden identity and schedule drafts when deciding whether operational edits can be saved.</summary>
+    internal bool CanSaveOperationalPolicy => IsOperationalPolicyValid && OperationalPolicyChangeCount > 0;
+
+    private bool IsOperationalPolicyValid =>
+        MaxConcurrencyOverride is null or >= 1
+        && RetryCountOverride is null or >= 0
+        && IsTimeoutValid
+        && MaxRetainedHistoryRecords is null or >= 0
+        && MaxRetentionDays is null or >= 1;
 
     internal static JobPolicyEditorState Create(
         JobDefinition definition,
@@ -194,6 +207,34 @@ internal sealed class JobPolicyEditorState
     {
         HasTimeoutOverride = false;
         SetTimeoutParts(Definition.Declaration.MaxExecutionTimeout);
+    }
+
+    /// <summary>
+    /// Applies a nullable total-minute draft, retaining fractional seconds at TimeSpan tick precision.
+    /// Null inherits the declaration; invalid or out-of-range input leaves the accepted draft unchanged.
+    /// </summary>
+    internal bool TrySetTimeoutMinutes(decimal? totalMinutes)
+    {
+        if (totalMinutes is null)
+        {
+            ResetTimeout();
+            return true;
+        }
+
+        if (totalMinutes <= 0 || totalMinutes > TimeSpan.MaxValue.Ticks / (decimal)TimeSpan.TicksPerMinute)
+        {
+            return false;
+        }
+
+        var ticks = decimal.Round(totalMinutes.Value * TimeSpan.TicksPerMinute, 0, MidpointRounding.ToEven);
+        if (ticks < 1 || ticks > long.MaxValue)
+        {
+            return false;
+        }
+
+        HasTimeoutOverride = true;
+        SetTimeoutParts(TimeSpan.FromTicks((long)ticks));
+        return true;
     }
 
     internal void ResetAll()
@@ -230,10 +271,41 @@ internal sealed class JobPolicyEditorState
         };
     }
 
+    /// <summary>
+    /// Replaces only execution and retention overrides, retaining the exact stored identity and schedule values.
+    /// Hidden schedule projection, validation, or conflict state does not participate in this change.
+    /// </summary>
+    internal JobPolicyChange CreateOperationalPolicyChange()
+    {
+        if (!IsOperationalPolicyValid)
+        {
+            throw new InvalidOperationException("An invalid operational-policy draft cannot be persisted.");
+        }
+
+        return new()
+        {
+            Overrides = Definition.Policy.Overrides with
+            {
+                DisabledOverride = DisabledOverride,
+                MaxConcurrencyOverride = MaxConcurrencyOverride,
+                RetryCountOverride = RetryCountOverride,
+                MaxExecutionTimeoutOverride = HasTimeoutOverride ? EffectiveTimeout : null,
+                MaxRetainedHistoryRecords = MaxRetainedHistoryRecords,
+                MaxRetentionDays = MaxRetentionDays
+            },
+            ExpectedConcurrencyStamp = ExpectedConcurrencyStamp
+        };
+    }
+
+    /// <summary>
+    /// Rebases edited fields onto the latest policy. Policy-only editors adopt hidden identity and schedule values
+    /// directly so their projected drafts do not create conflicts outside the edited fields.
+    /// </summary>
     internal void RebaseAfterConflict(
         JobDefinition latestDefinition,
         JobOperationalSummary? operationalSummary,
-        DateTimeOffset observedAtUtc)
+        DateTimeOffset observedAtUtc,
+        bool operationalPolicyOnly = false)
     {
         ArgumentNullException.ThrowIfNull(latestDefinition);
         var previousDefinition = Definition;
@@ -246,8 +318,11 @@ internal sealed class JobPolicyEditorState
             DisabledOverride,
             previousOverrides.DisabledOverride,
             latestOverrides.DisabledOverride);
-        MergeDisplayName(previousOverrides.DisplayNameOverride, latestOverrides.DisplayNameOverride);
-        MergeDescription(previousOverrides.DescriptionOverride, latestOverrides.DescriptionOverride);
+        if (!operationalPolicyOnly)
+        {
+            MergeDisplayName(previousOverrides.DisplayNameOverride, latestOverrides.DisplayNameOverride);
+            MergeDescription(previousOverrides.DescriptionOverride, latestOverrides.DescriptionOverride);
+        }
         MaxConcurrencyOverride = MergeOverride(
             MaxConcurrencyOverride,
             previousOverrides.MaxConcurrencyOverride,
@@ -270,6 +345,17 @@ internal sealed class JobPolicyEditorState
             latestOverrides.MaxRetentionDays);
         Definition = latestDefinition;
         HasConflict = true;
+
+        if (operationalPolicyOnly)
+        {
+            LoadIdentityDrafts(latestOverrides);
+            DiscardScheduleDraft();
+            Schedule = CreateScheduleDraft(latestDefinition, operationalSummary, observedAtUtc);
+            DormantScheduleOverride = latestDefinition.Declaration.JobType == JobType.Triggered
+                ? latestOverrides.ScheduleOverride
+                : null;
+            return;
+        }
 
         if (latestDefinition.Declaration.JobType == JobType.Recurring)
         {
@@ -384,6 +470,19 @@ internal sealed class JobPolicyEditorState
         TimeoutMinutes = value.Minutes;
         TimeoutSeconds = value.Seconds;
         _timeoutSubsecondTicks = value.Ticks % TimeSpan.TicksPerSecond;
+    }
+
+    private void LoadIdentityDrafts(JobPolicyOverrides overrides)
+    {
+        IsDisplayNameInherited = overrides.DisplayNameOverride is null;
+        DisplayNameDraft = overrides.DisplayNameOverride ?? string.Empty;
+        DescriptionMode = overrides.DescriptionOverride switch
+        {
+            null => JobDescriptionOverrideMode.Inherit,
+            { Value: null } => JobDescriptionOverrideMode.Clear,
+            _ => JobDescriptionOverrideMode.Value
+        };
+        DescriptionDraft = overrides.DescriptionOverride?.Value ?? string.Empty;
     }
 
     private void MergeDisplayName(string? previousOverride, string? latestOverride)

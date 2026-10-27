@@ -1,18 +1,17 @@
 @using Monica.UI.Shared.Components.Dialogs
 @using Monica.JobScheduler.UI.Localization
 
-<MudDialog Class="@(ScheduleOnly ? "scheduler-schedule-dialog" : null)" Style="@(ScheduleOnly ? "width:760px;max-width:calc(100vw - 32px)" : null)" Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
+<MudDialog Class="@(ScheduleOnly ? "scheduler-schedule-dialog" : "scheduler-policy-dialog")"
+           Style="width:760px;max-width:calc(100vw - 32px)"
+           Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
     <TitleContent>
         <div class="policy-workbench__title @(ScheduleOnly ? "policy-workbench__title--cron" : null)">
-            <div class="policy-workbench__title-icon">
-                <MoIcon Icon="@(ScheduleOnly ? MoIcons.CalendarDays : MoIcons.Sliders)" Size="1.5rem" />
+            <div class="policy-workbench__title-icon" aria-hidden="true">
+                <MoIcon Icon="@(ScheduleOnly ? MoIcons.CalendarDays : MoIcons.Sliders)" Size="18px" />
             </div>
             <div>
                 <MoDialogHeading Text="@L[ScheduleOnly ? "Workspace:CronEditor:Title" : "Policy:Title"]" />
-                <MudText Typo="Typo.body2">
-                    @(_state?.EffectiveDisplayName ?? Definition.Declaration.JobName)
-                </MudText>
-                @if (!ScheduleOnly) { <code title="@((_state?.Definition ?? Definition).Declaration.JobKey)">@((_state?.Definition ?? Definition).Declaration.JobKey)</code> }
+                <MudText Typo="Typo.body2">@(_state?.EffectiveDisplayName ?? Definition.Declaration.JobName)</MudText>
             </div>
         </div>
     </TitleContent>
@@ -20,27 +19,9 @@
         @if (_state is not null)
         {
             <div class="policy-workbench @(ScheduleOnly ? "policy-workbench--cron" : null)">
-                @if (!ScheduleOnly) {
-                <header class="policy-workbench__identity">
-                    @foreach (var fact in IdentityFacts)
-                    {
-                        <div>
-                            <span>@fact.Label</span>
-                            <code title="@fact.Value">@fact.Value</code>
-                        </div>
-                    }
-                </header>
-
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true"
-                          Icon="@MoIcons.Lock">
-                    @L["Policy:ImmutableNotice"]
-                </MudAlert>
-
-                }
                 @if (_state.HasConflict)
                 {
-                    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Dense="true"
-                              Icon="@MoIcons.Merge">
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Dense="true" Icon="@MoIcons.Merge">
                         @L["Policy:Conflict:DraftsPreserved",
                             _state.ConflictPreviousPolicyRevision ?? L["Common:NotAvailable"].Value,
                             _state.Definition.Policy.ConcurrencyStamp]
@@ -53,253 +34,185 @@
                     }
                 }
 
-                @if (!ScheduleOnly) {
-                <div class="policy-workbench__toolbar">
-                    <MudText Typo="Typo.body2">
-                        @L["Policy:Provenance:Help"]
-                    </MudText>
-                    <MudButton Variant="Variant.Text"
-                               StartIcon="@MoIcons.FileRestore"
-                               Disabled="@_isSaving"
-                               OnClick="ResetAll">
-                        @L[ScheduleOnly ? "Workspace:RestoreCron" : "Policy:Actions:ResetAll"]
-                    </MudButton>
-                </div>
-
-                }
-                @if (!ScheduleOnly)
+                @if (ScheduleOnly)
                 {
-                <section class="policy-section" aria-labelledby="policy-general-heading">
-                    <OperationalPolicySectionHeading HeadingId="policy-general-heading"
-                                                     Icon="@MoIcons.BadgeId"
-                                                     Title="@L["Policy:Sections:General"]"
-                                                     Description="@L["Policy:Sections:GeneralHelp"]" />
-                    <OperationalPolicyProvenanceHeader />
-
-                    <div class="policy-row">
-                        <div class="policy-row__label">@L["Policy:Fields:Enabled"]</div>
-                        <div data-label="@L["Policy:Provenance:Declared"]">
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
-                                     Color="@(!_state.Definition.Declaration.IsDisabledByDefault ? Color.Success : Color.Warning)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">
-                                @EnabledLabel(!_state.Definition.Declaration.IsDisabledByDefault)
-                            </MudChip>
-                        </div>
-                        <div class="policy-row__override" data-label="@L["Policy:Provenance:Override"]">
-                            <MudSelect T="bool?" Value="@_state.DisabledOverride"
-                                       ValueChanged="SetDisabledOverride"
-                                       Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
-                                       aria-label="@L["Policy:Fields:Enabled"]" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                                <MudSelectItem T="bool?" Value="@(null)">@L["Policy:InheritDefault"]</MudSelectItem>
-                                <MudSelectItem T="bool?" Value="@(false)">@L["Policy:ForceEnabled"]</MudSelectItem>
-                                <MudSelectItem T="bool?" Value="@(true)">@L["Policy:ForceDisabled"]</MudSelectItem>
-                            </MudSelect>
-                        </div>
-                        <div data-label="@L["Policy:Provenance:Effective"]">
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
-                                     Color="@(!_state.EffectiveDisabled ? Color.Success : Color.Warning)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">
-                                @EnabledLabel(!_state.EffectiveDisabled)
-                            </MudChip>
-                        </div>
-                    </div>
-
-                    <div class="policy-row">
-                        <div class="policy-row__label">@L["Policy:Fields:DisplayName"]</div>
-                        <div class="policy-row__text" data-label="@L["Policy:Provenance:Declared"]">@_state.Definition.Declaration.JobName</div>
-                        <div class="policy-row__override policy-row__override--with-reset" data-label="@L["Policy:Provenance:Override"]">
-                            <MudTextField T="string"
-                                          Value="@(_state.IsDisplayNameInherited ? null : _state.DisplayNameDraft)"
-                                          ValueChanged="SetDisplayName"
-                                           Placeholder="@_state.Definition.Declaration.JobName"
-                                           MaxLength="@JobDeclaration.JOB_NAME_MAX_LENGTH"
-                                           Immediate="true"
-                                           Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
-                                          Error="@(!_state.IsDisplayNameInherited
-                                                   && (string.IsNullOrWhiteSpace(_state.DisplayNameDraft)
-                                                       || _state.DisplayNameDraft.Length > JobDeclaration.JOB_NAME_MAX_LENGTH))"
-                                          ErrorText="@L["Policy:Validation:DisplayNameRequired"]"
-                                          aria-label="@L["Policy:Fields:DisplayName"]" />
-                            <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small"
-                                           Disabled="@(_isSaving || _state.IsDisplayNameInherited)"
-                                           OnClick="ResetDisplayName"
-                                           aria-label="@L["Policy:Actions:ResetField"]" />
-                        </div>
-                        <div class="policy-row__text" data-label="@L["Policy:Provenance:Effective"]">@_state.EffectiveDisplayName</div>
-                    </div>
-
-                    <div class="policy-row policy-row--multiline">
-                        <div class="policy-row__label">@L["Policy:Fields:Description"]</div>
-                        <div class="policy-row__text" data-label="@L["Policy:Provenance:Declared"]">@DisplayText(_state.Definition.Declaration.Description)</div>
-                        <div class="policy-row__override" data-label="@L["Policy:Provenance:Override"]">
-                            <MudSelect T="JobDescriptionOverrideMode" Value="@_state.DescriptionMode" ValueChanged="SetDescriptionMode"
-                                       Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
-                                       Label="@L["Policy:Fields:DescriptionMode"]" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                                @foreach (var mode in Enum.GetValues<JobDescriptionOverrideMode>())
-                                {
-                                    <MudSelectItem T="JobDescriptionOverrideMode" Value="@mode">
-                                        @L[$"Policy:DescriptionModes:{mode}"]
-                                    </MudSelectItem>
-                                }
-                            </MudSelect>
-                            @if (_state.DescriptionMode == JobDescriptionOverrideMode.Value)
-                            {
-                                <MudTextField T="string" Value="@_state.DescriptionDraft" ValueChanged="SetDescription"
-                                              Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                              MaxLength="@JobDeclaration.DESCRIPTION_MAX_LENGTH"
-                                              Error="@(string.IsNullOrWhiteSpace(_state.DescriptionDraft)
-                                                       || _state.DescriptionDraft.Length > JobDeclaration.DESCRIPTION_MAX_LENGTH)"
-                                              ErrorText="@L["Policy:Validation:DescriptionRequired"]"
-                                              Disabled="@_isSaving" Label="@L["Policy:Fields:Description"]" />
-                            }
-                        </div>
-                        <div class="policy-row__text" data-label="@L["Policy:Provenance:Effective"]">@DisplayText(_state.EffectiveDescription)</div>
-                    </div>
-                </section>
-
-                }
-                @if (_state.Schedule is { } schedule)
-                {
-                    <section class="@(ScheduleOnly ? "policy-cron-section" : "policy-section")" aria-label="@L["Policy:Sections:Schedule"]">
-                        @if (!ScheduleOnly) {
-                        <OperationalPolicySectionHeading HeadingId="policy-schedule-heading"
-                                                         Icon="@MoIcons.CalendarSync"
-                                                         Title="@L["Policy:Sections:Schedule"]"
-                                                         Description="@L["Policy:Sections:ScheduleHelp"]" />
-                        }
-                        <OperationalPolicyScheduleEditor Draft="@schedule" Compact="@ScheduleOnly" CurrentExpression="@_state.Definition.EffectiveConfiguration.Schedule?.CronExpression" IsPresent="@_state.Definition.IsPresent"
-                                                         Disabled="@_isSaving"
-                                                         IsPaused="@_state.EffectiveDisabled"
-                                                         Changed="DraftChanged" />
-                    </section>
-                }
-
-                @if (_state.HasScheduleTypeConflict)
-                {
-                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined"
-                              Icon="@MoIcons.SyncOff">
-                        <div class="policy-workbench__schedule-conflict">
-                            <span>@L["Policy:Conflict:ScheduleTypeChanged"]</span>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Warning"
-                                       OnClick="DiscardScheduleDraft" Disabled="@_isSaving">
-                                @L["Policy:Conflict:DiscardScheduleDraft"]
-                            </MudButton>
-                        </div>
-                    </MudAlert>
-                }
-
-                @if (!ScheduleOnly)
-                {
-                <section class="policy-section" aria-labelledby="policy-execution-heading">
-                    <OperationalPolicySectionHeading HeadingId="policy-execution-heading"
-                                                     Icon="@MoIcons.Gauge"
-                                                     Title="@L["Policy:Sections:Execution"]"
-                                                     Description="@L["Policy:Sections:ExecutionHelp"]" />
-                    <OperationalPolicyProvenanceHeader />
-
-                    <OperationalPolicyNumericRow Label="@L["Policy:Fields:MaxConcurrency"]"
-                                                 Declared="@_state.Definition.Declaration.MaxConcurrency"
-                                                 Value="@_state.MaxConcurrencyOverride"
-                                                 ValueChanged="SetMaxConcurrency"
-                                                 Effective="@_state.EffectiveMaxConcurrency"
-                                                 Minimum="1"
-                                                 Disabled="@_isSaving" />
-
-                    <OperationalPolicyNumericRow Label="@L["Policy:Fields:RetryCount"]"
-                                                 Declared="@_state.Definition.Declaration.RetryCount"
-                                                 Value="@_state.RetryCountOverride"
-                                                 ValueChanged="SetRetryCount"
-                                                 Effective="@_state.EffectiveRetryCount"
-                                                 Minimum="0"
-                                                 Disabled="@_isSaving" />
-
-                    <div class="policy-row policy-row--timeout">
-                        <div class="policy-row__label">@L["Policy:Fields:ExecutionTimeout"]</div>
-                        <div data-label="@L["Policy:Provenance:Declared"]"><code>@FormatDuration(_state.Definition.Declaration.MaxExecutionTimeout)</code></div>
-                        <div class="policy-row__override policy-row__override--with-reset" data-label="@L["Policy:Provenance:Override"]">
-                            @if (_state.HasTimeoutOverride)
-                            {
-                                <div class="policy-row__timeout-value">
-                                <div class="policy-row__timeout-fields">
-                                    <MudNumericField T="int" Value="@_state.TimeoutHours" ValueChanged="SetTimeoutHours"
-                                                     Label="@L["Policy:Fields:Hours"]" Min="0"
-                                                     Max="@_state.MaximumTimeoutHours"
-                                                     Error="@(!_state.IsTimeoutValid)"
-                                                     ErrorText="@L["Policy:Validation:Timeout"]"
-                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving" />
-                                    <MudNumericField T="int" Value="@_state.TimeoutMinutes" ValueChanged="SetTimeoutMinutes"
-                                                     Label="@L["Policy:Fields:Minutes"]" Min="0" Max="59"
-                                                     Error="@(!_state.IsTimeoutValid)"
-                                                     ErrorText="@L["Policy:Validation:Timeout"]"
-                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving" />
-                                    <MudNumericField T="int" Value="@_state.TimeoutSeconds" ValueChanged="SetTimeoutSeconds"
-                                                     Label="@L["Policy:Fields:Seconds"]" Min="0" Max="59"
-                                                     Error="@(!_state.IsTimeoutValid)"
-                                                     ErrorText="@L["Policy:Validation:Timeout"]"
-                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving" />
-                                </div>
-                                @if (_state.HasSubsecondTimeoutPrecision)
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Warning">
-                                        @L["Policy:Execution:SubsecondPrecisionPreserved"]
-                                    </MudText>
-                                }
-                                </div>
-                            }
-                            else
-                            {
-                                <MudButton Variant="Variant.Outlined" OnClick="EnableTimeoutOverride" Disabled="@_isSaving">
-                                    @L["Policy:Actions:Override"]
+                    @if (_state.Schedule is { } schedule)
+                    {
+                        <section class="policy-cron-section" aria-label="@L["Policy:Sections:Schedule"]">
+                            <OperationalPolicyScheduleEditor Draft="@schedule" Compact="true"
+                                                             CurrentExpression="@_state.Definition.EffectiveConfiguration.Schedule?.CronExpression"
+                                                             IsPresent="@_state.Definition.IsPresent"
+                                                             Disabled="@_isSaving"
+                                                             IsPaused="@_state.EffectiveDisabled"
+                                                             Changed="DraftChanged" />
+                        </section>
+                    }
+                    @if (_state.HasScheduleTypeConflict)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.SyncOff">
+                            <div class="policy-workbench__schedule-conflict">
+                                <span>@L["Policy:Conflict:ScheduleTypeChanged"]</span>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                                           OnClick="DiscardScheduleDraft" Disabled="@_isSaving">
+                                    @L["Policy:Conflict:DiscardScheduleDraft"]
                                 </MudButton>
-                            }
-                            <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small"
-                                           Disabled="@(_isSaving || !_state.HasTimeoutOverride)"
-                                           OnClick="ResetTimeout"
-                                           aria-label="@L["Policy:Actions:ResetField"]" />
-                        </div>
-                        <div data-label="@L["Policy:Provenance:Effective"]"><code>@FormatDuration(_state.EffectiveTimeout)</code></div>
-                    </div>
-
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Icon="@MoIcons.Info">
-                        @L["Policy:Execution:ProspectiveNotice"]
-                    </MudAlert>
-                </section>
-
-                <section class="policy-section" aria-labelledby="policy-retention-heading">
-                    <OperationalPolicySectionHeading HeadingId="policy-retention-heading"
-                                                     Icon="@MoIcons.History"
-                                                     Title="@L["Policy:Sections:Retention"]"
-                                                     Description="@L["Policy:Sections:RetentionHelp"]" />
-                    <OperationalPolicyProvenanceHeader />
-
-                    <OperationalPolicyNumericRow Label="@L["Policy:Fields:MaxRecords"]"
-                                                 Declared="@JobPolicy.DEFAULT_MAX_RETAINED_HISTORY_RECORDS"
-                                                 Value="@_state.MaxRetainedHistoryRecords"
-                                                 ValueChanged="SetMaxRecords"
-                                                 Effective="@_state.EffectiveMaxRetainedHistoryRecords"
-                                                 Minimum="0"
-                                                 Disabled="@_isSaving"
-                                                 ZeroHint="@L["Policy:Retention:ZeroUnlimited"]" />
-
-                    <div class="policy-row">
-                        <div class="policy-row__label">@L["Policy:Fields:MaxDays"]</div>
-                        <div data-label="@L["Policy:Provenance:Declared"]">@L["Policy:Values:NoLimit"]</div>
-                        <div class="policy-row__override policy-row__override--with-reset" data-label="@L["Policy:Provenance:Override"]">
-                            <MudNumericField T="int?" Value="@_state.MaxRetentionDays"
-                                             ValueChanged="SetMaxRetentionDays"
-                                             Min="1" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                             Error="@(_state.MaxRetentionDays is < 1)"
-                                             ErrorText="@L["Policy:Validation:NumericMinimum", L["Policy:Fields:MaxDays"], 1]"
-                                             Disabled="@_isSaving" Placeholder="@L["Policy:InheritDefault"]"
-                                             aria-label="@L["Policy:Fields:MaxDays"]" />
-                            <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small"
-                                           Disabled="@(_isSaving || _state.MaxRetentionDays is null)"
-                                           OnClick="ResetMaxRetentionDays"
-                                           aria-label="@L["Policy:Actions:ResetField"]" />
-                        </div>
-                        <div data-label="@L["Policy:Provenance:Effective"]">@(_state.EffectiveMaxRetentionDays is { } days ? L["Policy:Values:Days", days] : L["Policy:Values:NoLimit"])</div>
-                    </div>
-                </section>
-
+                            </div>
+                        </MudAlert>
+                    }
                 }
+                else
+                {
+                    <p class="policy-workbench__help">@L["Policy:Provenance:Help"]</p>
+                    <MudForm @ref="_policyForm" @bind-IsValid="_policyInputsValid">
+                        <div class="policy-comparison">
+                            <table class="policy-table" aria-label="@L["Policy:Title"]">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">@L["Policy:Provenance:Field"]</th>
+                                        <th scope="col">@L["Policy:Provenance:Declared"]</th>
+                                        <th scope="col">@L["Policy:Provenance:Override"]</th>
+                                        <th scope="col">@L["Policy:Provenance:Effective"]</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="@(_state.DisabledOverride.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:Enabled"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@EnabledLabel(!_state.Definition.Declaration.IsDisabledByDefault)</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-enabled" role="group" aria-label="@L["Policy:Fields:Enabled"]">
+                                                <button type="button" aria-pressed="@(_state.DisabledOverride is null ? "true" : "false")" disabled="@_isSaving" @onclick="@(() => SetDisabledOverride(null))">@L["Policy:InheritDefault"]</button>
+                                                <button type="button" aria-pressed="@(_state.DisabledOverride is false ? "true" : "false")" disabled="@_isSaving" @onclick="@(() => SetDisabledOverride(false))">@L["Policy:ForceEnabled"]</button>
+                                                <button type="button" aria-pressed="@(_state.DisabledOverride is true ? "true" : "false")" disabled="@_isSaving" @onclick="@(() => SetDisabledOverride(true))">@L["Policy:ForceDisabled"]</button>
+                                            </div>
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@EnabledLabel(!_state.EffectiveDisabled)</td>
+                                    </tr>
+                                    <tr class="@(_state.MaxConcurrencyOverride.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:MaxConcurrency"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@_state.Definition.Declaration.MaxConcurrency</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-field">
+                                                <div class="policy-field__input">
+                                                    <MudNumericField T="int?" Value="@_state.MaxConcurrencyOverride" ValueChanged="SetMaxConcurrency" Converter="@_concurrencyConverter"
+                                                                     Min="1" HideSpinButtons="true" Immediate="true"
+                                                                     Error="@(_state.MaxConcurrencyOverride is < 1)"
+                                                                     ErrorText="@L["Policy:Validation:NumericMinimum", L["Policy:Fields:MaxConcurrency"], 1]"
+                                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
+                                                                     Placeholder="@L["Policy:InheritPlaceholder"]" aria-label="@L["Policy:Fields:MaxConcurrency"]" />
+                                                </div>
+                                                @if (_state.MaxConcurrencyOverride.HasValue)
+                                                {
+                                                    <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Disabled="@_isSaving"
+                                                                   OnClick="@(() => SetMaxConcurrency(null))" aria-label="@L["Policy:Actions:ResetField"]" title="@L["Policy:Actions:ResetField"]" />
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@_state.EffectiveMaxConcurrency</td>
+                                    </tr>
+                                    <tr class="@(_state.RetryCountOverride.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:RetryCount"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@_state.Definition.Declaration.RetryCount</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-field">
+                                                <div class="policy-field__input">
+                                                    <MudNumericField T="int?" Value="@_state.RetryCountOverride" ValueChanged="SetRetryCount" Converter="@_retryConverter"
+                                                                     Min="0" HideSpinButtons="true" Immediate="true"
+                                                                     Error="@(_state.RetryCountOverride is < 0)"
+                                                                     ErrorText="@L["Policy:Validation:NumericMinimum", L["Policy:Fields:RetryCount"], 0]"
+                                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
+                                                                     Placeholder="@L["Policy:InheritPlaceholder"]" aria-label="@L["Policy:Fields:RetryCount"]" />
+                                                </div>
+                                                @if (_state.RetryCountOverride.HasValue)
+                                                {
+                                                    <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Disabled="@_isSaving"
+                                                                   OnClick="@(() => SetRetryCount(null))" aria-label="@L["Policy:Actions:ResetField"]" title="@L["Policy:Actions:ResetField"]" />
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@_state.EffectiveRetryCount</td>
+                                    </tr>
+                                    <tr class="@(TimeoutOverrideMinutes.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:ExecutionTimeout"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@FormatDuration(_state.Definition.Declaration.MaxExecutionTimeout)</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-field">
+                                                <div class="policy-field__input">
+                                                    <MudNumericField T="decimal?" Value="@TimeoutOverrideMinutes" ValueChanged="SetTimeoutOverrideMinutes" Converter="@_timeoutConverter"
+                                                                     HideSpinButtons="true" Immediate="true"
+                                                                     Error="@(!IsTimeoutInputValid)" ErrorText="@L["Policy:Validation:Timeout"]"
+                                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
+                                                                     Placeholder="@L["Policy:InheritPlaceholder"]" aria-label="@L["Policy:Fields:ExecutionTimeout"]" />
+                                                </div>
+                                                <span class="policy-field__unit">@L["Policy:Fields:Minutes"]</span>
+                                                @if (TimeoutOverrideMinutes.HasValue)
+                                                {
+                                                    <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Disabled="@_isSaving"
+                                                                   OnClick="@(() => SetTimeoutOverrideMinutes(null))" aria-label="@L["Policy:Actions:ResetField"]" title="@L["Policy:Actions:ResetField"]" />
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@(IsTimeoutInputValid ? FormatDuration(_state.EffectiveTimeout) : "—")</td>
+                                    </tr>
+                                    <tr class="@(_state.MaxRetainedHistoryRecords.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:MaxRecords"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@JobPolicy.DEFAULT_MAX_RETAINED_HISTORY_RECORDS</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-field">
+                                                <div class="policy-field__input">
+                                                    <MudNumericField T="int?" Value="@_state.MaxRetainedHistoryRecords" ValueChanged="SetMaxRecords" Converter="@_recordCountConverter"
+                                                                     Min="0" HideSpinButtons="true" Immediate="true"
+                                                                     Error="@(_state.MaxRetainedHistoryRecords is < 0)"
+                                                                     ErrorText="@L["Policy:Validation:NumericMinimum", L["Policy:Fields:MaxRecords"], 0]"
+                                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
+                                                                     Placeholder="@L["Policy:InheritPlaceholder"]" aria-label="@L["Policy:Fields:MaxRecords"]" />
+                                                </div>
+                                                @if (_state.MaxRetainedHistoryRecords.HasValue)
+                                                {
+                                                    <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Disabled="@_isSaving"
+                                                                   OnClick="@(() => SetMaxRecords(null))" aria-label="@L["Policy:Actions:ResetField"]" title="@L["Policy:Actions:ResetField"]" />
+                                                }
+                                            </div>
+                                            @if (_state.MaxRetainedHistoryRecords is 0)
+                                            {
+                                                <p class="policy-field__hint">@L["Policy:Retention:ZeroUnlimited"]</p>
+                                            }
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@(_state.EffectiveMaxRetainedHistoryRecords == 0 ? L["Policy:Values:NoLimit"].Value : _state.EffectiveMaxRetainedHistoryRecords.ToString())</td>
+                                    </tr>
+                                    <tr class="@(_state.MaxRetentionDays.HasValue ? "is-overridden" : null)">
+                                        <th scope="row">@L["Policy:Fields:MaxDays"]</th>
+                                        <td class="policy-table__declared" data-label="@L["Policy:Provenance:Declared"]">@L["Policy:Values:NoLimit"]</td>
+                                        <td class="policy-table__override" data-label="@L["Policy:Provenance:Override"]">
+                                            <div class="policy-field">
+                                                <div class="policy-field__input">
+                                                    <MudNumericField T="int?" Value="@_state.MaxRetentionDays" ValueChanged="SetMaxRetentionDays" Converter="@_retentionDaysConverter"
+                                                                     Min="1" HideSpinButtons="true" Immediate="true"
+                                                                     Error="@(_state.MaxRetentionDays is < 1)"
+                                                                     ErrorText="@L["Policy:Validation:NumericMinimum", L["Policy:Fields:MaxDays"], 1]"
+                                                                     Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_isSaving"
+                                                                     Placeholder="@L["Policy:InheritPlaceholder"]" aria-label="@L["Policy:Fields:MaxDays"]" />
+                                                </div>
+                                                @if (_state.MaxRetentionDays.HasValue)
+                                                {
+                                                    <MudIconButton Icon="@MoIcons.Restore" Size="Size.Small" Disabled="@_isSaving"
+                                                                   OnClick="@(() => SetMaxRetentionDays(null))" aria-label="@L["Policy:Actions:ResetField"]" title="@L["Policy:Actions:ResetField"]" />
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="policy-table__effective" data-label="@L["Policy:Provenance:Effective"]">@(_state.EffectiveMaxRetentionDays is { } days ? L["Policy:Values:Days", days] : L["Policy:Values:NoLimit"])</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </MudForm>
+                    <div class="policy-workbench__notice">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Info">
+                            @L["Policy:Execution:ProspectiveNotice"]
+                        </MudAlert>
+                    </div>
+                    <p class="policy-workbench__scope">@L["Policy:ScopeNote"]</p>
+                }
+
                 @if (_error is not null)
                 {
                     <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@_error</MudAlert>
@@ -309,19 +222,18 @@
     </DialogContent>
     <DialogActions>
         <div class="policy-workbench__actions @(ScheduleOnly ? "policy-workbench__actions--cron" : null)">
-            <MudText Typo="Typo.caption">
-                @(_state?.HasChanges == true ? L["Policy:UnsavedChanges"] : L["Policy:NoChanges"])
+            <MudText Typo="Typo.caption" aria-live="polite">
+                @(ScheduleOnly
+                    ? _state?.HasChanges == true ? L["Policy:UnsavedChanges"] : L["Policy:NoChanges"]
+                    : PolicyChangeCount > 0 ? L["Policy:ChangedCount", PolicyChangeCount] : L["Policy:NoChanges"])
             </MudText>
             <div>
-                <MudButton Variant="Variant.Text" Disabled="@_isSaving" OnClick="Cancel">
-                    @L["Common:Cancel"]
+                <MudButton Variant="Variant.Text" Disabled="@_isSaving" OnClick="Cancel">@L["Common:Cancel"]</MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.Save"
+                           Disabled="@(_isSaving || !CanSaveDraft || (!ScheduleOnly && (!IsTimeoutInputValid || !_policyInputsValid)))"
+                           OnClick="SaveAsync">
+                    @(_isSaving ? L["Common:Saving"] : L[ScheduleOnly ? "Workspace:SaveCron" : "Common:Save"])
                 </MudButton>
-                <span class="policy-workbench__primary-action">
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.Save"
-                               Disabled="@(_isSaving || _state is null || !_state.CanSave)" OnClick="SaveAsync">
-                        @(_isSaving ? L["Common:Saving"] : L[ScheduleOnly ? "Workspace:SaveCron" : "Common:Save"])
-                    </MudButton>
-                </span>
             </div>
         </div>
     </DialogActions>

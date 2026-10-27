@@ -500,7 +500,6 @@
   },
   "Policy": {
     "Title": "运维策略工作台",
-    "ImmutableNotice": "作业键、作业类型、参数契约、所有者和已配置时区始终由代码声明管理。策略变更影响后续准入；已排队和运行中的执行保留其已捕获配置。",
     "InheritDefault": "继承默认值",
     "ForceEnabled": "强制启用",
     "ForceDisabled": "强制禁用",
@@ -513,43 +512,22 @@
       "Declared": "声明或调度器默认值",
       "Override": "运维覆盖值",
       "Effective": "生效值",
-      "Help": "每一行都分别展示不可变声明默认值、运维意图以及调度器将采用的实际行为。"
+      "Help": "每一行都分别展示不可变声明默认值、运维意图以及调度器将采用的实际行为。",
+      "Field": "字段"
     },
     "Sections": {
-      "General": "常规",
-      "GeneralHelp": "控制准入状态和面向运维人员的作业信息。",
-      "Schedule": "调度",
-      "ScheduleHelp": "在部署已配置的时区中编辑周期节奏和边界。",
-      "Execution": "执行",
-      "ExecutionHelp": "控制容量以及新准入执行捕获的重试和超时快照。",
-      "Retention": "保留",
-      "RetentionHelp": "按数量和时长限制终态执行历史。"
+      "Schedule": "调度"
     },
     "Fields": {
       "Enabled": "启用状态",
       "DisplayName": "显示名称",
       "Description": "描述",
-      "DescriptionMode": "描述意图",
       "MaxConcurrency": "最大并发数",
       "RetryCount": "重试次数",
       "ExecutionTimeout": "执行超时",
-      "Hours": "小时",
       "Minutes": "分钟",
-      "Seconds": "秒",
       "MaxRecords": "保留执行数量",
       "MaxDays": "保留时长（天）"
-    },
-    "Identity": {
-      "ArgumentContract": "参数契约",
-      "PolicyRevision": "策略修订",
-      "UpdatedAt": "策略更新时间",
-      "JobType": "作业类型",
-      "LastObserved": "所有者最近上报"
-    },
-    "DescriptionModes": {
-      "Inherit": "继承声明描述",
-      "Clear": "清空描述",
-      "Value": "使用运维描述"
     },
     "BoundaryModes": {
       "Inherit": "继承声明边界",
@@ -557,9 +535,7 @@
       "Value": "使用运维边界"
     },
     "Actions": {
-      "ResetField": "移除此覆盖值并继承默认值",
-      "ResetAll": "重置全部覆盖值",
-      "Override": "添加覆盖值"
+      "ResetField": "移除此覆盖值并继承默认值"
     },
     "Values": {
       "Enabled": "已启用",
@@ -569,10 +545,10 @@
       "Cleared": "已清空"
     },
     "Validation": {
-      "DisplayNameRequired": "请输入长度符合限制的显示名称，或重置该字段以继承声明值。",
-      "DescriptionRequired": "请输入长度符合限制的说明、选择清空，或继承声明值。",
       "Timeout": "请输入大于 0 且在支持范围内的执行超时。",
-      "NumericMinimum": "{0}不得小于{1}，或重置以继承默认值。"
+      "NumericMinimum": "{0}不得小于{1}，或重置以继承默认值。",
+      "Number": "请输入有效数值，或留空继承默认值。",
+      "WholeNumber": "请输入有效整数，或留空继承默认值。"
     },
     "Conflict": {
       "DraftsPreserved": "另一位运维人员更改了策略基线（{0} → {1}）。未保存的编辑会保留，未触及字段会采用最新策略；请检查后再重试。",
@@ -582,8 +558,7 @@
       "DiscardScheduleDraft": "丢弃调度草稿"
     },
     "Execution": {
-      "ProspectiveNotice": "最大并发数会立即约束新领取，但不会取消活动执行。重试和超时变更仅由新准入的执行捕获。",
-      "SubsecondPrecisionPreserved": "现有超时值包含亚秒精度；编辑整秒字段时将保留这些小数刻度。"
+      "ProspectiveNotice": "最大并发数会立即约束新领取，但不会取消活动执行。重试和超时变更仅由新准入的执行捕获。"
     },
     "Retention": {
       "ZeroUnlimited": "设为 0 可禁用按数量保留。"
@@ -686,8 +661,12 @@
           "WeekdaysNine": "每个工作日上午 09:00",
           "MonthlyFirst": "每月第一天零点"
         }
-      }
-    }
+      },
+      "BoundaryTimeHint": "可输入 HH:mm:ss；钟面选择会保留秒数。"
+    },
+    "InheritPlaceholder": "留空继承",
+    "ChangedCount": "{0} 项策略变更",
+    "ScopeNote": "此处管理启用状态、执行与保留策略。Cron 可在作业详情的调度计划中修改，保存此处不会覆盖调度计划。"
   },
   "JobDetail": {
     "PageTitle": "任务调度 · 作业详情",

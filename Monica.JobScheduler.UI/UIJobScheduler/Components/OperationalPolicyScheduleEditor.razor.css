@@ -62,10 +62,6 @@
  .schedule-editor th, .schedule-editor td { padding: 10px; }
  .schedule-editor td[colspan] { padding: 16px; }
  }
-.cron-editor) { display: flex; flex-direction: column; overflow: hidden; }
-.dialog:has(.cron-editor) .dialog-head, .dialog:has(.cron-editor) .dialog-actions { flex: none; }
-.dialog:has(.cron-editor) .dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px; margin: -3px; }
-.dialog:has(.cron-editor) .dialog-actions { flex-wrap: wrap; align-items: center; padding-top: 14px; border-top: 1px solid var(--mud-palette-lines-default); }
 .cron-editor { display: grid; gap: 20px; }
 .ce-provenance { display: flex; align-items: center; gap: 20px; padding: 14px 16px; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-background-gray); }
 .ce-provenance > div { display: grid; flex: 1; min-width: 0; gap: 5px; }

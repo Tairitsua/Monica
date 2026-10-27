@@ -1,3 +1,4 @@
+@using System.Globalization
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Services
 
@@ -8,16 +9,18 @@
 @if (Compact)
 {
     <div class="boundary-compact">
-        <label><span>@Label</span><select value="@Draft.Mode" disabled="@Disabled" @onchange="SetCompactModeAsync">
-            @foreach (var mode in Enum.GetValues<CronBoundaryOverrideMode>()) { <option value="@mode">@L[$"Policy:BoundaryModes:{mode}"]</option> }
-        </select></label>
+        <div class="boundary-compact__heading">
+            <span>@Label</span>
+            <div class="boundary-compact__mode">@ModeSelector</div>
+        </div>
         @if (Draft.Mode == CronBoundaryOverrideMode.Value)
         {
-            <input type="datetime-local" step="1" value="@LocalValue" disabled="@Disabled" aria-label="@Label" @onchange="SetLocalValueAsync" />
-            @if (Draft.ValidationFailure != CronBoundaryValidationFailure.None) { <p class="boundary-compact__error" role="alert">@L[$"Policy:Schedule:BoundaryFailures:{Draft.ValidationFailure}"]</p> }
-            else if (Draft.IsAmbiguousLocalTime) { <p class="boundary-compact__warning">@L["Policy:Schedule:AmbiguousBoundary"]</p> }
+            @BoundaryInputs
         }
-        else { <p>@FormatScheduleTime(EffectiveUtc)</p> }
+        else
+        {
+            <p class="boundary-compact__effective">@FormatScheduleTime(EffectiveUtc)</p>
+        }
     </div>
 }
 else
@@ -38,51 +41,10 @@ else
         </div>
         <div class="boundary-editor__operator">
             <span>@L["Policy:Provenance:Override"]</span>
-            <MudSelect T="CronBoundaryOverrideMode"
-                       Value="@Draft.Mode"
-                       ValueChanged="SetModeAsync"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Disabled="@Disabled"
-                       aria-label="@L["Policy:Schedule:BoundaryMode"]" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.Inherit">
-                    @L["Policy:BoundaryModes:Inherit"]
-                </MudSelectItem>
-                <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.None">
-                    @L["Policy:BoundaryModes:None"]
-                </MudSelectItem>
-                <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.Value">
-                    @L["Policy:BoundaryModes:Value"]
-                </MudSelectItem>
-            </MudSelect>
+            @ModeSelector
             @if (Draft.Mode == CronBoundaryOverrideMode.Value)
             {
-                <div class="boundary-editor__inputs">
-                    <MudDatePicker Date="@Draft.LocalDate"
-                                   DateChanged="SetDateAsync"
-                                   Label="@L["Policy:Schedule:BoundaryDate"]"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Disabled="@Disabled" AdornmentIcon="@MoIcons.Calendar" PreviousIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" ClearIcon="@MoIcons.Close" />
-                    <MudTimePicker Time="@Draft.LocalTime"
-                                   TimeChanged="SetTimeAsync"
-                                   Label="@L["Policy:Schedule:BoundaryTime"]"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Disabled="@Disabled" AdornmentIcon="@MoIcons.Clock" ClearIcon="@MoIcons.Close" />
-                </div>
-                @if (Draft.ValidationFailure != CronBoundaryValidationFailure.None)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Error">
-                        @L[$"Policy:Schedule:BoundaryFailures:{Draft.ValidationFailure}"]
-                    </MudText>
-                }
-                else if (Draft.IsAmbiguousLocalTime)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Warning">
-                        @L["Policy:Schedule:AmbiguousBoundary"]
-                    </MudText>
-                }
+                @BoundaryInputs
             }
         </div>
         <div>
@@ -94,6 +56,10 @@ else
 }
 
 @code {
+    private TimeSpan? _clockRemainder;
+    private IConverter<DateTime?, string?> _dateConverter = null!;
+    private IConverter<TimeSpan?, string?> _timeConverter = null!;
+
     /// <summary>Gets whether to show the compact three-state control used by the schedule dialog.</summary>
     [Parameter] public bool Compact { get; set; }
 
@@ -123,19 +89,95 @@ else
 
     private DateTimeOffset? EffectiveUtc => Draft.HasOverride ? Draft.OverrideUtc : DeclaredUtc;
 
-    private string? LocalValue => Draft.LocalDate is {} date && Draft.LocalTime is {} time
-        ? date.Date.Add(time).ToString("yyyy-MM-dd'T'HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) : null;
+    private RenderFragment ModeSelector => @<MudSelect T="CronBoundaryOverrideMode"
+                                                       Value="@Draft.Mode"
+                                                       ValueChanged="SetModeAsync"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense"
+                                                       Disabled="@Disabled"
+                                                       aria-label="@($"{Label} · {L["Policy:Schedule:BoundaryMode"]}")"
+                                                       OpenIcon="@MoIcons.ChevronDown"
+                                                       CloseIcon="@MoIcons.ChevronUp">
+        <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.Inherit">@L["Policy:BoundaryModes:Inherit"]</MudSelectItem>
+        <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.None">@L["Policy:BoundaryModes:None"]</MudSelectItem>
+        <MudSelectItem T="CronBoundaryOverrideMode" Value="CronBoundaryOverrideMode.Value">@L["Policy:BoundaryModes:Value"]</MudSelectItem>
+    </MudSelect>;
 
-    private Task SetCompactModeAsync(ChangeEventArgs args) => Enum.TryParse<CronBoundaryOverrideMode>(args.Value?.ToString(), out var mode)
-        ? SetModeAsync(mode) : Task.CompletedTask;
+    private RenderFragment BoundaryInputs => @<div class="boundary-editor__date-time">
+        <div class="boundary-editor__inputs">
+            <MudDatePicker Date="@Draft.LocalDate"
+                           DateChanged="SetDateAsync"
+                           Converter="@_dateConverter"
+                           Label="@L["Policy:Schedule:BoundaryDate"]"
+                           DateFormat="yyyy-MM-dd"
+                           Editable="true"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Disabled="@Disabled"
+                           AdornmentIcon="@MoIcons.Calendar"
+                           AdornmentAriaLabel="@L["Policy:Schedule:BoundaryDate"]"
+                           PreviousIcon="@MoIcons.ChevronLeft"
+                           NextIcon="@MoIcons.ChevronRight"
+                           ClearIcon="@MoIcons.Close" />
+            <MudTimePicker Time="@Draft.LocalTime"
+                           TimeChanged="SetTimeAsync"
+                           Converter="@_timeConverter"
+                           PickerOpened="RememberClockSeconds"
+                           PickerClosed="ClearClockSeconds"
+                           Label="@L["Policy:Schedule:BoundaryTime"]"
+                           TimeFormat="HH:mm:ss"
+                           AmPm="false"
+                           Editable="true"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Disabled="@Disabled"
+                           AdornmentIcon="@MoIcons.Clock"
+                           AdornmentAriaLabel="@L["Policy:Schedule:BoundaryTime"]"
+                           ClearIcon="@MoIcons.Close" />
+        </div>
+        <p class="boundary-editor__time-hint">@L["Policy:Schedule:BoundaryTimeHint"]</p>
+        @if (Draft.ValidationFailure != CronBoundaryValidationFailure.None)
+        {
+            <p class="boundary-editor__error" role="alert">@L[$"Policy:Schedule:BoundaryFailures:{Draft.ValidationFailure}"]</p>
+        }
+        else if (Draft.IsAmbiguousLocalTime)
+        {
+            <p class="boundary-editor__warning">@L["Policy:Schedule:AmbiguousBoundary"]</p>
+        }
+    </div>;
 
-    private async Task SetLocalValueAsync(ChangeEventArgs args)
+    protected override void OnInitialized()
     {
-        var valid = DateTime.TryParseExact(args.Value?.ToString(), ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss"],
-            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var local);
-        Draft.LocalDate = valid ? local.Date : null;
-        Draft.LocalTime = valid ? local.TimeOfDay : null;
-        await Changed.InvokeAsync();
+        _dateConverter = Conversions.From<DateTime?, string?>(
+            value => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ParseDate);
+        _timeConverter = Conversions.From<TimeSpan?, string?>(
+            value => value?.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture), ParseTime);
+    }
+
+    private DateTime? ParseDate(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return DateTime.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var date)
+            ? date
+            : throw new FormatException(L["Policy:Schedule:BoundaryValidationError"]);
+    }
+
+    private TimeSpan? ParseTime(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return DateTime.TryParseExact(text.Trim(), ["HH:mm:ss", "HH:mm"], CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var time)
+            ? time.TimeOfDay
+            : throw new FormatException(L["Policy:Schedule:BoundaryValidationError"]);
     }
 
     private async Task SetModeAsync(CronBoundaryOverrideMode mode)
@@ -152,9 +194,17 @@ else
 
     private async Task SetTimeAsync(TimeSpan? value)
     {
-        Draft.LocalTime = value;
+        // MudBlazor's clock edits hours and minutes; the text input still accepts exact seconds.
+        Draft.LocalTime = _clockRemainder is { } remainder && value is { } selected
+            ? new TimeSpan(selected.Hours, selected.Minutes, 0) + remainder
+            : value;
         await Changed.InvokeAsync();
     }
+
+    private void RememberClockSeconds() => _clockRemainder = TimeSpan.FromTicks(
+        (Draft.LocalTime?.Ticks ?? 0) % TimeSpan.TicksPerMinute);
+
+    private void ClearClockSeconds() => _clockRemainder = null;
 
     private async Task ResetAsync()
     {

@@ -32,10 +32,13 @@ Indicators:
 - Custom dropdown/flyout/overlay markup with manual `@onmouseenter` / `@onmouseleave` / `@onclick` state machines
 - Manual `_isOpen`, `_isHovered`, delayed-close `CancellationTokenSource` patterns
 - Custom `<div class="dropdown-menu">` / `<div class="flyout-menu">` / `<div class="popover-panel">` instead of `MudMenu`, `MudPopover`, `MudDialog`, `MudDrawer`
+- A prototype's plain `select` or browser date/time input is copied into the product even though a themed Monica or MudBlazor control already owns the interaction; the closed field matches but the opened control uses unrelated browser/operating-system chrome
 - A temporary details overlay has no accessible identity, leaks keyboard focus, cannot close with Escape, or fails to restore focus; choosing `MudDrawer` alone does not establish dialog behavior
 - Clicking a disabled native menu leaf moves focus to the document and strands Escape, or a custom label overrides its disabled appearance; verify inert activation and dismissal after the actual pointer click
 
 Fix: use MudBlazor overlay primitives and inspect their exact source and runtime keyboard behavior. Add the missing focus/dismissal contract at the owning component where required, with trapping mounted only while open. Simple native buttons, links, and status-filter controls are valid; this category concerns overlay behavior, not all native interactive markup. Reference implementation: `NavBarDropdown.razor`, `NavBarMore.razor` in `Monica.UI/Shell/Components/Layout/`. See the shared [interaction guidance](../../monica-ui-development/references/monica-workbench-design-language.md#preserve-interaction-and-runtime-state).
+
+For prototype-derived form controls, follow [placeholder interpretation and verification](../../monica-ui-development/references/prototype-replication.md). Inspect the open picker/menu as well as its activator, and preserve localization, value/null semantics, timezone, required precision and validation when selecting the native component.
 
 For a controlled native input with a separate reset action, verify both displayed text and the filtered model. Clear must empty the actual input, restore the results, and allow that same query to be entered again. Check pending debounce as well as settled input; row counts alone do not prove correct native control ownership. See [component communication](../../monica-ui-development/references/blazor-best-practices.md#13-component-communication) for the native reset path.
 
@@ -74,6 +77,7 @@ Indicators:
 - A full-width table's header, last row, hover/selected paint or pager covers its owner's rounded corners; only the outer border is rounded while descendant backgrounds remain square
 - A flush table has competing outer/inner radii, does not declare whether its owner clips painted corners or the table is inset, or broad overflow clipping hides focus indicators, required local scrolling or overlay content
 - A rounded notice, callout or inner card meets an enclosing surface edge while retaining its own radius or border, creating competing corners; a selected segment's border or shadow makes its apparent top/bottom inset unequal
+- An obvious prototype defect, such as clipped controls, mismatched baselines or unequal content insets, is reproduced as a fidelity requirement instead of correcting the intended layout at its owner
 - Distinct tools with independent tasks and lifetimes remain hidden in one local tab route, preventing direct links, browser history and meaningful shell search entries without a deliberate navigation reason
 - A master/detail inventory grows the shell page through many entries while its selected dossier remains offscreen; selecting the last item requires manually returning to the details
 - A sticky catalog and its search/filter controls cannot fit a short scrollport, or a compact picker remains expanded after selection instead of revealing the selected dossier

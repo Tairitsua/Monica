@@ -1,6 +1,6 @@
 # Replicate a prototype without accumulating parallel UI code
 
-Use this workflow when implementing an accepted prototype or consolidating repeated visual patterns after implementation. The prototype establishes appearance and interaction; current source establishes available evidence and behavior. Resolve conflicts explicitly instead of inventing data to imitate a screenshot. The [working-interface language](monica-workbench-design-language.md) owns visual acceptance and containment; this reference owns asset selection and consolidation.
+Use this workflow when implementing an accepted prototype or consolidating repeated visual patterns after implementation. The prototype establishes the intended hierarchy, density, grouping and interaction; its incidental HTML markup and browser chrome are not the component specification. Current source establishes available evidence and behavior. Resolve conflicts explicitly instead of inventing data to imitate a screenshot. The [working-interface language](monica-workbench-design-language.md) owns visual acceptance and containment; this reference owns asset selection and consolidation.
 
 ## Map the accepted design to owners
 
@@ -9,11 +9,14 @@ Before coding, inspect the accepted route, relevant states, native page and stat
 Classify each difference:
 
 - **Geometry or paint:** measure the prototype and rendered native element at the same owner width, locale, theme and state. Correct the existing presentation owner.
+- **Prototype placeholder or defect:** replace unstyled browser controls with existing Monica or MudBlazor controls, and correct clear clipping, misalignment or unequal insets. Preserve the intended information structure and explain material corrections in the change report.
 - **Reusable semantics:** extend a shared component when several real callers need the same contract, then migrate them in the same change.
 - **Business composition:** keep module-specific evidence, data access, state transitions and aggregate calculations with the module. Compose shared primitives around it.
 - **Unavailable evidence or behavior:** verify the backend contract and extend that boundary only when the task requires it. Do not fabricate successful states or complete history to fill the design.
 
 Keep the mapping and screenshots in the task's temporary evidence location. Put only verified reusable contracts in canonical skills; do not append incident narratives or machine-specific preview URLs.
+
+Use the existing themed selection and date/time components, such as `MudSelect`, `MudDatePicker` and `MudTimePicker`, when a prototype uses a plain `select` or browser `date`, `time` or `datetime-local` input as a functional placeholder. A matching closed field does not justify an unthemed operating-system popup. Preserve the field's value and null semantics, precision (including seconds when required), timezone interpretation, validation and change notifications. Ordinary styled buttons, links and simple search fields can remain native HTML when their semantics fit; this is not a requirement to wrap every element in a component.
 
 ## Extract, migrate, and delete
 
@@ -28,6 +31,8 @@ Read every existing caller before changing a shared default. Deliberately plain 
 Use the repository's build and test gates, plus browser smoke checks. Follow the existing test policy: a visual extraction does not justify UI rendering tests for CSS classes, localized-key presence, or markup composition. Non-rendering behavior tests can protect a new parser or formatter contract when needed.
 
 Exercise the changed component in representative real callers, including another module when the shared default changes. Check zero values, long identities, reordered localized fragments, navigation and keyboard focus. Compare equivalent light/dark and narrow/intermediate/wide states at the actual component breakpoints. Inspect the applied styles and screenshots; a correct class name, successful build or no-overflow result cannot prove fidelity. Preserve the accepted design's content insets, marker sizes, font weight, and selected-control paint.
+
+Open every changed picker, select and menu during browser review. Check its theme, localized calendar and control text, viewport containment, keyboard selection/dismissal and restored focus. Exercise clearing, invalid input and accepted changes; verify that a date/time selection retains required seconds and uses the declared timezone rather than the browser's timezone. Correct an obvious prototype alignment defect instead of turning it into an acceptance target.
 
 ## Feed verified results back into the skill route
 

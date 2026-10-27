@@ -500,7 +500,6 @@
   },
   "Policy": {
     "Title": "Operational policy workbench",
-    "ImmutableNotice": "Job key, job type, argument contract, owner, and configured timezone remain code-owned. Policy changes affect future admission; queued and running executions preserve their captured configuration.",
     "InheritDefault": "Inherit default",
     "ForceEnabled": "Force enabled",
     "ForceDisabled": "Force disabled",
@@ -513,43 +512,22 @@
       "Declared": "Declared / scheduler default",
       "Override": "Operator override",
       "Effective": "Effective value",
-      "Help": "Each row separates the immutable declaration default from operator intent and the behavior the scheduler will apply."
+      "Help": "Each row separates the immutable declaration default from operator intent and the behavior the scheduler will apply.",
+      "Field": "Field"
     },
     "Sections": {
-      "General": "General",
-      "GeneralHelp": "Control admission state and operator-facing job identity.",
-      "Schedule": "Schedule",
-      "ScheduleHelp": "Edit recurring cadence and boundaries in the configured deployment timezone.",
-      "Execution": "Execution",
-      "ExecutionHelp": "Control capacity and the retry/timeout snapshot captured by newly admitted work.",
-      "Retention": "Retention",
-      "RetentionHelp": "Bound terminal execution history by count and age."
+      "Schedule": "Schedule"
     },
     "Fields": {
       "Enabled": "Enabled state",
       "DisplayName": "Display name",
       "Description": "Description",
-      "DescriptionMode": "Description intent",
       "MaxConcurrency": "Maximum concurrency",
       "RetryCount": "Retry count",
       "ExecutionTimeout": "Execution timeout",
-      "Hours": "Hours",
       "Minutes": "Minutes",
-      "Seconds": "Seconds",
       "MaxRecords": "Retained execution count",
       "MaxDays": "Retention age (days)"
-    },
-    "Identity": {
-      "ArgumentContract": "Argument contract",
-      "PolicyRevision": "Policy revision",
-      "UpdatedAt": "Policy updated",
-      "JobType": "Job type",
-      "LastObserved": "Owner last observed"
-    },
-    "DescriptionModes": {
-      "Inherit": "Inherit declared description",
-      "Clear": "Clear description",
-      "Value": "Use operator description"
     },
     "BoundaryModes": {
       "Inherit": "Inherit declared boundary",
@@ -557,9 +535,7 @@
       "Value": "Use operator boundary"
     },
     "Actions": {
-      "ResetField": "Remove this override and inherit its default",
-      "ResetAll": "Reset all overrides",
-      "Override": "Add override"
+      "ResetField": "Remove this override and inherit its default"
     },
     "Values": {
       "Enabled": "Enabled",
@@ -569,10 +545,10 @@
       "Cleared": "Cleared"
     },
     "Validation": {
-      "DisplayNameRequired": "Enter a display name within the supported length, or reset the field to inherit its declared value.",
-      "DescriptionRequired": "Enter a description within the supported length, choose Clear, or inherit the declared value.",
       "Timeout": "Enter a positive timeout within the supported duration range.",
-      "NumericMinimum": "{0} must be at least {1}, or reset it to inherit the default."
+      "NumericMinimum": "{0} must be at least {1}, or reset it to inherit the default.",
+      "Number": "Enter a valid number, or leave blank to inherit.",
+      "WholeNumber": "Enter a valid whole number, or leave blank to inherit."
     },
     "Conflict": {
       "DraftsPreserved": "Another operator changed the policy baseline ({0} → {1}). Your unsaved edits are preserved while untouched fields adopt the latest policy; review before retrying.",
@@ -582,8 +558,7 @@
       "DiscardScheduleDraft": "Discard schedule draft"
     },
     "Execution": {
-      "ProspectiveNotice": "Maximum concurrency governs new claims immediately without cancelling active work. Retry and timeout changes are captured only by newly admitted executions.",
-      "SubsecondPrecisionPreserved": "This existing timeout includes sub-second precision. Those fractional ticks are preserved when the whole-second fields are edited."
+      "ProspectiveNotice": "Maximum concurrency governs new claims immediately without cancelling active work. Retry and timeout changes are captured only by newly admitted executions."
     },
     "Retention": {
       "ZeroUnlimited": "Zero disables count-based retention."
@@ -686,8 +661,12 @@
           "WeekdaysNine": "Every weekday at 09:00",
           "MonthlyFirst": "At midnight on the first day of every month"
         }
-      }
-    }
+      },
+      "BoundaryTimeHint": "Enter HH:mm:ss; clock selections preserve seconds."
+    },
+    "InheritPlaceholder": "Inherit if blank",
+    "ChangedCount": "{0} policy changes",
+    "ScopeNote": "Manage enabled state, execution and retention here. Edit Cron under the job’s schedule; saving this policy preserves its schedule."
   },
   "JobDetail": {
     "PageTitle": "Job Scheduler · Job details",

@@ -9,16 +9,21 @@
 .boundary-editor__provenance strong { font-weight: 500; }
 .boundary-editor__provenance code { color: var(--boundary-muted); }
 .boundary-editor__operator { padding: 16px; border-radius: 6px; background: color-mix(in srgb, var(--mud-palette-primary) 5%, var(--mud-palette-surface)); }
-.boundary-editor__inputs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
-.boundary-editor ::deep .mud-error-text { color: color-mix(in srgb, var(--mud-palette-error) 25%, var(--mud-palette-text-primary)) !important; }
-.boundary-editor ::deep .mud-warning-text { color: color-mix(in srgb, var(--mud-palette-warning) 25%, var(--mud-palette-text-primary)) !important; }
+.boundary-editor__date-time { display: grid; gap: 8px; min-width: 0; }
+.boundary-editor__inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: 12px; min-width: 0; }
+.boundary-editor__inputs ::deep .mud-picker { min-width: 0; }
+.boundary-editor__inputs ::deep .mud-input-slot { font-family: var(--mo-font-family-mono); }
+.boundary-editor__date-time p { margin: 0; font-size: 12px; line-height: 1.6; }
+.boundary-editor__time-hint { color: var(--mud-palette-text-secondary); }
+.boundary-editor__error { color: var(--mud-palette-error); }
+.boundary-editor__warning { color: color-mix(in srgb, var(--mud-palette-warning) 78%, var(--mud-palette-text-primary)); }
 @container policy-boundary (max-width: 640px) { .boundary-editor__provenance { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .boundary-editor { padding: 16px; } }
 
-.boundary-compact { min-width: 0; color: var(--mud-palette-text-secondary); font-size: 12px; }
-.boundary-compact label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.boundary-compact select { width: 50%; min-width: 0; padding: 8px 10px; border: 1px solid var(--mud-palette-lines-inputs); border-radius: 6px; color: var(--mud-palette-text-primary); background: var(--mud-palette-surface); font: inherit; }
-.boundary-compact input { display: block; width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--mud-palette-lines-inputs); border-radius: 6px; color: var(--mud-palette-text-primary); background: var(--mud-palette-surface); font: 12px var(--mo-font-family-mono); color-scheme: inherit; }
-.boundary-compact p { margin: 8px 0 0; font: 12px/1.6 var(--mo-font-family-mono); }
-.boundary-compact .boundary-compact__error { color: var(--mud-palette-error); font-family: inherit; }
-.boundary-compact .boundary-compact__warning { color: color-mix(in srgb,var(--mud-palette-warning) 78%,var(--mud-palette-text-primary)); font-family: inherit; }
+.boundary-compact { display: grid; gap: 12px; min-width: 0; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.boundary-compact__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.boundary-compact__heading > span { flex: 1 1 8rem; }
+.boundary-compact__mode { flex: 1 1 12rem; min-width: 0; }
+.boundary-compact__mode ::deep .mud-input-control { margin: 0; }
+.boundary-compact ::deep .mud-input, .boundary-compact ::deep .mud-input-label { font-size: 13px; }
+.boundary-compact__effective { margin: 0; font: 12px/1.6 var(--mo-font-family-mono); }
