@@ -1,3 +1,7 @@
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Monica.Modules;
+using Monica.Locker.EfCore;
 using Microsoft.EntityFrameworkCore;
 using Monica.DependencyInjection.Abstractions;
 using Monica.JobScheduler.EfCore.Entities;
@@ -21,11 +25,11 @@ public sealed class JobSchedulerDbContext(
     internal DbSet<JobExecutionGateEntity> ExecutionGates => Set<JobExecutionGateEntity>();
     internal DbSet<JobRecurringCursorEntity> RecurringCursors => Set<JobRecurringCursorEntity>();
     internal DbSet<JobSchedulerOwnerEntity> SchedulerOwners => Set<JobSchedulerOwnerEntity>();
-    internal DbSet<JobSchedulerCoordinatorEntity> Coordinators => Set<JobSchedulerCoordinatorEntity>();
 
     protected override void OnModelCreatingExtend(ModelBuilder modelBuilder)
     {
         base.OnModelCreatingExtend(modelBuilder);
+        modelBuilder.ConfigureMonicaLeases(CachedServiceProvider.GetService<IOptions<ModuleJobSchedulerEfCoreOption>>()?.Value.LeaseTable);
         ConfigureDefinitions(modelBuilder);
         ConfigureExecution(modelBuilder);
         RemoveInheritedStringDefaults(modelBuilder);
@@ -41,16 +45,6 @@ public sealed class JobSchedulerDbContext(
             entity.Property(row => row.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(row => row.ManifestHash).HasMaxLength(64);
         });
-        modelBuilder.Entity<JobSchedulerCoordinatorEntity>(entity =>
-        {
-            entity.ToTable("JobSchedulerCoordinators");
-            entity.HasKey(row => new { row.SchedulerScopeKey, row.CoordinatorKey });
-            entity.Property(row => row.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
-            entity.Property(row => row.CoordinatorKey).HasMaxLength(256);
-            entity.Property(row => row.WorkerInstanceId).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
-            entity.Property(row => row.LeaseToken).HasMaxLength(32);
-        });
-
         modelBuilder.Entity<JobDefinitionEntity>(entity =>
         {
             entity.ToTable("JobDefinitions");

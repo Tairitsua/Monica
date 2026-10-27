@@ -12,4 +12,7 @@
 		<ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
 		<ProjectReference Include="..\Monica.HealthCheck\Monica.HealthCheck.csproj" />
 	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monica.Locker\Monica.Locker.csproj" />
+  </ItemGroup>
 </Project>

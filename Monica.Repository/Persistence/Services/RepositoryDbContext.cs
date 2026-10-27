@@ -1,3 +1,4 @@
+using Monica.Locker.EfCore;
 using System.Transactions;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -226,6 +227,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         OnModelCreatingExtend(builder);
         if (OutboxOptions is not null)
         {
+            builder.ConfigureMonicaLeases(OutboxOptions.LeaseTable);
             var outbox = builder.Entity<OutboxMessage>();
             outbox.ToTable("MonicaOutbox", table =>
             {

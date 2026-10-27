@@ -62,7 +62,7 @@ public sealed class OutboxCleanupTests
     {
         var time = new OutboxTestTimeProvider();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        var commands = new CleanupCommands { AfterDelete = cancellation.Cancel };
+        var commands = new CleanupCommands { AfterCommit = cancellation.Cancel };
         await using var app = await CreateAsync(time, commands);
         await SeedAsync(app, time, expiredCount: 7);
         commands.Recording = true;
@@ -74,6 +74,25 @@ public sealed class OutboxCleanupTests
         commands.Recording = false;
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
             Assert.Equal(4, await db.Set<OutboxMessage>().CountAsync(x => x.MessageId.StartsWith("expired-"), ct)), Token);
+    }
+
+    [Fact]
+    public async Task CleanupAsync_WhenCancelledBeforeBatchCommit_ShouldRollBackThatBatch()
+    {
+        var time = new OutboxTestTimeProvider();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var commands = new CleanupCommands { AfterDelete = cancellation.Cancel };
+        await using var app = await CreateAsync(time, commands);
+        await SeedAsync(app, time, expiredCount: 7);
+        commands.Recording = true;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            app.Services.GetRequiredService<OutboxDispatcher<TestRepositoryDbContext>>().CleanupAsync(cancellation.Token));
+
+        Assert.Equal(new[] { 3 }, commands.Deleted);
+        commands.Recording = false;
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+            Assert.Equal(7, await db.Set<OutboxMessage>().CountAsync(x => x.MessageId.StartsWith("expired-"), ct)), Token);
     }
 
     [Fact]
@@ -197,11 +216,13 @@ public sealed class OutboxCleanupTests
         };
     }
 
-    private sealed class CleanupCommands : DbCommandInterceptor
+    private sealed class CleanupCommands : DbCommandInterceptor, IDbTransactionInterceptor
     {
         public bool Recording { get; set; }
         public int FailOnDelete { get; init; }
         public Action? AfterDelete { get; init; }
+        public Action? AfterCommit { get; init; }
+        private readonly HashSet<DbTransaction> _cleanupTransactions = [];
         public List<string> Commands { get; } = [];
         public List<int> Deleted { get; } = [];
         public List<(string Name, object? Value)> Parameters { get; } = [];
@@ -209,19 +230,20 @@ public sealed class OutboxCleanupTests
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
-            if (Recording) Commands.Add(command.CommandText);
+            if (Recording && command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal)) Commands.Add(command.CommandText);
             return ValueTask.FromResult(result);
         }
 
         public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (Recording)
+            if (Recording && command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal))
             {
                 Commands.Add(command.CommandText);
                 Parameters.Clear();
                 Parameters.AddRange(command.Parameters.Cast<DbParameter>().Select(p => (p.ParameterName, p.Value)));
-                Assert.Null(command.Transaction);
+                Assert.NotNull(command.Transaction);
+                _cleanupTransactions.Add(command.Transaction);
                 if (Commands.Count == FailOnDelete) throw new IOException("Cleanup database command failed.");
             }
             return ValueTask.FromResult(result);
@@ -230,12 +252,19 @@ public sealed class OutboxCleanupTests
         public override ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData,
             int result, CancellationToken cancellationToken = default)
         {
-            if (Recording)
+            if (Recording && command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal))
             {
                 Deleted.Add(result);
                 AfterDelete?.Invoke();
             }
             return ValueTask.FromResult(result);
+        }
+
+        public Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (_cleanupTransactions.Remove(transaction)) AfterCommit?.Invoke();
+            return Task.CompletedTask;
         }
     }
 }

@@ -1,5 +1,7 @@
 # Lock providers and ownership
 
+For renewable database coordinator roles shared by JobScheduler and Outbox, use [coordinator leases](leases.md). The handle API described here retains its existing backend-specific acquisition, monitoring, and release behavior.
+
 Register `monica.AddLocker()` inside the host's `builder.AddMonica(...)` callback and select a provider. A missing provider fails module composition. `UseInProcessProvider()` coordinates only callers in the same host. `UseMedallionProvider(provider)` adapts an existing Medallion provider instance; its caller owns that supplied instance. `UseDaprProvider(...)` uses a named Dapr lock-store component:
 
 ```csharp

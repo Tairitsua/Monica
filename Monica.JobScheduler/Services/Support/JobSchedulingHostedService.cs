@@ -13,6 +13,7 @@ using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
 using Monica.Modules;
+using Monica.Locker.Leases;
 
 namespace Monica.JobScheduler.Services.Support;
 
@@ -39,7 +40,14 @@ internal sealed class JobSchedulingHostedService(
         .GroupBy(definition => definition.OwnerKey ?? schedulerOptions.Value.GetProjectName(), StringComparer.Ordinal)
         .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
         .ToArray();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CoordinatorState> _coordinators = new(StringComparer.Ordinal);
+    private readonly LeaseCoordinator _coordinators = new(store.CoordinatorLeases,
+        schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, new LeaseCoordinatorOptions
+        {
+            Duration = schedulerOptions.Value.CoordinatorLeaseDuration,
+            StandbyInterval = schedulerOptions.Value.SchedulingPollInterval,
+            OperationTimeout = TimeSpan.FromTicks(Math.Min(schedulerOptions.Value.StoreOperationTimeout.Ticks,
+                schedulerOptions.Value.CoordinatorLeaseDuration.Ticks / 4))
+        });
     private readonly Dictionary<string, DateTimeOffset> _nextSnapshotSyncUtc = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _synchronizedGrants = new(StringComparer.Ordinal);
     private readonly object _readinessLock = new();
@@ -55,12 +63,24 @@ internal sealed class JobSchedulingHostedService(
     protected override Task OnStartingAsync(CancellationToken cancellationToken) =>
         _options.AutonomousWork ? Task.CompletedTask : ScheduleAsync(cancellationToken);
 
-    protected override Task ExecuteBackgroundAsync(CancellationToken stoppingToken) => !_options.AutonomousWork
-        ? Task.CompletedTask
-        : Task.WhenAll(
-            RunLoopAsync("owner scheduling", ScheduleAsync, stoppingToken),
-            RunLoopAsync("lease recovery", RecoverAsync, stoppingToken),
-            RunLoopAsync("history cleanup", CleanupHistoryAsync, stoppingToken));
+    protected override async Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            if (_options.AutonomousWork)
+                await Task.WhenAll(
+                    RunLoopAsync("owner scheduling", ScheduleAsync, stoppingToken),
+                    RunLoopAsync("lease recovery", RecoverAsync, stoppingToken),
+                    RunLoopAsync("history cleanup", CleanupHistoryAsync, stoppingToken));
+        }
+        finally { await _coordinators.DisposeAsync(); }
+    }
+
+    public override void Dispose()
+    {
+        _coordinators.Dispose();
+        base.Dispose();
+    }
 
     private async Task RunLoopAsync(string plane, Func<CancellationToken, Task> cycle, CancellationToken stoppingToken)
     {
@@ -126,11 +146,13 @@ internal sealed class JobSchedulingHostedService(
         for (var visited = 0; visited < snapshots.Length; visited++)
         {
             var snapshot = snapshots[(_nextMaterializationOwnerIndex + visited) % snapshots.Length];
-            var lease = await EnsureCoordinatorAsync("owner:" + snapshot.OwnerKey, cancellationToken);
-            if (lease is null) continue;
-            await SyncOwnerStateAsync(snapshot, lease, cancellationToken);
+            var context = await GetCoordinatorAsync("owner:" + snapshot.OwnerKey, cancellationToken);
+            if (context is null) continue;
+            using var term = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.StoppingToken);
+            var lease = JobCoordinatorLeaseAdapter.ToKey(context.Identity);
+            await SyncOwnerStateAsync(snapshot, lease, term.Token);
             if (budget > 0)
-                budget = await MaterializeOwnerDueOccurrencesAsync(scopeKey, snapshot.OwnerKey, budget, lease, cancellationToken);
+                budget = await MaterializeOwnerDueOccurrencesAsync(scopeKey, snapshot.OwnerKey, budget, lease, term.Token);
             runtimeState.RecordOwnerSchedulingWork(timeProvider.GetUtcNow());
         }
         if (snapshots.Length > 0)
@@ -140,8 +162,11 @@ internal sealed class JobSchedulingHostedService(
     internal async Task RecoverAsync(CancellationToken cancellationToken)
     {
         if (!_options.AutonomousWork) return;
-        var lease = await EnsureCoordinatorAsync("maintenance", cancellationToken);
-        if (lease is null) return;
+        var context = await GetCoordinatorAsync("maintenance", cancellationToken);
+        if (context is null) return;
+        using var term = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.StoppingToken);
+        cancellationToken = term.Token;
+        var lease = JobCoordinatorLeaseAdapter.ToKey(context.Identity);
         await store.RecoverExpiredLeasesAsync(new ExpiredLeaseRecoveryRequest
         {
             SchedulerScopeKey = _options.SchedulerScopeKey,
@@ -183,7 +208,7 @@ internal sealed class JobSchedulingHostedService(
         {
             foreach (var declaration in snapshot.Declarations.Where(declaration => declaration.JobType == JobType.Recurring))
             {
-                await MaintainCoordinatorAsync(lease, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
                 {
                     CoordinatorLease = lease,
@@ -199,68 +224,16 @@ internal sealed class JobSchedulingHostedService(
         _nextSnapshotSyncUtc[snapshot.OwnerKey] = timeProvider.GetUtcNow().Add(_options.SnapshotSyncInterval);
     }
 
-    private async Task MaintainCoordinatorAsync(JobCoordinatorLeaseKey lease, CancellationToken cancellationToken)
-    {
-        // A large owner can need longer than one grant to reconcile cursors or materialize its bounded batch.
-        // Renew between store operations, but never continue the old cycle under a reacquired generation.
-        var current = await EnsureCoordinatorAsync(lease.CoordinatorKey, cancellationToken);
-        if (current is null || current.LeaseToken != lease.LeaseToken)
-        {
-            throw new InvalidOperationException("The scheduling coordinator changed while processing its current cycle.");
-        }
-    }
-
-    private async Task<JobCoordinatorLeaseKey?> EnsureCoordinatorAsync(string partition, CancellationToken cancellationToken)
-    {
-        var state = _coordinators.GetOrAdd(partition, static _ => new CoordinatorState());
-        await state.Mutex.WaitAsync(cancellationToken);
-        try
-        {
-            var now = timeProvider.GetUtcNow();
-            if (state.Lease is { } current)
-            {
-                var elapsed = timeProvider.GetElapsedTime(state.RequestStarted);
-                // A forward clock step is conservative; monotonic elapsed prevents backward steps extending a grant.
-                if (now - state.RequestUtc > elapsed) elapsed = now - state.RequestUtc;
-                var duration = current.ExpiresAtUtc - current.GrantedAtUtc;
-                if (elapsed < duration * 0.5) return current.Key;
-            }
-            else if (now < state.RetryAfterUtc)
-            {
-                return null;
-            }
-            var requestStarted = timeProvider.GetTimestamp();
-            var previousToken = state.Lease?.Key.LeaseToken;
-            // A failed request must not reset the timing origin of the last grant and make it appear fresh.
-            var granted = await store.TryAcquireCoordinatorLeaseAsync(_options.SchedulerScopeKey, partition,
-                _options.WorkerInstanceId, _options.CoordinatorLeaseDuration, previousToken, cancellationToken);
-            state.RequestStarted = requestStarted;
-            state.RequestUtc = now;
-            state.Lease = granted;
-            state.RetryAfterUtc = now.Add(_options.SchedulingPollInterval * 0.8);
-            return state.Lease?.Key;
-        }
-        finally
-        {
-            state.Mutex.Release();
-        }
-    }
-
-    private sealed class CoordinatorState
-    {
-        public SemaphoreSlim Mutex { get; } = new(1, 1);
-        public JobCoordinatorLease? Lease { get; set; }
-        public long RequestStarted { get; set; }
-        public DateTimeOffset RequestUtc { get; set; }
-        public DateTimeOffset RetryAfterUtc { get; set; }
-    }
+    private Task<LeaseContext?> GetCoordinatorAsync(string partition, CancellationToken cancellationToken) =>
+        _coordinators.GetAsync(new LeaseResource(_options.SchedulerScopeKey,
+            JobCoordinatorLeaseAdapter.PREFIX + partition), cancellationToken);
 
     private async Task<int> MaterializeOwnerDueOccurrencesAsync(
         string scopeKey, string ownerKey, int remainingBudget, JobCoordinatorLeaseKey lease, CancellationToken cancellationToken)
     {
         while (remainingBudget > 0)
         {
-            await MaintainCoordinatorAsync(lease, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var cursors = await store.GetDueRecurringSchedulesAsync(
                 scopeKey,
                 ownerKey,
@@ -282,7 +255,7 @@ internal sealed class JobSchedulingHostedService(
                 // The store owns the authoritative clock and advances the cursor past all missed occurrences in the
                 // same atomic operation as enqueueing this one. The host must not calculate the next cursor value from
                 // a potentially skewed process clock.
-                await MaintainCoordinatorAsync(lease, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 var result = await store.TryMaterializeRecurringOccurrenceAsync(
                     new RecurringOccurrenceMaterialization
                     {
@@ -321,8 +294,11 @@ internal sealed class JobSchedulingHostedService(
     {
         var now = timeProvider.GetUtcNow();
         if (!_options.AutonomousWork || !_options.EnableHistoryCleanup || now < _nextCleanupUtc) return;
-        var lease = await EnsureCoordinatorAsync("maintenance", cancellationToken);
-        if (lease is null) return;
+        var context = await GetCoordinatorAsync("maintenance", cancellationToken);
+        if (context is null) return;
+        using var term = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.StoppingToken);
+        cancellationToken = term.Token;
+        var lease = JobCoordinatorLeaseAdapter.ToKey(context.Identity);
         var result = await store.CleanupHistoryAsync(new JobHistoryCleanupRequest
         {
             SchedulerScopeKey = _options.SchedulerScopeKey, CoordinatorLease = lease,

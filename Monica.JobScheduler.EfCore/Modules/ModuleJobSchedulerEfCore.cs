@@ -6,6 +6,7 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.EfCore;
+using Monica.Locker.EfCore;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -87,4 +88,8 @@ public sealed class ModuleJobSchedulerEfCore : MonicaModule<ModuleJobSchedulerEf
 /// <summary>
 /// Configures relational scheduler persistence.
 /// </summary>
-public sealed class ModuleJobSchedulerEfCoreOption : ModuleOptions<ModuleJobSchedulerEfCore>;
+public sealed class ModuleJobSchedulerEfCoreOption : ModuleOptions<ModuleJobSchedulerEfCore>
+{
+    /// <summary>Shared coordinator table mapping; choose one migration owner per database/schema.</summary>
+    public LeaseTableOptions LeaseTable { get; } = new();
+}

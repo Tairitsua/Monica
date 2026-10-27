@@ -107,6 +107,7 @@
   <Project Path="Monica.JobScheduler.ServiceDiscovery/Monica.JobScheduler.ServiceDiscovery.csproj" />
   <Project Path="Monica.JobScheduler.UI/Monica.JobScheduler.UI.csproj" />
   <Project Path="Monica.JobScheduler/Monica.JobScheduler.csproj" />
+  <Project Path="Monica.Locker.EfCore/Monica.Locker.EfCore.csproj" />
   <Project Path="Monica.Locker/Monica.Locker.csproj" />
   <Project Path="Monica.Logging/Monica.Logging.csproj" />
   <Project Path="Monica.Markdown/Monica.Markdown.csproj" />

@@ -171,6 +171,8 @@ public static class ModuleRepositoryRegistrationExtensions
     {
         var options = new RepositoryOutboxOptions();
         configure?.Invoke(options);
+        ArgumentNullException.ThrowIfNull(options.MaintenanceLease);
+        options.MaintenanceLease.Validate();
         if (options.DeliveryLease <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery lease must be positive.");
         if (options.PollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Poll interval must be positive.");
         if (options.BatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Batch size must be positive.");

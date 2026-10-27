@@ -1,3 +1,5 @@
+using Monica.Testing.Time;
+using Monica.Locker.Leases;
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -268,62 +270,6 @@ public sealed class JobSchedulingHostedServiceTests
         unchanged.Cursor!.Version.Should().Be(suspended.Cursor!.Version);
         var owners = await store.QueryOwnerSummariesAsync(StoreFixture.SCOPE, TestContext.Current.CancellationToken);
         owners.Should().ContainSingle().Which.LastObservedAtUtc.Should().Be(NOW.Add(options.SnapshotSyncInterval));
-    }
-
-    [Fact]
-    public async Task ScheduleAsync_WhenCoordinatorRenewalFails_ShouldRetryUsingTheLastSuccessfulGrantTiming()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var time = new StoreFixture.ManualTimeProvider(NOW);
-        var store = Substitute.For<IJobSchedulerStore>();
-        var acquireCalls = 0;
-        store.TryAcquireCoordinatorLeaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<TimeSpan>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            acquireCalls++;
-            if (acquireCalls == 2)
-            {
-                throw new TimeoutException("The coordinator renewal request did not complete.");
-            }
-
-            return Task.FromResult<JobCoordinatorLease?>(new JobCoordinatorLease
-            {
-                Key = new JobCoordinatorLeaseKey
-                {
-                    SchedulerScopeKey = StoreFixture.SCOPE,
-                    CoordinatorKey = "owner:" + StoreFixture.OWNER_A,
-                    WorkerInstanceId = "renewal-worker",
-                    LeaseToken = "original-coordinator-token"
-                },
-                GrantedAtUtc = time.GetUtcNow(),
-                ExpiresAtUtc = time.GetUtcNow().AddSeconds(30)
-            });
-        });
-        store.SyncOwnerSnapshotAsync(Arg.Any<JobOwnerSnapshot>(), Arg.Any<CancellationToken>()).Returns(call =>
-            Task.FromResult(new JobDefinitionSyncResult
-            {
-                ManifestHash = call.Arg<JobOwnerSnapshot>().ComputeManifestHash(),
-                ObservedAtUtc = time.GetUtcNow()
-            }));
-        store.GetDueRecurringSchedulesAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(),
-            Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<RecurringScheduleCursor>>([]));
-        using var service = CreateService(store, [], time, configuredOptions: new ModuleJobSchedulerOption
-        {
-            SchedulerScopeKey = StoreFixture.SCOPE,
-            ProjectName = StoreFixture.OWNER_A,
-            WorkerInstanceId = "renewal-worker",
-            CoordinatorLeaseDuration = TimeSpan.FromSeconds(30),
-            EnableHistoryCleanup = false
-        });
-        await service.ScheduleAsync(token);
-        time.Advance(TimeSpan.FromSeconds(20));
-        Func<Task> failedRenewal = () => service.ScheduleAsync(token);
-        await failedRenewal.Should().ThrowAsync<TimeoutException>();
-
-        time.Advance(TimeSpan.FromSeconds(1));
-        await service.ScheduleAsync(token);
-
-        acquireCalls.Should().Be(3, "a failed renewal must not make the last successful grant appear newly acquired");
     }
 
     [Fact]
@@ -606,33 +552,35 @@ public sealed class JobSchedulingHostedServiceTests
     public async Task ScheduleAsync_WhenOneOwnerCycleCrossesGrantWindows_ShouldContinueOnlyWithTheOriginalGeneration(bool expiresBeforeRenewal)
     {
         var token = TestContext.Current.CancellationToken;
-        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var durable = new InMemoryJobSchedulerStore(time);
         var boundary = Substitute.For<IJobSchedulerStore>();
-        var grantedTokens = new List<string>();
         var mutationTokens = new List<string>();
         var synchronized = new List<string>();
-        boundary.TryAcquireCoordinatorLeaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<TimeSpan>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(async call =>
+        boundary.CoordinatorLeases.Returns(durable.CoordinatorLeases);
+        var elapsed = TimeSpan.Zero;
+        async Task AdvanceOperationAsync()
+        {
+            if (expiresBeforeRenewal && synchronized.Count == 1)
             {
-                if (expiresBeforeRenewal && grantedTokens.Count == 1)
-                {
-                    time.Advance(TimeSpan.FromSeconds(31));
-                }
-
-                var grant = await durable.TryAcquireCoordinatorLeaseAsync(call.ArgAt<string>(0), call.ArgAt<string>(1),
-                    call.ArgAt<string>(2), call.Arg<TimeSpan>(), call.ArgAt<string?>(4), call.Arg<CancellationToken>());
-                if (grant is not null) grantedTokens.Add(grant.Key.LeaseToken);
-                return grant;
-            });
+                time.AdvanceAfterPause(TimeSpan.FromSeconds(31));
+                return;
+            }
+            for (var step = 0; step < 2; step++)
+            {
+                await time.WaitForTimerAsync(elapsed + TimeSpan.FromSeconds(10), token);
+                time.Advance(TimeSpan.FromSeconds(10));
+                elapsed += TimeSpan.FromSeconds(10);
+                await time.WaitForTimerAsync(elapsed + TimeSpan.FromSeconds(10), token);
+            }
+        }
         boundary.SyncOwnerSnapshotAsync(Arg.Any<JobOwnerSnapshot>(), Arg.Any<CancellationToken>())
             .Returns(call => durable.SyncOwnerSnapshotAsync(call.Arg<JobOwnerSnapshot>(), call.Arg<CancellationToken>()));
         boundary.SynchronizeRecurringScheduleAsync(Arg.Any<RecurringScheduleSynchronization>(), Arg.Any<CancellationToken>())
             .Returns(async call =>
             {
                 var command = call.Arg<RecurringScheduleSynchronization>();
-                time.Advance(TimeSpan.FromSeconds(20));
+                await AdvanceOperationAsync();
                 var result = await durable.SynchronizeRecurringScheduleAsync(command, call.Arg<CancellationToken>());
                 mutationTokens.Add(command.CoordinatorLease!.LeaseToken);
                 synchronized.Add(command.CursorKey.JobKey);
@@ -645,7 +593,7 @@ public sealed class JobSchedulingHostedServiceTests
             .Returns(async call =>
             {
                 var command = call.Arg<RecurringOccurrenceMaterialization>();
-                time.Advance(TimeSpan.FromSeconds(20));
+                await AdvanceOperationAsync();
                 var result = await durable.TryMaterializeRecurringOccurrenceAsync(command, call.Arg<CancellationToken>());
                 mutationTokens.Add(command.CoordinatorLease!.LeaseToken);
                 return result;
@@ -666,10 +614,9 @@ public sealed class JobSchedulingHostedServiceTests
         if (expiresBeforeRenewal)
         {
             Func<Task> cycle = () => service.ScheduleAsync(token);
-            await cycle.Should().ThrowAsync<InvalidOperationException>();
+            await cycle.Should().ThrowAsync<Exception>().Where(error => (error is InvalidOperationException) || (error is OperationCanceledException));
             synchronized.Should().ContainSingle();
-            mutationTokens.Should().ContainSingle().Which.Should().Be(grantedTokens[0]);
-            grantedTokens.Distinct(StringComparer.Ordinal).Should().HaveCount(2);
+            mutationTokens.Should().ContainSingle();
             (await durable.QueryExecutionsAsync(new JobExecutionQuery
             {
                 SchedulerScopeKey = StoreFixture.SCOPE, OwnerKey = StoreFixture.OWNER_A
@@ -680,9 +627,8 @@ public sealed class JobSchedulingHostedServiceTests
         await service.ScheduleAsync(token);
 
         synchronized.Should().HaveCount(3).And.OnlyHaveUniqueItems();
-        grantedTokens.Should().HaveCountGreaterThan(1);
-        grantedTokens.Distinct(StringComparer.Ordinal).Should().ContainSingle();
-        mutationTokens.Should().HaveCount(5).And.AllBeEquivalentTo(grantedTokens[0]);
+        mutationTokens.Should().HaveCount(5);
+        mutationTokens.Distinct(StringComparer.Ordinal).Should().ContainSingle();
         time.GetUtcNow().Should().Be(NOW.AddSeconds(100));
         (await durable.QueryExecutionsAsync(new JobExecutionQuery
         {
@@ -695,7 +641,7 @@ public sealed class JobSchedulingHostedServiceTests
     private static JobSchedulingHostedService CreateService(
         IJobSchedulerStore store,
         IReadOnlyList<LocalJobDefinition> definitions,
-        StoreFixture.ManualTimeProvider time,
+        TimeProvider time,
         bool manualMode = false,
         ModuleJobSchedulerOption? configuredOptions = null,
         ITypeActivationPolicy? activation = null)

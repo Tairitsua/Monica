@@ -59,11 +59,11 @@ public sealed class ExternalJobSchedulerCoordinationTests
                 await using var expire = connection.CreateCommand();
                 expire.CommandTimeout = 5;
                 expire.CommandText = """
-                    UPDATE "JobSchedulerCoordinators" SET "ExpiresAtUtcTicks" = 0
-                    WHERE "SchedulerScopeKey" = @scope AND "CoordinatorKey" = @coordinator AND "LeaseToken" = @token
+                    UPDATE "MonicaLeases" SET "ExpiresAtUtcTicks" = 0
+                    WHERE "Scope" = @scope AND "Name" = @coordinator AND "TermId" = @token
                     """;
                 AddParameter(expire, "scope", SCOPE);
-                AddParameter(expire, "coordinator", COORDINATOR);
+                AddParameter(expire, "coordinator", "jobscheduler:" + COORDINATOR);
                 AddParameter(expire, "token", winner.Key.LeaseToken);
                 Assert.Equal(1, await expire.ExecuteNonQueryAsync(token));
                 await using var due = connection.CreateCommand();

@@ -16,6 +16,7 @@ Start with composition for module-graph or host-lifecycle problems, then select 
 | Discover application services, choose DI lifetimes, or decorate an interface | [Dependency injection](references/dependency-injection.md) |
 | Register workers or diagnose their startup, state, and shutdown | [Hosted services](references/hosted-services.md) |
 | Select a lock provider, configure shared lock keys, or check lease constraints | [Lockers](references/lockers.md) |
+| Coordinate database maintenance across replicas, share lease tables, or validate a protected transaction | [Coordinator leases](references/leases.md) |
 | Register an observable object or inspect captured state, retained history, and exceptions | [Observable instance evidence](references/observable-instances.md) |
 | Configure registry/worker roles or inspect registered services | [Service discovery](references/service-discovery.md) |
 | Store key-value state using a memory, distributed, or keyed provider | [State stores](references/state-stores.md) |

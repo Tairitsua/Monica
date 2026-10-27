@@ -2,139 +2,56 @@ using Microsoft.EntityFrameworkCore;
 using Monica.JobScheduler.EfCore.Entities;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Operations;
+using Monica.Locker.EfCore;
+using Monica.Locker.Leases;
+using Monica.JobScheduler.Services.Support;
 
 namespace Monica.JobScheduler.EfCore;
 
 public sealed partial class EfCoreJobSchedulerStore
 {
-    /// <inheritdoc />
-    public Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,
-        CancellationToken cancellationToken = default)
-    {
-        ValidateIdentity(schedulerScopeKey, nameof(schedulerScopeKey));
-        return ReadAsync(async (context, token) =>
-        {
-            var rows = await context.Coordinators.AsNoTracking()
-                .Where(row => row.SchedulerScopeKey == schedulerScopeKey)
-                .OrderBy(row => row.CoordinatorKey)
-                .Select(row => new { row.CoordinatorKey, row.WorkerInstanceId, row.ExpiresAtUtcTicks })
-                .ToListAsync(token);
-            var now = await GetUtcNowAsync(context, token);
-            return new JobCoordinatorSnapshot
-            {
-                ObservedAtUtc = now,
-                Coordinators = rows.Select(row => new JobCoordinatorSummary
-                {
-                    CoordinatorKey = row.CoordinatorKey,
-                    WorkerInstanceId = row.WorkerInstanceId,
-                    ExpiresAtUtc = FromTicks(row.ExpiresAtUtcTicks)
-                }).ToArray()
-            };
-        }, cancellationToken);
-    }
+    private RelationalLeaseStore<JobSchedulerDbContext>? _coordinatorLeases;
+    private RelationalLeaseStore<JobSchedulerDbContext> RelationalLeases =>
+        LazyInitializer.EnsureInitialized(ref _coordinatorLeases, () => new(_dbContextFactory, _timeProvider, _operationTimeout));
 
     /// <inheritdoc />
-    public Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
+    public IExclusiveLeaseStore CoordinatorLeases => this;
+
+    Task<LeaseGrant?> IExclusiveLeaseStore.TryAcquireAsync(LeaseResource resource, string holderId, TimeSpan duration,
+        CancellationToken cancellationToken) => RunStoreOperationAsync("CoordinatorAcquire", false,
+        token => RelationalLeases.TryAcquireAsync(resource, holderId, duration, token), cancellationToken);
+
+    Task<LeaseGrant?> IExclusiveLeaseStore.TryRenewAsync(LeaseIdentity identity, TimeSpan duration,
+        CancellationToken cancellationToken) => RunStoreOperationAsync("CoordinatorRenew", true,
+        token => RelationalLeases.TryRenewAsync(identity, duration, token), cancellationToken);
+
+    Task<bool> IExclusiveLeaseStore.TryReleaseAsync(LeaseIdentity identity, CancellationToken cancellationToken) =>
+        RunStoreOperationAsync("CoordinatorRelease", true,
+            token => RelationalLeases.TryReleaseAsync(identity, token), cancellationToken);
+
+    Task<LeaseSnapshot> IExclusiveLeaseStore.GetSnapshotAsync(string scope, string namePrefix, CancellationToken cancellationToken) =>
+        RunStoreOperationAsync("CoordinatorSnapshot", false,
+            token => RelationalLeases.GetSnapshotAsync(scope, namePrefix, token), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,
+        CancellationToken cancellationToken = default) =>
+        JobCoordinatorLeaseAdapter.SnapshotAsync(CoordinatorLeases, schedulerScopeKey, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
         string workerInstanceId, TimeSpan leaseDuration, string? currentToken = null,
         CancellationToken cancellationToken = default)
     {
-        ValidateIdentity(schedulerScopeKey, nameof(schedulerScopeKey));
-        ValidateIdentity(workerInstanceId, nameof(workerInstanceId));
-        ArgumentException.ThrowIfNullOrWhiteSpace(coordinatorKey);
-        if (coordinatorKey.Length > 256) throw new ArgumentOutOfRangeException(nameof(coordinatorKey));
-        ValidatePositiveDuration(leaseDuration, nameof(leaseDuration));
-        return AcquireCoordinatorCoreAsync(schedulerScopeKey, coordinatorKey, workerInstanceId, leaseDuration,
-            currentToken, cancellationToken);
-    }
-
-    private async Task<JobCoordinatorLease?> AcquireCoordinatorCoreAsync(string schedulerScopeKey, string coordinatorKey,
-        string workerInstanceId, TimeSpan leaseDuration, string? currentToken, CancellationToken cancellationToken)
-    {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(_operationTimeout);
-        cancellationToken = deadline.Token;
-        // Standbys observe the indexed coordinator row without joining the holder's write-lock queue. A false
-        // hint only defers this attempt; every acquisition and renewal still rechecks under the row lock below.
-        var heldByOther = await ReadAsync(async (context, token) =>
-        {
-            if (UsesNativeRowLocks(context))
-            {
-                var sql = "SELECT EXISTS (SELECT 1 FROM \"JobSchedulerCoordinators\" "
-                          + "WHERE \"SchedulerScopeKey\" = {0} AND \"CoordinatorKey\" = {1} "
-                          + "AND \"ExpiresAtUtcTicks\" > " + DATABASE_STATEMENT_TICKS_SQL
-                          + " AND (\"WorkerInstanceId\" <> {2} OR \"LeaseToken\" <> {3})) AS \"Value\"";
-                return await context.Database.SqlQueryRaw<bool>(sql,
-                    schedulerScopeKey, coordinatorKey, workerInstanceId, currentToken ?? string.Empty).SingleAsync(token);
-            }
-            var nowTicks = ToTicks(await GetUtcNowAsync(context, token));
-            return await context.Coordinators.AsNoTracking().AnyAsync(row =>
-                row.SchedulerScopeKey == schedulerScopeKey && row.CoordinatorKey == coordinatorKey
-                && row.ExpiresAtUtcTicks > nowTicks
-                && (row.WorkerInstanceId != workerInstanceId || row.LeaseToken != currentToken), token);
-        }, cancellationToken, nameof(TryAcquireCoordinatorLeaseAsync));
-        if (heldByOther) return null;
-
-        return await WriteAsync<JobCoordinatorLease?>(async (context, token) =>
-        {
-            var entity = await LockCoordinatorAsync(context, schedulerScopeKey, coordinatorKey, token);
-            var now = await GetUtcNowAsync(context, token);
-            if (entity is not null && entity.ExpiresAtUtcTicks > ToTicks(now)
-                && (entity.WorkerInstanceId != workerInstanceId || entity.LeaseToken != currentToken))
-            {
-                return null;
-            }
-            if (entity is null)
-            {
-                entity = new JobSchedulerCoordinatorEntity
-                {
-                    SchedulerScopeKey = schedulerScopeKey, CoordinatorKey = coordinatorKey,
-                    WorkerInstanceId = workerInstanceId, LeaseToken = NewToken()
-                };
-                context.Coordinators.Add(entity);
-            }
-            else if (entity.ExpiresAtUtcTicks <= ToTicks(now))
-            {
-                entity.LeaseToken = NewToken();
-            }
-            entity.WorkerInstanceId = workerInstanceId;
-            entity.ExpiresAtUtcTicks = ToTicks(now.Add(leaseDuration));
-            return new JobCoordinatorLease
-            {
-                Key = new JobCoordinatorLeaseKey
-                {
-                    SchedulerScopeKey = schedulerScopeKey, CoordinatorKey = coordinatorKey,
-                    WorkerInstanceId = workerInstanceId, LeaseToken = entity.LeaseToken
-                },
-                GrantedAtUtc = now, ExpiresAtUtc = FromTicks(entity.ExpiresAtUtcTicks)
-            };
-        }, cancellationToken, operationName: nameof(TryAcquireCoordinatorLeaseAsync));
+        return await JobCoordinatorLeaseAdapter.AcquireAsync(CoordinatorLeases, schedulerScopeKey, coordinatorKey,
+            workerInstanceId, leaseDuration, currentToken, deadline.Token);
     }
 
-    private static async Task<JobSchedulerCoordinatorEntity?> LockCoordinatorAsync(
-        JobSchedulerDbContext context, string scope, string key, CancellationToken token)
-    {
-        if (!UsesNativeRowLocks(context))
-        {
-            return await context.Coordinators.SingleOrDefaultAsync(row =>
-                row.SchedulerScopeKey == scope && row.CoordinatorKey == key, token);
-        }
-        return (await context.Coordinators.FromSqlInterpolated(
-                $"SELECT * FROM \"JobSchedulerCoordinators\" WHERE \"SchedulerScopeKey\" = {scope} AND \"CoordinatorKey\" = {key} FOR UPDATE")
-            .ToListAsync(token)).SingleOrDefault();
-    }
-
-    private async Task ValidateCoordinatorLeaseAsync(JobSchedulerDbContext context,
-        JobCoordinatorLeaseKey? key, CancellationToken token)
-    {
-        if (key is null) return;
-        var entity = await LockCoordinatorAsync(context, key.SchedulerScopeKey, key.CoordinatorKey, token);
-        var now = await GetUtcNowAsync(context, token);
-        if (entity is null || entity.WorkerInstanceId != key.WorkerInstanceId || entity.LeaseToken != key.LeaseToken
-            || entity.ExpiresAtUtcTicks <= ToTicks(now))
-        {
-            throw new InvalidOperationException("The scheduling coordinator lease is no longer current.");
-        }
-    }
+    private Task ValidateCoordinatorLeaseAsync(JobSchedulerDbContext context, JobCoordinatorLeaseKey? key,
+        CancellationToken cancellationToken) => key is null ? Task.CompletedTask
+        : RelationalLeases.EnsureHeldAsync(context, key.ToIdentity(), cancellationToken);
 
     private static async Task<JobSchedulerOwnerEntity?> LockOwnerAsync(
         JobSchedulerDbContext context, string scope, string owner, CancellationToken token)

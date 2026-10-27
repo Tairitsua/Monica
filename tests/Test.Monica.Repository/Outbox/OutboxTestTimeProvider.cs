@@ -19,28 +19,39 @@ internal sealed class OutboxTestTimeProvider : TimeProvider
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         if (period != Timeout.InfiniteTimeSpan) throw new NotSupportedException("Only one-shot test delays are supported.");
-        var delay = new Delay(callback, state);
-        _delays.GetOrAdd(dueTime, _ => Channel.CreateUnbounded<Delay>()).Writer.TryWrite(delay);
-        return delay;
+        var timer = new ControlledTimer(this, callback, state);
+        timer.Change(dueTime, period);
+        return timer;
     }
 
     public async Task<Delay> TakeDelayAsync(TimeSpan interval, CancellationToken cancellationToken)
         => await _delays.GetOrAdd(interval, _ => Channel.CreateUnbounded<Delay>()).Reader
             .ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
 
-    internal sealed class Delay(TimerCallback callback, object? state) : ITimer
+    internal sealed class Delay(Action fire)
     {
-        private int _active = 1;
+        public void Fire() => fire();
+    }
 
-        public void Fire()
-        {
-            if (Interlocked.Exchange(ref _active, 0) == 1) callback(state);
-        }
+    private sealed class ControlledTimer(OutboxTestTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    {
+        private int _generation;
+        private bool _disposed;
 
         public bool Change(TimeSpan dueTime, TimeSpan period)
-            => throw new NotSupportedException("Test delays cannot be rescheduled.");
+        {
+            if (_disposed) return false;
+            var generation = Interlocked.Increment(ref _generation);
+            if (dueTime != Timeout.InfiniteTimeSpan)
+                owner._delays.GetOrAdd(dueTime, _ => Channel.CreateUnbounded<Delay>()).Writer.TryWrite(new Delay(() =>
+                {
+                    if (Interlocked.CompareExchange(ref _generation, generation + 1, generation) == generation)
+                        callback(state);
+                }));
+            return true;
+        }
 
-        public void Dispose() => Interlocked.Exchange(ref _active, 0);
+        public void Dispose() { _disposed = true; Interlocked.Increment(ref _generation); }
         public ValueTask DisposeAsync()
         {
             Dispose();

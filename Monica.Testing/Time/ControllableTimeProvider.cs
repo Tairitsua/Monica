@@ -1,25 +1,32 @@
-namespace Test.Monica.JobScheduler.Services;
+namespace Monica.Testing.Time;
 
 /// <summary>
 /// Drives worker deadlines and monotonic elapsed time without waiting for the wall clock.
 /// </summary>
-internal sealed class WorkerTestTimeProvider(DateTimeOffset initialTime) : TimeProvider
+public sealed class ControllableTimeProvider(DateTimeOffset initialTime) : TimeProvider
 {
     private readonly object _gate = new();
     private readonly List<WorkerTimer> _timers = [];
     private TaskCompletionSource _timerChanged = CreateSignal();
     private long _timestamp;
+    private TimeSpan _wallOffset;
 
+    /// <inheritdoc />
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
+    /// <inheritdoc />
     public override DateTimeOffset GetUtcNow()
     {
         lock (_gate)
         {
-            return initialTime.AddTicks(_timestamp);
+            return initialTime.AddTicks(_timestamp).Add(_wallOffset);
         }
     }
 
+    /// <summary>Adjusts only wall time, leaving elapsed time and timers unchanged.</summary>
+    public void AdjustWallClock(TimeSpan offset) { lock (_gate) _wallOffset += offset; }
+
+    /// <inheritdoc />
     public override long GetTimestamp()
     {
         lock (_gate)
@@ -28,6 +35,7 @@ internal sealed class WorkerTestTimeProvider(DateTimeOffset initialTime) : TimeP
         }
     }
 
+    /// <inheritdoc />
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new WorkerTimer(this, callback, state);
@@ -40,6 +48,7 @@ internal sealed class WorkerTestTimeProvider(DateTimeOffset initialTime) : TimeP
         return timer;
     }
 
+    /// <summary>Advances elapsed time and delivers due timers in deadline order.</summary>
     public void Advance(TimeSpan duration)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
@@ -148,7 +157,7 @@ internal sealed class WorkerTestTimeProvider(DateTimeOffset initialTime) : TimeP
 
     private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private sealed class WorkerTimer(WorkerTestTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    private sealed class WorkerTimer(ControllableTimeProvider owner, TimerCallback callback, object? state) : ITimer
     {
         public TimerCallback Callback { get; } = callback;
 

@@ -12,6 +12,7 @@ using Monica.JobScheduler.EfCore.Metrics;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.Locker.Leases;
 using Monica.Modules;
 
 namespace Monica.JobScheduler.EfCore;
@@ -28,7 +29,7 @@ public sealed partial class EfCoreJobSchedulerStore(
     IDbContextFactory<JobSchedulerDbContext> dbContextFactory,
     TimeProvider? timeProvider = null,
     IOptions<ModuleJobSchedulerOption>? options = null,
-    IMeterFactory? meterFactory = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor, IDisposable
+    IMeterFactory? meterFactory = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor, IExclusiveLeaseStore, IDisposable
 {
     private const int MAX_TRANSACTION_ATTEMPTS = 5;
     private static readonly JsonSerializerOptions JSON_OPTIONS = new(JsonSerializerDefaults.Web);
@@ -212,8 +213,7 @@ public sealed partial class EfCoreJobSchedulerStore(
                     constraint = GetVastbaseIdentityConstraint(current, updateException);
                 }
 
-                if (constraint is "PK_JobExecutions" or "PK_JobExecutionGates" or "PK_JobSchedulerOwners"
-                    or "PK_JobSchedulerCoordinators")
+                if (constraint is "PK_JobExecutions" or "PK_JobExecutionGates" or "PK_JobSchedulerOwners")
                 {
                     return true;
                 }
@@ -241,7 +241,6 @@ public sealed partial class EfCoreJobSchedulerStore(
                 JobExecutionEntity => "PK_JobExecutions",
                 JobExecutionGateEntity => "PK_JobExecutionGates",
                 JobSchedulerOwnerEntity => "PK_JobSchedulerOwners",
-                JobSchedulerCoordinatorEntity => "PK_JobSchedulerCoordinators",
                 _ => null
             };
             if (constraint is not null

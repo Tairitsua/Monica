@@ -113,16 +113,33 @@ Mirror source folders such as `Modules/`, `Facades/`, `Services/`, `Providers/`,
 
 Source-generator tests are the exception to the host and ProjectUnit boundaries above. Keep them in a dedicated `Test.Monica.{GeneratorProject}` project, instantiate the incremental generator directly, and run it against an in-memory `CSharpCompilation`. Assert the updated compilation as well as generated text so same-compilation references are proven. Repeated identical runs must remain deterministic and must not create repository files; reserve solution-build tests for behavior owned by analyzer packaging or MSBuild targets.
 
+## Opt-in native lease tests and measurements
+
+`Test.Monica.JobScheduler/Stores/External` contains native protocol and shared lease integration scenarios tagged `Category=ExternalDatabase`. They skip unless the explicit `MONICA_JOBSCHEDULER_TEST_POSTGRES` or `MONICA_JOBSCHEDULER_TEST_VASTBASE` connection setting is present. Use a dedicated test server with database create/drop privileges: the fixture creates uniquely named `monica_jobs_test_*` databases, caps the shared application pool at three connections, and removes only its own database. It never reads application connection configuration. The Vastbase fixture requires the actual supported G100 Build15 server; PostgreSQL is not a substitute for that validation.
+
+```powershell
+# Set the test connection through your environment before running these commands.
+dotnet test tests/Test.Monica.JobScheduler/Test.Monica.JobScheduler.csproj -c Release --no-build --filter 'Category=ExternalDatabase'
+
+# Optional PostgreSQL measurements; use existing absolute output directories.
+$env:MONICA_LEASE_PERF_OUTPUT = Join-Path $PWD 'coordinator-measurements.json'
+$env:MONICA_OUTBOX_PERF_OUTPUT = Join-Path $PWD 'outbox-measurements.json'
+dotnet test tests/Test.Monica.JobScheduler/Test.Monica.JobScheduler.csproj -c Release --no-build --filter 'FullyQualifiedName~ExternalCoordinatorPerformanceTests|FullyQualifiedName~Maintenance_WhenManyHostsShareTheTable'
+# Set MONICA_LEASE_PERF_UNRELATED_ROWS=10000 for the larger shared-table scenario.
+```
+
+The coordinator workload uses 1/4/16 store instances and 100 measured operations per instance after warmup. It records SQL commands, transactions, and latency percentiles. The Outbox workload uses independent real hosts sharing one native database, 4,000 expired plus 12,000 retained rows, and 512-byte bodies. It compares the previous uncoordinated cleanup algorithm (test-only reference) with the worker's first coordinated pass, including election, and verifies one status sample across replicas. Treat these as bounded regression measurements, not production sizing or steady-state throughput claims. See the recorded [shared-lease performance report](performance/shared-leases-2026-10-27/README.md).
+
 ## WSL Execution
 
 Use Windows paths:
 
 ```bash
-dotnet test 'D:\Code\MoLibrary\Monica.slnx' --results-directory 'D:\Code\MoLibrary\tests\TestResults'
+pwsh.exe -File 'D:\Code\MoLibrary\scripts\run-tests.ps1' -NoBuild
 ```
 
 For coverage:
 
 ```bash
-dotnet test 'D:\Code\MoLibrary\Monica.slnx' --collect:"XPlat Code Coverage" --results-directory 'D:\Code\MoLibrary\tests\TestResults'
+pwsh.exe -File 'D:\Code\MoLibrary\scripts\run-tests.ps1' -NoBuild --collect:"XPlat Code Coverage"
 ```

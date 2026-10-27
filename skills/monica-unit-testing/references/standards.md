@@ -48,6 +48,8 @@
 
 ## Core Assertions
 
+Use `Monica.Testing.Time.ControllableTimeProvider` for deadline/renewal behavior shared across workers. `WaitForTimerAsync` waits for a scheduled absolute elapsed-time deadline before advancing; `Advance` delivers due timers in order, `AdvanceAfterPause` models delayed timer delivery, and `AdjustWallClock` changes wall time without changing monotonic elapsed time. Await explicit worker/store barriers as well as timers: advancing the clock does not drain asynchronous continuations. See `tests/Test.Monica.Locker/Leases/LeaseCoordinatorTests.cs` for independent renewal, late responses, clock movement, and shutdown cases. Keep provider concurrency claims in native integration tests rather than inferring them from this clock or SQLite.
+
 - Prefer public-surface assertions.
 - Assert `Res` and `Res<T>` status, message, and data explicitly.
 - Assert successful `Res<string>.Data` to catch the string-overload trap.

@@ -1,3 +1,4 @@
+using Monica.Testing.Time;
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -437,7 +438,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenRenewalNeverReturns_ShouldCancelAtTheLastConfirmedLeaseDeadline()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationObservingRecurringJob>();
@@ -502,7 +503,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenRenewalsKeepFailing_ShouldRetryWithoutExtendingTheLeaseDeadline()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationObservingRecurringJob>();
@@ -570,7 +571,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenRenewalSucceedsAfterCancellation_ShouldKeepTheOriginalStopDeadline()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
@@ -632,7 +633,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenCompletionNeverReturns_ShouldCancelTheIndependentFinalizationBudget()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CompletionProbe();
         using var host = CreateJobHost<CompletingRecurringJob, CompletionProbe>(probe);
         var definition = CreateDefinition<CompletingRecurringJob>();
@@ -695,7 +696,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenShutdownReleaseNeverReturns_ShouldCancelTheIndependentFinalizationBudget()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationObservingRecurringJob>();
@@ -755,7 +756,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenClaimResponseExhaustsTheStoppingRunway_ShouldNotStartUserCode()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationObservingRecurringJob>();
@@ -787,7 +788,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ClaimAvailableWorkAsync_WhenClaimResponseIsDelayed_ShouldCountTheStoreWaitAgainstTheLease()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationObservingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationObservingRecurringJob>();
@@ -826,7 +827,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenProcessPauseExhaustsLeaseSafety_ShouldRequestRestartWithoutAnotherGracePeriod()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
@@ -868,7 +869,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenUserCodeBlocksBeforeReturningATask_ShouldStartTheWatchdogBeforeDispatch()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<SynchronouslyBlockingRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<SynchronouslyBlockingRecurringJob>();
@@ -917,7 +918,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ExecuteLeaseAsync_WhenCancellationCallbackBlocks_ShouldRequestRestartAtTheGraceDeadline()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new BlockingCancellationProbe();
         using var host = CreateJobHost<BlockingCancellationRecurringJob, BlockingCancellationProbe>(probe);
         var definition = CreateDefinition<BlockingCancellationRecurringJob>();
@@ -971,7 +972,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
     [Fact]
     public async Task ClaimAvailableWorkAsync_WhenAnAttemptIgnoresCancellation_ShouldStopNewClaimsWithoutReleasingTheLease()
     {
-        var time = new WorkerTestTimeProvider(NOW);
+        var time = new ControllableTimeProvider(NOW);
         var probe = new CancellationProbe();
         using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
         var definition = CreateDefinition<CancellationIgnoringRecurringJob>();

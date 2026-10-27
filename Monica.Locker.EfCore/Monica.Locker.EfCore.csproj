@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Shared relational coordinator leases and transaction-bound ownership checks for Monica.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monica.Locker\Monica.Locker.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+  </ItemGroup>
+</Project>

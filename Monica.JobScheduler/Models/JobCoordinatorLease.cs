@@ -1,3 +1,6 @@
+using Monica.Locker.Leases;
+using Monica.JobScheduler.Services.Support;
+
 namespace Monica.JobScheduler.Models;
 
 /// <summary>Identifies one fenced scheduling or maintenance coordinator grant.</summary>
@@ -11,6 +14,9 @@ public sealed record JobCoordinatorLeaseKey
     public required string WorkerInstanceId { get; init; }
     /// <summary>Gets the opaque token that fences previous coordinator grants.</summary>
     public required string LeaseToken { get; init; }
+
+    internal LeaseIdentity ToIdentity() => new(new LeaseResource(SchedulerScopeKey,
+        JobCoordinatorLeaseAdapter.PREFIX + CoordinatorKey), WorkerInstanceId, LeaseToken);
 
     internal void ValidatePartition(string scope, string partition)
     {

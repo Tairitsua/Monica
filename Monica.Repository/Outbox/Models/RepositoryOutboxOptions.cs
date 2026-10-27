@@ -1,8 +1,17 @@
+using Monica.Locker.EfCore;
+using Monica.Locker.Leases;
+
 namespace Monica.Repository.Outbox.Models;
 
 /// <summary>Controls durable delivery for one repository context. Event contracts come from EventBus metadata.</summary>
 public sealed class RepositoryOutboxOptions
 {
+    /// <summary>Shared coordinator table mapping. Select one migration owner when Outbox and JobScheduler share a database.</summary>
+    public LeaseTableOptions LeaseTable { get; } = new();
+
+    /// <summary>Maintenance coordination: 30-second grant, five-second standby/operation bounds. Delivery claims remain independent.</summary>
+    public LeaseCoordinatorOptions MaintenanceLease { get; set; } = new();
+
     /// <summary>Claim duration, five minutes by default. Configure above the transport's normal send timeout.</summary>
     public TimeSpan DeliveryLease { get; set; } = TimeSpan.FromMinutes(5);
 

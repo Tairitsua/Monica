@@ -2,6 +2,7 @@ using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Operations;
 using Monica.JobScheduler.Models.Execution;
+using Monica.Locker.Leases;
 
 namespace Monica.JobScheduler.Abstractions;
 
@@ -10,6 +11,9 @@ namespace Monica.JobScheduler.Abstractions;
 /// </summary>
 public interface IJobSchedulerStore : IJobDefinitionStore, IJobExecutionStore, IJobSchedulerAnalyticsStore
 {
+    /// <summary>Gets role leases bound to this store's correctness authority, distinct from job execution claims.</summary>
+    IExclusiveLeaseStore CoordinatorLeases { get; }
+
     /// <summary>Observes retained coordinator holders and expiries in one exact scope without exposing tokens.</summary>
     /// <remarks>This read does not acquire or renew any lease. Expired records remain visible for diagnosis.</remarks>
     Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,

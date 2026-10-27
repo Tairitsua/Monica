@@ -81,7 +81,7 @@ internal sealed class ExternalSchedulerStoreFixture : IAsyncDisposable
 
             // Vastbase's empty template contains vendor objects. EnsureCreated sees those objects and skips the
             // scheduler model, so create only this model after verifying the fixture-owned template baseline.
-            TestContext.Current.AddAttachment("scheduler-schema.sql", context.Database.GenerateCreateScript());
+            TestContext.Current.AddAttachment($"scheduler-schema-{database.DatabaseName}.sql", context.Database.GenerateCreateScript());
             await context.GetService<IRelationalDatabaseCreator>().CreateTablesAsync(cancellationToken);
             TestContext.Current.TestOutputHelper?.WriteLine($"Created scheduler model tables in owned {database.DatabaseName}.");
             return new ExternalSchedulerStoreFixture(database, host, factory);

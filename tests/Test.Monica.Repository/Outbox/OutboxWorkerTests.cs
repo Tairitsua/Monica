@@ -62,24 +62,24 @@ public sealed class OutboxWorkerTests
     }
 
     [Fact]
-    public async Task Worker_WhenCleanupIsBlocked_ShouldKeepDeliveringAndCancelMaintenanceOnShutdown()
+    public async Task Worker_WhenStatusSamplingIsBlocked_ShouldKeepDeliveringAndCancelMaintenanceOnShutdown()
     {
         var time = new OutboxTestTimeProvider();
-        var commands = new WorkerCommands { BlockCleanup = true };
+        var commands = new WorkerCommands { BlockStatus = true };
         await using var app = await CreateAsync(time, commands);
         var poll = await time.TakeDelayAsync(PollInterval, Token);
-        var cleanup = await time.TakeDelayAsync(CleanupInterval, Token);
+        var status = await time.TakeDelayAsync(StatusInterval, Token);
         await PublishAsync(app, 1);
 
-        cleanup.Fire();
-        await commands.CleanupEntered.Task.WaitAsync(TimeSpan.FromSeconds(15), Token);
+        status.Fire();
+        await commands.StatusEntered.Task.WaitAsync(TimeSpan.FromSeconds(15), Token);
         poll.Fire();
         _ = await time.TakeDelayAsync(PollInterval, Token);
 
         await AssertDeliveredAsync(app, 1);
-        Assert.False(commands.CleanupExited.Task.IsCompleted);
+        Assert.False(commands.StatusExited.Task.IsCompleted);
         await app.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), Token);
-        Assert.True(commands.CleanupExited.Task.IsCompletedSuccessfully);
+        Assert.True(commands.StatusExited.Task.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -142,40 +142,36 @@ public sealed class OutboxWorkerTests
         private int _statusCount;
         public int CleanupCount => Volatile.Read(ref _cleanupCount);
         public int StatusCount => Volatile.Read(ref _statusCount);
-        public bool BlockCleanup { get; init; }
+        public bool BlockStatus { get; init; }
         public bool FailFirstCleanup { get; init; }
-        public TaskCompletionSource CleanupEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource CleanupExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource StatusEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource StatusExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
             if (command.CommandText.Contains("COUNT(*)", StringComparison.Ordinal)
                 && command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal))
-                Interlocked.Increment(ref _statusCount);
-            return ValueTask.FromResult(result);
-        }
-
-        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
-            CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (!command.CommandText.StartsWith("DELETE", StringComparison.Ordinal)
-                || !command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal)) return result;
-            var count = Interlocked.Increment(ref _cleanupCount);
-            if (FailFirstCleanup && count == 1) throw new IOException("Maintenance database unavailable.");
-            if (BlockCleanup)
             {
-                CleanupEntered.TrySetResult();
-                try
+                Interlocked.Increment(ref _statusCount);
+                if (BlockStatus)
                 {
-                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                }
-                finally
-                {
-                    CleanupExited.TrySetResult();
+                    StatusEntered.TrySetResult();
+                    try { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+                    finally { StatusExited.TrySetResult(); }
                 }
             }
             return result;
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!command.CommandText.StartsWith("DELETE", StringComparison.Ordinal)
+                || !command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal)) return ValueTask.FromResult(result);
+            var count = Interlocked.Increment(ref _cleanupCount);
+            if (FailFirstCleanup && count == 1) throw new IOException("Maintenance database unavailable.");
+            return ValueTask.FromResult(result);
         }
     }
 }

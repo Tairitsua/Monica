@@ -515,6 +515,7 @@
           "Monica.ApplicationModel",
           "Monica.DependencyInjection",
           "Monica.Locker",
+          "Monica.Locker.EfCore",
           "Monica.ServiceDiscovery",
           "Monica.StateStore",
           "Monica.StateStore.StackExchange",

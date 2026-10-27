@@ -16,7 +16,7 @@ public sealed class EfCoreJobSchedulerStoreIdentityConflictTests
     private static readonly DateTimeOffset Now = new(2026, 10, 26, 0, 0, 0, TimeSpan.Zero);
     private const string COORDINATOR = "owner:identity-conflict";
     private const string WORKER = "identity-worker";
-    private const string IDENTITY_MESSAGE = "duplicate key value violates unique constraint \"PK_JobSchedulerCoordinators\"";
+    private const string IDENTITY_MESSAGE = "duplicate key value violates unique constraint \"PK_MonicaLeases\"";
 
     [Fact]
     public async Task TryAcquireCoordinatorLeaseAsync_WhenVastbaseReportsMatchingInsertConflictWithoutConstraintMetadata_ShouldReplayAndPersistOneGrant()
@@ -110,7 +110,7 @@ public sealed class EfCoreJobSchedulerStoreIdentityConflictTests
         {
             var context = eventData.Context ?? throw new InvalidOperationException("The store save supplied no context.");
             var entries = context.ChangeTracker.Entries().Where(entry =>
-                entry.Metadata.GetTableName() == "JobSchedulerCoordinators"
+                entry.Metadata.GetTableName() == "MonicaLeases"
                 && entry.State is EntityState.Added or EntityState.Modified).ToArray();
             if (entries.Length == 0)
             {

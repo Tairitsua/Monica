@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Modules;
+using Monica.Locker.Leases;
 
 namespace Monica.Repository.Outbox.Services;
 
@@ -23,20 +24,21 @@ internal sealed class OutboxWorker(
     protected override Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
         => Task.WhenAll(_stores.Select(store => RunStoreAsync(store, stoppingToken)));
 
-    private Task RunStoreAsync(IOutboxStore store, CancellationToken stoppingToken)
+    private async Task RunStoreAsync(IOutboxStore store, CancellationToken stoppingToken)
     {
         OutboxStoreStatus? previousStatus = null;
+        await using var coordinator = store.CreateMaintenanceCoordinator();
         // Each operation owns a fresh scope. Slow maintenance or another context's transport
         // must not hold up delivery. The host awaits all loops during shutdown.
-        return Task.WhenAll(
+        await Task.WhenAll(
             DeliverAsync(store, stoppingToken),
-            RunMaintenanceAsync(store, store.CleanupInterval, "cleanup", async token =>
+            RunMaintenanceAsync(store, coordinator, store.CleanupInterval, "cleanup", async (identity, token) =>
             {
-                var cleaned = await store.CleanupAsync(token);
+                var cleaned = await store.CleanupAsync(identity, token);
                 if (cleaned != 0)
                     RecordState($"{store.StoreName}: pruned {cleaned} acknowledged outbox messages", logLevel: LogLevel.Debug);
             }, stoppingToken),
-            RunMaintenanceAsync(store, store.StatusInterval, "status sampling", async token =>
+            RunMaintenanceAsync(store, coordinator, store.StatusInterval, "status sampling", async (_, token) =>
             {
                 var status = await store.GetStatusAsync(token);
                 ReportStatus(store, status, previousStatus);
@@ -72,20 +74,34 @@ internal sealed class OutboxWorker(
         }
     }
 
-    private async Task RunMaintenanceAsync(IOutboxStore store, TimeSpan interval, string operation,
-        Func<CancellationToken, Task> action, CancellationToken stoppingToken)
+    private async Task RunMaintenanceAsync(IOutboxStore store, LeaseCoordinator coordinator, TimeSpan interval, string operation,
+        Func<LeaseIdentity, CancellationToken, Task> action, CancellationToken stoppingToken)
     {
+        var delay = interval;
         while (!stoppingToken.IsCancellationRequested)
         {
             // Maintenance has its own cadence and does not scan the database at host startup.
-            await Task.Delay(interval, time, stoppingToken);
+            await Task.Delay(delay, time, stoppingToken);
+            LeaseContext? context = null;
             try
             {
-                await action(stoppingToken);
+                context = await coordinator.GetAsync(await store.GetMaintenanceResourceAsync(stoppingToken), stoppingToken);
+                if (context is null)
+                {
+                    delay = store.MaintenanceRetryInterval;
+                    continue;
+                }
+                delay = interval;
+                using var term = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, context.StoppingToken);
+                await action(context.Identity, term.Token);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (OperationCanceledException) when (context?.StoppingToken.IsCancellationRequested == true)
+            {
+                delay = store.MaintenanceRetryInterval;
             }
             catch (Exception exception)
             {

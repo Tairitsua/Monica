@@ -1,0 +1,284 @@
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+
+namespace Monica.Locker.Leases;
+
+/// <summary>Configures one process's reusable coordination leases.</summary>
+public sealed record LeaseCoordinatorOptions
+{
+    /// <summary>Confirmed ownership duration, 30 seconds by default. Renewal runs every third of this duration.</summary>
+    public TimeSpan Duration { get; init; } = TimeSpan.FromSeconds(30);
+    /// <summary>Minimum interval between unsuccessful acquisitions, five seconds by default.</summary>
+    public TimeSpan StandbyInterval { get; init; } = TimeSpan.FromSeconds(5);
+    /// <summary>Maximum wait for a store operation or runtime drain, five seconds by default.</summary>
+    public TimeSpan OperationTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Rejects invalid intervals before starting coordination or background work.</summary>
+    public void Validate()
+    {
+        if (Duration <= TimeSpan.Zero || Duration > TimeSpan.FromDays(1)
+            || StandbyInterval <= TimeSpan.Zero || OperationTimeout <= TimeSpan.Zero
+            || OperationTimeout >= Duration / 3)
+            throw new ArgumentException("Lease duration must exceed three operation timeouts and be at most one day; all intervals must be positive.");
+    }
+}
+
+/// <summary>Supplies an immutable acquisition and a cancellation signal that is never reset for a later term.</summary>
+public sealed record LeaseContext(LeaseIdentity Identity, CancellationToken StoppingToken);
+
+/// <summary>Caches role grants and supervises their renewal independently of protected work.</summary>
+/// <remarks>
+/// One owner keeps this instance for its worker lifetime. GetAsync admits work only under a confirmed term; pass the
+/// term token to that work and validate its identity inside every protected database transaction. Cancellation alone
+/// does not fence external effects. Stop and drain all caller-owned work before DisposeAsync releases grants.
+/// Synchronous Dispose only stops supervision and leaves grants to expire; it never releases potentially active work.
+/// </remarks>
+public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
+{
+    private readonly IExclusiveLeaseStore _store;
+    private readonly string _holder;
+    private readonly TimeProvider _time;
+    private readonly LeaseCoordinatorOptions _options;
+    private readonly ILogger _logger;
+    private readonly ConcurrentDictionary<LeaseResource, Entry> _entries = new();
+    private readonly CancellationTokenSource _stopping = new();
+    private int _disposed;
+    private int _released;
+
+    /// <summary>Creates an explicitly store-bound supervisor; it does not acquire roles until requested.</summary>
+    public LeaseCoordinator(IExclusiveLeaseStore store, string holderId, TimeProvider timeProvider,
+        ILogger logger, LeaseCoordinatorOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentException.ThrowIfNullOrWhiteSpace(holderId);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(logger);
+        if (holderId.Length > 256) throw new ArgumentOutOfRangeException(nameof(holderId));
+        _store = store;
+        _holder = holderId;
+        _time = timeProvider;
+        _logger = logger;
+        _options = options ?? new();
+        _options.Validate();
+    }
+
+    /// <summary>Gets a usable cached term or attempts acquisition; returns null during contention/backoff.</summary>
+    /// <remarks>Acquisition errors propagate. A stalled provider prevents further attempts for that resource until its call resolves.</remarks>
+    public async Task<LeaseContext?> GetAsync(LeaseResource resource, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        var entry = _entries.GetOrAdd(resource, static _ => new Entry());
+        await entry.Mutex.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (entry.Term is { } current && current.IsUsable) return current.Context;
+            entry.Term?.Retire();
+            if (entry.Renewal is { } previousRenewal)
+                await previousRenewal.WaitAsync(_options.OperationTimeout, cancellationToken).ConfigureAwait(false);
+            if (entry.Pending is { IsCompleted: false }
+                || entry.Attempted && _time.GetElapsedTime(entry.LastAttempt) < _options.StandbyInterval) return null;
+            entry.LastAttempt = _time.GetTimestamp();
+            entry.Attempted = true;
+            var started = _time.GetTimestamp();
+            var wallStart = _time.GetUtcNow();
+            var grant = await RequestAsync(entry, token => _store.TryAcquireAsync(resource, _holder, _options.Duration, token),
+                cancellationToken).ConfigureAwait(false);
+            if (grant is null) return null;
+            if (grant.Identity.Resource != resource || grant.Identity.HolderId != _holder)
+                throw new InvalidOperationException("The lease provider returned a grant for a different resource or holder.");
+            entry.Attempted = false;
+            cancellationToken.ThrowIfCancellationRequested();
+            _stopping.Token.ThrowIfCancellationRequested();
+            var term = new Term(grant, started, wallStart, _time, _logger);
+            entry.Term = term;
+            if (_stopping.IsCancellationRequested) term.Retire();
+            if (!term.IsUsable) return null;
+            entry.Renewal = Task.Run(() => RenewAsync(entry, term), CancellationToken.None);
+            return term.Context;
+        }
+        finally { entry.Mutex.Release(); }
+    }
+
+    private async Task RenewAsync(Entry entry, Term term)
+    {
+        try
+        {
+            while (term.IsUsable && !_stopping.IsCancellationRequested)
+            {
+                await Task.Delay(_options.Duration / 3, _time, term.Context.StoppingToken).ConfigureAwait(false);
+                await entry.Mutex.WaitAsync(term.Context.StoppingToken).ConfigureAwait(false);
+                try
+                {
+                    if (!ReferenceEquals(entry.Term, term) || !term.IsUsable) return;
+                    var started = _time.GetTimestamp();
+                    var wallStart = _time.GetUtcNow();
+                    var renewed = await RequestAsync(entry,
+                        token => _store.TryRenewAsync(term.Context.Identity, _options.Duration, token),
+                        term.Context.StoppingToken).ConfigureAwait(false);
+                    if (renewed is null || renewed.Identity != term.Context.Identity || !term.Confirm(renewed, started, wallStart)) return;
+                }
+                finally { entry.Mutex.Release(); }
+            }
+        }
+        catch (OperationCanceledException) when (term.Context.StoppingToken.IsCancellationRequested || _stopping.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Lease renewal failed for {Scope}/{Resource}; retiring its term.",
+                term.Context.Identity.Resource.Scope, term.Context.Identity.Resource.Name);
+        }
+        finally { term.Retire(); }
+    }
+
+    private async Task<LeaseGrant?> RequestAsync(Entry entry, Func<CancellationToken, Task<LeaseGrant?>> operation,
+        CancellationToken cancellationToken)
+    {
+        var request = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
+        // Isolate a provider's synchronous preamble as well as its asynchronous wait from the deadline supervisor.
+        var pending = Task.Run(() => operation(request.Token), CancellationToken.None);
+        entry.Pending = pending;
+        _ = pending.ContinueWith(task =>
+        {
+            _ = task.Exception;
+            request.Dispose();
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        try
+        {
+            return await pending.WaitAsync(_options.OperationTimeout, _time, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Do not wait for arbitrary cancellation callbacks. Retain Pending so unresolved I/O cannot accumulate.
+            try { Observe(request.CancelAsync()); } catch (ObjectDisposedException) { }
+            throw;
+        }
+    }
+
+    /// <summary>Cancels local terms without releasing their database records.</summary>
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        Observe(_stopping.CancelAsync());
+        foreach (var entry in _entries.Values) entry.Term?.Retire();
+    }
+
+    /// <summary>Stops supervision and conditionally releases grants after the caller has drained its protected work.</summary>
+    /// <remarks>Unresolved calls or cancellation callbacks surface a bounded timeout; uncertain grants are left to expire.</remarks>
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        if (Interlocked.Exchange(ref _released, 1) != 0) return;
+        var entries = _entries.Values.ToArray();
+        await Task.WhenAll(entries.Select(entry => entry.Renewal ?? Task.CompletedTask)
+            .Concat(entries.Select(entry => entry.Pending ?? Task.CompletedTask))
+            .Select(task => task.ContinueWith(completed => { _ = completed.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)))
+            .WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
+        foreach (var entry in entries)
+        {
+            if (entry.Term is not { } term) continue;
+            await term.Cancellation.WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
+            using var deadline = new CancellationTokenSource(_options.OperationTimeout);
+            var releasing = Task.Run(() => _store.TryReleaseAsync(term.Context.Identity, deadline.Token), CancellationToken.None);
+            Observe(releasing);
+            await releasing.WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
+        }
+    }
+
+    private void Observe(Task task) => _ = task.ContinueWith(completed =>
+        _logger.LogWarning(completed.Exception, "A lease background operation failed."), CancellationToken.None,
+        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+    private sealed class Entry
+    {
+        internal SemaphoreSlim Mutex { get; } = new(1, 1);
+        internal Term? Term;
+        internal Task? Renewal;
+        internal Task? Pending;
+        internal long LastAttempt;
+        internal bool Attempted;
+    }
+
+    private sealed class Term
+    {
+        private readonly object _gate = new();
+        private readonly TimeProvider _time;
+        private readonly ILogger _logger;
+        private readonly CancellationTokenSource _lost = new();
+        private readonly ITimer _deadline;
+        private LeaseGrant _grant;
+        private long _started;
+        private DateTimeOffset _wallStart;
+        private bool _retired;
+        internal LeaseContext Context { get; }
+        internal Task Cancellation { get; private set; } = Task.CompletedTask;
+
+        internal Term(LeaseGrant grant, long started, DateTimeOffset wallStart, TimeProvider time, ILogger logger)
+        {
+            _grant = grant;
+            _started = started;
+            _time = time;
+            _wallStart = wallStart;
+            _logger = logger;
+            Context = new LeaseContext(grant.Identity, _lost.Token);
+            _deadline = time.CreateTimer(_ => Retire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            Confirm(grant, started, wallStart);
+        }
+
+        internal bool IsUsable
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    if (!_retired && Remaining <= TimeSpan.Zero) Retire();
+                    return !_retired;
+                }
+            }
+        }
+
+        private TimeSpan Remaining
+        {
+            get
+            {
+                var elapsed = _time.GetElapsedTime(_started);
+                var wallElapsed = _time.GetUtcNow() - _wallStart;
+                if (wallElapsed > elapsed) elapsed = wallElapsed;
+                return _grant.ValidFor - elapsed
+                    - TimeSpan.FromTicks(Math.Min(TimeSpan.FromSeconds(1).Ticks, _grant.ValidFor.Ticks / 10));
+            }
+        }
+
+        internal bool Confirm(LeaseGrant grant, long started, DateTimeOffset wallStart)
+        {
+            lock (_gate)
+            {
+                if (_retired) return false;
+                if (Remaining <= TimeSpan.Zero) { Retire(); return false; }
+                _grant = grant;
+                _started = started;
+                _wallStart = wallStart;
+                var remaining = Remaining;
+                if (remaining <= TimeSpan.Zero) { Retire(); return false; }
+                _deadline.Change(remaining, Timeout.InfiniteTimeSpan);
+                return true;
+            }
+        }
+
+        internal void Retire()
+        {
+            lock (_gate)
+            {
+                if (_retired) return;
+                _retired = true;
+                _deadline.Dispose();
+                Cancellation = _lost.CancelAsync();
+                _ = Cancellation.ContinueWith(task =>
+                {
+                    if (task.IsFaulted) _logger.LogWarning(task.Exception, "A lease-lost callback failed.");
+                    _lost.Dispose();
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
+        }
+    }
+}

@@ -1,0 +1,79 @@
+{
+  "database": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "capturedAtUtc": "2026-10-27T15:55:03.2277322+00:00",
+  "unrelatedRows": 10000,
+  "results": [
+    {
+      "scenario": "standby",
+      "replicas": 1,
+      "operations": 100,
+      "poolLimit": 3,
+      "sqlCommands": 100,
+      "transactions": 0,
+      "elapsedMs": 93.7194,
+      "p50Ms": 0.8294,
+      "p95Ms": 1.0971,
+      "p99Ms": 1.5388
+    },
+    {
+      "scenario": "independent-renewal",
+      "replicas": 1,
+      "operations": 100,
+      "poolLimit": 3,
+      "sqlCommands": 300,
+      "transactions": 100,
+      "elapsedMs": 339.6798,
+      "p50Ms": 3.2399,
+      "p95Ms": 3.9963,
+      "p99Ms": 5.2106
+    },
+    {
+      "scenario": "standby",
+      "replicas": 4,
+      "operations": 400,
+      "poolLimit": 3,
+      "sqlCommands": 400,
+      "transactions": 0,
+      "elapsedMs": 124.2245,
+      "p50Ms": 1.0022,
+      "p95Ms": 1.3552,
+      "p99Ms": 8.0113
+    },
+    {
+      "scenario": "independent-renewal",
+      "replicas": 4,
+      "operations": 400,
+      "poolLimit": 3,
+      "sqlCommands": 1200,
+      "transactions": 400,
+      "elapsedMs": 406.5209,
+      "p50Ms": 3.7507,
+      "p95Ms": 5.3943,
+      "p99Ms": 6.0834
+    },
+    {
+      "scenario": "standby",
+      "replicas": 16,
+      "operations": 1600,
+      "poolLimit": 3,
+      "sqlCommands": 1600,
+      "transactions": 0,
+      "elapsedMs": 356.8651,
+      "p50Ms": 3.3153,
+      "p95Ms": 5.0667,
+      "p99Ms": 5.4451
+    },
+    {
+      "scenario": "independent-renewal",
+      "replicas": 16,
+      "operations": 1600,
+      "poolLimit": 3,
+      "sqlCommands": 4800,
+      "transactions": 1600,
+      "elapsedMs": 1676.2323,
+      "p50Ms": 16.4601,
+      "p95Ms": 19.0524,
+      "p99Ms": 19.9666
+    }
+  ]
+}
