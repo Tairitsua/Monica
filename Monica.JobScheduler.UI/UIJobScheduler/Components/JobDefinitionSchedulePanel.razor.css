@@ -2,16 +2,17 @@
 .job-schedule-panel header{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:16px}
 .job-schedule-panel h2{font-size:15px;font-weight:600;margin:0}
 .job-schedule-panel header p{margin:5px 0 0;font-size:12.5px;line-height:1.65;color:var(--mud-palette-text-secondary)}
-.job-schedule-panel header ::deep .mud-button-root{font-size:12px;white-space:nowrap;text-transform:none;border-radius:7px}
-.job-schedule-panel dl{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin:0}
-.job-schedule-panel dl>div{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--mud-palette-lines-default);font-size:12px}
+.job-schedule-panel header ::deep .mud-button-root{font-size:12px;white-space:nowrap;text-transform:none;border-radius:7px;border-color:var(--mud-palette-lines-inputs)}
+.job-schedule-panel dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px;margin:0}
+.job-schedule-panel dl>div{display:grid;grid-template-columns:minmax(92px,36%) minmax(0,1fr);align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px dashed var(--mud-palette-lines-default);font-size:12.5px}
 .job-schedule-panel dt{color:var(--mud-palette-text-secondary)}
-.job-schedule-panel dd{display:flex;flex-wrap:wrap;gap:7px;margin:0;min-width:0}
+.job-schedule-panel dd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;min-width:0;font-size:13px}
 .job-schedule-panel code{font-family:var(--mo-font-family-mono);overflow-wrap:anywhere}
 .job-schedule-panel__notice{font-size:12px;margin-top:12px;color:var(--mud-palette-text-secondary)}
-@container scheduler (max-width:700px){.job-schedule-panel{padding:18px 16px}
+@container scheduler-page (max-width:980px){.job-schedule-panel dl{grid-template-columns:minmax(0,1fr)}}
+@container scheduler-page (max-width:620px){.job-schedule-panel{padding:18px 16px}
 .job-schedule-panel header{flex-wrap:wrap}
-.job-schedule-panel dl{grid-template-columns:1fr}
 }
 
-.job-schedule-panel__cursor{padding:0 24px 16px;}
+.job-schedule-panel__cursor{margin:0 0 22px;padding:16px 18px;border-radius:7px;background:var(--mud-palette-background-gray)}
+.job-schedule-panel .job-schedule-panel__cursor ::deep time{font-size:17px}

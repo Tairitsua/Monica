@@ -120,15 +120,17 @@
     .ce-provenance code { font-size: 12px; }
     .ce-save-status { flex-basis: 100%; }
 }
-.cron-editor{font-weight:400;line-height:1.5}
+.cron-editor{font-size:13.5px;font-weight:400;line-height:1.5}
 .cron-editor p,.cron-editor h3{margin-bottom:0}
 .cron-editor code,.cron-editor time,.ce-fields b,.ce-current-next b{font-family:var(--mo-font-family-mono)}
 .ce-draft ::deep .ce-expression-field .mud-input{font:18px var(--mo-font-family-mono);border-radius:7px}
 .ce-draft ::deep .ce-expression-field .mud-input-slot{padding:13px 12px;font-weight:400}
 .ce-draft ::deep .ce-expression-field .mud-input-control-helper-container{display:none}
-.ce-format{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--mud-palette-lines-default);border-radius:7px;background:var(--mud-palette-background-gray)}
-.ce-format button{padding:6px 9px;font-size:12px;font-weight:400;background:transparent;border:0;border-radius:5px;color:var(--mud-palette-text-secondary);cursor:pointer}
-.ce-format button[aria-pressed=true]{color:var(--mud-palette-text-primary);background:var(--mud-palette-surface);box-shadow:0 1px 3px color-mix(in srgb,var(--mud-palette-text-primary) 10%,transparent)}
+.ce-format{display:inline-flex;gap:2px;padding:3px;border-radius:9px;background:var(--mud-palette-background-gray);box-shadow:inset 0 0 0 1px var(--mud-palette-lines-default)}
+.ce-format button{display:inline-flex;align-items:center;height:30px;padding:0 13px;font-size:13px;font-weight:500;line-height:1.5;background:transparent;border:0;border-radius:7px;color:var(--mud-palette-text-secondary);cursor:pointer}
+.ce-format button:hover{color:var(--mud-palette-text-primary)}
+.ce-format button:focus-visible{outline:2px solid var(--mud-palette-primary);outline-offset:2px}
+.ce-format button[aria-pressed=true]{color:var(--mud-palette-text-primary);background:var(--mud-palette-surface);box-shadow:0 0 0 1px var(--mud-palette-lines-default),0 1px 2px color-mix(in srgb,var(--mud-palette-text-primary) 4%,transparent)}
 .ce-presets button{padding:4px 9px;background:var(--mud-palette-surface);color:var(--mud-palette-text-primary);border:1px solid var(--mud-palette-lines-default);border-radius:5px;font-size:11.5px;cursor:pointer}
 .ce-inherit ::deep .mud-button-root{font-size:11.5px;text-transform:none;font-weight:500}
 .ce-validation{gap:6px;color:var(--mud-palette-success)}

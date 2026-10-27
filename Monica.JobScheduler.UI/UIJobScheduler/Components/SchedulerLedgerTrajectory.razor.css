@@ -12,14 +12,14 @@
 .ledger-trajectory header>span{font-size:10.5px;color:var(--mud-palette-text-secondary);white-space:nowrap}
 .ledger-trajectory__lanes{padding:0 28px}
 .ledger-trajectory__lane{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px;align-items:center;height:44px}
-.ledger-trajectory__lane>span{font-size:11px;display:grid;grid-template-columns:6px 1fr;gap:2px 6px;align-items:center}
+.ledger-trajectory__lane>span{font-size:11px;display:grid;grid-template-columns:7px 1fr;gap:2px 6px;align-items:center}
 .ledger-trajectory__lane>span>small{grid-column:2;font:9.5px var(--mo-font-family-mono);color:var(--mud-palette-text-secondary)}
 [data-state]{--tone:var(--mud-palette-text-secondary)}
 [data-state=succeeded]{--tone:var(--mud-palette-success)}
 [data-state=failed]{--tone:var(--mud-palette-error)}
 [data-state=skipped]{--tone:var(--mud-palette-warning)}
 [data-state=running]{--tone:var(--mud-palette-info)}
-.ledger-trajectory__lane i,.ledger-trajectory__active i,.ledger-trajectory__readout i,.ledger-trajectory__states i{width:6px;height:6px;border-radius:2px;background:var(--tone);flex:none}
+.ledger-trajectory__lane i,.ledger-trajectory__active i,.ledger-trajectory__readout i,.ledger-trajectory__states i{width:7px;height:7px;border-radius:2px;background:var(--tone);flex:none}
 .ledger-trajectory__bars{display:flex;gap:3px;align-items:flex-end;height:38px;border-bottom:1px solid var(--mud-palette-lines-default)}
 .ledger-trajectory__bars button{height:38px;position:relative;flex:1;min-width:1px;display:flex;align-items:flex-end;outline-offset:2px}
 .ledger-trajectory__bars button i{width:100%;height:var(--bar-height);border-radius:2px 2px 0 0;opacity:.78;pointer-events:none}
@@ -64,3 +64,5 @@
 }
 .ledger-trajectory__bars button{border:0;background:transparent;padding:0;cursor:pointer;touch-action:pan-y}
 .ledger-trajectory__bars button[data-selected=true]{background:color-mix(in srgb,var(--mud-palette-primary) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mud-palette-primary) 35%,transparent)}
+
+.ledger-trajectory__states i{width:9px;height:9px}

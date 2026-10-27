@@ -48,7 +48,6 @@
                         <section class="job-detail-page__signature"><JobDefinitionDetailHeader Summary="@summary" RecentActivity="@state.RecentActivity" ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())" IsRefreshing="@(state.IsLoading || _commandAdmission is not null)" IsMutating="@(state.IsMutating || _commandAdmission is not null)"
                                                    OnRefresh="RefreshAsync" OnInspectSchedule="OpenScheduleInspectorAsync" OnEditPolicy="OpenPolicyAsync"
                                                    OnToggleDisabled="ToggleDisabledAsync" OnRunNow="RunRecurringNowAsync" OnTrigger="OpenTriggerAsync" />
-                        <SchedulerHistoryCoverage />
                         <SchedulerJobFinding Summary="@summary" Recent="@state.RecentActivity" />
                         <SchedulerJobTrajectory Recent="@state.RecentActivity" ObservedAtUtc="@(state.ObservedAtUtc ?? TimeProvider.GetUtcNow())" LedgerUrl="@LedgerUrl(summary.Definition)" ExecutionSelected="OpenExecutionDetailsAsync" /></section>
                         <div class="job-detail-page__viewbar">
@@ -67,10 +66,11 @@
                         }
                         else if (SelectedView == "policy")
                         {
-                            <JobDefinitionContractPanel Definition="@summary.Definition" />
+                            <JobDefinitionContractPanel Definition="@summary.Definition" OnEdit="OpenPolicyAsync" />
                         }
                         else
                         {
+                        <SchedulerHistoryCoverage Sample="@state.RecentActivity" />
                         <div class="job-detail-page__evidence-grid">
                             <div class="job-detail-page__main-evidence">
                                 @if(summary.LatestExecution is not { State: JobExecutionState.Running or JobExecutionState.Queued or JobExecutionState.Failed })

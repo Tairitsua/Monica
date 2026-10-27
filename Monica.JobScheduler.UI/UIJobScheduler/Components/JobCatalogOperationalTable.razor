@@ -13,7 +13,7 @@
     @if (FilterContent is not null) { <div class="catalog-table__filters">@FilterContent</div> }
     @if (SelectionContent is not null) { <div class="catalog-table__selection-toolbar">@SelectionContent</div> }
     <div class="catalog-table__data">
-        <MudTable @ref="_table" T="JobOperationalSummary" ServerData="LoadServerDataAsync" RowsPerPage="@PageSize" Dense="true" Hover="true" Breakpoint="Breakpoint.Xs" SortLabel="@L["Catalog:SortLabel"]"
+        <MudTable @ref="_table" T="JobOperationalSummary" ServerData="LoadServerDataAsync" RowsPerPage="@PageSize" Dense="true" Hover="true" Breakpoint="Breakpoint.None" SortLabel="@L["Catalog:SortLabel"]"
                   TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Catalog:Title"].Value })" HorizontalScrollbar="false" Elevation="0" Square="true" AllowUnsorted="false">
             <ColGroup><col class="catalog-table__selection-column" /><col class="catalog-table__definition-column" /><col class="catalog-table__plan-column" /><col class="catalog-table__standing-column" /><col class="catalog-table__evidence-column" /><col class="catalog-table__next-column" /><col class="catalog-table__actions-column" /></ColGroup>
             <HeaderContent>
@@ -23,12 +23,12 @@
             </HeaderContent>
             <RowTemplate>
                 @{ var definition = context.Definition; var effective = definition.EffectiveConfiguration; }
-                <MudTd Class="catalog-table__selection-cell" DataLabel="@L["Workspace:SelectRow"]">
+                <MudTd Class="catalog-table__selection-cell">
                     @if (IsRecurring(context) && definition.IsPresent) { <MudCheckBox T="bool" Value="@SelectedJobIds.Contains(definition.Id)" ValueChanged="@(_ => SelectionToggled.InvokeAsync(context))" Disabled="@IsMutating" Dense="true" Color="Color.Primary" aria-label="@L["Catalog:Selection:SelectJob", effective.JobName]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /> }
                 </MudTd>
-                <MudTd Class="catalog-table__definition-cell" DataLabel="@L["Catalog:Columns:Definition"]">
+                <MudTd Class="catalog-table__definition-cell">
                     <div class="catalog-table__identity">
-                        <div class="catalog-table__identity-line"><i data-tone="@RowTone(context)"></i><a class="catalog-table__identity-name" href="@GetDetailHref(context)">@effective.JobName <MoIcon Icon="@MoIcons.ArrowUpRight" Size="11px" /></a>
+                        <div class="catalog-table__identity-line"><i data-tone="@RowTone(context)"></i><a class="catalog-table__identity-name" href="@GetDetailHref(context)">@effective.JobName <MoIcon Icon="@MoIcons.ArrowUpRight" Size="12px" /></a>
                         </div>
                         <a class="catalog-table__owner" href="@($"/job-scheduler/catalog?owner={Uri.EscapeDataString(definition.OwnerKey)}")">@definition.OwnerKey</a>
                     </div>

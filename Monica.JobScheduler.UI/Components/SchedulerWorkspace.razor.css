@@ -1,4 +1,4 @@
-.scheduler-workspace { display:grid; gap:20px; width:100%; min-width:0; container:scheduler / inline-size; --mo-page-gutter-block:24px; --mo-page-gutter-inline:32px; }
+.scheduler-workspace { display:grid; gap:20px; width:100%; min-width:0; container:scheduler / inline-size; font-size:13.5px; line-height:1.5; --mo-page-gutter-block:24px; --mo-page-gutter-inline:32px; }
 .scheduler-workspace__header { display:flex; align-items:center; gap:16px; min-width:0; }
 .scheduler-workspace__seal { display:grid; place-items:center; flex:none; width:52px; height:52px; border-radius:15px; color:var(--mud-palette-surface); background:var(--mud-palette-text-primary); }
 .scheduler-workspace__header ::deep .mo-vl-masthead { flex:1; min-width:0; }
@@ -19,16 +19,20 @@
 .scheduler-workspace ::deep .mo-workbench-navigation { margin-top:-6px; gap:4px; padding-bottom:10px; }
 .scheduler-workspace ::deep .mo-workbench-navigation a { height:32px; min-height:32px; padding:0 12px; font-size:13px; font-weight:500; gap:7px; }
 .scheduler-workspace ::deep .mo-workbench-navigation :is(.mud-icon-root,.mo-icon) { width:15px; height:15px; }
-.scheduler-workspace ::deep .mo-vl-display { font-size:72px; font-weight:400; line-height:1.05; letter-spacing:-.055em; }
-.scheduler-workspace ::deep .mo-vl-display__unit { font-size:20px; font-weight:400; color:var(--mud-palette-text-secondary); letter-spacing:-.015em; }
+.scheduler-workspace ::deep .mo-vl-display { font-size:clamp(48px,6vw,72px); font-weight:300; line-height:.95; letter-spacing:-.045em; flex-wrap:wrap; gap:0; }
+.scheduler-workspace ::deep .mo-vl-display__unit { margin:0 0 0 .10em; font-size:.28em; font-weight:400; color:var(--mud-palette-text-secondary); letter-spacing:0; }
 @media(max-width:600px) { .scheduler-workspace { gap:20px; }
  .scheduler-workspace__header { align-items:flex-start; gap:12px; }
  .scheduler-workspace__seal { width:40px; height:40px; border-radius:12px; margin-top:14px; }
  .scheduler-workspace__header ::deep .mo-vl-title { font-size:25px; }
  .scheduler-workspace__header ::deep .mo-vl-crumb { font-size:11px; }
- .scheduler-workspace ::deep .mo-vl-display { font-size:56px; }
  }
-@media(max-width:600px){.scheduler-workspace{--mo-page-gutter-block:20px;--mo-page-gutter-inline:16px;}
+@container scheduler-page (max-width:720px){.scheduler-workspace{--mo-page-gutter-block:20px;--mo-page-gutter-inline:16px;}
 }
 
 .scheduler-workspace ::deep h1 { scroll-margin-block-start: 36px; }
+.scheduler-page-frame { container:scheduler-page / inline-size; width:100%; min-width:0; }
+
+.scheduler-workspace ::deep .mo-vl-mark { display:inline-block; padding:0 6px; margin:0 1px; border-radius:5px; background:color-mix(in srgb,var(--mo-vl-role) 12%,var(--mud-palette-surface)); color:color-mix(in srgb,var(--mo-vl-role) 72%,var(--mud-palette-text-primary)); font-weight:600; line-height:1.6; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+.scheduler-workspace ::deep .mo-vl-display__value { font-size:inherit; font-weight:inherit; line-height:inherit; letter-spacing:inherit; }

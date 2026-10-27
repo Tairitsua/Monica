@@ -13,6 +13,7 @@
 <HeadContent><link rel="stylesheet" href="@Assets["_content/Monica.JobScheduler.UI/css/execution-inspector.css"]" /></HeadContent>
 <CascadingValue Value="@this" IsFixed="true">
 <CascadingValue Value="@_actionsKey" Name="SchedulerWorkspaceActions" IsFixed="true">
+<div class="scheduler-page-frame">
 <div class="scheduler-workspace mo-page-shell mo-page-shell--full-width">
     <div class="scheduler-workspace__header">
         <span class="scheduler-workspace__seal" aria-hidden="true"><MoIcon Icon="@CurrentIcon" Size="1.5rem" /></span>
@@ -47,6 +48,7 @@
         }
         @ChildContent
     </div>
+</div>
 </div>
 </CascadingValue>
 </CascadingValue>

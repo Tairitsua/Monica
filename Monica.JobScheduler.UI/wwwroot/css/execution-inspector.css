@@ -10,7 +10,7 @@
     margin: 0;
     border: 0 !important;
     border-radius: 0 !important;
-    box-shadow: var(--mo-shadow-overlay) !important;
+    box-shadow: 0 12px 32px -8px color-mix(in srgb, var(--mud-palette-text-primary) 18%, transparent), 0 4px 10px -4px color-mix(in srgb, var(--mud-palette-text-primary) 8%, transparent) !important;
     animation: scheduler-inspector-enter .18s ease-out;
 }
 .scheduler-execution-sheet > .mud-dialog-title { flex: none; }
@@ -18,11 +18,13 @@
 .scheduler-execution-sheet > .mud-dialog-title .mud-button-close .mud-icon-root { width: 16px; height: 16px; }
 .scheduler-execution-sheet .mud-dialog-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .scheduler-execution-backdrop, .scheduler-schedule-backdrop { backdrop-filter: blur(2px); }
-.mud-overlay:is(.scheduler-execution-backdrop, .scheduler-schedule-backdrop) .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 36%, transparent); }
-[data-theme$="-dark"] .mud-overlay:is(.scheduler-execution-backdrop, .scheduler-schedule-backdrop) .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 43%, transparent); }
+.mud-overlay:is(.scheduler-execution-backdrop, .scheduler-schedule-backdrop) .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 55%, transparent); }
+[data-theme$="-dark"] .mud-overlay:is(.scheduler-execution-backdrop, .scheduler-schedule-backdrop) .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 55%, transparent); }
 @keyframes scheduler-inspector-enter { from { opacity: 0; transform: translateX(14px); } }
 @media (prefers-reduced-motion: reduce) { .mud-dialog.scheduler-execution-sheet { animation: none; } }
 
 .mud-dialog.scheduler-schedule-dialog { max-height: calc(100dvh - 32px); border: 0 !important; }
 .scheduler-schedule-dialog .mud-dialog-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .scheduler-schedule-dialog .mud-button-close .mud-icon-root { width: 16px; height: 16px; }
+
+[data-theme$="-dark"] .mud-dialog.scheduler-execution-sheet { box-shadow:0 0 0 1px color-mix(in srgb,var(--mud-palette-text-primary) 6%,transparent),0 18px 40px -12px color-mix(in srgb,var(--mud-palette-black) 65%,transparent) !important; }

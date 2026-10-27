@@ -16,7 +16,7 @@
 .fchip[aria-pressed=true] { background:color-mix(in srgb,var(--vl-role) 10%,var(--mud-palette-surface));border-color:color-mix(in srgb,var(--vl-role) 40%,var(--mud-palette-lines-default));color:color-mix(in srgb,var(--vl-role) 75%,var(--mud-palette-text-primary)); }
 .rt-owner-filter { display:inline-flex;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere;padding:4px 8px;border:1px solid var(--mud-palette-lines-default);border-radius:999px;font-size:12px;background:var(--mud-palette-surface);color:var(--mud-palette-text-secondary);cursor:pointer; }
 .status { display:inline-flex;gap:6px;color:color-mix(in srgb,var(--vl-role) 72%,var(--mud-palette-text-primary)); }
-.status i { flex:none;display:inline-block;width:6px;height:6px;border-radius:2px;background:var(--vl-role); }
+.status i { flex:none;display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--vl-role); }
 .rt-empty { padding:30px 20px;text-align:center;color:var(--mud-palette-text-secondary);font-size:13px; }
 .rt-show-coordinators { border:0;background:transparent;cursor:pointer; }
 .rt-coordination-note { display:flex;gap:10px;padding:18px 22px;color:var(--mud-palette-text-secondary);font-size:12.5px;line-height:1.7; }

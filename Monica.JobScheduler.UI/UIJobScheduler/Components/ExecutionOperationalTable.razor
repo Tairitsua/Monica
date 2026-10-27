@@ -12,12 +12,11 @@
                   RowsPerPage="@PageSize"
                   Dense="true"
                   Hover="true"
-                  Breakpoint="Breakpoint.Xs"
+                  Breakpoint="Breakpoint.None"
                   TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Executions:Title"].Value })"
                   HorizontalScrollbar="false"
                   Elevation="0"
                   Square="true">
-            <ColGroup><col class="execution-ledger__state-column" /><col class="execution-ledger__identity-column" /><col class="execution-ledger__recorded-column" /><col class="execution-ledger__duration-column" /><col class="execution-ledger__attempt-column" /><col class="execution-ledger__instance-column" /></ColGroup>
             <HeaderContent>
                 <MudTh>@L["Executions:Columns:State"]</MudTh><MudTh>@L["Executions:Columns:Definition"]</MudTh><MudTh>@TimeColumn</MudTh><MudTh>@L["Executions:Columns:Duration"]</MudTh><MudTh>@L["Workspace:ClaimsAndFailures"]</MudTh><MudTh>@L["ExecutionDetail:Instance"]</MudTh>
             </HeaderContent>
@@ -26,7 +25,7 @@
                 {
                     var execution = context.Capture;
                     <MudTd DataLabel="@L["Executions:Columns:State"]"><button type="button" class="execution-ledger__state" data-state="@execution.State.ToString().ToLowerInvariant()" disabled="@CommandsDisabled" aria-label="@L["Executions:Actions:OpenDetailsFor", JobSchedulerUiPresentation.GetJobDisplayName(execution.Template), execution.InstanceId]" @onclick="@(() => InspectAsync(execution))"><i></i>@L[$"ExecutionStates:{execution.State}"]</button></MudTd>
-                    <MudTd DataLabel="@L["Executions:Columns:Definition"]"><div class="execution-ledger__identity"><a class="execution-ledger__name" href="@JobSchedulerUiUrls.JobDefinition(new JobId(execution.Template.OwnerKey, execution.Template.JobKey), Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)">@JobSchedulerUiPresentation.GetJobDisplayName(execution.Template)</a><small class="execution-ledger__owner">@execution.Template.OwnerKey</small></div></MudTd>
+                    <MudTd Class="execution-ledger__job-cell"><div class="execution-ledger__identity"><a class="execution-ledger__name" title="@JobSchedulerUiPresentation.GetJobDisplayName(execution.Template)" href="@JobSchedulerUiUrls.JobDefinition(new JobId(execution.Template.OwnerKey, execution.Template.JobKey), Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)">@JobSchedulerUiPresentation.GetJobDisplayName(execution.Template)</a><small class="execution-ledger__owner" title="@execution.Template.OwnerKey">@execution.Template.OwnerKey</small></div></MudTd>
                     <MudTd DataLabel="@TimeColumn"><div class="execution-ledger__recorded"><time datetime="@RowTimestamp(execution)?.ToString("O")">@TimePresentation.FormatTimestamp(RowTimestamp(execution))</time><small>@L[$"ExecutionOrigins:{execution.Origin}"]</small></div></MudTd>
                     <MudTd Class="execution-ledger__number" DataLabel="@L["Executions:Columns:Duration"]">@FormatDuration(execution)</MudTd>
                     <MudTd Class="execution-ledger__number" DataLabel="@L["Workspace:ClaimsAndFailures"]"><span title="@($"{L["Executions:Evidence:Claims"]}: {execution.ExecutionAttempt} · {L["Executions:Evidence:ConsumedFailures"]}: {execution.RetryAttempt}")">@execution.ExecutionAttempt / @execution.RetryAttempt</span></MudTd>

@@ -6,12 +6,8 @@
 .job-finding>div>p{font-size:13px;color:var(--mud-palette-text-secondary)}
 .job-finding__value{font-size:60px;line-height:1.1;letter-spacing:-.05em;font-weight:400;color:color-mix(in srgb,var(--tone) 76%,var(--mud-palette-text-primary));margin-top:8px}
 .job-finding__value small{font-size:13px;color:var(--mud-palette-text-secondary);margin-left:10px;letter-spacing:0}
-.job-finding__lede{font-size:14px;line-height:1.8;max-width:610px;justify-self:end}
-@container scheduler (max-width:620px){.job-finding{grid-template-columns:1fr;gap:14px;padding:18px 16px}
+.job-finding__lede{font-size:14px;line-height:1.8;max-width:65ch;justify-self:end}
+@container scheduler-page (max-width:620px){.job-finding{grid-template-columns:minmax(0,1fr);gap:12px;padding:18px 16px}
 .job-finding__value{font-size:48px}
 .job-finding__lede{justify-self:start}
 }
-.job-finding__coverage { display:flex;align-items:start;gap:8px;margin-top:12px;padding:12px 16px;border:1px solid var(--mud-palette-lines-default);border-radius:8px;font-size:12px;line-height:1.7;color:var(--mud-palette-text-secondary);background:var(--mud-palette-surface); }
-.job-finding__coverage p { margin:0; }
-.job-finding__coverage b { color:var(--mud-palette-text-primary);font-weight:600; }
-.job-finding__coverage ::deep .mo-icon { flex:none;margin-top:3px; }

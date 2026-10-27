@@ -11,7 +11,7 @@
             <MudText Typo="Typo.h6" HtmlTag="h2" id="job-contract-heading">@L["JobDetail:Contract:Title"]</MudText>
             <p>@L["JobDetail:Contract:Description"]</p>
         </div>
-        <span class="job-contract-panel__immutable"><MoIcon Icon="@MoIcons.Lock" Size="1.5rem" />@L["JobDetail:Contract:Immutable"]</span>
+        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Sliders" OnClick="OnEdit">@L["Workspace:EditPolicy"]</MudButton>
     </header>
     <div class="job-contract-panel__comparison">
         <div class="job-contract-panel__columns" aria-hidden="true">
@@ -33,9 +33,9 @@
                             </MudTooltip>
                         }
                     </dt>
-                    <dd data-label="@L["Policy:Provenance:Declared"]">@fact.Declared</dd>
-                    <dd class="job-contract-panel__override" data-label="@L["Policy:Provenance:Override"]">@fact.Override</dd>
-                    <dd data-label="@L["Policy:Provenance:Effective"]">@fact.Effective</dd>
+                    <dd class="job-contract-panel__declared" data-label="@L["Policy:Provenance:Declared"]">@fact.Declared</dd>
+                    <dd class="job-contract-panel__override" data-label="@L["Policy:Provenance:Override"]"><span class="@(fact.Override == L["Policy:InheritDefault"].Value ? "job-contract-panel__inherited" : "job-contract-panel__explicit")">@fact.Override</span></dd>
+                    <dd class="job-contract-panel__effective" data-label="@L["Policy:Provenance:Effective"]">@fact.Effective</dd>
                 </div>
             }
         </dl>
@@ -61,6 +61,12 @@
     /// </summary>
     [Parameter, EditorRequired]
     public JobDefinition Definition { get; set; } = null!;
+
+    /// <summary>
+    /// Gets the callback that opens the policy editor for this definition.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
 
     private IReadOnlyList<PolicyFact> PolicyFacts
     {

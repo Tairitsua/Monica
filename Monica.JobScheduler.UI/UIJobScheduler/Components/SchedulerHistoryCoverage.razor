@@ -1,2 +1,19 @@
 @inject IStringLocalizer<JobSchedulerResource> L
-<div class="history-coverage"><MoIcon Icon="@MoIcons.Info" Size="15px" /><p><b>@L["Architecture:HistoryTitle"]</b><span>@L["Architecture:HistoryNote"]</span></p></div>
+<div class="history-coverage">
+    <MoIcon Icon="@MoIcons.Info" Size="15px" />
+    <div class="history-coverage__content">
+        <p><b>@L["Architecture:HistoryTitle"]</b><span>@L["Architecture:HistoryNote"]</span></p>
+        @if (Sample is { } sample && (sample.Items.Count < sample.TotalCount || sample.Error is not null))
+        {
+            <p><b>@L["Architecture:Unknown"]</b><span>@L[sample.Error is null ? "Architecture:SampleLimited" : "Architecture:SampleUnavailable"]. @L["Architecture:SampleNote"]</span></p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Gets optional fetched-sample coverage, which is independent of retained-history completeness.
+    /// </summary>
+    [Parameter]
+    public JobExecutionActivitySlice? Sample { get; set; }
+}

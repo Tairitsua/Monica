@@ -73,6 +73,7 @@ Indicators:
 - Selection or row-action glyphs and focus bounds touch the surface edge despite a declared column width; native checkbox negative margins or compressed inner padding undo the intended inset, or selection replaces the focused input
 - A full-width table's header, last row, hover/selected paint or pager covers its owner's rounded corners; only the outer border is rounded while descendant backgrounds remain square
 - A flush table has competing outer/inner radii, does not declare whether its owner clips painted corners or the table is inset, or broad overflow clipping hides focus indicators, required local scrolling or overlay content
+- A rounded notice, callout or inner card meets an enclosing surface edge while retaining its own radius or border, creating competing corners; a selected segment's border or shadow makes its apparent top/bottom inset unequal
 - Distinct tools with independent tasks and lifetimes remain hidden in one local tab route, preventing direct links, browser history and meaningful shell search entries without a deliberate navigation reason
 - A master/detail inventory grows the shell page through many entries while its selected dossier remains offscreen; selecting the last item requires manually returning to the details
 - A sticky catalog and its search/filter controls cannot fit a short scrollport, or a compact picker remains expanded after selection instead of revealing the selected dossier
@@ -118,6 +119,7 @@ Indicators:
 - The same accent rail is repeated across unrelated card groups, replaces a clearer page-specific outline/icon/badge treatment, or appears where it encodes no additional status or category meaning
 - Border radii drift from the theme baseline without an intentional component contract, grow across nested surfaces, or global theme selectors override component-owned geometry
 - The implementation loses the prototype's typography, density, spacing rhythm, composition, surface roles, width utilization, or responsive reflow
+- Prototype acceptance checks only wide and phone layouts or lack matched owner widths; intermediate native breakpoints silently change the layout, or small repeated markers, icon tiles, badges and selected segments differ without rendered measurements
 - Interface, hierarchy, and diagnostic text have no deliberate font-role separation, or monospace is used broadly as decoration
 - A font declared by the prototype/source is missing from local WOFF2 assets, lacks `@font-face`, fails offline, has no explicit fallback stack/CJK coverage, or is silently replaced by a fallback
 - Component CSS repainting global MudBlazor behavior that should be consistent across modules
