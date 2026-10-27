@@ -1,103 +1,30 @@
-@using Monica.JobScheduler.Models.Operations
-@using Monica.JobScheduler.UI.Localization
-@using Monica.JobScheduler.UI.UIJobScheduler.Support
+@using System.Globalization
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
-
-<section class="runtime-owners" aria-labelledby="runtime-owners-heading">
-    <header class="runtime-owners__heading">
-        <MoIcon Icon="@MoIcons.Network" aria-hidden="true" Size="1.5rem" />
-        <div>
-            <h2 id="runtime-owners-heading">@L["Runtime:Owners:Title"]</h2>
-            <p>
-                <MudTooltip Text="@($"{L["Runtime:Config:ExactInterval"]}: {SchedulerRuntimePresentation.FormatExactInterval(Overview.OwnerOnlineThreshold)}")">
-                    <span class="runtime-owners__threshold" tabindex="0">@L["Runtime:Owners:Description", SchedulerRuntimePresentation.FormatInterval(Overview.OwnerOnlineThreshold, L)]</span>
-                </MudTooltip>
-            </p>
-        </div>
-    </header>
-    <div class="runtime-owners__table">
-        <MudTable T="JobOwnerSummary" Items="@Overview.Owners" Dense="true" Hover="true" Square="true" Elevation="0" Breakpoint="Breakpoint.None">
-            <ColGroup>
-                <col class="runtime-owners__identity-column" />
-                <col class="runtime-owners__observation-column" />
-                <col class="runtime-owners__counts-column" />
-                <col class="runtime-owners__counts-column" />
-            </ColGroup>
-            <HeaderContent>
-                <MudTh>@L["Runtime:Owners:Owner"]</MudTh>
-                <MudTh>@L["Runtime:Owners:Liveness"]</MudTh>
-                <MudTh>@L["Runtime:Owners:Jobs"]</MudTh>
-                <MudTh>@L["Runtime:Owners:Active"]</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                @{ var freshness = SchedulerRuntimePresentation.ClassifyOwnerObservation(Overview.CapturedAtUtc, context.LastObservedAtUtc, Overview.OwnerOnlineThreshold); }
-                <MudTd DataLabel="@L["Runtime:Owners:Owner"]">
-                    <a class="runtime-owners__owner-link" href="@CatalogUrl(context.OwnerKey)" aria-label="@L["Runtime:Owners:OpenCatalog", context.OwnerKey]">
-                        <code>@context.OwnerKey</code>
-                        <MoIcon Icon="@MoIcons.ArrowRight" aria-hidden="true" Size="1.5rem" />
-                    </a>
-                </MudTd>
-                <MudTd DataLabel="@L["Runtime:Owners:Liveness"]">
-                    <div class="runtime-owners__observation">
-                        <span class="runtime-owners__status" data-freshness="@freshness.ToString().ToLowerInvariant()">
-                            <MoIcon Icon="@ObservationIcon(freshness)" aria-hidden="true" Size="1.5rem" />
-                            @ObservationText(freshness)
-                        </span>
-                        <div class="runtime-owners__time">
-                            <span>@L["Runtime:Owners:ManifestPublished"]</span>
-                            <time datetime="@context.ManifestPublishedAtUtc?.ToString("O")">@TimePresentation.FormatTimestamp(context.ManifestPublishedAtUtc)</time>
-                            <span>@L["Runtime:Owners:LastObserved"]</span>
-                            <time datetime="@context.LastObservedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(context.LastObservedAtUtc)</time>
-                        </div>
-                        @if (context.ManifestHash is { } hash)
-                        {
-                            <details>
-                                <summary>@L["Runtime:Owners:ManifestHash"]</summary>
-                                <code>@hash</code>
-                            </details>
-                        }
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="@L["Runtime:Owners:Jobs"]">
-                    <span class="runtime-owners__counts" title="@L["Runtime:Owners:JobsHelp"]">@L["Runtime:Owners:JobsCounts", context.PresentCount, context.AbsentCount]</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Runtime:Owners:Active"]">
-                    <span class="runtime-owners__counts">@L["Runtime:Owners:ActiveCounts", context.QueuedCount, context.RunningCount]</span>
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <div class="runtime-owners__empty">
-                    <MoIcon Icon="@MoIcons.Network" aria-hidden="true" Size="1.5rem" />
-                    <p>@L["Runtime:Owners:Empty"]</p>
-                </div>
-            </NoRecordsContent>
-        </MudTable>
-    </div>
+@inject NavigationManager Navigation
+<section class="rt-owners" aria-labelledby="rt-owners-heading">
+    <header class="rt-heading"><span class="tile" data-role="primary"><MoIcon Icon="@MoIcons.Package" Size="18px"/></span><div><h2 id="rt-owners-heading">@L["Runtime:Owners:Title"]</h2><p>@L["Workspace:PublicationsDescription"]</p></div><b>@Overview.Owners.Count</b></header>
+    <div class="rt-owner-intro"><p class="rt-observation-finding"><span class="status" data-role="@(StaleCount > 0 ? "warning" : "success")"><i></i>@L[StaleCount > 0 ? "Workspace:StalePublications" : "Workspace:RecentPublications",StaleCount]</span></p><p>@L["Runtime:Owners:Description",SchedulerRuntimePresentation.FormatInterval(Overview.OwnerOnlineThreshold,L)]</p></div>
+    <div class="rt-toolbar"><div class="seg" role="group" aria-label="@L["Workspace:PublicationFilters:Title"]">@foreach(var key in new[]{"all","recent","stale"}) { <button type="button" aria-pressed="@((_freshness == key).ToString().ToLowerInvariant())" @onclick="@(() => SetFreshness(key))">@L[$"Workspace:PublicationFilters:{key}"] <span>@(key == "all" ? Overview.Owners.Count : key == "stale" ? StaleCount : Overview.Owners.Count-StaleCount)</span></button> }</div><label class="rt-search"><MoIcon Icon="@MoIcons.Search" Size="15px"/><input type="search" aria-label="@L["Workspace:SearchOwners"]" placeholder="@L["Workspace:SearchOwners"]" value="@_query" @oninput="SearchAsync"/></label></div>
+    <table class="rt-owner-table"><thead><tr><th>@L["Runtime:Owners:Owner"]</th><th>@L["Runtime:Owners:Liveness"]</th><th>@L["Workspace:PresentAbsent"]</th><th>@L["Workspace:RunningQueued"]</th></tr></thead><tbody>@foreach(var owner in Visible)
+    {
+        var freshness=Freshness(owner);var age=Overview.CapturedAtUtc-owner.LastObservedAtUtc;
+        <tr><td data-label="@L["Runtime:Owners:Owner"]"><a class="rt-owner-name" href="@CatalogUrl(owner.OwnerKey)">@owner.OwnerKey <MoIcon Icon="@MoIcons.ArrowRight" Size="13px"/></a></td><td data-label="@L["Runtime:Owners:Liveness"]"><div class="rt-freshness"><div><span class="status" data-role="@(freshness == SchedulerOwnerObservationFreshness.Recent ? "success" : "warning")"><i></i>@ObservationText(freshness)</span><time datetime="@owner.LastObservedAtUtc.ToString("O")">@TimePresentation.FormatClock(owner.LastObservedAtUtc)</time></div><div class="rt-age"><span class="rt-age-track" data-role="@(freshness == SchedulerOwnerObservationFreshness.Recent ? "success" : "warning")"><i style="@($"width:{Math.Clamp(age.TotalMilliseconds/Math.Max(1,Overview.OwnerOnlineThreshold.TotalMilliseconds)*100,0,100).ToString("0.##",CultureInfo.InvariantCulture)}%")"></i></span><span>@TimePresentation.FormatDuration(age)</span></div></div></td><td data-label="@L["Workspace:PresentAbsent"]"><span class="rt-count-pair"><a href="@CatalogUrl(owner.OwnerKey)">@owner.PresentCount</a><span>/</span><a href="@(CatalogUrl(owner.OwnerKey)+"&present=false")">@owner.AbsentCount</a></span></td><td data-label="@L["Workspace:RunningQueued"]"><span class="rt-count-pair"><a class="@(owner.RunningCount > 0 ? "rt-count-active" : null)" href="@ExecutionUrl(owner.OwnerKey,JobExecutionState.Running)">@owner.RunningCount</a><span>/</span><a href="@ExecutionUrl(owner.OwnerKey,JobExecutionState.Queued)">@owner.QueuedCount</a></span></td></tr>
+    }</tbody></table>
+    @if(!Visible.Any()) { <p class="rt-empty">@L["Runtime:Owners:Empty"]</p> }
+    <footer class="rt-table-foot"><span>@L["Workspace:PublicationCount",Visible.Count(),Overview.Owners.Count]</span><span>@L["Workspace:PublicationAge",TimePresentation.FormatDuration(Overview.OwnerOnlineThreshold)]</span></footer>
 </section>
-
 @code {
-    /// <summary>Gets or sets the captured durable footprint of definition-backed owners in one scheduler scope.</summary>
-    /// <remarks>
-    /// Freshness is relative to this snapshot's capture and supplied threshold. It is not remote process health.
-    /// The caller owns authorization and refresh; native links preserve each exact ordinal owner identity.
-    /// </remarks>
-    [Parameter, EditorRequired]
-    public JobSchedulerRuntimeOverview Overview { get; set; } = null!;
-
-    private static string CatalogUrl(string ownerKey) => $"/job-scheduler/catalog?owner={Uri.EscapeDataString(ownerKey)}";
-
-    private string ObservationText(SchedulerOwnerObservationFreshness freshness) => freshness switch
-    {
-        SchedulerOwnerObservationFreshness.Recent => L["Runtime:Owners:RecentObservation"],
-        SchedulerOwnerObservationFreshness.Stale => L["Runtime:Owners:StaleObservation"],
-        _ => L["Runtime:Owners:AheadOfCapture"]
-    };
-
-    private static string ObservationIcon(SchedulerOwnerObservationFreshness freshness) => freshness switch
-    {
-        SchedulerOwnerObservationFreshness.Recent => MoIcons.Success,
-        SchedulerOwnerObservationFreshness.Stale => MoIcons.Clock,
-        _ => MoIcons.Warning
-    };
+    /// <summary>Gets the exact durable definition-publication snapshot and its freshness threshold.</summary>
+    [Parameter,EditorRequired] public JobSchedulerRuntimeOverview Overview { get; set; } = null!;
+    private string _query=string.Empty,_freshness="all";
+    private int StaleCount => Overview.Owners.Count(owner => Freshness(owner) != SchedulerOwnerObservationFreshness.Recent);
+    private IEnumerable<JobOwnerSummary> Visible => Overview.Owners.Where(owner => owner.OwnerKey.Contains(_query,StringComparison.OrdinalIgnoreCase) && (_freshness == "all" || (Freshness(owner)==SchedulerOwnerObservationFreshness.Recent) == (_freshness=="recent"))).OrderBy(owner => Freshness(owner)==SchedulerOwnerObservationFreshness.Recent).ThenByDescending(owner => owner.RunningCount).ThenBy(owner => owner.OwnerKey,StringComparer.Ordinal);
+    protected override void OnParametersSet() { var query=Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query); _query=query.TryGetValue("q",out var search) ? search.ToString() : string.Empty; _freshness=query.TryGetValue("freshness",out var value) && value.ToString() is "recent" or "stale" ? value.ToString() : "all"; }
+    private void SetFreshness(string value) { _freshness=value;Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("freshness",value=="all" ? null : value),replace:true); }
+    private void SearchAsync(ChangeEventArgs args) { _query=args.Value?.ToString() ?? string.Empty;Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q",string.IsNullOrEmpty(_query) ? null : _query),replace:true); }
+    private SchedulerOwnerObservationFreshness Freshness(JobOwnerSummary owner) => SchedulerRuntimePresentation.ClassifyOwnerObservation(Overview.CapturedAtUtc,owner.LastObservedAtUtc,Overview.OwnerOnlineThreshold);
+    private static string CatalogUrl(string owner) => $"/job-scheduler/catalog?owner={Uri.EscapeDataString(owner)}";
+    private static string ExecutionUrl(string owner,JobExecutionState state) => SchedulerRouteBuilder.Ledger(new JobExecutionQuery { SchedulerScopeKey=string.Empty,OwnerKey=owner,States=[state] });
+    private string ObservationText(SchedulerOwnerObservationFreshness freshness) => L[freshness switch { SchedulerOwnerObservationFreshness.Recent => "Runtime:Owners:RecentObservation",SchedulerOwnerObservationFreshness.Stale => "Runtime:Owners:StaleObservation",_ => "Runtime:Owners:AheadOfCapture" }];
 }

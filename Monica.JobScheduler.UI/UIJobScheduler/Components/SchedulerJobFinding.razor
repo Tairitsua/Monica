@@ -1,18 +1,15 @@
-@using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
-
-<div class="job-finding">
-    <div class="job-finding__decision"><div><p>@L[Failed > 0 ? "Workspace:FailedCompletions" : Summary.ActiveExecutionCount > 0 ? "JobDetail:Header:ActiveExecutions" : "Analytics:Window:Completed"]</p><MoDisplayValue Value="@(Value?.ToString("N0") ?? "—")" Unit="@L["Workspace:RecordsUnit"]" /></div><p>@L[Summary.LatestExecution?.State == JobExecutionState.Failed ? "Workspace:JobFailedFinding" : Summary.Definition.IsDisabled ? "Workspace:JobPausedFinding" : "Workspace:JobFinding"]</p></div>
-    <dl><div><dt>@L["JobDetail:Header:QueuedExecutions"]</dt><dd>@Summary.QueuedExecutionCount</dd></div><div><dt>@L["ExecutionDetail:RetryCount"]</dt><dd>@Summary.Definition.EffectiveConfiguration.RetryCount</dd></div><div><dt>@L["ExecutionDetail:Timeout"]</dt><dd>@TimePresentation.FormatDuration(Summary.Definition.EffectiveConfiguration.MaxExecutionTimeout)</dd></div><div><dt>@L["JobDetail:Schedule:NextOccurrence"]</dt><dd>@(Summary.NextOccurrenceUtc is { } next ? TimePresentation.FormatScheduleTimestamp(next) : "—")</dd></div></dl>
-    @if (Snapshot is not null) { <p class="job-finding__window">@L["Analytics:Window:Accepted"] · @TimePresentation.FormatRange(Snapshot.StartTimeUtc, Snapshot.EndTimeUtc)</p> }
+<div class="job-finding" data-tone="@Tone">
+    <div><p>@L[Streak > 0 ? "Workspace:ConsecutiveFailures" : Summary.ActiveExecutionCount > 0 ? "JobDetail:Header:ActiveExecutions" : "Workspace:RetainedRecords"]</p><div class="job-finding__value">@Value<small>@L[Streak > 0 ? "Workspace:AttemptsUnit" : Summary.ActiveExecutionCount > 0 ? "Workspace:ActiveUnit" : "Workspace:RecordsUnit"]</small></div></div>
+    <p class="job-finding__lede">@if (!Summary.Definition.IsPresent) { @L["Workspace:AbsentFinding"] } else if(Summary.Definition.IsDisabled) { @L["Workspace:JobPausedFinding"] } else if(Streak > 0) { @L["Workspace:StreakFinding",Streak,Summary.Definition.EffectiveConfiguration.RetryCount,Summary.NextOccurrenceUtc is {} next ? TimePresentation.FormatScheduleTimestamp(next) : "—"] } else { @L[Summary.ActiveExecutionCount > 0 ? "Workspace:JobActiveFinding" : "Workspace:JobFinding", Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Recent.TotalCount] }</p>
 </div>
-
 @code {
-    /// <summary>Gets the accepted owner-scoped job projection.</summary>
-    [Parameter, EditorRequired] public JobOperationalSummary Summary { get; set; } = null!;
-    /// <summary>Gets optional accepted bounded completion analytics; it is never presented as a consecutive failure streak.</summary>
-    [Parameter] public JobExecutionAnalyticsSnapshot? Snapshot { get; set; }
-    private long Failed => Snapshot?.Trend.Sum(bucket => bucket.FailedCount) ?? 0;
-    private long? Value => Failed > 0 ? Failed : Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Snapshot?.CompletedTerminalCount;
+    /// <summary>Gets the accepted operational definition.</summary>
+    [Parameter,EditorRequired] public JobOperationalSummary Summary { get; set; } = null!;
+    /// <summary>Gets the latest retained evidence, ordered newest first.</summary>
+    [Parameter,EditorRequired] public JobExecutionActivitySlice Recent { get; set; } = JobExecutionActivitySlice.Empty;
+    private int Streak => Recent.Items.Where(record => record.State is JobExecutionState.Succeeded or JobExecutionState.Failed).TakeWhile(record => record.State == JobExecutionState.Failed).Count();
+    private string Tone => Summary.Definition.IsDisabled || !Summary.Definition.IsPresent ? "neutral" : Streak > 0 ? "error" : Summary.ActiveExecutionCount > 0 ? "info" : "success";
+    private int Value => Streak > 0 ? Streak : Summary.ActiveExecutionCount > 0 ? Summary.ActiveExecutionCount : Recent.TotalCount;
 }

@@ -48,8 +48,8 @@
                     {
                         <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
                         <SchedulerOwnerInsightTable Overview="@overview" />
-                        <SchedulerCoordinatorTable Snapshot="@overview.Coordination" />
-                        <details class="runtime-page__identity"><summary>@L["Runtime:Identity:Title"]</summary><SchedulerRuntimeIdentityCard Overview="@overview" /></details>
+                        <SchedulerRuntimeConfigurationPanel Overview="@overview" />
+                        <details class="runtime-page__identity"><summary>@L["Workspace:CoordinationEvidence"]</summary><SchedulerCoordinatorTable Snapshot="@overview.Coordination" /></details>
                     }
                     else if (state.IsQueryFailed && !state.IsLoading)
                     {
@@ -68,10 +68,7 @@
                                                      WorkerInsightError="@state.WorkerInsightError"
                                                      WorkerInsightObservedAtUtc="@state.WorkerInsightObservedAtUtc" />
                     }
-                    @if (state.Overview is { } configurationSnapshot)
-                    {
-                        <SchedulerRuntimeConfigurationPanel Overview="@configurationSnapshot" />
-                    }
+
                 </SchedulerAccessBoundary>
             }
         </div>
@@ -79,6 +76,10 @@
 </SchedulerWorkspace>
 
 @code {
+    /// <summary>Gets the owner search preserved in the runtime route.</summary>
+    [SupplyParameterFromQuery(Name="q")] public string? Search { get; set; }
+    /// <summary>Gets the publication-freshness filter preserved in the runtime route.</summary>
+    [SupplyParameterFromQuery(Name="freshness")] public string? Freshness { get; set; }
     /// <summary>Gets the route for serving-host runtime and separately sourced registry observations.</summary>
     public const string PAGE_URL = "/job-scheduler/runtime";
 

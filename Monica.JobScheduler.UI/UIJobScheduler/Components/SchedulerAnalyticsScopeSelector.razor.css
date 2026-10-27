@@ -1,6 +1,13 @@
-.analytics-scope { min-width: 0; width: min(100%, 460px); }
-.analytics-scope__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.analytics-scope__controls ::deep .mud-input-control { min-width: 0; margin-block: 0; }
-.analytics-scope__controls ::deep .mud-input { font-size: 12px; }
-.analytics-scope p { margin-top: 7px; color: var(--mud-palette-text-secondary); font-size: 10.5px; line-height: 1.7; }
-@media (max-width: 500px) { .analytics-scope__controls { grid-template-columns: minmax(0, 1fr); } }
+.analytics-scope{flex:1 1 420px;max-width:620px;min-width:0}
+.analytics-scope__controls{display:flex;gap:10px}
+.analytics-scope__field{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.analytics-scope__field>span{font-size:12px;color:var(--mud-palette-text-secondary)}
+.analytics-scope__field ::deep .mud-input-control{margin:0;flex:1;min-width:0}
+.analytics-scope__controls ::deep .mud-input-outlined{height:32px;min-height:32px;font-size:12.5px;background:var(--mud-palette-surface)}
+.analytics-scope__controls ::deep .mud-input-slot{padding:5px 10px !important;font-size:12.5px;font-weight:400}
+.analytics-scope__controls ::deep .mud-input-control-helper-container{display:none}
+.analytics-scope p{margin-top:7px;color:var(--mud-palette-text-secondary);font-size:10.5px;line-height:1.7}
+.analytics-scope p[hidden]{display:none}
+@media(max-width:500px){.analytics-scope__controls{flex-direction:column}
+.analytics-scope__field>span{width:60px}
+}

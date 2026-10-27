@@ -6,10 +6,16 @@
 <SchedulerWorkspace Title="@L["Workspace:Pages:Catalog:Title"]"
                     Description="@L["Workspace:Pages:Catalog:Description"]"
                     ActivePanelIndex="1">
-    <JobCatalogContent @key="(Present, Owner, Type, Disabled, Search)" Present="@Present" Owner="@Owner" InitialType="@Type" InitialDisabled="@Disabled" InitialSearch="@Search" InitialInstanceId="@InstanceId" />
+    <JobCatalogContent Present="@Present" Owner="@Owner" InitialType="@Type" InitialDisabled="@Disabled" InitialSearch="@Search" InitialStanding="@Standing" InitialCadence="@Cadence" InitialSort="@Sort" InitialInstanceId="@InstanceId" />
 </SchedulerWorkspace>
 
 @code {
+    /// <summary>Gets the route-held operational standing, cadence and inventory ordering.</summary>
+    [SupplyParameterFromQuery(Name = "standing")] public string? Standing { get; set; }
+    /// <summary>Gets the schedule cadence filter selected in the composition map.</summary>
+    [SupplyParameterFromQuery(Name = "cadence")] public string? Cadence { get; set; }
+    /// <summary>Gets attention, name, owner or next-occurrence ordering.</summary>
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
     public const string PAGE_URL = "/job-scheduler/catalog";
 
     /// <summary>

@@ -10,6 +10,7 @@ internal static class SchedulerRouteBuilder
     {
         var values = new List<string>();
         void Add(string key, string? value) { if (value is not null) values.Add($"{key}={Uri.EscapeDataString(value)}"); }
+        Add("time", query.CompletedAfterUtc is not null || query.CompletedBeforeUtc is not null ? "completed" : null);
         Add("owner", query.OwnerKey);
         Add("job", query.JobKey);
         Add("q", query.SearchText);

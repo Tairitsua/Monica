@@ -28,6 +28,7 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
     private int _accessVersion;
     private int _pendingMutations;
     private string? _routeOwner, _routeJob;
+    private bool _completedTime;
     private DateTimeOffset? _routeStart, _routeEnd;
 
     internal JobExecutionsPageState(
@@ -177,7 +178,7 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
         var intent = new QueryIntent(SearchText, Array.AsReadOnly(_selectedStates.Order().ToArray()), TimeRange,
             CustomStartDate?.Date, CustomEndDate?.Date, Math.Max(1, tableState.Page + 1),
             Math.Clamp(tableState.PageSize, 1, 200), ResolveSortField(tableState.SortLabel),
-            tableState.SortDirection != SortDirection.Ascending, _routeOwner, _routeJob, _routeStart, _routeEnd);
+            tableState.SortDirection != SortDirection.Ascending, _routeOwner, _routeJob, _routeStart, _routeEnd, _completedTime);
         return _lifetime.RunAsync(async token =>
         {
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, requestCancellation);
@@ -220,13 +221,20 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
     /// <remarks>Search remains the store's case-insensitive identifier search, not an exact-ID query.</remarks>
     /// <exception cref="ObjectDisposedException">This synchronous draft update targets a retired state.</exception>
     public void ApplyInitialQuery(string? states, string? instanceId, string? ownerKey = null, string? jobKey = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, string? searchText = null, string? range = null)
+        DateTimeOffset? from = null, DateTimeOffset? to = null, string? searchText = null, string? range = null, bool completedTime = false)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
         _selectedStates = CopyStates(ParseStates(states));
         SearchText = searchText ?? (ownerKey is null && jobKey is null ? instanceId : null);
-        TimeRange = range switch { "1h" => ExecutionTimeRange.LastHour, "24h" => ExecutionTimeRange.Last24Hours,
-            "7d" => ExecutionTimeRange.Last7Days, "30d" => ExecutionTimeRange.Last30Days, _ => ExecutionTimeRange.All };
+        TimeRange = range switch
+        {
+            "1h" => ExecutionTimeRange.LastHour,
+            "24h" => ExecutionTimeRange.Last24Hours,
+            "7d" => ExecutionTimeRange.Last7Days,
+            "30d" => ExecutionTimeRange.Last30Days,
+            _ => ExecutionTimeRange.All
+        };
+        _completedTime = completedTime;
         _routeOwner = ownerKey;
         _routeJob = jobKey;
         _routeStart = from;
@@ -387,8 +395,10 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
             JobKey = intent.JobKey,
             SearchText = intent.SearchText,
             States = intent.States.Count == 0 ? null : intent.States,
-            CreatedAfterUtc = range.Start,
-            CreatedBeforeUtc = range.End,
+            CreatedAfterUtc = intent.CompletedTime ? null : range.Start,
+            CreatedBeforeUtc = intent.CompletedTime ? null : range.End,
+            CompletedAfterUtc = intent.CompletedTime ? range.Start ?? DateTimeOffset.MinValue : null,
+            CompletedBeforeUtc = intent.CompletedTime ? range.End ?? admittedAtUtc : null,
             PageNumber = intent.PageNumber,
             PageSize = intent.PageSize,
             SortField = intent.SortField,
@@ -494,13 +504,13 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
     private sealed record QueryIntent(string? SearchText, IReadOnlyCollection<JobExecutionState> States,
         ExecutionTimeRange TimeRange, DateTime? StartDate, DateTime? EndDate, int PageNumber, int PageSize,
         JobExecutionSortField SortField, bool SortDescending, string? OwnerKey, string? JobKey,
-        DateTimeOffset? ExactStart, DateTimeOffset? ExactEnd)
+        DateTimeOffset? ExactStart, DateTimeOffset? ExactEnd, bool CompletedTime)
     {
         internal bool HasInvalidRange => TimeRange == ExecutionTimeRange.Custom
             && StartDate is { } start && EndDate is { } end && start > end;
 
         internal bool Matches(QueryIntent other) => SearchText == other.SearchText && States.SequenceEqual(other.States)
-            && TimeRange == other.TimeRange && StartDate == other.StartDate && EndDate == other.EndDate
+            && CompletedTime == other.CompletedTime && TimeRange == other.TimeRange && StartDate == other.StartDate && EndDate == other.EndDate
             && PageNumber == other.PageNumber && PageSize == other.PageSize
             && SortField == other.SortField && SortDescending == other.SortDescending
             && OwnerKey == other.OwnerKey && JobKey == other.JobKey && ExactStart == other.ExactStart && ExactEnd == other.ExactEnd;

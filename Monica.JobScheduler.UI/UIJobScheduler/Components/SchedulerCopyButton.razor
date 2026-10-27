@@ -1,0 +1,27 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<JobSchedulerResource> L
+@implements IAsyncDisposable
+<button type="button" class="scheduler-copy" disabled="@_busy" aria-label="@L["Workspace:CopyJobKey"]" @onclick="CopyAsync"><MoIcon Icon="@MoIcons.Copy" Size="13px" /></button>
+@code {
+    /// <summary>Gets the exact value copied to the browser clipboard.</summary>
+    [Parameter,EditorRequired] public string Value { get; set; } = string.Empty;
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private bool _busy;
+    private async Task CopyAsync()
+    {
+        if (_busy || _lifetime.IsRetired) return;
+        _busy=true; var value=Value;
+        try { await _lifetime.RunAsync(async token => {
+            var copied=false;
+            try { copied=await JS.InvokeAsync<bool>("MoClipboard.copyText",token,value); }
+            catch (JSException) { }
+            if (!_lifetime.IsRetired) Snackbar.Add(L[copied ? "Catalog:Actions:CopiedKey" : "Catalog:Actions:CopyKeyFailed"],copied ? Severity.Success : Severity.Warning);
+        }); }
+        catch(OperationCanceledException) when (_lifetime.IsRetired) { }
+        finally { _busy=false; }
+    }
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+}

@@ -52,29 +52,7 @@
                     <SchedulerPulse Definitions="@overview.Definitions" CapturedAtUtc="@overview.CapturedAtUtc" StateCounts="@overview.ExecutionStateCounts"
                                     WindowMinutes="@WindowMinutes" WindowChanged="SetWindow" Search="@Search" SearchChanged="SetSearch" />
 
-                    <RecentExecutionsPanel Executions="@overview.RecentExecutions"
-                                           IsRefreshing="@_state.IsLoading"
-                                           OnRefresh="RefreshAsync" />
 
-                    <aside class="overview-page__insight" aria-labelledby="overview-insight-title">
-                        <span class="overview-page__insight-icon" aria-hidden="true">
-                            <MoIcon Icon="@MoIcons.ChartTrend" Size="1.5rem" />
-                        </span>
-                        <div>
-                            <MudText id="overview-insight-title" Typo="Typo.h6" HtmlTag="h2">
-                                @L["Overview:Analytics:Title"]
-                            </MudText>
-                            <MudText Typo="Typo.body2">
-                                @L["Overview:Analytics:Description"]
-                            </MudText>
-                        </div>
-                        <MudButton Href="@SchedulerStatisticsPage.PAGE_URL"
-                                   Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   EndIcon="@MoIcons.ArrowRight">
-                            @L["Overview:Analytics:Action"]
-                        </MudButton>
-                    </aside>
                 }
             </div>
         </SchedulerAccessBoundary>
@@ -89,12 +67,12 @@
     private readonly object _lifetimeGate = new();
     private TaskCompletionSource? _retirement;
 
-    /// <summary>Gets the route-held diagnostic window (15m, 1h, 24h).</summary>
+    /// <summary>Gets the route-held diagnostic window (15m, 1h, 6h).</summary>
     [SupplyParameterFromQuery(Name = "window")] public string? Window { get; set; }
     /// <summary>Gets the route-held pulse name, key or owner filter.</summary>
     [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
-    private int WindowMinutes => Window switch { "15m" => 15, "24h" => 1440, _ => 60 };
-    private void SetWindow(int minutes) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("window", minutes == 15 ? "15m" : minutes == 1440 ? "24h" : "1h"));
+    private int WindowMinutes => Window switch { "15m" => 15, "6h" => 360, "24h" => 1440, _ => 60 };
+    private void SetWindow(int minutes) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("window", minutes == 15 ? "15m" : minutes == 360 ? "6h" : minutes == 1440 ? "24h" : "1h"));
     private void SetSearch(string value) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", string.IsNullOrEmpty(value) ? null : value), replace: true);
     private void SetAutoRefresh(bool enabled) { if (_state is { } state && !_disposed) state.SetAutoRefreshEnabled(enabled); }
 

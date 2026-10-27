@@ -2,57 +2,8 @@
 @using Monica.JobScheduler.UI.Localization
 
 <section class="execution-ledger @(HasLoadedSnapshot ? null : "execution-ledger--unavailable")" aria-labelledby="execution-ledger-title">
-    <header class="execution-ledger__heading">
-        <div>
-            <span class="execution-ledger__eyebrow">@L["Executions:LedgerEyebrow"]</span>
-            <h2 id="execution-ledger-title">@L["Executions:Title"]</h2>
-            @if (HasLoadedSnapshot)
-            {
-                <p>@L["Executions:Count", TotalCount]</p>
-            }
-            else
-            {
-                <p>@L[IsQueryFailed ? "Executions:SnapshotUnavailable" : "Executions:SnapshotPending"]</p>
-            }
-        </div>
-
-    </header>
-
-    @if (FilterContent is not null)
-    {
-        <div class="execution-ledger__filters">@FilterContent</div>
-    }
-
-    <div class="execution-ledger__ordering">
-        <div class="execution-ledger__sort-field">
-            <MudSelect T="JobExecutionSortField"
-                       Value="@_sortField"
-                       ValueChanged="ChangeSortFieldAsync"
-                       ToStringFunc="FormatSortField"
-                       Label="@L["Executions:Sort:Field"]"
-                       Disabled="@(IsLoading || CommandsDisabled)"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                @foreach (var field in Enum.GetValues<JobExecutionSortField>())
-                {
-                    <MudSelectItem T="JobExecutionSortField" Value="@field">@FormatSortField(field)</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
-        <div class="execution-ledger__sort-direction">
-            <MudSelect T="SortDirection"
-                       Value="@_sortDirection"
-                       ValueChanged="ChangeSortDirectionAsync"
-                       ToStringFunc="FormatSortDirection"
-                       Label="@L["Executions:Sort:Direction"]"
-                       Disabled="@(IsLoading || CommandsDisabled)"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem T="SortDirection" Value="@SortDirection.Descending">@L["Executions:Sort:Descending"]</MudSelectItem>
-                <MudSelectItem T="SortDirection" Value="@SortDirection.Ascending">@L["Executions:Sort:Ascending"]</MudSelectItem>
-            </MudSelect>
-        </div>
-    </div>
+    <header class="execution-ledger__heading"><h2 id="execution-ledger-title">@L["Executions:Title"] @if(HasLoadedSnapshot) { <small>@TotalCount.ToString("N0")</small> }</h2><div class="execution-ledger__ordering"><div role="group" aria-label="@L["Executions:Sort:Field"]">@foreach(var field in Enum.GetValues<JobExecutionSortField>()) { <button type="button" aria-pressed="@((_sortField==field).ToString().ToLowerInvariant())" disabled="@(IsLoading || CommandsDisabled)" @onclick="@(() => ChangeSortFieldAsync(field))">@FormatSortField(field)</button> }</div><button type="button" disabled="@(IsLoading || CommandsDisabled)" @onclick="@(() => ChangeSortDirectionAsync(_sortDirection==SortDirection.Descending ? SortDirection.Ascending : SortDirection.Descending))"><MoIcon Icon="@(_sortDirection==SortDirection.Descending ? MoIcons.ArrowDown : MoIcons.ArrowUp)" Size="13px"/>@FormatSortDirection(_sortDirection)</button></div></header>
+    @if(FilterContent is not null) { <div class="execution-ledger__filters">@FilterContent</div> }
 
     <div class="execution-ledger__data">
         <MudTable @ref="_table"

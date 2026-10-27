@@ -79,6 +79,9 @@ internal sealed class SchedulerTimePresentation(
     /// <summary>Formats a compact ordinary observation time through the host-owned display policy.</summary>
     internal string FormatClock(DateTimeOffset? value) => timeFormatter.FormatTime(value);
 
+    /// <summary>Formats a compact chart boundary in the host display timezone, without milliseconds.</summary>
+    internal string FormatChartTimestamp(DateTimeOffset value) => timeFormatter.Format(value, "MM-dd HH:mm");
+
     /// <summary>Uses the host clock on the observation day and retains a date for records on other display days.</summary>
     internal string FormatListTimestamp(DateTimeOffset value, DateTimeOffset observedAtUtc) =>
         timeFormatter.ToDisplayTime(value).Date == timeFormatter.ToDisplayTime(observedAtUtc).Date

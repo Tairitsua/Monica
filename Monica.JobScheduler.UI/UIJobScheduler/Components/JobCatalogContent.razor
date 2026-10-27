@@ -30,13 +30,13 @@
                 }
                 @if (_state.HasLoadedFacets)
                 {
-                    <SchedulerCatalogComposition Definitions="@_state.Definitions" ObservedAtUtc="@_state.ObservedAtUtc.GetValueOrDefault()" />
+                    <SchedulerCatalogComposition Definitions="@_state.Definitions" Tones="@_state.Evidence.ToDictionary(pair => pair.Key, pair => pair.Value.Tone)" Catalog="@_state.Catalog" Truncated="@_state.IsCatalogTruncated" Standing="@_state.Standing" Cadence="@_state.Cadence" ObservedAtUtc="@_state.ObservedAtUtc.GetValueOrDefault()" />
                 }
                 <JobCatalogOperationalTable @ref="_catalogTable"
                                             ServerData="@_state.LoadTableAsync"
                                             SelectedJobIds="@_state.SelectedJobIds"
                                             TotalCount="@_state.TotalCount"
-                                            PageSize="@_state.PageSize"
+                                            PageSize="@_state.PageSize" StandingResolver="@_state.StandingOf"
                                             PageSizeOptions="@_state.PageSizeOptions"
                                             IsMutating="@_state.IsMutating"
                                             IsQueryFailed="@(_state.Error is not null)"
@@ -56,7 +56,7 @@
                                           JobTypeCounts="@_state.JobTypeCounts"
                                           HasFacetEvidence="@_state.HasLoadedFacets"
                                           JobTypeSelected="SelectJobTypeAsync"
-                                          SelectedDisabledState="@_state.SelectedDisabledState"
+                                          Standing="@_state.Standing" StandingCounts="@_state.StandingCounts" StandingSelected="SelectStandingAsync" Sort="@_state.CatalogSort" SortSelected="SelectSortAsync" Cadence="@_state.Cadence" SelectedDisabledState="@_state.SelectedDisabledState"
                                           DisabledStateSelected="SelectDisabledStateAsync"
                                           IsLoading="@(_state.IsLoading || _state.IsMutating)"
                                           SearchRequested="SearchAsync"
@@ -90,6 +90,26 @@
     /// <summary>Gets the route-owned exact execution selection; changing it preserves the current catalog state.</summary>
     [Parameter] public string? InitialInstanceId { get; set; }
 
+    /// <summary>Gets route-held operational standing.</summary>
+    [Parameter] public string? InitialStanding { get; set; }
+    /// <summary>Gets route-held cadence.</summary>
+    [Parameter] public string? InitialCadence { get; set; }
+    /// <summary>Gets route-held inventory ordering.</summary>
+    [Parameter] public string? InitialSort { get; set; }
+    private (bool?, string?, string?, bool?, string?, string?, string?, string?) _filters;
+    private void ApplyRoute()
+    {
+        if (_state is not { } state) return;
+        state.ApplyInitialQuery(Present, Owner);
+        state.OwnerId = Owner;
+        state.SearchText = InitialSearch;
+        state.SelectedJobType = Enum.TryParse<JobType>(InitialType, true, out var type) && Enum.IsDefined(type) ? type : null;
+        state.SelectedDisabledState = InitialDisabled;
+        state.Standing = InitialStanding;
+        state.Cadence = InitialCadence;
+        state.CatalogSort = InitialSort ?? "attention";
+        _filters = (Present, Owner, InitialType, InitialDisabled, InitialSearch, InitialStanding, InitialCadence, InitialSort);
+    }
     private JobCatalogPageState? _state;
     private JobCatalogOperationalTable? _catalogTable;
     private readonly object _lifetimeGate = new();
@@ -111,12 +131,18 @@
         _state.SelectedJobType = Enum.TryParse<JobType>(InitialType, true, out var type) && Enum.IsDefined(type) ? type : null;
         _state.SelectedDisabledState = InitialDisabled;
         _state.SearchText = InitialSearch;
+        ApplyRoute();
         await _state.InitializeAsync();
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_disposed || _requestedInstanceId == InitialInstanceId || _state is not { } state) return;
+        if (_disposed || _state is not { } state) return;
+        if (_filters != (Present, Owner, InitialType, InitialDisabled, InitialSearch, InitialStanding, InitialCadence, InitialSort))
+        {
+            ApplyRoute(); state.Search(); await ReloadFromFirstPageAsync();
+        }
+        if (_requestedInstanceId == InitialInstanceId) return;
         var id = InitialInstanceId;
         _requestedInstanceId = id;
         var version = ++_inspectorVersion;
@@ -177,7 +203,8 @@
             var url = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
             {
                 ["owner"] = state.OwnerId, ["type"] = state.SelectedJobType?.ToString(), ["paused"] = state.SelectedDisabledState,
-                ["q"] = string.IsNullOrEmpty(state.SearchText) ? null : state.SearchText
+                ["q"] = string.IsNullOrEmpty(state.SearchText) ? null : state.SearchText,
+                ["standing"] = state.Standing, ["cadence"] = state.Cadence, ["sort"] = state.CatalogSort == "attention" ? null : state.CatalogSort
             });
             if (url != Navigation.Uri) { Navigation.NavigateTo(url); return; }
         }
@@ -198,6 +225,8 @@
         await ReloadFromFirstPageAsync();
     }
 
+    private async Task SelectStandingAsync(string? standing) { if (_state is { } state) state.Standing = standing; await SearchAsync(); }
+    private async Task SelectSortAsync(string sort) { if (_state is { } state) state.CatalogSort = sort; await SearchAsync(); }
     private async Task SelectJobTypeAsync(JobType? jobType)
     {
         _state?.SelectJobType(jobType);

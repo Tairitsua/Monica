@@ -7,13 +7,17 @@
         <div class="snapshot-actions__stamp"><span>@L["Workspace:Captured"]</span><time datetime="@CapturedAtUtc?.ToString("O")" title="@TimePresentation.FormatTimestamp(CapturedAtUtc)">@TimePresentation.FormatClock(CapturedAtUtc)</time></div>
         @if (AutoRefreshEnabled is { } automatic)
         {
-            <button type="button" class="snapshot-actions__auto" aria-pressed="@automatic" @onclick="@(() => AutoRefreshChanged.InvokeAsync(!automatic))"><i class="@(automatic ? "is-live" : null)"></i>@L[automatic ? "Workspace:AutoRefresh" : "Workspace:AutoPaused"]</button>
+            <button type="button" class="snapshot-actions__auto" aria-pressed="@((automatic).ToString().ToLowerInvariant())" @onclick="@(() => AutoRefreshChanged.InvokeAsync(!automatic))"><i class="@(automatic ? "is-live" : null)"></i>@L[automatic ? "Workspace:AutoRefresh" : "Workspace:AutoPaused"]</button>
         }
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@IsLoading" OnClick="RefreshRequested">@L["Common:Refresh"]</MudButton>
     </div>
 </SectionContent>
 
 @code {
+    /// <summary>Gets the workspace that refreshes local readiness with each accepted page capture.</summary>
+    [CascadingParameter] public SchedulerWorkspace? Workspace { get; set; }
+    protected override Task OnParametersSetAsync() => Workspace?.ObserveCaptureAsync(CapturedAtUtc) ?? Task.CompletedTask;
+
     /// <summary>Gets the workspace-owned section identity; a snapshot action group is owned by its containing SchedulerWorkspace.</summary>
     [CascadingParameter(Name = "SchedulerWorkspaceActions")] public object ActionsKey { get; set; } = new();
     /// <summary>Gets the instant belonging to accepted evidence, rather than the last attempted refresh.</summary>

@@ -1,8 +1,8 @@
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 
-<section class="schedule-preview" aria-labelledby="schedule-preview-title">
-    <header><div><h2 id="schedule-preview-title">@L["Workspace:NextFive"]</h2><p>@L["Workspace:PlanNotice"]</p></div><span>@Definition.EffectiveConfiguration.Schedule?.TimeZoneId</span></header>
+<section class="schedule-preview" aria-label="@L["Workspace:NextFive"]">
+
     @if (_preview is { Occurrences.Count: > 0 })
     {
         <ol>@foreach (var (occurrence, index) in _preview.Occurrences.Select((value, index) => (value, index)))
@@ -11,6 +11,7 @@
         }</ol>
     }
     else { <p class="schedule-preview__empty">@L["JobDetail:Schedule:NoNextOccurrence"]</p> }
+    <p class="schedule-preview__notice">@L["Workspace:PlanNotice"]</p>
 </section>
 
 @code {
@@ -21,7 +22,7 @@
     private CronPolicyEvaluation? _preview;
     protected override void OnParametersSet()
     {
-        _preview = Definition.EffectiveConfiguration.Schedule is { } schedule
+        _preview = Definition.IsPresent && !Definition.IsDisabled && Definition.EffectiveConfiguration.Schedule is { } schedule
             ? CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId, schedule.StartTimeUtc, schedule.EndTimeUtc, ObservedAtUtc)
             : null;
     }

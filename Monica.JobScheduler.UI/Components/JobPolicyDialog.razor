@@ -1,25 +1,26 @@
 @using Monica.UI.Shared.Components.Dialogs
 @using Monica.JobScheduler.UI.Localization
 
-<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
+<MudDialog Style="@(ScheduleOnly ? "width:760px;max-width:calc(100vw - 32px)" : null)" Gutters="false" TitleClass="pa-0" ContentClass="pa-0" ActionsClass="pa-0">
     <TitleContent>
-        <div class="policy-workbench__title">
+        <div class="policy-workbench__title @(ScheduleOnly ? "policy-workbench__title--cron" : null)">
             <div class="policy-workbench__title-icon">
-                <MoIcon Icon="@MoIcons.Sliders" Size="1.5rem" />
+                <MoIcon Icon="@(ScheduleOnly ? MoIcons.CalendarDays : MoIcons.Sliders)" Size="1.5rem" />
             </div>
             <div>
                 <MoDialogHeading Text="@L[ScheduleOnly ? "Workspace:EditCron" : "Policy:Title"]" />
                 <MudText Typo="Typo.body2">
                     @(_state?.EffectiveDisplayName ?? Definition.Declaration.JobName)
                 </MudText>
-                <code title="@((_state?.Definition ?? Definition).Declaration.JobKey)">@((_state?.Definition ?? Definition).Declaration.JobKey)</code>
+                @if (!ScheduleOnly) { <code title="@((_state?.Definition ?? Definition).Declaration.JobKey)">@((_state?.Definition ?? Definition).Declaration.JobKey)</code> }
             </div>
         </div>
     </TitleContent>
     <DialogContent>
         @if (_state is not null)
         {
-            <div class="policy-workbench">
+            <div class="policy-workbench @(ScheduleOnly ? "policy-workbench--cron" : null)">
+                @if (!ScheduleOnly) {
                 <header class="policy-workbench__identity">
                     @foreach (var fact in IdentityFacts)
                     {
@@ -35,6 +36,7 @@
                     @L["Policy:ImmutableNotice"]
                 </MudAlert>
 
+                }
                 @if (_state.HasConflict)
                 {
                     <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Dense="true"
@@ -51,6 +53,7 @@
                     }
                 }
 
+                @if (!ScheduleOnly) {
                 <div class="policy-workbench__toolbar">
                     <MudText Typo="Typo.body2">
                         @L["Policy:Provenance:Help"]
@@ -63,6 +66,7 @@
                     </MudButton>
                 </div>
 
+                }
                 @if (!ScheduleOnly)
                 {
                 <section class="policy-section" aria-labelledby="policy-general-heading">
@@ -154,12 +158,14 @@
                 }
                 @if (_state.Schedule is { } schedule)
                 {
-                    <section class="policy-section" aria-labelledby="policy-schedule-heading">
+                    <section class="@(ScheduleOnly ? "policy-cron-section" : "policy-section")" aria-label="@L["Policy:Sections:Schedule"]">
+                        @if (!ScheduleOnly) {
                         <OperationalPolicySectionHeading HeadingId="policy-schedule-heading"
                                                          Icon="@MoIcons.CalendarSync"
                                                          Title="@L["Policy:Sections:Schedule"]"
                                                          Description="@L["Policy:Sections:ScheduleHelp"]" />
-                        <OperationalPolicyScheduleEditor Draft="@schedule"
+                        }
+                        <OperationalPolicyScheduleEditor Draft="@schedule" Compact="@ScheduleOnly" CurrentExpression="@_state.Definition.EffectiveConfiguration.Schedule?.CronExpression" IsPresent="@_state.Definition.IsPresent"
                                                          Disabled="@_isSaving"
                                                          IsPaused="@_state.EffectiveDisabled"
                                                          Changed="DraftChanged" />
@@ -302,7 +308,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <div class="policy-workbench__actions">
+        <div class="policy-workbench__actions @(ScheduleOnly ? "policy-workbench__actions--cron" : null)">
             <MudText Typo="Typo.caption">
                 @(_state?.HasChanges == true ? L["Policy:UnsavedChanges"] : L["Policy:NoChanges"])
             </MudText>

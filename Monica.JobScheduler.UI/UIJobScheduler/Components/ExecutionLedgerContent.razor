@@ -29,7 +29,7 @@ else if (_state is { } state)
             <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@(state.IsLoading || state.IsMutating)" RefreshRequested="RefreshAsync" />
             @if (state.HasLoadedSnapshot && state.LoadedQuery is { } acceptedQuery && state.ObservedAtUtc is { } acceptedAt)
             {
-                <SchedulerLedgerTrajectory Query="@acceptedQuery" ObservedAtUtc="@acceptedAt" StateSelected="SelectTrajectoryStateAsync" />
+                <SchedulerLedgerTrajectory Query="@acceptedQuery" ObservedAtUtc="@acceptedAt" StateSelected="SelectTrajectoryStateAsync" AllStatesSelected="@(() => SelectStatesAsync([]))" FilterContent="@LedgerFilters" />
             }
             <ExecutionOperationalTable @ref="_table" ServerData="@state.LoadTableAsync"
                                        TotalCount="@state.TotalCount" HasLoadedSnapshot="@state.HasLoadedSnapshot"
@@ -37,32 +37,7 @@ else if (_state is { } state)
                                        PageSize="@state.PageSize" PageSizeOptions="@state.PageSizeOptions"
                                        IsLoading="@state.IsLoading"
                                        InspectRequested="InspectAsync" RequestCancellation="RequestCancellationAsync">
-                <FilterContent>
-                    <ExecutionFilterBar TRange="ExecutionTimeRange"
-                                        SearchText="@state.SearchText" SearchTextChanged="@(value => state.SearchText = value)"
-                                        TimeRange="@state.TimeRange" TimeRangeChanged="@(value => state.TimeRange = value)"
-                                        TimeRanges="@TimeRanges" TimeRangeLabel="FormatTimeRange"
-                                        ShowCustomDates="@(state.TimeRange == ExecutionTimeRange.Custom)"
-                                        CustomStartDate="@state.CustomStartDate" CustomStartDateChanged="@(value => state.CustomStartDate = value)"
-                                        CustomEndDate="@state.CustomEndDate" CustomEndDateChanged="@(value => state.CustomEndDate = value)"
-                                        SelectedStates="@state.SelectedStates" SelectedStatesChanged="SelectStatesAsync"
-                                        IsLoading="@(state.IsLoading || state.IsMutating)" HasInvalidCustomRange="@state.HasInvalidCustomRange"
-                                        ApplyRequested="ApplyAsync" ResetRequested="ResetAsync" />
-                    <div class="execution-ledger-content__scope">
-                        <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />
-                        <span>@L["Executions:RecordedTimeNotice"]</span>
-                    </div>
-                    @if (state.HasInvalidCustomRange)
-                    {
-                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Warning">@L["Executions:Filters:InvalidRange"]</MudAlert>
-                    }
-                    @if (state.IsQueryFailed && state.HasLoadedSnapshot && state.LoadedQuery is { } query)
-                    {
-                        <p class="execution-ledger-content__accepted-query">
-                            @L["Executions:AcceptedQuery", FormatAcceptedQuery(query)]
-                        </p>
-                    }
-                </FilterContent>
+
             </ExecutionOperationalTable>
         </SchedulerAccessBoundary>
     </div>
@@ -89,8 +64,22 @@ else if (_state is { } state)
     [Parameter] public string? InitialSearch { get; set; }
     /// <summary>Gets the initial route-held rolling preset.</summary>
     [Parameter] public string? InitialRange { get; set; }
+    /// <summary>Gets the requested creation or completion interval basis.</summary>
+    [Parameter] public string? InitialTime { get; set; }
 
-    private ExecutionTimeRange[] TimeRanges => Enum.GetValues<ExecutionTimeRange>().Where(range => range != ExecutionTimeRange.Exact || _state?.HasExactRange == true).ToArray();
+    private (string?,string?,string?,string?,string?,string?,string?,string?,string?)? _routeParameters;
+    private (string?,string?,string?,string?,string?,string?,string?,string?,string?) RouteParameters => (InitialStates,InitialInstanceId,InitialOwner,InitialJob,InitialFrom,InitialTo,InitialSearch,InitialRange,InitialTime);
+    private static readonly ExecutionTimeRange[] Presets=[ExecutionTimeRange.LastHour,ExecutionTimeRange.Last24Hours,ExecutionTimeRange.Last7Days,ExecutionTimeRange.Last30Days,ExecutionTimeRange.All];
+    private string RangeKey(ExecutionTimeRange range) => range switch { ExecutionTimeRange.LastHour => "1h",ExecutionTimeRange.Last24Hours => "24h",ExecutionTimeRange.Last7Days => "7d",ExecutionTimeRange.Last30Days => "30d",_ => "all" };
+    private Task SetRangeAsync(ExecutionTimeRange range) { if(_state is {} state) state.TimeRange=range;return ApplyAsync(); }
+    private void SetTime(string basis) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("time",basis=="created" ? null : basis));
+    private Task SearchAsync(string value) { if(_state is {} state) state.SearchText=value;return ApplyAsync(); }
+    private RenderFragment LedgerFilters => @<div class="ledger-filter-band">
+        <div class="ledger-filter-seg" role="group" aria-label="@L["Workspace:TimeBasis"]"><button type="button" aria-pressed="@((InitialTime != "completed").ToString().ToLowerInvariant())" @onclick='@(() => SetTime("created"))'>@L["Workspace:RecordedTime"]</button><button type="button" aria-pressed="@((InitialTime == "completed").ToString().ToLowerInvariant())" @onclick='@(() => SetTime("completed"))'>@L["Workspace:CompletedTime"]</button></div>
+        <div class="ledger-filter-seg" role="group" aria-label="@L["Executions:Filters:TimeRange"]">@foreach(var range in Presets) { <button type="button" aria-pressed="@((_state?.TimeRange==range).ToString().ToLowerInvariant())" @onclick="@(() => SetRangeAsync(range))">@L[$"Workspace:LedgerRanges:{RangeKey(range)}"]</button> }</div>
+        <div class="ledger-filter-search"><MudTextField T="string" Value="@_state?.SearchText" Placeholder="@L["Executions:Filters:SearchPlaceholder"]" aria-label="@L["Executions:Filters:Search"]" Immediate="true" DebounceInterval="350" OnDebounceIntervalElapsed="SearchAsync" Clearable="true" ClearIcon="@MoIcons.Close" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+        @if(InitialOwner is not null || InitialJob is not null || _state?.TimeRange==ExecutionTimeRange.Exact || !string.IsNullOrEmpty(_state?.SearchText)) { <div class="ledger-filter-context"><span>@InitialOwner @InitialJob</span>@if(_state?.LoadedQuery is {} query && (query.CompletedAfterUtc ?? query.CreatedAfterUtc) is {} start && (query.CompletedBeforeUtc ?? query.CreatedBeforeUtc) is {} end) { <time>@TimePresentation.FormatRange(start,end)</time> }<button type="button" @onclick="ResetAsync">@L["Executions:Actions:Reset"] <MoIcon Icon="@MoIcons.Close" Size="12px"/></button></div> }
+    </div>;
     private readonly SchedulerOperationLifetime _lifetime = new();
     private readonly object _retirementGate = new();
     private TaskCompletionSource? _retirement;
@@ -107,6 +96,7 @@ else if (_state is { } state)
         _confirmations = new(OpenConfirmationAsync, CompleteCancellationAsync);
         var state = PageStateFactory.CreatePageState();
         _state = state;
+        _routeParameters=RouteParameters;
         state.StateChanged += OnStateChangedAsync;
         if (!TryParseBound(InitialFrom, out var from) || !TryParseBound(InitialTo, out var to)
             || to == DateTimeOffset.MinValue || (from.HasValue && to.HasValue && to <= from))
@@ -114,9 +104,22 @@ else if (_state is { } state)
             _routeError = true;
             return;
         }
-        state.ApplyInitialQuery(InitialStates, InitialInstanceId, InitialOwner, InitialJob, from, to, InitialSearch, InitialRange);
+        _routeParameters=RouteParameters;
+        state.ApplyInitialQuery(InitialStates, InitialInstanceId, InitialOwner, InitialJob, from, to, InitialSearch, InitialRange, InitialTime == "completed");
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }
         catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if(_routeParameters == RouteParameters || _state is not {} state || _lifetime.IsRetired) return;
+        _routeParameters=RouteParameters;
+        if(!TryParseBound(InitialFrom,out var from) || !TryParseBound(InitialTo,out var to) || to==DateTimeOffset.MinValue || (from.HasValue && to.HasValue && to<=from)) { _routeError=true;return; }
+        _routeError=false;
+        state.ApplyInitialQuery(InitialStates,InitialInstanceId,InitialOwner,InitialJob,from,to,InitialSearch,InitialRange,InitialTime=="completed");
+        _initialInspectorOpened=false;
+        if(_table is not null) await _table.ReloadFromFirstPageAsync();
+        else await state.InitializeAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -132,7 +135,7 @@ else if (_state is { } state)
         if (!_lifetime.IsRetired) StateHasChanged();
     });
 
-    private string FormatTimeRange(ExecutionTimeRange range) => L[$"Executions:TimeRanges:{range}"];
+
 
     private static bool TryParseBound(string? value, out DateTimeOffset? bound)
     {
@@ -155,8 +158,8 @@ else if (_state is { } state)
             ? string.Join(", ", query.States.Select(state => L[$"ExecutionStates:{state}"].Value))
             : L["Executions:Filters:AnyState"].Value;
         return L["Executions:QueryDescription", states, query.SearchText ?? L["Executions:AnyIdentifier"].Value,
-            query.CreatedAfterUtc is { } start ? TimePresentation.FormatTimestamp(start) : "—",
-            query.CreatedBeforeUtc is { } end ? TimePresentation.FormatTimestamp(end) : "—",
+            (query.CompletedAfterUtc ?? query.CreatedAfterUtc) is { } start ? TimePresentation.FormatTimestamp(start) : "—",
+            (query.CompletedBeforeUtc ?? query.CreatedBeforeUtc) is { } end ? TimePresentation.FormatTimestamp(end) : "—",
             query.PageNumber].Value;
     }
 
@@ -167,7 +170,12 @@ else if (_state is { } state)
         await ApplyAsync();
     }
 
-    private Task SelectTrajectoryStateAsync(JobExecutionState state) => SelectStatesAsync(_state?.SelectedStates.Count == 1 && _state.SelectedStates.Contains(state) ? [] : new[] { state });
+    private Task SelectTrajectoryStateAsync(JobExecutionState state)
+    {
+        var states=_state?.SelectedStates.ToHashSet() ?? [];
+        if(!states.Add(state)) states.Remove(state);
+        return SelectStatesAsync(states.ToArray());
+    }
 
     private Task ApplyAsync()
     {

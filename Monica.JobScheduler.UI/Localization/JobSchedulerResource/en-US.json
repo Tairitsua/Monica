@@ -20,19 +20,19 @@
     }
   },
   "Workspace": {
-    "Eyebrow": "MONICA / DURABLE SCHEDULING",
-    "TimeZone": "Scheduler timezone · {0}",
+    "Eyebrow": "Operations · Task scheduling",
+    "TimeZone": "Time zone · {0}",
     "Navigation": {
       "Overview": "Overview",
-      "Catalog": "Catalog",
-      "Executions": "Executions",
+      "Catalog": "Job catalog",
+      "Executions": "Execution ledger",
       "Statistics": "Analytics",
       "Runtime": "Runtime",
       "AriaLabel": "Scheduler workspaces"
     },
     "Pages": {
       "Overview": {
-        "Title": "Scheduler operations",
+        "Title": "Scheduler overview",
         "Description": "Review durable workload and recorded outcomes, then open the execution evidence that explains them."
       },
       "Catalog": {
@@ -40,11 +40,11 @@
         "Description": "Find owner-scoped definitions, inspect their effective cadence and execution evidence, and control future admission."
       },
       "JobDetail": {
-        "Title": "Job operational dossier",
+        "Title": "Job details",
         "Description": "Read one immutable declaration alongside its effective policy, schedule cursor, worker compatibility, and latest execution evidence."
       },
       "Executions": {
-        "Title": "Durable execution ledger",
+        "Title": "Execution ledger",
         "Description": "Find durable records, inspect captured settings and retained history, and request cooperative cancellation."
       },
       "Statistics": {
@@ -56,7 +56,7 @@
         "Description": "Inspect this host's local cycles and effective options, definition-backed owners in the shared scope, and optional service-registry observations."
       }
     },
-    "Scope": "Configured scope · {0}",
+    "Scope": "Scope · {0}",
     "CopyId": "Copy instance ID",
     "OpenLedger": "Open in execution ledger",
     "EditCron": "Edit Cron",
@@ -71,12 +71,10 @@
     "PlanNotice": "Plans use the declared schedule timezone. Suspension, boundaries and capacity can still affect admission.",
     "Next": "Next",
     "Planned": "Planned",
-    "Inventory": "Job composition",
-    "PublishedDefinitions": "published definitions",
-    "DefinitionBreakdown": "{0} recurring · {1} triggered · {2} additional unpublished definitions",
-    "CatalogFinding": "The loaded snapshot has {0} published jobs across {1} owners.",
-    "LargestOwner": "Largest owner:",
-    "OwnerCadence": "Owner × cadence",
+    "Inventory": "Job definitions",
+    "PublishedDefinitions": "present definitions",
+    "DefinitionBreakdown": "{0} recurring · {1} triggered · {2} more unpublished",
+    "OwnerCadence": "Catalog composition",
     "CollapseMap": "Collapse map",
     "ExpandMap": "Expand map",
     "Cadences": {
@@ -90,23 +88,19 @@
       "1mo": "Calendar / rare",
       "demand": "On demand"
     },
-    "DefinitionMapScope": "Loaded definition snapshot; each mark opens one job.",
     "Standing": "Standing",
     "LatestFailed": "Latest execution failed",
     "AttentionJobs": "Jobs needing attention",
-    "JobsUnit": "jobs",
     "FailureSignal": "Failure signals",
     "OverrunSignal": "Above sampled baseline",
     "SkipSignal": "Frequent skips",
-    "AttentionFinding": "Review recent executions and policy before acting on these jobs:",
     "CalmFinding": "No listed attention signals appear in the loaded window. Retained history and future plans remain visible for review.",
-    "SampleScope": "Loaded {0} of {1} records in the interval",
     "Windows": {
       "15": "15 min",
       "60": "1 hour",
-      "1440": "24 hours"
+      "1440": "24 hours",
+      "360": "6 hours"
     },
-    "SampleFailures": "Sampled failures in window",
     "PulseTitle": "Scheduler pulse",
     "PulseDescription": "Signals use the loaded execution window. Future marks are the next five planned occurrences, not guaranteed admissions.",
     "SampleTruncated": "This interval exceeds 2,000 records. Marks and signals use the loaded sample; older records remain searchable through ledger pagination.",
@@ -116,32 +110,192 @@
     "Captured": "Captured",
     "AutoRefresh": "Auto refresh",
     "AutoPaused": "Refresh paused",
-    "RuntimeFinding": "This decision describes the serving host: whether its scheduling and execution cycles are ready. Review definition publication, remote registration and individual outcomes separately below.",
     "FailedCompletions": "Failed completions",
-    "FailedCompletionsScope": "Retained completions in the selected interval",
-    "AnalyticsFinding": "The interval contains {0} retained completions, including {1} failures. Review the distribution, then inspect the responsible job or execution.",
     "CohortNote": "Counted by creation time, including queued and running work. This differs from the completion-time population above.",
     "ClaimsAndFailures": "Claims / failures",
     "MatchingExecutions": "Matching execution records",
     "RecordsUnit": "records",
-    "LedgerFinding": "Inspect executions by scope, interval and state. Each lane uses its own peak. Select a time bucket to narrow the interval; an instance ID opens execution evidence.",
     "TrajectoryTitle": "Execution trajectory",
-    "TrajectoryDescription": "Bucketed by creation time, with a separate scale for each state. Select a row label to filter that state.",
-    "BucketDetails": "{0} · {1} records · {2}",
-    "TrajectoryCaptured": "Trajectory captured separately at {0}; the paged table shows retained records for its current query.",
-    "JobFailedFinding": "The latest execution failed. Inspect its error, claims and retries before running it manually or changing the future schedule.",
     "JobPausedFinding": "The recurring plan is paused. Existing executions retain their captured configuration; editing Cron does not resume scheduling.",
-    "JobFinding": "Execution evidence, future plans and policy share this independent job page. Every operation uses the exact owner and job identity.",
+    "JobFinding": "The latest result does not form a failure streak. {0} retained records are available to inspect; retention determines how much earlier history remains.",
     "BackToSource": "Back to source list",
     "ClockHours": "h:mm:ss",
     "ClockMinutes": "m:ss",
-    "TrendScale": "Each outcome uses its own peak scale",
-    "TrendPeak": "Maximum completions in one bucket",
     "CopyJobKey": "Copy job key",
     "IdCopied": "Instance ID copied",
     "AllJobs": "All jobs",
     "ScopeChoices": "Choices use {0} of {1} retained definitions; exact route scopes remain available.",
-    "SelectRow": "Select"
+    "SelectRow": "Select",
+    "LoopsReady": "Scheduling and worker loops ready",
+    "LoopsPending": "Scheduling or worker loop not ready",
+    "MapDescription": "Explore owners × cadences",
+    "Standings": {
+      "all": "All",
+      "attention": "Needs attention",
+      "healthy": "Healthy",
+      "ondemand": "On demand",
+      "paused": "Paused",
+      "absent": "Unpublished"
+    },
+    "Sorts": {
+      "attention": "Attention first",
+      "name": "Job name",
+      "owner": "Owner",
+      "next": "Next occurrence"
+    },
+    "SortLabel": "Sort",
+    "CatalogSearch": "Filter by name, job key or owner",
+    "CatalogFailures": "{0} jobs failed on their latest run.",
+    "CatalogNever": "{0} triggered jobs have never run.",
+    "CatalogSlow": "{0} run hourly or slower with no retries configured.",
+    "CatalogTruncated": "Showing the first 2,000 retained definitions; filters and counts cover this snapshot.",
+    "Matches": "{0} matches",
+    "CatalogOwners": "present definitions come from {0} owners;",
+    "CatalogOwnerCount": "owns {0} of them.",
+    "FailureShare": "accounts for {0} of failures.",
+    "OpenFailures": "Inspect failed executions",
+    "OpenRecords": "View executions",
+    "RankingTitle": "Failure concentration",
+    "RankingDescription": "Retained completions in the selected window.",
+    "RankFailures": "Failures",
+    "RankVolume": "Volume",
+    "RankingCount": "{0} of {1} ranked jobs",
+    "PeakValue": "Peak {0}",
+    "BucketOutcomes": "{0} succeeded · {1} failed · {2} skipped",
+    "TrendHint": "Each lane uses its own peak. Focus or hover to read an interval; select it to inspect records.",
+    "PresentUnit": "present",
+    "Intermittent": "Intermittent",
+    "FailureStreak": "{0} consecutive failures",
+    "FindingPeriod": ".",
+    "PulseWindow": "Completed in the last {0} · active work at capture",
+    "DecidedReliability": "{0} of decided executions",
+    "FailureJobs": "Across {0} ranked jobs",
+    "SkipFact": "Recorded without entering the queue",
+    "LiveFact": "{0} queued · {1} observed workers",
+    "GroupBy": "Group lanes",
+    "ByStanding": "By standing",
+    "ByOwner": "By owner",
+    "JobTimeline": "Job · retained activity",
+    "Last": "Last",
+    "PulseHint": "Hover or focus a mark to inspect its evidence; select it to open execution details.",
+    "RunningNow": "Running now",
+    "RunningNowDescription": "Elapsed time against the retained median and P95.",
+    "LeaseUntil": "Lease until {0}",
+    "NoLive": "No running or queued executions.",
+    "ArrivalBoard": "Next occurrences",
+    "ArrivalDescription": "Cron projections, in host time. Execution is not guaranteed.",
+    "SteadyJobs": "Continuous",
+    "DueIn": "In {0}",
+    "NoArrivals": "No enabled recurring schedules in this scope.",
+    "PulseGroups": {
+      "attention": "Needs attention",
+      "healthy": "Healthy",
+      "ondemand": "On demand",
+      "inactive": "Inactive"
+    },
+    "ConsecutiveFailures": "Consecutive failures",
+    "RetainedRecords": "Retained executions",
+    "AbsentFinding": "This definition is no longer published. Retained execution evidence remains available.",
+    "StreakFinding": "{0} consecutive failed outcomes in the latest retained records. Retries: {1}. Next planned occurrence: {2}.",
+    "RecentTrajectory": "Recent execution trajectory",
+    "RecentTrajectoryDescription": "Latest {0} retained executions · bar height represents elapsed duration.",
+    "TrajectoryHint": "← → to move · Enter to inspect",
+    "LatestEvidenceDescription": "The newest durable record for this job.",
+    "ActiveEvidenceDescription": "Queued and running records at the accepted capture.",
+    "FailureEvidenceDescription": "Latest five failures completed in the past 30 days.",
+    "LatestFailureMessage": "Latest retained failure message",
+    "TypicalDuration": "Typical elapsed duration",
+    "DurationSample": "{0} measured completions in the past 30 days",
+    "RetainedHistory": "Retained history",
+    "RetainedHistoryDescription": "Current durable records. Retention limits apply to terminal history.",
+    "PublicationNotHeartbeat": "Definition publication time, not a worker heartbeat.",
+    "ServingHost": "Serving host",
+    "LocallyReady": "Locally ready",
+    "LocalReadyFinding": "Scheduling and worker cycles are ready. This host publishes {0} present definitions; claims, leases and outcomes pass through the shared durable store.",
+    "LocalUnreadyFinding": "One or more local cycles are not ready. Inspect their current diagnostics before admitting more work.",
+    "RuntimePath": "Local scheduling and execution path",
+    "MaterializeDescription": "Materialize recurring occurrences",
+    "DurableDescription": "Queue, leases and retained evidence",
+    "ClaimDescription": "Claim compatible queued work",
+    "Poll": "Poll interval",
+    "ViewQueue": "View queue",
+    "Slots": "{0} of {1} worker slots in use",
+    "PublicationsDescription": "Durable definition footprints across this scheduler scope.",
+    "StalePublications": "{0} owner publications are stale",
+    "RecentPublications": "All owner publications are recent",
+    "SearchOwners": "Search owners…",
+    "PresentAbsent": "Present / absent",
+    "RunningQueued": "Running / queued",
+    "PublicationCount": "{0} of {1} owners",
+    "PublicationAge": "Observation age · threshold {0}",
+    "CoordinationEvidence": "Coordinator leases and maintenance evidence",
+    "PublicationFilters": {
+      "Title": "Publication freshness",
+      "all": "All",
+      "recent": "Recent",
+      "stale": "Stale"
+    },
+    "LedgerCountFinding": "{0} retained records match the current selection. Across the time window, {1} failed and {2} skipped. Select states to narrow the ledger.",
+    "CompletedDistribution": "Completion time · each lane uses its own scale. Click or drag an interval to zoom.",
+    "RecordedDistribution": "Recorded time · each lane uses its own scale. Click or drag an interval to zoom.",
+    "IndependentPeaks": "Independent scales",
+    "OtherStates": "Live / other",
+    "Peak": "Peak {0}",
+    "ZoomHint": "Click an interval to zoom",
+    "ZoomSelection": "Zoom to selection",
+    "BucketData": "Show interval data",
+    "Interval": "Interval",
+    "DistributionBucket": "{0} · {1} records · zoom into this interval",
+    "TimeBasis": "Time basis",
+    "RecordedTime": "Recorded",
+    "CompletedTime": "Completed",
+    "LedgerRanges": {
+      "1h": "1 h",
+      "24h": "24 h",
+      "7d": "7 d",
+      "30d": "30 d",
+      "all": "All time"
+    },
+    "DurationDescription": "{0} measured completions · retained elapsed duration",
+    "AnalyticsSummary": "{0} completed records in this range, including {1} failures.",
+    "PerHour": "/ hour",
+    "RunNow": "Run now",
+    "PauseSchedule": "Pause schedule",
+    "ResumeSchedule": "Resume schedule",
+    "EditPolicy": "Edit operator policy",
+    "AttemptsUnit": "attempts",
+    "ActiveUnit": "active",
+    "JobActiveFinding": "{0} executions are active. Check their elapsed duration and leases below; future occurrences remain governed by the current schedule and policy.",
+    "CronEditor": {
+      "Declared": "Code declaration",
+      "Current": "Effective now",
+      "Expression": "Cron expression",
+      "Valid": "Valid expression",
+      "Five": "5 fields · minutes",
+      "Six": "6 fields · seconds",
+      "Syntax": "Five fields: minute hour day month weekday. Six fields include seconds first.",
+      "Presets": "Common schedules",
+      "PresetNames": {
+        "0": "Every 5 minutes",
+        "1": "Every 30 minutes",
+        "2": "Every hour",
+        "3": "Daily at 03:00",
+        "4": "Weekdays at 09:00",
+        "5": "First day of month"
+      },
+      "InheritedHint": "The code declaration is active. Editing creates an operator override.",
+      "OverrideHint": "Saving uses this Cron override. Restore the declaration to remove it.",
+      "Preview": "Next 5 after this change",
+      "PreviewDescription": "Projected from the current time, using the effective schedule boundaries.",
+      "ZoneHelp": "The scheduler owns this time zone. All planned occurrences use it.",
+      "Paused": "Scheduling is paused. Preview shows matching occurrences; saving does not resume scheduling.",
+      "Absent": "This definition is no longer published. Saving an override does not republish it or start executions.",
+      "Note": "Saving affects future scheduling. Existing executions and history stay intact. Capacity may still skip a planned occurrence."
+    },
+    "ElapsedDuration": "Elapsed time",
+    "RunningDurationNote": "Timeout {0} · lease until {1}",
+    "RecordedDurationNote": "Recorded elapsed interval between start and completion.",
+    "ReadinessUnknown": "Local readiness unavailable"
   },
   "Access": {
     "Checking": "Checking scheduler access…",
@@ -152,7 +306,6 @@
     "Loading": "Loading…",
     "Retry": "Retry",
     "Refresh": "Refresh",
-    "Search": "Search",
     "Cancel": "Cancel",
     "Save": "Save policy",
     "Saving": "Saving…",
@@ -223,11 +376,7 @@
       "AbsentDescription": "Jobs missing from their owner's latest snapshot",
       "CategoryCount": "{0} signal categories"
     },
-    "Analytics": {
-      "Title": "Performance analytics",
-      "Description": "Explore throughput, outcome trends, duration percentiles, and the slowest jobs over a bounded time window.",
-      "Action": "Open analytics"
-    },
+    "Analytics": {},
     "Recent": {
       "Title": "Latest ledger entries",
       "Description": "Newest durable records, including skipped occurrences.",
@@ -239,7 +388,6 @@
   "Catalog": {
     "PageTitle": "Job Scheduler · Catalog",
     "Title": "Job definitions",
-    "Count": "{0} matching definitions",
     "Enabled": "Enabled",
     "Disabled": "Disabled",
     "OnDemand": "On demand",
@@ -248,16 +396,12 @@
     "Filters": {
       "AriaLabel": "Catalog search and filters",
       "Search": "Definition",
-      "SearchPlaceholder": "Job name or key",
       "Owner": "Owner",
       "AnyOwner": "All owners",
       "Type": "Job type",
       "AnyType": "All types",
-      "Policy": "Effective policy",
       "AnyPolicy": "Any policy",
-      "PageSize": "Rows per page",
-      "FacetScope": "Counts in the loaded presence snapshot",
-      "FacetUnavailable": "Facet snapshot unavailable"
+      "PageSize": "Rows per page"
     },
     "Columns": {
       "Definition": "Definition",
@@ -270,7 +414,6 @@
     "Actions": {
       "Run": "Run job now",
       "Trigger": "Run through the active job definition",
-      "Policy": "Edit operator policy",
       "Details": "Open job details",
       "Pause": "Pause recurring materialization",
       "Resume": "Resume recurring materialization",
@@ -554,14 +697,11 @@
     "RefreshFailed": "The latest refresh failed: {0}",
     "ObservedAt": "Operational evidence observed {0}",
     "Actions": {
-      "BackToCatalog": "Back to catalog",
-      "InspectSchedule": "Review schedule / policy"
+      "BackToCatalog": "Back to catalog"
     },
     "Header": {
       "ActiveExecutions": "Active executions",
-      "QueuedExecutions": "Queued executions",
-      "OwnerAbsent": "Absent",
-      "Eyebrow": "OWNER-SCOPED DEFINITION"
+      "OwnerAbsent": "Absent"
     },
     "Activity": {
       "Eyebrow": "LIVE EXECUTION EVIDENCE",
@@ -579,16 +719,10 @@
       "OpenDetails": "Open execution details for {0}"
     },
     "Schedule": {
-      "Title": "Recurring schedule",
-      "Description": "The stored cursor follows the effective cadence and boundaries; the configured timezone remains code-owned.",
-      "NextOccurrence": "Next occurrence",
       "CronExpression": "Cron expression",
       "TimeZone": "Schedule timezone",
-      "StartBoundary": "Start boundary",
-      "EndBoundary": "End boundary",
       "TriggeredTitle": "On-demand admission",
       "TriggeredDescription": "This job has no recurring cursor. Operators admit an execution explicitly through the active job definition.",
-      "ManualOnly": "Manual mode is suppressing automatic occurrences. Run job now remains available and does not advance the recurring cursor.",
       "StatusDescriptions": {
         "NotRecurring": "No recurring cursor applies to an on-demand job.",
         "AwaitingSynchronization": "The active owner declaration is waiting for the scheduler to create its durable cursor.",
@@ -643,8 +777,7 @@
       "TerminalDispositions": "Terminal dispositions",
       "ExecutedCompletions": "Executed completions",
       "DurationSamples": "Duration samples",
-      "CohortNote": "Outcome tiles describe executions created in the window; reliability and duration use executions completed in the window.",
-      "LoadFailed": "Job health analytics could not be refreshed: {0}"
+      "CohortNote": "Outcome tiles describe executions created in the window; reliability and duration use executions completed in the window."
     }
   },
   "RecurringScheduleStatuses": {
@@ -689,7 +822,6 @@
       "Last30Days": "Last 30 days"
     },
     "Metrics": {
-      "AriaLabel": "Scheduler analytics summary",
       "Reliability": "Success share",
       "Throughput": "Executed completions per hour",
       "ScheduleFulfillment": "Recurring dispatch fulfillment",
@@ -703,16 +835,11 @@
       "Description": "Retained completions in each fixed interval, separated by outcome.",
       "HourBuckets": "1-hour intervals",
       "DayBuckets": "24-hour intervals",
-      "NoCompletions": "No completed outcomes in this window. The returned intervals remain available below.",
       "ViewData": "View interval data",
-      "DataAriaLabel": "Completion counts for every returned interval",
-      "Interval": "Interval",
-      "PartialBucket": "Partial final bucket"
+      "Interval": "Interval"
     },
     "Duration": {
       "Title": "Recorded elapsed duration",
-      "Description": "From retained start to completion; retry waiting may be included. This is not CPU time or summed attempt time.",
-      "Samples": "{0} measured completions",
       "PercentilesAriaLabel": "Execution duration percentiles",
       "Minimum": "Minimum",
       "Average": "Average",
@@ -727,36 +854,22 @@
       "Maximum": "Maximum"
     },
     "Rankings": {
-      "Volume": "Completion concentration",
-      "VolumeDescription": "Share of all completed outcomes in this window, including skipped and cancelled records.",
-      "Failures": "Failure concentration",
-      "FailuresDescription": "Share of all failed completions in this window. Jobs without failures are omitted.",
-      "TopTen": "Top 10",
-      "OpenJobWithMetric": "Rank {0}: open {1}; {2}: {3} ({4})",
       "VolumeEmpty": "No terminal job activity completed in this window.",
-      "FailuresEmpty": "No failed executions completed in this window.",
-      "VolumePopulation": "{0} completed outcomes in this window",
-      "FailurePopulation": "{0} failed completions in this window"
+      "FailuresEmpty": "No failed executions completed in this window."
     },
     "Slowest": {
       "Top": "Longest recorded elapsed per job · Top 10",
       "Description": "One longest measured completion for each exact owner and job. Open its retained execution evidence.",
       "Empty": "No qualifying measured completions in this window.",
-      "OpenDetails": "Rank {0}: inspect {1}, instance {2}; {3}; completed {4}; recorded elapsed {5}",
-      "Inspect": "Inspect record"
+      "OpenDetails": "Rank {0}: inspect {1}, instance {2}; {3}; completed {4}; recorded elapsed {5}"
     },
     "Window": {
-      "Completed": "Completed outcomes",
-      "Accepted": "Accepted analysis window",
-      "Requested": "Requested analysis window",
       "Bounds": "Start included · End excluded",
       "Unavailable": "Analysis is unavailable",
       "UnavailableDescription": "This window has no accepted result yet. Retry the actual store read.",
       "Retained": "Showing the last accepted window: {0}. Its bounds and observation remain unchanged."
     },
-    "Summary": {
-      "Title": "Completion summary"
-    },
+    "Summary": {},
     "Cohort": {
       "Title": "Execution state share",
       "Description": "Current states of records created in the accepted window; this is a separate population from completions.",
@@ -766,7 +879,6 @@
   "Executions": {
     "PageTitle": "Job Scheduler · Executions",
     "Title": "Execution ledger",
-    "Count": "{0} matching records",
     "Empty": "No durable executions match the current filters.",
     "Filters": {
       "AriaLabel": "Execution search and filters",
@@ -778,17 +890,9 @@
       "StartDate": "Start date",
       "EndDate": "End date",
       "PageSize": "Rows per page",
-      "InvalidRange": "The end date must be on or after the start date."
+      "InvalidRange": "The time range is invalid. Check its start and end."
     },
-    "TimeRanges": {
-      "All": "All time",
-      "LastHour": "Last hour",
-      "Last24Hours": "Last 24 hours",
-      "Last7Days": "Last 7 days",
-      "Last30Days": "Last 30 days",
-      "Custom": "Custom range",
-      "Exact": "Exact interval"
-    },
+    "TimeRanges": {},
     "Columns": {
       "Definition": "Definition",
       "Instance": "Instance",
@@ -817,7 +921,6 @@
       "AlreadyTerminal": "The execution was already terminal.",
       "NotFound": "The execution no longer exists."
     },
-    "LedgerEyebrow": "DURABLE EXECUTION RECORDS",
     "SnapshotUnavailable": "Execution records are unavailable. Refresh to try again.",
     "SnapshotPending": "Loading execution records…",
     "Sort": {
@@ -834,8 +937,6 @@
       "Claims": "Worker claims",
       "ConsumedFailures": "Consumed retry failures"
     },
-    "RecordedTimeNotice": "Includes all created records, including skipped occurrences.",
-    "AcceptedQuery": "Retained snapshot filters: {0}",
     "QueryDescription": "{0} · {1} · {2} to {3} · page {4}",
     "AnyIdentifier": "all identifiers",
     "RefreshFailed": "Showing the last accepted snapshot. The latest read failed: {0}"
@@ -958,8 +1059,6 @@
       "StoreOperationTimeout": "Store operation budget"
     },
     "Plane": {
-      "Title": "Local cycles",
-      "Description": "Latest local cycle evidence. Not ready can mean initialization or a failed cycle.",
       "Scheduling": "Scheduling cycle",
       "Worker": "Worker cycle",
       "Ready": "Last cycle ready",
@@ -977,19 +1076,10 @@
       "Description": "Definition-backed owners in this scope. A latest definition observation older than {0} is stale; this is not a process heartbeat.",
       "Owner": "Owner",
       "Liveness": "Snapshot observation",
-      "Jobs": "Definitions",
-      "JobsHelp": "Definitions currently published versus retained but no longer published.",
-      "JobsCounts": "{0} present · {1} absent",
-      "Active": "Execution records",
-      "ActiveCounts": "{0} queued · {1} running",
-      "LastObserved": "Last observed",
-      "OpenCatalog": "Open {0} in the catalog",
       "Empty": "No definition-backed owner is recorded in this scope.",
       "RecentObservation": "Recent observation",
       "StaleObservation": "Stale observation",
-      "AheadOfCapture": "Ahead of capture",
-      "ManifestPublished": "Manifest content accepted",
-      "ManifestHash": "Accepted manifest hash"
+      "AheadOfCapture": "Ahead of capture"
     },
     "Workers": {
       "Title": "Service-registry observations",

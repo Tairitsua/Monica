@@ -1,102 +1,34 @@
-@using Monica.JobScheduler.UI.Localization
-
 @inject IStringLocalizer<JobSchedulerResource> L
-
 <section class="catalog-filter" aria-label="@L["Catalog:Filters:AriaLabel"]">
-    <div class="catalog-filter__types" role="group" aria-label="@L["Catalog:Filters:Type"]">
-        <span class="catalog-filter__label">@L["Catalog:Filters:Type"]</span>
-        <button type="button"
-                class="catalog-filter__type"
-                aria-pressed="@((SelectedJobType is null).ToString().ToLowerInvariant())"
-                disabled="@IsLoading"
-                @onclick="@(() => JobTypeSelected.InvokeAsync((JobType?)null))">
-            <MoIcon Icon="@MoIcons.Package" Size="1.25rem" />
-            <span>@L["Catalog:Filters:AnyType"]</span>
-            @if (HasFacetEvidence) { <span class="catalog-filter__count">@JobTypeCounts.Values.Sum()</span> }
-        </button>
-        @foreach (var type in Enum.GetValues<JobType>())
+    <div class="catalog-filter__states" role="group" aria-label="@L["Workspace:Standing"]">
+        @foreach (var standing in new[] { "all", "attention", "healthy", "ondemand", "paused", "absent" })
         {
-            <button type="button"
-                    class="catalog-filter__type"
-                    aria-pressed="@((SelectedJobType == type).ToString().ToLowerInvariant())"
-                    disabled="@IsLoading"
-                    @onclick="@(() => JobTypeSelected.InvokeAsync(type))">
-                <MoIcon Icon="@GetJobTypeIcon(type)" Size="1.25rem" />
-                <span>@L[$"JobTypes:{type}"]</span>
-                @if (HasFacetEvidence) { <span class="catalog-filter__count">@JobTypeCounts.GetValueOrDefault(type)</span> }
+            <button type="button" class="catalog-filter__state" data-tone="@Tone(standing)" data-standing="@standing" data-zero="@((StandingCounts.GetValueOrDefault(standing) == 0).ToString().ToLowerInvariant())" aria-pressed="@(((Standing ?? "all") == standing).ToString().ToLowerInvariant())" @onclick="@(() => StandingSelected.InvokeAsync(standing == "all" ? null : standing))">
+                @if (standing != "all") { <i aria-hidden="true"></i> }<span>@L[$"Workspace:Standings:{standing}"]</span><small>@StandingCounts.GetValueOrDefault(standing)</small>
             </button>
         }
-        <span class="catalog-filter__facet-scope">@L[HasFacetEvidence ? "Catalog:Filters:FacetScope" : "Catalog:Filters:FacetUnavailable"]</span>
     </div>
-
     <div class="catalog-filter__query">
-        <div class="catalog-filter__field">
-            <MudTextField T="string"
-                          Value="@SearchText"
-                          ValueChanged="SearchTextChanged"
-                          Label="@L["Catalog:Filters:Search"]"
-                          Placeholder="@L["Catalog:Filters:SearchPlaceholder"]"
-                          Immediate="true"
-                          Clearable="true"
-                          Disabled="@IsLoading"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@MoIcons.Search"
-                          OnKeyDown="HandleSearchKeyDown" ClearIcon="@MoIcons.Close" />
+        <div class="catalog-filter__search">
+            <MudTextField T="string" Value="@SearchText" ValueChanged="SearchTextChanged" Placeholder="@L["Workspace:CatalogSearch"]" aria-label="@L["Workspace:CatalogSearch"]" DebounceInterval="300" OnDebounceIntervalElapsed="ApplySearchAsync" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" ClearIcon="@MoIcons.Close" />
         </div>
-        <div class="catalog-filter__field">
-            <MudSelect T="string"
-                       Value="@OwnerId"
-                       ValueChanged="OwnerIdChanged"
-                       Label="@L["Catalog:Filters:Owner"]"
-                       title="@OwnerId"
-                       Clearable="true"
-                       Disabled="@IsLoading"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" ClearIcon="@MoIcons.Close">
+        <div class="catalog-filter__owner">
+            <MudSelect T="string" Value="@OwnerId" ValueChanged="ChangeOwnerAsync" aria-label="@L["Catalog:Filters:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
                 <MudSelectItem T="string" Value="@((string?)null)">@L["Catalog:Filters:AnyOwner"]</MudSelectItem>
-                @foreach (var owner in OwnerFacets)
-                {
-                    <MudSelectItem T="string" Value="@owner.Key">
-                        <span class="catalog-filter__owner-option" title="@owner.Key">
-                            <span>@owner.Key</span>
-                            <span class="catalog-filter__count">@owner.Value</span>
-                        </span>
-                    </MudSelectItem>
-                }
+                @foreach(var owner in OwnerFacets) { <MudSelectItem T="string" Value="@owner.Key">@owner.Key</MudSelectItem> }
             </MudSelect>
         </div>
-        <div class="catalog-filter__actions">
-            <MudButton Variant="Variant.Outlined"
-                       StartIcon="@MoIcons.FilterOff"
-                       Disabled="@IsLoading"
-                       OnClick="ResetRequested">@L["Catalog:Actions:Reset"]</MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@MoIcons.Search"
-                       Disabled="@IsLoading"
-                       OnClick="SearchRequested">@L["Common:Search"]</MudButton>
+        <div class="catalog-filter__types" role="group" aria-label="@L["Catalog:Filters:Type"]">
+            <button type="button" aria-pressed="@((SelectedJobType is null).ToString().ToLowerInvariant())" @onclick="@(() => JobTypeSelected.InvokeAsync((JobType?)null))">@L["Catalog:Filters:AnyType"]</button>
+            @foreach(var type in Enum.GetValues<JobType>()) { <button type="button" aria-pressed="@((SelectedJobType == type).ToString().ToLowerInvariant())" @onclick="@(() => JobTypeSelected.InvokeAsync(type))">@L[$"JobTypes:{type}"]</button> }
         </div>
+        <div class="catalog-filter__sort"><span>@L["Workspace:SortLabel"]</span><MudSelect T="string" Value="@Sort" ValueChanged="SortSelected" aria-label="@L["Workspace:SortLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">@foreach(var sort in new[] { "attention", "name", "owner", "next" }) { <MudSelectItem T="string" Value="@sort">@L[$"Workspace:Sorts:{sort}"]</MudSelectItem> }</MudSelect></div>
     </div>
-
-    <div class="catalog-filter__states" role="group" aria-label="@L["Catalog:Filters:Policy"]">
-        <span class="catalog-filter__label">@L["Catalog:Filters:Policy"]</span>
-        @foreach (var option in PolicyOptions)
-        {
-            <button type="button"
-                    class="catalog-filter__state"
-                    data-tone="@option.Tone"
-                    aria-pressed="@((SelectedDisabledState == option.Value).ToString().ToLowerInvariant())"
-                    disabled="@IsLoading"
-                    @onclick="@(() => DisabledStateSelected.InvokeAsync(option.Value))">
-                <span class="catalog-filter__state-dot" aria-hidden="true"></span>
-                <span>@option.Label</span>
-            </button>
-        }
-    </div>
+    @if (OwnerId is not null || Cadence is not null || Standing is not null || SelectedDisabledState is not null || !string.IsNullOrEmpty(SearchText) || SelectedJobType is not null)
+    {
+        <div class="catalog-filter__active">@if (Cadence is not null) { <span>@L[$"Workspace:Cadences:{Cadence}"]</span> }<MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Close" OnClick="ResetRequested">@L["Catalog:Actions:Reset"]</MudButton></div>
+    }
 </section>
-
 @code {
     [Parameter] public string? SearchText { get; set; }
     [Parameter] public EventCallback<string?> SearchTextChanged { get; set; }
@@ -125,6 +57,21 @@
     [Parameter] public EventCallback SearchRequested { get; set; }
     [Parameter] public EventCallback ResetRequested { get; set; }
 
+    /// <summary>Gets the selected operational standing; null selects every standing.</summary>
+    [Parameter] public string? Standing { get; set; }
+    /// <summary>Gets standing facets evaluated with their own filter excluded.</summary>
+    [Parameter] public IReadOnlyDictionary<string, int> StandingCounts { get; set; } = new Dictionary<string, int>();
+    /// <summary>Persists a standing selection.</summary>
+    [Parameter] public EventCallback<string?> StandingSelected { get; set; }
+    /// <summary>Gets the selected cadence from the composition map.</summary>
+    [Parameter] public string? Cadence { get; set; }
+    /// <summary>Gets the selected ordering.</summary>
+    [Parameter] public string Sort { get; set; } = "attention";
+    /// <summary>Persists the selected ordering.</summary>
+    [Parameter] public EventCallback<string> SortSelected { get; set; }
+    private async Task ChangeOwnerAsync(string? value) { await OwnerIdChanged.InvokeAsync(value); await SearchRequested.InvokeAsync(); }
+    private async Task ApplySearchAsync(string value) { await SearchTextChanged.InvokeAsync(value); await SearchRequested.InvokeAsync(); }
+    private static string Tone(string standing) => standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => "neutral" };
     private IReadOnlyList<PolicyOption> PolicyOptions =>
     [
         new(null, L["Catalog:Filters:AnyPolicy"], "neutral"),

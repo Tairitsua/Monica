@@ -6,14 +6,19 @@
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 @inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@implements IAsyncDisposable
 
+<CascadingValue Value="@this" IsFixed="true">
 <CascadingValue Value="@_actionsKey" Name="SchedulerWorkspaceActions" IsFixed="true">
 <div class="scheduler-workspace mo-page-shell mo-page-shell--full-width">
     <div class="scheduler-workspace__header">
         <span class="scheduler-workspace__seal" aria-hidden="true"><MoIcon Icon="@CurrentIcon" Size="1.5rem" /></span>
         <MoPageMasthead Title="@Title" Crumb="@L["Workspace:Eyebrow"]">
             <Meta>
-                <span class="scheduler-workspace__scope" title="@Description"><i aria-hidden="true"></i>@L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]</span>
+                <span class="scheduler-workspace__readiness" data-ready="@(_ready?.ToString().ToLowerInvariant())" title="@L["Runtime:Plane:LocalOnly"]"><i aria-hidden="true"></i>@L[_ready is true ? "Workspace:LoopsReady" : _ready is false ? "Workspace:LoopsPending" : "Workspace:ReadinessUnknown"]</span>
+                <span class="scheduler-workspace__scope">@L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]</span>
                 <span class="scheduler-workspace__zone" title="@TimePresentation.TimeZoneDisplayName">@L["Workspace:TimeZone", TimePresentation.TimeZoneId]</span>
             </Meta>
             <Actions><SectionOutlet SectionId="@_actionsKey" /></Actions>
@@ -30,7 +35,7 @@
         }
         @if (Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.StartsWith("/job-scheduler/jobs/", StringComparison.OrdinalIgnoreCase))
         {
-            <a href="@Navigation.Uri" aria-current="page"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><span>@L["JobDetail:PageTitle"]</span></a>
+            <a href="@Navigation.Uri" aria-current="page"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><span>@L["Pages:JobDetail:Title"]</span></a>
         }
     </MoWorkbenchNavigation>
 
@@ -38,6 +43,7 @@
         @ChildContent
     </div>
 </div>
+</CascadingValue>
 </CascadingValue>
 
 @code {
@@ -76,7 +82,41 @@
     public RenderFragment? ChildContent { get; set; }
 
     private readonly object _actionsKey = new();
-    private string CurrentIcon => ROUTES[Math.Clamp(ActivePanelIndex, 0, ROUTES.Length - 1)].Icon;
+    private string CurrentIcon => ActivePanelIndex == 0 ? MoIcons.CalendarCheck : ROUTES[Math.Clamp(ActivePanelIndex, 0, ROUTES.Length - 1)].Icon;
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private bool? _ready;
+    private DateTimeOffset? _readinessCapture;
+    private int _readinessVersion;
+
+    internal async Task ObserveCaptureAsync(DateTimeOffset? capturedAtUtc)
+    {
+        if (_lifetime.IsRetired || capturedAtUtc is null || capturedAtUtc == _readinessCapture) return;
+        _readinessCapture = capturedAtUtc;
+        var version = ++_readinessVersion;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                var authorized = await Access.IsAuthorizedAsync(token);
+                if (!authorized) { _lifetime.TryApply(() => _ready = null); return; }
+                var result = await Facade.GetRuntimeOverviewAsync(token);
+                _lifetime.TryApply(() =>
+                {
+                    if (version == _readinessVersion)
+                        _ready = result.IsFailed(out _, out var overview) ? null
+                            : overview.LocalPlane.SchedulingReady && overview.LocalPlane.WorkerReady;
+                });
+            });
+            if (!_lifetime.IsRetired) await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (Exception)
+        {
+            if (_lifetime.TryApply(() => _ready = null)) await InvokeAsync(StateHasChanged);
+        }
+    }
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;

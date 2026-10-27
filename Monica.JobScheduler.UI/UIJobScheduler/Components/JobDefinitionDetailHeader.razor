@@ -8,25 +8,9 @@
 <header class="job-detail-header">
     <div class="job-detail-header__main">
         <section class="job-detail-header__identity">
-            <p class="job-detail-header__eyebrow">@L["JobDetail:Header:Eyebrow"]</p>
-            <div class="job-detail-header__title-row">
-                <span class="job-detail-header__symbol" aria-hidden="true">
-                    <MoIcon Icon="@(Definition.Declaration.JobType == JobType.Recurring
-                                        ? MoIcons.History
-                                        : MoIcons.Zap)" Size="1.5rem" />
-                </span>
-                <MudText Typo="Typo.h5" HtmlTag="h2">@Definition.EffectiveConfiguration.JobName</MudText>
-            </div>
-            @if (!string.IsNullOrWhiteSpace(Definition.EffectiveConfiguration.Description))
-            {
-                <p class="job-detail-header__description">@Definition.EffectiveConfiguration.Description</p>
-            }
-            <dl class="job-detail-header__identity-facts">
-                <div><dt>@L["JobDetail:Contract:Owner"]</dt><dd><code>@Definition.OwnerKey</code></dd></div>
-                <div><dt>@L["JobDetail:Contract:JobKey"]</dt><dd><code>@Definition.Declaration.JobKey</code></dd></div>
-            </dl>
-        </section>
-        <div class="job-detail-header__operations">
+            <p class="job-detail-header__eyebrow">@L[$"JobTypes:{Definition.Declaration.JobType}"] · @Definition.OwnerKey</p>
+            <h2>@Definition.EffectiveConfiguration.JobName</h2>
+            <div class="job-detail-header__key"><code>@Definition.Declaration.JobKey</code><SchedulerCopyButton Value="@Definition.Declaration.JobKey" /></div>
             <div class="job-detail-header__chips">
                 <span class="job-detail-header__status" data-tone="primary">@L[$"JobTypes:{Definition.Declaration.JobType}"]</span>
                 <span class="job-detail-header__status" data-tone="@(IsPolicyDisabled ? "warning" : "success")">
@@ -48,6 +32,8 @@
                     </span>
                 }
             </div>
+        </section>
+        <div class="job-detail-header__operations">
             <div class="job-detail-header__actions">
                 @if (Definition.Declaration.JobType == JobType.Triggered)
                 {
@@ -63,7 +49,7 @@
                     <MudTooltip Text="@(IsManualSuppressed ? L["Catalog:Actions:RunDuringManual"] : L["Catalog:Actions:Run"])" Placement="Placement.Top" Arrow="true">
                         <span class="job-detail-header__primary-action">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Play"
-                                       Disabled="@(!Definition.IsPresent || IsMutating)" OnClick="OnRunNow">@L["Catalog:Actions:Run"]</MudButton>
+                                       Disabled="@(!Definition.IsPresent || IsMutating)" OnClick="OnRunNow">@L["Workspace:RunNow"]</MudButton>
                         </span>
                     </MudTooltip>
                     <MudTooltip Text="@ToggleDisabledTooltip" Placement="Placement.Top" Arrow="true">
@@ -71,7 +57,7 @@
                             <MudButton Variant="Variant.Outlined" Color="Color.Default"
                                        StartIcon="@(IsOperatorPaused ? MoIcons.PlayCircle : MoIcons.PauseCircle)"
                                        Disabled="@IsMutating" OnClick="OnToggleDisabled">
-                                @(IsOperatorPaused ? L["Catalog:Actions:Resume"] : L["Catalog:Actions:Pause"])
+                                @(IsOperatorPaused ? L["Workspace:ResumeSchedule"] : L["Workspace:PauseSchedule"])
                             </MudButton>
                         </span>
                     </MudTooltip>
@@ -79,11 +65,8 @@
                                Disabled="@IsMutating" OnClick="OnInspectSchedule">@L["Workspace:EditCron"]</MudButton>
                 }
                 <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Sliders"
-                           Disabled="@IsMutating" OnClick="OnEditPolicy">@L["Catalog:Actions:Policy"]</MudButton>
-                <MudTooltip Text="@L["Common:Refresh"]">
-                    <MudIconButton Icon="@MoIcons.Refresh" Variant="Variant.Outlined"
-                                   Disabled="@IsRefreshing" OnClick="OnRefresh" aria-label="@L["Common:Refresh"]" />
-                </MudTooltip>
+                           Disabled="@IsMutating" OnClick="OnEditPolicy">@L["Workspace:EditPolicy"]</MudButton>
+
             </div>
         </div>
     </div>

@@ -3,9 +3,9 @@
 @inject SchedulerTimePresentation TimePresentation
 
 <section class="execution-detail-hero" data-state="@Execution.State.ToString().ToLowerInvariant()" aria-label="@L["ExecutionDetail:Identity"]">
-    <p class="execution-detail-hero__label">@L["ExecutionDetail:Duration"]</p>
+    <p class="execution-detail-hero__label">@L[Execution.State == JobExecutionState.Running ? "Workspace:ElapsedDuration" : "ExecutionDetail:Duration"]</p>
     <strong class="execution-detail-hero__duration">@Duration.Value <small>@Duration.Unit</small></strong>
-    <p class="execution-detail-hero__note">@L["ExecutionDetail:EvidenceScope"]</p>
+    <p class="execution-detail-hero__note">@(Execution.State == JobExecutionState.Running ? L["Workspace:RunningDurationNote", TimePresentation.FormatDuration(Execution.Template.MaxExecutionTimeout), TimePresentation.FormatExecutionClock(Execution.LeaseExpiresAtUtc)] : L["Workspace:RecordedDurationNote"])</p>
     @if (Execution.SkipReason is { } skipReason)
     { <p class="execution-detail-hero__skip"><MoIcon Icon="@MoIcons.SkipNext" Size="1rem" />@L["ExecutionDetail:SkipReason"] · @L[$"ExecutionSkipReasons:{skipReason}"]</p> }
 </section>

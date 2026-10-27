@@ -51,6 +51,39 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
 
     internal IReadOnlyList<JobOperationalSummary> Summaries { get; private set; } = [];
     internal IReadOnlyList<JobDefinition> Definitions { get; private set; } = [];
+    internal IReadOnlyList<JobOperationalSummary> Catalog { get; private set; } = [];
+    internal IReadOnlyDictionary<JobId, SchedulerJobEvidence> Evidence { get; private set; } = new Dictionary<JobId, SchedulerJobEvidence>();
+    internal string? Standing { get; set; }
+    internal string? Cadence { get; set; }
+    internal string CatalogSort { get; set; } = "attention";
+    internal bool IsCatalogTruncated { get; private set; }
+    internal IReadOnlyDictionary<string, int> StandingCounts => new[] { "all", "attention", "healthy", "ondemand", "paused", "absent" }
+        .ToDictionary(key => key, key => Catalog.Count(row => Matches(row, exceptStanding: true) && (key == "all" || StandingOf(row) == key)));
+    internal string StandingOf(JobOperationalSummary row) => !row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused"
+        : Evidence.GetValueOrDefault(row.Definition.Id)?.NeedsAttention == true || row.LatestExecution?.State == JobExecutionState.Failed ? "attention"
+        : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    private bool Matches(JobOperationalSummary row, bool exceptStanding = false) => Matches(row,
+        new JobDefinitionQuery
+        {
+            OwnerKey = OwnerId,
+            IsPresent = PresentFilter,
+            JobType = SelectedJobType,
+            IsDisabled = SelectedDisabledState,
+            SearchText = SearchText
+        }, Standing, Cadence, exceptStanding);
+
+    private bool Matches(JobOperationalSummary row, JobDefinitionQuery query, string? standing, string? cadence, bool exceptStanding = false)
+    {
+        var definition = row.Definition;
+        return (query.OwnerKey is null || definition.OwnerKey == query.OwnerKey)
+            && (query.IsPresent is null || definition.IsPresent == query.IsPresent)
+            && (query.JobType is null || definition.Declaration.JobType == query.JobType)
+            && (query.IsDisabled is null || definition.IsDisabled == query.IsDisabled)
+            && (exceptStanding || standing is null || standing == "all" || StandingOf(row) == standing)
+            && (cadence is null || SchedulerCadence.Bucket(definition, ObservedAtUtc ?? DateTimeOffset.UtcNow) == cadence)
+            && (string.IsNullOrWhiteSpace(query.SearchText) || new[] { definition.EffectiveConfiguration.JobName, definition.Declaration.JobKey, definition.OwnerKey }
+                .Any(value => value.Contains(query.SearchText, StringComparison.CurrentCultureIgnoreCase)));
+    }
     internal DateTimeOffset? ObservedAtUtc { get; private set; }
     internal IReadOnlyList<KeyValuePair<string, int>> OwnerFacets { get; private set; } = [];
     internal IReadOnlyDictionary<JobType, int> JobTypeCounts { get; private set; } =
@@ -108,6 +141,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     /// </summary>
     internal void ApplyInitialQuery(bool? present, string? owner)
     {
+        PresentFilter = present;
         if (present is { } value)
         {
             PresentFilter = value;
@@ -223,11 +257,14 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                 PageSize = PageSize
             };
         });
+        var standing = Standing;
+        var cadence = Cadence;
+        var sort = CatalogSort;
         return _lifetime.RunAsync(async lifetimeToken =>
         {
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 lifetimeToken, requestCancellation);
-            var result = await LoadAsync(query!, version, linkedCancellation.Token);
+            var result = await LoadAsync(query!, standing, cadence, sort, version, linkedCancellation.Token);
             linkedCancellation.Token.ThrowIfCancellationRequested();
             return result;
         });
@@ -271,6 +308,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
 
         var updatedDefinition = items[index].Definition with { Policy = policy };
+        Catalog = Catalog.Select(row => row.Definition.Id == jobId ? row with { Definition = updatedDefinition } : row).ToArray();
+        Evidence = Evidence.ToDictionary(pair => pair.Key, pair => pair.Key == jobId ? pair.Value with { Definition = updatedDefinition } : pair.Value);
         var isRecurring = updatedDefinition.Declaration.JobType == JobType.Recurring;
         var suspensionReasons = isRecurring
             ? JobSchedulerUiPresentation.SetOperatorPolicySuspension(
@@ -448,7 +487,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     }
 
     private async Task<TableData<JobOperationalSummary>> LoadAsync(
-        JobDefinitionQuery query, int version, CancellationToken cancellationToken)
+        JobDefinitionQuery query, string? standing, string? cadence, string sort, int version, CancellationToken cancellationToken)
     {
         await _loadGate.WaitAsync(cancellationToken);
         try
@@ -460,20 +499,19 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             {
                 return new() { Items = [], TotalItems = 0 };
             }
-            var result = await _facade.QueryOperationalSummariesAsync(query, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var page))
+            await LoadFacetsAsync(cancellationToken);
+            if (FacetsError is not null) throw new InvalidOperationException(FacetsError);
+            var candidates = Catalog.Where(row => Matches(row, query, standing, cadence));
+            var ordered = sort switch
             {
-                _lifetime.TryApply(() =>
-                {
-                    if (version != _loadVersion) return;
-                    Summaries = [];
-                    TotalCount = 0;
-                    _selectedJobIds.Clear();
-                    Error = error.Message;
-                });
-                return new() { Items = [], TotalItems = 0 };
-            }
+                "name" => candidates.OrderBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
+                "owner" => candidates.OrderBy(row => row.Definition.OwnerKey, StringComparer.Ordinal).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
+                "next" => candidates.OrderBy(row => row.NextOccurrenceUtc ?? DateTimeOffset.MaxValue),
+                _ => candidates.OrderBy(row => Array.IndexOf(new[] { "attention", "healthy", "ondemand", "paused", "absent" }, StandingOf(row))).ThenByDescending(row => Evidence.GetValueOrDefault(row.Definition.Id)?.FailureStreak ?? 0).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture)
+            };
+            var matches = ordered.ToArray();
+            var page = new QueryResult<JobOperationalSummary>(matches.Skip((query.PageNumber - 1) * query.PageSize).Take(query.PageSize).ToList(), matches.Length);
+            cancellationToken.ThrowIfCancellationRequested();
             _lifetime.TryApply(() =>
             {
                 if (version != _loadVersion) return;
@@ -517,7 +555,20 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             return;
         }
 
-        var scopedDefinitions = overview.Definitions
+        var catalog = new List<JobOperationalSummary>();
+        var total = 0;
+        for (var pageNumber = 1; pageNumber <= 10; pageNumber++)
+        {
+            var response = await _facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = pageNumber, PageSize = 200 }, cancellationToken);
+            if (response.IsFailed(out var catalogError, out var page)) { _lifetime.TryApply(() => FacetsError = catalogError.Message); return; }
+            catalog.AddRange(page.Items); total = page.TotalCount;
+            if (catalog.Count >= total || page.Items.Count == 0) break;
+        }
+        var sample = await SchedulerExecutionSample.LoadAsync(_facade, new JobExecutionQuery
+        { SchedulerScopeKey = string.Empty, CreatedAfterUtc = overview.CapturedAtUtc.AddHours(-1), CreatedBeforeUtc = overview.CapturedAtUtc }, cancellationToken);
+        var records = sample.Records.Concat(catalog.Select(row => row.LatestExecution).OfType<JobExecutionInstance>()).DistinctBy(record => record.InstanceId).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+        var evidence = catalog.ToDictionary(row => row.Definition.Id, row => SchedulerJobEvidence.Create(row.Definition, records[row.Definition.Id], overview.CapturedAtUtc));
+        var scopedDefinitions = catalog.Select(row => row.Definition)
             .Where(definition => PresentFilter is null || definition.IsPresent == PresentFilter)
             .ToArray();
         var ownerFacets = scopedDefinitions
@@ -531,7 +582,10 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         _lifetime.TryApply(() =>
         {
             OwnerFacets = ownerFacets;
-            Definitions = overview.Definitions;
+            Catalog = catalog;
+            Evidence = evidence;
+            IsCatalogTruncated = catalog.Count < total;
+            Definitions = catalog.Select(row => row.Definition).ToArray();
             ObservedAtUtc = overview.CapturedAtUtc;
             JobTypeCounts = jobTypeCounts;
             HasLoadedFacets = true;
@@ -548,6 +602,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         _selectedJobIds.Clear();
         OwnerFacets = [];
         Definitions = [];
+        Catalog = [];
+        Evidence = new Dictionary<JobId, SchedulerJobEvidence>();
         ObservedAtUtc = null;
         JobTypeCounts = new Dictionary<JobType, int>();
         HasLoadedFacets = false;

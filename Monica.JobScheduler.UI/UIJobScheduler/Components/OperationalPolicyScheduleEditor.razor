@@ -1,5 +1,42 @@
 @using Monica.JobScheduler.UI.Localization
 
+@if (Compact)
+{
+<div class="cron-editor">
+    <div class="ce-provenance"><div><span>@L["Workspace:CronEditor:Declared"]</span><code>@Draft.DeclaredExpression</code></div><MoIcon Icon="@MoIcons.ArrowRight" Size="16px"/><div><span>@L["Workspace:CronEditor:Current"]</span><code>@CurrentExpression</code></div></div>
+    <div class="ce-workspace">
+        <section class="ce-draft">
+            <p class="ce-label">@L["Workspace:CronEditor:Expression"]</p>
+            <MudTextField T="string" Value="@Draft.EffectiveExpression" ValueChanged="SetExpressionAsync" Immediate="true" AutoFocus="true" MaxLength="@JobDeclaration.CRON_EXPRESSION_MAX_LENGTH" Variant="Variant.Outlined" Error="@(!IsDraftValid)" Disabled="@Disabled" Class="ce-expression-field" aria-label="@L["Workspace:CronEditor:Expression"]" autocomplete="off" spellcheck="false" />
+            <div class="ce-validation @(!IsDraftValid ? "is-error" : null)" aria-live="polite"><MoIcon Icon="@(IsDraftValid ? MoIcons.Success : MoIcons.Error)" Size="13px"/>@(IsDraftValid ? L["Workspace:CronEditor:Valid"] : ValidationError)</div>
+            <div class="ce-format" role="group" aria-label="@L["Policy:Schedule:Format"]">
+                <button type="button" disabled="@Disabled" aria-pressed="@((Draft.Mode == CronExpressionMode.FiveFields).ToString().ToLowerInvariant())" @onclick="@(() => ChangeModeAsync(CronExpressionMode.FiveFields))">@L["Workspace:CronEditor:Five"]</button>
+                <button type="button" disabled="@Disabled" aria-pressed="@((Draft.Mode == CronExpressionMode.SixFieldsWithSeconds).ToString().ToLowerInvariant())" @onclick="@(() => ChangeModeAsync(CronExpressionMode.SixFieldsWithSeconds))">@L["Workspace:CronEditor:Six"]</button>
+            </div>
+            @if (_conversionFailure is not null) { <p class="ce-error" role="alert">@_conversionFailure</p> }
+            <div class="ce-fields">@foreach (var field in Draft.Evaluation.Fields) { <div><span>@FieldLabel(field.Kind)</span><b>@field.Value</b></div> }</div>
+            <p class="ce-hint">@L["Workspace:CronEditor:Syntax"]</p>
+            <div class="ce-presets"><h3>@L["Workspace:CronEditor:Presets"]</h3><div>@for(var i=0;i<CompactPresets.Length;i++) { var index=i;var expression=PresetExpression(index);<button type="button" disabled="@Disabled" aria-pressed="@((Draft.EffectiveExpression == expression).ToString().ToLowerInvariant())" @onclick="@(() => SetExpressionAsync(expression))">@L[$"Workspace:CronEditor:PresetNames:{index}"]</button> }</div></div>
+            <div class="ce-inherit"><MudButton Variant="Variant.Text" StartIcon="@MoIcons.Restore" Disabled="@(Disabled || Draft.OverrideExpression is null)" OnClick="ResetExpressionAsync">@L["Workspace:RestoreCron"]</MudButton><p>@L[Draft.OverrideExpression is null ? "Workspace:CronEditor:InheritedHint" : "Workspace:CronEditor:OverrideHint"]</p></div>
+        </section>
+        <section class="ce-preview">
+            <div class="ce-zone"><MoIcon Icon="@MoIcons.Globe" Size="16px"/><div><span>@L["Policy:Schedule:ConfiguredTimeZone"]</span><b>@Draft.TimeZoneId</b><small>@L["Workspace:CronEditor:ZoneHelp"]</small></div></div>
+            <h3>@L["Workspace:CronEditor:Preview"]</h3><p>@L["Workspace:CronEditor:PreviewDescription"]</p>
+            @if (IsDraftValid && Draft.Evaluation.Occurrences.Count > 0)
+            {
+                <ol>@for(var i=0;i<Draft.Evaluation.Occurrences.Count;i++) { var occurrence=Draft.Evaluation.Occurrences[i];<li><span>@((i+1).ToString("00"))</span><time datetime="@occurrence.Utc.ToString("O")">@FormatScheduleTime(occurrence.Utc)</time></li> }</ol>
+            }
+            else { <div class="ce-no-preview"><MoIcon Icon="@MoIcons.CalendarDays" Size="18px"/><p>@L[IsDraftValid ? "Policy:Schedule:Preview:Empty" : "Policy:Schedule:Preview:Invalid"]</p></div> }
+            <div class="ce-current-next"><span>@L["Policy:Schedule:AuthoritativeNext"]</span><b>@FormatScheduleTime(Draft.AuthoritativeNextOccurrenceUtc)</b></div>
+        </section>
+    </div>
+    @if (!IsPresent || IsPaused) { <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Text">@L[IsPresent ? "Workspace:CronEditor:Paused" : "Workspace:CronEditor:Absent"]</MudAlert> }
+    <p class="ce-note"><MoIcon Icon="@MoIcons.Info" Size="15px"/>@L["Workspace:CronEditor:Note"]</p>
+</div>
+
+}
+else
+{
 <div class="schedule-editor">
     <div class="schedule-editor__cadence" data-valid="@IsDraftValid.ToString().ToLowerInvariant()">
         <div class="schedule-editor__cadence-heading">
@@ -337,3 +374,5 @@
         </table>
     </div>
 </div>
+
+}

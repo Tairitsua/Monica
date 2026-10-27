@@ -120,6 +120,10 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
     [Parameter]
     public string? EmptyText { get; set; }
 
+    /// <summary>Gets the standing derived from the accepted catalog capture.</summary>
+    [Parameter] public Func<JobOperationalSummary, string>? StandingResolver { get; set; }
+    private string CatalogStanding(JobOperationalSummary row) => StandingResolver?.Invoke(row) ?? (!row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused" : row.LatestExecution?.State == JobExecutionState.Failed ? "attention" : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy");
+    private static string StandingTone(string standing) => standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => "neutral" };
     private readonly Dictionary<string, string?> _cronDescriptions = new(StringComparer.Ordinal);
     private readonly SchedulerOperationLifetime _operations = new();
     private IReadOnlyList<JobOperationalSummary> _visibleSummaries = [];

@@ -2,7 +2,7 @@
 
 <section class="catalog-table" aria-labelledby="catalog-table-title">
     <header class="catalog-table__heading">
-        <div><h2 id="catalog-table-title">@L["Catalog:Title"]</h2><p>@L["Catalog:Count", TotalCount]</p></div>
+        <div><h2 id="catalog-table-title">@L["Catalog:Title"]</h2><span class="catalog-table__count">@L["Workspace:Matches", TotalCount]</span></div>
         <div class="catalog-table__heading-actions">
             @if (_visibleSummaries.Any(IsRecurring))
             {
@@ -17,8 +17,8 @@
                   TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Catalog:Title"].Value })" HorizontalScrollbar="false" Elevation="0" Square="true" AllowUnsorted="false">
             <ColGroup><col class="catalog-table__selection-column" /><col class="catalog-table__definition-column" /><col class="catalog-table__plan-column" /><col class="catalog-table__standing-column" /><col class="catalog-table__evidence-column" /><col class="catalog-table__next-column" /></ColGroup>
             <HeaderContent>
-                <MudTh aria-label="@L["Catalog:Selection:SelectAll"]"></MudTh>
-                <MudTh><MudTableSortLabel T="JobOperationalSummary" SortLabel="@nameof(JobDefinitionSortField.JobName)" InitialDirection="SortDirection.Ascending" SortIcon="@MoIcons.ArrowUp">@L["Catalog:Columns:Definition"]</MudTableSortLabel></MudTh>
+                <MudTh><MudCheckBox T="bool" Value="@AreAllRecurringSelected" ValueChanged="AllRecurringSelectionChanged" Disabled="@IsMutating" Dense="true" Color="Color.Primary" aria-label="@L["Catalog:Selection:SelectAll"]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /></MudTh>
+                <MudTh>@L["Catalog:Columns:Definition"]</MudTh>
                 <MudTh>@L["Catalog:Columns:Schedule"]</MudTh><MudTh>@L["Workspace:Standing"]</MudTh><MudTh>@L["Catalog:Columns:LastRun"]</MudTh><MudTh>@L["Catalog:Columns:NextRun"]</MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -28,7 +28,7 @@
                 </MudTd>
                 <MudTd Class="catalog-table__definition-cell" DataLabel="@L["Catalog:Columns:Definition"]">
                     <div class="catalog-table__identity">
-                        <div class="catalog-table__identity-line"><i data-tone="@StandingTone(context)"></i><a class="catalog-table__identity-name" href="@GetDetailHref(context)">@effective.JobName</a>
+                        <div class="catalog-table__identity-line"><i data-tone="@StandingTone(CatalogStanding(context))"></i><a class="catalog-table__identity-name" href="@GetDetailHref(context)">@effective.JobName</a>
                             <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Catalog:Columns:Actions"]">
                                 @if (IsRecurring(context)) { <MudMenuItem Icon="@(IsOperatorPaused(context) ? MoIcons.PlayCircle : MoIcons.PauseCircle)" Disabled="@IsMutating" title="@GetToggleDisabledTooltip(context)" OnClick="@(() => DisabledStateToggled.InvokeAsync(context))">@GetToggleDisabledLabel(context)</MudMenuItem> }
                                 <MudMenuItem Icon="@MoIcons.Play" Disabled="@(IsMutating || !definition.IsPresent || (!IsRecurring(context) && definition.IsDisabled))" OnClick="@(() => RunRequested.InvokeAsync(context))">@L["Catalog:Actions:Run"]</MudMenuItem>
@@ -45,14 +45,14 @@
                         else { <span>@L["Catalog:OnDemand"]</span><code>@(definition.Declaration.JobArgsKey ?? L["Catalog:Triggered:NoArguments"])</code> }
                     </div>
                 </MudTd>
-                <MudTd Class="catalog-table__standing-cell" DataLabel="@L["Workspace:Standing"]"><span class="catalog-table__standing" data-tone="@StandingTone(context)" title="@GetLifecycleDescription(context)"><i></i>@StandingLabel(context)</span></MudTd>
+                <MudTd Class="catalog-table__standing-cell" DataLabel="@L["Workspace:Standing"]"><span class="catalog-table__standing" data-tone="@StandingTone(CatalogStanding(context))" title="@GetLifecycleDescription(context)"><i></i>@L[$"Workspace:Standings:{CatalogStanding(context)}"]</span></MudTd>
                 <MudTd Class="catalog-table__evidence-cell" DataLabel="@L["Catalog:Columns:LastRun"]">
                     @if (context.LatestExecution is { } latest)
                     {
                         <button type="button" class="catalog-table__latest" title="@latest.InstanceId" aria-label="@L["Executions:Actions:OpenDetailsFor", effective.JobName, latest.InstanceId]" @onclick="@(() => OpenLatestExecutionAsync(latest.InstanceId))">
                             <span class="catalog-table__latest-state" data-state="@latest.State.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{latest.State}"] <MoIcon Icon="@MoIcons.ChevronRight" Size=".75rem" /></span>
                             <time datetime="@latest.CreatedAtUtc.ToString("O")" title="@TimePresentation.FormatTimestamp(latest.CreatedAtUtc)">@TimePresentation.FormatListTimestamp(latest.CreatedAtUtc, TimeProvider.GetUtcNow())</time>
-                            <span class="catalog-table__duration"><small>@L["ExecutionDetail:Duration"]</small><b>@TimePresentation.FormatExecutionDuration(latest, TimeProvider.GetUtcNow())</b></span>
+                            <span class="catalog-table__duration"><small>@L["Executions:Columns:Duration"]</small><b>@TimePresentation.FormatExecutionDuration(latest, TimeProvider.GetUtcNow())</b></span>
                         </button>
                     }
                     else { <span class="catalog-table__never-run">@L["Catalog:History:NeverRun"]</span> }

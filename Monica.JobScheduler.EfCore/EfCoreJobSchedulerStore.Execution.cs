@@ -107,36 +107,7 @@ public sealed partial class EfCoreJobSchedulerStore
         query.Validate();
         return ReadAsync(async (dbContext, token) =>
         {
-            var filtered = dbContext.Executions.AsNoTracking()
-                .Where(item => item.SchedulerScopeKey == query.SchedulerScopeKey);
-            if (!string.IsNullOrWhiteSpace(query.OwnerKey))
-            {
-                filtered = filtered.Where(item => item.OwnerKey == query.OwnerKey);
-            }
-            if (!string.IsNullOrWhiteSpace(query.JobKey))
-            {
-                filtered = filtered.Where(item => item.JobKey == query.JobKey);
-            }
-            if (query.States is { Count: > 0 })
-            {
-                filtered = filtered.Where(item => query.States.Contains(item.State));
-            }
-            if (!string.IsNullOrWhiteSpace(query.SearchText))
-            {
-                var search = query.SearchText.ToLower();
-                filtered = filtered.Where(item =>
-                    item.InstanceId.ToLower().Contains(search) || item.JobKey.ToLower().Contains(search));
-            }
-            if (query.CreatedAfterUtc is { } createdAfter)
-            {
-                var ticks = ToTicks(createdAfter);
-                filtered = filtered.Where(item => item.CreatedAtUtcTicks >= ticks);
-            }
-            if (query.CreatedBeforeUtc is { } createdBefore)
-            {
-                var ticks = ToTicks(createdBefore);
-                filtered = filtered.Where(item => item.CreatedAtUtcTicks <= ticks);
-            }
+            var filtered = FilterExecutions(dbContext, query);
 
             var totalCount = await filtered.CountAsync(token);
             var ordered = query.SortField switch
@@ -1167,4 +1138,51 @@ public sealed partial class EfCoreJobSchedulerStore
             throw new ArgumentOutOfRangeException(parameterName, duration, "Duration must be greater than zero.");
         }
     }
+    private static IQueryable<JobExecutionEntity> FilterExecutions(JobSchedulerDbContext dbContext, JobExecutionQuery query)
+    {
+        var filtered = dbContext.Executions.AsNoTracking()
+            .Where(item => item.SchedulerScopeKey == query.SchedulerScopeKey);
+        if (!string.IsNullOrWhiteSpace(query.OwnerKey))
+        {
+            filtered = filtered.Where(item => item.OwnerKey == query.OwnerKey);
+        }
+        if (!string.IsNullOrWhiteSpace(query.JobKey))
+        {
+            filtered = filtered.Where(item => item.JobKey == query.JobKey);
+        }
+        if (query.States is { Count: > 0 })
+        {
+            filtered = filtered.Where(item => query.States.Contains(item.State));
+        }
+        if (!string.IsNullOrWhiteSpace(query.SearchText))
+        {
+            var search = query.SearchText.ToLower();
+            filtered = filtered.Where(item =>
+                item.InstanceId.ToLower().Contains(search) || item.JobKey.ToLower().Contains(search));
+        }
+        if (query.CreatedAfterUtc is { } createdAfter)
+        {
+            var ticks = ToTicks(createdAfter);
+            filtered = filtered.Where(item => item.CreatedAtUtcTicks >= ticks);
+        }
+        if (query.CreatedBeforeUtc is { } createdBefore)
+        {
+            var ticks = ToTicks(createdBefore);
+            filtered = filtered.Where(item => item.CreatedAtUtcTicks <= ticks);
+        }
+
+        if (query.CompletedAfterUtc is { } completedAfter)
+        {
+            var ticks = ToTicks(completedAfter);
+            filtered = filtered.Where(item => item.CompletedAtUtcTicks >= ticks);
+        }
+        if (query.CompletedBeforeUtc is { } completedBefore)
+        {
+            var ticks = ToTicks(completedBefore);
+            filtered = filtered.Where(item => item.CompletedAtUtcTicks <= ticks);
+        }
+
+        return filtered;
+    }
+
 }

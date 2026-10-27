@@ -14,7 +14,7 @@
             @if (index > 0) { <li class="execution-history__gap" aria-hidden="true">+@TimePresentation.FormatPreciseDuration(entry.TimestampUtc - ordered[index - 1].TimestampUtc)</li> }
             <li class="execution-history__entry" data-state="@entry.NewState?.ToString().ToLowerInvariant()">
                 <i class="execution-history__node" aria-hidden="true"></i>
-                <div class="execution-history__body"><strong>@L[$"ExecutionHistoryKinds:{entry.Kind}"] @if (entry.NewState is { } state) { <span>· @L[$"ExecutionStates:{state}"]</span> }</strong><p>@entry.Message</p>
+                <div class="execution-history__body"><strong>@L[$"ExecutionHistoryKinds:{entry.Kind}"]@(" ") @if (entry.NewState is { } state) { <span>· @L[$"ExecutionStates:{state}"]</span> }</strong><p>@entry.Message</p>
                     @if (!string.IsNullOrEmpty(entry.WorkerInstanceId)) { <small class="execution-history__worker" title="@entry.WorkerInstanceId">@JobSchedulerUiPresentation.ShortIdentity(entry.WorkerInstanceId)</small> }
                     <small class="execution-history__level" data-level="@entry.LogLevel.ToString().ToLowerInvariant()">@L[$"LogLevels:{entry.LogLevel}"]</small>
                 </div>

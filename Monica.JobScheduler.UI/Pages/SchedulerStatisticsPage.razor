@@ -40,45 +40,6 @@
             {
                 <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
                     <SchedulerSnapshotActions CapturedAtUtc="@state.ObservedAtUtc" IsLoading="@state.IsLoading" RefreshRequested="RefreshAsync" />
-                    <section class="statistics-window" aria-labelledby="statistics-window-heading" aria-busy="@(state.IsLoading ? "true" : "false")">
-                        <div class="statistics-window__summary">
-                            <div class="statistics-window__completion">
-                                <span class="statistics-window__eyebrow" id="statistics-window-heading">@L["Workspace:FailedCompletions"]</span>
-                                <strong>@(state.Snapshot is { } result ? result.Trend.Sum(bucket => bucket.FailedCount).ToString("N0", CultureInfo.CurrentCulture) : "—")</strong>
-                                <span>@L["Workspace:FailedCompletionsScope"]</span>
-                            </div>
-                            <div class="statistics-window__evidence">
-                                @if ((state.LoadedQuery ?? state.RequestedQuery) is { } query)
-                                {
-                                    <span class="statistics-window__eyebrow">@(state.HasLoadedSnapshot ? L["Analytics:Window:Accepted"] : L["Analytics:Window:Requested"])</span>
-                                    <div class="statistics-window__interval" data-start="@query.StartTimeUtc.ToString("O")" data-end="@query.EndTimeUtc.ToString("O")">
-                                        @TimePresentation.FormatRange(query.StartTimeUtc, query.EndTimeUtc)
-                                    </div>
-                                    <span>@L["Analytics:Window:Bounds"]</span>
-                                }
-                                @if (state.Snapshot is { } snapshot)
-                                {
-                                    <p class="statistics-window__finding">@L["Workspace:AnalyticsFinding", snapshot.CompletedTerminalCount, snapshot.Trend.Sum(bucket => bucket.FailedCount)]</p>
-                                }
-                                @if (Owner is not null || Job is not null) { <p class="statistics-window__scope"><code>@Owner</code><code>@Job</code><a href="/job-scheduler/statistics">@L["Catalog:Actions:Reset"]</a></p> }
-                            </div>
-                        </div>
-                        <div class="statistics-window__controls">
-                            <div class="statistics-window__presets" role="group" aria-label="@L["Analytics:Range:Title"]">
-                                @foreach (var range in Enum.GetValues<SchedulerAnalyticsTimeRange>())
-                                {
-                                    <button type="button" class="@(state.TimeRange == range ? "is-selected" : null)"
-                                            aria-pressed="@(state.TimeRange == range ? "true" : "false")"
-                                            @onclick="@(() => SelectRangeAsync(range))">@L[$"Analytics:Range:{range}"]</button>
-                                }
-                                <MudTooltip Text="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]">
-                                    <MudIconButton Icon="@MoIcons.Info" Size="Size.Small" Color="Color.Inherit" aria-label="@L["Analytics:Range:Title"]" aria-description="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]" />
-                                </MudTooltip>
-                            </div>
-
-                            <SchedulerAnalyticsScopeSelector Owner="@Owner" Job="@Job" OwnerChanged="SelectOwner" JobChanged="SelectJob" CapturedAtUtc="@state.ObservedAtUtc" />
-                        </div>
-                    </section>
                     @if (state.IsLoading && !state.HasLoadedSnapshot)
                     {
                         <div class="statistics-page__loading" role="status">
@@ -105,7 +66,25 @@
                         {
                             <p class="statistics-page__retained">@L["Analytics:Window:Retained", L[$"Analytics:Range:{loadedRange}"]]</p>
                         }
-                        <SchedulerAnalyticsDashboard Snapshot="@acceptedSnapshot" InspectExecution="InspectAsync" />
+                        <SchedulerAnalyticsDashboard Snapshot="@acceptedSnapshot" InspectExecution="InspectAsync" Owner="@Owner" Job="@Job">
+<FilterContent>
+<div class="statistics-window__controls">
+                            <div class="statistics-window__presets" role="group" aria-label="@L["Analytics:Range:Title"]">
+                                @foreach (var range in new[] { SchedulerAnalyticsTimeRange.Last24Hours, SchedulerAnalyticsTimeRange.Last7Days, SchedulerAnalyticsTimeRange.Last30Days })
+                                {
+                                    <button type="button" class="@(state.TimeRange == range ? "is-selected" : null)"
+                                            aria-pressed="@((state.TimeRange == range ? "true" : "false").ToString().ToLowerInvariant())"
+                                            @onclick="@(() => SelectRangeAsync(range))">@L[$"Analytics:Range:{range}"]</button>
+                                }
+                                <MudTooltip Text="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]">
+                                    <MudIconButton Icon="@MoIcons.Info" Size="Size.Small" Color="Color.Inherit" aria-label="@L["Analytics:Range:Title"]" aria-description="@L["Analytics:Range:Description", TimePresentation.TimeZoneId]" />
+                                </MudTooltip>
+                            </div>
+
+                            <SchedulerAnalyticsScopeSelector Owner="@Owner" Job="@Job" OwnerChanged="SelectOwner" JobChanged="SelectJob" CapturedAtUtc="@state.ObservedAtUtc" />
+                        </div>
+</FilterContent>
+</SchedulerAnalyticsDashboard>
                     }
                 </SchedulerAccessBoundary>
             }

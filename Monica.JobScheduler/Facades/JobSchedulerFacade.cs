@@ -353,6 +353,19 @@ public sealed class JobSchedulerFacade(
             cancellationToken);
     }
 
+    /// <summary>Gets exact retained ledger distribution for the configured scope, independently of pagination and state selection.</summary>
+    /// <param name="query">Ledger identity, search and creation or completion bounds; caller scope is always replaced.</param>
+    /// <param name="bucketCount">Number of intervals, from 1 through 200; defaults to 48.</param>
+    /// <param name="cancellationToken">Cancels the aggregate read.</param>
+    public Task<Res<JobExecutionDistribution>> GetExecutionDistributionAsync(JobExecutionQuery query, int bucketCount = 48,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var bounded = query with { SchedulerScopeKey = _schedulerScopeKey, States = null, PageNumber = 1, PageSize = 1 };
+        return ExecuteAsync(() => store.GetExecutionDistributionAsync(bounded, bucketCount, cancellationToken),
+            "load execution distribution", cancellationToken);
+    }
+
     private static JobDefinitionQuery BoundDefinitionQuery(JobDefinitionQuery query)
     {
         ArgumentNullException.ThrowIfNull(query);

@@ -5,17 +5,17 @@
 
 <div class="analytics-scope">
     <div class="analytics-scope__controls">
-        <MudSelect T="string" Value="@(Owner ?? string.Empty)" ValueChanged="SelectOwnerAsync"
-                   Label="@L["Catalog:Columns:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+        <div class="analytics-scope__field"><span>@L["Catalog:Columns:Owner"]</span><MudSelect T="string" Value="@(Owner ?? string.Empty)" ValueChanged="SelectOwnerAsync"
+                   aria-label="@L["Catalog:Columns:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Disabled="@(_loading || CapturedAtUtc is null)" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
             <MudSelectItem T="string" Value="@string.Empty">@L["Catalog:Filters:AnyOwner"]</MudSelectItem>
             @foreach (var owner in Owners)
             {
                 <MudSelectItem T="string" Value="@owner">@owner</MudSelectItem>
             }
-        </MudSelect>
-        <MudSelect T="string" Value="@(Job ?? string.Empty)" ValueChanged="SelectJobAsync"
-                   Label="@L["Executions:Columns:Definition"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+        </MudSelect></div>
+        <div class="analytics-scope__field"><span>@L["Executions:Columns:Definition"]</span><MudSelect T="string" Value="@(Job ?? string.Empty)" ValueChanged="SelectJobAsync"
+                   aria-label="@L["Executions:Columns:Definition"]" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Disabled="@(_loading || CapturedAtUtc is null)" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
             <MudSelectItem T="string" Value="@string.Empty">@L["Workspace:AllJobs"]</MudSelectItem>
             @foreach (var definition in Jobs)
@@ -26,9 +26,9 @@
             {
                 <MudSelectItem T="string" Value="@Job">@Job</MudSelectItem>
             }
-        </MudSelect>
+        </MudSelect></div>
     </div>
-    <p>@(_loading ? L["Common:Loading"] : _error ?? (_hasLoadedChoices ? L["Workspace:ScopeChoices", _definitions.Count, _total] : L["Common:NotAvailable"]))</p>
+    <p hidden="@(!_loading && _error is null && _hasLoadedChoices && _definitions.Count >= _total)">@(_loading ? L["Common:Loading"] : _error ?? (_hasLoadedChoices ? L["Workspace:ScopeChoices", _definitions.Count, _total] : L["Common:NotAvailable"]))</p>
 </div>
 
 @code {

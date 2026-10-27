@@ -132,6 +132,12 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
     /// </summary>
     public JobExecutionActivitySlice RecentFailureActivity { get; private set; } = JobExecutionActivitySlice.Empty;
 
+    /// <summary>Gets the latest forty retained executions for the job trajectory, with its exact retained total.</summary>
+    public JobExecutionActivitySlice RecentActivity { get; private set; } = new() { ItemLimit = 40 };
+
+    /// <summary>Gets the newest retained error message from the latest failed execution, when available.</summary>
+    public string? LatestFailureMessage { get; private set; }
+
     /// <summary>
     /// Gets whether the first access check completed.
     /// </summary>
@@ -220,7 +226,8 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 analyticsQuery.EndTimeUtc.AddTicks(-1),
                 RecentFailureActivity.ItemLimit,
                 cancellationToken);
-            await Task.WhenAll(summaryTask, analyticsTask, runningTask, failuresTask);
+            var recentTask = QueryExecutionsAsync(null, JobExecutionSortField.CreatedAtUtc, null, now, 40, cancellationToken);
+            await Task.WhenAll(summaryTask, analyticsTask, runningTask, failuresTask, recentTask);
             cancellationToken.ThrowIfCancellationRequested();
             var summaryResult = await summaryTask;
             if (summaryResult.IsFailed(out var error, out var summary))
@@ -232,6 +239,14 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             var analyticsResult = await analyticsTask;
             var runningResult = await runningTask;
             var failureResult = await failuresTask;
+            var recentResult = await recentTask;
+            string? failureMessage = null;
+            if (!failureResult.IsFailed(out _, out var failedPage) && failedPage.Items.FirstOrDefault() is { } latestFailure)
+            {
+                var detailResult = await _facade.GetExecutionAsync(latestFailure.InstanceId, cancellationToken);
+                if (!detailResult.IsFailed(out _, out var failureDetail))
+                    failureMessage = failureDetail?.History.LastOrDefault(entry => entry.LogLevel >= Microsoft.Extensions.Logging.LogLevel.Error)?.Message;
+            }
             _lifetime.TryApply(() =>
             {
                 Summary = summary;
@@ -246,6 +261,8 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 }
                 RunningActivity = AcceptExecutionEvidence(runningResult, RunningActivity);
                 RecentFailureActivity = AcceptExecutionEvidence(failureResult, RecentFailureActivity);
+                RecentActivity = AcceptExecutionEvidence(recentResult, RecentActivity);
+                LatestFailureMessage = failureMessage;
                 ObservedAtUtc = now;
             });
         }
@@ -488,6 +505,8 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
         Analytics = null;
         RunningActivity = JobExecutionActivitySlice.Empty;
         RecentFailureActivity = JobExecutionActivitySlice.Empty;
+        RecentActivity = new() { ItemLimit = 40 };
+        LatestFailureMessage = null;
         IsNotFound = false;
         Error = null;
         AnalyticsError = null;
@@ -495,7 +514,7 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
     }
 
     private Task<Res<QueryResult<JobExecutionInstance>>> QueryExecutionsAsync(
-        JobExecutionState state,
+        JobExecutionState? state,
         JobExecutionSortField sortField,
         DateTimeOffset? createdAfterUtc,
         DateTimeOffset? createdBeforeUtc,
@@ -506,9 +525,11 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             SchedulerScopeKey = string.Empty,
             OwnerKey = JobId.OwnerKey,
             JobKey = JobKey,
-            States = [state],
-            CreatedAfterUtc = createdAfterUtc,
-            CreatedBeforeUtc = createdBeforeUtc,
+            States = state is JobExecutionState.Running ? [JobExecutionState.Running, JobExecutionState.Queued] : state is { } value ? [value] : null,
+            CreatedAfterUtc = sortField == JobExecutionSortField.CompletedAtUtc ? null : createdAfterUtc,
+            CreatedBeforeUtc = sortField == JobExecutionSortField.CompletedAtUtc ? null : createdBeforeUtc,
+            CompletedAfterUtc = sortField == JobExecutionSortField.CompletedAtUtc ? createdAfterUtc : null,
+            CompletedBeforeUtc = sortField == JobExecutionSortField.CompletedAtUtc ? createdBeforeUtc : null,
             SortField = sortField,
             SortDescending = true,
             PageNumber = 1,

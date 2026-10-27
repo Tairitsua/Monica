@@ -66,6 +66,12 @@ public sealed record JobExecutionQuery
     /// </summary>
     public DateTimeOffset? CreatedBeforeUtc { get; init; }
 
+    /// <summary>Gets an optional inclusive terminal-completion lower bound. Executions without a completion are excluded.</summary>
+    public DateTimeOffset? CompletedAfterUtc { get; init; }
+
+    /// <summary>Gets an optional inclusive terminal-completion upper bound. Combines with other filters before counting and paging.</summary>
+    public DateTimeOffset? CompletedBeforeUtc { get; init; }
+
     /// <summary>
     /// Gets the selected sort field.
     /// </summary>

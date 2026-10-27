@@ -1,133 +1,56 @@
-@inject NavigationManager Navigation
 @using System.Globalization
-@using Monica.JobScheduler.UI.Localization
-
+@inject NavigationManager Navigation
+@inject SchedulerTimePresentation TimePresentation
 @inject IStringLocalizer<JobSchedulerResource> L
-
 <div class="analytics-dashboard">
-    <div class="analytics-dashboard__completion">
-        <SchedulerCompletionTrend Snapshot="@Snapshot" />
-        <section class="analytics-dashboard__summary" aria-labelledby="@_summaryHeadingId">
-            <header class="analytics-dashboard__heading">
-                <span class="analytics-dashboard__heading-icon" aria-hidden="true"><MoIcon Icon="@MoIcons.ChartColumn" Size="1.25rem" /></span>
-                <h2 id="@_summaryHeadingId">@L["Analytics:Summary:Title"]</h2>
-            </header>
-            <dl class="analytics-dashboard__summary-facts" aria-label="@L["Analytics:Metrics:AriaLabel"]">
-                <div data-tone="success">
-                    <dt>@L["Analytics:Metrics:Reliability"]</dt>
-                    <dd>@FormatRatio(Snapshot.Reliability, DecidedCount)</dd>
-                    <dd class="analytics-dashboard__summary-detail">@L["Analytics:Metrics:DecidedRuns", DecidedCount]</dd>
-                </div>
-                <div data-tone="info">
-                    <dt>@L["Analytics:Metrics:ScheduleFulfillment"]</dt>
-                    <dd>@FormatRatio(Snapshot.RecurringScheduleFulfillment, Snapshot.RecurringScheduleDispositionCount)</dd>
-                    <dd class="analytics-dashboard__summary-detail">@L["Analytics:Metrics:ScheduledDispositions", Snapshot.RecurringScheduleDispositionCount]</dd>
-                </div>
-                <div data-tone="primary">
-                    <dt>@L["Analytics:Metrics:Throughput"]</dt>
-                    <dd>@Snapshot.ExecutedThroughputPerHour.ToString("N2", CultureInfo.CurrentCulture)</dd>
-                    <dd class="analytics-dashboard__summary-detail">@L["Analytics:Metrics:PerHour"]</dd>
-                    <dd class="analytics-dashboard__summary-detail">@L["Analytics:Metrics:ExecutionSample", Snapshot.ExecutedTerminalCount, WindowHours]</dd>
-                </div>
-            </dl>
-        </section>
-    </div>
-
+    <section class="an-signature" data-calm="@((FailedCount == 0).ToString().ToLowerInvariant())">
+        <div class="an-band">@FilterContent</div>
+        <div class="an-decision"><div><p class="display-label">@L["Workspace:FailedCompletions"]</p><div class="display">@FailedCount.ToString("N0")</div></div>
+            <div class="an-finding"><p class="lede">@L["Workspace:AnalyticsSummary", Snapshot.CompletedTerminalCount, FailedCount] @if (Snapshot.TopJobsByFailures.FirstOrDefault() is { } top) { <a class="vmark" href="@JobUrl(top)">@top.JobName</a> <span>@L["Workspace:FailureShare", FormatShare(top.FailedCount,FailedCount)]</span> }</p><a class="an-open" href="@LedgerUrl(FailedCount > 0 ? JobExecutionState.Failed : null)">@L[FailedCount > 0 ? "Workspace:OpenFailures" : "Workspace:OpenRecords"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a></div>
+        </div>
+        <p class="an-window" data-start="@Snapshot.StartTimeUtc.ToString("O")" data-end="@Snapshot.EndTimeUtc.ToString("O")">@TimePresentation.FormatRange(Snapshot.StartTimeUtc,Snapshot.EndTimeUtc) · @L["Analytics:Window:Bounds"]</p>
+        <SchedulerCompletionTrend Snapshot="@Snapshot" Owner="@Owner" Job="@Job" />
+        <dl class="an-facts">
+            <div data-tone="success"><dt><i></i>@L["Analytics:Metrics:Reliability"]</dt><dd>@FormatRatio(Snapshot.Reliability,DecidedCount)</dd><small>@L["Analytics:Metrics:DecidedRuns",DecidedCount]</small></div>
+            <div data-tone="warning"><dt><i></i>@L["Analytics:Metrics:ScheduleFulfillment"]</dt><dd>@FormatRatio(Snapshot.RecurringScheduleFulfillment,Snapshot.RecurringScheduleDispositionCount)</dd><small>@L["Analytics:Metrics:ScheduledDispositions",Snapshot.RecurringScheduleDispositionCount]</small></div>
+            <div data-tone="info"><dt><i></i>@L["Analytics:Metrics:Throughput"]</dt><dd>@Snapshot.ExecutedThroughputPerHour.ToString("N1")<small>@L["Workspace:PerHour"]</small></dd><small>@L["Analytics:Metrics:ExecutionSample",Snapshot.ExecutedTerminalCount,WindowHours]</small></div>
+        </dl>
+    </section>
     <SchedulerExecutionStateShare Snapshot="@Snapshot" />
-
-    <SchedulerAnalyticsDurationEvidence Snapshot="@Snapshot" InspectExecution="@InspectExecution" />
-
-    <div class="analytics-dashboard__rankings">
-        @foreach (var group in RankingGroups)
-        {
-            <section class="analytics-dashboard__ranking" data-tone="@group.Tone" aria-labelledby="@group.HeadingId">
-                <header class="analytics-dashboard__heading analytics-dashboard__heading--ranking">
-                    <div>
-                        <h2 id="@group.HeadingId">@group.Label</h2>
-                        <p>@group.Description</p>
-                        <p class="analytics-dashboard__denominator">@group.PopulationLabel</p>
-                    </div>
-                    <span class="analytics-dashboard__population">@L["Analytics:Rankings:TopTen"]</span>
-                </header>
-                @if (group.Items.Count == 0)
-                {
-                    <div class="analytics-dashboard__empty">
-                        <MoIcon Icon="@MoIcons.ChartColumn" Size="1.5rem" />
-                        <p>@group.EmptyLabel</p>
-                    </div>
-                }
-                else
-                {
-                    <ol class="analytics-dashboard__ranking-list">
-                        @for (var index = 0; index < group.Items.Count; index++)
-                        {
-                            var item = group.Items[index];
-                            var value = group.GetValue(item);
-                            <li @key="new JobId(item.OwnerKey, item.JobKey)">
-                                <a href="@JobSchedulerUiUrls.JobDefinition(new JobId(item.OwnerKey, item.JobKey), Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)"
-                                   aria-label="@L["Analytics:Rankings:OpenJobWithMetric", index + 1, item.JobName, group.Label, value, FormatShare(value, group.TotalValue)]">
-                                    <span class="analytics-dashboard__rank-number">@(index + 1)</span>
-                                    <span class="analytics-dashboard__rank-copy">
-                                        <strong>@item.JobName</strong>
-                                        <span class="analytics-dashboard__identity"><span>@L["ExecutionDetail:Owner"]</span><code>@item.OwnerKey</code></span>
-                                        <span class="analytics-dashboard__identity"><span>@L["ExecutionDetail:Job"]</span><code>@item.JobKey</code></span>
-                                        @if (group.TotalValue > 0)
-                                        {
-                                            <progress aria-hidden="true" max="@group.TotalValue" value="@value">@value</progress>
-                                        }
-                                    </span>
-                                    <span class="analytics-dashboard__rank-value">
-                                        <b>@value.ToString("N0", CultureInfo.CurrentCulture)</b>
-                                        <small>@FormatShare(value, group.TotalValue)</small>
-                                    </span>
-                                    <span class="analytics-dashboard__rank-arrow" aria-hidden="true"><MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></span>
-                                </a>
-                            </li>
-                        }
-                    </ol>
-                }
-            </section>
-        }
+    <div class="an-evidence">
+        <section class="an-ranking" data-tone="@(_volume ? "primary" : "error")">
+            <header><div><h2>@L["Workspace:RankingTitle"]</h2><p>@L["Workspace:RankingDescription"]</p></div><div class="an-seg" role="group" aria-label="@L["Workspace:RankingTitle"]"><button type="button" aria-pressed="@((!_volume).ToString().ToLowerInvariant())" @onclick="@(() => SetRank(false))">@L["Workspace:RankFailures"]</button><button type="button" aria-pressed="@((_volume).ToString().ToLowerInvariant())" @onclick="@(() => SetRank(true))">@L["Workspace:RankVolume"]</button></div></header>
+            <ol class="an-ranked">@foreach(var pair in Ranking.Take(_expanded ? int.MaxValue : 6).Select((item,index) => (item,index)))
+            {
+                var value = _volume ? pair.item.CompletedTerminalCount : pair.item.FailedCount; var total = _volume ? Snapshot.CompletedTerminalCount : FailedCount;
+                <li><span class="an-rank-number">@((pair.index+1).ToString("00"))</span><div class="an-rank-copy"><a href="@JobUrl(pair.item)">@pair.item.JobName <MoIcon Icon="@MoIcons.ArrowUpRight" Size=".75rem" /></a><small>@pair.item.OwnerKey</small><progress max="@Math.Max(1,total)" value="@value" aria-label="@L["Workspace:FailureShare",FormatShare(value,total)]"></progress></div><a class="an-rank-value" href="@LedgerUrl(_volume ? null : JobExecutionState.Failed,pair.item.OwnerKey,pair.item.JobKey)"><b>@value.ToString("N0")</b><small>@FormatShare(value,total)</small><MoIcon Icon="@MoIcons.ChevronRight" Size=".875rem" /></a></li>
+            }</ol>
+            @if (Ranking.Count == 0) { <p class="an-empty">@L[_volume ? "Analytics:Rankings:VolumeEmpty" : "Analytics:Rankings:FailuresEmpty"]</p> }
+            <footer><span>@L["Workspace:RankingCount",Math.Min(_expanded ? int.MaxValue : 6,Ranking.Count),Ranking.Count]</span>@if(Ranking.Count > 6) { <button type="button" @onclick="@(() => _expanded = !_expanded)">@L[_expanded ? "Workspace:CollapseJobs" : "Workspace:ShowAllJobs",Ranking.Count]</button> }</footer>
+        </section>
+        <SchedulerAnalyticsDurationEvidence Snapshot="@Snapshot" InspectExecution="@InspectExecution" />
     </div>
 </div>
-
 @code {
-    private readonly string _summaryHeadingId = $"analytics-summary-{Guid.NewGuid():N}";
-    private readonly string _volumeHeadingId = $"analytics-volume-{Guid.NewGuid():N}";
-    private readonly string _failuresHeadingId = $"analytics-failures-{Guid.NewGuid():N}";
-
-    /// <summary>Gets the accepted bounded durable-store evidence rendered by this dashboard.</summary>
-    /// <remarks>The parent owns authorization, query admission, freshness, errors and retirement.</remarks>
-    [Parameter, EditorRequired]
-    public JobExecutionAnalyticsSnapshot Snapshot { get; set; } = null!;
-
-    /// <summary>Gets the callback for inspecting the exact immutable slow-record capture displayed by the dashboard.</summary>
-    /// <remarks>
-    /// The parent must freshly authorize inspection and owns duplicate admission, the actual native dialog reference
-    /// and Result, refresh and retirement. Unlike the previous dashboard, this presentation does not open dialogs.
-    /// Identities are opaque; preserve the supplied instance, owner and job keys exactly.
-    /// </remarks>
-    [Parameter, EditorRequired]
-    public EventCallback<JobExecutionAnalyticsSlowExecution> InspectExecution { get; set; }
-
-    private long FailedCount => Snapshot.Trend.Sum(static bucket => bucket.FailedCount);
-    private long DecidedCount => Snapshot.Trend.Sum(static bucket => bucket.SucceededCount + bucket.FailedCount);
-    private string WindowHours => (Snapshot.EndTimeUtc - Snapshot.StartTimeUtc).TotalHours.ToString("G6", CultureInfo.CurrentCulture);
-    private static string FormatRatio(double value, long denominator) => denominator > 0 ? value.ToString("P1", CultureInfo.CurrentCulture) : "—";
-    private static string FormatShare(long value, long total) => total > 0 ? (value / (double)total).ToString("P1", CultureInfo.CurrentCulture) : "—";
-
-    private IReadOnlyList<AnalyticsRankingGroup> RankingGroups =>
-    [
-        new(_volumeHeadingId, L["Analytics:Rankings:Volume"], L["Analytics:Rankings:VolumeDescription"],
-            L["Analytics:Rankings:VolumePopulation", Snapshot.CompletedTerminalCount], Snapshot.TopJobsByVolume,
-            static item => item.CompletedTerminalCount, Snapshot.CompletedTerminalCount, L["Analytics:Rankings:VolumeEmpty"], "primary"),
-        new(_failuresHeadingId, L["Analytics:Rankings:Failures"], L["Analytics:Rankings:FailuresDescription"],
-            L["Analytics:Rankings:FailurePopulation", FailedCount], Snapshot.TopJobsByFailures,
-            static item => item.FailedCount, FailedCount, L["Analytics:Rankings:FailuresEmpty"], "error")
-    ];
-
-    private sealed record AnalyticsRankingGroup(
-        string HeadingId, string Label, string Description, string PopulationLabel,
-        IReadOnlyList<JobExecutionAnalyticsJobRank> Items, Func<JobExecutionAnalyticsJobRank, long> GetValue,
-        long TotalValue, string EmptyLabel, string Tone);
+    /// <summary>Gets the accepted analytics capture.</summary>
+    [Parameter,EditorRequired] public JobExecutionAnalyticsSnapshot Snapshot { get; set; } = null!;
+    /// <summary>Gets the route's controls, retained by its asynchronous page owner.</summary>
+    [Parameter] public RenderFragment? FilterContent { get; set; }
+    /// <summary>Gets the exact owner and job drilldown scope.</summary>
+    [Parameter] public string? Owner { get; set; }
+    /// <summary>Gets the exact job drilldown scope.</summary>
+    [Parameter] public string? Job { get; set; }
+    /// <summary>Opens the exact displayed execution with the parent's authorization and dialog lifetime.</summary>
+    [Parameter,EditorRequired] public EventCallback<JobExecutionAnalyticsSlowExecution> InspectExecution { get; set; }
+    private bool _volume,_expanded;
+    private long FailedCount => Snapshot.Trend.Sum(b => b.FailedCount);
+    private long DecidedCount => Snapshot.Trend.Sum(b => b.SucceededCount+b.FailedCount);
+    private string WindowHours => (Snapshot.EndTimeUtc-Snapshot.StartTimeUtc).TotalHours.ToString("G6",CultureInfo.CurrentCulture);
+    private IReadOnlyList<JobExecutionAnalyticsJobRank> Ranking => _volume ? Snapshot.TopJobsByVolume : Snapshot.TopJobsByFailures;
+    protected override void OnParametersSet() => _volume = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query).TryGetValue("rank",out var rank) && rank == "volume";
+    private void SetRank(bool volume) { _volume=volume; _expanded=false; Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("rank",volume ? "volume" : null),replace:true); }
+    private string JobUrl(JobExecutionAnalyticsJobRank job) => JobSchedulerUiUrls.JobDefinition(new JobId(job.OwnerKey,job.JobKey),Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
+    private string LedgerUrl(JobExecutionState? state,string? owner=null,string? job=null) => SchedulerRouteBuilder.Ledger(new JobExecutionQuery { SchedulerScopeKey=string.Empty, OwnerKey=owner??Owner,JobKey=job??Job,States=state is {} value ? new[]{value}:null,CompletedAfterUtc=Snapshot.StartTimeUtc,CompletedBeforeUtc=Snapshot.EndTimeUtc.AddTicks(-1) },Snapshot.StartTimeUtc,Snapshot.EndTimeUtc);
+    private static string FormatRatio(double value,long total) => total > 0 ? value.ToString("P1",CultureInfo.CurrentCulture) : "—";
+    private static string FormatShare(long value,long total) => total > 0 ? (value/(double)total).ToString("P1",CultureInfo.CurrentCulture) : "—";
 }
