@@ -516,6 +516,7 @@
           "Monica.DependencyInjection",
           "Monica.Locker",
           "Monica.Locker.EfCore",
+            "Monica.Locker.Redis",
           "Monica.ServiceDiscovery",
           "Monica.StateStore",
           "Monica.StateStore.StackExchange",

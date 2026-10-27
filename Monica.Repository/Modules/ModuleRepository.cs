@@ -1,5 +1,6 @@
 using Monica.EventBus.Abstractions;
 using Monica.EventBus;
+using Monica.Locker.Leases;
 using Monica.Repository.Inbox.Annotations;
 using Monica.Repository.Inbox.Models;
 using Monica.Repository.Inbox.Services;
@@ -193,7 +194,13 @@ public static class ModuleRepositoryRegistrationExtensions
                 throw new InvalidOperationException($"Outbox context '{typeof(TDbContext).FullName}' must be registered once with one declaring owner.");
             context.Services.AddSingleton(new OutboxRegistration<TDbContext>(options));
             context.Services.TryAddScoped<ITransactionalEventSink, TransactionalEventSink>();
-            context.Services.AddSingleton<OutboxDispatcher<TDbContext>>();
+            context.Services.AddSingleton(sp => new OutboxDispatcher<TDbContext>(
+                sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredService<OutboxRegistration<TDbContext>>(),
+                sp.GetRequiredService<ILogger<OutboxDispatcher<TDbContext>>>(),
+                sp.GetRequiredService<IDbContextFactory<TDbContext>>(),
+                options.MaintenanceLeaseStore is { } selection
+                    ? sp.GetRequiredKeyedService<IExclusiveLeaseStore>(selection.ServiceKey) : null));
             var mode = options.EnableWorker
                 ? context.Application.TypeActivation!.GetActivation(typeof(TDbContext), TypeActivationKind.Outbox)
                 : ActivationMode.Disabled;

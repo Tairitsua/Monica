@@ -29,7 +29,7 @@ public sealed record LeaseIdentity(LeaseResource Resource, string HolderId, stri
 /// <remarks>Measure <see cref="ValidFor"/> from the caller's monotonic request start, never from response arrival.</remarks>
 public sealed record LeaseGrant(LeaseIdentity Identity, TimeSpan ValidFor, DateTimeOffset ConfirmedAtUtc)
 {
-    /// <summary>Gets the authoritative expiry. The current SQL and memory providers supply their own clock.</summary>
+    /// <summary>Gets the authoritative expiry. SQL, Redis and memory providers supply their authority clock.</summary>
     public DateTimeOffset ExpiresAtUtc => ConfirmedAtUtc.Add(ValidFor);
 }
 

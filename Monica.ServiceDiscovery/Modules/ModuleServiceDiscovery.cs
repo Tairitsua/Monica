@@ -20,6 +20,7 @@ using Monica.ServiceDiscovery.Providers;
 using Monica.ServiceDiscovery.Services;
 using Monica.ServiceDiscovery.Services.Support;
 using Monica.StateStore.Abstractions;
+using Monica.Locker.Leases;
 using Polly;
 using Polly.Retry;
 
@@ -33,7 +34,7 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void ValidateOptions(ModuleServiceDiscoveryOption options, string? profileName)
     {
-
+        options.Election.Validate();
         var applicationIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var service in options.PredefinedServices)
         {
@@ -60,6 +61,9 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
             throw new InvalidOperationException(
                 $"Unsupported {nameof(ServiceDiscoveryStorageMode)} value '{storageMode}'.");
         }
+
+        if (storageMode != ServiceDiscoveryStorageMode.Memory && options.LeaderLeaseStore is null)
+            throw new InvalidOperationException("Distributed service discovery requires UseLeaderLeaseStore with an explicit keyed lease authority and scope.");
 
         if (storageMode == ServiceDiscoveryStorageMode.ExternalKeyed)
         {
@@ -102,6 +106,8 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void DeclareContracts(ModuleContractDescriptor<ModuleServiceDiscoveryOption> contracts)
     {
+        if (contracts.Options.LeaderLeaseStore is { } leaseSelection)
+            contracts.RequireKeyedService<IExclusiveLeaseStore>(leaseSelection.ServiceKey);
         if (Application.TypeActivation is IApplicationModel model)
             ServiceDiscoveryApplicationIdentity.Validate(contracts.Options, model.Deployment);
         switch (contracts.Options.StorageMode)
@@ -125,6 +131,16 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     public override void ConfigureServices(ModuleContext<ModuleServiceDiscoveryOption> context)
     {
         var services = context.Services;
+        services.TryAddSingleton(TimeProvider.System);
+        if (Option.LeaderLeaseStore is { } leaseSelection)
+        {
+            if (leaseSelection.ServiceKey != nameof(ModuleServiceDiscovery))
+                services.AddKeyedSingleton<IExclusiveLeaseStore>(nameof(ModuleServiceDiscovery), (provider, _) =>
+                    provider.GetRequiredKeyedService<IExclusiveLeaseStore>(leaseSelection.ServiceKey));
+        }
+        else
+            services.AddKeyedSingleton<IExclusiveLeaseStore>(nameof(ModuleServiceDiscovery), (provider, _) =>
+                new InMemoryLeaseStore(provider.GetRequiredService<TimeProvider>()));
         switch (Option.StorageMode)
         {
             case ServiceDiscoveryStorageMode.Memory:
@@ -167,7 +183,8 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
 
         // Register the new StateStore foundational services.
         services.TryAddSingleton<IRegistrationStateManager, RegistrationStateManager>();
-        services.TryAddSingleton<ILeaderElectionService, LeaderElectionService>();
+        services.AddSingleton<LeaderElectionService>();
+        services.AddSingleton<ILeaderElectionService>(provider => provider.GetRequiredService<LeaderElectionService>());
 
         var autonomous = Application.Application.AutonomousWork;
         Application.RecordActivation(new ResourceActivation
@@ -336,11 +353,25 @@ public static class ModuleServiceDiscoveryBuilderExtensions
                 })
                 .SatisfyFeature(ModuleServiceDiscovery.STATE_STORE_FEATURE);
         }
+
+        /// <summary>
+        /// Binds leadership and leader observations to a keyed singleton lease authority. Membership remains in the
+        /// selected StateStore. Every participant must share this scope and backend; memory storage may omit this
+        /// selection for process-local election. Redis users accept possible duplicate leaders during failover.
+        /// </summary>
+        public ModuleRegistration<ModuleServiceDiscovery, ModuleServiceDiscoveryOption> UseLeaderLeaseStore(
+            string serviceKey, string scope) => registration.Configure(options =>
+                options.LeaderLeaseStore = new LeaseStoreSelection(serviceKey, scope));
     }
 }
 
 public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServiceDiscovery>
 {
+    /// <summary>
+    /// Explicit keyed authority and namespace for leader election/queries. Required with distributed or external
+    /// membership storage. Null uses one process-local lease store only when memory storage is selected.
+    /// </summary>
+    public LeaseStoreSelection? LeaderLeaseStore { get; set; }
     /// <summary>
     /// Gets the responsibility assigned to this host. The default is <see cref="ServiceDiscoveryRole.Worker"/>.
     /// Use the role registration methods when the host owns registry or standalone control-plane work.
@@ -433,11 +464,6 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
     public ElectionConfig Election { get; set; } = new();
 
     /// <summary>
-    /// Isolation handling mode.
-    /// </summary>
-    public EIsolationHandlingMode IsolationHandlingMode { get; set; } = EIsolationHandlingMode.ContinueRunning;
-
-    /// <summary>
     /// Gets the host-owned keyed service used when <see cref="StorageMode"/> is
     /// <see cref="ServiceDiscoveryStorageMode.ExternalKeyed"/>. Configure it through
     /// <see cref="ModuleServiceDiscoveryBuilderExtensions.UseExternalKeyedStorage"/>.
@@ -499,20 +525,4 @@ public enum ServiceDiscoveryStorageMode
     /// Uses a host-owned keyed <see cref="IStateStore"/> registration.
     /// </summary>
     ExternalKeyed
-}
-
-/// <summary>
-/// Isolation handling mode.
-/// </summary>
-public enum EIsolationHandlingMode
-{
-    /// <summary>
-    /// Continue running in degraded mode without participating in leader election.
-    /// </summary>
-    ContinueRunning,
-
-    /// <summary>
-    /// Shut down quickly.
-    /// </summary>
-    FastShutdown
 }

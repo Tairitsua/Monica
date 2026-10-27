@@ -638,13 +638,54 @@ public sealed class JobSchedulingHostedServiceTests
             .Should().ContainSingle().Which.ExpiresAtUtc.Should().BeAfter(time.GetUtcNow());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExternalHistoryCoordination_ShouldNeverReplaceExecutionRecoveryFencing(bool unavailable)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new ControllableTimeProvider(NOW);
+        var durable = new InMemoryJobSchedulerStore(time);
+        var boundary = Substitute.For<IJobSchedulerStore>();
+        boundary.CoordinatorLeases.Returns(durable.CoordinatorLeases);
+        boundary.RecoverExpiredLeasesAsync(Arg.Any<ExpiredLeaseRecoveryRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => durable.RecoverExpiredLeasesAsync(call.Arg<ExpiredLeaseRecoveryRequest>(), call.Arg<CancellationToken>()));
+        boundary.CleanupHistoryAsync(Arg.Any<JobHistoryCleanupRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => durable.CleanupHistoryAsync(call.Arg<JobHistoryCleanupRequest>(), call.Arg<CancellationToken>()));
+        IExclusiveLeaseStore external = new InMemoryLeaseStore(time);
+        if (unavailable)
+        {
+            external = Substitute.For<IExclusiveLeaseStore>();
+            external.TryAcquireAsync(Arg.Any<LeaseResource>(), Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromException<LeaseGrant?>(new IOException("External authority unavailable")));
+        }
+        using var service = CreateService(boundary, [], time, configuredOptions: new ModuleJobSchedulerOption
+        {
+            SchedulerScopeKey = StoreFixture.SCOPE, ProjectName = StoreFixture.OWNER_A, EnableHistoryCleanup = true,
+            HistoryCleanupLeaseStore = new LeaseStoreSelection("advisory", "database-a")
+        }, historyCleanupLeases: new(external));
+        if (unavailable) await Assert.ThrowsAsync<IOException>(() => service.CleanupHistoryAsync(token));
+        else
+        {
+            await service.CleanupHistoryAsync(token);
+            await boundary.Received(1).CleanupHistoryAsync(Arg.Is<JobHistoryCleanupRequest>(request => request.CoordinatorLease == null),
+                Arg.Any<CancellationToken>());
+            Assert.Single((await external.GetSnapshotAsync("database-a", "jobscheduler:history:", token)).Leases);
+        }
+        await service.RecoverAsync(token);
+        await boundary.Received(1).RecoverExpiredLeasesAsync(Arg.Is<ExpiredLeaseRecoveryRequest>(request =>
+            request.CoordinatorLease != null && request.CoordinatorLease.CoordinatorKey == "maintenance"), Arg.Any<CancellationToken>());
+        Assert.Single((await durable.CoordinatorLeases.GetSnapshotAsync(StoreFixture.SCOPE, "jobscheduler:maintenance", token)).Leases);
+    }
+
     private static JobSchedulingHostedService CreateService(
         IJobSchedulerStore store,
         IReadOnlyList<LocalJobDefinition> definitions,
         TimeProvider time,
         bool manualMode = false,
         ModuleJobSchedulerOption? configuredOptions = null,
-        ITypeActivationPolicy? activation = null)
+        ITypeActivationPolicy? activation = null,
+        HistoryCleanupLeaseStore? historyCleanupLeases = null)
     {
         var options = configuredOptions ?? new ModuleJobSchedulerOption
         {
@@ -664,6 +705,6 @@ public sealed class JobSchedulingHostedServiceTests
             Options.Create(new ModuleHostedServiceOption()),
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<JobSchedulingHostedService>.Instance,
-            activation);
+            activation, historyCleanupLeases);
     }
 }

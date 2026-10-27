@@ -41,7 +41,7 @@
                 @if (Snapshot is { IsLeaderElectionEnabled: true } snapshot)
                 {
                     <MudChip T="string" Color="@snapshot.CurrentLeaderStatus.GetColor()" Icon="@snapshot.CurrentLeaderStatus.GetIcon()" Variant="Variant.Outlined" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@snapshot.CurrentLeaderStatus.GetText(L)</MudChip>
-                    <dl class="host-facts"><div><dt>@L["CurrentInstance:Fields:LeaderBecomeTime"]</dt><dd>@Time(snapshot.LeaderBecomeTime)</dd></div><div><dt>@L["CurrentInstance:Fields:CurrentETag"]</dt><dd><code>@Value(snapshot.CurrentETag)</code></dd></div></dl>
+                    <dl class="host-facts"><div><dt>@L["CurrentInstance:Fields:LeaderBecomeTime"]</dt><dd>@Time(snapshot.LeaderBecomeTime)</dd></div><div><dt>@L["CurrentInstance:Fields:CurrentTermId"]</dt><dd><code>@Value(snapshot.CurrentTermId)</code></dd></div></dl>
                 }
                 else { <p class="host-empty-note">@L["CurrentInstance:States:LeaderElectionDisabled"]</p> }
                 <div class="host-cluster-lease"><h4>@L["CurrentInstance:Sections:ClusterLeaderInfo"]</h4><p>@L["Workbench:LeaseScope"]</p>@if (ClusterLeader is { } leader) { <dl class="host-facts"><div><dt>@L["CurrentInstance:Fields:AppId"]</dt><dd><code>@leader.AppId</code></dd></div><div><dt>@L["CurrentInstance:Fields:LeaderInstanceId"]</dt><dd><code>@leader.InstanceId</code></dd></div><div><dt>@L["CurrentInstance:Fields:LeaderBecomeTime"]</dt><dd>@Time(leader.BecomeLeaderTime)</dd></div></dl> } else { <p class="host-empty-note">@L["Workbench:NoLeaderLease"]</p> }</div>

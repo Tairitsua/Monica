@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Locker.Leases;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
@@ -48,10 +49,11 @@ public sealed class RegistrationStateManagerTests
             serverAddresses.Addresses.Add(listeningAddress);
             IServiceDiscoveryClientInfo clientInfo = new DefaultServiceDiscoveryClientInfo(
                 options, new MonicaApplicationOptions(), serverAddresses);
-            var leaderService = new LeaderElectionService(
-                clientInfo, options, NullLogger<LeaderElectionService>.Instance);
+            var leases = new InMemoryLeaseStore(TimeProvider.System);
+            using var leaderService = new LeaderElectionService(
+                clientInfo, options, NullLogger<LeaderElectionService>.Instance, leases, TimeProvider.System);
             var manager = new RegistrationStateManager(
-                store, clientInfo, leaderService, options, NullLogger<RegistrationStateManager>.Instance);
+                store, clientInfo, leaderService, options, NullLogger<RegistrationStateManager>.Instance, leases);
 
             var registration = await manager.RegisterOrHeartbeatAsync(cancellationToken);
 

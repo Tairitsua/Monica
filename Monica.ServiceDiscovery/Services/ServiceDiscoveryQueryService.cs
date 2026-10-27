@@ -113,7 +113,7 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
             CurrentLeaderStatus = leaderService.CurrentStatus,
             IsLeader = leaderService.IsLeader,
             LeaderBecomeTime = leaderService.LeaderBecomeTime,
-            CurrentETag = leaderService.CurrentETag,
+            CurrentTermId = leaderService.CurrentTermId,
             ClusterLeaderState = lease is null ? null : new LeaderState
             {
                 AppId = lease.AppId, InstanceId = lease.InstanceId, BecomeLeaderTime = lease.BecomeLeaderTime
@@ -164,17 +164,16 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
         };
     }
 
-    public async Task<bool> ReleaseLeaderAsync()
+    public Task<bool> ReleaseLeaderAsync()
     {
         var leaderService = GetLeaderService();
         if (!leaderService.IsLeader)
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         leaderService.TriggerLeaderLost(LeaderLostReason.GracefulShutdown);
-        await GetStateManager().DeleteLeaderKeyAsync();
-        return true;
+        return Task.FromResult(true);
     }
 
     public async Task ForceDeleteLeaderAsync(string appId)

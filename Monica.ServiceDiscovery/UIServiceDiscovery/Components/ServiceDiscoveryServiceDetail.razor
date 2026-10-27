@@ -60,14 +60,14 @@
                     <div class="inspector-host-scope"><span>@L["Workbench:QueryingHost"]</span><p>@L["Workbench:ConfigurationScope"]</p></div>
                     <section class="inspector-config-group"><h4>@L["ServiceDetail:Configuration:Sections:ElectionConfig"]</h4><dl class="inspector-facts"><div><dt>@L["ServiceDetail:Configuration:Fields:HeartbeatPeriodSeconds"]</dt><dd>@_election.HeartbeatPeriodSeconds <small>@L["ServiceDetail:Configuration:Fields:HeartbeatPeriodHelper"]</small></dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:HeartbeatJitterMilliseconds"]</dt><dd>@_election.HeartbeatJitterMilliseconds <small>@L["ServiceDetail:Configuration:Fields:HeartbeatJitterHelper"]</small></dd></div></dl></section>
                     <section class="inspector-config-group"><h4>@L["ServiceDetail:Configuration:Sections:TtlConfig"]</h4><div class="inspector-ttl-columns"><section><h5>@L["ServiceDetail:Configuration:Fields:InstanceTtl"]</h5><dl class="inspector-facts compact"><div><dt>@L["ServiceDetail:Configuration:Fields:Multiplier"]</dt><dd>@_election.RegistrationOfflineTTLMultiplier</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:AdditionalSeconds"]</dt><dd>@_election.RegistrationOfflineTTLAdditionalSeconds</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:CalculatedValue"]</dt><dd>@L["Shared:Formats:SecondsValue", _election.RegistrationTTL.TotalSeconds]</dd></div></dl></section><section><h5>@L["ServiceDetail:Configuration:Fields:LeaderTtl"]</h5><dl class="inspector-facts compact"><div><dt>@L["ServiceDetail:Configuration:Fields:Multiplier"]</dt><dd>@_election.LeaderOfflineTTLMultiplier</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:AdditionalSeconds"]</dt><dd>@_election.LeaderOfflineTTLAdditionalSeconds</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:CalculatedValue"]</dt><dd>@L["Shared:Formats:SecondsValue", _election.LeaderTTL.TotalSeconds]</dd></div></dl></section></div></section>
-                    <section class="inspector-config-group"><h4>@L["ServiceDetail:Configuration:Sections:RuntimeMode"]</h4><dl class="inspector-facts"><div><dt>@L["ServiceDetail:Configuration:Fields:StateStoreMode"]</dt><dd>@StorageModeText()</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:IsolationHandlingMode"]</dt><dd>@IsolationModeText()<small>@L["ServiceDetail:Configuration:Fields:IsolationHandlingHelper"]</small></dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:HostRole"]</dt><dd>@HostRoleText()</dd></div></dl><p class="inspector-note">@L["ServiceDetail:Configuration:Messages:StateTransition"]</p><p class="inspector-note">@L["Workbench:IsolationBehaviorCaveat"]</p></section>
+                    <section class="inspector-config-group"><h4>@L["ServiceDetail:Configuration:Sections:RuntimeMode"]</h4><dl class="inspector-facts"><div><dt>@L["ServiceDetail:Configuration:Fields:StateStoreMode"]</dt><dd>@StorageModeText()</dd></div><div><dt>@L["ServiceDetail:Configuration:Fields:HostRole"]</dt><dd>@HostRoleText()</dd></div></dl><p class="inspector-note">@L["ServiceDetail:Configuration:Messages:StateTransition"]</p></section>
                 </section>
             </MudTabPanel>
             <MudTabPanel Text="@L["ServiceDetail:Tabs:ElectionStatus"]">
                 <section class="inspector-section">
                     <div class="inspector-host-scope"><span>@L["Workbench:QueryingHost"]</span><p>@L["Workbench:LocalElectionScope"]</p></div>
                     <div class="inspector-election-columns">
-                        <section><h4>@L["ServiceDetail:ElectionStatus:Sections:CurrentStatus"]</h4>@if (_hostRole == ServiceDiscoveryRole.Worker) { <p class="inspector-note">@L["CurrentInstance:States:LeaderElectionDisabled"]</p> } else { <MudChip T="string" Color="@_localStatus.GetColor()" Icon="@_localStatus.GetIcon()" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@_localStatus.GetText(L)</MudChip> }<dl class="inspector-facts compact"><div><dt>@L["ServiceDetail:ElectionStatus:Fields:BecameLeaderAt"]</dt><dd>@Time(_localBecomeTime)</dd></div><div><dt>@L["ServiceDetail:ElectionStatus:Fields:CurrentETag"]</dt><dd><code>@Value(_localETag)</code><small>@L["ServiceDetail:ElectionStatus:Tooltips:CurrentETag"]</small></dd></div></dl></section>
+                        <section><h4>@L["ServiceDetail:ElectionStatus:Sections:CurrentStatus"]</h4>@if (_hostRole == ServiceDiscoveryRole.Worker) { <p class="inspector-note">@L["CurrentInstance:States:LeaderElectionDisabled"]</p> } else { <MudChip T="string" Color="@_localStatus.GetColor()" Icon="@_localStatus.GetIcon()" Size="Size.Small" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@_localStatus.GetText(L)</MudChip> }<dl class="inspector-facts compact"><div><dt>@L["ServiceDetail:ElectionStatus:Fields:BecameLeaderAt"]</dt><dd>@Time(_localBecomeTime)</dd></div><div><dt>@L["ServiceDetail:ElectionStatus:Fields:CurrentTermId"]</dt><dd><code>@Value(_localTermId)</code><small>@L["ServiceDetail:ElectionStatus:Tooltips:CurrentTermId"]</small></dd></div></dl></section>
                         <section><h4>@L["ServiceDetail:ElectionStatus:Sections:Description"]</h4><dl class="inspector-status-guide"><div><dt>@L["Shared:LeaderStatuses:Leader"]</dt><dd>@L["ServiceDetail:ElectionStatus:Descriptions:Leader"]</dd></div><div><dt>@L["Shared:LeaderStatuses:Follower"]</dt><dd>@L["ServiceDetail:ElectionStatus:Descriptions:Follower"]</dd></div><div><dt>@L["Shared:LeaderStatuses:Looking"]</dt><dd>@L["ServiceDetail:ElectionStatus:Descriptions:Looking"]</dd></div></dl></section>
                     </div>
                     <section class="inspector-maintenance"><h4>@L["ServiceDetail:ElectionStatus:Sections:Management"]</h4><p>@L["Workbench:ForceDeleteScope", service.AppId]</p><MudAlert Severity="Severity.Warning" Dense="true" Icon="@MoIcons.Warning">@L["ServiceDetail:ElectionStatus:Warnings:ForceDeleteLeader"]</MudAlert><MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@MoIcons.Delete" OnClick="OnForceDeleteLeaderClicked" Disabled="@(!HasLeader || _actionBusy || _leaderDeleted)">@L["ServiceDetail:ElectionStatus:Actions:ForceDeleteLeader"]</MudButton>@if (_leaderDeleted) { <p role="status">@L["Workbench:LeaderDeleteCaptureUnchanged"]</p> }</section>
@@ -98,10 +98,9 @@
     private ElectionConfig _election = new();
     private ServiceDiscoveryRole _hostRole;
     private ServiceDiscoveryStorageMode? _storageMode;
-    private EIsolationHandlingMode _isolationMode;
     private LeaderStatus _localStatus;
     private DateTime? _localBecomeTime;
-    private string? _localETag;
+    private string? _localTermId;
     private List<InstanceDisplayItem> _instances = [];
     private IDialogReference? _confirmation;
     private Task? _actionTask;
@@ -135,10 +134,9 @@
         };
         _hostRole = options.Role;
         _storageMode = options.StorageMode;
-        _isolationMode = options.IsolationHandlingMode;
         _localStatus = LeaderElectionService.CurrentStatus;
         _localBecomeTime = LeaderElectionService.LeaderBecomeTime;
-        _localETag = LeaderElectionService.CurrentETag;
+        _localTermId = LeaderElectionService.CurrentTermId;
         _instances = _service.Instances.Values.Select(instance => new InstanceDisplayItem(instance, false, null))
             .Concat(_service.EvictedInstances.Select(instance => new InstanceDisplayItem(instance.ToInstanceState(), true, instance.EvictionTime)))
             .OrderBy(instance => instance.IsEvicted).ThenByDescending(instance => instance.EvictionTime ?? DateTime.MinValue).ToList();
@@ -228,12 +226,6 @@
         catch (JSDisconnectedException) { }
     }
 
-    private string IsolationModeText() => L[_isolationMode switch
-    {
-        EIsolationHandlingMode.ContinueRunning => "ServiceDetail:Configuration:Values:ContinueRunning",
-        EIsolationHandlingMode.FastShutdown => "ServiceDetail:Configuration:Values:FastShutdown",
-        _ => "Shared:Values:Unknown"
-    }].Value;
     private string StorageModeText() => L[_storageMode switch
     {
         ServiceDiscoveryStorageMode.Memory => "ServiceDetail:Configuration:Values:MemoryStorage",

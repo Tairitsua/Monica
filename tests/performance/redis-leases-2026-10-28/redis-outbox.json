@@ -1,0 +1,406 @@
+{
+  "capturedAtUtc": "2026-10-27T17:43:56.1821752+00:00",
+  "poolLimit": 3,
+  "retainedRows": 12000,
+  "expiredRows": 4000,
+  "payloadBytes": 512,
+  "cleanupBatchSize": 1000,
+  "results": [
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 124.1716,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 8,
+      "sqlTransactions": 6
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 23.2751,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 19.5263,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 19.6099,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 19.6252,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 18.4882,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 59.692,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 15,
+      "sqlTransactions": 8
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 21.5586,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 19.7168,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 20.1066,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 21.1611,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 18.684,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 65.7302,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 30,
+      "sqlTransactions": 11
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 17.4795,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 17.7989,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 17.9501,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 20.204,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "postgresql",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 23.3112,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 5,
+      "sqlTransactions": 5
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 33.1913,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 12.6869,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.8487,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 14.571,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.0141,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 1,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 12.5366,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 19.1627,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.6364,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.3391,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.9448,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.5393,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 4,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 12.8502,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cold-election-and-cleanup",
+      "elapsedMs": 16.981,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "statistics",
+      "queries": 1
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 12.9564,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.4258,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 16.1601,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 13.2262,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    },
+    {
+      "authority": "redis",
+      "replicas": 16,
+      "scenario": "cached-holder-cleanup",
+      "elapsedMs": 14.6316,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0,
+      "sqlTransactions": 0
+    }
+  ]
+}

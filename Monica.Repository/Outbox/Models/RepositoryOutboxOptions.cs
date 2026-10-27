@@ -12,6 +12,14 @@ public sealed class RepositoryOutboxOptions
     /// <summary>Maintenance coordination: 30-second grant, five-second standby/operation bounds. Delivery claims remain independent.</summary>
     public LeaseCoordinatorOptions MaintenanceLease { get; set; } = new();
 
+    /// <summary>
+    /// Optional keyed authority for duplicate-tolerant cleanup and statistics. Null uses the local database's
+    /// transaction-fenced leases. An external store (for example Redis) suppresses redundant work without a SQL
+    /// lease-row guard; retention predicates still protect pending/recent messages. Scope must identify this database.
+    /// All replicas sharing a physical Outbox table must select the same authority and scope.
+    /// </summary>
+    public LeaseStoreSelection? MaintenanceLeaseStore { get; set; }
+
     /// <summary>Claim duration, five minutes by default. Configure above the transport's normal send timeout.</summary>
     public TimeSpan DeliveryLease { get; set; } = TimeSpan.FromMinutes(5);
 

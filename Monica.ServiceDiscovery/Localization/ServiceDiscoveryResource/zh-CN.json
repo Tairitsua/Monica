@@ -58,7 +58,7 @@
       "AppName": "应用名称",
       "AssemblyVersion": "程序集版本",
       "BuildTime": "构建时间",
-      "CurrentETag": "当前 ETag",
+      "CurrentTermId": "当前任期",
       "CurrentStatus": "当前状态",
       "InstanceId": "实例 ID",
       "LastHeartbeat": "最后心跳",
@@ -275,15 +275,13 @@
         "HeartbeatPeriodHelper": "实例定期发送心跳的间隔",
         "HeartbeatPeriodSeconds": "心跳周期 (秒)",
         "InstanceTtl": "实例 TTL",
-        "IsolationHandlingHelper": "网络隔离时的处理策略",
-        "IsolationHandlingMode": "孤立处理模式",
         "LeaderTtl": "Leader TTL",
         "Multiplier": "倍率",
         "HostRole": "主机角色",
         "StateStoreMode": "状态存储模式"
       },
       "Messages": {
-        "StateTransition": "状态转换: 心跳成功 → 正常运行 | 心跳失败 → Polly 重试策略 → 重试耗尽 → 释放 Leader → 触发孤立处理"
+        "StateTransition": "成员心跳与租约续租独立运行。心跳重试耗尽后停止续租并取消 Leader 工作；宿主继续运行。"
       },
       "Sections": {
         "ElectionConfig": "选举配置",
@@ -291,10 +289,8 @@
         "TtlConfig": "TTL 配置"
       },
       "Values": {
-        "ContinueRunning": "继续运行（降级模式）",
         "DistributedStorage": "分布式状态存储",
         "ExternalKeyedStorage": "外部键控状态存储",
-        "FastShutdown": "快速下线",
         "MemoryStorage": "进程内内存状态存储",
         "RegistryRole": "注册中心控制平面",
         "StandaloneRole": "独立控制平面与工作节点",
@@ -316,7 +312,7 @@
       },
       "Fields": {
         "BecameLeaderAt": "成为 Leader 时间:",
-        "CurrentETag": "当前 ETag:"
+        "CurrentTermId": "当前任期:"
       },
       "Sections": {
         "CurrentStatus": "当前选举状态",
@@ -324,7 +320,7 @@
         "Management": "Leader 管理操作"
       },
       "Tooltips": {
-        "CurrentETag": "用于乐观锁的版本标识"
+        "CurrentTermId": "每次获取租约的唯一标识，续租保持不变"
       },
       "Warnings": {
         "ForceDeleteLeader": "强制删除 Leader 将导致当前 Leader 实例丢失 Leader 状态，并触发新一轮选举。此操作主要用于开发测试 Leader 变更场景。"
@@ -483,7 +479,7 @@
     "HeartbeatAgeSeconds": "{0:N0} 秒",
     "BuildIdentity": "构建身份",
     "LocalElectionScope": "本地选举状态属于查询主机，与提供程序中应用当前的领导租约分别记录。",
-    "LeaseScope": "快照时提供程序中的应用租约；续约可能更新其报告的领导时间。",
+    "LeaseScope": "快照时提供程序中的应用租约；续约保持本次任期的获取时间不变。",
     "NoLeaderLease": "成功读取提供程序时未发现领导租约。",
     "MetadataScope": "此主机在快照时提供的元数据。",
     "NoCurrentHostCapture": "尚无当前主机快照",
@@ -496,8 +492,7 @@
     "ObservedDisappearance": "观察到消失",
     "DisappearanceObservedAt": "观察到消失的时间",
     "ConfigurationScope": "这些设置属于查询主机，并在检查器打开时读取；它们不代表所选远程服务的配置。",
-    "IsolationBehaviorCaveat": "当前 FastShutdown 实现记录隔离并撤销本地领导身份，不会停止主机。",
-    "ForceDeleteScope": "删除应用 {0} 当前的领导键；成员注册保持不变，主机可能在下一次心跳时重新获取租约。",
+    "ForceDeleteScope": "撤销应用 {0} 当前的领导租约；成员注册保持不变，主机可能在下一次选举尝试时获取新任期。",
     "LeaderDeleteCaptureUnchanged": "删除已完成；此固定快照保持不变，请刷新目录以读取新的提供程序证据。",
     "ForceDeleteConfirmation": "是否删除应用 {0} 当前的领导键？即使快照后领导身份发生变化，操作仍针对该应用键。它不会删除注册或停止主机，租约也可能被再次获取。",
     "CatalogUnavailable": "目录证据不可用，请刷新重试；读取失败不能表明此端点不存在。",

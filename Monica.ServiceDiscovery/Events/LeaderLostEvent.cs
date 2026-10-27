@@ -1,3 +1,5 @@
+using Monica.Locker.Leases;
+
 namespace Monica.ServiceDiscovery.Events;
 
 /// <summary>
@@ -36,6 +38,8 @@ public enum LeaderLostReason
 /// </summary>
 public class LeaderLostEvent
 {
+    /// <summary>The ended acquisition; delayed observers must not cancel a later term.</summary>
+    public required LeaseIdentity Identity { get; init; }
     /// <summary>
     /// Application identifier that lost leadership.
     /// </summary>

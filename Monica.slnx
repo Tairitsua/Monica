@@ -50,6 +50,7 @@
     <Project Path="tests/Test.Monica.HealthCheck/Test.Monica.HealthCheck.csproj" />
     <Project Path="tests/Test.Monica.JobScheduler.UI/Test.Monica.JobScheduler.UI.csproj" />
     <Project Path="tests/Test.Monica.JobScheduler/Test.Monica.JobScheduler.csproj" />
+    <Project Path="tests/Test.Monica.Locker.Redis/Test.Monica.Locker.Redis.csproj" />
     <Project Path="tests/Test.Monica.Locker/Test.Monica.Locker.csproj" />
     <Project Path="tests/Test.Monica.Markdown/Test.Monica.Markdown.csproj" />
     <Project Path="tests/Test.Monica.ProjectUnits.CodeAnalysis/Test.Monica.ProjectUnits.CodeAnalysis.csproj" />
@@ -108,6 +109,7 @@
   <Project Path="Monica.JobScheduler.UI/Monica.JobScheduler.UI.csproj" />
   <Project Path="Monica.JobScheduler/Monica.JobScheduler.csproj" />
   <Project Path="Monica.Locker.EfCore/Monica.Locker.EfCore.csproj" />
+  <Project Path="Monica.Locker.Redis/Monica.Locker.Redis.csproj" />
   <Project Path="Monica.Locker/Monica.Locker.csproj" />
   <Project Path="Monica.Logging/Monica.Logging.csproj" />
   <Project Path="Monica.Markdown/Monica.Markdown.csproj" />

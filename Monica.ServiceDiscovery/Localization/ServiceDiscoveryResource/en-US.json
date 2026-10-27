@@ -58,7 +58,7 @@
       "AppName": "App name",
       "AssemblyVersion": "Assembly version",
       "BuildTime": "Build time",
-      "CurrentETag": "Current ETag",
+      "CurrentTermId": "Current term",
       "CurrentStatus": "Current status",
       "InstanceId": "Instance ID",
       "LastHeartbeat": "Last heartbeat",
@@ -275,15 +275,13 @@
         "HeartbeatPeriodHelper": "Interval between instance heartbeats.",
         "HeartbeatPeriodSeconds": "Heartbeat period (sec)",
         "InstanceTtl": "Instance TTL",
-        "IsolationHandlingHelper": "Strategy used when network isolation occurs.",
-        "IsolationHandlingMode": "Isolation handling mode",
         "LeaderTtl": "Leader TTL",
         "Multiplier": "Multiplier",
         "HostRole": "Host role",
         "StateStoreMode": "State store mode"
       },
       "Messages": {
-        "StateTransition": "State transition: heartbeat success → running | heartbeat failure → Polly retry policy → retries exhausted → release leader → trigger isolation handling"
+        "StateTransition": "Membership heartbeats and lease renewal run independently. Exhausted heartbeat retries stop renewal and cancel leader work; the host stays running."
       },
       "Sections": {
         "ElectionConfig": "Election configuration",
@@ -291,10 +289,8 @@
         "TtlConfig": "TTL configuration"
       },
       "Values": {
-        "ContinueRunning": "Continue running (degraded mode)",
         "DistributedStorage": "Distributed state store",
         "ExternalKeyedStorage": "External keyed state store",
-        "FastShutdown": "Fast shutdown",
         "MemoryStorage": "Process-local memory state store",
         "RegistryRole": "Registry control plane",
         "StandaloneRole": "Standalone control plane and worker",
@@ -316,7 +312,7 @@
       },
       "Fields": {
         "BecameLeaderAt": "Became leader at:",
-        "CurrentETag": "Current ETag:"
+        "CurrentTermId": "Current term:"
       },
       "Sections": {
         "CurrentStatus": "Current election status",
@@ -324,7 +320,7 @@
         "Management": "Leader management"
       },
       "Tooltips": {
-        "CurrentETag": "Version identifier used for optimistic concurrency."
+        "CurrentTermId": "Unique acquisition identifier; renewal retains it."
       },
       "Warnings": {
         "ForceDeleteLeader": "Force deleting the leader will remove the current leader status from the leader instance and trigger a new election. This action is mainly intended for development and testing scenarios."
@@ -483,7 +479,7 @@
     "HeartbeatAgeSeconds": "{0:N0} seconds",
     "BuildIdentity": "Build identity",
     "LocalElectionScope": "Local election state belongs to the querying host. It is independent of the provider’s current application leader lease.",
-    "LeaseScope": "Provider lease for this application at capture time. Its reported leader time can advance during renewal.",
+    "LeaseScope": "Provider lease for this application at capture time. Acquisition time remains unchanged during renewal.",
     "NoLeaderLease": "No leader lease was present in the successful provider read.",
     "MetadataScope": "Metadata exposed by this host at capture time.",
     "NoCurrentHostCapture": "No current host capture yet",
@@ -496,8 +492,7 @@
     "ObservedDisappearance": "Observed disappearance",
     "DisappearanceObservedAt": "Disappearance observed at",
     "ConfigurationScope": "These settings belong to the querying host and were captured when the inspector opened. They do not describe the selected remote service’s configuration.",
-    "IsolationBehaviorCaveat": "The current FastShutdown implementation logs isolation and revokes local leadership; it does not stop the host.",
-    "ForceDeleteScope": "Delete the current leader key for application {0}. Membership remains registered, and a host may acquire the lease again on its next heartbeat.",
+    "ForceDeleteScope": "Revoke the current leader lease for application {0}. Membership remains registered, and a host may acquire a new term on its next election attempt.",
     "LeaderDeleteCaptureUnchanged": "The delete completed. This frozen capture remains unchanged; refresh the directory for new provider evidence.",
     "ForceDeleteConfirmation": "Delete the current leader key for application {0}? This targets the application key even if leadership changed since capture. It does not remove registrations or stop a host, and the lease may be acquired again.",
     "CatalogUnavailable": "Catalog evidence is unavailable. Refresh to retry; a failed read does not establish that this endpoint is absent.",

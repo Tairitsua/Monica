@@ -32,7 +32,8 @@ internal sealed class JobSchedulingHostedService(
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     IServiceScopeFactory serviceScopeFactory,
     ILogger<JobSchedulingHostedService> logger,
-    ITypeActivationPolicy? activation = null)
+    ITypeActivationPolicy? activation = null,
+    HistoryCleanupLeaseStore? historyCleanupLeases = null)
     : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
 {
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
@@ -41,14 +42,11 @@ internal sealed class JobSchedulingHostedService(
         .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
         .ToArray();
     private readonly LeaseCoordinator _coordinators = new(store.CoordinatorLeases,
-        schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, new LeaseCoordinatorOptions
-        {
-            Duration = schedulerOptions.Value.CoordinatorLeaseDuration,
-            StandbyInterval = schedulerOptions.Value.SchedulingPollInterval,
-            OperationTimeout = TimeSpan.FromTicks(Math.Min(schedulerOptions.Value.StoreOperationTimeout.Ticks,
-                schedulerOptions.Value.CoordinatorLeaseDuration.Ticks / 4))
-        });
+        schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, CoordinatorOptions(schedulerOptions.Value));
     private readonly Dictionary<string, DateTimeOffset> _nextSnapshotSyncUtc = new(StringComparer.Ordinal);
+    private readonly LeaseCoordinator? _historyCoordinator = historyCleanupLeases is null ? null : new(
+        historyCleanupLeases.Store, schedulerOptions.Value.WorkerInstanceId, timeProvider, logger,
+        CoordinatorOptions(schedulerOptions.Value));
     private readonly Dictionary<string, string> _synchronizedGrants = new(StringComparer.Ordinal);
     private readonly object _readinessLock = new();
     private readonly Dictionary<string, bool> _readyPlanes = new()
@@ -57,6 +55,12 @@ internal sealed class JobSchedulingHostedService(
     private DateTimeOffset _nextCleanupUtc;
     private int _nextMaterializationOwnerIndex;
     private bool _manualCatalogInitialized;
+
+    private static LeaseCoordinatorOptions CoordinatorOptions(ModuleJobSchedulerOption options) => new()
+    {
+        Duration = options.CoordinatorLeaseDuration, StandbyInterval = options.SchedulingPollInterval,
+        OperationTimeout = TimeSpan.FromTicks(Math.Min(options.StoreOperationTimeout.Ticks, options.CoordinatorLeaseDuration.Ticks / 4))
+    };
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
 
@@ -73,12 +77,17 @@ internal sealed class JobSchedulingHostedService(
                     RunLoopAsync("lease recovery", RecoverAsync, stoppingToken),
                     RunLoopAsync("history cleanup", CleanupHistoryAsync, stoppingToken));
         }
-        finally { await _coordinators.DisposeAsync(); }
+        finally
+        {
+            if (_historyCoordinator is not null) await _historyCoordinator.DisposeAsync();
+            await _coordinators.DisposeAsync();
+        }
     }
 
     public override void Dispose()
     {
         _coordinators.Dispose();
+        _historyCoordinator?.Dispose();
         base.Dispose();
     }
 
@@ -294,11 +303,14 @@ internal sealed class JobSchedulingHostedService(
     {
         var now = timeProvider.GetUtcNow();
         if (!_options.AutonomousWork || !_options.EnableHistoryCleanup || now < _nextCleanupUtc) return;
-        var context = await GetCoordinatorAsync("maintenance", cancellationToken);
+        var context = _historyCoordinator is null
+            ? await GetCoordinatorAsync("maintenance", cancellationToken)
+            : await _historyCoordinator.GetAsync(new LeaseResource(_options.HistoryCleanupLeaseStore!.Scope,
+                $"jobscheduler:history:{_options.SchedulerScopeKey}"), cancellationToken);
         if (context is null) return;
         using var term = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.StoppingToken);
         cancellationToken = term.Token;
-        var lease = JobCoordinatorLeaseAdapter.ToKey(context.Identity);
+        var lease = _historyCoordinator is null ? JobCoordinatorLeaseAdapter.ToKey(context.Identity) : null;
         var result = await store.CleanupHistoryAsync(new JobHistoryCleanupRequest
         {
             SchedulerScopeKey = _options.SchedulerScopeKey, CoordinatorLease = lease,

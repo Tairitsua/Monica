@@ -25,9 +25,6 @@ public sealed class ApplicationIdentityCompositionTests
         Assert.Empty(await manager.GetAllInstancesAsync(token));
         Assert.Equal(3, (await app.Services.GetRequiredService<IServiceDiscoveryCatalogProvider>().GetPreloadedServicesAsync()).Count);
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterOrHeartbeatAsync(token));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.TryBecomeLeaderAsync(token));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RenewLeaderLeaseAsync("etag", token));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DeleteLeaderKeyAsync(token));
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.ForceDeleteLeaderKeyAsync("local", token));
         Assert.Empty(await manager.GetAllInstancesAsync(token));
     }

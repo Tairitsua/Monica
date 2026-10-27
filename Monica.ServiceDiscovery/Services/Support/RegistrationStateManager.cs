@@ -6,6 +6,7 @@ using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
 using Monica.StateStore.Abstractions;
 using Monica.Core;
+using Monica.Locker.Leases;
 
 namespace Monica.ServiceDiscovery.Services.Support;
 
@@ -18,13 +19,13 @@ public class RegistrationStateManager(
     ILeaderElectionService leaderElectionService,
     IOptions<ModuleServiceDiscoveryOption> options,
     ILogger<RegistrationStateManager> logger,
+    [FromKeyedServices(nameof(ModuleServiceDiscovery))] IExclusiveLeaseStore leases,
     MonicaApplication? application = null)
     : IRegistrationStateManager
 {
     private readonly ModuleServiceDiscoveryOption _option = options.Value;
 
     private const string REG_PREFIX = "reg:";
-    private const string LEADER_PREFIX = "leader:";
 
     // Cached registration time to avoid unnecessary Get operations on every heartbeat
     private DateTime? _cachedRegistrationTime;
@@ -41,11 +42,6 @@ public class RegistrationStateManager(
     /// </summary>
     private string GetRegistrationKey() =>
         $"{(clientInfo.GetServiceStatus() is { } status ? $"{status.AppId}:{status.InstanceId}" : throw new InvalidOperationException("InstanceId is required"))}";
-
-    /// <summary>
-    /// Get Leader Key
-    /// </summary>
-    private string GetLeaderKey() => clientInfo.GetServiceStatus().AppId;
 
     public async Task<RegistrationResult> RegisterOrHeartbeatAsync(CancellationToken ct = default)
     {
@@ -92,157 +88,31 @@ public class RegistrationStateManager(
         }
     }
 
-    public async Task<bool> LeaderExistsAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            var leaderKey = GetLeaderKey();
-            return await stateStore.ExistAsync(LEADER_PREFIX + leaderKey, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to determine whether the leader key exists.");
-            return false;
-        }
-    }
+    public async Task<bool> LeaderExistsAsync(CancellationToken ct = default) =>
+        await GetLeaderStateAsync(ct) is not null;
 
     public async Task<LeaderState?> GetLeaderStateAsync(CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        try
+        var appId = clientInfo.GetServiceStatus().AppId;
+        var resource = LeaderElectionService.Resource(_option, appId);
+        var snapshot = await leases.GetSnapshotAsync(resource.Scope, resource.Name, ct);
+        var leader = snapshot.Leases.SingleOrDefault(row => row.Resource == resource
+            && row.ExpiresAtUtc > snapshot.ObservedAtUtc);
+        return leader is null ? null : new LeaderState
         {
-            var leaderKey = GetLeaderKey();
-            var state = await stateStore.GetStateAsync<LeaderState>(LEADER_PREFIX + leaderKey, ct);
-            ct.ThrowIfCancellationRequested();
-            return state;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get the leader state.");
-            throw;
-        }
-    }
-
-    public async Task<(bool Success, LeaderState? State, string? ETag)> TryBecomeLeaderAsync(CancellationToken ct = default)
-    {
-        EnsureParticipation();
-        try
-        {
-            var leaderKey = GetLeaderKey();
-            var now = DateTime.UtcNow;
-            var serviceStatus = clientInfo.GetServiceStatus();
-
-            var leaderState = new LeaderState
-            {
-                InstanceId = serviceStatus.InstanceId,
-                BecomeLeaderTime = now,
-                AppId = serviceStatus.AppId
-            };
-
-            // Try to save only if Key does not exist
-            var success = await stateStore.TrySaveStateIfNotExistsAsync(
-                LEADER_PREFIX + leaderKey,
-                leaderState,
-                ct,
-                _option.Election.LeaderTTL);
-
-            if (success)
-            {
-                // Get ETag
-                var (_, eTag) = await stateStore.GetStateAndETagAsync<LeaderState>(LEADER_PREFIX + leaderKey, ct);
-                logger.LogInformation("Instance {InstanceId} acquired leadership.", serviceStatus.InstanceId);
-                return (true, leaderState, eTag);
-            }
-
-            logger.LogDebug("Leadership was not acquired because the leader key already exists.");
-            return (false, null, null);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to acquire leadership.");
-            return (false, null, null);
-        }
-    }
-
-    public async Task<(bool Success, string? NewETag, LeaderState? ActualState, string? ActualETag)> RenewLeaderLeaseAsync(string expectedETag, CancellationToken ct = default)
-    {
-        EnsureParticipation();
-        try
-        {
-            var leaderKey = GetLeaderKey();
-            var now = DateTime.UtcNow;
-            var serviceStatus = clientInfo.GetServiceStatus();
-
-            var leaderState = new LeaderState
-            {
-                InstanceId = serviceStatus.InstanceId,
-                BecomeLeaderTime = now,
-                AppId = serviceStatus.AppId
-            };
-
-            var (success, newETag) = await stateStore.TrySaveStateWithETagAsync(
-                LEADER_PREFIX + leaderKey,
-                leaderState,
-                expectedETag,
-                ct,
-                _option.Election.LeaderTTL);
-
-            if (success)
-            {
-                logger.LogDebug("Leader lease renewed with ETag {ETag}.", newETag);
-                return (true, newETag, null, null);
-            }
-
-            var (actualState, actualETag) = await stateStore.GetStateAndETagAsync<LeaderState>(LEADER_PREFIX + leaderKey, ct);
-            if (actualState is not null)
-            {
-                logger.LogWarning(
-                    "Leader lease renewal failed because the ETag did not match. Expected ETag: {ExpectedETag}; actual ETag: {ActualETag}.",
-                    expectedETag,
-                    actualETag);
-            }
-            else
-            {
-                logger.LogWarning("Leader lease renewal failed because no leader state was found.");
-            }
-
-            return (false, null, actualState, actualETag);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Leader lease renewal failed unexpectedly.");
-            return (false, null, null, null);
-        }
-    }
-
-    public async Task DeleteLeaderKeyAsync(CancellationToken ct = default)
-    {
-        EnsureParticipation();
-        try
-        {
-            var leaderKey = GetLeaderKey();
-            await stateStore.DeleteStateAsync(LEADER_PREFIX + leaderKey, ct);
-            logger.LogInformation("Deleted leader key {LeaderKey}.", leaderKey);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to delete the leader key.");
-        }
+            AppId = appId, InstanceId = leader.HolderId, BecomeLeaderTime = leader.AcquiredAtUtc.UtcDateTime
+        };
     }
 
     public async Task ForceDeleteLeaderKeyAsync(string appId, CancellationToken ct = default)
     {
         EnsureParticipation();
-        try
-        {
-            await stateStore.DeleteStateAsync(LEADER_PREFIX + appId, ct);
-            logger.LogInformation("Force-deleted the leader key for application {AppId}.", appId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to force-delete the leader key for application {AppId}.", appId);
-            throw;
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        if (leases is not ILeaseAdministration administration)
+            throw new NotSupportedException("The selected lease authority does not support administrative revocation.");
+        await administration.RevokeAsync(LeaderElectionService.Resource(_option, appId), ct);
+        if (appId == clientInfo.GetServiceStatus().AppId)
+            leaderElectionService.TriggerLeaderLost(Monica.ServiceDiscovery.Events.LeaderLostReason.LeaderKeyExpired);
     }
 
     public async Task<List<InstanceState>> GetAllInstancesAsync(CancellationToken ct = default)
@@ -280,47 +150,13 @@ public class RegistrationStateManager(
 
     public async Task<List<InstanceState>> GetAllLeaderInstancesAsync(CancellationToken ct = default)
     {
-        try
-        {
-            // Step 1: Use glob pattern to scan all keys under the leader prefix
-            var leaderKeys = await stateStore.ScanKeysAsync(LEADER_PREFIX + "*", ct);
-
-            if (leaderKeys.Count == 0)
-            {
-                logger.LogDebug("No leader instances were found.");
-                return [];
-            }
-
-            // Step 2: Get all LeaderState in batches
-            var leaderStates = await stateStore.GetBulkStateAsync<LeaderState>(
-                leaderKeys,
-                removeEmptyValue: true,
-                cancellationToken: ct);
-
-            // Step 3: Build the key list of InstanceState
-            var instanceKeys = leaderStates.Values
-                .Where(ls => ls != null && !string.IsNullOrEmpty(ls.AppId))
-                .Select(ls => REG_PREFIX + $"{ls!.AppId}:{ls.InstanceId}")
-                .ToList();
-
-            if (instanceKeys.Count == 0)
-            {
-                logger.LogDebug("No valid leader instance keys were found.");
-                return [];
-            }
-
-            // Step 4: Get the InstanceState of all Leaders in batches
-            var instances = await stateStore.GetBulkStateAsync<InstanceState>(
-                instanceKeys,
-                removeEmptyValue: true,
-                cancellationToken: ct);
-
-            return instances.Values.Where(x => x != null).ToList()!;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to retrieve leader instances.");
-            return [];
-        }
+        var scope = _option.LeaderLeaseStore?.Scope ?? "service-discovery";
+        var snapshot = await leases.GetSnapshotAsync(scope, LeaderElectionService.RESOURCE_PREFIX, ct);
+        var keys = snapshot.Leases.Where(row => row.ExpiresAtUtc > snapshot.ObservedAtUtc)
+            .Select(row => REG_PREFIX + row.Resource.Name[LeaderElectionService.RESOURCE_PREFIX.Length..]
+                + ":" + row.HolderId).ToList();
+        if (keys.Count == 0) return [];
+        var instances = await stateStore.GetBulkStateAsync<InstanceState>(keys, removeEmptyValue: true, cancellationToken: ct);
+        return instances.Values.Where(instance => instance is not null).ToList()!;
     }
 }

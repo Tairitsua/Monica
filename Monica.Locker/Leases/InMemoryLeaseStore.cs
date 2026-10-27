@@ -3,7 +3,8 @@ namespace Monica.Locker.Leases;
 /// <summary>Implements the lease protocol within one process; it never coordinates independent hosts.</summary>
 /// <param name="timeProvider">Clock used for expiration, including deterministic test clocks.</param>
 /// <param name="synchronizationRoot">Optional owner lock shared with protected in-memory state transitions.</param>
-public sealed class InMemoryLeaseStore(TimeProvider timeProvider, object? synchronizationRoot = null) : IExclusiveLeaseStore
+public sealed class InMemoryLeaseStore(TimeProvider timeProvider, object? synchronizationRoot = null)
+    : IExclusiveLeaseStore, ILeaseAdministration
 {
     private readonly object _gate = synchronizationRoot ?? new object();
     private readonly Dictionary<LeaseResource, (LeaseGrant Grant, DateTimeOffset Acquired)> _leases = [];
@@ -50,6 +51,13 @@ public sealed class InMemoryLeaseStore(TimeProvider timeProvider, object? synchr
         lock (_gate)
             return Task.FromResult(_leases.TryGetValue(identity.Resource, out var current)
                 && current.Grant.Identity == identity && _leases.Remove(identity.Resource));
+    }
+
+    /// <inheritdoc />
+    public Task<bool> RevokeAsync(LeaseResource resource, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate) return Task.FromResult(_leases.Remove(resource));
     }
 
     /// <summary>Checks ownership while the caller holds the shared synchronization root through its entire mutation.</summary>

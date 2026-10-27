@@ -34,12 +34,15 @@ internal sealed class ExternalSchedulerStoreFixture : IAsyncDisposable
 
     internal ExternalSchedulerDatabase Database { get; }
 
-    internal static async Task<ExternalSchedulerStoreFixture> CreateAsync(
+    internal static Task<ExternalSchedulerStoreFixture> CreateAsync(
         string provider,
         CancellationToken cancellationToken,
-        params IInterceptor[] interceptors)
+        params IInterceptor[] interceptors) => CreateWithPoolAsync(provider, cancellationToken, 3, interceptors);
+
+    internal static async Task<ExternalSchedulerStoreFixture> CreateWithPoolAsync(
+        string provider, CancellationToken cancellationToken, int maximumPoolSize, params IInterceptor[] interceptors)
     {
-        var database = await ExternalSchedulerDatabase.CreateAsync(provider, cancellationToken);
+        var database = await ExternalSchedulerDatabase.CreateAsync(provider, cancellationToken, maximumPoolSize);
         IHost? host = null;
         try
         {

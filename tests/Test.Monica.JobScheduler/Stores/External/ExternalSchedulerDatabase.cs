@@ -52,8 +52,9 @@ internal sealed class ExternalSchedulerDatabase : IAsyncDisposable
 
     internal static async Task<ExternalSchedulerDatabase> CreateAsync(
         string provider,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, int maximumPoolSize = 3)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumPoolSize, 1);
         var variableName = provider switch
         {
             POSTGRES => "MONICA_JOBSCHEDULER_TEST_POSTGRES",
@@ -100,7 +101,7 @@ internal sealed class ExternalSchedulerDatabase : IAsyncDisposable
             options["Database"] = databaseName;
             options["Pooling"] = true;
             options["Minimum Pool Size"] = 0;
-            options["Maximum Pool Size"] = 3;
+            options["Maximum Pool Size"] = maximumPoolSize;
             database = new ExternalSchedulerDatabase(
                 provider, admin, options.ConnectionString, databaseName, serverVersion);
             await command.ExecuteNonQueryAsync(cancellationToken);

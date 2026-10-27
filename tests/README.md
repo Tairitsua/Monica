@@ -143,3 +143,23 @@ For coverage:
 ```bash
 pwsh.exe -File 'D:\Code\MoLibrary\scripts\run-tests.ps1' -NoBuild --collect:"XPlat Code Coverage"
 ```
+
+
+### Redis leases and maintenance authority comparison
+
+Set `MONICA_LEASE_TEST_REDIS` to a disposable Redis endpoint (for example `127.0.0.1:<owned-port>`). The Redis contract suite uses unique key namespaces; normal grants expire or are conditionally released. The discovery suite also composes two real hosts against that authority. Do not point native mutation/revocation tests at an application Redis instance.
+
+```powershell
+dotnet test tests/Test.Monica.Locker.Redis/Test.Monica.Locker.Redis.csproj -c Release --no-build
+dotnet test tests/Test.Monica.ServiceDiscovery/Test.Monica.ServiceDiscovery.csproj -c Release --no-build
+
+$env:MONICA_REDIS_LEASE_PERF_OUTPUT = 'C:/test-results/coordinator.json'
+$env:MONICA_ADVISORY_OUTBOX_PERF_OUTPUT = 'C:/test-results/outbox.json'
+dotnet test tests/Test.Monica.JobScheduler/Test.Monica.JobScheduler.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeAuthorities_ShouldRecord|FullyQualifiedName~MaintenanceAuthorities_ShouldCompare'
+```
+
+The comparison also requires `MONICA_JOBSCHEDULER_TEST_POSTGRES` as above. Coordinator scenarios use 1/4/16 independent stores and Redis connections, 100 operations per replica, and both three-connection and sixteen-connection PostgreSQL pools. The latter writes a `.pool16.json` sibling. SQL interceptors and the Redis client profiler count actual commands. These paths use the same shared lease protocol, without a StateStore serialization adapter.
+
+Outbox scenarios use real hosts, real authority/elapsed clocks, 4,000 expired and 12,000 recent acknowledgments with 512-byte payloads. Only maintenance cadence is triggered manually. The fixture truncates/reseeds its owned table and refreshes statistics between samples, outside measured intervals. It records first election plus cleanup and five cached-holder cleanup passes, checks one status query across replicas, and preserves all recent rows. Standby traffic is measured separately in the coordinator workload. Cleanup uses the production two-second pass budget and five-second operation deadline. A separate native test revokes Redis while a DELETE is in flight, verifies safe overlapping cleanup, and then delivers the preserved pending message.
+
+These measurements do not establish Redis failover exclusivity, WAN latency, production throughput or deployment sizing. See [Redis lease measurements](performance/redis-leases-2026-10-28/README.md) for conditions and raw results.

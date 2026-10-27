@@ -7,26 +7,26 @@ using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
-using Monica.ServiceDiscovery.Events;
+using Monica.ServiceDiscovery.Services.Support;
 using Polly;
 using Polly.Registry;
 
 namespace Monica.ServiceDiscovery.Services;
 
 /// <summary>
-/// StateStore-based service discovery client service.
-/// Implements heartbeat, leader election using Polly resilience pipelines.
+/// Publishes StateStore membership through a retry pipeline and runs independent lease leadership supervision.
 /// </summary>
 public class ServiceDiscoveryClientHostedService(
     IRegistrationStateManager stateManager,
-    ILeaderElectionService leaderService,
+    LeaderElectionService leaderService,
     IServiceDiscoveryClientInfo clientInfo,
     IOptions<ModuleServiceDiscoveryOption> option,
     IObservableInstanceRegistry observableManager,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     ResiliencePipelineProvider<string> pipelineProvider,
     IServiceScopeFactory serviceScopeFactory,
-    ILogger<ServiceDiscoveryClientHostedService> logger)
+    ILogger<ServiceDiscoveryClientHostedService> logger,
+    TimeProvider timeProvider)
     : MoBackgroundService(observableManager, hostedServiceOptions, serviceScopeFactory, logger), IServiceRegistrationCoordinator
 {
     private readonly ModuleServiceDiscoveryOption _option = option.Value;
@@ -61,6 +61,20 @@ public class ServiceDiscoveryClientHostedService(
 
     protected override async Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
     {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var heartbeat = RunHeartbeatAsync(lifetime.Token);
+        var election = _option.Role == ServiceDiscoveryRole.Worker
+            ? Task.Delay(Timeout.Infinite, lifetime.Token) : leaderService.RunAsync(lifetime.Token);
+        try { await await Task.WhenAny(heartbeat, election); }
+        finally
+        {
+            await lifetime.CancelAsync();
+            await Task.WhenAll(heartbeat, election);
+        }
+    }
+
+    private async Task RunHeartbeatAsync(CancellationToken stoppingToken)
+    {
         RecordState("Starting StateStore heartbeat loop", HostedServiceState.Starting);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -86,7 +100,7 @@ public class ServiceDiscoveryClientHostedService(
 
             try
             {
-                await Task.Delay(delay, stoppingToken);
+                await Task.Delay(delay, timeProvider, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -94,21 +108,6 @@ public class ServiceDiscoveryClientHostedService(
             }
         }
 
-        // Graceful shutdown - trigger LeaderLost if we're the Leader
-        if (leaderService.IsLeader)
-        {
-            RecordState("Service shutting down, triggering Leader lost", logLevel: LogLevel.Information);
-            leaderService.TriggerLeaderLost(LeaderLostReason.GracefulShutdown);
-
-            try
-            {
-                await stateManager.DeleteLeaderKeyAsync(CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                RecordState("Failed to delete Leader key", exception: ex, logLevel: LogLevel.Warning);
-            }
-        }
     }
 
     /// <summary>
@@ -137,19 +136,19 @@ public class ServiceDiscoveryClientHostedService(
                 clientInfo.UpdateLastHeartbeatTime(result.HeartbeatTime.Value);
             }
 
-            await HandleSuccessfulHeartbeatAsync(ct);
+            HandleSuccessfulHeartbeat();
         }
         catch (HeartbeatFailedException ex)
         {
             // All retries exhausted - handle persistent failure
-            await HandlePersistentHeartbeatFailureAsync(ex.Message, ct);
+            HandlePersistentHeartbeatFailure(ex.Message);
         }
     }
 
     /// <summary>
     /// Handle successful heartbeat
     /// </summary>
-    private async Task HandleSuccessfulHeartbeatAsync(CancellationToken ct)
+    private void HandleSuccessfulHeartbeat()
     {
         // Reset consecutive failures on success
         _consecutiveFailures = 0;
@@ -162,156 +161,19 @@ public class ServiceDiscoveryClientHostedService(
 
         RecordState("Heartbeat successful", HostedServiceState.Running);
 
-        // Check or maintain Leader status
-        await CheckOrMaintainLeaderAsync(ct);
+        leaderService.SetRegistrationAvailable(true);
     }
 
     /// <summary>
     /// Handle persistent heartbeat failure (after all retries exhausted)
     /// </summary>
-    private async Task HandlePersistentHeartbeatFailureAsync(string? errorMessage, CancellationToken ct)
+    private void HandlePersistentHeartbeatFailure(string? errorMessage)
     {
         _consecutiveFailures++;
         RecordState($"Heartbeat failed after retries: {errorMessage}, consecutive failures: {_consecutiveFailures}", HostedServiceState.Degraded);
 
-        // If we're the Leader and heartbeat consistently fails, we should give up leadership
-        if (leaderService.IsLeader)
-        {
-            RecordState("Leader heartbeat failed after retries, giving up leadership", logLevel: LogLevel.Warning);
-            leaderService.TriggerLeaderLost(LeaderLostReason.NetworkIsolation);
+        leaderService.SetRegistrationAvailable(false);
 
-            // Handle based on isolation mode
-            if (_option.IsolationHandlingMode == EIsolationHandlingMode.FastShutdown)
-            {
-                RecordState("Isolation handling mode is FastShutdown, triggering service isolation event", logLevel: LogLevel.Warning);
-            }
-        }
-
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Check or maintain Leader status
-    /// </summary>
-    private async Task CheckOrMaintainLeaderAsync(CancellationToken ct)
-    {
-        // Worker hosts publish heartbeats but never compete for application control-plane leadership.
-        if (_option.Role == ServiceDiscoveryRole.Worker)
-        {
-            return;
-        }
-
-        if (!leaderService.IsLeader)
-        {
-            // Not currently Leader, check if we should compete
-            var leaderExists = await stateManager.LeaderExistsAsync(ct);
-            if (!leaderExists)
-            {
-                await CompeteForLeaderAsync(ct);
-            }
-            else
-            {
-                RecordState("Leader exists, staying as Follower", logLevel: LogLevel.Debug);
-            }
-        }
-        else
-        {
-            // Currently Leader, renew lease
-            await RenewLeaderLeaseAsync(ct);
-        }
-    }
-
-    /// <summary>
-    /// Compete to become Leader
-    /// </summary>
-    private async Task CompeteForLeaderAsync(CancellationToken ct)
-    {
-        RecordState("Attempting to compete for Leader", logLevel: LogLevel.Debug);
-
-        if (!await TryAcquireLeaderLeaseAsync(ct))
-        {
-            RecordState("Leader competition failed, another instance may have become Leader", logLevel: LogLevel.Debug);
-        }
-    }
-
-    /// <summary>
-    /// Attempts to acquire a fresh leader lease without emitting a LeaderLost/LeaderGained pair.
-    /// Used both for follower competition and same-heartbeat inline recovery after lease expiration.
-    /// </summary>
-    private async Task<bool> TryAcquireLeaderLeaseAsync(CancellationToken ct)
-    {
-        var (success, state, eTag) = await stateManager.TryBecomeLeaderAsync(ct);
-
-        if (!success || state == null || string.IsNullOrEmpty(eTag))
-        {
-            return false;
-        }
-
-        if (leaderService.IsLeader)
-        {
-            leaderService.UpdateETag(eTag);
-            RecordState(
-                "Leader lease expired but was reacquired within the same heartbeat, continuing as Leader",
-                logLevel: LogLevel.Warning);
-            return true;
-        }
-
-        leaderService.SetAsLeader(state.BecomeLeaderTime, eTag);
-        RecordState("Successfully became Leader", HostedServiceState.Running);
-        return true;
-    }
-
-    /// <summary>
-    /// Renew Leader lease
-    /// </summary>
-    private async Task RenewLeaderLeaseAsync(CancellationToken ct)
-    {
-        var currentETag = leaderService.CurrentETag;
-        if (string.IsNullOrEmpty(currentETag))
-        {
-            RecordState("Cannot renew Leader: ETag is empty", logLevel: LogLevel.Warning);
-            leaderService.TriggerLeaderLost(LeaderLostReason.NetworkIsolation);
-            return;
-        }
-
-        var (success, newETag, actualState, actualETag) = await stateManager.RenewLeaderLeaseAsync(currentETag, ct);
-
-        if (success && !string.IsNullOrEmpty(newETag))
-        {
-            leaderService.UpdateETag(newETag);
-            RecordState("Leader lease renewed successfully", logLevel: LogLevel.Debug);
-            return;
-        }
-
-        var currentInstanceId = clientInfo.GetServiceStatus().InstanceId;
-
-        if (actualState != null)
-        {
-            if (actualState.InstanceId != currentInstanceId)
-            {
-                // Another instance became Leader
-                leaderService.TriggerLeaderLost(LeaderLostReason.LeaderKeyTakenByOther);
-                RecordState($"Leader taken by another instance ({actualState.InstanceId})", HostedServiceState.Running);
-            }
-            else
-            {
-                // We're still Leader but ETag is stale - refresh
-                RecordState($"ETag mismatch but still Leader, refreshing ETag: {currentETag} -> {actualETag}", logLevel: LogLevel.Information);
-                leaderService.UpdateETag(actualETag!);
-            }
-        }
-        else
-        {
-            RecordState("Leader key expired or deleted, attempting inline leader recovery", logLevel: LogLevel.Warning);
-
-            if (await TryAcquireLeaderLeaseAsync(ct))
-            {
-                return;
-            }
-
-            RecordState("Leader key expired and inline recovery failed, leadership lost", logLevel: LogLevel.Warning);
-            leaderService.TriggerLeaderLost(LeaderLostReason.LeaderKeyExpired);
-        }
     }
 
     /// <summary>

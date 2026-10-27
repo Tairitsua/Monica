@@ -21,6 +21,7 @@ using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.Providers;
 using Monica.JobScheduler.Services;
 using Monica.JobScheduler.Services.Support;
+using Monica.Locker.Leases;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -248,6 +249,9 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         services.AddSingleton<JobOrchestrator>();
         services.AddSingleton<ITriggeredJobManager, TriggeredJobManager>();
         services.AddSingleton<JobSchedulerFacade>();
+        if (Option.AutonomousWork && Option.HistoryCleanupLeaseStore is { } cleanupSelection)
+            services.AddSingleton(provider => new HistoryCleanupLeaseStore(
+                provider.GetRequiredKeyedService<IExclusiveLeaseStore>(cleanupSelection.ServiceKey)));
         services.AddSingleton<JobSchedulingHostedService>();
         services.AddSingleton<JobExecutionWorkerHostedService>();
         services.AddHostedService(static provider => provider.GetRequiredService<JobSchedulingHostedService>());
@@ -288,6 +292,8 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
     public override void DeclareContracts(ModuleContractDescriptor<ModuleJobSchedulerOption> contracts)
     {
         contracts.RequireService<IJobSchedulerStore>();
+        if (contracts.Options.AutonomousWork && contracts.Options.HistoryCleanupLeaseStore is { } cleanupSelection)
+            contracts.RequireKeyedService<IExclusiveLeaseStore>(cleanupSelection.ServiceKey);
     }
 
     private LocalJobDefinition CreateLocalDefinition(
@@ -487,6 +493,14 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     /// 30 seconds. Coordinated mutations recheck the grant under its row lock before touching job state.
     /// </summary>
     public TimeSpan CoordinatorLeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Optional keyed authority for duplicate-tolerant terminal-history pruning. Null shares the scheduler store's
+    /// maintenance lease. An external store only coordinates cleanup; owner scheduling and execution recovery
+    /// always retain the scheduler database's transaction guards. Scope must identify the protected database.
+    /// All replicas must use the same selection. Ignored when autonomous work is disabled.
+    /// </summary>
+    public LeaseStoreSelection? HistoryCleanupLeaseStore { get; set; }
 
     /// <summary>
     /// Gets explicit previous-manifest hashes authorized for replacement, indexed by logical owner. Configure this

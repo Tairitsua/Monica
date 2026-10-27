@@ -19,7 +19,7 @@ namespace Monica.Locker.EfCore;
 /// <param name="timeProvider">Clock for SQLite fixtures. Native providers always use their database clock.</param>
 /// <param name="operationTimeout">Whole-call deadline, including lock waits and retry; defaults to five seconds.</param>
 public sealed class RelationalLeaseStore<TContext>(IDbContextFactory<TContext> contextFactory,
-    TimeProvider? timeProvider = null, TimeSpan? operationTimeout = null) : IExclusiveLeaseStore
+    TimeProvider? timeProvider = null, TimeSpan? operationTimeout = null) : IExclusiveLeaseStore, ILeaseAdministration
     where TContext : DbContext
 {
     private const int MAX_ATTEMPTS = 3;
@@ -84,6 +84,12 @@ public sealed class RelationalLeaseStore<TContext>(IDbContextFactory<TContext> c
         ExecuteAsync(async (db, token) => await db.Set<LeaseRecord>()
             .Where(row => row.Scope == identity.Resource.Scope && row.Name == identity.Resource.Name
                 && row.HolderId == identity.HolderId && row.TermId == identity.TermId)
+            .ExecuteDeleteAsync(token) == 1, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> RevokeAsync(LeaseResource resource, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(async (db, token) => await db.Set<LeaseRecord>()
+            .Where(row => row.Scope == resource.Scope && row.Name == resource.Name)
             .ExecuteDeleteAsync(token) == 1, cancellationToken);
 
     /// <summary>Locks and validates a grant in the caller's active protected transaction.</summary>

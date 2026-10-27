@@ -32,14 +32,21 @@ internal sealed record OutboxStoreStatus(int PendingCount, DateTime? OldestPendi
 /// <summary>Claims committed, due messages in one store and conditionally acknowledges successful delivery.</summary>
 public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, TimeProvider time,
     OutboxRegistration<TDbContext> registration, ILogger<OutboxDispatcher<TDbContext>> logger,
-    IDbContextFactory<TDbContext> contextFactory) : IOutboxStore
+    IDbContextFactory<TDbContext> contextFactory, IExclusiveLeaseStore? maintenanceLeaseStore = null) : IOutboxStore
     where TDbContext : RepositoryDbContext<TDbContext>
 {
     private readonly RelationalLeaseStore<TDbContext> _leases = new(contextFactory, time,
         registration.Options.MaintenanceLease.OperationTimeout);
+    private readonly IExclusiveLeaseStore? _maintenanceLeases = (registration.Options.MaintenanceLeaseStore, maintenanceLeaseStore) switch
+    {
+        (null, null) => null,
+        (not null, not null) => maintenanceLeaseStore,
+        _ => throw new ArgumentException("External maintenance requires both a lease-store selection and its resolved singleton store.")
+    };
     private readonly string _holder = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
     private LeaseResource? _maintenanceResource;
-    private LeaseCoordinator CreateCoordinator() => new(_leases, _holder, time, logger, registration.Options.MaintenanceLease);
+    private LeaseCoordinator CreateCoordinator() => new(_maintenanceLeases ?? _leases, _holder, time, logger,
+        registration.Options.MaintenanceLease);
 
     string IOutboxStore.StoreName => typeof(TDbContext).Name;
     TimeSpan IOutboxStore.PollInterval => registration.Options.PollInterval;
@@ -71,7 +78,9 @@ public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, Ti
                 WHERE relation.oid = to_regclass({0})
                 """, name).SingleAsync(cancellationToken);
         }
-        resource = new LeaseResource("outbox", $"maintenance:{schema.Length}:{schema}:{table.Length}:{table}");
+        var prefix = registration.Options.MaintenanceLeaseStore is null ? "maintenance" : "outbox:maintenance";
+        resource = new LeaseResource(registration.Options.MaintenanceLeaseStore?.Scope ?? "outbox",
+            $"{prefix}:{schema.Length}:{schema}:{table.Length}:{table}");
         _maintenanceResource = resource;
         return resource;
     }
@@ -184,8 +193,9 @@ public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, Ti
     /// Pending rows are never deleted. Cancellation and database failures propagate to the caller;
     /// batches already committed remain deleted.
     /// </summary>
-    /// <remarks>Returns zero when another maintenance owner holds the role. Each batch validates ownership
-    /// inside its deletion transaction. This manual invocation releases its role after completion.</remarks>
+    /// <remarks>Returns zero when another maintenance owner holds the role. The default SQL authority validates
+    /// ownership inside each deletion transaction; an external authority uses repeat-safe autocommitted deletes.
+    /// This manual invocation releases its role after completion.</remarks>
     public async Task<int> CleanupAsync(CancellationToken cancellationToken = default)
     {
         await using var coordinator = CreateCoordinator();
@@ -221,10 +231,13 @@ public sealed class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, Ti
             cancellationToken.ThrowIfCancellationRequested();
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(options.MaintenanceLease.OperationTimeout);
-            await using var transaction = await db.Database.BeginTransactionAsync(deadline.Token);
-            await _leases.EnsureHeldAsync(db, identity, deadline.Token);
+            // External coordination is advisory: the single bounded DELETE is safe to repeat and commits itself.
+            // A Redis read followed by a SQL write would not fence anything, so do not pretend to validate it here.
+            await using var transaction = _maintenanceLeases is null
+                ? await db.Database.BeginTransactionAsync(deadline.Token) : null;
+            if (transaction is not null) await _leases.EnsureHeldAsync(db, identity, deadline.Token);
             var count = await rows.Where(x => keys.Contains(x.Sequence)).ExecuteDeleteAsync(deadline.Token);
-            await transaction.CommitAsync(deadline.Token);
+            if (transaction is not null) await transaction.CommitAsync(deadline.Token);
             deleted += count;
             if (count < options.CleanupBatchSize) break;
         } while (time.GetElapsedTime(started) < options.CleanupTimeBudget);

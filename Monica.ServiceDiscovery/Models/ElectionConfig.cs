@@ -1,3 +1,5 @@
+using Monica.Locker.Leases;
+
 namespace Monica.ServiceDiscovery.Models;
 
 /// <summary>
@@ -35,6 +37,17 @@ public class ElectionConfig
     /// </summary>
     public int HeartbeatJitterMilliseconds { get; set; } = 1000;
 
+    /// <summary>Election retry and membership-expiry observation interval; defaults to five seconds.</summary>
+    public TimeSpan LeaseStandbyInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Maximum lease operation wait; defaults to five seconds and must be less than one third of LeaderTTL.</summary>
+    public TimeSpan LeaseOperationTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    internal LeaseCoordinatorOptions CreateLeaseOptions() => new()
+    {
+        Duration = LeaderTTL, StandbyInterval = LeaseStandbyInterval, OperationTimeout = LeaseOperationTimeout
+    };
+
     #region Computed Properties
 
     /// <summary>
@@ -61,6 +74,9 @@ public class ElectionConfig
     /// </summary>
     public void Validate()
     {
+        CreateLeaseOptions().Validate();
+        if (HeartbeatJitterMilliseconds < 0 || HeartbeatJitterMilliseconds >= HeartbeatPeriod.TotalMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(HeartbeatJitterMilliseconds));
         if (HeartbeatPeriodSeconds <= 0)
             throw new ArgumentException("Heartbeat period must be greater than 0", nameof(HeartbeatPeriodSeconds));
 

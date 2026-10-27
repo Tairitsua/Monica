@@ -43,7 +43,7 @@ public sealed class CurrentInstanceInfoState(ServiceDiscoveryFacade serviceDisco
                 CurrentLeaderStatus = snapshot.CurrentLeaderStatus,
                 IsLeader = snapshot.IsLeader,
                 LeaderBecomeTime = snapshot.LeaderBecomeTime,
-                CurrentETag = snapshot.CurrentETag,
+                CurrentTermId = snapshot.CurrentTermId,
                 ClusterLeaderState = snapshot.ClusterLeaderState is { } leader
                     ? new LeaderState { AppId = leader.AppId, InstanceId = leader.InstanceId, BecomeLeaderTime = leader.BecomeLeaderTime }
                     : null

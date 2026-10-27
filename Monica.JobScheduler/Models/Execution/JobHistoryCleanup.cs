@@ -5,7 +5,7 @@ public sealed record JobHistoryCleanupRequest
 {
     /// <summary>Gets the scheduler scope to maintain, including absent or removed owners.</summary>
     public required string SchedulerScopeKey { get; init; }
-    /// <summary>Gets the exclusive maintenance grant, when invoked by the automatic host.</summary>
+    /// <summary>The database maintenance grant, or null for manual/advisory cleanup. Only terminal history is pruned.</summary>
     public JobCoordinatorLeaseKey? CoordinatorLease { get; init; }
     /// <summary>Gets the last fully scanned identity; null starts a fresh keyset scan.</summary>
     public JobId? AfterJob { get; init; }
