@@ -70,6 +70,16 @@ public sealed class InMemoryLeaseStore(TimeProvider timeProvider, object? synchr
     }
 
     /// <inheritdoc />
+    public Task<LeaseSnapshot> GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+            return Task.FromResult(new LeaseSnapshot(timeProvider.GetUtcNow(),
+                _leases.TryGetValue(resource, out var row) ? [ToObservation(row)] : []));
+    }
+
+    /// <inheritdoc />
     public Task<LeaseSnapshot> GetSnapshotAsync(string scope, string namePrefix,
         CancellationToken cancellationToken = default)
     {
@@ -79,9 +89,12 @@ public sealed class InMemoryLeaseStore(TimeProvider timeProvider, object? synchr
                 .Where(row => row.Grant.Identity.Resource.Scope == scope
                     && row.Grant.Identity.Resource.Name.StartsWith(namePrefix, StringComparison.Ordinal))
                 .OrderBy(row => row.Grant.Identity.Resource.Name, StringComparer.Ordinal)
-                .Select(row => new LeaseObservation(row.Grant.Identity.Resource, row.Grant.Identity.HolderId,
-                    row.Acquired, row.Grant.ConfirmedAtUtc, row.Grant.ExpiresAtUtc)).ToArray()));
+                .Select(ToObservation).ToArray()));
     }
+
+    private static LeaseObservation ToObservation((LeaseGrant Grant, DateTimeOffset Acquired) row) =>
+        new(row.Grant.Identity.Resource, row.Grant.Identity.HolderId,
+            row.Acquired, row.Grant.ConfirmedAtUtc, row.Grant.ExpiresAtUtc);
 
     private static void Validate(LeaseResource resource, string holderId, TimeSpan duration)
     {

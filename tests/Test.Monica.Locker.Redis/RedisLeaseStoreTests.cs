@@ -76,6 +76,43 @@ public sealed class RedisLeaseStoreTests
     }
 
     [Fact]
+    public async Task GetSnapshotAsync_WhenEnumerationIsDisabled_ShouldReadOnlyTheExactResourceAndObserveExpiry()
+    {
+        using var connection = await ConnectAsync(disableEnumeration: true);
+        var store = new RedisLeaseStore(connection, Options());
+        var resource = new LeaseResource("exact:*{scope}", "leader:服务");
+        var otherName = Assert.IsType<LeaseGrant>(await store.TryAcquireAsync(new(resource.Scope, resource.Name + ":other"),
+            "neighbor", DURATION, Token));
+        var otherScope = Assert.IsType<LeaseGrant>(await store.TryAcquireAsync(new(resource.Scope + ":other", resource.Name),
+            "other-scope", DURATION, Token));
+        try
+        {
+            var missing = await store.GetSnapshotAsync(resource, Token);
+            Assert.Empty(missing.Leases);
+            Assert.True(missing.ObservedAtUtc >= otherScope.ConfirmedAtUtc);
+
+            var grant = Assert.IsType<LeaseGrant>(await store.TryAcquireAsync(resource, "holder", DURATION, Token));
+            var live = await store.GetSnapshotAsync(resource, Token);
+            var row = Assert.Single(live.Leases);
+            Assert.Equal(resource, row.Resource);
+            Assert.Equal(grant.Identity.HolderId, row.HolderId);
+            Assert.Equal(grant.ConfirmedAtUtc, row.AcquiredAtUtc);
+            Assert.Equal(grant.ExpiresAtUtc, row.ExpiresAtUtc);
+
+            Assert.NotNull(await store.TryRenewAsync(grant.Identity, TimeSpan.FromMilliseconds(100), Token));
+            await Task.Delay(TimeSpan.FromMilliseconds(200), Token);
+            var expired = await store.GetSnapshotAsync(resource, Token);
+            Assert.Empty(expired.Leases);
+            Assert.True(expired.ObservedAtUtc > live.ObservedAtUtc);
+        }
+        finally
+        {
+            await store.TryReleaseAsync(otherName.Identity, Token);
+            await store.TryReleaseAsync(otherScope.Identity, Token);
+        }
+    }
+
+    [Fact]
     public async Task Snapshot_ShouldScanTheSelectedDatabaseRatherThanDatabaseZero()
     {
         using var connection = await ConnectAsync();
@@ -137,13 +174,14 @@ public sealed class RedisLeaseStoreTests
 
     private static RedisLeaseStoreOptions Options() => new() { KeyPrefix = "tests:" + Guid.NewGuid().ToString("N") };
 
-    private static async Task<ConnectionMultiplexer> ConnectAsync()
+    private static async Task<ConnectionMultiplexer> ConnectAsync(bool disableEnumeration = false)
     {
         var endpoint = Environment.GetEnvironmentVariable("MONICA_LEASE_TEST_REDIS");
         if (string.IsNullOrWhiteSpace(endpoint)) Assert.Skip("Set MONICA_LEASE_TEST_REDIS to a disposable Redis authority.");
         var options = ConfigurationOptions.Parse(endpoint);
         options.AbortOnConnectFail = true;
         options.AsyncTimeout = 2000;
+        if (disableEnumeration) options.CommandMap = CommandMap.Create(["SCAN", "KEYS", "TIME"], available: false);
         return await ConnectionMultiplexer.ConnectAsync(options);
     }
 }

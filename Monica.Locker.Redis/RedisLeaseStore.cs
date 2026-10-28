@@ -77,6 +77,19 @@ public sealed class RedisLeaseStore : IExclusiveLeaseStore, ILeaseAdministration
     }
 
     /// <inheritdoc />
+    public async Task<LeaseSnapshot> GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = await _database.ScriptEvaluateAsync(ObserveScript, [Key(resource)], flags: CommandFlags.DemandMaster)
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
+        var values = (RedisResult[])result!;
+        var observation = ToObservation(resource.Scope, values);
+        return new LeaseSnapshot(DateTimeOffset.FromUnixTimeMilliseconds((long)values[0]),
+            observation is null ? [] : [observation]);
+    }
+
+    /// <inheritdoc />
     public async Task<LeaseSnapshot> GetSnapshotAsync(string scope, string namePrefix,
         CancellationToken cancellationToken = default)
     {
@@ -100,14 +113,9 @@ public sealed class RedisLeaseStore : IExclusiveLeaseStore, ILeaseAdministration
                 if (!seen.Add(key)) continue;
                 var result = await _database.ScriptEvaluateAsync(ObserveScript, [key], flags: CommandFlags.DemandMaster)
                     .WaitAsync(cancellationToken).ConfigureAwait(false);
-                if (result.IsNull) continue;
-                var values = (RedisResult[])result!;
-                var name = (string)values[0]!;
-                if (!name.StartsWith(namePrefix, StringComparison.Ordinal)) continue;
-                observations.Add(new LeaseObservation(new LeaseResource(scope, name), (string)values[1]!,
-                    DateTimeOffset.FromUnixTimeMilliseconds((long)values[2]),
-                    DateTimeOffset.FromUnixTimeMilliseconds((long)values[3]),
-                    DateTimeOffset.FromUnixTimeMilliseconds((long)values[4] + (long)values[5])));
+                var observation = ToObservation(scope, (RedisResult[])result!);
+                if (observation is not null && observation.Resource.Name.StartsWith(namePrefix, StringComparison.Ordinal))
+                    observations.Add(observation);
             }
         }
         return new LeaseSnapshot(observedAt!.Value, observations);
@@ -150,6 +158,12 @@ public sealed class RedisLeaseStore : IExclusiveLeaseStore, ILeaseAdministration
         ? null : new LeaseGrant(identity, TimeSpan.FromMilliseconds(milliseconds),
             DateTimeOffset.FromUnixTimeMilliseconds((long)result));
 
+    private static LeaseObservation? ToObservation(string scope, RedisResult[] values) => values.Length == 1 ? null
+        : new LeaseObservation(new LeaseResource(scope, (string)values[1]!), (string)values[2]!,
+            DateTimeOffset.FromUnixTimeMilliseconds((long)values[3]),
+            DateTimeOffset.FromUnixTimeMilliseconds((long)values[4]),
+            DateTimeOffset.FromUnixTimeMilliseconds((long)values[0] + (long)values[5]));
+
     private const string ClockScript = """
         local clock = redis.call('TIME')
         local now = clock[1] * 1000 + math.floor(clock[2] / 1000)
@@ -180,8 +194,8 @@ public sealed class RedisLeaseStore : IExclusiveLeaseStore, ILeaseAdministration
         """;
     private const string ObserveScript = ClockScript + """
         local ttl = redis.call('PTTL', KEYS[1])
-        if ttl <= 0 then return nil end
-        return {redis.call('HGET', KEYS[1], 'name'), redis.call('HGET', KEYS[1], 'holder'),
-            redis.call('HGET', KEYS[1], 'acquired'), redis.call('HGET', KEYS[1], 'confirmed'), now, ttl}
+        if ttl <= 0 then return {now} end
+        return {now, redis.call('HGET', KEYS[1], 'name'), redis.call('HGET', KEYS[1], 'holder'),
+            redis.call('HGET', KEYS[1], 'acquired'), redis.call('HGET', KEYS[1], 'confirmed'), ttl}
         """;
 }

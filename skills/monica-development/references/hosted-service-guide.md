@@ -148,7 +148,7 @@ public sealed class MyCleanupService(
 }
 ```
 
-`OnBecameLeaderAsync` is required and may execute more than once during one host lifetime. Make it idempotent or reset leader-owned state explicitly. `LeaderExecuteBackgroundAsync` and `OnLeaderLostAsync` are optional hooks; always honor the leader token.
+`OnBecameLeaderAsync` is required and may execute more than once within a leadership term after a work failure. Make it repeatable and reset attempt-owned state explicitly. `LeaderExecuteBackgroundAsync` and `OnLeaderLostAsync` are optional hooks; always honor the attempt token. The [discovery lifecycle contract](../../monica-infra-hosting/references/service-discovery.md#leadership-authority-and-lifetime) owns retry, `WorkFailed` cleanup, finite-work completion, and unrecoverable cleanup semantics. An optional `TimeProvider` constructor argument controls retry delays; pass the host clock when it is customized.
 
 ## Checklist
 

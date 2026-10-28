@@ -12,7 +12,7 @@ public sealed record LeaseCoordinatorOptions
     public TimeSpan Duration { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Minimum interval between unsuccessful acquisitions, five seconds by default.</summary>
     public TimeSpan StandbyInterval { get; init; } = TimeSpan.FromSeconds(5);
-    /// <summary>Maximum wait for a store operation or runtime drain, five seconds by default.</summary>
+    /// <summary>Maximum wait for a store operation or the entire runtime drain, five seconds by default.</summary>
     public TimeSpan OperationTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Rejects invalid intervals before starting coordination or background work.</summary>
@@ -45,8 +45,9 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
     private readonly LeaseMetrics? _metrics;
     private readonly ConcurrentDictionary<LeaseResource, Entry> _entries = new();
     private readonly CancellationTokenSource _stopping = new();
+    private readonly object _disposalGate = new();
+    private Task? _disposal;
     private int _disposed;
-    private int _released;
 
     /// <summary>Creates an explicitly store-bound supervisor; it does not acquire roles until requested.</summary>
     /// <remarks>Pass the host-owned meter factory to enable shared lease metrics; null disables instrumentation.
@@ -182,35 +183,56 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Stops supervision and conditionally releases grants after the caller has drained its protected work.</summary>
-    /// <remarks>Unresolved calls or cancellation callbacks surface a bounded timeout; uncertain grants are left to expire.</remarks>
-    public async ValueTask DisposeAsync()
+    /// <remarks>
+    /// All resources share one real-time shutdown budget, independent of the workload clock. Each resource drains
+    /// and releases independently; failures do not skip other resources. Uncertain grants are left to expire.
+    /// Repeated or concurrent callers await the same cleanup task, including its failure.
+    /// </remarks>
+    public ValueTask DisposeAsync()
     {
-        Dispose();
-        if (Interlocked.Exchange(ref _released, 1) != 0) return;
-        var entries = _entries.Values.ToArray();
-        await Task.WhenAll(entries.Select(entry => entry.Renewal ?? Task.CompletedTask)
-            .Concat(entries.Select(entry => entry.Pending ?? Task.CompletedTask))
-            .Select(task => task.ContinueWith(completed => { _ = completed.Exception; }, CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)))
-            .WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
-        foreach (var entry in entries)
-        {
-            if (entry.Term is not { } term) continue;
-            await term.Cancellation.WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
-            await ReleaseAsync(term.Context.Identity).ConfigureAwait(false);
-        }
+        lock (_disposalGate) return new(_disposal ??= DisposeCoreAsync());
     }
 
-    private async Task ReleaseAsync(LeaseIdentity identity)
+    private async Task DisposeCoreAsync()
     {
+        var started = TimeProvider.System.GetTimestamp();
+        Dispose();
+        await Task.WhenAll(_entries.Values.Select(entry => DrainAndReleaseAsync(entry, started))).ConfigureAwait(false);
+    }
+
+    private async Task DrainAndReleaseAsync(Entry entry, long shutdownStarted)
+    {
+        if (!await entry.Mutex.WaitAsync(RemainingShutdownTime(shutdownStarted)).ConfigureAwait(false))
+            throw new TimeoutException("Lease shutdown timed out waiting for an active request.");
+        try
+        {
+            // No request can publish a later term after this point. Observe failed I/O before conditionally releasing
+            // the known identity; a stalled operation leaves only this resource's grant to expire.
+            await Task.WhenAll(entry.Renewal ?? Task.CompletedTask, entry.Pending ?? Task.CompletedTask)
+                .ContinueWith(completed => { _ = completed.Exception; }, CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)
+                .WaitAsync(RemainingShutdownTime(shutdownStarted)).ConfigureAwait(false);
+            if (entry.Term is not { } term) return;
+            await term.Cancellation.WaitAsync(RemainingShutdownTime(shutdownStarted)).ConfigureAwait(false);
+            await ReleaseAsync(term.Context.Identity, RemainingShutdownTime(shutdownStarted)).ConfigureAwait(false);
+        }
+        finally { entry.Mutex.Release(); }
+    }
+
+    private TimeSpan RemainingShutdownTime(long started) =>
+        TimeSpan.FromTicks(Math.Max(0, (_options.OperationTimeout - TimeProvider.System.GetElapsedTime(started)).Ticks));
+
+    private async Task ReleaseAsync(LeaseIdentity identity, TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.Zero) throw new TimeoutException("Lease shutdown exhausted its release budget.");
         var started = _time.GetTimestamp();
         var outcome = "failed";
-        using var deadline = new CancellationTokenSource(_options.OperationTimeout);
+        using var deadline = new CancellationTokenSource(remaining);
         var releasing = Task.Run(() => _store.TryReleaseAsync(identity, deadline.Token), CancellationToken.None);
         Observe(releasing);
         try
         {
-            outcome = await releasing.WaitAsync(_options.OperationTimeout).ConfigureAwait(false) ? "success" : "lost";
+            outcome = await releasing.WaitAsync(remaining).ConfigureAwait(false) ? "success" : "lost";
         }
         catch (Exception exception)
         {

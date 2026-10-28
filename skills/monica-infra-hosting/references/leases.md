@@ -8,6 +8,8 @@ Keep execution claims in their business records. Job execution tokens remain on 
 
 `IExclusiveLeaseStore` exposes `TryAcquireAsync`, `TryRenewAsync`, `TryReleaseAsync`, and a read-only `GetSnapshotAsync`. A `LeaseResource` is an immutable `(Scope, Name)` within one configured backend/database/schema. Each successful acquisition creates a fresh opaque `TermId`, even for the same holder after expiration. Renewal accepts only the exact, unexpired identity and never reacquires; `null` means unavailable/lost, while transport and ambiguous commit failures propagate. Release compares the complete identity. Tokens are equality guards, not increasing fencing numbers for external systems.
 
+Use `GetSnapshotAsync(resource, cancellationToken)` when the resource is known. It returns the authority's observation time and zero or one retained observation without enumerating unrelated roles. Redis uses one keyed Lua request, SQL an equality lookup on the composite primary key, and memory a dictionary lookup. A retained SQL/memory observation may be expired; compare its expiry with `ObservedAtUtc`. Missing Redis keys still return Redis observation time. The scope/prefix overload is an inventory operation: Redis completes a database-wide `SCAN`, even when few matching roles exist. Reserve it for low-frequency diagnostics. Custom store implementations must implement the exact overload without falling back to inventory enumeration.
+
 `LeaseCoordinator.GetAsync` caches a usable `LeaseContext`. One coordinator belongs to one worker lifetime. Renewal runs independently of business callbacks, and a context's cancellation token is never reused for a later term. The deadline starts before the request, uses the returned validity duration, and subtracts a margin of up to one second. Monotonic elapsed time prevents backward wall-clock changes from extending validity; forward wall-clock jumps shorten it conservatively. A failed/stalled renewal retires the term. An unresolved provider call is observed and prevents more calls accumulating for that resource; a late result never revives a retired context.
 
 | `LeaseCoordinatorOptions` | Default | Constraint |
@@ -17,6 +19,8 @@ Keep execution claims in their business records. Job execution tokens remain on 
 | `OperationTimeout` | 5 seconds | Positive and strictly below one third of `Duration`; also bounds runtime drain |
 
 Use the context token in protected work, and drain that work before `DisposeAsync` releases the role. Synchronous `Dispose` stops supervision but leaves the record to expire. Cancellation does not undo a remote send or fence arbitrary external writes. For SQL writes, `RelationalLeaseStore<TContext>.EnsureHeldAsync` must run inside the caller's active transaction, before business-row locks, against the same authority and mapping. It holds the lease row until commit/rollback and never renews or commits. Keep the whole transaction bounded and keep external network calls outside it.
+
+Asynchronous disposal shares one real-clock `OperationTimeout` budget across all resources, independently of an injected workload clock. Resources drain and release concurrently; a stalled or failing resource does not skip healthy roles. Uncertain grants expire naturally. Concurrent and repeated `DisposeAsync` calls await the same cleanup task and observe the same failure. When an owner has multiple coordinators, stop them all before awaiting any cleanup so one unavailable authority cannot keep another renewing.
 
 ```csharp
 using Monica.Locker.EfCore;

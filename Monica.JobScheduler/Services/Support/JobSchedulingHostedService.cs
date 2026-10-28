@@ -81,8 +81,12 @@ internal sealed class JobSchedulingHostedService(
         }
         finally
         {
-            if (_historyCoordinator is not null) await _historyCoordinator.DisposeAsync();
-            await _coordinators.DisposeAsync();
+            // Stop both authorities before awaiting either provider. A failing advisory backend must not keep
+            // the scheduler's database roles alive after its protected work has drained.
+            _coordinators.Dispose();
+            _historyCoordinator?.Dispose();
+            await Task.WhenAll(_coordinators.DisposeAsync().AsTask(),
+                _historyCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask);
         }
     }
 

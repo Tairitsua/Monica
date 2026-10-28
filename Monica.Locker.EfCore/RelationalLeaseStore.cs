@@ -111,6 +111,18 @@ public sealed class RelationalLeaseStore<TContext>(IDbContextFactory<TContext> c
     }
 
     /// <inheritdoc />
+    public Task<LeaseSnapshot> GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        return ExecuteAsync(async (db, token) =>
+        {
+            var row = await db.Set<LeaseRecord>().AsNoTracking()
+                .SingleOrDefaultAsync(row => row.Scope == resource.Scope && row.Name == resource.Name, token);
+            return new LeaseSnapshot(await GetUtcNowAsync(db, token), row is null ? [] : [row.ToObservation()]);
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<LeaseSnapshot> GetSnapshotAsync(string scope, string namePrefix,
         CancellationToken cancellationToken = default) => ExecuteAsync(async (db, token) =>
         {

@@ -207,6 +207,43 @@ public sealed class JobSchedulerCoordinationStoreContractTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task GetSnapshotAsync_WhenReadingOneLease_ShouldIsolateItsResourceAndPreserveExpiredEvidence(bool useEfCore)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, NOW);
+        var leases = fixture.Store.CoordinatorLeases;
+        var resource = new LeaseResource(fixture.Scope, "jobscheduler:owner:exact");
+        await leases.TryAcquireAsync(new(resource.Scope, resource.Name + ":other"), "neighbor", TimeSpan.FromMinutes(1), token);
+        await leases.TryAcquireAsync(new("other-scope", resource.Name), "other-scope", TimeSpan.FromMinutes(1), token);
+
+        var missing = await leases.GetSnapshotAsync(resource, token);
+        missing.ObservedAtUtc.Should().Be(NOW);
+        missing.Leases.Should().BeEmpty();
+
+        var grant = (await leases.TryAcquireAsync(resource, "holder", TimeSpan.FromSeconds(30), token))!;
+        fixture.Time.Advance(TimeSpan.FromSeconds(10));
+        var live = await leases.GetSnapshotAsync(resource, token);
+        live.ObservedAtUtc.Should().Be(NOW.AddSeconds(10));
+        var observation = live.Leases.Should().ContainSingle().Subject;
+        observation.Resource.Should().Be(resource);
+        observation.HolderId.Should().Be(grant.Identity.HolderId);
+        observation.AcquiredAtUtc.Should().Be(grant.ConfirmedAtUtc);
+        observation.ConfirmedAtUtc.Should().Be(grant.ConfirmedAtUtc);
+        observation.ExpiresAtUtc.Should().Be(grant.ExpiresAtUtc);
+
+        fixture.Time.Advance(TimeSpan.FromSeconds(21));
+        var expired = await leases.GetSnapshotAsync(resource, token);
+        expired.ObservedAtUtc.Should().Be(NOW.AddSeconds(31));
+        expired.Leases.Should().ContainSingle().Which.Should().Be(observation);
+        (await leases.TryRenewAsync(grant.Identity, TimeSpan.FromSeconds(30), token)).Should().BeNull();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            leases.GetSnapshotAsync(resource, new CancellationToken(canceled: true)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task CoordinatedOwnerMutations_WhenTheGrantExpiresOrIsTakenOver_ShouldRejectStaleSyncAndRecurringWork(bool useEfCore)
     {
         var token = TestContext.Current.CancellationToken;

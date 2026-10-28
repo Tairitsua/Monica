@@ -27,8 +27,8 @@ public sealed class RepositoryOutboxOptions
     public int BatchSize { get; set; } = 100;
 
     /// <summary>
-    /// Maximum simultaneous deliveries per store and drain invocation; defaults to one. Claims only free
-    /// delivery slots. Increasing this value overlaps handlers and transport calls in independent scopes;
+    /// Maximum simultaneous deliveries per dispatcher across all drain invocations; defaults to one. Timed-out
+    /// sends retain capacity until they finish. Claims only free slots. Increasing this value overlaps independent scopes;
     /// it does not guarantee ordering, including messages with the same transport key.
     /// </summary>
     public int DeliveryConcurrency { get; set; } = 1;

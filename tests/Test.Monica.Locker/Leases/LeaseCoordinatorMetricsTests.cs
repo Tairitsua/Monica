@@ -208,7 +208,7 @@ public sealed class LeaseCoordinatorMetricsTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, call.Arg<CancellationToken>());
                 return true;
             });
-        await using var coordinator = new LeaseCoordinator(boundary, "holder", time, NullLogger.Instance,
+        using var coordinator = new LeaseCoordinator(boundary, "holder", time, NullLogger.Instance,
             new LeaseCoordinatorOptions { OperationTimeout = TimeSpan.FromMilliseconds(250) }, probe.Factory);
         Assert.NotNull(await coordinator.GetAsync(RESOURCE, Token));
 

@@ -37,7 +37,7 @@ public class ElectionConfig
     /// </summary>
     public int HeartbeatJitterMilliseconds { get; set; } = 1000;
 
-    /// <summary>Election retry and membership-expiry observation interval; defaults to five seconds.</summary>
+    /// <summary>Election retry, membership-expiry observation, and failed local leader-work retry interval; defaults to five seconds.</summary>
     public TimeSpan LeaseStandbyInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Maximum lease operation wait; defaults to five seconds and must be less than one third of LeaderTTL.</summary>

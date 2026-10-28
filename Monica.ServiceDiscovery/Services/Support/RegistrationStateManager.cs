@@ -95,7 +95,7 @@ public class RegistrationStateManager(
     {
         var appId = clientInfo.GetServiceStatus().AppId;
         var resource = LeaderElectionService.Resource(_option, appId);
-        var snapshot = await leases.GetSnapshotAsync(resource.Scope, resource.Name, ct);
+        var snapshot = await leases.GetSnapshotAsync(resource, ct);
         var leader = snapshot.Leases.SingleOrDefault(row => row.Resource == resource
             && row.ExpiresAtUtc > snapshot.ObservedAtUtc);
         return leader is null ? null : new LeaderState

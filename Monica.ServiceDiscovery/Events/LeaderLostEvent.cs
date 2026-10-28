@@ -30,7 +30,10 @@ public enum LeaderLostReason
     /// <summary>
     /// Leader Key has expired or been deleted
     /// </summary>
-    LeaderKeyExpired
+    LeaderKeyExpired,
+
+    /// <summary>A coordinated service's local work attempt failed; the shared leadership term remains active.</summary>
+    WorkFailed
 }
 
 /// <summary>

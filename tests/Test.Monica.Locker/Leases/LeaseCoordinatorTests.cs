@@ -136,6 +136,106 @@ public sealed class LeaseCoordinatorTests
     }
 
     [Fact]
+    public async Task DisposeAsync_WhenSeveralReleasesArePending_ShouldStartThemTogetherAndShareCleanupAcrossCallers()
+    {
+        var time = new ControllableTimeProvider(START);
+        var durable = new InMemoryLeaseStore(time);
+        var boundary = ForwardTo(durable);
+        var allEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = 0;
+        boundary.TryReleaseAsync(Arg.Any<LeaseIdentity>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                if (Interlocked.Increment(ref entered) == 3) allEntered.TrySetResult();
+                await finish.Task;
+                return await durable.TryReleaseAsync(call.Arg<LeaseIdentity>(), call.Arg<CancellationToken>());
+            });
+        using var coordinator = Create(boundary, time);
+        for (var index = 0; index < 3; index++)
+            Assert.NotNull(await coordinator.GetAsync(new LeaseResource("test", $"role-{index}"), Token));
+
+        var first = coordinator.DisposeAsync().AsTask();
+        var second = coordinator.DisposeAsync().AsTask();
+        try
+        {
+            await allEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            Assert.Same(first, second);
+            Assert.False(first.IsCompleted);
+        }
+        finally { finish.TrySetResult(); }
+        await Task.WhenAll(first, second);
+        Assert.Empty((await durable.GetSnapshotAsync("test", "role-", Token)).Leases);
+        await boundary.Received(3).TryReleaseAsync(Arg.Any<LeaseIdentity>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenOneReleaseFails_ShouldStillReleaseEveryOtherResourceAndRetainItsFailure()
+    {
+        var time = new ControllableTimeProvider(START);
+        var durable = new InMemoryLeaseStore(time);
+        var boundary = ForwardTo(durable);
+        var failure = new IOException("The release response was lost.");
+        boundary.TryReleaseAsync(Arg.Is<LeaseIdentity>(identity => identity.Resource == RESOURCE), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<bool>(failure));
+        using var coordinator = Create(boundary, time);
+        Assert.NotNull(await coordinator.GetAsync(RESOURCE, Token));
+        Assert.NotNull(await coordinator.GetAsync(new LeaseResource("test", "independent"), Token));
+
+        var cleanup = coordinator.DisposeAsync().AsTask();
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => cleanup));
+        Assert.Same(cleanup, coordinator.DisposeAsync().AsTask());
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => coordinator.DisposeAsync().AsTask()));
+        Assert.Equal(RESOURCE, Assert.Single((await durable.GetSnapshotAsync("test", "", Token)).Leases).Resource);
+        await boundary.Received(2).TryReleaseAsync(Arg.Any<LeaseIdentity>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenARequestNeverDrains_ShouldReleaseIndependentRolesAndExpireItsRealTimeBudget()
+    {
+        var time = new ControllableTimeProvider(START);
+        var durable = new InMemoryLeaseStore(time);
+        var boundary = ForwardTo(durable);
+        var renewalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renewalReply = new TaskCompletionSource<LeaseGrant?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var independentReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        boundary.TryRenewAsync(Arg.Any<LeaseIdentity>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                if (call.Arg<LeaseIdentity>().Resource != RESOURCE)
+                    return durable.TryRenewAsync(call.Arg<LeaseIdentity>(), call.Arg<TimeSpan>(), call.Arg<CancellationToken>());
+                renewalEntered.TrySetResult();
+                return renewalReply.Task;
+            });
+        boundary.TryReleaseAsync(Arg.Any<LeaseIdentity>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var result = await durable.TryReleaseAsync(call.Arg<LeaseIdentity>(), call.Arg<CancellationToken>());
+                independentReleased.TrySetResult();
+                return result;
+            });
+        using var coordinator = new LeaseCoordinator(boundary, "holder", time, NullLogger.Instance,
+            new LeaseCoordinatorOptions { OperationTimeout = TimeSpan.FromSeconds(1) });
+        Assert.NotNull(await coordinator.GetAsync(RESOURCE, Token));
+        await time.WaitForTimerAsync(TimeSpan.FromSeconds(10), Token);
+        time.Advance(TimeSpan.FromSeconds(10));
+        await renewalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.NotNull(await coordinator.GetAsync(new LeaseResource("test", "independent"), Token));
+
+        var cleanup = coordinator.DisposeAsync().AsTask();
+        try
+        {
+            await independentReleased.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            await Assert.ThrowsAsync<TimeoutException>(() => cleanup.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            Assert.True(cleanup.IsCompleted);
+            Assert.Equal(START.AddSeconds(10), time.GetUtcNow());
+            Assert.Equal(RESOURCE, Assert.Single((await durable.GetSnapshotAsync("test", "", Token)).Leases).Resource);
+            await boundary.Received(1).TryReleaseAsync(Arg.Any<LeaseIdentity>(), Arg.Any<CancellationToken>());
+        }
+        finally { renewalReply.TrySetResult(null); }
+    }
+
+    [Fact]
     public async Task Dispose_WhenAcquisitionIsInFlight_ShouldRejectTheLateGrant()
     {
         var time = new ControllableTimeProvider(START);

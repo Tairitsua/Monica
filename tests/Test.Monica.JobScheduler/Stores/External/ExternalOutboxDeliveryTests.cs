@@ -222,7 +222,7 @@ public sealed partial class ExternalOutboxLeaseTests
     [Theory]
     [InlineData(ExternalSchedulerDatabase.POSTGRES)]
     [InlineData(ExternalSchedulerDatabase.VASTBASE)]
-    public async Task Delivery_WhenTheFirstSenderTimesOut_ShouldRetainItsClaimAndContinueWithLaterRows(string provider)
+    public async Task Delivery_WhenOneSenderTimesOut_ShouldRetainItsSlotAndUseTheOtherSlotForLaterRows(string provider)
     {
         var token = TestContext.Current.CancellationToken;
         var fixture = await ExternalSchedulerStoreFixture.CreateAsync(provider, token);
@@ -230,7 +230,11 @@ public sealed partial class ExternalOutboxLeaseTests
         {
             var transport = new DeliveryTransport(blockedSends: 1);
             using var host = CreateHost(fixture.Database, TimeProvider.System, new OutboxCommands(), worker: false,
-                transport: transport, configureOutbox: options => options.DeliveryLease = TimeSpan.FromSeconds(2));
+                transport: transport, configureOutbox: options =>
+                {
+                    options.DeliveryLease = TimeSpan.FromSeconds(2);
+                    options.DeliveryConcurrency = 2;
+                });
             await CreateOutboxSchemaAsync(host, token);
             await SeedDeliveryAsync(host, 4, token);
             var draining = Dispatcher(host).DrainAsync(4, token);
@@ -254,6 +258,9 @@ public sealed partial class ExternalOutboxLeaseTests
             {
                 transport.AllowSends.TrySetResult();
                 await draining;
+                using var settled = CancellationTokenSource.CreateLinkedTokenSource(token);
+                settled.CancelAfter(TimeSpan.FromSeconds(10));
+                while ((await ReadDeliveryAsync(host, settled.Token))[0].LastError is null) await Task.Yield();
             }
         });
     }

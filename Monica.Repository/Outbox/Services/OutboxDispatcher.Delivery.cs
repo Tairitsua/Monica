@@ -9,11 +9,18 @@ namespace Monica.Repository.Outbox.Services;
 
 public sealed partial class OutboxDispatcher<TDbContext>
 {
+    private readonly SemaphoreSlim _deliverySlots = new(registration.Options.DeliveryConcurrency,
+        registration.Options.DeliveryConcurrency);
+
     /// <summary>
     /// Runs one bounded pass, claiming only available delivery slots. Failed attempts count toward the limit;
     /// the result counts successful acknowledgments. Each send owns an independent scope. Delivery remains at least once.
     /// </summary>
-    /// <remarks>Must run outside an ambient transaction: claims must commit before any external delivery starts.</remarks>
+    /// <remarks>
+    /// Must run outside an ambient transaction: claims must commit before any external delivery starts.
+    /// All passes share this dispatcher's capacity. A timed-out send retains its slot and scope until it actually
+    /// finishes; a pass returns without claiming more messages when all slots are occupied.
+    /// </remarks>
     public async Task<int> DrainAsync(int maximumMessages = 100, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumMessages, 1);
@@ -21,7 +28,6 @@ public sealed partial class OutboxDispatcher<TDbContext>
             throw new InvalidOperationException("Outbox delivery cannot run inside an ambient transaction; claims must commit before sending.");
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
-        var concurrency = registration.Options.DeliveryConcurrency;
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var active = new List<Task<int>>();
         var remaining = maximumMessages;
@@ -32,20 +38,28 @@ public sealed partial class OutboxDispatcher<TDbContext>
             while (remaining > 0 || active.Count > 0)
             {
                 stopping.Token.ThrowIfCancellationRequested();
-                var available = Math.Min(remaining, concurrency - active.Count);
+                var available = ReserveDeliverySlots(remaining);
                 if (available > 0)
                 {
-                    // Include the database round trip in the send budget. A late claim reply never grants a fresh lease.
-                    var started = time.GetTimestamp();
-                    var claimed = await ClaimAsync(db, cursor, available, stopping.Token);
-                    if (claimed.Count == 0) remaining = 0;
-                    else
+                    var reserved = available;
+                    try
                     {
-                        remaining -= claimed.Count;
-                        cursor = claimed.Max(message => message.Sequence);
-                        foreach (var message in claimed)
-                            active.Add(DeliverAsync(message, started, stopping.Token));
+                        // Include the claim round trip in the send budget. Reserve capacity before touching the rows.
+                        var started = time.GetTimestamp();
+                        var claimed = await ClaimAsync(db, cursor, available, stopping.Token);
+                        if (claimed.Count == 0) remaining = 0;
+                        else
+                        {
+                            remaining -= claimed.Count;
+                            cursor = claimed.Max(message => message.Sequence);
+                            foreach (var message in claimed)
+                            {
+                                reserved--;
+                                active.Add(DeliverAsync(message, started, stopping.Token));
+                            }
+                        }
                     }
+                    finally { if (reserved > 0) _deliverySlots.Release(reserved); }
                 }
                 if (active.Count == 0) break;
                 await Task.WhenAny(active);
@@ -67,42 +81,90 @@ public sealed partial class OutboxDispatcher<TDbContext>
         }
     }
 
+    private int ReserveDeliverySlots(int maximum)
+    {
+        var reserved = 0;
+        while (reserved < maximum && _deliverySlots.Wait(0)) reserved++;
+        return reserved;
+    }
+
     private async Task<int> DeliverAsync(OutboxMessage candidate, long claimStarted, CancellationToken cancellationToken)
+    {
+        CancellationTokenSource? timeout = null;
+        CancellationTokenSource? deadline = null;
+        Task<int>? delivery = null;
+        try
+        {
+            var duration = registration.Options.DeliveryLease;
+            var margin = TimeSpan.FromTicks(Math.Min(TimeSpan.TicksPerSecond, duration.Ticks / 10));
+            var remaining = duration - margin - time.GetElapsedTime(claimStarted);
+            if (remaining <= TimeSpan.Zero) return 0;
+            cancellationToken.ThrowIfCancellationRequested();
+            timeout = new CancellationTokenSource(remaining, time);
+            deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+            var token = deadline.Token;
+            delivery = SendAndSettleAsync(candidate, token, cancellationToken);
+            try { return await delivery.WaitAsync(token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                logger.LogWarning("Outbox delivery deadline elapsed for message {MessageId}; its slot remains occupied until the send finishes.", candidate.MessageId);
+                return 0;
+            }
+        }
+        finally
+        {
+            // Waiting can end before sending. The real operation retains its scope, cancellation sources and slot.
+            _ = ReleaseDeliverySlotAsync(delivery ?? Task.FromResult(0), timeout, deadline, candidate.MessageId);
+        }
+    }
+
+    private async Task ReleaseDeliverySlotAsync(Task<int> delivery, CancellationTokenSource? timeout,
+        CancellationTokenSource? deadline, string messageId)
+    {
+        try { await delivery; }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { logger.LogError(exception, "Outbox delivery operation failed for message {MessageId}.", messageId); }
+        finally
+        {
+            deadline?.Dispose();
+            timeout?.Dispose();
+            _deliverySlots.Release();
+        }
+    }
+
+    private async Task<int> SendAndSettleAsync(OutboxMessage candidate, CancellationToken deadline,
+        CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var db = services.GetRequiredService<TDbContext>();
         var rows = db.Set<OutboxMessage>();
         var options = registration.Options;
-        var margin = TimeSpan.FromTicks(Math.Min(TimeSpan.TicksPerSecond, options.DeliveryLease.Ticks / 10));
-        var remaining = options.DeliveryLease - margin - time.GetElapsedTime(claimStarted);
-        // An interrupted claim counts as an attempt. Leave it to expire, including ambiguous commit outcomes.
-        if (remaining <= TimeSpan.Zero) return 0;
-        cancellationToken.ThrowIfCancellationRequested();
-        using var timeout = new CancellationTokenSource(remaining, time);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
+            deadline.ThrowIfCancellationRequested();
             var message = candidate.ToEventMessage();
             Task delivery;
             if (message.Scope == EventSubscriptionScope.Local)
-                delivery = services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, deadline.Token);
+                delivery = services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, deadline);
             else if (message.Scope == EventSubscriptionScope.Distributed)
             {
                 var transport = message.Metadata.ServiceKey is { } key
                     ? services.GetRequiredKeyedService<IEventTransport>(key)
                     : services.GetRequiredService<IEventTransport>();
-                delivery = transport.SendAsync(message, deadline.Token);
+                delivery = transport.SendAsync(message, deadline);
             }
             else throw new InvalidOperationException($"Unknown outbox delivery scope '{message.Scope}'.");
-            await delivery.WaitAsync(deadline.Token);
+            await delivery;
+            deadline.ThrowIfCancellationRequested();
             var acknowledgedAt = time.GetUtcNow().UtcDateTime;
             return await rows.Where(x => x.Sequence == candidate.Sequence && x.LeaseId == candidate.LeaseId
                     && x.DeliveredAtUtc == null)
                 .ExecuteUpdateAsync(update => update.SetProperty(x => x.DeliveredAtUtc, acknowledgedAt)
                     .SetProperty(x => x.LeaseId, (Guid?)null)
                     .SetProperty(x => x.LeaseUntilUtc, (DateTime?)null)
-                    .SetProperty(x => x.LastError, (string?)null), cancellationToken);
+                    .SetProperty(x => x.LastError, (string?)null), deadline);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -110,10 +172,10 @@ public sealed partial class OutboxDispatcher<TDbContext>
         }
         catch (Exception exception)
         {
-            var timedOut = exception is OperationCanceledException;
-            if (timedOut)
+            var timedOut = deadline.IsCancellationRequested || exception is OperationCanceledException;
+            if (timedOut && !deadline.IsCancellationRequested)
                 logger.LogWarning(exception, "Outbox delivery deadline elapsed for message {MessageId}; lease expiry will permit retry.", candidate.MessageId);
-            else
+            else if (!timedOut)
                 logger.LogError(exception, "Outbox delivery failed for message {MessageId}; it remains due for retry.", candidate.MessageId);
             var error = exception.ToString();
             if (error.Length > 1000) error = error[..1000];
@@ -122,7 +184,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
                 var owned = rows.Where(x => x.Sequence == candidate.Sequence && x.LeaseId == candidate.LeaseId);
                 if (timedOut)
                 {
-                    // A transport may ignore cancellation. Do not permit immediate retry while its send is still running.
+                    // A late completion never acknowledges or clears a timed-out claim.
                     await owned.ExecuteUpdateAsync(update => update.SetProperty(x => x.LastError, error), CancellationToken.None);
                 }
                 else

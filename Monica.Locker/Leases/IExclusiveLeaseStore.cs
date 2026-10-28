@@ -18,6 +18,13 @@ public interface IExclusiveLeaseStore
     /// <summary>Releases only the specified term. Call after protected work has drained.</summary>
     Task<bool> TryReleaseAsync(LeaseIdentity identity, CancellationToken cancellationToken = default);
 
+    /// <summary>Reads one exact resource without acquiring, renewing, or enumerating other roles.</summary>
+    /// <remarks>
+    /// Returns the authority's observation time and at most one retained record, which may be expired.
+    /// A missing resource returns an empty snapshot; storage failures propagate rather than implying absence.
+    /// </remarks>
+    Task<LeaseSnapshot> GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken = default);
+
     /// <summary>Reads retained roles in one scope and module prefix without acquiring or renewing them.</summary>
     /// <remarks>Intended for low-cardinality coordination roles, not per-message or per-execution inventories.</remarks>
     Task<LeaseSnapshot> GetSnapshotAsync(string scope, string namePrefix,

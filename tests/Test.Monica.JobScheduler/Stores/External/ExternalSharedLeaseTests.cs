@@ -40,6 +40,10 @@ public sealed class ExternalSharedLeaseTests
                 var row = Assert.Single(snapshot.Leases);
                 Assert.Equal(next.ConfirmedAtUtc, row.AcquiredAtUtc);
                 Assert.Equal(renewed.ConfirmedAtUtc, row.ConfirmedAtUtc);
+                var exact = await store.GetSnapshotAsync(RESOURCE, token);
+                Assert.Equal(row, Assert.Single(exact.Leases));
+                Assert.True(exact.ObservedAtUtc >= renewed.ConfirmedAtUtc);
+                Assert.Empty((await store.GetSnapshotAsync(new(RESOURCE.Scope, RESOURCE.Name + ":missing"), token)).Leases);
             }
             finally { foreach (var store in stores.OfType<IDisposable>()) store.Dispose(); }
         });

@@ -29,6 +29,10 @@ public sealed partial class EfCoreJobSchedulerStore
         RunStoreOperationAsync("CoordinatorRelease", true,
             token => RelationalLeases.TryReleaseAsync(identity, token), cancellationToken);
 
+    Task<LeaseSnapshot> IExclusiveLeaseStore.GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken) =>
+        RunStoreOperationAsync("CoordinatorSnapshot", false,
+            token => RelationalLeases.GetSnapshotAsync(resource, token), cancellationToken);
+
     Task<LeaseSnapshot> IExclusiveLeaseStore.GetSnapshotAsync(string scope, string namePrefix, CancellationToken cancellationToken) =>
         RunStoreOperationAsync("CoordinatorSnapshot", false,
             token => RelationalLeases.GetSnapshotAsync(scope, namePrefix, token), cancellationToken);
