@@ -6,6 +6,8 @@ Start with the failed boundary and inspect its owning contract:
 | --- | --- |
 | Repository write is missing or a save fails | Context registration mode and ownership in [repositories](repositories.md); returned result envelope, flush behavior, and fresh-scope retry in [transactions](transactions.md) |
 | Operation rolls back unexpectedly | Nested failure, participant selection, and physical connection identity in [transactions](transactions.md) |
+| A DbContext is not a participant in the active transaction | Compare the error's context, logical transaction owner and selected participants; inspect the consumer's domain mapping, actual DI scope, connection instance and any physical sharding adapter. Same database names alone do not establish participation. |
+| A Shared call rejects a remote or independent store | Check resolved role/authority routing and whether a caller transaction is active. Co-locate compatible participants for atomic work, or explicitly select Independent when separate commit is intended. |
 | Event is not delivered or is delivered again | Primary-context outbox/inbox setup, migrations, and staging in [transactional events](transactional-events.md); then EventBus transport and worker health |
 | Outbox cleanup is slow or the table keeps growing | Independent cleanup controls, retention volume, existing timestamp index, and provider execution plan in [Outbox delivery and maintenance](transactional-events.md#outbox-delivery-and-maintenance) |
 | PostgreSQL/GaussDB rejects a UTC timestamp parameter | Outbox/inbox UTC mapping in [transactional events](transactional-events.md) |
@@ -13,3 +15,5 @@ Start with the failed boundary and inspect its owning contract:
 | Migration history counts differ from assembly counts, or a bulk update has partial outcomes | Assembly/history scope and sequential command outcomes in [Repository diagnostics](repository-diagnostics.md#inspect-and-apply-migrations) |
 
 For implementation changes, run the affected `Test.Monica.Repository` project, then the repository's required solution build and standard non-UI test gate.
+
+For a repeatedly failing event, reproduce the receiving handler with its actual method policy and primary Inbox context. Preserve admission filters and intentional prepare/commit phases. Do not remove participant guards, make every child call Independent, or classify an unexplained database failure as a permanent business rejection to stop retries. A database consolidation still requires correct scoped connection sharing and logical/physical context ownership.

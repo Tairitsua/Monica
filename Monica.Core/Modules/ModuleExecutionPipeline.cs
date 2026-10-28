@@ -79,6 +79,7 @@ public sealed class ModuleExecutionPipeline : MonicaModule<ModuleExecutionPipeli
         services.TryAddSingleton(_ =>
             new ExecutionBehaviorServiceRegistrationValidator(registrations, services));
         services.TryAddSingleton<ExecutionBehaviorPlanCache>();
+        services.TryAddSingleton<ExecutionScopeContext>();
         services.TryAddSingleton<IExecutionPipelineCatalog>(serviceProvider =>
             serviceProvider.GetRequiredService<ExecutionBehaviorPlanCache>());
         services.TryAddSingleton<ExecutionPipelineCatalogFacade>();

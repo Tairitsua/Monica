@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Data;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Monica.Tool.Extensions;
@@ -83,6 +84,14 @@ public sealed class ExecutionDescriptor
 
         if (transaction is not null)
         {
+            if (!Enum.IsDefined(transaction.IsolationLevel))
+                throw new ArgumentOutOfRangeException(nameof(transaction.IsolationLevel));
+            if (transaction.IsolationLevel != IsolationLevel.Unspecified)
+            {
+                if (TransactionMode != ExecutionTransactionMode.Automatic)
+                    throw new InvalidOperationException("An isolation requirement requires an automatic transaction.");
+                TransactionIsolationLevel = transaction.IsolationLevel;
+            }
             ArgumentNullException.ThrowIfNull(transaction.DbContextTypes);
             if (transaction.DbContextTypes.Length > 0)
             {
@@ -234,6 +243,9 @@ public sealed class ExecutionDescriptor
     /// default selection. The persistence module validates these types and owns their transaction participation.
     /// </summary>
     public IReadOnlyList<Type>? TransactionDbContextTypes { get; }
+
+    /// <summary>Gets the method's required isolation, or null when it uses the provider default.</summary>
+    public IsolationLevel? TransactionIsolationLevel { get; }
 
     private static ExecutionDescriptor GetOrAdd(Type componentType, DescriptorKey key)
     {

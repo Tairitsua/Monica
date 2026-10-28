@@ -25,3 +25,18 @@ public sealed class CommandStore : IResultRequest<OperationReceipt>
 public sealed record QueryIdentity(bool WaitForPeer = false) : IResultRequest<OperationReceipt>;
 
 public sealed record OperationReceipt(Guid ScopeId, string? User, Guid NestedScopeId = default);
+
+/// <summary>Coordinates a child call with an explicit transaction relationship.</summary>
+[ApiEndpoint(ApiHttpMethod.Post, "transactions/Coordinate")]
+public sealed record CommandCoordinate(bool Independent = false, bool FailParent = false, bool FailChild = false,
+    bool CallOriginalAfterView = false) : IResultRequest<TransactionReceipt>;
+
+/// <summary>Writes in the selected participant and calls a nested query.</summary>
+[ApiEndpoint(ApiHttpMethod.Post, "transactions/Child")]
+public sealed record CommandTransactionChild(bool Fail = false) : IResultRequest<TransactionReceipt>;
+
+/// <summary>Reads the receiving operation's scope identity.</summary>
+[ApiEndpoint(ApiHttpMethod.Post, "transactions/Scope")]
+public sealed record QueryTransactionScope(bool Cancel = false) : IResultRequest<Guid>;
+
+public sealed record TransactionReceipt(Guid ScopeId, Guid ChildScopeId, Guid GrandchildScopeId, string? User);

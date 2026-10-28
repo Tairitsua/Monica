@@ -302,6 +302,8 @@ public sealed class ExecutionContractTests
     [InlineData(nameof(NullEntryTransactionOperation), typeof(ArgumentException))]
     [InlineData(nameof(DuplicateContextsTransactionOperation), typeof(ArgumentException))]
     [InlineData(nameof(UndefinedModeTransactionOperation), typeof(ArgumentOutOfRangeException))]
+    [InlineData(nameof(NoneWithIsolationOperation), typeof(InvalidOperationException))]
+    [InlineData(nameof(InvalidIsolationOperation), typeof(ArgumentOutOfRangeException))]
     public void ExecutionDescriptor_WhenMethodTransactionDeclarationIsInvalid_ShouldFailBeforeExecution(
         string methodName, Type exceptionType)
     {
@@ -362,6 +364,12 @@ public sealed class ExecutionContractTests
     private static void AutomaticOperation(string value)
     {
     }
+
+    [ExecutionTransaction(ExecutionTransactionMode.None, IsolationLevel = System.Data.IsolationLevel.Serializable)]
+    private static void NoneWithIsolationOperation(string value) { }
+
+    [ExecutionTransaction(ExecutionTransactionMode.Automatic, IsolationLevel = (System.Data.IsolationLevel)12345)]
+    private static void InvalidIsolationOperation(string value) { }
 
     [ExecutionTransaction(ExecutionTransactionMode.None, DbContextTypes = new[] { typeof(FirstTransactionContext) })]
     private static void InvalidTransactionOperation(string value)

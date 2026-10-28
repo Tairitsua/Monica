@@ -19,12 +19,19 @@ internal sealed class ApplicationApiInvoker(
     ApplicationApiClientCatalog catalog,
     IJsonSerializerOptionsProvider serializer,
     IOptions<ModuleApiClientOption> apiClientOptions,
-    IEnumerable<IApplicationInvocationAuthorityPolicy> authorities) : IApplicationApiInvoker
+    IEnumerable<IApplicationInvocationAuthorityPolicy> authorities,
+    IServiceProvider services) : IApplicationApiInvoker
 {
     private readonly IApplicationInvocationAuthorityPolicy? _authority = authorities.SingleOrDefault();
 
-    public async Task<TResponse> InvokeAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,
-        CancellationToken cancellationToken = default) where TResponse : class, IRemoteResultEnvelope<TResponse>
+    public Task<TResponse> InvokeAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,
+        CancellationToken cancellationToken = default, ApiTransaction transaction = ApiTransaction.Shared)
+        where TResponse : class, IRemoteResultEnvelope<TResponse>
+        => ApiTransactionPolicy.ExecuteAsync(services, transaction,
+            () => InvokeCoreAsync(request, endpoint, cancellationToken, transaction));
+
+    private async Task<TResponse> InvokeCoreAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,
+        CancellationToken cancellationToken, ApiTransaction transaction) where TResponse : class, IRemoteResultEnvelope<TResponse>
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -38,7 +45,7 @@ internal sealed class ApplicationApiInvoker(
         if (destination is null)
         {
             if (localHandler is not null && (operation.RequiredRole is null || model.IsRoleActive(operation.RequiredRole)))
-                return await local.InvokeAsync(request, cancellationToken);
+                return await local.InvokeAsync(request, cancellationToken, transaction);
             destination = new ApplicationInvocationDestination(model.ResolveRoleAppId(operation.RequiredRole ?? operation.RoleId));
         }
         else if (operation.RequiredRole is { } required && model.ResolveRoleAppId(required) != destination.AppId)
@@ -46,6 +53,7 @@ internal sealed class ApplicationApiInvoker(
             throw new InvalidOperationException($"Authority destination '{destination.AppId}' conflicts with the owner of required role '{required}'.");
         }
 
+        ApiTransactionPolicy.EnsureRemoteAllowed(services, transaction);
         using var client = clients.CreateClient(catalog.GetClientName(destination.AppId, destination.ProviderKey));
         var operationName = requestType.Name.StartsWith("Command", StringComparison.Ordinal) ? requestType.Name["Command".Length..]
             : requestType.Name.StartsWith("Query", StringComparison.Ordinal) ? requestType.Name["Query".Length..] : requestType.Name;
