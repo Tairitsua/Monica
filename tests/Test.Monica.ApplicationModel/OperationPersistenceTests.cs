@@ -8,7 +8,10 @@ using Monica.ApplicationModel.Models;
 using Monica.Core.Execution;
 using Monica.Core.Mediator;
 using Monica.Core.Modularity.Abstractions;
+using Monica.EventBus.Abstractions;
+using Monica.EventBus.Models;
 using Monica.Modules;
+using Monica.Repository.Inbox.Models;
 using Monica.Testing.Hosting;
 using Xunit;
 
@@ -16,6 +19,25 @@ namespace Test.Monica.ApplicationModel;
 
 public sealed class OperationPersistenceTests
 {
+    [Fact]
+    public async Task Receive_WhenForeignTopicHasNoRequestBinding_ShouldSelectConsumerDomainAndCommitItsReceipt()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var app = await new PersistenceFactory().CreateAsync(cancellationToken: token);
+        await using var scope = app.CreateScope(token);
+        await scope.Resolve<IDistributedEventBus>().SubscribeAsync<ForeignOrderNotice, WorkerNoticeHandler>();
+        var message = scope.Resolve<IEventMessageFactory>().Prepare(typeof(ForeignOrderNotice), new ForeignOrderNotice("received"),
+            EventSubscriptionScope.Distributed);
+        await scope.Resolve<IEventReceiveDispatcher>().DispatchAsync(message, token);
+        await scope.Resolve<IEventReceiveDispatcher>().DispatchAsync(message, token);
+        await app.VerifyAsync<OrderingContext>(async (db, ct) =>
+        {
+            Assert.Equal("received", (await db.Orders.SingleAsync(ct)).Name);
+            Assert.Single(await db.Set<InboxReceipt>().ToListAsync(ct));
+        }, token);
+        await app.VerifyAsync<OrderingHistoryContext>(async (db, ct) => Assert.Empty(await db.Orders.ToListAsync(ct)), token);
+    }
+
     [Theory]
     [InlineData(false, false, 1, 0)]
     [InlineData(true, false, 0, 1)]
@@ -50,15 +72,18 @@ public sealed class OperationPersistenceTests
                     ["worker"] = new() { Roles = ["ordering.worker"] }
                 };
             });
-            builder.AddMediator();
+            builder.AddApplication();
+            builder.AddEventBus().UseNoOpDistributedEventBus();
             builder.AddRepository()
                 .AddRepositoryDbContext<OrderingContext>((_, db) => db.UseSqlite("Data Source=unused"))
-                .AddRepositoryDbContext<OrderingHistoryContext>((_, db) => db.UseSqlite("Data Source=unused"));
+                .AddRepositoryDbContext<OrderingHistoryContext>((_, db) => db.UseSqlite("Data Source=unused"))
+                .AddInbox<OrderingContext>();
             builder.AddUnitOfWork(options => options.ForDomain(DomainId.Ordering, typeof(OrderingContext)));
         }
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
+            services.AddScoped<WorkerNoticeHandler>();
             services.UseTestDatabase<OrderingContext>();
             services.UseTestDatabase<OrderingHistoryContext>();
         }

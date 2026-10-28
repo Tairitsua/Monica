@@ -19,15 +19,18 @@ public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkMana
         ExecutionContext<TInput> context,
         ExecutionDelegate<TResult> next)
     {
+        // None does not open a transaction, but nested entries still validate participation and failures.
+        if (context.Descriptor.TransactionMode == ExecutionTransactionMode.None && unitOfWorkManager.Current is null)
+            return next();
         context.Features.TryGet<UnitOfWorkScopeOptions>(out var options);
-        if (options is null && context.Descriptor.TransactionDbContextTypes is { } selected)
+        if (options is null)
         {
-            options = new UnitOfWorkScopeOptions(selected);
+            var selected = context.Descriptor.TransactionDbContextTypes;
+            if (selected is null && services?.GetService(typeof(ApplicationTransactionContexts)) is ApplicationTransactionContexts defaults)
+                selected = defaults.Select(context.Descriptor);
+            if (selected is not null || context.Descriptor.TransactionIsolationLevel is not null)
+                options = new UnitOfWorkScopeOptions(selected, context.Descriptor.TransactionIsolationLevel);
         }
-        if (options is null && unitOfWorkManager.Current is null &&
-            services?.GetService(typeof(ApplicationTransactionContexts)) is ApplicationTransactionContexts defaults &&
-            defaults.Select(context.Descriptor) is { } ownedContexts)
-            options = new UnitOfWorkScopeOptions(ownedContexts);
         return unitOfWorkManager.RunAsync(next.Invoke, options, context.CancellationToken);
     }
 }

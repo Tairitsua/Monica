@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Dapr.Abstractions;
@@ -246,13 +247,18 @@ internal class DaprEventBusSubscriptionHostedService(
                     message.Topic);
                 return TopicResponseAction.Retry;
             }
-            catch (EventMessageDeserializationException ex)
+            catch (Exception ex) when (ex is BusinessException or EventMessageDeserializationException)
             {
+                var deadLetterTopic = _deadLetterTopicPolicy.Resolve(message.Topic);
                 TopicStatusStore.ReportError(ServiceKey, message.Topic,
-                    $"Rejected malformed Dapr message for topic {message.Topic}", ex);
-                RecordState($"Rejected malformed Dapr message for topic {message.Topic}",
+                    $"Permanently rejected Dapr message {metadata.MessageId} for topic {message.Topic}", ex);
+                RecordState($"Permanently rejected Dapr message for topic {message.Topic}",
                     HostedServiceState.Degraded, ex);
-                Logger.LogWarning(ex, "Dropping malformed Dapr message for topic {Topic}", message.Topic);
+                Logger.Log(ex is BusinessException ? LogLevel.Error : LogLevel.Warning, ex,
+                    "Permanently rejected Dapr message {MessageId} on topic {Topic}; returning Drop " +
+                    "(ServiceKey: {ServiceKey}, DeadLetterTopic: {DeadLetterTopic})",
+                    metadata.MessageId, message.Topic, ServiceKey ?? "default", deadLetterTopic);
+                // Dapr owns forwarding Drop responses to the configured dead-letter topic.
                 return TopicResponseAction.Drop;
             }
             catch (Exception ex)

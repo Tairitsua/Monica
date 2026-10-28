@@ -35,6 +35,7 @@ public class ModuleUnitOfWork : MonicaModule<ModuleUnitOfWorkOption>
             Application.TypeActivation as IApplicationModel, Option.DomainDbContexts));
         context.Services.AddScoped<UnitOfWorkManager>();
         context.Services.AddScoped<IUnitOfWorkManager>(sp => sp.GetRequiredService<UnitOfWorkManager>());
+        context.Services.AddScoped<IExecutionTransaction>(sp => sp.GetRequiredService<UnitOfWorkManager>());
         context.Services.AddScoped<DomainEventQueue>();
         context.Services.AddScoped<IDomainEventQueue>(sp => sp.GetRequiredService<DomainEventQueue>());
     }
@@ -46,7 +47,7 @@ public class ModuleUnitOfWork : MonicaModule<ModuleUnitOfWorkOption>
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(UnitOfWorkExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork,
-                static descriptor => descriptor.TransactionMode == ExecutionTransactionMode.Automatic));
+                static descriptor => descriptor.IsBusinessOperation || descriptor.TransactionMode == ExecutionTransactionMode.Automatic));
     }
 }
 

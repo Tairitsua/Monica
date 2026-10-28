@@ -41,13 +41,12 @@ public class ModuleApplication : MonicaModule<ModuleApplicationOption>
             descriptor => descriptor.Point == MediatorExecutionPoints.Request));
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(options => options.AddBehavior(
             typeof(ApplicationOperationBehavior<,>), ExecutionBehaviorOrder.Diagnostics - 100,
-            descriptor => descriptor.Point == MediatorExecutionPoints.Request));
+            descriptor => descriptor.IsBusinessOperation));
     }
 
     /// <inheritdoc />
     public override void ConfigureServices(ModuleContext<ModuleApplicationOption> context)
     {
-        context.Services.TryAddSingleton<ApplicationOperationContext>();
         context.Services.TryAddScoped<IApplicationCallerContext, ApplicationCallerContext>();
         context.Services.Replace(ServiceDescriptor.Scoped<ILocalApiInvoker, ApplicationLocalApiInvoker>());
         context.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadOnlyRequestConvention, ApplicationQueryConvention>());

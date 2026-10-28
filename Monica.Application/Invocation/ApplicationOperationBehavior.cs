@@ -2,9 +2,9 @@ using Monica.Core.Execution;
 
 namespace Monica.Application.Invocation;
 
-/// <summary>Marks native mediator entries so nested Local APIs join the receiving operation and transaction.</summary>
+/// <summary>Makes every application business entry's receiving scope available to nested API calls.</summary>
 internal sealed class ApplicationOperationBehavior<TInput, TResult>(
-    IServiceProvider services, ApplicationOperationContext operation) : IExecutionBehavior<TInput, TResult>
+    IServiceProvider services, ExecutionScopeContext operation) : IExecutionBehavior<TInput, TResult>
 {
     public async Task<TResult> ExecuteAsync(ExecutionContext<TInput> context, ExecutionDelegate<TResult> next)
     {

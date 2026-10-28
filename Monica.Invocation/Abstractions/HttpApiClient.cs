@@ -7,6 +7,7 @@ using Monica.Core.Results.Abstractions;
 using Monica.Invocation.Models;
 using Microsoft.Extensions.Options;
 using Monica.Modules;
+using Monica.Invocation.Services;
 
 namespace Monica.Invocation.Abstractions;
 
@@ -47,8 +48,9 @@ public abstract class HttpApiClient(ICachedServiceProvider serviceProvider, Http
         where TResponse : class, IRemoteResultEnvelope<TResponse>
     {
         var options = CachedServiceProvider.GetRequiredService<IOptions<ModuleApiClientOption>>().Value;
-        return CachedServiceProvider.GetRequiredService<IRemoteCallClient>().InvokeAsync<TResponse>(
-            HttpClient, createRequest, context with { Transport = options.ProviderTransport }, cancellationToken);
+        return ApiTransactionPolicy.ExecuteAsync(CachedServiceProvider, Transaction,
+            () => CachedServiceProvider.GetRequiredService<IRemoteCallClient>().InvokeAsync<TResponse>(
+                HttpClient, createRequest, context with { Transport = options.ProviderTransport }, cancellationToken), remote: true);
     }
 
     /// <summary>

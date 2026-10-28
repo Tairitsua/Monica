@@ -1,6 +1,7 @@
 using System.Text;
 using AwesomeAssertions;
 using Confluent.Kafka;
+using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.EventBus.Kafka.Providers.ConfluentKafka;
 using Monica.EventBus.Models;
 using Xunit;
@@ -20,11 +21,12 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             () => handled.Task,
             () => committed = true,
             () => rewound = true,
+            _ => Assert.Fail("A successful delivery must not be rejected."),
             TestContext.Current.CancellationToken);
 
         committed.Should().BeFalse();
         handled.SetResult();
-        await pending;
+        (await pending).Should().BeTrue();
         committed.Should().BeTrue();
         rewound.Should().BeFalse();
     }
@@ -40,11 +42,105 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             () => Task.FromException(failure),
             () => committed = true,
             () => rewound = true,
+            _ => Assert.Fail("An unexpected failure must remain retryable."),
             TestContext.Current.CancellationToken);
 
         (await Assert.ThrowsAsync<InvalidOperationException>(operation)).Should().BeSameAs(failure);
         committed.Should().BeFalse();
         rewound.Should().BeTrue();
+    }
+
+    public static TheoryData<Exception> PermanentFailures => new()
+    {
+        new BusinessException("Required matching time is missing."),
+        new EventMessageDeserializationException("Invalid event body.")
+    };
+
+    [Theory]
+    [MemberData(nameof(PermanentFailures))]
+    public async Task CommitAfterHandlingAsync_WhenPermanentlyRejected_ShouldLogCommitAndContinue(Exception failure)
+    {
+        var operations = new List<string>();
+        Exception? rejected = null;
+
+        var processed = await KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+            () => Task.FromException(failure),
+            () => operations.Add("commit"),
+            () => operations.Add("rewind"),
+            exception =>
+            {
+                rejected = exception;
+                operations.Add("reject");
+            },
+            TestContext.Current.CancellationToken);
+        var nextProcessed = await KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+            () => Task.CompletedTask,
+            () => operations.Add("next-commit"),
+            () => operations.Add("next-rewind"),
+            _ => Assert.Fail("The next delivery must not be rejected."),
+            TestContext.Current.CancellationToken);
+
+        processed.Should().BeFalse();
+        nextProcessed.Should().BeTrue();
+        rejected.Should().BeSameAs(failure);
+        operations.Should().Equal("reject", "commit", "next-commit");
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenCancelled_ShouldRewindWithoutAcknowledging()
+    {
+        var rewound = false;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+                () => Task.FromCanceled(new CancellationToken(canceled: true)),
+                () => Assert.Fail("Cancellation must not acknowledge delivery."),
+                () => rewound = true,
+                _ => Assert.Fail("Cancellation must not reject delivery."),
+                TestContext.Current.CancellationToken));
+
+        rewound.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CommitAfterHandlingAsync_WhenCommitFails_ShouldRewindEvenAfterRejection(bool rejectHandler)
+    {
+        var rewound = false;
+        var rejectionCount = 0;
+        // Even a terminal-looking exception from commit is a failed acknowledgement, not a handler rejection.
+        var commitFailure = new BusinessException("Commit failed.");
+
+        var thrown = await Assert.ThrowsAsync<BusinessException>(() =>
+            KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+                () => rejectHandler ? Task.FromException(new BusinessException("Rejected.")) : Task.CompletedTask,
+                () => throw commitFailure,
+                () => rewound = true,
+                _ => rejectionCount++,
+                TestContext.Current.CancellationToken));
+
+        thrown.Should().BeSameAs(commitFailure);
+        rewound.Should().BeTrue();
+        rejectionCount.Should().Be(rejectHandler ? 1 : 0);
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenRewindFails_ShouldRequireConsumerToStop()
+    {
+        var handlerFailure = new InvalidOperationException("Handler failed.");
+        var seekFailure = new InvalidOperationException("Seek failed.");
+
+        var thrown = await Assert.ThrowsAsync<KafkaEventBusSubscriptionHostedService.KafkaConsumerRestartRequiredException>(() =>
+            KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+                () => Task.FromException(handlerFailure),
+                () => Assert.Fail("A failed delivery must not be acknowledged."),
+                () => throw seekFailure,
+                _ => Assert.Fail("An unexpected failure must remain retryable."),
+                TestContext.Current.CancellationToken));
+
+        Assert.IsType<AggregateException>(thrown.InnerException).InnerExceptions
+            .Should().Equal(handlerFailure, seekFailure);
     }
 
     [Fact]
@@ -59,10 +155,67 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => cancellation.CancelAsync(),
                 () => committed = true,
                 () => rewound = true,
+                _ => Assert.Fail("Cancellation must not reject delivery."),
                 cancellation.Token));
 
         committed.Should().BeFalse();
         rewound.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenCancelledDuringRejection_ShouldNotCommitOrSeek()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+                () => Task.FromException(new BusinessException("Rejected.")),
+                () => Assert.Fail("A canceled delivery must not be acknowledged."),
+                () => Assert.Fail("A stopped consumer must not seek."),
+                _ => cancellation.Cancel(),
+                cancellation.Token));
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenOwnershipIsLostAfterRejection_ShouldRestartWithoutSeeking()
+    {
+        var failure = new KafkaException(new Error(ErrorCode.Local_AssignmentLost));
+        var rejected = false;
+
+        var restart = await Assert.ThrowsAsync<KafkaEventBusSubscriptionHostedService.KafkaConsumerRestartRequiredException>(() =>
+            KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+                () => Task.FromException(new BusinessException("Rejected.")),
+                () => throw failure,
+                () => Assert.Fail("A transferred partition must not be sought."),
+                _ => rejected = true,
+                TestContext.Current.CancellationToken));
+
+        rejected.Should().BeTrue();
+        restart.InnerException.Should().BeSameAs(failure);
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenNativeBodyIsNull_ShouldRejectAndAcknowledge()
+    {
+        var record = CreateRecord();
+        record.Message.Value = null!;
+        var committed = false;
+        Exception? rejection = null;
+
+        var processed = await KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+            () =>
+            {
+                KafkaEventBusSubscriptionHostedService.CreateReceivedMessage(record, null);
+                return Task.CompletedTask;
+            },
+            () => committed = true,
+            () => Assert.Fail("A permanent body rejection must not rewind."),
+            failure => rejection = failure,
+            TestContext.Current.CancellationToken);
+
+        processed.Should().BeFalse();
+        committed.Should().BeTrue();
+        rejection.Should().BeOfType<EventMessageDeserializationException>();
     }
 
     [Theory]
@@ -81,6 +234,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw failure,
                 () => rewound = true,
+                _ => Assert.Fail("This failure must remain retryable."),
                 TestContext.Current.CancellationToken));
 
         restart.InnerException.Should().BeSameAs(failure);
@@ -98,6 +252,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw failure,
                 () => rewound = true,
+                _ => Assert.Fail("This failure must remain retryable."),
                 TestContext.Current.CancellationToken));
 
         thrown.Should().BeSameAs(failure);
@@ -116,6 +271,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.FromException(failure),
                 () => committed = true,
                 () => throw seekFailure,
+                _ => Assert.Fail("This failure must remain retryable."),
                 TestContext.Current.CancellationToken));
 
         committed.Should().BeFalse();
@@ -154,7 +310,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
 
         Action read = () => KafkaEventBusSubscriptionHostedService.CreateReceivedMessage(record, null);
 
-        read.Should().Throw<EventMessageDeserializationException>().WithMessage($"*'{missingHeader}'*");
+        read.Should().Throw<KafkaEventBusSubscriptionHostedService.KafkaNativeEnvelopeException>().WithMessage($"*'{missingHeader}'*");
     }
 
     [Fact]
@@ -166,7 +322,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
         var committed = false;
         var rewound = false;
 
-        await Assert.ThrowsAsync<EventMessageDeserializationException>(() =>
+        await Assert.ThrowsAsync<KafkaEventBusSubscriptionHostedService.KafkaNativeEnvelopeException>(() =>
             KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
                 () =>
                 {
@@ -175,6 +331,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 },
                 () => committed = true,
                 () => rewound = true,
+                _ => Assert.Fail("This failure must remain retryable."),
                 TestContext.Current.CancellationToken));
 
         committed.Should().BeFalse();

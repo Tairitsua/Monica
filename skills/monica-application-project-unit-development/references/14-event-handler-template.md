@@ -82,4 +82,5 @@ public sealed class LocalEventHandlerOrderApproved(DomainRefreshReadModel domain
 - Keep work in the handler when it belongs to processing that delivery. Choose a [TriggeredJob](15-job-template.md) when work needs an independent execution lifecycle, such as delayed scheduling, operator control, concurrency policy, or execution history. Use [transactional events](../../monica-infra-persistence/references/transactional-events.md) for durable delivery and deduplicated receives.
 - Pass the handler `CancellationToken` into every cancellable dependency. A distributed delivery timeout can return
   the message for retry, but it cannot forcibly terminate handler code that ignores cancellation.
+- Follow the [EventBus failure contract](../../monica-infra-messaging/references/event-bus.md#rejected-deliveries-and-retries) to distinguish permanent business rejections from retryable failures; persist expected alarm or rejection outcomes before returning normally.
 - Do not let handlers become alternate application services with large control flow and validation logic.

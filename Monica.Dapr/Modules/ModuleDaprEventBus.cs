@@ -138,7 +138,9 @@ public class ModuleDaprEventBusOption : ModuleOptions<ModuleDaprEventBus>
     /// Defaults to <see langword="null" />, which disables dead-letter forwarding. For example, the suffix
     /// <c>.dead-letter</c> maps <c>orders</c> to <c>orders.dead-letter</c>. A subscription whose source topic already
     /// ends with this suffix is treated as terminal and receives no further dead-letter target, preventing recursive
-    /// forwarding. Configuring this option does not provision broker topics or define Dapr retry limits; the host must
+    /// forwarding. BusinessException and malformed event bodies return Drop immediately: Dapr forwards them to this
+    /// destination when configured, or discards them otherwise. Other handler failures request retry.
+    /// Configuring this option does not provision broker topics or define Dapr retry limits; the host must
     /// deploy those resources separately before enabling forwarding. A configured suffix must be non-empty and contain
     /// no whitespace; invalid values are rejected when the subscription hosted service is activated.
     /// </summary>

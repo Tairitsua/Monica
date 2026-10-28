@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.EventBus.Abstractions;
@@ -162,14 +163,31 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 {
                     continue;
                 }
-                await CommitAfterHandlingAsync(
+                var processed = await CommitAfterHandlingAsync(
                     () => HandleExternalMessageAsync(
                         CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner),
                     () => consumer.Commit(result),
                     () => consumer.Seek(result.TopicPartitionOffset),
+                    failure =>
+                    {
+                        var idBytes = result.Message.Headers?.LastOrDefault(header => header.Key == "monica-message-id")?.GetValueBytes();
+                        var messageId = idBytes is null ? null : Encoding.UTF8.GetString(idBytes);
+                        TopicStatusStore.ReportError(ServiceKey, topicConsumer.TopicName,
+                            $"Permanently rejected Kafka message {messageId} at {result.TopicPartitionOffset}",
+                            failure);
+                        RecordState($"Permanently rejected Kafka message for topic {topicConsumer.TopicName}",
+                            HostedServiceState.Degraded, failure);
+                        Logger.LogError(failure,
+                            "Permanently rejected Kafka message {MessageId} at {TopicPartitionOffset}; skipping delivery " +
+                            "(ServiceKey: {ServiceKey})",
+                            messageId, result.TopicPartitionOffset, ServiceKey ?? "default");
+                    },
                     cancellationToken);
 
-                TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                if (processed)
+                {
+                    TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                }
 
                 if (!hasProvenHealthy)
                 {
@@ -220,12 +238,25 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         // coordinator. Consumer.Dispose uses NO_CONSUMER_CLOSE instead.
     }
 
-    internal static async Task CommitAfterHandlingAsync(
-        Func<Task> handle, Action commit, Action rewind, CancellationToken cancellationToken = default)
+    internal static async Task<bool> CommitAfterHandlingAsync(
+        Func<Task> handle, Action commit, Action rewind, Action<Exception> reject,
+        CancellationToken cancellationToken = default)
     {
+        var processed = true;
         try
         {
-            await handle();
+            try
+            {
+                await handle();
+            }
+            catch (Exception failure) when (failure is BusinessException or EventMessageDeserializationException)
+            {
+                // Classify only handler failures, after its transaction and scope have unwound.
+                cancellationToken.ThrowIfCancellationRequested();
+                reject(failure);
+                processed = false;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -235,8 +266,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         }
         catch (Exception failure)
         {
-            // Broker offsets advance only after the complete handler operation commits.
-            // Rewind so a failed delivery retains the same identity on this consumer.
+            // A retryable handler failure or failed offset commit must retain the same delivery identity.
             RewindOrThrow(rewind, failure);
             throw;
         }
@@ -256,18 +286,15 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             RewindOrThrow(rewind, failure);
             throw;
         }
+
+        return processed;
     }
 
     internal static EventMessage CreateReceivedMessage(ConsumeResult<string, string> result, string? serviceKey)
     {
-        if (result.Message?.Value is null)
-        {
-            throw new EventMessageDeserializationException($"Kafka message on topic '{result.Topic}' has a null body.");
-        }
-
         string? Header(string name)
         {
-            var value = result.Message.Headers?.LastOrDefault(header => header.Key == name)?.GetValueBytes();
+            var value = result.Message?.Headers?.LastOrDefault(header => header.Key == name)?.GetValueBytes();
             return value is null ? null : Encoding.UTF8.GetString(value);
         }
 
@@ -275,18 +302,26 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         {
             var value = Header(name);
             return !string.IsNullOrWhiteSpace(value) ? value
-                : throw new EventMessageDeserializationException(
+                : throw new KafkaNativeEnvelopeException(
                     $"Kafka message on topic '{result.Topic}' lacks required native EventBus header '{name}'. " +
                     "Dapr CloudEvents must be drained before switching providers.");
         }
 
         var metadata = new EventDeliveryMetadata(
             RequiredHeader("monica-message-id"), RequiredHeader("monica-source"), RequiredHeader("monica-event-name"),
-            result.Topic, serviceKey, Header("traceparent"), Header("tracestate"))
+            result.Topic, serviceKey, Header("traceparent"), Header("tracestate"));
+        if (result.Message?.Value is null)
         {
-            TransportKey = result.Message.Key
-        };
+            throw new EventMessageDeserializationException($"Kafka message on topic '{result.Topic}' has a null body.");
+        }
+
+        metadata = metadata with { TransportKey = result.Message.Key };
         return new EventMessage(metadata, EventSubscriptionScope.Distributed, Encoding.UTF8.GetBytes(result.Message.Value));
+    }
+
+    // A protocol mismatch requires an operator-controlled cutover, not permanent body rejection.
+    internal sealed class KafkaNativeEnvelopeException(string message) : Exception(message)
+    {
     }
 
     private static bool IsOwnershipLoss(KafkaException exception)

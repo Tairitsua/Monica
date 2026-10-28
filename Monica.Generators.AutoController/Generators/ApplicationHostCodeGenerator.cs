@@ -87,6 +87,18 @@ internal static class ApplicationHostCodeGenerator
         builder.Append("public sealed class Application").Append(first.Domain).Append(first.RequestKind).AppendLine("ApiClient(");
         builder.Append("    global::Monica.Invocation.Abstractions.IApplicationApiInvoker invoker) : ").Append(client.Key).AppendLine();
         builder.AppendLine("{");
+        builder.AppendLine("    private readonly global::Monica.Invocation.Models.ApiTransaction _transaction;");
+        builder.Append("    private Application").Append(first.Domain).Append(first.RequestKind).AppendLine("ApiClient(");
+        builder.AppendLine("        global::Monica.Invocation.Abstractions.IApplicationApiInvoker invoker,");
+        builder.AppendLine("        global::Monica.Invocation.Models.ApiTransaction transaction) : this(invoker)");
+        builder.AppendLine("    {");
+        builder.AppendLine("        if (!global::System.Enum.IsDefined(transaction)) throw new global::System.ArgumentOutOfRangeException(nameof(transaction));");
+        builder.AppendLine("        _transaction = transaction;");
+        builder.AppendLine("    }");
+        builder.AppendLine("    /// <inheritdoc />");
+        builder.Append("    public ").Append(client.Key).AppendLine(" WithTransaction(global::Monica.Invocation.Models.ApiTransaction transaction)");
+        builder.Append("        => new Application").Append(first.Domain).Append(first.RequestKind).AppendLine("ApiClient(invoker, transaction);");
+        builder.AppendLine();
         foreach (var operation in client.OrderBy(static operation => operation.Endpoint!.OperationName, StringComparer.Ordinal))
         {
             var endpoint = operation.Endpoint!;
@@ -99,7 +111,7 @@ internal static class ApplicationHostCodeGenerator
                 .Append(Literal(endpoint.HttpMethod.ToUpperInvariant())).Append(", ").Append(Literal(endpoint.CompleteRoute))
                 .Append(", ").Append(endpoint.Binding == "Query" ? "true" : "false")
                 .Append(", ").Append(endpoint.Binding == "Body" ? "true" : "false")
-                .AppendLine("), cancellationToken);");
+                .AppendLine("), cancellationToken, _transaction);");
             builder.AppendLine();
         }
         builder.AppendLine("}");
