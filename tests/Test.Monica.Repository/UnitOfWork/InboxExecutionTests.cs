@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
@@ -70,6 +71,30 @@ public sealed class InboxExecutionTests
     }
 
     [Fact]
+    public async Task Receive_WhenBusinessRejectedAfterFlush_ShouldRollBackBeforePropagatingToTransport()
+    {
+        await using var app = await new RepositoryScenarioFactory(
+            inbox: true,
+            configure: services => services.AddScoped<RejectingInboxHandler>()).CreateAsync(cancellationToken: Token);
+        EventMessage message;
+        await using (var scope = app.CreateScope(Token))
+        {
+            message = scope.Resolve<IEventMessageFactory>().Prepare(
+                typeof(RejectedInboxNotice), new RejectedInboxNotice("rejected"), EventSubscriptionScope.Distributed);
+        }
+
+        var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+            app.Services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, Token));
+
+        Assert.Equal("The notice violates a business rule.", exception.Message);
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            Assert.Empty(await db.HardDeleteRows.ToListAsync(ct));
+            Assert.Empty(await db.Set<InboxReceipt>().ToListAsync(ct));
+        }, Token);
+    }
+
+    [Fact]
     public async Task Receive_WhenDuplicateDeliveriesOverlap_ShouldCommitOneReceiptPerConsumer()
     {
         await using var app = await new RepositoryScenarioFactory(inbox: true).CreateAsync(cancellationToken: Token);
@@ -130,5 +155,19 @@ public sealed class SecondInboxHandler(TestRepositoryDbContext db) : IDistribute
     {
         db.HardDeleteRows.Add(new HardDeleteRow { Title = "b:" + eventData.Value });
         return Task.CompletedTask;
+    }
+}
+
+[EventName("tests.inbox.rejected.v1")]
+public sealed record RejectedInboxNotice(string Value);
+
+[Inbox("tests.inbox.rejected")]
+public sealed class RejectingInboxHandler(TestRepositoryDbContext db) : IDistributedEventHandler<RejectedInboxNotice>
+{
+    public async Task HandleEventAsync(RejectedInboxNotice eventData, CancellationToken cancellationToken)
+    {
+        db.HardDeleteRows.Add(new HardDeleteRow { Title = eventData.Value });
+        await db.SaveChangesAsync(cancellationToken);
+        throw new BusinessException("The notice violates a business rule.");
     }
 }

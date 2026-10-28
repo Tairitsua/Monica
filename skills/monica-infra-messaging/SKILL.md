@@ -9,7 +9,7 @@ Choose the communication boundary before the transport; database-coupled deliver
 
 | Task | Read |
 | --- | --- |
-| Notify typed handlers within one process or across processes | [EventBus](references/event-bus.md) |
+| Notify typed handlers, classify rejected deliveries, or configure dead-letter handling | [EventBus](references/event-bus.md) |
 | Inspect EventBus subscriptions, transport status, providers, or diagnostic listeners | [EventBus diagnostics](references/event-bus-diagnostics.md) |
 | Configure the Kafka console or inspect broker clusters, topics, consumer groups, and offset samples | [Kafka console](references/kafka-console.md) |
 | Call a published request, select Shared/Independent participation, or route by role | [API client](references/invocation.md) |
