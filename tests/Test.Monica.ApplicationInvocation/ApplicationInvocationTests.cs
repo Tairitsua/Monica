@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
@@ -18,12 +19,15 @@ using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
 using Monica.ApplicationModel.Models;
 using Monica.Core.Execution.Mvc;
+using Monica.Core.Execution;
 using Monica.Core.Mediator;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
 using Monica.Modules;
 using Monica.Invocation.Abstractions;
 using Monica.Invocation.Models;
+using Monica.Repository.UnitOfWork.Abstractions;
+using Monica.Repository.UnitOfWork.Models;
 using Monica.Testing.Hosting;
 using Xunit;
 
@@ -33,6 +37,53 @@ public sealed class ApplicationInvocationTests
 {
     private static readonly ApiHttpEndpoint OrdinaryEndpoint = new("POST", "api/v1/Ordering/invocation/ordinary", false, true);
     private static readonly ApiHttpEndpoint RequiredEndpoint = new("POST", "api/v1/Ordering/invocation/constrained", false, true);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Shared_WhenRoleOrAuthorityRoutesRemotely_ShouldRejectBeforeSendingEvenWhenCaught(bool authority)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var host = await new InvocationApplicationFactory(appId: authority ? "remote" : "local", authority: authority,
+            transactions: true).CreateAsync(cancellationToken: token);
+        PrepareCaller(host);
+        if (authority)
+            host.Services.GetRequiredService<AuthorityChoice>().Destination = new ApplicationInvocationDestination("remote", "primary");
+        await using var scope = host.CreateScope(token);
+        var manager = scope.Resolve<IUnitOfWorkManager>();
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
+        {
+            scope.Resolve<OrderingContext>().Orders.Add(new StoredOrder { Name = "must roll back" });
+            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<IApplicationApiInvoker>()
+                .InvokeAsync(new CommandConstrained(9), RequiredEndpoint, token));
+            Assert.Contains("Independent", rejected.Message);
+        }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token));
+        Assert.Contains("rollback-only", exception.Message);
+        Assert.Empty(host.Services.GetRequiredService<RecordingTransport>().Calls);
+        Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().ConstrainedCalls);
+        await host.VerifyAsync<OrderingContext>(async (db, ct) => Assert.Empty(await db.Orders.ToListAsync(ct)), token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Shared_WhenRoleCanExecuteLocally_ShouldJoinCallerWhileIndependentCanDispatchRemotely(bool independent)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var host = await new InvocationApplicationFactory(colocated: !independent, transactions: true)
+            .CreateAsync(cancellationToken: token);
+        PrepareCaller(host);
+        await using var scope = host.CreateScope(token);
+        await scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
+        {
+            var result = await scope.Resolve<IApplicationApiInvoker>().InvokeAsync(new CommandConstrained(9), RequiredEndpoint, token,
+                independent ? ApiTransaction.Independent : ApiTransaction.Shared);
+            Assert.Equal(ResStatus.Ok, result.Status);
+            Assert.Equal(independent ? 501 : 42, result.Data);
+        }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token);
+        Assert.Equal(independent ? 1 : 0, host.Services.GetRequiredService<RecordingTransport>().Calls.Count);
+        Assert.Equal(independent ? 0 : 1, host.Services.GetRequiredService<InvocationLedger>().ConstrainedCalls);
+    }
 
     [Theory]
     [InlineData(false)]
@@ -272,7 +323,8 @@ public sealed class ApplicationInvocationTests
     }
 
     private sealed class InvocationApplicationFactory(string appId = "local", bool colocated = false, bool httpProvider = true,
-        bool authority = false, bool receivers = false, bool remoteOnly = false, bool multipleHttpContributions = false)
+        bool authority = false, bool receivers = false, bool remoteOnly = false, bool multipleHttpContributions = false,
+        bool transactions = false)
         : MonicaTestApplicationFactory<ApplicationInvocationTests>
     {
         protected override IEnumerable<Assembly> TypeDiscoveryAssemblies =>
@@ -293,6 +345,11 @@ public sealed class ApplicationInvocationTests
                     ((Dictionary<string, ApplicationPlacement>)options.Applications)["external"] = new() { Roles = ["ordering.external"] };
             });
             builder.AddApplication();
+            if (transactions)
+            {
+                builder.AddRepository().AddRepositoryDbContext<OrderingContext>((_, options) => options.UseSqlite("Data Source=unused"));
+                builder.AddUnitOfWork(options => options.ForDomain(DomainId.Ordering, typeof(OrderingContext)));
+            }
             builder.AddResultEnvelope().UseResultFieldNames(names => names.Status = "code");
             var applicationInvocation = builder.AddApplicationInvocation();
             if (multipleHttpContributions)
@@ -313,6 +370,7 @@ public sealed class ApplicationInvocationTests
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
+            if (transactions) services.UseTestDatabase<OrderingContext>();
             services.RemoveAll<IHttpClientFactory>();
             services.AddHttpClient();
             services.AddSingleton<RecordingTransport>();

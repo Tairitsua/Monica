@@ -6,6 +6,8 @@ Read [unified architecture](03-unified-architecture.md) for the single domain-co
 
 Use [startup and local execution](04-startup-and-local-execution.md) for configuration authority, environment inputs and the single-host Manual profile. These use the same domain/role placement and native lifecycle; local development adds no separate application model.
 
+Use [database layout and migrations](05-database-migrations.md) for migration placement, schema and history ownership, deployment preflight, and consolidation. The project specification owns concrete store mappings and installation choices; environment cutover assets own the execution and rollback procedure.
+
 ## Rule Strength
 
 | Kind | Meaning |

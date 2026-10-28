@@ -20,7 +20,7 @@ namespace Monica.Repository.UnitOfWork.Services;
 public sealed class UnitOfWorkManager(
     IServiceProvider services,
     IEnumerable<RepositoryDbContextRegistration> registrations,
-    IOptions<ModuleUnitOfWorkOption> configuration) : IUnitOfWorkManager, IUnitOfWork
+    IOptions<ModuleUnitOfWorkOption> configuration) : IUnitOfWorkManager, IUnitOfWork, IExecutionTransaction
 {
     private const string ROLLBACK_EXCEPTION_DATA_KEY = "Monica.Repository.UnitOfWork.RollbackException";
     private readonly List<DbContext> _contexts = [];
@@ -28,11 +28,15 @@ public sealed class UnitOfWorkManager(
     private bool _active;
     private bool _terminal;
     private bool _rollbackOnly;
+    private UnitOfWorkScopeOptions _options = new();
 
     /// <inheritdoc />
     public IUnitOfWork? Current => _active ? this : null;
     /// <inheritdoc />
     public Guid Id { get; } = Guid.NewGuid();
+
+    /// <inheritdoc />
+    public bool IsActive => _active && _transaction is not null;
 
     /// <inheritdoc />
     public Task RunAsync(Func<Task> work, UnitOfWorkScopeOptions? options = null, CancellationToken cancellationToken = default)
@@ -43,11 +47,12 @@ public sealed class UnitOfWorkManager(
     {
         ArgumentNullException.ThrowIfNull(work);
         EnsureUsable();
+        using var scope = services.GetRequiredService<ExecutionScopeContext>().Enter(services);
         if (_active)
         {
             try
             {
-                if (options is not null) throw new InvalidOperationException("Nested work joins the existing transaction and cannot change its options.");
+                if (options is not null) await JoinAsync(options, cancellationToken);
                 var nestedResult = await work();
                 if (IsFailure(nestedResult)) MarkRollbackOnly();
                 return nestedResult;
@@ -152,7 +157,12 @@ public sealed class UnitOfWorkManager(
         if (_rollbackOnly) throw new InvalidOperationException("The operation is rollback-only. Dispose the scope before retrying.");
         var owner = context is IRepositoryContextAdapter { TransactionOwner: { } transactionOwner } ? transactionOwner : context;
         if (_transaction is not null && !_contexts.Contains(owner))
-            throw new InvalidOperationException("This DbContext is not a participant in the active transaction.");
+        {
+            MarkRollbackOnly();
+            throw new InvalidOperationException($"DbContext '{context.GetType().FullName}' (transaction owner '{owner.GetType().FullName}') " +
+                $"is not a participant in active transaction '{Id}'. Participants: {string.Join(", ", _contexts.Select(x => x.GetType().FullName))}. " +
+                "Select the executing domain's context and share its connection, or call through WithTransaction(ApiTransaction.Independent).");
+        }
     }
 
     private void EnsureUsable()
@@ -162,34 +172,61 @@ public sealed class UnitOfWorkManager(
 
     private async Task BeginAsync(UnitOfWorkScopeOptions options, CancellationToken token)
     {
+        _options = options;
         token.ThrowIfCancellationRequested();
         var available = registrations.Where(x => x.ProviderType == DbContextProviderType.UnitOfWork)
             .Select(x => x.DbContextType).Distinct().ToArray();
         var selected = options.DbContextTypes?.Distinct().ToArray() ?? available;
         if (options.DbContextTypes is null && selected.Length > 1)
             throw new InvalidOperationException("Select the operation's DbContext explicitly when multiple write contexts are registered.");
+        await EnlistAsync(selected, options, token);
+    }
+
+    private async Task JoinAsync(UnitOfWorkScopeOptions options, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (_transaction is not null && options.IsolationLevel is { } required &&
+            required != _transaction.GetDbTransaction().IsolationLevel)
+            throw new InvalidOperationException($"Nested isolation '{required}' cannot replace active isolation '{_transaction.GetDbTransaction().IsolationLevel}'.");
+        if (options.CommandTimeout is { } timeout && timeout != _options.CommandTimeout)
+            throw new InvalidOperationException("Nested work cannot replace the active operation's command timeout.");
+        await EnlistAsync(options.DbContextTypes?.Distinct().ToArray() ?? [],
+            _options with { IsolationLevel = options.IsolationLevel ?? _options.IsolationLevel }, token);
+    }
+
+    private async Task EnlistAsync(IReadOnlyList<Type> selected, UnitOfWorkScopeOptions options, CancellationToken token)
+    {
+        var additional = new List<DbContext>();
         foreach (var type in selected)
         {
             if (!registrations.Any(registration => registration.DbContextType == type))
                 throw new InvalidOperationException($"Context '{type}' is not registered for unit-of-work participation.");
             var context = (DbContext)services.GetRequiredService(type);
+            if (_contexts.Contains(context)) continue;
             if (!context.Database.IsRelational()) throw new NotSupportedException("Write operations require a relational provider with real transaction support.");
             if (context.Database.CurrentTransaction is not null)
                 throw new InvalidOperationException("The operation boundary must own its transaction; an externally started transaction is already active.");
+            additional.Add(context);
+        }
+        if (additional.Count == 0) return;
+        var primary = _contexts.FirstOrDefault() ?? additional[0];
+        // Validate all participants before opening a transaction. Independent stores cannot be committed atomically.
+        if (additional.Any(x => !ReferenceEquals(x.Database.GetDbConnection(), primary.Database.GetDbConnection())
+                               || x.Database.ProviderName != primary.Database.ProviderName))
+            throw new NotSupportedException("Shared transactions require the same DbConnection instance and relational provider. " +
+                "Use WithTransaction(ApiTransaction.Independent) for an independently committed API call.");
+        foreach (var context in additional)
             if (options.CommandTimeout is { } timeout) context.Database.SetCommandTimeout(timeout);
+        if (_transaction is null)
+            _transaction = options.IsolationLevel is { } isolation
+                ? await primary.Database.BeginTransactionAsync(isolation, token)
+                : await primary.Database.BeginTransactionAsync(token);
+        foreach (var context in additional)
+        {
+            if (!ReferenceEquals(context, primary))
+                await context.Database.UseTransactionAsync(_transaction.GetDbTransaction(), token);
             _contexts.Add(context);
         }
-        if (_contexts.Count == 0) return;
-        var primary = _contexts[0];
-        // Validate all participants before opening a transaction. Independent stores cannot be committed atomically.
-        if (_contexts.Any(x => !ReferenceEquals(x.Database.GetDbConnection(), primary.Database.GetDbConnection())
-                               || x.Database.ProviderName != primary.Database.ProviderName))
-            throw new NotSupportedException("Shared transactions require the same DbConnection instance and relational provider.");
-        _transaction = options.IsolationLevel is { } isolation
-            ? await primary.Database.BeginTransactionAsync(isolation, token)
-            : await primary.Database.BeginTransactionAsync(token);
-        foreach (var context in _contexts.Skip(1))
-            await context.Database.UseTransactionAsync(_transaction.GetDbTransaction(), token);
     }
 
     private async Task RollbackAsync()

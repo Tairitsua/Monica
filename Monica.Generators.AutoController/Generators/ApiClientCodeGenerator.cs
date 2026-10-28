@@ -134,6 +134,9 @@ internal static class ApiClientCodeGenerator
         builder.Append("public interface ").Append(interfaceName)
             .AppendLine(" : global::Monica.Invocation.Abstractions.IApplicationApi");
         builder.AppendLine("{");
+        builder.AppendLine("    /// <summary>Creates an immutable call view with explicit transaction participation; the injected client remains unchanged.</summary>");
+        builder.Append("    ").Append(interfaceName).AppendLine(" WithTransaction(global::Monica.Invocation.Models.ApiTransaction transaction);");
+        builder.AppendLine();
         foreach (var endpoint in endpoints)
         {
             AppendDocumentation(builder, endpoint.DocumentationComment, "    ");
@@ -169,6 +172,7 @@ internal static class ApiClientCodeGenerator
         builder.Append("    : ").Append(baseType).Append("(serviceProvider, httpClient), ")
             .Append(contractNamespaceRoot).Append(".Contracts.").AppendLine(interfaceName);
         builder.AppendLine("{");
+        AppendTransactionView(builder, contractNamespaceRoot, interfaceName);
         foreach (var endpoint in endpoints)
         {
             AppendHttpMethod(builder, endpoint);
@@ -196,6 +200,7 @@ internal static class ApiClientCodeGenerator
         builder.Append("    : ").Append(baseType).Append("(serviceProvider), ")
             .Append(contractNamespaceRoot).Append(".Contracts.").AppendLine(interfaceName);
         builder.AppendLine("{");
+        AppendTransactionView(builder, contractNamespaceRoot, interfaceName);
         foreach (var endpoint in endpoints)
         {
             builder.Append("    public virtual async global::System.Threading.Tasks.Task<")
@@ -211,6 +216,15 @@ internal static class ApiClientCodeGenerator
 
         builder.AppendLine("}");
         return builder.ToString();
+    }
+
+    private static void AppendTransactionView(StringBuilder builder, string root, string interfaceName)
+    {
+        var contract = $"global::{root}.Contracts.{interfaceName}";
+        builder.AppendLine("    /// <inheritdoc />");
+        builder.Append("    public ").Append(contract).AppendLine(" WithTransaction(global::Monica.Invocation.Models.ApiTransaction transaction)");
+        builder.Append("        => WithTransactionCore<").Append(contract).AppendLine(">(transaction);");
+        builder.AppendLine();
     }
 
     private static void AppendHttpMethod(StringBuilder builder, EndpointModel endpoint)

@@ -77,7 +77,8 @@ public sealed class ApplicationHostSourceGeneratorTests
             .And.Contain("GetTotal(").And.Contain("GetChatTotal(")
             .And.Contain("ApiHttpEndpoint(\"POST\", \"api/v2/Ordering/queries/Total\", false, true)")
             .And.Contain("ApiHttpEndpoint(\"GET\", \"api/v2/Ordering/queries/ChatTotal\", true, false)")
-            .And.Contain("cancellationToken);")
+            .And.Contain("cancellationToken, _transaction);")
+            .And.Contain("IOrderingQueryApi WithTransaction(global::Monica.Invocation.Models.ApiTransaction transaction)")
             .And.NotContain("LocalApiClient").And.NotContain("HttpApiClient");
         var receiver = run.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
         receiver.Should().Contain("ApplicationApiReceiver(typeof(global::Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal))")

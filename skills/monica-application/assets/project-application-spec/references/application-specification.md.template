@@ -10,6 +10,10 @@
 
 <Give the actual local launch profile: host, AppId, complete role placement, AutonomousWork=false, connected resource environment and explicit diagnostic exposure. State which native manual actions are verified and which prerequisites or migration gaps remain. Link to shared startup/local-execution rules, including the implications of explicit writes; do not add a second service registry, startup object, or execution mode.>
 
+## Persistence and Migrations
+
+<Record the actual domain/context/migration-assembly/schema/history mapping, physical shared-table owners, current/history placement and scoped connection ownership. Link to shared database-layout and migration rules. Identify the project's migration runner, strict preflight flags, supported upgrade and fresh-install paths, and the operational owner of consolidation and rollback assets. Distinguish proposed placement from deployed facts; do not duplicate environment credentials here.>
+
 ## Local Conventions and Extension Contracts
 
 <State concrete naming, placement, metadata language and requirement source. Record only adopted product specializations: their native role, value, consumers, dependencies, lifetime/ownership, and behavioral evidence. Link to shared rules instead of copying them.>

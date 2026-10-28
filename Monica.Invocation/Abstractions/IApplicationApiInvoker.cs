@@ -9,7 +9,11 @@ namespace Monica.Invocation.Abstractions;
 public interface IApplicationApiInvoker
 {
     /// <summary>Invokes the operation with its shared HTTP mapping and caller cancellation.</summary>
+    /// <remarks>
+    /// Shared is the default and rejects remote dispatch during an active local transaction. Independent isolates
+    /// local execution in a fresh operation and leaves remote execution owned by the receiver. It never bypasses role routing.
+    /// </remarks>
     Task<TResponse> InvokeAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, ApiTransaction transaction = ApiTransaction.Shared)
         where TResponse : class, IRemoteResultEnvelope<TResponse>;
 }

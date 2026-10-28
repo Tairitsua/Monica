@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Mediator;
 using Monica.Core.Results.Abstractions;
 using Monica.DependencyInjection.Abstractions;
+using Monica.Invocation.Services;
 
 namespace Monica.Invocation.Abstractions;
 
@@ -22,5 +23,6 @@ public abstract class LocalApiClient(ICachedServiceProvider serviceProvider) : A
     /// <summary>Invokes through the host-owned boundary instead of retaining a circuit-owned mediator.</summary>
     protected Task<TResult> InvokeAsync<TResult>(IRequest<TResult> request, CancellationToken cancellationToken = default)
         where TResult : class, IRemoteResultEnvelope<TResult>
-        => CachedServiceProvider.GetRequiredService<ILocalApiInvoker>().InvokeAsync(request, cancellationToken);
+        => ApiTransactionPolicy.ExecuteAsync(CachedServiceProvider, Transaction,
+            () => CachedServiceProvider.GetRequiredService<ILocalApiInvoker>().InvokeAsync(request, cancellationToken, Transaction));
 }

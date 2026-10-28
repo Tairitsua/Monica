@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
 using Monica.Core.Execution;
+using Monica.Core.Mediator;
 
 namespace Monica.Repository.UnitOfWork.Services;
 
@@ -31,9 +32,19 @@ internal sealed class ApplicationTransactionContexts
     public IReadOnlyList<Type>? Select(ExecutionDescriptor descriptor)
     {
         if (_model is null) return null;
-        var domain = _model.Operations.TryGetValue(descriptor.InputType, out var operation) ? operation.DomainId :
-            _model.FindRole(descriptor.ComponentType.Assembly)?.DomainId ??
+        var domain = _model.FindRole(descriptor.ComponentType.Assembly)?.DomainId ??
             descriptor.ComponentType.Assembly.GetCustomAttribute<ApplicationDomainAttribute>()?.DomainId;
+        if (descriptor.Point == MediatorExecutionPoints.Request &&
+            _model.Operations.TryGetValue(descriptor.InputType, out var operation))
+        {
+            if (descriptor.ComponentType.FullName != operation.HandlerTypeName ||
+                descriptor.ComponentType.Assembly.GetName().Name != operation.HandlerAssemblyName)
+                throw new InvalidOperationException($"Execution component '{descriptor.ComponentType}' does not match the verified handler for '{descriptor.InputType}'.");
+            if (domain is not null && domain != operation.DomainId)
+                throw new InvalidOperationException($"Execution component '{descriptor.ComponentType}' belongs to '{domain}', " +
+                    $"but operation '{descriptor.InputType}' belongs to '{operation.DomainId}'.");
+            domain ??= operation.DomainId;
+        }
         return domain is not null && _contexts.TryGetValue(domain, out var context) ? [context] : [];
     }
 }
