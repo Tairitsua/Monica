@@ -281,10 +281,12 @@ public sealed partial class ExternalOutboxLeaseTests
     private static IHost CreateHost(ExternalSchedulerDatabase database, TimeProvider time, OutboxCommands commands, bool worker,
         IConnectionMultiplexer? redis = null, ExternalStoreCommandCounter? allCommands = null,
         IEventTransport? transport = null, Action<RepositoryOutboxOptions>? configureOutbox = null,
-        Action<DbContextOptionsBuilder>? configureDbContext = null)
+        Action<DbContextOptionsBuilder>? configureDbContext = null, IExclusiveLeaseStore? maintenanceStore = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        if (maintenanceStore is not null)
+            builder.Services.AddKeyedSingleton<IExclusiveLeaseStore>("test-maintenance", maintenanceStore);
         if (redis is not null)
         {
             builder.Services.AddSingleton(redis);
@@ -308,6 +310,8 @@ public sealed partial class ExternalOutboxLeaseTests
                     options.CleanupInterval = TimeSpan.FromSeconds(60);
                     options.StatusInterval = TimeSpan.FromSeconds(61);
                     if (redis is not null) options.MaintenanceLeaseStore = new LeaseStoreSelection("maintenance", database.DatabaseName);
+                    if (maintenanceStore is not null)
+                        options.MaintenanceLeaseStore = new LeaseStoreSelection("test-maintenance", database.DatabaseName);
                     if (time is MaintenanceCadenceTimeProvider)
                     {
                         options.PollInterval = TimeSpan.FromSeconds(7);

@@ -109,15 +109,43 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
         {
             // Resolve search_path once so different context CLR types protecting the same physical table contend.
             var name = db.GetService<ISqlGenerationHelper>().DelimitIdentifier(table, model.GetSchema());
-            schema = await db.Database.SqlQueryRaw<string>("""
+            schema = await ReadStoreScalarAsync<string>(db, """
                 SELECT namespace.nspname::text AS "Value" FROM pg_catalog.pg_class AS relation
                 JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
-                WHERE relation.oid = to_regclass({0})
-                """, name).SingleAsync(cancellationToken);
+                WHERE relation.oid = to_regclass(@table)
+                """, cancellationToken, ("table", name));
         }
         location = (schema, table);
         _tableLocation = location;
         return location;
+    }
+
+    // Store metadata and clock reads are not entity queries. Use the owned connection directly so query
+    // compilers for sharded business models do not attempt to route a scalar as an unmapped DbSet.
+    private static async Task<TResult> ReadStoreScalarAsync<TResult>(TDbContext db, string sql,
+        CancellationToken cancellationToken, params (string Name, object Value)[] parameters)
+    {
+        await db.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            await using var command = db.Database.GetDbConnection().CreateCommand();
+            command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+            command.CommandText = sql;
+            if (db.Database.GetCommandTimeout() is { } timeout) command.CommandTimeout = timeout;
+            foreach (var (name, value) in parameters)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = name;
+                parameter.Value = value;
+                command.Parameters.Add(parameter);
+            }
+            return await command.ExecuteScalarAsync(cancellationToken) is TResult result
+                ? result : throw new InvalidOperationException("The Outbox store did not return the expected metadata or clock value.");
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
     }
 
     /// <summary>

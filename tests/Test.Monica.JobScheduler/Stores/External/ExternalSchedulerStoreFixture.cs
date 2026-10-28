@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.Core.Modularity.Extensions;
+using Monica.EntityFrameworkCore.Extensions;
+using Monica.EntityFrameworkCore.Models;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.EfCore;
 using Monica.Modules;
@@ -39,8 +41,17 @@ internal sealed class ExternalSchedulerStoreFixture : IAsyncDisposable
         CancellationToken cancellationToken,
         params IInterceptor[] interceptors) => CreateWithPoolAsync(provider, cancellationToken, 3, interceptors);
 
-    internal static async Task<ExternalSchedulerStoreFixture> CreateWithPoolAsync(
-        string provider, CancellationToken cancellationToken, int maximumPoolSize, params IInterceptor[] interceptors)
+    internal static Task<ExternalSchedulerStoreFixture> CreateWithPoolAsync(
+        string provider, CancellationToken cancellationToken, int maximumPoolSize, params IInterceptor[] interceptors) =>
+        CreateCoreAsync(provider, cancellationToken, maximumPoolSize, null, interceptors);
+
+    internal static Task<ExternalSchedulerStoreFixture> CreateWithLayoutAsync(
+        string provider, InfrastructureTableLayout layout, CancellationToken cancellationToken) =>
+        CreateCoreAsync(provider, cancellationToken, 3, layout, []);
+
+    private static async Task<ExternalSchedulerStoreFixture> CreateCoreAsync(
+        string provider, CancellationToken cancellationToken, int maximumPoolSize,
+        InfrastructureTableLayout? layout, IInterceptor[] interceptors)
     {
         var database = await ExternalSchedulerDatabase.CreateAsync(provider, cancellationToken, maximumPoolSize);
         IHost? host = null;
@@ -52,6 +63,7 @@ internal sealed class ExternalSchedulerStoreFixture : IAsyncDisposable
                     (_, options) =>
                     {
                         database.ConfigureDbContext(options);
+                        if (layout is not null) options.UseMonicaTableLayout(layout);
                         options.AddInterceptors(interceptors);
                     }, DbContextProviderType.Default));
             builder.Services.AddMonicaTestSeams();

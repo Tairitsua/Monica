@@ -54,8 +54,9 @@ public sealed partial class EfCoreJobSchedulerStore
             return await context.SchedulerOwners.SingleOrDefaultAsync(row =>
                 row.SchedulerScopeKey == scope && row.OwnerKey == owner, token);
         }
-        return (await context.SchedulerOwners.FromSqlInterpolated(
-                $"SELECT * FROM \"JobSchedulerOwners\" WHERE \"SchedulerScopeKey\" = {scope} AND \"OwnerKey\" = {owner} FOR UPDATE")
+        var sql = "SELECT * FROM " + TableSql<JobSchedulerOwnerEntity>(context)
+                  + " WHERE \"SchedulerScopeKey\" = {0} AND \"OwnerKey\" = {1} FOR UPDATE";
+        return (await context.SchedulerOwners.FromSqlRaw(sql, scope, owner)
             .ToListAsync(token)).SingleOrDefault();
     }
 

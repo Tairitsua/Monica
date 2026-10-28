@@ -57,8 +57,12 @@ public sealed partial class EfCoreJobSchedulerStore
             // Publication is rare and owner-scoped. Lock existing gates in one sorted statement, avoiding one
             // round trip per declaration. New gates are protected by the already established owner mutex.
             if (UsesNativeRowLocks(dbContext))
-                await dbContext.ExecutionGates.FromSqlInterpolated(
-                    $"SELECT * FROM \"JobExecutionGates\" WHERE \"SchedulerScopeKey\" = {normalized.SchedulerScopeKey} AND \"OwnerKey\" = {normalized.OwnerKey} ORDER BY \"JobKey\" FOR UPDATE").ToListAsync(token);
+            {
+                var sql = "SELECT * FROM " + TableSql<JobExecutionGateEntity>(dbContext)
+                          + " WHERE \"SchedulerScopeKey\" = {0} AND \"OwnerKey\" = {1} ORDER BY \"JobKey\" FOR UPDATE";
+                await dbContext.ExecutionGates.FromSqlRaw(sql, normalized.SchedulerScopeKey, normalized.OwnerKey)
+                    .ToListAsync(token);
+            }
             else
                 await dbContext.ExecutionGates.Where(row => row.SchedulerScopeKey == normalized.SchedulerScopeKey
                     && row.OwnerKey == normalized.OwnerKey).OrderBy(row => row.JobKey).ToListAsync(token);

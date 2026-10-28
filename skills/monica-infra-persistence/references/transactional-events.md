@@ -2,6 +2,8 @@
 
 Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores. Use `SharedStoreKey` below to consolidate automatic dispatchers and qualify delivery destinations.
 
+Outbox physical-table discovery and native retry-clock reads execute on the context-owned connection, preserving its active transaction and command timeout. These store operations do not require scalar query-root support from a business model's custom query compiler. Verify worker startup and failed-delivery retry on the real sharding/provider composition as well as ordinary entity queries.
+
 Register the primary repository context and its UnitOfWork [transaction boundary](transactions.md) before configuring durable events.
 
 Choose the event's execution boundary first:

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Monica.JobScheduler.EfCore.Entities;
 using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.Models;
@@ -35,10 +37,10 @@ public sealed partial class EfCoreJobSchedulerStore
             placeholders.Add("{" + parameters.Count + "}");
             parameters.Add(key);
         }
-        var sql = "SELECT EXISTS (SELECT 1 FROM \"JobExecutionGates\" g "
+        var sql = "SELECT EXISTS (SELECT 1 FROM " + TableSql<JobExecutionGateEntity>(context) + " g "
                   + "WHERE g.\"SchedulerScopeKey\" = {0} AND g.\"OwnerKey\" = {1} "
                   + "AND g.\"ActiveCount\" < g.\"MaxConcurrency\" AND g.\"JobKey\" IN (" + string.Join(",", placeholders) + ") "
-                  + "AND EXISTS (SELECT 1 FROM \"JobExecutions\" e WHERE e.\"SchedulerScopeKey\" = g.\"SchedulerScopeKey\" "
+                  + "AND EXISTS (SELECT 1 FROM " + TableSql<JobExecutionEntity>(context) + " e WHERE e.\"SchedulerScopeKey\" = g.\"SchedulerScopeKey\" "
                   + "AND e.\"OwnerKey\" = g.\"OwnerKey\" AND e.\"JobKey\" = g.\"JobKey\" "
                   + "AND e.\"State\" = 'Queued' AND e.\"AvailableAtUtcTicks\" <= "
                   + DATABASE_STATEMENT_TICKS_SQL + ")) AS \"Value\"";
@@ -76,10 +78,10 @@ public sealed partial class EfCoreJobSchedulerStore
             placeholders.Add("{" + parameters.Count + "}");
             parameters.Add(key);
         }
-        var sql = "SELECT g.* FROM \"JobExecutionGates\" g "
+        var sql = "SELECT g.* FROM " + TableSql<JobExecutionGateEntity>(context) + " g "
                   + "WHERE g.\"SchedulerScopeKey\" = {0} AND g.\"OwnerKey\" = {1} "
                   + "AND g.\"ActiveCount\" < g.\"MaxConcurrency\" AND g.\"JobKey\" IN (" + string.Join(",", placeholders) + ") "
-                  + "AND EXISTS (SELECT 1 FROM \"JobExecutions\" e WHERE e.\"SchedulerScopeKey\" = g.\"SchedulerScopeKey\" "
+                  + "AND EXISTS (SELECT 1 FROM " + TableSql<JobExecutionEntity>(context) + " e WHERE e.\"SchedulerScopeKey\" = g.\"SchedulerScopeKey\" "
                   + "AND e.\"OwnerKey\" = g.\"OwnerKey\" AND e.\"JobKey\" = g.\"JobKey\" "
                   + "AND e.\"State\" = 'Queued' AND e.\"AvailableAtUtcTicks\" <= "
                   + DATABASE_STATEMENT_TICKS_SQL + ") "
@@ -91,6 +93,14 @@ public sealed partial class EfCoreJobSchedulerStore
         context.Database.ProviderName is { } provider
         && (provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)
             || provider.Contains("Gauss", StringComparison.OrdinalIgnoreCase));
+
+    // Identifiers come only from the active EF model and are delimited by its provider; values remain parameters.
+    private static string TableSql<TEntity>(JobSchedulerDbContext context)
+    {
+        var entity = context.Model.FindEntityType(typeof(TEntity))
+                     ?? throw new InvalidOperationException($"Scheduler entity '{typeof(TEntity).Name}' is not mapped.");
+        return context.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+    }
 
     private static async Task<JobExecutionGateEntity?> LockGateAsync(
         JobSchedulerDbContext context, string scope, string owner, string job,
@@ -104,9 +114,10 @@ public sealed partial class EfCoreJobSchedulerStore
 
         // Raw row locking is deliberately confined to PostgreSQL and the verified Vastbase/Gauss provider.
         // SQLite retains its serializable fixture boundary; capacity reads must never use SKIP LOCKED.
-        var query = skipLocked
-            ? context.ExecutionGates.FromSqlInterpolated($"SELECT * FROM \"JobExecutionGates\" WHERE \"SchedulerScopeKey\" = {scope} AND \"OwnerKey\" = {owner} AND \"JobKey\" = {job} FOR UPDATE SKIP LOCKED")
-            : context.ExecutionGates.FromSqlInterpolated($"SELECT * FROM \"JobExecutionGates\" WHERE \"SchedulerScopeKey\" = {scope} AND \"OwnerKey\" = {owner} AND \"JobKey\" = {job} FOR UPDATE");
+        var sql = "SELECT * FROM " + TableSql<JobExecutionGateEntity>(context)
+                  + " WHERE \"SchedulerScopeKey\" = {0} AND \"OwnerKey\" = {1} AND \"JobKey\" = {2} FOR UPDATE"
+                  + (skipLocked ? " SKIP LOCKED" : string.Empty);
+        var query = context.ExecutionGates.FromSqlRaw(sql, scope, owner, job);
         return (await query.ToListAsync(token)).SingleOrDefault();
     }
 
@@ -119,8 +130,9 @@ public sealed partial class EfCoreJobSchedulerStore
                 row => row.SchedulerScopeKey == scope && row.InstanceId == instance, token);
         }
 
-        return (await context.Executions.FromSqlInterpolated(
-                $"SELECT * FROM \"JobExecutions\" WHERE \"SchedulerScopeKey\" = {scope} AND \"InstanceId\" = {instance} FOR UPDATE")
+        var sql = "SELECT * FROM " + TableSql<JobExecutionEntity>(context)
+                  + " WHERE \"SchedulerScopeKey\" = {0} AND \"InstanceId\" = {1} FOR UPDATE";
+        return (await context.Executions.FromSqlRaw(sql, scope, instance)
             .ToListAsync(token)).SingleOrDefault();
     }
 

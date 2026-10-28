@@ -201,8 +201,8 @@ public sealed partial class OutboxDispatcher<TDbContext>
                         backoff * (0.8 + Random.Shared.NextDouble() * 0.4));
                     // Retry eligibility must use the same clock as claiming. This extra read is only on failure.
                     var retryClock = UsesNativeClaims(db)
-                        ? await db.Database.SqlQueryRaw<DateTime>("SELECT (clock_timestamp() AT TIME ZONE 'UTC') AS \"Value\"")
-                            .SingleAsync(CancellationToken.None)
+                        ? await ReadStoreScalarAsync<DateTime>(db,
+                            "SELECT (clock_timestamp() AT TIME ZONE 'UTC')", CancellationToken.None)
                         : time.GetUtcNow().UtcDateTime;
                     var retryAt = retryClock.AddMilliseconds(jittered);
                     await owned.ExecuteUpdateAsync(update => update.SetProperty(x => x.LeaseId, (Guid?)null)

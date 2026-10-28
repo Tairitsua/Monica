@@ -31,6 +31,8 @@ The policy adds no prefix and does not strip existing module-owned identifiers. 
 
 Schema support is resolved without database I/O. A missing schema or denied permission is an error for deployment to address, never a reason to fall back. Prepare the infrastructure schema before the provider's first history-table access requires it; prove bootstrap order on an empty instance of the actual provider.
 
+Native store SQL must resolve table names and schemas from the active EF model and quote them with the provider's `ISqlGenerationHelper`; mapping a schema does not qualify hand-written SQL. Keep data values parameterized. Verify native scheduler probes, owner/gate locks, claims, and completion with `infra` absent from the connection search path.
+
 ## Module-owned mappings
 
 ```csharp
