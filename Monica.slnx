@@ -37,6 +37,7 @@
     <Project Path="tests/Test.Monica.Dapr/Test.Monica.Dapr.csproj" />
     <Project Path="tests/Test.Monica.DataChannel/Test.Monica.DataChannel.csproj" />
     <Project Path="tests/Test.Monica.DataChannel.Dapr/Test.Monica.DataChannel.Dapr.csproj" />
+    <Project Path="tests/Test.Monica.EntityFrameworkCore/Test.Monica.EntityFrameworkCore.csproj" />
     <Project Path="tests/Test.Monica.EventBus.Kafka/Test.Monica.EventBus.Kafka.csproj" />
     <Project Path="tests/Test.Monica.EventBus/Test.Monica.EventBus.csproj" />
     <Project Path="tests/Test.Monica.DependencyInjection/Test.Monica.DependencyInjection.csproj" />
@@ -94,6 +95,7 @@
   <Project Path="Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
   <Project Path="Monica.Experimental/Monica.Experimental.csproj" />
   <Project Path="Monica.WebApi/Monica.WebApi.csproj" />
+  <Project Path="Monica.EntityFrameworkCore/Monica.EntityFrameworkCore.csproj" />
   <Project Path="Monica.EventBus.Kafka/Monica.EventBus.Kafka.csproj" />
   <Project Path="Monica.EventBus/Monica.EventBus.csproj" />
   <Project Path="Monica.Framework.Generators/Monica.Framework.Generators.csproj" />

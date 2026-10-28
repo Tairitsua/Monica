@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monica.EntityFrameworkCore.Extensions;
 using Monica.Locker.EfCore.Internal;
 
 namespace Monica.Locker.EfCore;
@@ -8,12 +9,12 @@ public static class LeaseModelBuilderExtensions
 {
     /// <summary>Maps <c>MonicaLeases</c>; exactly one context per database/schema must own its migrations.</summary>
     /// <param name="modelBuilder">The model used by lease operations and protected transactions.</param>
-    /// <param name="options">Shared schema and migration ownership; defaults to the provider schema with migration ownership.</param>
+    /// <param name="options">Migration ownership; defaults to ownership. Placement follows UseMonicaTableLayout.</param>
     /// <remarks>Apply migrations before workers start. This method never creates tables at runtime.</remarks>
     public static void ConfigureMonicaLeases(this ModelBuilder modelBuilder, LeaseTableOptions? options = null)
     {
         var lease = modelBuilder.Entity<LeaseRecord>();
-        lease.ToTable("MonicaLeases", options?.Schema, table =>
+        lease.ToMonicaInfrastructureTable("MonicaLeases", table =>
         {
             if (options?.ExcludeFromMigrations == true) table.ExcludeFromMigrations();
         });
@@ -29,8 +30,6 @@ public static class LeaseModelBuilderExtensions
 /// <summary>Configures the one shared coordinator table within a database authority.</summary>
 public sealed class LeaseTableOptions
 {
-    /// <summary>Explicit common schema, or null for the provider/context default. All participants must resolve the same table.</summary>
-    public string? Schema { get; set; }
     /// <summary>Excludes this table from this context's migrations; defaults to false. Exactly one context must own its creation.</summary>
     public bool ExcludeFromMigrations { get; set; }
 }

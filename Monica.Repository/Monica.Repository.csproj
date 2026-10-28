@@ -17,5 +17,6 @@
     <ProjectReference Include="..\Monica.DependencyInjection\Monica.DependencyInjection.csproj" />
     <ProjectReference Include="..\Monica.EventBus\Monica.EventBus.csproj" />
     <ProjectReference Include="..\Monica.Locker.EfCore\Monica.Locker.EfCore.csproj" />
+    <ProjectReference Include="..\Monica.EntityFrameworkCore\Monica.EntityFrameworkCore.csproj" />
   </ItemGroup>
 </Project>

@@ -116,13 +116,13 @@ Call `modelBuilder.ConfigureMonicaLeases(options)` in each participating context
 
 PostgreSQL and GaussDB-compatible providers use native row locks and database time. Time is sampled **after** a row-lock wait so renewal cannot revive an expired grant. Active standbys make one indexed read without a transaction; independent roles lock different rows. Each operation owns and disposes a fresh context, so holding a grant holds no connection. Only known transaction conflicts and precisely recognized lease-key insert races are retried. SQLite uses serializable transactions and a process clock for local/fixture use; it does not establish the production multi-replica contract. Other providers fail explicitly. Verify native concurrency on the actual deployed server/provider combination.
 
-Exactly one context per database/schema must own the table's migration. Set `LeaseTableOptions.ExcludeFromMigrations = true` in other participants, keeping `Schema` and the actual resolved table identical. JobScheduler exposes this through `ModuleJobSchedulerEfCoreOption.LeaseTable`; Outbox through `RepositoryOutboxOptions.LeaseTable`. Their models map the table automatically. A host can, for example, let JobScheduler own the table and configure Outbox:
+Exactly one context per database/schema must own the table's migration. Set `LeaseTableOptions.ExcludeFromMigrations = true` in other participants and configure the same [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md) on their context options. `LeaseTableOptions.Schema` has been removed; `UseMonicaTableLayout` is the shared placement authority, including plain DbContext consumers of `ConfigureMonicaLeases`. JobScheduler exposes migration ownership through `ModuleJobSchedulerEfCoreOption.LeaseTable`; Outbox through `RepositoryOutboxOptions.LeaseTable`. Their models map the table automatically. A host can, for example, let JobScheduler own the table and configure Outbox:
 
 ```csharp
 repository.AddOutbox<OrdersDbContext>(options =>
 {
     options.LeaseTable.ExcludeFromMigrations = true;
-    // Set the same explicit Schema on all participants when the provider default is unsuitable.
+    // Configure UseMonicaTableLayout on every participating context's options.
 });
 ```
 

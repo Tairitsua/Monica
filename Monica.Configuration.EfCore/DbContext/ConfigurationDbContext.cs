@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monica.EntityFrameworkCore.Extensions;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Configuration.EfCore.Entities;
 using Monica.Configuration.Models;
@@ -45,6 +46,7 @@ public sealed class ConfigurationDbContext(
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Configuration values can include secrets, so this store never enables sensitive data logging implicitly.
+        ConfigureRepositoryOptions(optionsBuilder);
     }
 
     protected override void OnModelCreatingExtend(ModelBuilder modelBuilder)
@@ -52,12 +54,20 @@ public sealed class ConfigurationDbContext(
         ConfigureKeys(modelBuilder);
         base.OnModelCreatingExtend(modelBuilder);
 
+        modelBuilder.Entity<ConfigurationDefinitionEntity>().ToMonicaInfrastructureTable("ConfigurationDefinitions");
+        modelBuilder.Entity<ConfigurationDefinitionPublishHistoryEntity>().ToMonicaInfrastructureTable("ConfigurationDefinitionPublishHistories");
+        modelBuilder.Entity<ConfigurationEffectiveValueEntity>().ToMonicaInfrastructureTable("ConfigurationEffectiveValues");
+        modelBuilder.Entity<ConfigurationValueHistoryEntity>().ToMonicaInfrastructureTable("ConfigurationValueHistories");
+        modelBuilder.Entity<ConfigurationMutationGroupEntity>().ToMonicaInfrastructureTable("ConfigurationMutationGroups");
+        modelBuilder.Entity<ConfigurationUnifiedVersionEntity>().ToMonicaInfrastructureTable("ConfigurationUnifiedVersions");
+        modelBuilder.Entity<ConfigurationUnifiedVersionDocumentEntity>().ToMonicaInfrastructureTable("ConfigurationUnifiedVersionDocuments");
+
         var timeColumnType = UsesTimestampWithTimeZone(Database.ProviderName)
             ? TIMESTAMP_WITH_TIME_ZONE_COLUMN_TYPE
             : TIMESTAMP_COLUMN_TYPE;
 
         modelBuilder.Entity<ConfigurationStoreLockEntity>()
-            .ToTable("ConfigurationStoreLocks");
+            .ToMonicaInfrastructureTable("ConfigurationStoreLocks");
         modelBuilder.Entity<ConfigurationStoreLockEntity>()
             .Property(x => x.LockKey)
             .IsRequired()
@@ -113,7 +123,7 @@ public sealed class ConfigurationDbContext(
             .HasPrecision(6)
             .HasColumnType(timeColumnType);
         modelBuilder.Entity<ConfigurationDefinitionPublisherStateEntity>()
-            .ToTable("ConfigurationDefinitionPublisherStates");
+            .ToMonicaInfrastructureTable("ConfigurationDefinitionPublisherStates");
         modelBuilder.Entity<ConfigurationDefinitionPublisherStateEntity>()
             .Property(x => x.DefinitionIdentity)
             .IsRequired()

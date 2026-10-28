@@ -1,5 +1,7 @@
 # Startup inputs and managed stores
 
+`ConfigurationDbContext` marks its tables for [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md). Configure `UseMonicaTableLayout` and `UseMonicaMigrationHistory` in the `UseDbConfigurationStore` callback and matching migration factory. The context preserves repository model variants and interception while opting out of implicit sensitive logging. Layout does not move existing configuration values or initialize the database.
+
 ## Deployment-owned startup options
 
 Use `[Configuration("Deployment:Resources", Kind = ConfigurationKind.Startup)]` for values that decide host construction, such as provider activation and connection settings. Supply ordinary host configuration before `AddMonica`; Core captures one immutable provider snapshot before invoking its callback. Read that snapshot through `GetStartupOptions<T>()` from `Monica.Configuration.Bootstrap`. The extension is available on the Monica builder and module composition contexts, without constructing a service provider or accessing a managed store.

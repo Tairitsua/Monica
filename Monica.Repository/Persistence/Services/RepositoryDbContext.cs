@@ -1,4 +1,5 @@
 using Monica.Locker.EfCore;
+using Monica.EntityFrameworkCore.Extensions;
 using System.Transactions;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -60,6 +61,9 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     private RepositoryEntityEventOptions? EntityEventOptions => CachedServiceProvider.GetService<RepositoryEntityEventOptionsRegistration<TDbContext>>()?.Options;
     bool IRepositoryModelFeatures.HasOutbox => OutboxOptions is not null;
     bool IRepositoryModelFeatures.HasInbox => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>() is not null;
+    bool IRepositoryModelFeatures.ExcludeOutboxFromMigrations => OutboxOptions?.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.ExcludeInboxFromMigrations => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>()?.Options.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.ExcludeLeasesFromMigrations => OutboxOptions?.LeaseTable.ExcludeFromMigrations == true;
     bool IOutboxStoreContext.HasOutbox => OutboxOptions is not null;
     bool IOutboxStoreContext.HasPendingOutboxMessages => _pendingMessages.Count != 0;
     bool IInboxStoreContext.HasInbox => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>() is not null;
@@ -68,7 +72,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     /// <summary>
     /// Identifies this context's model variant. Override for dynamic mappings such as table shards,
     /// including <c>base.ModelCacheKey</c> and every value that changes the model in the returned key.
-    /// Monica adds outbox configuration and design-time mode to this key automatically.
+    /// Monica adds message-store participation, migration exclusions, and design-time mode automatically.
+    /// UseMonicaTableLayout isolates EF's internal model cache by the immutable provider/layout identity.
     /// The getter runs before model initialization and must not access <see cref="DbContext.Model"/>.
     /// </summary>
     protected virtual object ModelCacheKey => GetType();
@@ -129,8 +134,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     protected readonly DbContextOptions DbContextOptions = options;
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.ReplaceService<IModelCacheKeyFactory, RepositoryModelCacheKeyFactory>();
-        optionsBuilder.AddInterceptors(RepositoryOperationInterceptor.Instance);
+        ConfigureRepositoryOptions(optionsBuilder);
         var enableSensitiveDataLogging = Options.EnableSensitiveDataLogging
             ?? CachedServiceProvider.GetService<IHostEnvironment>()?.IsDevelopment()
             ?? false;
@@ -140,6 +144,14 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             // EF Core must receive this setting during OnConfiguring for parameter values to be included in diagnostics.
             optionsBuilder.EnableSensitiveDataLogging();
         }
+    }
+
+    /// <summary>Installs repository model variants and operation interception without enabling sensitive logging.</summary>
+    /// <remarks>Contexts overriding OnConfiguring without calling base must call this method to preserve repository behavior.</remarks>
+    protected void ConfigureRepositoryOptions(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, RepositoryModelCacheKeyFactory>();
+        optionsBuilder.AddInterceptors(RepositoryOperationInterceptor.Instance);
     }
 
     #region Model conventions
@@ -229,7 +241,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         {
             builder.ConfigureMonicaLeases(OutboxOptions.LeaseTable);
             var outbox = builder.Entity<OutboxMessage>();
-            outbox.ToTable("MonicaOutbox", table =>
+            outbox.ToMonicaInfrastructureTable("MonicaOutbox", table =>
             {
                 if (OutboxOptions.ExcludeFromMigrations) table.ExcludeFromMigrations();
             });
@@ -254,7 +266,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         if (inboxRegistration is not null)
         {
             var inbox = builder.Entity<InboxReceipt>();
-            inbox.ToTable("MonicaInbox", table =>
+            inbox.ToMonicaInfrastructureTable("MonicaInbox", table =>
             {
                 if (inboxRegistration.Options.ExcludeFromMigrations) table.ExcludeFromMigrations();
             });

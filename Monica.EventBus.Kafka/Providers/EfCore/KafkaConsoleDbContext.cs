@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monica.EntityFrameworkCore.Extensions;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Repository.Persistence.Services;
 
@@ -28,7 +29,7 @@ public sealed class KafkaConsoleDbContext(
 
         builder.Entity<KafkaClusterEntity>(entity =>
         {
-            entity.ToTable("mo_eventbus_kafka_clusters");
+            entity.ToMonicaInfrastructureTable("mo_eventbus_kafka_clusters");
             entity.HasKey(cluster => cluster.ClusterId);
             entity.Property(cluster => cluster.ClusterId).HasMaxLength(128);
             entity.Property(cluster => cluster.DisplayName).HasMaxLength(256);
@@ -45,7 +46,7 @@ public sealed class KafkaConsoleDbContext(
 
         builder.Entity<KafkaPerformanceSnapshotEntity>(entity =>
         {
-            entity.ToTable("mo_eventbus_kafka_performance_snapshots");
+            entity.ToMonicaInfrastructureTable("mo_eventbus_kafka_performance_snapshots");
             entity.HasKey(snapshot => snapshot.ClusterId);
             entity.Property(snapshot => snapshot.ClusterId).HasMaxLength(128);
             entity.Property(snapshot => snapshot.Message).HasMaxLength(2048);

@@ -1,5 +1,7 @@
 # Transactional events and delivery
 
+Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores or deduplicate dispatchers; shared-store transitions must preserve consumer identity and local-handler eligibility.
+
 Register the primary repository context and its UnitOfWork [transaction boundary](transactions.md) before configuring durable events.
 
 Choose the event's execution boundary first:
