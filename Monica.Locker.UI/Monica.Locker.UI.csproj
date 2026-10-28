@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <PackageDescription>Authorized lease observation and lock-mechanism workbenches for Monica.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monica.Locker\Monica.Locker.csproj" />
+    <ProjectReference Include="..\Monica.UI\Monica.UI.csproj" />
+    <EmbeddedResource Include="Localization\**\*.json" />
+  </ItemGroup>
+</Project>

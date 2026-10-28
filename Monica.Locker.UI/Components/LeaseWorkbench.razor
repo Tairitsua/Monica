@@ -1,0 +1,64 @@
+@inject LeaseWorkbenchState State
+@inject LeaseDiagnosticsFacade Facade
+@inject IStringLocalizer<LockerResource> L
+@inject MoTimeFormatter Time
+@inject NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="ls-root">
+<LeaseWorkspace>
+    <Meta><span>@L["Workspace:ConfiguredSources"]</span><span class="ls-scope">@string.Join(" · ", State.Authorities.Select(item => item.Authority.Scope).Distinct())</span></Meta>
+    <Actions>
+        @if (_accessChecked && !State.AccessDenied)
+        {
+            <div class="ls-refresh">
+                <div class="ls-stamp"><span>@L["Common:Captured"]</span><time datetime="@State.OldestObservation?.ToString("O")">@Time.Format(State.OldestObservation)</time></div>
+                <MudMenu Label="@(State.RefreshSeconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", State.RefreshSeconds])" Variant="Variant.Outlined" EndIcon="@MoIcons.ChevronDown" aria-label="@L["Refresh:Title"]">
+                    @foreach (var seconds in LeaseWorkbenchState.RefreshIntervals)
+                    {
+                        <MudMenuItem OnClick="@(() => SetInterval(seconds))" Icon="@(State.RefreshSeconds == seconds ? MoIcons.Check : null)">@(seconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", seconds])</MudMenuItem>
+                    }
+                </MudMenu>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="ManualRefreshAsync" Disabled="@_busy">@L["Common:Refresh"]</MudButton>
+            </div>
+        }
+    </Actions>
+    <ChildContent>
+        @if (!_accessChecked)
+        {
+            <MoContentState Loading="true"><MudProgressCircular Indeterminate="true" /><p>@L["Common:Loading"]</p></MoContentState>
+        }
+        else if (State.AccessDenied)
+        {
+            <MoContentState><MoIcon Icon="@MoIcons.Lock" Size="2rem" /><h2>@L["Access:Denied"]</h2><p>@L["Access:Description"]</p></MoContentState>
+        }
+        else
+        {
+            <p class="ls-refresh-note">@L["Refresh:Policy"]</p>
+            @if (State.Failed || State.Authorities.Any(item => item.RefreshFailed))
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">@L["Evidence:Stale"]</MudAlert>
+            }
+            @if (!State.HasLoaded)
+            {
+                <MoContentState Loading="@_busy"><h2>@L[_busy ? "Common:Loading" : "Evidence:Unavailable"]</h2><p>@L["Evidence:Retry"]</p></MoContentState>
+            }
+            else if (State.Authorities.Count == 0)
+            {
+                <MoContentState><MoIcon Icon="@MoIcons.Database" Size="2rem" /><h2>@L["Evidence:Unconfigured"]</h2><p>@L["Evidence:UnconfiguredDescription"]</p></MoContentState>
+            }
+            else
+            {
+                <LeaseOwnershipMap Authorities="@State.Authorities" Rows="@State.Rows" SelectedAuthority="@Authority" SelectAuthority="SetAuthority" Inspect="OpenResource" />
+                <LeaseInventory Rows="@State.Rows" Authorities="@State.Authorities" Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" Filter="SetFilter" Inspect="OpenResource" />
+                <div class="ls-footnote"><h3>@L["Evidence:ClaimsTitle"]</h3><p>@L["Evidence:ClaimsDescription"]</p></div>
+            }
+            @if (!string.IsNullOrEmpty(ResourceName) && !string.IsNullOrEmpty(ResourceAuthority))
+            {
+                <LeaseEvidence @key="(ResourceAuthority, ResourceName)" Evidence="@(State.Selection is { } selected && selected.Authority == ResourceAuthority && selected.Resource.Name == ResourceName ? State.Exact : null)" Failed="@State.ExactFailed" Busy="@_busy" ResourceName="@ResourceName" SourceId="@ResourceAuthority" Close="CloseResource" Refresh="RefreshResourceAsync" Revoke="RevokeAsync" />
+            }
+        }
+    </ChildContent>
+</LeaseWorkspace>
+</div>

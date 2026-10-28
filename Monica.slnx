@@ -110,6 +110,7 @@
   <Project Path="Monica.JobScheduler/Monica.JobScheduler.csproj" />
   <Project Path="Monica.Locker.EfCore/Monica.Locker.EfCore.csproj" />
   <Project Path="Monica.Locker.Redis/Monica.Locker.Redis.csproj" />
+  <Project Path="Monica.Locker.UI/Monica.Locker.UI.csproj" />
   <Project Path="Monica.Locker/Monica.Locker.csproj" />
   <Project Path="Monica.Logging/Monica.Logging.csproj" />
   <Project Path="Monica.Markdown/Monica.Markdown.csproj" />

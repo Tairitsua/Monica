@@ -13,7 +13,7 @@ Select native UI composition and the task below. Read the owning capability befo
 | Diagnose scripts, styles, inactive controls, or refresh 404s | [Static assets](references/troubleshooting/static-assets.md), [Routing and refresh](references/troubleshooting/routing-and-refresh.md) |
 | Configure icons, themes, languages, or localization | [Icons](references/icons.md), [Theme and localization](references/theme-and-localization.md) |
 | Reuse emphasized findings, filters, fact grids, or evidence instruments | [Shared visual components](references/visual-components.md) |
-| Inspect host identity, timing, DbContexts, sessions, or migrations | [System information](references/system-information.md), [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md) |
+| Inspect host identity, timing, DbContexts, sessions, migrations, or leases | [System information](references/system-information.md), [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md), [Lease workbench](../monica-infra-hosting/references/lease-workbench.md) |
 | Render Markdown, diagrams, document search, or local images | [Markdown](references/markdown.md) |
 | Probe connectivity, transform text, or view and edit JSON | [Utilities](references/utilities.md), [JSON](references/json.md) |
 | Inspect mapping pairs and expressions | [Mapper workspace](references/mapper.md) |

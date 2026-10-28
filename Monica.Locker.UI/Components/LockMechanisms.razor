@@ -1,0 +1,41 @@
+@inject IStringLocalizer<LockerResource> L
+@inject NavigationManager Navigation
+
+<div class="locks-content">
+    @if (Invalid) { <MudAlert Severity="Severity.Warning" Dense="true">@L["Locks:Unknown"] @L["Locks:UnknownNote"]</MudAlert> }
+    <section class="lk-signature">
+        <div class="lk-choice-band"><div class="lk-choice-caption"><span>@L["Locks:Choose"]</span><small>@L["Locks:PreviewNote"]</small></div><div class="lk-choices" role="group" aria-label="@L["Locks:Choose"]">
+            @foreach (var item in PROVIDERS)
+            { <button class="lk-choice @(item.Key == Selected ? "is-selected" : null)" aria-pressed="@(item.Key == Selected ? "true" : "false")" @onclick="@(() => Select(item.Route))"><MoIcon Icon="@item.Icon" Size="1rem" />@L[$"Locks:Mechanisms:{item.Key}:Short"]</button> }
+        </div></div>
+        <div class="lk-decision"><div class="lk-display"><p class="lk-eyebrow">@L[$"Locks:Mechanisms:{Selected}:Context"]</p><h2>@L[$"Locks:Mechanisms:{Selected}:Label"]</h2><div class="lk-display-meta"><span class="lk-provider-tag">@L[$"Locks:Mechanisms:{Selected}:Short"]</span><span>@L["Locks:Selected"]</span></div></div><div class="lk-finding"><span class="lk-contract">@L["Locks:ContractOnly"]</span><p>@L[$"Locks:Mechanisms:{Selected}:Finding"]</p></div></div>
+        <div class="lk-flow" aria-label="@L["Locks:Stages"]">
+            <div class="lk-flow-caption"><span>@L["Locks:SuccessPath"]</span><span>@L[$"Locks:Mechanisms:{Selected}:WorkHint"]</span></div>
+            <ol class="lk-steps">
+                @foreach (var step in STEPS)
+                { <li class="lk-step @step.Role"><div class="lk-step-top"><span class="lk-tile"><MoIcon Icon="@step.Icon" Size="1.25rem" /></span><span class="lk-step-index">@step.Number</span></div><h3>@L[step.Title]</h3><p>@L[step.Note]</p></li> }
+            </ol>
+            <div class="lk-branches"><div class="lk-not-acquired"><span class="lk-branch-symbol"><MoIcon Icon="@MoIcons.CornerDownRight" Size="1rem" /></span><div><b>@L["Locks:NotAcquired"]</b><p>@L["Locks:NotAcquiredNote"]</p></div></div><div class="lk-loss @(Selected == "InProcess" ? "info" : "warning")"><span class="lk-tile"><MoIcon Icon="@MoIcons.ShieldCheck" Size="1.25rem" /></span><div><span class="lk-loss-eyebrow">@L["Locks:LossPath"]</span><h3>@L[$"Locks:Mechanisms:{Selected}:LossTitle"]</h3><p>@L[$"Locks:Mechanisms:{Selected}:LossNote"]</p></div></div></div>
+            <p class="lk-flow-note"><MoIcon Icon="@MoIcons.Info" Size="1rem" />@L["Locks:DiagramNote"]</p>
+        </div>
+    </section>
+    <div class="lk-evidence">
+        <section class="lk-comparison"><div class="lk-section-head"><div><h2>@L["Locks:Compare"]</h2><p>@L["Locks:CompareNote"]</p></div><MoIcon Icon="@MoIcons.Columns" Size="1.25rem" /></div>
+            <table class="lk-table"><thead><tr><th scope="col">@L["Locks:Provider"]</th><th scope="col">@L["Locks:Scope"]</th><th scope="col">@L["Locks:Expiry"]</th><th scope="col">@L["Locks:Signal"]</th></tr></thead><tbody>
+                @foreach (var item in PROVIDERS)
+                { <tr class="@(Selected == item.Key ? "is-selected" : null)"><th scope="row"><button class="lk-provider-name" aria-pressed="@(Selected == item.Key ? "true" : "false")" @onclick="@(() => Select(item.Route))"><MoIcon Icon="@item.Icon" Size="1rem" />@L[$"Locks:Mechanisms:{item.Key}:Short"]</button></th><td data-label="@L["Locks:Scope"]">@L[$"Locks:Mechanisms:{item.Key}:Scope"]</td><td data-label="@L["Locks:Expiry"]">@L[$"Locks:Mechanisms:{item.Key}:Expiry"]</td><td data-label="@L["Locks:Signal"]">@L[$"Locks:Mechanisms:{item.Key}:Signal"]</td></tr> }
+            </tbody></table>
+        </section>
+        <aside class="lk-observation"><div class="lk-observation-title"><MoIcon Icon="@MoIcons.Eye" Size="1.25rem" /><h2>@L["Locks:Observe"]</h2></div><p class="lk-observation-intro">@L["Locks:ContractNote"]</p><dl class="lk-unavailable"><div><dt>@L["Locks:Inventory"]</dt><dd>@L["Locks:NoInventory"]</dd><p>@L["Locks:InventoryNote"]</p></div><div><dt>@L["Locks:Revoke"]</dt><dd>@L["Locks:NoRevoke"]</dd><p>@L["Locks:RevokeNote"]</p></div></dl><a class="lk-role-link" href="leases"><span>@L["Locks:RoleLink"]<small>@L["Locks:RoleLinkNote"]</small></span><MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" /></a></aside>
+    </div>
+    <div class="lk-commit-boundary"><MoIcon Icon="@MoIcons.ShieldCheck" Size="1.25rem" /><p><b>@L["Locks:Boundary"]</b><span>@L["Locks:BoundaryNote"]</span></p></div>
+</div>
+
+@code {
+    [Parameter] public string? Provider { get; set; }
+    private static readonly (string Key, string Route, string Icon)[] PROVIDERS = [("Medallion", "medallion", MoIcons.Network), ("InProcess", "in-process", MoIcons.Server), ("Dapr", "dapr", MoIcons.Timer)];
+    private static readonly (string Title, string Note, string Role, string Icon, string Number)[] STEPS = [("Locks:Acquired", "Locks:AcquireNote", "primary", MoIcons.Key, "01"), ("Locks:Work", "Locks:WorkNote", "info", MoIcons.Workflow, "02"), ("Locks:Release", "Locks:ReleaseNote", "success", MoIcons.Check, "03")];
+    private string Selected => PROVIDERS.FirstOrDefault(item => item.Route == Provider).Key ?? "Medallion";
+    private bool Invalid => Provider is not null && !PROVIDERS.Any(item => item.Route == Provider);
+    private void Select(string value) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("provider", value), replace: true);
+}

@@ -1,0 +1,23 @@
+@inject IStringLocalizer<LockerResource> L
+
+<div class="lease-workspace mo-page-shell mo-page-shell--full-width">
+    <div class="lease-workspace__header">
+        <span class="lease-workspace__seal"><MoIcon Icon="@MoIcons.Key" Size="1.5rem" /></span>
+        <MoPageMasthead Title="@L["Workspace:Title"]" Crumb="@L["Workspace:Eyebrow"]">
+            <Meta>@Meta</Meta>
+            <Actions>@Actions</Actions>
+        </MoPageMasthead>
+    </div>
+    <MoWorkbenchNavigation Label="@L["Workspace:Title"]">
+        <a href="leases" aria-current="@(!Locks ? "page" : null)"><MoIcon Icon="@MoIcons.Network" Size="1rem" />@L["Navigation:Leases"]</a>
+        <a href="leases/locks" aria-current="@(Locks ? "page" : null)"><MoIcon Icon="@MoIcons.Lock" Size="1rem" />@L["Navigation:Locks"]</a>
+    </MoWorkbenchNavigation>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public bool Locks { get; set; }
+    [Parameter] public RenderFragment? Meta { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

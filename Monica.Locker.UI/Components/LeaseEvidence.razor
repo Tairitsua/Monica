@@ -1,0 +1,70 @@
+@inject IStringLocalizer<LockerResource> L
+@inject MoTimeFormatter Time
+
+<div class="ls-evidence-host">
+<MudDrawer Open="true" OpenChanged="@(_ => Close.InvokeAsync())" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Width="min(520px, 100vw)" Elevation="8" Class="ls-evidence-drawer">
+    <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild" Disabled="@_confirmOpen">
+    <div class="ls-evidence" role="dialog" aria-modal="true" aria-labelledby="lease-evidence-heading" @onkeydown="OnKeyDown">
+        <header><div><p>@L["Evidence:Title"]</p><h2 id="lease-evidence-heading">@LeasePresentation.Title(ResourceName, L)</h2></div><MudIconButton Icon="@MoIcons.Close" aria-label="@L["Common:Close"]" OnClick="@(() => Close.InvokeAsync())" /></header>
+        <div class="ls-evidence-body">
+            @if (Failed) { <MudAlert Severity="Severity.Warning" Dense="true">@L["Evidence:ExactFailed"]</MudAlert> }
+            @if (_revokeError) { <MudAlert Severity="Severity.Error" Dense="true">@L["Admin:Failed"]</MudAlert> }
+            @if (Evidence?.Snapshot.Leases.FirstOrDefault() is { } record)
+            {
+                var expired = record.ExpiresAtUtc <= Evidence.Snapshot.ObservedAtUtc;
+                var duration = LeasePresentation.Duration((record.ExpiresAtUtc - Evidence.Snapshot.ObservedAtUtc).TotalSeconds, L);
+                <div class="ls-grant @(expired ? "warning" : "success")"><span>@L[expired ? "Evidence:Expired" : "Evidence:Unexpired"]</span><b class="ls-grant-value">@(expired ? "−" : null)@duration.Value<small>@duration.Unit</small></b><p>@L[expired ? "Evidence:ExpiredAgo" : "Evidence:Remaining"]</p><div class="ls-grant-holder"><MoIcon Icon="@MoIcons.Server" Size="1rem" />@record.HolderId</div></div>
+                <div class="ls-exact-action"><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton><p>@L["Evidence:ExactHint"]</p></div>
+                <section><h3>@L["Evidence:Identity"]</h3><dl><div><dt>@L["Inventory:Authority"]</dt><dd>@Evidence.Authority.DisplayName</dd></div><div><dt>@L["Evidence:Scope"]</dt><dd>@record.Resource.Scope</dd></div><div><dt>@L["Evidence:Name"]</dt><dd>@record.Resource.Name</dd></div><div><dt>@L["Evidence:ServiceKey"]</dt><dd>@Evidence.Authority.StoreKey</dd></div></dl></section>
+                <section><h3>@L["Evidence:Timeline"]</h3><ol class="ls-time-spine">
+                    @foreach (var point in new[] { ("Acquired", record.AcquiredAtUtc), ("Confirmed", record.ConfirmedAtUtc), ("Expires", record.ExpiresAtUtc), ("Observed", Evidence.Snapshot.ObservedAtUtc) })
+                    { <li><i></i><div><span>@L[$"Timestamps:{point.Item1}"]</span><time datetime="@point.Item2.ToString("O")">@Time.Format(point.Item2)</time></div></li> }
+                </ol><p>@L["Evidence:TimelineNote"]</p></section>
+                <section><h3>@L["Evidence:Meaning"]</h3><p>@L[$"Meaning:{Evidence.Authority.Kind}"]</p></section>
+                <section class="ls-admin"><h3>@L["Admin:Title"]</h3><p>@L["Admin:Warning"]</p>
+                    @if (Evidence.CanRevoke) { <MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="@Busy" OnClick="OpenConfirmation">@L["Admin:Revoke"]</MudButton> }
+                    else { <p>@L["Admin:Unavailable"]</p> }
+                </section>
+            }
+            else
+            {
+                <MoContentState Loading="@Busy"><MoIcon Icon="@MoIcons.Inbox" Size="2rem" /><h3>@L[Busy ? "Common:Loading" : Failed || Evidence is null ? "Evidence:Unavailable" : "Evidence:Missing"]</h3><p>@L["Evidence:MissingDescription"]</p><MudButton Variant="Variant.Outlined" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton></MoContentState>
+                <dl><div><dt>@L["Inventory:Authority"]</dt><dd>@SourceId</dd></div><div><dt>@L["Evidence:Name"]</dt><dd>@ResourceName</dd></div></dl>
+            }
+        </div>
+    </div>
+    </MudFocusTrap>
+</MudDrawer>
+</div>
+<MudDialog @bind-Visible="_confirmOpen" Options="_dialogOptions" DefaultFocus="DefaultFocus.LastChild">
+    <TitleContent><h2>@L["Admin:ConfirmTitle"]</h2></TitleContent>
+    <DialogContent><p>@L["Admin:ConfirmDescription"]</p><p class="mo-vl-mono">@_target?.Authority.Id / @_target?.Authority.Scope / @_target?.Snapshot.Leases.FirstOrDefault()?.Resource.Name</p><MudAlert Severity="Severity.Warning" Dense="true">@L["Admin:Warning"]</MudAlert><MudCheckBox T="bool" @bind-Value="_acknowledged" Label="@L["Admin:Acknowledge"]" /></DialogContent>
+    <DialogActions><MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="@(!_acknowledged || Busy)" OnClick="ConfirmAsync">@L["Admin:Revoke"]</MudButton><MudButton Disabled="@Busy" OnClick="@(() => _confirmOpen = false)">@L["Common:Cancel"]</MudButton></DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public LeaseResourceEvidence? Evidence { get; set; }
+    [Parameter] public bool Failed { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string ResourceName { get; set; } = string.Empty;
+    [Parameter] public string SourceId { get; set; } = string.Empty;
+    [Parameter] public EventCallback Close { get; set; }
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public Func<LeaseResourceEvidence, Task<bool>>? Revoke { get; set; }
+    private bool _confirmOpen, _acknowledged, _revokeError, _submitting;
+    private LeaseResourceEvidence? _target;
+    private readonly DialogOptions _dialogOptions = new() { CloseOnEscapeKey = true, BackdropClick = false, MaxWidth = MaxWidth.Small, FullWidth = true };
+    private Task OnKeyDown(KeyboardEventArgs args) => args.Key == "Escape" && !_confirmOpen ? Close.InvokeAsync() : Task.CompletedTask;
+    private void OpenConfirmation() { _target = Evidence; _acknowledged = false; _confirmOpen = true; }
+    private async Task ConfirmAsync()
+    {
+        if (!_acknowledged || Busy || _submitting || _target is null || Revoke is null) return;
+        _submitting = true;
+        try
+        {
+            _revokeError = !await Revoke(_target);
+            _confirmOpen = false;
+        }
+        finally { _submitting = false; }
+    }
+}

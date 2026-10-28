@@ -1,0 +1,205 @@
+{
+  "Navigation": {
+    "Category": "租约与锁",
+    "Leases": "协调租约",
+    "Locks": "临界区锁"
+  },
+  "Workspace": {
+    "Title": "租约与锁",
+    "Eyebrow": "协同运行 / 所有权",
+    "ConfiguredSources": "已配置租约源的观测"
+  },
+  "Common": {
+    "Captured": "最早租约源观测时间",
+    "Refresh": "刷新租约清单",
+    "Loading": "正在读取租约证据…",
+    "Close": "关闭证据",
+    "Cancel": "取消",
+    "Seconds": "秒",
+    "Minutes": "分钟",
+    "Hours": "小时"
+  },
+  "Refresh": {
+    "Title": "自动刷新",
+    "Every": "每 {0} 秒",
+    "Off": "自动刷新已关闭",
+    "Policy": "后台页面暂停自动读取，清单刷新复用缓存快照。"
+  },
+  "Access": {
+    "Denied": "无权访问",
+    "Description": "当前用户未获主机运维策略授权。"
+  },
+  "Map": {
+    "Intro": "每项职责，清晰可见的持有者。",
+    "Population": "条租约观测记录",
+    "Across": "来自 {0} 个已配置的租约源查询",
+    "Finding": "有效期以各租约源的观测时刻为准。保留的过期记录不能说明其工作进程是否仍在运行。",
+    "Title": "职责归属图",
+    "Description": "选择一项职责，查看对应证据",
+    "Records": "{0} 条观测记录",
+    "More": "在下方记录中查看其余 {0} 项"
+  },
+  "Evidence": {
+    "Stale": "部分刷新失败。已保留上次成功观测及其原始时间；暂不可用的租约源会单独标明。",
+    "Unavailable": "观测暂不可用",
+    "Retry": "请重试读取。查询失败不能用于判断所有权。",
+    "Unconfigured": "尚未配置租约源",
+    "UnconfiguredDescription": "在主机中注册租约存储及允许查看的作用域与资源前缀后，即可在此查看。",
+    "ClaimsTitle": "职责租约，不等同于消息或作业领取",
+    "ClaimsDescription": "作业执行与 Outbox 投递领取仍保留在业务记录中。本页展示共享协调职责。",
+    "Unexpired": "观测时未过期",
+    "Expired": "已过期记录",
+    "RefreshFailed": "刷新失败",
+    "Truncated": "显示 {0} / {1} 条记录",
+    "Empty": "没有留存的租约观测",
+    "EmptyDescription": "已配置查询未返回记录。没有记录不代表该职责从未被获取。",
+    "Retention": "SQL 可能保留过期行；Redis 过期键会从清单中消失。",
+    "CaptureNote": "有效期以各租约源的观测时刻为准。这些数值是快照，不是实时倒计时。",
+    "Title": "租约证据",
+    "ExactFailed": "精确查询失败；先前证据仍保留其原始观测时间。",
+    "ExpiredAgo": "观测时已过期",
+    "Remaining": "观测时剩余",
+    "RefreshExact": "刷新此资源",
+    "ExactHint": "精确查询只读取一个资源，不遍历整个清单。",
+    "Identity": "资源标识",
+    "Scope": "作用域",
+    "Name": "资源名称",
+    "ServiceKey": "服务键",
+    "Timeline": "当前授权的时间点",
+    "TimelineNote": "这些时间点仅描述当前留存的授权，不包含历任持有者或续约历史。",
+    "Meaning": "如何理解这个租约源",
+    "Missing": "该资源没有留存的观测",
+    "MissingDescription": "记录可能已过期、被撤销或移除。租约清单不是所有权历史。"
+  },
+  "Inventory": {
+    "Title": "租约记录",
+    "Description": "找到职责，再查看对应资源的精确观测。",
+    "Shown": "显示 {0} / {1} 条记录",
+    "Search": "搜索职责、持有者或资源…",
+    "AllAuthorities": "全部租约源",
+    "NoMatch": "没有匹配的记录",
+    "NoMatchDescription": "可切换租约源，或移除搜索与状态筛选。",
+    "Resource": "职责 / 资源",
+    "Holder": "观测到的持有者",
+    "Authority": "租约源",
+    "Validity": "观测时有效期",
+    "Previous": "上一页",
+    "Next": "下一页",
+    "Page": "第 {0} / {1} 页"
+  },
+  "Filters": {
+    "all": "全部记录",
+    "unexpired": "观测时未过期",
+    "expired": "已过期记录"
+  },
+  "Providers": {
+    "Sql": "SQL",
+    "Redis": "Redis",
+    "InMemory": "进程内",
+    "Custom": "自定义"
+  },
+  "Meaning": {
+    "Sql": "关系型租约源可支持持久化协调。事务保护取决于使用方是否在受保护事务内校验自己的授权。",
+    "Redis": "Redis 协调可重复执行的后台工作。异步故障切换可能丢失已确认的授权，因此属于建议性协调。",
+    "InMemory": "此租约源仅在当前进程内协调，不同副本不共享这些授权。",
+    "Custom": "此租约源由主机提供，有效期、一致性与事务保证由其实现定义。"
+  },
+  "Timestamps": {
+    "Acquired": "获取时间",
+    "Confirmed": "最后确认",
+    "Expires": "过期时间",
+    "Observed": "租约源观测时间"
+  },
+  "Admin": {
+    "Title": "管理操作",
+    "Warning": "撤销不会立即停止工作进程。新的持有者可能在旧任务仍运行时取得租约。",
+    "Revoke": "撤销当前租约",
+    "Unavailable": "此绑定未提供管理端撤销能力。",
+    "ConfirmTitle": "撤销此资源的当前租约？",
+    "ConfirmDescription": "操作会移除执行时存在的授权，其持有者可能已与当前显示的不同。",
+    "Acknowledge": "我了解工作可能发生重叠。",
+    "Failed": "无法确认撤销结果，请刷新证据后再决定是否重试。"
+  },
+  "Roles": {
+    "Recovery": "执行租约恢复",
+    "History": "执行历史清理",
+    "Outbox": "Outbox 清理与统计",
+    "Discovery": "注册中心主节点"
+  },
+  "Locks": {
+    "Choose": "选择一种锁机制",
+    "PreviewNote": "切换下方内容，不修改服务配置。",
+    "Selected": "当前查看",
+    "Compare": "选择前，先看这三个差异",
+    "CompareNote": "同一个调用方式，不同的协调范围与失锁能力。",
+    "Provider": "提供者",
+    "Scope": "协调范围",
+    "Expiry": "有效期与续期",
+    "Signal": "失锁信号",
+    "Unknown": "这个提供者不在示例中",
+    "UnknownNote": "当前展示默认机制。请选择下面的一个提供者继续查看。",
+    "Stages": "锁的持有与释放流程",
+    "Acquired": "取得锁",
+    "Work": "执行受保护操作",
+    "Release": "等待结束，再释放",
+    "AcquireNote": "未取得锁，就不进入操作。",
+    "WorkNote": "把取消信号传给操作；等待它真正结束。",
+    "ReleaseNote": "离开持有范围时，等待句柄释放。",
+    "NotAcquired": "未取得",
+    "NotAcquiredNote": "返回调用方，不执行操作",
+    "SuccessPath": "取得句柄后",
+    "LossPath": "操作期间的变化",
+    "DiagramNote": "流程展示调用关系，不代表实时执行、当前持有者或耗时。",
+    "Observe": "这页能看到什么",
+    "ContractOnly": "能力说明",
+    "ContractNote": "这里比较的是提供者契约。当前没有接入这个服务的锁运行数据。",
+    "Inventory": "当前持锁清单",
+    "NoInventory": "未提供查询能力",
+    "InventoryNote": "不能据此列出持有者、排队数量或等待时长。",
+    "Revoke": "管理端强制解锁",
+    "NoRevoke": "未提供管理能力",
+    "RevokeNote": "释放由取得句柄的调用方负责。",
+    "Boundary": "业务提交仍需自己的边界",
+    "BoundaryNote": "锁失效或取消不会撤销已经发出的请求。数据库更新仍需事务与并发校验。",
+    "RoleLink": "查看可续期的协调租约",
+    "RoleLinkNote": "调度主角色、Outbox 维护与服务发现选主。",
+    "Mechanisms": {
+      "InProcess": {
+        "Label": "一个进程内协调",
+        "Short": "In-process",
+        "Context": "当前进程 · 本地临界区",
+        "Finding": "适合同一进程内共享资源的串行访问。其他副本各自拥有一把锁，不参与这里的协调。",
+        "LossTitle": "没有独立的租约到期",
+        "LossNote": "本地信号量由句柄释放。没有失锁通知；仍要响应调用方的取消请求。",
+        "WorkHint": "由调用方管理取消",
+        "Scope": "单个进程",
+        "Expiry": "随句柄释放，无独立到期机制",
+        "Signal": "不提供丢失观测，令牌不可取消"
+      },
+      "Medallion": {
+        "Label": "原生分布式协调",
+        "Short": "Medallion",
+        "Context": "共享后端 · 跨副本临界区",
+        "Finding": "适合需要跨副本协调、并希望感知锁丢失的操作。有效期与续期取决于你选择的原生后端。",
+        "LossTitle": "收到失锁信号，停止并等待操作退出",
+        "LossNote": "可转发原生 HandleLostToken。读取它可能启动后端监测；业务操作需要响应取消。",
+        "WorkHint": "调用方取消 + 后端失锁信号",
+        "Scope": "所选原生后端",
+        "Expiry": "到期与续期由原生提供程序选项决定",
+        "Signal": "透传原生句柄信号，能力取决于后端"
+      },
+      "Dapr": {
+        "Label": "固定期限的持有",
+        "Short": "Dapr",
+        "Context": "同一 App ID · 同一锁存储",
+        "Finding": "适合使用 Dapr 锁组件、且操作能在已知期限内结束的场景。当前适配器不续期，也不能通知锁已丢失。",
+        "LossTitle": "期限到了，操作不会自动停止",
+        "LossNote": "安排足够短的工作期限。无失锁通知不等于仍然持锁；不要让操作越过已知有效期。",
+        "WorkHint": "工作期限必须短于锁的有效期",
+        "Scope": "配置的 Dapr 锁组件",
+        "Expiry": "固定租期，Monica 适配器不续期",
+        "Signal": "不提供丢失观测，令牌不可取消"
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+@inject IStringLocalizer<LockerResource> L
+@inject MoTimeFormatter Time
+
+<section class="ls-signature">
+    <div class="ls-decision">
+        <div><p class="ls-eyebrow">@L["Map:Intro"]</p><div class="ls-display">@Rows.Count<span>@L["Map:Population"]</span></div><p class="ls-context">@L["Map:Across", Authorities.Count]</p></div>
+        <div class="ls-finding">
+            <div class="ls-tally"><span class="ls-status success"><i></i>@Rows.Count(item => !item.Expired) @L["Evidence:Unexpired"]</span><span class="ls-status warning"><i></i>@Rows.Count(item => item.Expired) @L["Evidence:Expired"]</span></div>
+            <p>@L["Map:Finding"]</p>
+        </div>
+    </div>
+    <div class="ls-map">
+        <header><h2>@L["Map:Title"]</h2><span>@L["Map:Description"]</span></header>
+        @foreach (var source in Authorities)
+        {
+            var records = Rows.Where(row => row.Authority.Id == source.Authority.Id).ToArray();
+            <div class="ls-authority @LeasePresentation.Role(source.Authority.Kind)">
+                <button class="ls-authority-label" aria-pressed="@(SelectedAuthority == source.Authority.Id ? "true" : "false")" @onclick="@(() => SelectAuthority.InvokeAsync(source.Authority.Id))">
+                    <span class="ls-provider"><MoIcon Icon="@(source.Authority.Kind == LeaseAuthorityKind.Sql ? MoIcons.Database : MoIcons.Layers)" Size="1rem" />@L[$"Providers:{source.Authority.Kind}"]</span>
+                    <b>@source.Authority.DisplayName</b><span>@L["Map:Records", records.Length]</span>
+                    <time datetime="@source.Snapshot?.ObservedAtUtc.ToString("O")">@Time.Format(source.Snapshot?.ObservedAtUtc)</time>
+                    @if (source.RefreshFailed) { <span class="ls-source-failure">@L["Evidence:RefreshFailed"]</span> }
+                    @if (source.IsTruncated) { <span>@L["Evidence:Truncated", records.Length, source.TotalCount]</span> }
+                </button>
+                <div class="ls-role-tiles">
+                    @foreach (var row in records.Take(8))
+                    {
+                        <button class="ls-role-tile @(row.Expired ? "is-expired" : null)" @onclick="@(() => Inspect.InvokeAsync(row))">
+                            <span class="ls-role-top"><i class="@(row.Expired ? "warning" : "success")"></i><b>@LeasePresentation.Title(row.Record.Resource.Name, L)</b><MoIcon Icon="@MoIcons.ArrowUpRight" Size="0.8rem" /></span>
+                            <span class="ls-role-holder">@row.Record.HolderId</span><span class="ls-role-caption">@L[row.Expired ? "Evidence:Expired" : "Evidence:Unexpired"]</span>
+                        </button>
+                    }
+                    @if (records.Length > 8) { <button class="ls-more" @onclick="@(() => SelectAuthority.InvokeAsync(source.Authority.Id))">@L["Map:More", records.Length - 8]</button> }
+                    @if (records.Length == 0) { <p class="ls-map-empty">@L[source.RefreshFailed ? "Evidence:Unavailable" : "Evidence:Empty"]</p> }
+                </div>
+            </div>
+        }
+    </div>
+    <div class="ls-signature-foot"><MoIcon Icon="@MoIcons.Info" Size="1rem" /><span>@L["Evidence:Retention"]</span></div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    [Parameter] public string? SelectedAuthority { get; set; }
+    [Parameter] public EventCallback<string> SelectAuthority { get; set; }
+    [Parameter] public EventCallback<LeaseRow> Inspect { get; set; }
+}

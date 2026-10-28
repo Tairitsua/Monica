@@ -1,0 +1,9 @@
+.ls-root { min-width:0; }
+.ls-refresh { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.ls-stamp { display:flex; flex-direction:column; align-items:flex-end; gap:3px; margin-right:6px; font-size:11.5px; color:var(--mud-palette-text-secondary); }
+.ls-stamp time { font-family:var(--mo-font-family-mono); font-size:12px; color:var(--mud-palette-text-primary); white-space:nowrap; }
+.ls-scope { font-family:var(--mo-font-family-mono); font-size:12px; }
+.ls-refresh-note { margin:-12px 0 0; text-align:right; font-size:12px; color:var(--mud-palette-text-secondary); }
+.ls-footnote h3 { font-size:13px; font-weight:550; }
+.ls-footnote p { margin-top:6px; font-size:12px; line-height:1.8; color:var(--mud-palette-text-secondary); }
+@media(max-width:600px) { .ls-stamp { width:100%; align-items:flex-start; } .ls-refresh-note { text-align:left; } }

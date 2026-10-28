@@ -17,6 +17,7 @@ Start with composition for module-graph or host-lifecycle problems, then select 
 | Register workers or diagnose their startup, state, and shutdown | [Hosted services](references/hosted-services.md) |
 | Select a lock provider, configure shared lock keys, or check lease constraints | [Lockers](references/lockers.md) |
 | Select keyed SQL/Redis lease authorities, coordinate repeat-safe maintenance, or validate a protected transaction | [Coordinator leases](references/leases.md) |
+| Inspect lease holders, configure cached inventory queries, or expose operator revocation | [Lease workbench](references/lease-workbench.md) |
 | Register an observable object or inspect captured state, retained history, and exceptions | [Observable instance evidence](references/observable-instances.md) |
 | Configure registry/worker roles or inspect registered services | [Service discovery](references/service-discovery.md) |
 | Store key-value state using a memory, distributed, or keyed provider | [State stores](references/state-stores.md) |

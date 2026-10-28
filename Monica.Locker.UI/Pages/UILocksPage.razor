@@ -1,0 +1,34 @@
+@attribute [Route(PAGE_URL)]
+@inject IStringLocalizer<LockerResource> L
+@inject ILeaseDiagnosticsAccess Access
+@implements IAsyncDisposable
+
+<PageTitle>@L["Navigation:Locks"]</PageTitle>
+<LeaseWorkspace Locks="true">
+    <Meta><span>@L["Locks:ContractOnly"]</span></Meta>
+    <ChildContent>
+        @if (!_checked) { <MoContentState Loading="true"><MudProgressCircular Indeterminate="true" /><p>@L["Common:Loading"]</p></MoContentState> }
+        else if (!_authorized) { <MoContentState><h2>@L["Access:Denied"]</h2><p>@L["Access:Description"]</p></MoContentState> }
+        else { <LockMechanisms Provider="@Provider" /> }
+    </ChildContent>
+</LeaseWorkspace>
+
+@code {
+    public const string PAGE_URL = "/leases/locks";
+    [SupplyParameterFromQuery(Name = "provider")] public string? Provider { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _initialization;
+    private bool _checked, _authorized;
+    protected override Task OnInitializedAsync() => _initialization = CheckAsync();
+    private async Task CheckAsync()
+    {
+        try { _authorized = await Access.IsAuthorizedAsync(_lifetime.Token); _checked = true; }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        await _lifetime.CancelAsync();
+        try { if (_initialization is not null) await _initialization; }
+        finally { _lifetime.Dispose(); }
+    }
+}

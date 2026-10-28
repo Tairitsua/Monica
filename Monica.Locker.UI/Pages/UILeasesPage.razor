@@ -1,0 +1,13 @@
+@attribute [Route(PAGE_URL)]
+@inject IStringLocalizer<LockerResource> L
+<PageTitle>@L["Navigation:Leases"]</PageTitle>
+<LeaseWorkbench Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" ResourceAuthority="@ResourceAuthority" ResourceName="@ResourceName" />
+
+@code {
+    public const string PAGE_URL = "/leases";
+    [SupplyParameterFromQuery(Name = "authority")] public string? Authority { get; set; }
+    [SupplyParameterFromQuery(Name = "state")] public string? EvidenceState { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "source")] public string? ResourceAuthority { get; set; }
+    [SupplyParameterFromQuery(Name = "resource")] public string? ResourceName { get; set; }
+}
