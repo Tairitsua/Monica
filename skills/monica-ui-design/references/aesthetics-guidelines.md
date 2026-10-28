@@ -16,6 +16,7 @@ This reference covers building and verifying a browser prototype once the [desig
 - Model the fixture on the real scope, captured read-only from a running host or its store: real cardinalities, name lengths, cadences and state mixes, and the problems operators actually have, such as a failing cleanup job, a stuck execution or a job that skips because it outruns its cadence.
 - Make it deterministic. Derive history from a fixed anchor so each refresh extends the same history with stable identifiers, and replay prototype actions such as run now, pause, cancel and policy saves into later snapshots.
 - Record provenance in the design note: what is real, what is synthetic and what is derived. Sanitize scope keys, hosts and identifiers before the fixture leaves the team, and never present fixture data as live host evidence.
+- Apply the [prototype time-display contract](../../monica-infra-ui/references/time-display.md#prototype-time-display) to timestamp fixtures, labels and timezone verification.
 - Model only data the facade supplies or that a named, bounded query could supply. Record each missing query as an open decision instead of hiding it behind a decorative control.
 - Expose review scenarios for the states the design must survive, such as an empty scope, a failed refresh and an unknown deep link.
 
