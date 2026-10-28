@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -181,7 +181,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout Codex skill validator
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: openai/skills
           ref: 49f948faa9258a0c61caceaf225e179651397431
