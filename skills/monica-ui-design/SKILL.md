@@ -12,6 +12,7 @@ Design from the domain's real evidence. Before drawing, learn what the module's 
 | Decide what a page shows: questions, judgments, display value, finding, scope, signature, states, actions | [Design method](references/design-method.md) |
 | Build and verify the prototype: workspace, fixtures, interactions, reflow, checks, design note, handoff | [Prototype practice](references/aesthetics-guidelines.md) |
 | Design prototype timestamps, deployment timezone display, or schedule-time context | [Page time display](../monica-infra-ui/references/time-display.md#prototype-time-display) |
+| Design an inspector or drawer using the existing shared implementation | [Inspectors and drawers](references/aesthetics-guidelines.md#inspectors-and-drawers) |
 | Signature region, color role map, scale tiers and shared component vocabulary | [Visual language](../monica-ui-development/references/monica-visual-language.md) |
 | Evidence honesty, containment, scroll ownership, interaction state and page acceptance | [Working-interface language](../monica-ui-development/references/monica-workbench-design-language.md) |
 | Theme paint, fonts and shell geometry | [Precision Default](../monica-ui-development/references/monica-precision-design-language.md) or [Grove](../monica-ui-development/references/monica-grove-design-language.md) |
