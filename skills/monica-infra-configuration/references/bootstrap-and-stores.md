@@ -1,6 +1,6 @@
 # Startup inputs and managed stores
 
-`ConfigurationDbContext` marks its tables for [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md). Configure `UseMonicaTableLayout` and `UseMonicaMigrationHistory` in the `UseDbConfigurationStore` callback and matching migration factory. The context preserves repository model variants and interception while opting out of implicit sensitive logging. Layout does not move existing configuration values or initialize the database.
+`ConfigurationDbContext` marks its tables for [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md). Configure `UseMonicaTableLayout` and `UseMonicaMigrationHistory` in the `UseDbConfigurationStore` callback and matching migration factory. The context preserves repository model variants while retaining its existing interception policy and opting out of implicit sensitive logging. Layout does not move existing configuration values or initialize the database.
 
 ## Deployment-owned startup options
 

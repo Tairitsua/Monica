@@ -17,9 +17,34 @@ internal sealed class OutboxWorker(
     IEnumerable<IOutboxStore> stores)
     : MoBackgroundService(registry, hostedOptions, scopes, logger)
 {
-    private readonly IOutboxStore[] _stores = stores.ToArray();
+    private readonly IOutboxStore[] _contributions = stores.ToArray();
+    private IOutboxStore[] _stores = [];
 
     public override string ServiceName => "MonicaOutbox";
+
+    protected override async Task OnStartingAsync(CancellationToken cancellationToken)
+    {
+        var selected = new List<IOutboxStore>();
+        var identities = new HashSet<OutboxStoreIdentity>();
+        foreach (var group in _contributions.Where(store => store.SharedStoreKey is not null)
+                     .GroupBy(store => store.SharedStoreKey, StringComparer.Ordinal))
+        {
+            var owner = group.First();
+            var identity = await owner.GetIdentityAsync(cancellationToken);
+            foreach (var contribution in group.Skip(1))
+            {
+                if (contribution.Policy != owner.Policy)
+                    throw new InvalidOperationException($"Shared Outbox '{group.Key}' has conflicting delivery or maintenance policies.");
+                if (await contribution.GetIdentityAsync(cancellationToken) != identity)
+                    throw new InvalidOperationException($"Shared Outbox '{group.Key}' maps to different physical stores.");
+            }
+            if (!identities.Add(identity))
+                throw new InvalidOperationException("The same physical Outbox is registered under different shared store keys.");
+            selected.Add(owner);
+        }
+        selected.AddRange(_contributions.Where(store => store.SharedStoreKey is null));
+        _stores = selected.ToArray();
+    }
 
     protected override Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
         => Task.WhenAll(_stores.Select(store => RunStoreAsync(store, stoppingToken)));

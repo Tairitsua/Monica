@@ -16,6 +16,16 @@ public interface IEventReceiveDispatcher
     /// <remarks>Other owners in a combined host do not participate in this delivery.</remarks>
     Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken);
 
+    /// <summary>Delivers to exactly the selected active subscriptions, failing if any selection is unavailable or incompatible.</summary>
+    /// <remarks>
+    /// Used after durable destination qualification. IDs are a host-local snapshot, never persisted identities.
+    /// Every selected handler must finish before acknowledgment; later removal or deactivation fails delivery.
+    /// Custom dispatchers must implement this capability to deliver qualified shared Outbox local messages.
+    /// </remarks>
+    Task DispatchSelectedAsync(EventMessage message, IReadOnlyCollection<EventSubscriptionId> subscriptionIds,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This dispatcher does not support exact active subscription delivery.");
+
     /// <summary>Delivers a test message only to the explicitly selected local subscriptions.</summary>
     /// <remarks>
     /// Active and held subscriptions are eligible; disabled, inactive, missing or incompatible selections fail

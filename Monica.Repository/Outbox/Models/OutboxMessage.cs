@@ -25,6 +25,11 @@ public sealed class OutboxMessage
     public string? TraceParent { get; set; }
     /// <summary>Local or distributed delivery destination.</summary>
     public EventSubscriptionScope Scope { get; set; }
+    /// <summary>
+    /// Captured shared-store delivery capability: transport identity or complete typed local handler set.
+    /// Null identifies an unqualified context-owned/legacy row, which shared workers never claim.
+    /// </summary>
+    public string? DeliveryTarget { get; set; }
     /// <summary>Immutable UTF-8 JSON payload captured when the application published.</summary>
     public byte[] Body { get; set; } = [];
     /// <summary>UTC capture time.</summary>

@@ -46,7 +46,7 @@ public sealed class ConfigurationDbContext(
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Configuration values can include secrets, so this store never enables sensitive data logging implicitly.
-        ConfigureRepositoryOptions(optionsBuilder);
+        ConfigureRepositoryModel(optionsBuilder);
     }
 
     protected override void OnModelCreatingExtend(ModelBuilder modelBuilder)

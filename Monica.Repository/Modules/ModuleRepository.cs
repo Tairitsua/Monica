@@ -173,6 +173,12 @@ public static class ModuleRepositoryRegistrationExtensions
     {
         var options = new RepositoryOutboxOptions();
         configure?.Invoke(options);
+        if (options.SharedStoreKey is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.SharedStoreKey);
+            if (options.SharedStoreKey.Length > 200)
+                throw new ArgumentOutOfRangeException(nameof(configure), "Shared store keys must be at most 200 characters.");
+        }
         ArgumentNullException.ThrowIfNull(options.MaintenanceLease);
         options.MaintenanceLease.Validate();
         if (options.DeliveryLease <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery lease must be positive.");
@@ -195,6 +201,14 @@ public static class ModuleRepositoryRegistrationExtensions
             if (context.Services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistration<TDbContext>)))
                 throw new InvalidOperationException($"Outbox context '{typeof(TDbContext).FullName}' must be registered once with one declaring owner.");
             context.Services.AddSingleton(new OutboxRegistration<TDbContext>(options));
+            // Inspect the completed host collection at first resolution, including host overrides applied
+            // after AddMonica. Never construct scoped transports while building this singleton catalog.
+            context.Services.TryAddSingleton(sp => new OutboxDeliveryCapabilities(
+                sp.GetRequiredService<IEventSubscriptionRegistry>(),
+                context.Services.Where(descriptor => descriptor.ServiceType == typeof(IEventTransport)
+                        && (!descriptor.IsKeyedService || descriptor.ServiceKey is string))
+                    .Select(descriptor => descriptor.IsKeyedService ? (string?)descriptor.ServiceKey : null)
+                    .Distinct().ToArray()));
             context.Services.TryAddScoped<ITransactionalEventSink, TransactionalEventSink>();
             context.Services.AddSingleton(sp => new OutboxDispatcher<TDbContext>(
                 sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<TimeProvider>(),

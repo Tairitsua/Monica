@@ -280,7 +280,8 @@ public sealed partial class ExternalOutboxLeaseTests
 
     private static IHost CreateHost(ExternalSchedulerDatabase database, TimeProvider time, OutboxCommands commands, bool worker,
         IConnectionMultiplexer? redis = null, ExternalStoreCommandCounter? allCommands = null,
-        IEventTransport? transport = null, Action<RepositoryOutboxOptions>? configureOutbox = null)
+        IEventTransport? transport = null, Action<RepositoryOutboxOptions>? configureOutbox = null,
+        Action<DbContextOptionsBuilder>? configureDbContext = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
@@ -296,6 +297,7 @@ public sealed partial class ExternalOutboxLeaseTests
                 (_, options) =>
                 {
                     database.ConfigureDbContext(options);
+                    configureDbContext?.Invoke(options);
                     options.AddInterceptors(commands);
                     if (allCommands is not null) options.AddInterceptors(allCommands.Interceptors);
                 }, DbContextProviderType.Default)

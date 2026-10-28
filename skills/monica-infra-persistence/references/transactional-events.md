@@ -1,6 +1,6 @@
 # Transactional events and delivery
 
-Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores or deduplicate dispatchers; shared-store transitions must preserve consumer identity and local-handler eligibility.
+Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores. Use `SharedStoreKey` below to consolidate automatic dispatchers and qualify delivery destinations.
 
 Register the primary repository context and its UnitOfWork [transaction boundary](transactions.md) before configuring durable events.
 
@@ -24,7 +24,38 @@ repository.AddOutbox<OrdersDbContext>();
 
 Register `AddOutbox<TDbContext>` once per context; repeated declarations fail before startup instead of choosing the last owner or options. Outbox activation is evaluated separately from each `TDbContext`'s declared role or domain `BackgroundRole`. A role's registration callback cannot claim a different context owner; its captured owner remains diagnostic provenance only. A combined host can dispatch one context while holding another. `Application:AutonomousWork=false` holds every background outbox scan, claim, delivery and cleanup; `EnableWorker=false` also disables that context's worker contribution. Transactional staging and passive dispatcher services remain registered. Manual API calls can commit pending outbox rows into shared storage, where the environment's workers may deliver them. No generic manual Outbox trigger is introduced.
 
-Entity event projections are optional: `AddEntityEventProjections<TContext>` stages projection events during save and also requires outbox on the primary context. Projection callbacks should be side-effect-free. When several contexts map the same physical Outbox/Inbox tables, choose exactly one migration owner; every other context sets `ExcludeFromMigrations = true` on its outbox and inbox options in the migration composition. Physical ownership includes database, schema and table: separate domain schemas may retain distinct stores. The migration owner is fixed for schema evolution and need not be the primary context of every runtime transaction; that primary context must still map and enable its selected store. Exclusion does not rewrite old migrations or migrate existing data. Because `ExcludeFromMigrations` also removes a table from `EnsureCreated`, apply it only in the composition used to generate migrations, never in runtime hosts. See [database layout and migrations](../../monica-application/references/05-database-migrations.md) before changing existing ownership or history.
+Entity event projections are optional: `AddEntityEventProjections<TContext>` stages projection events during save and also requires outbox on the primary context. Projection callbacks should be side-effect-free. When several contexts map the same physical Outbox/Inbox tables, choose exactly one migration owner; every other context sets `ExcludeFromMigrations = true` on its outbox and inbox options. Keep this ownership consistent in runtime and migration composition. The owner need not be the primary context of every runtime transaction; that primary context must still map and enable its selected store. Exclusion does not rewrite old migrations or migrate existing data. `EnsureCreated` on an excluded context cannot create the shared tables; install the owner's migrations first, including in integration fixtures. See [database layout and migrations](../../monica-application/references/05-database-migrations.md) before changing existing ownership or history.
+
+## Shared physical stores
+
+Assign one stable `SharedStoreKey` to every context writing one physical Outbox. This is a host composition identity, independent of CLR context names, process IDs and migration ownership:
+
+```csharp
+repository.AddOutbox<OrdersDbContext>(options =>
+{
+    options.SharedStoreKey = "application-messages";
+    options.ExcludeFromMigrations = true;
+    options.LeaseTable.ExcludeFromMigrations = true;
+});
+repository.AddOutbox<BillingDbContext>(options =>
+{
+    options.SharedStoreKey = "application-messages";
+    options.ExcludeFromMigrations = true;
+    options.LeaseTable.ExcludeFromMigrations = true;
+});
+// A separately composed technical context owns the shared tables' migrations.
+monica.AddHostedService(options => options.FailFastOnStartupError = true);
+```
+
+Automatic contributions with one key produce one delivery loop and one pair of maintenance loops per host. Startup compares provider, endpoint, database, resolved schema/table and delivery/maintenance policies. Conflicting mappings or policies fault the worker; `FailFastOnStartupError = true` also aborts host startup. PostgreSQL/Gauss resolve the actual table schema through the database search path. Use identical endpoint names across contributors; aliases are not inferred. Private SQLite memory connections cannot represent a shared store. The key never grants activation: held/disabled contexts retain staging and explicit dispatcher services without becoming automatic workers. A null key retains context-owned dispatch. Explicit calls to different context dispatchers have separate capacity limits; use one dispatcher for deliberate manual draining of a shared store.
+
+Shared publication captures `DeliveryTarget` with the immutable payload. Distributed targets identify the default or explicitly string-keyed `IEventTransport` registration. Local targets identify the complete registered typed handler set, event contract, topic, bus key and logical owners; subscription runtime IDs and assembly versions are excluded. The producer must contain the complete intended local handler registration set. Shared local publication rejects an absent, ambiguous or delegate-based destination. A local event requiring handlers from different partial artifacts should use explicit distributed consumers with their own Inbox identities.
+
+Before claiming, a shared dispatcher selects only targets available on its host. Unsupported transports, incomplete local sets, inactive handlers and unqualified legacy rows remain pending without incrementing attempts or taking a lease. Typed local handlers are selected again before sending, then dispatched by exact active subscription IDs; removal/deactivation fails delivery rather than acknowledging a subset. Changes to the intended handler set are durable routing changes: drain pending local messages under the old complete set before deployment, or explicitly reconcile them. There is no automatic handler-set rewrite or delegation across hosts.
+
+Every context must map the same message columns and use the same store policy. Add the `DeliveryTarget` column and its eligibility index in the sole migration owner. Quiesce old workers before shared publication: an older binary does not understand qualification. Drain old rows first or explicitly migrate their destinations after verifying the complete local handler set; shared workers intentionally do not infer missing identities. Context-owned workers in this version claim only unqualified rows. Keep Outbox and Inbox as separate tables, and preserve `(Consumer, Source, MessageId)` semantics when consolidating Inbox receipts. Do not reuse one consumer identity for different domain responsibilities merely because their receipts previously lived in separate databases.
+
+`SharedOutboxTests` exercises coalescing, conflicting targets/policies, partial local hosts, delegate rejection, unavailable keyed transports and legacy rows with real hosted SQLite stores. `ExternalSharedOutboxTests` verifies qualified native claims under `infra` on explicitly selected PostgreSQL/Vastbase test servers.
 
 ## Outbox delivery and maintenance
 
@@ -40,6 +71,7 @@ The send deadline begins before claiming and reserves up to one second (10% for 
 
 | Option | Default | Behavior |
 | --- | --- | --- |
+| `SharedStoreKey` | null | Coalesces eligible contributions to one physical store and enables destination qualification when explicitly set |
 | `BatchSize` | 100 | Maximum messages claimed per delivery pass, including failed attempts; full successful batches continue immediately |
 | `DeliveryConcurrency` | 1 | Maximum simultaneous deliveries per dispatcher across passes, including unresolved timed-out sends; increase explicitly for independent handlers/transports |
 | `DeliveryLease` | 5 minutes | Claim lifetime; the send budget includes the claim round trip and a conservative expiry margin |
@@ -53,7 +85,7 @@ The send deadline begins before claiming and reserves up to one second (10% for 
 | `MaintenanceLease.StandbyInterval` | 5 seconds | Minimum retry delay for a standby |
 | `MaintenanceLease.OperationTimeout` | 5 seconds | Deadline for a lease call, one cleanup transaction, or one status sample; must be less than `Duration / 3` |
 
-Cleanup selects keys inside the `DELETE` statement, ordered by `DeliveredAtUtc`, using the leading column of the existing `(DeliveredAtUtc, NextAttemptAtUtc, LeaseUntilUtc, Sequence)` index. It does not load message payloads or transfer a key list to the application. With the default SQL authority, each batch validates and locks the maintenance lease inside its deletion transaction. A pass fixes its cutoff once, stops after a partial batch or the time budget, and retains committed batches if a later command fails or cancellation occurs. Cancellation within a batch rolls it back. The pass budget is checked between commits; `MaintenanceLease.OperationTimeout` bounds individual transactions and status calls. Status is an observational read under the term token and does not hold the lease-row lock, so a takeover boundary may overlap a cancelling status query without affecting correctness. No columns or indexes are added to the Outbox table, but the shared `MonicaLeases` table requires a migration. Set `LeaseTable.ExcludeFromMigrations = true` when another context owns that table and use the same schema mapping. Follow the shared lease cutover instructions before upgrading replicas.
+Cleanup selects keys inside the `DELETE` statement, ordered by `DeliveredAtUtc`, using the leading column of the `(DeliveredAtUtc, NextAttemptAtUtc, LeaseUntilUtc, Sequence)` index. It does not load message payloads or transfer a key list to the application. With the default SQL authority, each batch validates and locks the maintenance lease inside its deletion transaction. A pass fixes its cutoff once, stops after a partial batch or the time budget, and retains committed batches if a later command fails or cancellation occurs. Cancellation within a batch rolls it back. The pass budget is checked between commits; `MaintenanceLease.OperationTimeout` bounds individual transactions and status calls. Status is an observational read under the term token and does not hold the lease-row lock, so a takeover boundary may overlap a cancelling status query without affecting correctness. The shared `MonicaLeases` table also requires a migration. Set `LeaseTable.ExcludeFromMigrations = true` when another context owns that table and use the same schema mapping. Follow the shared lease cutover instructions before upgrading replicas.
 
 `OutboxDispatcher<TDbContext>.CleanupAsync` participates in the same election. A manual call returns zero when another maintenance owner holds the role, and releases its own role after its fully awaited pass. Worker-owned coordination remains alive between passes; it does not acquire/release on every cleanup batch. Lease reads, renewal and transaction guards add fixed overhead; measure both cold election and retained-row maintenance cost at the deployed replica count.
 

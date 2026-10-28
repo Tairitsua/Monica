@@ -42,6 +42,7 @@ public sealed class ManualEventDeliveryTests
             .Prepare(typeof(TestNotice), new TestNotice("manual"), EventSubscriptionScope.Distributed);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.DispatchAsync(message, token));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.DispatchSelectedAsync(message, [selected.Id], token));
         await Assert.ThrowsAsync<InvalidOperationException>(() => registry.ActivateAsync(selected.Id, token));
         await Assert.ThrowsAsync<InvalidOperationException>(() => selected.ActivateAsync());
         await dispatcher.DispatchTestAsync(message, [selected.Id], token);

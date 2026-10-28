@@ -134,7 +134,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     protected readonly DbContextOptions DbContextOptions = options;
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        ConfigureRepositoryOptions(optionsBuilder);
+        ConfigureRepositoryModel(optionsBuilder);
+        optionsBuilder.AddInterceptors(RepositoryOperationInterceptor.Instance);
         var enableSensitiveDataLogging = Options.EnableSensitiveDataLogging
             ?? CachedServiceProvider.GetService<IHostEnvironment>()?.IsDevelopment()
             ?? false;
@@ -146,12 +147,11 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         }
     }
 
-    /// <summary>Installs repository model variants and operation interception without enabling sensitive logging.</summary>
-    /// <remarks>Contexts overriding OnConfiguring without calling base must call this method to preserve repository behavior.</remarks>
-    protected void ConfigureRepositoryOptions(DbContextOptionsBuilder optionsBuilder)
+    /// <summary>Installs repository model variants without changing interception or sensitive logging.</summary>
+    /// <remarks>Contexts with their own OnConfiguring policy call this method to preserve repository model identity.</remarks>
+    protected void ConfigureRepositoryModel(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.ReplaceService<IModelCacheKeyFactory, RepositoryModelCacheKeyFactory>();
-        optionsBuilder.AddInterceptors(RepositoryOperationInterceptor.Instance);
     }
 
     #region Model conventions
@@ -249,11 +249,13 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             outbox.Property(x => x.Sequence).ValueGeneratedOnAdd();
             outbox.HasIndex(x => x.MessageId).IsUnique();
             outbox.HasIndex(x => new { x.DeliveredAtUtc, x.NextAttemptAtUtc, x.LeaseUntilUtc, x.Sequence });
+            outbox.HasIndex(x => new { x.DeliveryTarget, x.DeliveredAtUtc, x.NextAttemptAtUtc, x.LeaseUntilUtc, x.Sequence });
             outbox.Property(x => x.MessageId).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.Source).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.EventName).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.TopicName).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.ServiceKey).HasMaxLength(200);
+            outbox.Property(x => x.DeliveryTarget).HasMaxLength(66);
             outbox.Property(x => x.TransportKey).HasMaxLength(500);
             outbox.Property(x => x.Body).IsRequired();
             outbox.Property(x => x.LastError).HasMaxLength(1000);
@@ -302,7 +304,10 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     {
         if (_saveFailed) throw new InvalidOperationException("This context's save failed. Retry in a fresh operation scope.");
         if (OutboxOptions is null) throw new InvalidOperationException("The selected transaction owner must enable AddOutbox.");
-        _pendingMessages.Add(OutboxMessage.Capture(message, CachedServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System));
+        var captured = OutboxMessage.Capture(message, CachedServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System);
+        if (OutboxOptions.SharedStoreKey is not null)
+            captured.DeliveryTarget = CachedServiceProvider.GetRequiredService<OutboxDeliveryCapabilities>().Capture(message);
+        _pendingMessages.Add(captured);
     }
 
     private void ValidateSave()

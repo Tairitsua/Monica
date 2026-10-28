@@ -6,6 +6,15 @@ namespace Monica.Repository.Outbox.Models;
 /// <summary>Controls durable delivery for one repository context. Event contracts come from EventBus metadata.</summary>
 public sealed class RepositoryOutboxOptions
 {
+    /// <summary>
+    /// Stable identity of a shared physical Outbox, or null for a context-owned store (the default).
+    /// Automatic contributions with the same key share one delivery/maintenance loop per host after validating
+    /// their physical target and operational settings. This does not enable a held context's worker.
+    /// All writers and replicas of that table must use the same key, schema, delivery and maintenance policy.
+    /// Shared delivery claims only destinations supported by this host; migrate or drain older unqualified rows first.
+    /// </summary>
+    public string? SharedStoreKey { get; set; }
+
     /// <summary>Shared coordinator table mapping. Select one migration owner when Outbox and JobScheduler share a database.</summary>
     public LeaseTableOptions LeaseTable { get; } = new();
 

@@ -48,7 +48,7 @@ Do not combine the common policy with a conflicting explicit per-table schema. `
 
 ## Model identity and ownership
 
-The EF options extension and model convention also work with a plain DbContext and contexts overriding `OnConfiguring`. EF-managed internal services separate models by immutable layout/provider identity without replacing a caller's `IModelCacheKeyFactory`. Repository retains shard/model variants, message-store participation, migration exclusions, and design-time identity. Overrides skipping `RepositoryDbContext.OnConfiguring` call `ConfigureRepositoryOptions` to retain repository behavior without implicit sensitive logging.
+The EF options extension and model convention also work with a plain DbContext and contexts overriding `OnConfiguring`. EF-managed internal services separate models by immutable layout/provider identity without replacing a caller's `IModelCacheKeyFactory`. Repository retains shard/model variants, message-store participation, migration exclusions, and design-time identity. Overrides skipping `RepositoryDbContext.OnConfiguring` call `ConfigureRepositoryModel` to retain model identity without changing their existing interception or sensitive-logging policy.
 
 A supplied `UseModel` model must have been built for the same resolved namespace and provider; mismatches are rejected even after another context warmed EF's cache. Advanced callers supplying an EF internal service provider must install the options extension's services and keep that provider's layout fixed. Normal application DI registration needs neither extra service registration nor a second service provider.
 

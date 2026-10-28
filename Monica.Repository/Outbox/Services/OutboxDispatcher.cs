@@ -14,6 +14,9 @@ namespace Monica.Repository.Outbox.Services;
 internal interface IOutboxStore
 {
     string StoreName { get; }
+    string? SharedStoreKey { get; }
+    OutboxStorePolicy Policy { get; }
+    Task<OutboxStoreIdentity> GetIdentityAsync(CancellationToken cancellationToken);
     TimeSpan PollInterval { get; }
     int BatchSize { get; }
     TimeSpan CleanupInterval { get; }
@@ -45,10 +48,13 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
     };
     private readonly string _holder = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
     private LeaseResource? _maintenanceResource;
+    private (string Schema, string Table)? _tableLocation;
     private LeaseCoordinator CreateCoordinator() => new(_maintenanceLeases ?? _leases, _holder, time, logger,
         registration.Options.MaintenanceLease, meterFactory);
 
     string IOutboxStore.StoreName => typeof(TDbContext).Name;
+    string? IOutboxStore.SharedStoreKey => registration.Options.SharedStoreKey;
+    OutboxStorePolicy IOutboxStore.Policy => OutboxStorePolicy.From(registration.Options);
     TimeSpan IOutboxStore.PollInterval => registration.Options.PollInterval;
     int IOutboxStore.BatchSize => registration.Options.BatchSize;
     TimeSpan IOutboxStore.CleanupInterval => registration.Options.CleanupInterval;
@@ -60,10 +66,41 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
     Task<LeaseResource> IOutboxStore.GetMaintenanceResourceAsync(CancellationToken cancellationToken) =>
         GetMaintenanceResourceAsync(cancellationToken);
 
+    async Task<OutboxStoreIdentity> IOutboxStore.GetIdentityAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var connection = db.Database.GetDbConnection();
+        // Private SQLite memory connections are distinct stores even with identical connection strings.
+        if (connection.GetType().FullName == "Microsoft.Data.Sqlite.SqliteConnection")
+        {
+            var settings = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = connection.ConnectionString };
+            settings.TryGetValue("Mode", out var mode);
+            settings.TryGetValue("Cache", out var cache);
+            if (connection.DataSource is "" or ":memory:"
+                || string.Equals(mode?.ToString(), "Memory", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(cache?.ToString(), "Shared", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("A shared Outbox requires a persistent or explicitly shared named SQLite database.");
+        }
+        var location = await GetTableLocationAsync(db, cancellationToken);
+        return new OutboxStoreIdentity(db.Database.ProviderName!, connection.DataSource, connection.Database,
+            location.Schema, location.Table);
+    }
+
     private async Task<LeaseResource> GetMaintenanceResourceAsync(CancellationToken cancellationToken)
     {
         if (_maintenanceResource is { } resource) return resource;
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var (schema, table) = await GetTableLocationAsync(db, cancellationToken);
+        var prefix = registration.Options.MaintenanceLeaseStore is null ? "maintenance" : "outbox:maintenance";
+        resource = new LeaseResource(registration.Options.MaintenanceLeaseStore?.Scope ?? "outbox",
+            $"{prefix}:{schema.Length}:{schema}:{table.Length}:{table}");
+        _maintenanceResource = resource;
+        return resource;
+    }
+
+    private async Task<(string Schema, string Table)> GetTableLocationAsync(TDbContext db, CancellationToken cancellationToken)
+    {
+        if (_tableLocation is { } location) return location;
         var model = db.Model.FindEntityType(typeof(OutboxMessage))!;
         var table = model.GetTableName()!;
         var schema = model.GetSchema() ?? string.Empty;
@@ -78,11 +115,9 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
                 WHERE relation.oid = to_regclass({0})
                 """, name).SingleAsync(cancellationToken);
         }
-        var prefix = registration.Options.MaintenanceLeaseStore is null ? "maintenance" : "outbox:maintenance";
-        resource = new LeaseResource(registration.Options.MaintenanceLeaseStore?.Scope ?? "outbox",
-            $"{prefix}:{schema.Length}:{schema}:{table.Length}:{table}");
-        _maintenanceResource = resource;
-        return resource;
+        location = (schema, table);
+        _tableLocation = location;
+        return location;
     }
 
     /// <summary>

@@ -23,8 +23,17 @@ public sealed class EventReceiveDispatcher(
         => DispatchCoreAsync(message, filterWorkloadOwner: true, workloadOwner, cancellationToken);
 
     /// <inheritdoc />
-    public async Task DispatchTestAsync(EventMessage message,
+    public Task DispatchTestAsync(EventMessage message,
         IReadOnlyCollection<EventSubscriptionId> subscriptionIds, CancellationToken cancellationToken = default)
+        => DispatchIdsAsync(message, subscriptionIds, allowHeld: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task DispatchSelectedAsync(EventMessage message,
+        IReadOnlyCollection<EventSubscriptionId> subscriptionIds, CancellationToken cancellationToken = default)
+        => DispatchIdsAsync(message, subscriptionIds, allowHeld: false, cancellationToken);
+
+    private async Task DispatchIdsAsync(EventMessage message,
+        IReadOnlyCollection<EventSubscriptionId> subscriptionIds, bool allowHeld, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(subscriptionIds);
@@ -33,18 +42,19 @@ public sealed class EventReceiveDispatcher(
         if (ids.Length == 0 || ids.Distinct().Count() != ids.Length)
             throw new ArgumentException("Select a nonempty set of distinct local subscriptions.", nameof(subscriptionIds));
         if (string.IsNullOrWhiteSpace(message.Metadata.MessageId) || string.IsNullOrWhiteSpace(message.Metadata.Source))
-            throw new ArgumentException("A test delivery requires a stable message ID and producer source.", nameof(message));
+            throw new ArgumentException("Selected delivery requires a stable message ID and producer source.", nameof(message));
         var subscriptions = ids.Select(id => registry.GetById(id)
             ?? throw new InvalidOperationException($"Event subscription '{id}' no longer exists.")).ToArray();
         foreach (var subscription in subscriptions)
         {
-            if (subscription.State is not (EventSubscriptionState.Active or EventSubscriptionState.Held)
+            if ((subscription.State != EventSubscriptionState.Active
+                    && !(allowHeld && subscription.State == EventSubscriptionState.Held))
                 || subscription.Scope != message.Scope
                 || subscription.TopicName != message.Metadata.TopicName
                 || subscription.ServiceKey != message.Metadata.ServiceKey)
-                throw new InvalidOperationException($"Event subscription '{subscription.Id}' is not eligible for this test delivery.");
+                throw new InvalidOperationException($"Event subscription '{subscription.Id}' is not eligible for this selected delivery.");
         }
-        await DispatchSelectedAsync(message, subscriptions, cancellationToken, allowHeld: true).ConfigureAwait(false);
+        await DispatchSelectedAsync(message, subscriptions, cancellationToken, allowHeld).ConfigureAwait(false);
     }
 
     private async Task DispatchCoreAsync(

@@ -28,6 +28,9 @@ public sealed partial class OutboxDispatcher<TDbContext>
             throw new InvalidOperationException("Outbox delivery cannot run inside an ambient transaction; claims must commit before sending.");
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
+        var eligibleTargets = registration.Options.SharedStoreKey is null ? null
+            : scope.ServiceProvider.GetRequiredService<OutboxDeliveryCapabilities>().GetEligibleTargets();
+        if (eligibleTargets is { Length: 0 }) return 0;
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var active = new List<Task<int>>();
         var remaining = maximumMessages;
@@ -46,7 +49,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
                     {
                         // Include the claim round trip in the send budget. Reserve capacity before touching the rows.
                         var started = time.GetTimestamp();
-                        var claimed = await ClaimAsync(db, cursor, available, stopping.Token);
+                        var claimed = await ClaimAsync(db, cursor, available, eligibleTargets, stopping.Token);
                         if (claimed.Count == 0) remaining = 0;
                         else
                         {
@@ -147,7 +150,10 @@ public sealed partial class OutboxDispatcher<TDbContext>
             var message = candidate.ToEventMessage();
             Task delivery;
             if (message.Scope == EventSubscriptionScope.Local)
-                delivery = services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, deadline);
+                delivery = options.SharedStoreKey is null
+                    ? services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, deadline)
+                    : services.GetRequiredService<IEventReceiveDispatcher>().DispatchSelectedAsync(message,
+                        services.GetRequiredService<OutboxDeliveryCapabilities>().SelectLocal(candidate), deadline);
             else if (message.Scope == EventSubscriptionScope.Distributed)
             {
                 var transport = message.Metadata.ServiceKey is { } key
