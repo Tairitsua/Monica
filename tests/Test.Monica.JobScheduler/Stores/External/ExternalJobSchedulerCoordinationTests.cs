@@ -4,6 +4,8 @@ using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.JobScheduler.Services.Support;
+using Monica.Locker.Leases;
 using Xunit;
 
 namespace Test.Monica.JobScheduler.Stores.External;
@@ -19,11 +21,12 @@ public sealed class ExternalJobSchedulerCoordinationTests
     private const string OWNER = "external-owner";
     private const string COORDINATOR = "owner:" + OWNER;
     private const string JOB = "external-job";
+    private static readonly LeaseResource RESOURCE = new(SCOPE, "jobscheduler:" + COORDINATOR);
 
     [Theory]
     [InlineData(ExternalSchedulerDatabase.POSTGRES)]
     [InlineData(ExternalSchedulerDatabase.VASTBASE)]
-    public async Task TryAcquireCoordinatorLeaseAsync_WhenConnectionsRaceThenTakeOver_ShouldFenceTheOldOwnerMutations(string provider)
+    public async Task TryAcquireAsync_WhenConnectionsRaceThenTakeOver_ShouldFenceTheOldOwnerMutations(string provider)
     {
         var token = TestContext.Current.CancellationToken;
         var fixture = await ExternalSchedulerStoreFixture.CreateAsync(provider, token);
@@ -36,8 +39,9 @@ public sealed class ExternalJobSchedulerCoordinationTests
             var secondAttempt = AcquireAsync(second, "second-worker");
             start.SetResult();
             var attempts = await Task.WhenAll(firstAttempt, secondAttempt);
-            var winner = attempts.OfType<JobCoordinatorLease>().Should().ContainSingle().Subject;
-            var successorWorker = winner.Key.WorkerInstanceId == "first-worker" ? "second-worker" : "first-worker";
+            var winner = attempts.OfType<LeaseGrant>().Should().ContainSingle().Subject;
+            var winnerKey = JobCoordinatorLeaseAdapter.ToKey(winner.Identity);
+            var successorWorker = winner.Identity.HolderId == "first-worker" ? "second-worker" : "first-worker";
             var snapshot = new JobOwnerSnapshot(SCOPE, OWNER,
             [
                 new JobDeclaration
@@ -45,11 +49,11 @@ public sealed class ExternalJobSchedulerCoordinationTests
                     JobKey = JOB, JobName = JOB, JobType = JobType.Recurring,
                     CronExpression = "* * * * * *", TimeZoneId = "UTC"
                 }
-            ]) { CoordinatorLease = winner.Key };
+            ]) { CoordinatorLease = winnerKey };
             var published = await first.SyncOwnerSnapshotAsync(snapshot, token);
             var synchronized = await first.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
             {
-                CoordinatorLease = winner.Key,
+                CoordinatorLease = winnerKey,
                 CursorKey = new RecurringScheduleCursorKey { SchedulerScopeKey = SCOPE, OwnerKey = OWNER, JobKey = JOB }
             }, token);
             var cursor = synchronized.Cursor!;
@@ -64,7 +68,7 @@ public sealed class ExternalJobSchedulerCoordinationTests
                     """;
                 AddParameter(expire, "scope", SCOPE);
                 AddParameter(expire, "coordinator", "jobscheduler:" + COORDINATOR);
-                AddParameter(expire, "token", winner.Key.LeaseToken);
+                AddParameter(expire, "token", winner.Identity.TermId);
                 Assert.Equal(1, await expire.ExecuteNonQueryAsync(token));
                 await using var due = connection.CreateCommand();
                 due.CommandTimeout = 5;
@@ -79,15 +83,16 @@ public sealed class ExternalJobSchedulerCoordinationTests
                 Assert.Equal(1, await due.ExecuteNonQueryAsync(token));
             }
 
-            var successor = await second.TryAcquireCoordinatorLeaseAsync(SCOPE, COORDINATOR, successorWorker,
-                TimeSpan.FromMinutes(2), cancellationToken: token);
+            var successor = await second.CoordinatorLeases.TryAcquireAsync(RESOURCE,
+                successorWorker, TimeSpan.FromMinutes(2), token);
             successor.Should().NotBeNull();
-            successor!.Key.LeaseToken.Should().NotBe(winner.Key.LeaseToken);
+            var successorKey = JobCoordinatorLeaseAdapter.ToKey(successor!.Identity);
+            successor!.Identity.TermId.Should().NotBe(winner.Identity.TermId);
             var dueCursor = (await first.GetDueRecurringSchedulesAsync(SCOPE, OWNER, 1, token))
                 .Should().ContainSingle().Subject;
             var materialization = new RecurringOccurrenceMaterialization
             {
-                CoordinatorLease = winner.Key, CursorKey = dueCursor.Key,
+                CoordinatorLease = winnerKey, CursorKey = dueCursor.Key,
                 ExpectedVersion = dueCursor.Version, ExpectedOccurrenceUtc = dueCursor.NextOccurrenceUtc!.Value,
                 InstanceId = "stale-owner-occurrence"
             };
@@ -97,19 +102,19 @@ public sealed class ExternalJobSchedulerCoordinationTests
             await staleMaterialize.Should().ThrowAsync<InvalidOperationException>();
             (await first.GetExecutionAsync(SCOPE, materialization.InstanceId, token)).Should().BeNull();
             (await first.GetOwnerManifestHashAsync(SCOPE, OWNER, token)).Should().Be(published.ManifestHash);
-            (await second.SyncOwnerSnapshotAsync(snapshot with { CoordinatorLease = successor.Key }, token))
+            (await second.SyncOwnerSnapshotAsync(snapshot with { CoordinatorLease = successorKey }, token))
                 .ContentChanged.Should().BeFalse();
             var accepted = await second.TryMaterializeRecurringOccurrenceAsync(materialization with
             {
-                CoordinatorLease = successor.Key, InstanceId = "successor-owner-occurrence"
+                CoordinatorLease = successorKey, InstanceId = "successor-owner-occurrence"
             }, token);
             accepted.Status.Should().Be(RecurringMaterializationStatus.Materialized);
 
-            async Task<JobCoordinatorLease?> AcquireAsync(IJobSchedulerStore store, string worker)
+            async Task<LeaseGrant?> AcquireAsync(IJobSchedulerStore store, string worker)
             {
                 await start.Task.WaitAsync(token);
-                return await store.TryAcquireCoordinatorLeaseAsync(SCOPE, COORDINATOR, worker,
-                    TimeSpan.FromMinutes(2), cancellationToken: token);
+                return await store.CoordinatorLeases.TryAcquireAsync(RESOURCE,
+                    worker, TimeSpan.FromMinutes(2), token);
             }
         });
     }
@@ -153,12 +158,12 @@ public sealed class ExternalJobSchedulerCoordinationTests
             claimed.Should().BeEmpty();
             AssertOneReadOnlySelect(counter);
 
-            var holder = await store.TryAcquireCoordinatorLeaseAsync(SCOPE, COORDINATOR, "holder-worker",
-                TimeSpan.FromMinutes(2), cancellationToken: token);
+            var holder = await store.CoordinatorLeases.TryAcquireAsync(RESOURCE,
+                "holder-worker", TimeSpan.FromMinutes(2), token);
             holder.Should().NotBeNull();
             counter.Reset();
-            var contender = await fixture.CreateStore().TryAcquireCoordinatorLeaseAsync(SCOPE, COORDINATOR,
-                "standby-worker", TimeSpan.FromMinutes(2), cancellationToken: token);
+            var contender = await fixture.CreateStore().CoordinatorLeases.TryAcquireAsync(RESOURCE,
+                "standby-worker", TimeSpan.FromMinutes(2), token);
             contender.Should().BeNull();
             AssertOneReadOnlySelect(counter);
         });

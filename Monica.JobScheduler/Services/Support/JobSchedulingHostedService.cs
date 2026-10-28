@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +34,8 @@ internal sealed class JobSchedulingHostedService(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<JobSchedulingHostedService> logger,
     ITypeActivationPolicy? activation = null,
-    HistoryCleanupLeaseStore? historyCleanupLeases = null)
+    HistoryCleanupLeaseStore? historyCleanupLeases = null,
+    IMeterFactory? meterFactory = null)
     : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
 {
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
@@ -42,11 +44,11 @@ internal sealed class JobSchedulingHostedService(
         .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
         .ToArray();
     private readonly LeaseCoordinator _coordinators = new(store.CoordinatorLeases,
-        schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, CoordinatorOptions(schedulerOptions.Value));
+        schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, CoordinatorOptions(schedulerOptions.Value), meterFactory);
     private readonly Dictionary<string, DateTimeOffset> _nextSnapshotSyncUtc = new(StringComparer.Ordinal);
     private readonly LeaseCoordinator? _historyCoordinator = historyCleanupLeases is null ? null : new(
         historyCleanupLeases.Store, schedulerOptions.Value.WorkerInstanceId, timeProvider, logger,
-        CoordinatorOptions(schedulerOptions.Value));
+        CoordinatorOptions(schedulerOptions.Value), meterFactory);
     private readonly Dictionary<string, string> _synchronizedGrants = new(StringComparer.Ordinal);
     private readonly object _readinessLock = new();
     private readonly Dictionary<string, bool> _readyPlanes = new()

@@ -19,14 +19,6 @@ public interface IJobSchedulerStore : IJobDefinitionStore, IJobExecutionStore, I
     Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Acquires or renews a coordinator grant. Renewal requires its current token; an expired grant always gets a
-    /// new token. Returns null while a different active grant owns the partition. Store time is authoritative.
-    /// </summary>
-    Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
-        string workerInstanceId, TimeSpan leaseDuration, string? currentToken = null,
-        CancellationToken cancellationToken = default);
-
     /// <summary>Runs one bounded history pass, returning a keyset continuation instead of rescanning the scope.</summary>
     Task<JobHistoryCleanupResult> CleanupHistoryAsync(JobHistoryCleanupRequest request,
         CancellationToken cancellationToken = default);

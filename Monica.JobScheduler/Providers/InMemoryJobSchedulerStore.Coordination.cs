@@ -21,13 +21,6 @@ public sealed partial class InMemoryJobSchedulerStore
         CancellationToken cancellationToken = default) =>
         JobCoordinatorLeaseAdapter.SnapshotAsync(CoordinatorLeases, schedulerScopeKey, cancellationToken);
 
-    /// <inheritdoc />
-    public Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
-        string workerInstanceId, TimeSpan leaseDuration, string? currentToken = null,
-        CancellationToken cancellationToken = default) =>
-        JobCoordinatorLeaseAdapter.AcquireAsync(CoordinatorLeases, schedulerScopeKey,
-            coordinatorKey, workerInstanceId, leaseDuration, currentToken, cancellationToken);
-
     private void ValidateCoordinatorLeaseUnsafe(JobCoordinatorLeaseKey? key)
     {
         if (key is not null) MemoryLeases.EnsureHeld(key.ToIdentity());

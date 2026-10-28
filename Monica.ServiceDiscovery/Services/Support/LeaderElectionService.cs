@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,7 +21,7 @@ public sealed class LeaderElectionService(
     IOptions<ModuleServiceDiscoveryOption> options,
     ILogger<LeaderElectionService> logger,
     [FromKeyedServices(nameof(ModuleServiceDiscovery))] IExclusiveLeaseStore leases,
-    TimeProvider timeProvider) : ILeaderElectionService, IDisposable
+    TimeProvider timeProvider, IMeterFactory? meterFactory = null) : ILeaderElectionService, IDisposable
 {
     private readonly ModuleServiceDiscoveryOption _options = options.Value;
     private readonly object _gate = new();
@@ -71,7 +72,7 @@ public sealed class LeaderElectionService(
                 {
                     if (_disposed) return;
                     coordinator = RegistrationIsCurrent()
-                        ? _coordinator ??= new LeaseCoordinator(leases, status.InstanceId, timeProvider, logger, runtimeOptions)
+                        ? _coordinator ??= new LeaseCoordinator(leases, status.InstanceId, timeProvider, logger, runtimeOptions, meterFactory)
                         : null;
                 }
                 if (coordinator is null) TriggerLeaderLost(LeaderLostReason.NetworkIsolation);

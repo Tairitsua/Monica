@@ -147,6 +147,8 @@ pwsh.exe -File 'D:\Code\MoLibrary\scripts\run-tests.ps1' -NoBuild --collect:"XPl
 
 ### Redis leases and maintenance authority comparison
 
+For an owned Docker topology that kills a Redis primary and verifies Sentinel-managed lease recovery, see the [isolated Sentinel failover check](Test.Monica.Locker.Redis/SENTINEL.md). It is separately enabled with `MONICA_LEASE_TEST_SENTINEL=1` and does not use `MONICA_LEASE_TEST_REDIS`.
+
 Set `MONICA_LEASE_TEST_REDIS` to a disposable Redis endpoint (for example `127.0.0.1:<owned-port>`). The Redis contract suite uses unique key namespaces; normal grants expire or are conditionally released. The discovery suite also composes two real hosts against that authority. Do not point native mutation/revocation tests at an application Redis instance.
 
 ```powershell

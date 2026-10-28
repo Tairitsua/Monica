@@ -43,6 +43,20 @@ if (context is not null)
 
 Retain the coordinator around the worker loop rather than constructing one on every tick. The example illustrates a single fully awaited operation and its disposal boundary.
 
+## Coordinator metrics
+
+Pass the host's `System.Diagnostics.Metrics.IMeterFactory` to `LeaseCoordinator` to emit standard .NET metrics. The built-in JobScheduler, Outbox maintenance and ServiceDiscovery workers pass their host factory when it is registered. Generic Host and ASP.NET Core supply that factory; a bare `ServiceCollection` needs `services.AddMetrics()` if instrumentation is wanted. A manually constructed coordinator must receive the factory explicitly, for example with an injected `meterFactory`:
+
+```csharp
+await using var coordinator = new LeaseCoordinator(
+    store, instanceId, TimeProvider.System, logger,
+    meterFactory: meterFactory);
+```
+
+Omitting the factory disables instrumentation. Coordinators sharing one factory share the meter and instruments; the host owns their lifetime, and disposing a coordinator never disposes the factory or meter. No exporter, polling service or Locker module registration is required to emit measurements. Choose collection/export separately through [OpenTelemetry metrics](../../monica-infra-observability/references/opentelemetry-metrics.md).
+
+The [coordinator metric contract](../../monica-infra-observability/references/metrics.md#coordinator-lease-metrics) defines operation outcomes, durations and one-time term retirement. These measurements cover role coordination, including maintenance and leadership. Per-message Outbox delivery claims and job execution claims retain their own business-record protocols and are not counted by these instruments. Metrics and snapshots cannot establish current ownership or replace transaction fencing.
+
 ## Provider selection and Redis
 
 Use keyed singleton `IExclusiveLeaseStore` registrations when a host needs several authorities. `LeaseStoreSelection(serviceKey, scope)` selects the registration and a stable authority namespace. Consumers resolve the key once during composition, then use the bound store. Do not resolve providers per iteration or select a global lease backend that silently replaces scheduler transaction fencing.

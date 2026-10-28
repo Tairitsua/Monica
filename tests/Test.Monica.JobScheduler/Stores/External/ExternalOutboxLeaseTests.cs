@@ -4,10 +4,12 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monica.Core.Modularity.Extensions;
 using Monica.DependencyInjection.Abstractions;
+using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 using Monica.Modules;
 using Monica.Locker.Leases;
@@ -24,7 +26,7 @@ namespace Test.Monica.JobScheduler.Stores.External;
 
 [Trait("Category", "ExternalDatabase")]
 [Collection(ExternalSchedulerDatabaseCollection.NAME)]
-public sealed class ExternalOutboxLeaseTests
+public sealed partial class ExternalOutboxLeaseTests
 {
     [Fact]
     public async Task Cleanup_WhenItsTransactionIsBlocked_ShouldAllowDeliveryOnAnotherNativeConnection()
@@ -277,7 +279,8 @@ public sealed class ExternalOutboxLeaseTests
     }
 
     private static IHost CreateHost(ExternalSchedulerDatabase database, TimeProvider time, OutboxCommands commands, bool worker,
-        IConnectionMultiplexer? redis = null, ExternalStoreCommandCounter? allCommands = null)
+        IConnectionMultiplexer? redis = null, ExternalStoreCommandCounter? allCommands = null,
+        IEventTransport? transport = null, Action<RepositoryOutboxOptions>? configureOutbox = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
@@ -309,9 +312,15 @@ public sealed class ExternalOutboxLeaseTests
                         options.MaintenanceLease = new LeaseCoordinatorOptions
                             { StandbyInterval = TimeSpan.FromSeconds(3) };
                     }
+                    configureOutbox?.Invoke(options);
                 });
         });
         builder.Services.AddMonicaTestSeams();
+        if (transport is not null)
+        {
+            builder.Services.RemoveAll<IEventTransport>();
+            builder.Services.AddSingleton(transport);
+        }
         builder.Services.AddSingleton(time);
         return builder.Build();
     }
@@ -395,7 +404,8 @@ public sealed class ExternalOutboxLeaseTests
             if (command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal)
                 && command.CommandText.Contains("count(", StringComparison.OrdinalIgnoreCase)) Interlocked.Increment(ref _statusQueries);
             if (command.CommandText.Contains("MonicaOutbox", StringComparison.Ordinal)
-                && command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.Ordinal))
+                && (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.Ordinal)
+                    || command.CommandText.TrimStart().StartsWith("WITH", StringComparison.Ordinal)))
             {
                 Interlocked.Increment(ref _deliveryScans);
                 _scanObserved.Release();

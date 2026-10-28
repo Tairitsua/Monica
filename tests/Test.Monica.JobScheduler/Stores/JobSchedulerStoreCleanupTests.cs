@@ -2,6 +2,8 @@ using AwesomeAssertions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.JobScheduler.Services.Support;
+using Monica.Locker.Leases;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 
@@ -152,23 +154,21 @@ public sealed class JobSchedulerStoreCleanupTests
         await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.fenced"));
         await CompleteExecutionsAsync(fixture, StoreFixture.OWNER_A, "jobs.fenced", 3);
         await SetRetentionAsync(fixture, StoreFixture.OWNER_A, "jobs.fenced", 1);
-        var original = await fixture.Store.TryAcquireCoordinatorLeaseAsync(
-            fixture.Scope, "maintenance", "original-maintainer", TimeSpan.FromSeconds(30),
-            cancellationToken: TestContext.Current.CancellationToken)
+        var original = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:maintenance"), "original-maintainer", TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)
             ?? throw new InvalidOperationException("The original maintenance grant was not acquired.");
         fixture.Time.Advance(TimeSpan.FromSeconds(31));
-        var replacement = await fixture.Store.TryAcquireCoordinatorLeaseAsync(
-            fixture.Scope, "maintenance", "replacement-maintainer", TimeSpan.FromSeconds(30),
-            cancellationToken: TestContext.Current.CancellationToken)
+        var replacement = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:maintenance"), "replacement-maintainer", TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)
             ?? throw new InvalidOperationException("The replacement maintenance grant was not acquired.");
 
         Func<Task> staleCleanup = () => fixture.Store.CleanupHistoryAsync(
-            CleanupRequest(fixture) with { CoordinatorLease = original.Key }, TestContext.Current.CancellationToken);
+            CleanupRequest(fixture) with { CoordinatorLease = JobCoordinatorLeaseAdapter.ToKey(original.Identity) }, TestContext.Current.CancellationToken);
         await staleCleanup.Should().ThrowAsync<InvalidOperationException>();
         (await QueryJobAsync(fixture, StoreFixture.OWNER_A, "jobs.fenced")).Should().HaveCount(3);
 
         var result = await fixture.Store.CleanupHistoryAsync(
-            CleanupRequest(fixture) with { CoordinatorLease = replacement.Key }, TestContext.Current.CancellationToken);
+            CleanupRequest(fixture) with { CoordinatorLease = JobCoordinatorLeaseAdapter.ToKey(replacement.Identity) }, TestContext.Current.CancellationToken);
         result.DeletedCount.Should().Be(2);
         result.CompletedScan.Should().BeTrue();
     }

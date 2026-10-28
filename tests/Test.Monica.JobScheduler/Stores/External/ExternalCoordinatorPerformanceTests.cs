@@ -1,8 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Monica.JobScheduler.Abstractions;
-using Monica.JobScheduler.Models;
-using Monica.JobScheduler.Models.Definitions;
+using Monica.Locker.Leases;
 using Xunit;
 
 namespace Test.Monica.JobScheduler.Stores.External;
@@ -45,22 +44,25 @@ public sealed class ExternalCoordinatorPerformanceTests
                 try
                 {
                     var scope = $"perf-{replicas}";
-                    var holder = await AcquireAsync(stores[0], scope, "held", "holder");
+                    var heldResource = new LeaseResource(scope, "jobscheduler:held");
+                    var duration = TimeSpan.FromMinutes(5);
+                    var holder = await stores[0].CoordinatorLeases.TryAcquireAsync(heldResource, "holder", duration, token);
                     Assert.NotNull(holder);
-                    var grants = new JobCoordinatorLease[replicas];
+                    var grants = new LeaseGrant[replicas];
                     for (var replica = 0; replica < replicas; replica++)
-                        grants[replica] = (await AcquireAsync(stores[replica], scope, $"resource-{replica}", $"holder-{replica}"))!;
+                        grants[replica] = (await stores[replica].CoordinatorLeases.TryAcquireAsync(
+                            new LeaseResource(scope, $"jobscheduler:resource-{replica}"), $"holder-{replica}", duration, token))!;
 
                     // Warm up query translation and each scenario before recording the same fixed work.
                     await MeasureAsync("standby", async (store, replica) =>
-                        Assert.Null(await AcquireAsync(store, scope, "held", $"standby-{replica}")));
+                        Assert.Null(await store.CoordinatorLeases.TryAcquireAsync(
+                            heldResource, $"standby-{replica}", duration, token)));
                     await MeasureAsync("independent-renewal", async (store, replica) =>
                     {
                         var previous = grants[replica];
-                        var renewed = await AcquireAsync(store, scope, previous.Key.CoordinatorKey,
-                            previous.Key.WorkerInstanceId, previous.Key.LeaseToken);
+                        var renewed = await store.CoordinatorLeases.TryRenewAsync(previous.Identity, duration, token);
                         Assert.NotNull(renewed);
-                        Assert.Equal(previous.Key.LeaseToken, renewed.Key.LeaseToken);
+                        Assert.Equal(previous.Identity.TermId, renewed.Identity.TermId);
                         grants[replica] = renewed;
                     });
 
@@ -107,8 +109,5 @@ public sealed class ExternalCoordinatorPerformanceTests
             results
         }, new JsonSerializerOptions { WriteIndented = true }), token);
 
-        Task<JobCoordinatorLease?> AcquireAsync(IJobSchedulerStore store, string scope, string resource,
-            string holder, string? current = null) => store.TryAcquireCoordinatorLeaseAsync(scope, resource, holder,
-                TimeSpan.FromMinutes(5), current, token);
     }
 }

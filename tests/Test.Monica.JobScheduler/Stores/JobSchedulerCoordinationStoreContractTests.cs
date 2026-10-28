@@ -2,6 +2,8 @@ using AwesomeAssertions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.JobScheduler.Services.Support;
+using Monica.Locker.Leases;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 
@@ -156,53 +158,50 @@ public sealed class JobSchedulerCoordinationStoreContractTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task TryAcquireCoordinatorLeaseAsync_WhenHeldRenewedAndExpired_ShouldRequireTheCurrentHolderAndToken(bool useEfCore)
+    public async Task CoordinatorLeases_WhenHeldRenewedAndExpired_ShouldRequireTheCurrentIdentityAndExplicitReacquisition(bool useEfCore)
     {
         var token = TestContext.Current.CancellationToken;
         await using var fixture = await StoreFixture.CreateAsync(useEfCore, NOW);
-        var first = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), cancellationToken: token);
+        var leases = fixture.Store.CoordinatorLeases;
+        var resource = new LeaseResource(fixture.Scope, "jobscheduler:" + OWNER_COORDINATOR);
+        var duration = TimeSpan.FromSeconds(30);
+        var first = await leases.TryAcquireAsync(resource, "worker-a", duration, token);
         first.Should().NotBeNull();
-        first!.GrantedAtUtc.Should().Be(NOW);
+        first!.ConfirmedAtUtc.Should().Be(NOW);
         first.ExpiresAtUtc.Should().Be(NOW.AddSeconds(30));
-        first.Key.LeaseToken.Should().NotBeNullOrWhiteSpace();
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), cancellationToken: token)).Should().BeNull();
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), "wrong-token", token)).Should().BeNull();
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromSeconds(30), first.Key.LeaseToken, token)).Should().BeNull();
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, "owner:" + StoreFixture.OWNER_B,
-            "worker-b", TimeSpan.FromSeconds(30), cancellationToken: token)).Should().NotBeNull();
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync("other-scope", OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromSeconds(30), cancellationToken: token)).Should().NotBeNull();
+        first.Identity.TermId.Should().NotBeNullOrWhiteSpace();
+        (await leases.TryAcquireAsync(resource, "worker-a", duration, token)).Should().BeNull();
+        (await leases.TryRenewAsync(first.Identity with { TermId = "wrong-token" }, duration, token)).Should().BeNull();
+        (await leases.TryRenewAsync(first.Identity with { HolderId = "worker-b" }, duration, token)).Should().BeNull();
+        (await leases.TryAcquireAsync(new LeaseResource(fixture.Scope, "jobscheduler:owner:" + StoreFixture.OWNER_B),
+            "worker-b", duration, token)).Should().NotBeNull();
+        (await leases.TryAcquireAsync(new LeaseResource("other-scope", resource.Name),
+            "worker-b", duration, token)).Should().NotBeNull();
 
         fixture.Time.Advance(TimeSpan.FromSeconds(10));
-        var renewed = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), first.Key.LeaseToken, token);
+        var renewed = await leases.TryRenewAsync(first.Identity, duration, token);
         renewed.Should().NotBeNull();
-        renewed!.Key.Should().Be(first.Key);
-        renewed.GrantedAtUtc.Should().Be(NOW.AddSeconds(10));
+        renewed!.Identity.Should().Be(first.Identity);
+        renewed.ConfirmedAtUtc.Should().Be(NOW.AddSeconds(10));
         renewed.ExpiresAtUtc.Should().Be(NOW.AddSeconds(40));
         fixture.Time.Advance(TimeSpan.FromSeconds(21));
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromSeconds(30), cancellationToken: token)).Should().BeNull();
+        (await leases.TryAcquireAsync(resource, "worker-b", duration, token)).Should().BeNull();
 
         fixture.Time.Advance(TimeSpan.FromSeconds(9));
-        var takeover = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromSeconds(30), cancellationToken: token);
+        (await leases.TryRenewAsync(first.Identity, duration, token)).Should().BeNull();
+        var takeover = await leases.TryAcquireAsync(resource, "worker-b", duration, token);
         takeover.Should().NotBeNull();
-        takeover!.GrantedAtUtc.Should().Be(renewed.ExpiresAtUtc);
-        takeover.Key.WorkerInstanceId.Should().Be("worker-b");
-        takeover.Key.LeaseToken.Should().NotBe(first.Key.LeaseToken);
-        (await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), first.Key.LeaseToken, token)).Should().BeNull();
+        takeover!.ConfirmedAtUtc.Should().Be(renewed.ExpiresAtUtc);
+        takeover.Identity.HolderId.Should().Be("worker-b");
+        takeover.Identity.TermId.Should().NotBe(first.Identity.TermId);
+        (await leases.TryRenewAsync(first.Identity, duration, token)).Should().BeNull();
+        (await leases.TryReleaseAsync(first.Identity, token)).Should().BeFalse();
 
         fixture.Time.Advance(TimeSpan.FromSeconds(30));
-        var reacquired = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromSeconds(30), takeover.Key.LeaseToken, token);
+        (await leases.TryRenewAsync(takeover.Identity, duration, token)).Should().BeNull();
+        var reacquired = await leases.TryAcquireAsync(resource, "worker-b", duration, token);
         reacquired.Should().NotBeNull();
-        reacquired!.Key.LeaseToken.Should().NotBe(takeover.Key.LeaseToken);
+        reacquired!.Identity.TermId.Should().NotBe(takeover.Identity.TermId);
     }
 
     [Theory]
@@ -212,14 +211,15 @@ public sealed class JobSchedulerCoordinationStoreContractTests
     {
         var token = TestContext.Current.CancellationToken;
         await using var fixture = await StoreFixture.CreateAsync(useEfCore, NOW);
-        var grant = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-a", TimeSpan.FromSeconds(30), cancellationToken: token);
+        var grant = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:" + OWNER_COORDINATOR), "worker-a", TimeSpan.FromSeconds(30), token);
         grant.Should().NotBeNull();
-        var snapshot = Snapshot(StoreFixture.RecurringDeclaration("jobs.alpha")) with { CoordinatorLease = grant!.Key };
+        var grantKey = JobCoordinatorLeaseAdapter.ToKey(grant!.Identity);
+        var snapshot = Snapshot(StoreFixture.RecurringDeclaration("jobs.alpha")) with { CoordinatorLease = grantKey };
         var published = await fixture.Store.SyncOwnerSnapshotAsync(snapshot, token);
         var synchronization = new RecurringScheduleSynchronization
         {
-            CoordinatorLease = grant.Key,
+            CoordinatorLease = grantKey,
             CursorKey = CursorKey("jobs.alpha")
         };
         var created = await fixture.Store.SynchronizeRecurringScheduleAsync(synchronization, token);
@@ -229,9 +229,10 @@ public sealed class JobSchedulerCoordinationStoreContractTests
 
         Func<Task> expiredSnapshot = () => fixture.Store.SyncOwnerSnapshotAsync(snapshot, token);
         await expiredSnapshot.Should().ThrowAsync<InvalidOperationException>();
-        var takeover = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "worker-b", TimeSpan.FromMinutes(1), cancellationToken: token);
+        var takeover = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:" + OWNER_COORDINATOR), "worker-b", TimeSpan.FromMinutes(1), token);
         takeover.Should().NotBeNull();
+        var takeoverKey = JobCoordinatorLeaseAdapter.ToKey(takeover!.Identity);
         Func<Task> staleSnapshot = () => fixture.Store.SyncOwnerSnapshotAsync(snapshot, token);
         Func<Task> staleSynchronization = () => fixture.Store.SynchronizeRecurringScheduleAsync(synchronization with
         {
@@ -239,7 +240,7 @@ public sealed class JobSchedulerCoordinationStoreContractTests
         }, token);
         var materialization = new RecurringOccurrenceMaterialization
         {
-            CoordinatorLease = grant.Key,
+            CoordinatorLease = grantKey,
             CursorKey = cursor.Key,
             ExpectedVersion = cursor.Version,
             ExpectedOccurrenceUtc = cursor.NextOccurrenceUtc!.Value,
@@ -259,16 +260,16 @@ public sealed class JobSchedulerCoordinationStoreContractTests
         unchanged.NextOccurrenceUtc.Should().Be(cursor.NextOccurrenceUtc);
         unchanged.IsSuspended.Should().BeFalse();
 
-        var acceptedSnapshot = await fixture.Store.SyncOwnerSnapshotAsync(snapshot with { CoordinatorLease = takeover!.Key }, token);
+        var acceptedSnapshot = await fixture.Store.SyncOwnerSnapshotAsync(snapshot with { CoordinatorLease = takeoverKey }, token);
         acceptedSnapshot.ContentChanged.Should().BeFalse();
         var acceptedSynchronization = await fixture.Store.SynchronizeRecurringScheduleAsync(synchronization with
         {
-            CoordinatorLease = takeover.Key
+            CoordinatorLease = takeoverKey
         }, token);
         acceptedSynchronization.Status.Should().Be(RecurringScheduleSynchronizationStatus.Unchanged);
         var acceptedMaterialization = await fixture.Store.TryMaterializeRecurringOccurrenceAsync(materialization with
         {
-            CoordinatorLease = takeover.Key,
+            CoordinatorLease = takeoverKey,
             InstanceId = "current-coordinator-occurrence"
         }, token);
         acceptedMaterialization.Status.Should().Be(RecurringMaterializationStatus.Materialized);
@@ -283,23 +284,24 @@ public sealed class JobSchedulerCoordinationStoreContractTests
     {
         var token = TestContext.Current.CancellationToken;
         await using var fixture = await StoreFixture.CreateAsync(useEfCore, NOW);
-        var grant = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, OWNER_COORDINATOR,
-            "owner-worker", TimeSpan.FromMinutes(1), cancellationToken: token);
+        var grant = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:" + OWNER_COORDINATOR), "owner-worker", TimeSpan.FromMinutes(1), token);
         grant.Should().NotBeNull();
+        var grantKey = JobCoordinatorLeaseAdapter.ToKey(grant!.Identity);
         var declaration = StoreFixture.RecurringDeclaration("jobs.alpha");
         Func<Task> otherOwner = () => fixture.Store.SyncOwnerSnapshotAsync(
-            new JobOwnerSnapshot(fixture.Scope, StoreFixture.OWNER_B, [declaration]) { CoordinatorLease = grant!.Key }, token);
+            new JobOwnerSnapshot(fixture.Scope, StoreFixture.OWNER_B, [declaration]) { CoordinatorLease = grantKey }, token);
         Func<Task> otherScope = () => fixture.Store.SyncOwnerSnapshotAsync(
-            new JobOwnerSnapshot("other-scope", StoreFixture.OWNER_A, [declaration]) { CoordinatorLease = grant!.Key }, token);
+            new JobOwnerSnapshot("other-scope", StoreFixture.OWNER_A, [declaration]) { CoordinatorLease = grantKey }, token);
         Func<Task> otherCursor = () => fixture.Store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
         {
-            CoordinatorLease = grant!.Key,
+            CoordinatorLease = grantKey,
             CursorKey = CursorKey("jobs.alpha") with { OwnerKey = StoreFixture.OWNER_B }
         }, token);
         Func<Task> maintenance = () => fixture.Store.RecoverExpiredLeasesAsync(new ExpiredLeaseRecoveryRequest
         {
             SchedulerScopeKey = fixture.Scope,
-            CoordinatorLease = grant!.Key
+            CoordinatorLease = grantKey
         }, token);
 
         await otherOwner.Should().ThrowAsync<InvalidOperationException>();
@@ -322,21 +324,23 @@ public sealed class JobSchedulerCoordinationStoreContractTests
         var executionLease = (await fixture.ClaimAsync(StoreFixture.OWNER_A, "execution-worker", ["jobs.alpha"],
             leaseDuration: TimeSpan.FromSeconds(10))).Should().ContainSingle().Subject;
         await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.alpha", instanceId: "waiting-execution");
-        var grant = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, MAINTENANCE_COORDINATOR,
-            "maintenance-a", TimeSpan.FromSeconds(10), cancellationToken: token);
+        var grant = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:" + MAINTENANCE_COORDINATOR), "maintenance-a", TimeSpan.FromSeconds(10), token);
         grant.Should().NotBeNull();
+        var grantKey = JobCoordinatorLeaseAdapter.ToKey(grant!.Identity);
         fixture.Time.Advance(TimeSpan.FromSeconds(11));
         var request = new ExpiredLeaseRecoveryRequest
         {
             SchedulerScopeKey = fixture.Scope,
-            CoordinatorLease = grant!.Key,
+            CoordinatorLease = grantKey,
             MaxCount = 1
         };
         Func<Task> staleRecovery = () => fixture.Store.RecoverExpiredLeasesAsync(request, token);
         await staleRecovery.Should().ThrowAsync<InvalidOperationException>();
-        var takeover = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, MAINTENANCE_COORDINATOR,
-            "maintenance-b", TimeSpan.FromSeconds(30), cancellationToken: token);
+        var takeover = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:" + MAINTENANCE_COORDINATOR), "maintenance-b", TimeSpan.FromSeconds(30), token);
         takeover.Should().NotBeNull();
+        var takeoverKey = JobCoordinatorLeaseAdapter.ToKey(takeover!.Identity);
         await staleRecovery.Should().ThrowAsync<InvalidOperationException>();
         var beforeRecovery = await fixture.Store.GetExecutionAsync(fixture.Scope, executionLease.Execution.InstanceId, token);
         beforeRecovery!.State.Should().Be(JobExecutionState.Running);
@@ -344,7 +348,7 @@ public sealed class JobSchedulerCoordinationStoreContractTests
         (await fixture.ClaimAsync(StoreFixture.OWNER_A, "blocked-worker", ["jobs.alpha"]))
             .Should().BeEmpty();
 
-        var recovered = await fixture.Store.RecoverExpiredLeasesAsync(request with { CoordinatorLease = takeover!.Key }, token);
+        var recovered = await fixture.Store.RecoverExpiredLeasesAsync(request with { CoordinatorLease = takeoverKey }, token);
         recovered.Should().ContainSingle().Which.State.Should().Be(JobExecutionState.Queued);
         (await fixture.Store.RequestCancellationAsync(fixture.Scope, "waiting-execution", cancellationToken: token))
             .Status.Should().Be(JobCancellationStatus.Cancelled);

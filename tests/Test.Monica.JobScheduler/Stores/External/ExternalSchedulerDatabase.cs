@@ -160,12 +160,16 @@ internal sealed class ExternalSchedulerDatabase : IAsyncDisposable
         }
     }
 
+    /// <summary>Configures fresh options for one context; do not share these options between independently owned contexts.</summary>
     internal void ConfigureDbContext(DbContextOptionsBuilder options)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (Provider == VASTBASE)
         {
-            options.UseGaussDB(_workloadSource);
+            // GaussDB includes an explicit data source's connection string in its internal-provider cache key.
+            // A context-owned connection from the same fixture pool permits provider reuse across isolated
+            // databases while preserving connection disposal and the shared pool limit.
+            options.UseGaussDB(_workloadSource.CreateConnection(), contextOwnsConnection: true);
         }
         else
         {

@@ -1,0 +1,1272 @@
+{
+  "capturedAtUtc": "2026-10-28T07:19:56.5677189+00:00",
+  "provider": "postgres",
+  "poolLimit": 3,
+  "messageCount": 128,
+  "batchSize": 32,
+  "samples": 5,
+  "payloadBytes": 512,
+  "transport": "recording-immediate-acceptance",
+  "results": [
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 394.7124,
+        "MessagesPerSecond": 324.28674650201003,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 99.3322,
+        "DrainP95Ms": 107.4985,
+        "DrainMaxMs": 107.4985
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 319.9914,
+        "MessagesPerSecond": 400.01075028891404,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 71.8143,
+        "DrainP95Ms": 90.5595,
+        "DrainMaxMs": 90.5595
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 317.0165,
+        "MessagesPerSecond": 403.76447282712417,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 73.3251,
+        "DrainP95Ms": 86.1819,
+        "DrainMaxMs": 86.1819
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 301.0447,
+        "MessagesPerSecond": 425.1860271913108,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 71.3767,
+        "DrainP95Ms": 81.5078,
+        "DrainMaxMs": 81.5078
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 309.9633,
+        "MessagesPerSecond": 412.95211400833585,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 78.3127,
+        "DrainP95Ms": 85.864,
+        "DrainMaxMs": 85.864
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 455.6816,
+        "MessagesPerSecond": 280.8978901057229,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 105.5142,
+        "DrainP95Ms": 131.4178,
+        "DrainMaxMs": 131.4178
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 414.0874,
+        "MessagesPerSecond": 309.11348666972236,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 98.3318,
+        "DrainP95Ms": 117.0936,
+        "DrainMaxMs": 117.0936
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 354.2091,
+        "MessagesPerSecond": 361.3684685119609,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 88.6461,
+        "DrainP95Ms": 92.233,
+        "DrainMaxMs": 92.233
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 359.6224,
+        "MessagesPerSecond": 355.92888540869535,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 84.3582,
+        "DrainP95Ms": 99.2292,
+        "DrainMaxMs": 99.2292
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 314.9208,
+        "MessagesPerSecond": 406.45139984402425,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 78.972,
+        "DrainP95Ms": 80.4244,
+        "DrainMaxMs": 80.4244
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 89.3762,
+        "MessagesPerSecond": 1432.148603319452,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 21.3351,
+        "DrainP95Ms": 22.9918,
+        "DrainMaxMs": 22.9918
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 86.1916,
+        "MessagesPerSecond": 1485.0635096691558,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 21.0723,
+        "DrainP95Ms": 22.5284,
+        "DrainMaxMs": 22.5284
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 94.1344,
+        "MessagesPerSecond": 1359.7579630825715,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 22.5771,
+        "DrainP95Ms": 25.301,
+        "DrainMaxMs": 25.301
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 97.4044,
+        "MessagesPerSecond": 1314.1090135558557,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 20.7652,
+        "DrainP95Ms": 32.9128,
+        "DrainMaxMs": 32.9128
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 93.457,
+        "MessagesPerSecond": 1369.6138330997144,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 22.3011,
+        "DrainP95Ms": 25.4609,
+        "DrainMaxMs": 25.4609
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 182.3481,
+        "MessagesPerSecond": 701.9541196206595,
+        "SqlCommands": 660,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          33,
+          37,
+          29,
+          29
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 45.4107,
+        "DrainP95Ms": 46.3689,
+        "DrainMaxMs": 46.9626
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 197.7597,
+        "MessagesPerSecond": 647.2501728107395,
+        "SqlCommands": 654,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          35,
+          34,
+          25,
+          34
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 47.7897,
+        "DrainP95Ms": 54.1314,
+        "DrainMaxMs": 54.6583
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 191.0683,
+        "MessagesPerSecond": 669.9175111727063,
+        "SqlCommands": 660,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          30,
+          29,
+          33,
+          36
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 46.9534,
+        "DrainP95Ms": 50.3026,
+        "DrainMaxMs": 50.6675
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 194.0953,
+        "MessagesPerSecond": 659.4698583633916,
+        "SqlCommands": 654,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          30,
+          36,
+          30,
+          32
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 47.2518,
+        "DrainP95Ms": 50.9435,
+        "DrainMaxMs": 51.0107
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 195.0631,
+        "MessagesPerSecond": 656.1979174943904,
+        "SqlCommands": 659,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          33,
+          34,
+          37,
+          24
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 47.6055,
+        "DrainP95Ms": 50.751,
+        "DrainMaxMs": 51.116
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 107.1681,
+        "MessagesPerSecond": 1194.385269497173,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          31,
+          32,
+          33
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 3.7599,
+        "DrainP95Ms": 105.9685,
+        "DrainMaxMs": 105.9685
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 112.3575,
+        "MessagesPerSecond": 1139.2207907794318,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          31,
+          32,
+          33
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 3.5175,
+        "DrainP95Ms": 110.4575,
+        "DrainMaxMs": 110.4575
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 107.0307,
+        "MessagesPerSecond": 1195.9185542092127,
+        "SqlCommands": 260,
+        "ReturningClaims": 132,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 1.9252,
+        "DrainP95Ms": 105.8109,
+        "DrainMaxMs": 105.8109
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 113.572,
+        "MessagesPerSecond": 1127.0383545240024,
+        "SqlCommands": 260,
+        "ReturningClaims": 132,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 0.9028,
+        "DrainP95Ms": 112.855,
+        "DrainMaxMs": 112.855
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 108.4631,
+        "MessagesPerSecond": 1180.1248535216123,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          31,
+          32,
+          33,
+          32
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 3.9573,
+        "DrainP95Ms": 106.3321,
+        "DrainMaxMs": 106.3321
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 62.1637,
+        "MessagesPerSecond": 2059.0794949464075,
+        "SqlCommands": 160,
+        "ReturningClaims": 32,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 7.2219,
+        "DrainP95Ms": 61.2088,
+        "DrainMaxMs": 61.2088
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 61.2971,
+        "MessagesPerSecond": 2088.190142763687,
+        "SqlCommands": 160,
+        "ReturningClaims": 32,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 6.3844,
+        "DrainP95Ms": 60.4077,
+        "DrainMaxMs": 60.4077
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 67.9689,
+        "MessagesPerSecond": 1883.214234745597,
+        "SqlCommands": 160,
+        "ReturningClaims": 32,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 7.4541,
+        "DrainP95Ms": 67.1274,
+        "DrainMaxMs": 67.1274
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 70.8088,
+        "MessagesPerSecond": 1807.6849205183535,
+        "SqlCommands": 160,
+        "ReturningClaims": 32,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 6.8444,
+        "DrainP95Ms": 69.9192,
+        "DrainMaxMs": 69.9192
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 62.066,
+        "MessagesPerSecond": 2062.3207553249767,
+        "SqlCommands": 160,
+        "ReturningClaims": 32,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 4.1399,
+        "DrainP95Ms": 61.3738,
+        "DrainMaxMs": 61.3738
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 488.6004,
+        "MessagesPerSecond": 261.97276956793326,
+        "SqlCommands": 2237,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          7,
+          8,
+          7,
+          8,
+          9,
+          9,
+          7,
+          10,
+          8,
+          8,
+          7,
+          7,
+          7,
+          9,
+          8
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 118.3285,
+        "DrainP95Ms": 126.1976,
+        "DrainMaxMs": 131.1262
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 509.3169,
+        "MessagesPerSecond": 251.31700911554282,
+        "SqlCommands": 2230,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          8,
+          9,
+          6,
+          8,
+          8,
+          6,
+          8,
+          9,
+          8,
+          8,
+          8,
+          9,
+          7,
+          9,
+          8
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 123.6764,
+        "DrainP95Ms": 137.1743,
+        "DrainMaxMs": 138.6693
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 460.5779,
+        "MessagesPerSecond": 277.91172785320356,
+        "SqlCommands": 2256,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          7,
+          8,
+          7,
+          10,
+          9,
+          8,
+          8,
+          8,
+          7,
+          8,
+          7,
+          8,
+          9
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 109.96,
+        "DrainP95Ms": 120.1071,
+        "DrainMaxMs": 122.0853
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 453.822,
+        "MessagesPerSecond": 282.04890904363384,
+        "SqlCommands": 2229,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          7,
+          9,
+          9,
+          7,
+          7,
+          8,
+          8,
+          7,
+          8,
+          8,
+          8,
+          8,
+          8,
+          7,
+          11
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 112.0196,
+        "DrainP95Ms": 116.9831,
+        "DrainMaxMs": 125.0417
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 453.2825,
+        "MessagesPerSecond": 282.3846056267339,
+        "SqlCommands": 2255,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          10,
+          8,
+          8,
+          8,
+          5,
+          8,
+          9,
+          8,
+          8,
+          9,
+          7,
+          7,
+          8,
+          8,
+          8,
+          9
+        ],
+        "DrainCalls": 79,
+        "DrainP50Ms": 111.2972,
+        "DrainP95Ms": 119.0732,
+        "DrainMaxMs": 121.0841
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 114.8609,
+        "MessagesPerSecond": 1114.3914073457547,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 3.8245,
+        "DrainP95Ms": 110.5562,
+        "DrainMaxMs": 111.6333
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 106.112,
+        "MessagesPerSecond": 1206.2726176115802,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 3.8803,
+        "DrainP95Ms": 101.9813,
+        "DrainMaxMs": 102.3869
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 106.7185,
+        "MessagesPerSecond": 1199.4171582246752,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 3.9879,
+        "DrainP95Ms": 103.1769,
+        "DrainMaxMs": 103.2503
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 106.2146,
+        "MessagesPerSecond": 1205.1073957817475,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          7,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 3.8214,
+        "DrainP95Ms": 101.2979,
+        "DrainMaxMs": 105.4166
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 111.3222,
+        "MessagesPerSecond": 1149.8155803604313,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 4.2787,
+        "DrainP95Ms": 107.6858,
+        "DrainMaxMs": 107.9581
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 70.3496,
+        "MessagesPerSecond": 1819.484403607128,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 13.3915,
+        "DrainP95Ms": 66.2798,
+        "DrainMaxMs": 66.4479
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 73.04,
+        "MessagesPerSecond": 1752.4644030668128,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 9.1525,
+        "DrainP95Ms": 69.1552,
+        "DrainMaxMs": 69.7047
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 66.3944,
+        "MessagesPerSecond": 1927.873435108985,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 4.41,
+        "DrainP95Ms": 62.2664,
+        "DrainMaxMs": 62.5514
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 66.3405,
+        "MessagesPerSecond": 1929.4397841439243,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 5.7848,
+        "DrainP95Ms": 62.5456,
+        "DrainMaxMs": 62.8331
+      }
+    },
+    {
+      "provider": "postgres",
+      "serverVersion": "PostgreSQL 15.19 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 64.5476,
+        "MessagesPerSecond": 1983.0326766603253,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 7.8356,
+        "DrainP95Ms": 60.4908,
+        "DrainMaxMs": 60.9609
+      }
+    }
+  ]
+}

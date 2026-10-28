@@ -10,6 +10,7 @@ using Monica.JobScheduler.Models.Operations;
 using Monica.JobScheduler.Providers;
 using Monica.JobScheduler.Services.Support;
 using Monica.Modules;
+using Monica.Locker.Leases;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 using Xunit.Sdk;
@@ -187,8 +188,8 @@ public sealed class JobSchedulerFacadeTests
         harness.RuntimeState.SetInFlightExecutions(2);
         harness.RuntimeState.RecordOwnerSchedulingWork(NOW);
         harness.RuntimeState.RecordLeaseRecoveryWork(NOW.AddSeconds(-1));
-        await harness.Store.TryAcquireCoordinatorLeaseAsync(StoreFixture.SCOPE, "maintenance", "diagnostic-holder",
-            TimeSpan.FromSeconds(30), cancellationToken: TestContext.Current.CancellationToken);
+        await harness.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(StoreFixture.SCOPE, "jobscheduler:maintenance"), "diagnostic-holder", TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         var result = await harness.Facade.GetRuntimeOverviewAsync(TestContext.Current.CancellationToken);
 

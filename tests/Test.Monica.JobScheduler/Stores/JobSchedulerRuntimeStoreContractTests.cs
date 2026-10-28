@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Monica.JobScheduler.Models.Definitions;
+using Monica.Locker.Leases;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 
@@ -17,10 +18,10 @@ public sealed class JobSchedulerRuntimeStoreContractTests
     {
         var token = TestContext.Current.CancellationToken;
         await using var fixture = await StoreFixture.CreateAsync(useEfCore, NOW);
-        await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, "maintenance", "first",
-            TimeSpan.FromSeconds(2), cancellationToken: token);
-        await fixture.Store.TryAcquireCoordinatorLeaseAsync("other-scope", "maintenance", "other",
-            TimeSpan.FromMinutes(1), cancellationToken: token);
+        await fixture.Store.CoordinatorLeases.TryAcquireAsync(new LeaseResource(fixture.Scope, "jobscheduler:maintenance"),
+            "first", TimeSpan.FromSeconds(2), token);
+        await fixture.Store.CoordinatorLeases.TryAcquireAsync(new LeaseResource("other-scope", "jobscheduler:maintenance"),
+            "other", TimeSpan.FromMinutes(1), token);
         fixture.Time.Advance(TimeSpan.FromSeconds(3));
 
         var snapshot = await fixture.Store.GetCoordinatorSnapshotAsync(fixture.Scope, token);
@@ -29,8 +30,8 @@ public sealed class JobSchedulerRuntimeStoreContractTests
         var row = snapshot.Coordinators.Should().ContainSingle().Subject;
         row.WorkerInstanceId.Should().Be("first");
         row.ExpiresAtUtc.Should().Be(NOW.AddSeconds(2));
-        var successor = await fixture.Store.TryAcquireCoordinatorLeaseAsync(fixture.Scope, "maintenance", "second",
-            TimeSpan.FromSeconds(2), cancellationToken: token);
+        var successor = await fixture.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(fixture.Scope, "jobscheduler:maintenance"), "second", TimeSpan.FromSeconds(2), token);
         successor.Should().NotBeNull("observing an expired grant must not renew it");
     }
 

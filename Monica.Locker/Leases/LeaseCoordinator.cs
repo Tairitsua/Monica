@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
+using Monica.Locker.Leases.Metrics;
 using Microsoft.Extensions.Logging;
 
 namespace Monica.Locker.Leases;
@@ -40,14 +42,17 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
     private readonly TimeProvider _time;
     private readonly LeaseCoordinatorOptions _options;
     private readonly ILogger _logger;
+    private readonly LeaseMetrics? _metrics;
     private readonly ConcurrentDictionary<LeaseResource, Entry> _entries = new();
     private readonly CancellationTokenSource _stopping = new();
     private int _disposed;
     private int _released;
 
     /// <summary>Creates an explicitly store-bound supervisor; it does not acquire roles until requested.</summary>
+    /// <remarks>Pass the host-owned meter factory to enable shared lease metrics; null disables instrumentation.
+    /// This coordinator neither owns nor disposes that factory. Metric tags never include resource or holder identities.</remarks>
     public LeaseCoordinator(IExclusiveLeaseStore store, string holderId, TimeProvider timeProvider,
-        ILogger logger, LeaseCoordinatorOptions? options = null)
+        ILogger logger, LeaseCoordinatorOptions? options = null, IMeterFactory? meterFactory = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentException.ThrowIfNullOrWhiteSpace(holderId);
@@ -60,6 +65,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         _logger = logger;
         _options = options ?? new();
         _options.Validate();
+        _metrics = LeaseMetrics.For(meterFactory);
     }
 
     /// <summary>Gets a usable cached term or attempts acquisition; returns null during contention/backoff.</summary>
@@ -82,7 +88,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
             entry.Attempted = true;
             var started = _time.GetTimestamp();
             var wallStart = _time.GetUtcNow();
-            var grant = await RequestAsync(entry, token => _store.TryAcquireAsync(resource, _holder, _options.Duration, token),
+            var grant = await RequestAsync(entry, "acquire", token => _store.TryAcquireAsync(resource, _holder, _options.Duration, token),
                 cancellationToken).ConfigureAwait(false);
             if (grant is null) return null;
             if (grant.Identity.Resource != resource || grant.Identity.HolderId != _holder)
@@ -90,9 +96,9 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
             entry.Attempted = false;
             cancellationToken.ThrowIfCancellationRequested();
             _stopping.Token.ThrowIfCancellationRequested();
-            var term = new Term(grant, started, wallStart, _time, _logger);
+            var term = new Term(grant, started, wallStart, _time, _logger, _metrics);
             entry.Term = term;
-            if (_stopping.IsCancellationRequested) term.Retire();
+            if (_stopping.IsCancellationRequested) term.Retire("stopped");
             if (!term.IsUsable) return null;
             entry.Renewal = Task.Run(() => RenewAsync(entry, term), CancellationToken.None);
             return term.Context;
@@ -102,6 +108,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
 
     private async Task RenewAsync(Entry entry, Term term)
     {
+        var retirementReason = "expired";
         try
         {
             while (term.IsUsable && !_stopping.IsCancellationRequested)
@@ -113,10 +120,15 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
                     if (!ReferenceEquals(entry.Term, term) || !term.IsUsable) return;
                     var started = _time.GetTimestamp();
                     var wallStart = _time.GetUtcNow();
-                    var renewed = await RequestAsync(entry,
+                    var renewed = await RequestAsync(entry, "renew",
                         token => _store.TryRenewAsync(term.Context.Identity, _options.Duration, token),
                         term.Context.StoppingToken).ConfigureAwait(false);
-                    if (renewed is null || renewed.Identity != term.Context.Identity || !term.Confirm(renewed, started, wallStart)) return;
+                    if (renewed is null || renewed.Identity != term.Context.Identity)
+                    {
+                        retirementReason = "renewal_rejected";
+                        return;
+                    }
+                    if (!term.Confirm(renewed, started, wallStart)) return;
                 }
                 finally { entry.Mutex.Release(); }
             }
@@ -124,15 +136,18 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         catch (OperationCanceledException) when (term.Context.StoppingToken.IsCancellationRequested || _stopping.IsCancellationRequested) { }
         catch (Exception exception)
         {
+            retirementReason = exception is TimeoutException ? "renewal_timeout" : "renewal_failed";
             _logger.LogWarning(exception, "Lease renewal failed for {Scope}/{Resource}; retiring its term.",
                 term.Context.Identity.Resource.Scope, term.Context.Identity.Resource.Name);
         }
-        finally { term.Retire(); }
+        finally { term.Retire(_stopping.IsCancellationRequested ? "stopped" : retirementReason); }
     }
 
-    private async Task<LeaseGrant?> RequestAsync(Entry entry, Func<CancellationToken, Task<LeaseGrant?>> operation,
+    private async Task<LeaseGrant?> RequestAsync(Entry entry, string operationName, Func<CancellationToken, Task<LeaseGrant?>> operation,
         CancellationToken cancellationToken)
     {
+        var started = _time.GetTimestamp();
+        var outcome = "failed";
         var request = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
         // Isolate a provider's synchronous preamble as well as its asynchronous wait from the deadline supervisor.
         var pending = Task.Run(() => operation(request.Token), CancellationToken.None);
@@ -144,14 +159,18 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         try
         {
-            return await pending.WaitAsync(_options.OperationTimeout, _time, cancellationToken).ConfigureAwait(false);
+            var grant = await pending.WaitAsync(_options.OperationTimeout, _time, cancellationToken).ConfigureAwait(false);
+            outcome = grant is not null ? "success" : operationName == "acquire" ? "contended" : "lost";
+            return grant;
         }
-        catch
+        catch (Exception exception)
         {
+            outcome = LeaseMetrics.FailureResult(exception);
             // Do not wait for arbitrary cancellation callbacks. Retain Pending so unresolved I/O cannot accumulate.
             try { Observe(request.CancelAsync()); } catch (ObjectDisposedException) { }
             throw;
         }
+        finally { _metrics?.RecordOperation(operationName, outcome, _time.GetElapsedTime(started)); }
     }
 
     /// <summary>Cancels local terms without releasing their database records.</summary>
@@ -159,7 +178,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Observe(_stopping.CancelAsync());
-        foreach (var entry in _entries.Values) entry.Term?.Retire();
+        foreach (var entry in _entries.Values) entry.Term?.Retire("stopped");
     }
 
     /// <summary>Stops supervision and conditionally releases grants after the caller has drained its protected work.</summary>
@@ -178,11 +197,28 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         {
             if (entry.Term is not { } term) continue;
             await term.Cancellation.WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
-            using var deadline = new CancellationTokenSource(_options.OperationTimeout);
-            var releasing = Task.Run(() => _store.TryReleaseAsync(term.Context.Identity, deadline.Token), CancellationToken.None);
-            Observe(releasing);
-            await releasing.WaitAsync(_options.OperationTimeout).ConfigureAwait(false);
+            await ReleaseAsync(term.Context.Identity).ConfigureAwait(false);
         }
+    }
+
+    private async Task ReleaseAsync(LeaseIdentity identity)
+    {
+        var started = _time.GetTimestamp();
+        var outcome = "failed";
+        using var deadline = new CancellationTokenSource(_options.OperationTimeout);
+        var releasing = Task.Run(() => _store.TryReleaseAsync(identity, deadline.Token), CancellationToken.None);
+        Observe(releasing);
+        try
+        {
+            outcome = await releasing.WaitAsync(_options.OperationTimeout).ConfigureAwait(false) ? "success" : "lost";
+        }
+        catch (Exception exception)
+        {
+            outcome = exception is OperationCanceledException && deadline.IsCancellationRequested
+                ? "timeout" : LeaseMetrics.FailureResult(exception);
+            throw;
+        }
+        finally { _metrics?.RecordOperation("release", outcome, _time.GetElapsedTime(started)); }
     }
 
     private void Observe(Task task) => _ = task.ContinueWith(completed =>
@@ -204,6 +240,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         private readonly object _gate = new();
         private readonly TimeProvider _time;
         private readonly ILogger _logger;
+        private readonly LeaseMetrics? _metrics;
         private readonly CancellationTokenSource _lost = new();
         private readonly ITimer _deadline;
         private LeaseGrant _grant;
@@ -213,13 +250,14 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
         internal LeaseContext Context { get; }
         internal Task Cancellation { get; private set; } = Task.CompletedTask;
 
-        internal Term(LeaseGrant grant, long started, DateTimeOffset wallStart, TimeProvider time, ILogger logger)
+        internal Term(LeaseGrant grant, long started, DateTimeOffset wallStart, TimeProvider time, ILogger logger, LeaseMetrics? metrics)
         {
             _grant = grant;
             _started = started;
             _time = time;
             _wallStart = wallStart;
             _logger = logger;
+            _metrics = metrics;
             Context = new LeaseContext(grant.Identity, _lost.Token);
             _deadline = time.CreateTimer(_ => Retire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             Confirm(grant, started, wallStart);
@@ -265,7 +303,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
             }
         }
 
-        internal void Retire()
+        internal void Retire(string reason = "expired")
         {
             lock (_gate)
             {
@@ -279,6 +317,7 @@ public sealed class LeaseCoordinator : IDisposable, IAsyncDisposable
                     _lost.Dispose();
                 }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
+            _metrics?.RecordTermEnded(reason);
         }
     }
 }

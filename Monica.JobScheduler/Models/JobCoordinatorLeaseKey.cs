@@ -24,14 +24,3 @@ public sealed record JobCoordinatorLeaseKey
             throw new InvalidOperationException("The coordinator grant belongs to a different scheduling partition.");
     }
 }
-
-/// <summary>Contains an authoritative coordinator grant and its database-time validity interval.</summary>
-public sealed record JobCoordinatorLease
-{
-    /// <summary>Gets the key required by subsequent coordinated mutations.</summary>
-    public required JobCoordinatorLeaseKey Key { get; init; }
-    /// <summary>Gets the authoritative time at grant or renewal.</summary>
-    public required DateTimeOffset GrantedAtUtc { get; init; }
-    /// <summary>Gets the authoritative expiration of the grant.</summary>
-    public required DateTimeOffset ExpiresAtUtc { get; init; }
-}

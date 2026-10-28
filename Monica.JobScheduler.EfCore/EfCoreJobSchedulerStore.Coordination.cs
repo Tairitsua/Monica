@@ -38,17 +38,6 @@ public sealed partial class EfCoreJobSchedulerStore
         CancellationToken cancellationToken = default) =>
         JobCoordinatorLeaseAdapter.SnapshotAsync(CoordinatorLeases, schedulerScopeKey, cancellationToken);
 
-    /// <inheritdoc />
-    public async Task<JobCoordinatorLease?> TryAcquireCoordinatorLeaseAsync(string schedulerScopeKey, string coordinatorKey,
-        string workerInstanceId, TimeSpan leaseDuration, string? currentToken = null,
-        CancellationToken cancellationToken = default)
-    {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(_operationTimeout);
-        return await JobCoordinatorLeaseAdapter.AcquireAsync(CoordinatorLeases, schedulerScopeKey, coordinatorKey,
-            workerInstanceId, leaseDuration, currentToken, deadline.Token);
-    }
-
     private Task ValidateCoordinatorLeaseAsync(JobSchedulerDbContext context, JobCoordinatorLeaseKey? key,
         CancellationToken cancellationToken) => key is null ? Task.CompletedTask
         : RelationalLeases.EnsureHeldAsync(context, key.ToIdentity(), cancellationToken);

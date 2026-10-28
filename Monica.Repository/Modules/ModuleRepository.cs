@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus;
 using Monica.Locker.Leases;
@@ -177,6 +178,7 @@ public static class ModuleRepositoryRegistrationExtensions
         if (options.DeliveryLease <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery lease must be positive.");
         if (options.PollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Poll interval must be positive.");
         if (options.BatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Batch size must be positive.");
+        if (options.DeliveryConcurrency <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery concurrency must be positive.");
         if (options.CleanupBatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup batch size must be positive.");
         if (options.CleanupInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup interval must be positive.");
         if (options.CleanupTimeBudget <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup time budget must be positive.");
@@ -200,7 +202,8 @@ public static class ModuleRepositoryRegistrationExtensions
                 sp.GetRequiredService<ILogger<OutboxDispatcher<TDbContext>>>(),
                 sp.GetRequiredService<IDbContextFactory<TDbContext>>(),
                 options.MaintenanceLeaseStore is { } selection
-                    ? sp.GetRequiredKeyedService<IExclusiveLeaseStore>(selection.ServiceKey) : null));
+                    ? sp.GetRequiredKeyedService<IExclusiveLeaseStore>(selection.ServiceKey) : null,
+                sp.GetService<IMeterFactory>()));
             var mode = options.EnableWorker
                 ? context.Application.TypeActivation!.GetActivation(typeof(TDbContext), TypeActivationKind.Outbox)
                 : ActivationMode.Disabled;

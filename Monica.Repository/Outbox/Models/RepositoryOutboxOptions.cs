@@ -23,8 +23,15 @@ public sealed class RepositoryOutboxOptions
     /// <summary>Claim duration, five minutes by default. Configure above the transport's normal send timeout.</summary>
     public TimeSpan DeliveryLease { get; set; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Maximum due rows each delivery pass scans; defaults to 100. Does not limit cleanup.</summary>
+    /// <summary>Maximum messages claimed per delivery pass, including failed attempts; defaults to 100. Does not limit cleanup.</summary>
     public int BatchSize { get; set; } = 100;
+
+    /// <summary>
+    /// Maximum simultaneous deliveries per store and drain invocation; defaults to one. Claims only free
+    /// delivery slots. Increasing this value overlaps handlers and transport calls in independent scopes;
+    /// it does not guarantee ordering, including messages with the same transport key.
+    /// </summary>
+    public int DeliveryConcurrency { get; set; } = 1;
 
     /// <summary>Delay after an incomplete delivery batch or a failed scan; defaults to five seconds. Full successful batches continue immediately.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
