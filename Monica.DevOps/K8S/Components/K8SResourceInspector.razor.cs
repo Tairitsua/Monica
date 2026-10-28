@@ -15,8 +15,8 @@ namespace Monica.DevOps.K8S.Components;
 
 /// <summary>Shows captured Kubernetes evidence in a temporary, keyboard-contained inspector.</summary>
 /// <remarks>The parent owns resource reads, operation review and open state. Keep this component mounted
-/// while navigating relations, then retire it when closing or changing namespace. Native focus ownership
-/// stays with the conditional focus trap and nested dialogs; callers must preserve their launch controls.</remarks>
+/// while navigating relations, then retire it when closing or changing namespace. The shared side sheet
+/// owns native dialog focus and dismissal; callers must preserve their launch controls.</remarks>
 public partial class K8SResourceInspector : IAsyncDisposable
 {
     [Inject] private IStringLocalizer<K8SResource> L { get; set; } = default!;
@@ -27,7 +27,7 @@ public partial class K8SResourceInspector : IAsyncDisposable
 
     /// <summary>Gets or sets captured resource, Pod and raw Describe evidence.</summary>
     [Parameter, EditorRequired] public K8SResourceDetails Details { get; set; } = new();
-    /// <summary>Gets or sets whether the drawer and its native focus trap are mounted.</summary>
+    /// <summary>Gets or sets whether the shared evidence sheet is open.</summary>
     [Parameter] public bool Open { get; set; }
     /// <summary>Gets or sets the shared dismissal callback used by Close, Escape and the overlay.</summary>
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
@@ -107,7 +107,6 @@ public partial class K8SResourceInspector : IAsyncDisposable
 
     private Task DrawerChangedAsync(bool open) => open ? Task.CompletedTask : CloseAsync();
     private Task CloseAsync() => _retired || HasPendingAction ? Task.CompletedTask : OpenChanged.InvokeAsync(false);
-    private Task HandleKeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
 
     private bool ActionDisabled(string operation) => _retired || _token.IsCancellationRequested ||
         (_operationOrigin != operation && (!CanOperate || IsBusy || HasPendingWork)) ||

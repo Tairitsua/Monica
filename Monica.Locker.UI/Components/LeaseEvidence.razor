@@ -1,12 +1,14 @@
 @inject IStringLocalizer<LockerResource> L
 @inject MoTimeFormatter Time
+@using Monica.UI.Shared.Components.Dialogs
+@implements IAsyncDisposable
 
-<div class="ls-evidence-host">
-<MudDrawer Open="true" OpenChanged="@(_ => Close.InvokeAsync())" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Width="min(520px, 100vw)" Elevation="8" Class="ls-evidence-drawer">
-    <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild" Disabled="@_confirmOpen">
-    <div class="ls-evidence" role="dialog" aria-modal="true" aria-labelledby="lease-evidence-heading" @onkeydown="OnKeyDown">
-        <header><div><p>@L["Evidence:Title"]</p><h2 id="lease-evidence-heading">@LeasePresentation.Title(ResourceName, L)</h2></div><MudIconButton Icon="@MoIcons.Close" aria-label="@L["Common:Close"]" OnClick="@(() => Close.InvokeAsync())" /></header>
-        <div class="ls-evidence-body">
+<MoSideSheet Open="true" OpenChanged="OnSheetVisibilityChanged" CloseLabel="@L["Common:Close"]">
+    <TitleContent>
+        <div class="ls-evidence-title"><p>@L["Evidence:Title"]</p><h2>@LeasePresentation.Title(ResourceName, L)</h2></div>
+    </TitleContent>
+    <ChildContent>
+        <div class="ls-evidence ls-evidence-body">
             @if (Failed) { <MudAlert Severity="Severity.Warning" Dense="true">@L["Evidence:ExactFailed"]</MudAlert> }
             @if (_revokeError) { <MudAlert Severity="Severity.Error" Dense="true">@L["Admin:Failed"]</MudAlert> }
             @if (Evidence?.Snapshot.Leases.FirstOrDefault() is { } record)
@@ -32,12 +34,10 @@
                 <dl><div><dt>@L["Inventory:Authority"]</dt><dd>@SourceId</dd></div><div><dt>@L["Evidence:Name"]</dt><dd>@ResourceName</dd></div></dl>
             }
         </div>
-    </div>
-    </MudFocusTrap>
-</MudDrawer>
-</div>
-<MudDialog @bind-Visible="_confirmOpen" Options="_dialogOptions" DefaultFocus="DefaultFocus.LastChild">
-    <TitleContent><h2>@L["Admin:ConfirmTitle"]</h2></TitleContent>
+    </ChildContent>
+</MoSideSheet>
+<MudDialog @ref="_confirmation" @bind-Visible="_confirmOpen" Options="_dialogOptions" DefaultFocus="DefaultFocus.LastChild">
+    <TitleContent><MoDialogHeading Text="@L["Admin:ConfirmTitle"]" /></TitleContent>
     <DialogContent><p>@L["Admin:ConfirmDescription"]</p><p class="mo-vl-mono">@_target?.Authority.Id / @_target?.Authority.Scope / @_target?.Snapshot.Leases.FirstOrDefault()?.Resource.Name</p><MudAlert Severity="Severity.Warning" Dense="true">@L["Admin:Warning"]</MudAlert><MudCheckBox T="bool" @bind-Value="_acknowledged" Label="@L["Admin:Acknowledge"]" /></DialogContent>
     <DialogActions><MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="@(!_acknowledged || Busy)" OnClick="ConfirmAsync">@L["Admin:Revoke"]</MudButton><MudButton Disabled="@Busy" OnClick="@(() => _confirmOpen = false)">@L["Common:Cancel"]</MudButton></DialogActions>
 </MudDialog>
@@ -51,14 +51,23 @@
     [Parameter] public EventCallback Close { get; set; }
     [Parameter] public EventCallback Refresh { get; set; }
     [Parameter] public Func<LeaseResourceEvidence, Task<bool>>? Revoke { get; set; }
-    private bool _confirmOpen, _acknowledged, _revokeError, _submitting;
+    private bool _confirmOpen, _acknowledged, _revokeError, _submitting, _retired;
+    private MudDialog? _confirmation;
+    private Task<IDialogReference>? _confirmationOpening;
+    private Task? _retirement;
     private LeaseResourceEvidence? _target;
     private readonly DialogOptions _dialogOptions = new() { CloseOnEscapeKey = true, BackdropClick = false, MaxWidth = MaxWidth.Small, FullWidth = true };
-    private Task OnKeyDown(KeyboardEventArgs args) => args.Key == "Escape" && !_confirmOpen ? Close.InvokeAsync() : Task.CompletedTask;
-    private void OpenConfirmation() { _target = Evidence; _acknowledged = false; _confirmOpen = true; }
+    private Task OnSheetVisibilityChanged(bool visible) => !visible && !_retired ? Close.InvokeAsync() : Task.CompletedTask;
+    private Task OpenConfirmation()
+    {
+        if (_retired || _confirmOpen || _confirmationOpening is { IsCompleted: false }) return Task.CompletedTask;
+        _target = Evidence;
+        _acknowledged = false;
+        return _confirmationOpening = _confirmation!.ShowAsync();
+    }
     private async Task ConfirmAsync()
     {
-        if (!_acknowledged || Busy || _submitting || _target is null || Revoke is null) return;
+        if (!_acknowledged || Busy || _submitting || _retired || _target is null || Revoke is null) return;
         _submitting = true;
         try
         {
@@ -66,5 +75,14 @@
             _confirmOpen = false;
         }
         finally { _submitting = false; }
+    }
+
+    public ValueTask DisposeAsync() => new(_retirement ??= RetireAsync());
+
+    private async Task RetireAsync()
+    {
+        _retired = true;
+        // Drain native opening so route retirement also closes a late-created provider portal.
+        if (_confirmationOpening is not null) (await _confirmationOpening).Close();
     }
 }

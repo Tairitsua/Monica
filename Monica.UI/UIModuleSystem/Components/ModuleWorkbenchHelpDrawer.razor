@@ -3,49 +3,22 @@
 @using Monica.UI.UIModuleSystem.State
 @inject IStringLocalizer<ModuleSystemResource> L
 
-<MudDrawer Open="@Session.IsHelpDrawerOpen"
-           Class="mo-viewport-drawer"
-           OpenChanged="@OpenChanged"
-           Anchor="Anchor.End"
-           Variant="DrawerVariant.Temporary"
-           Overlay="true"
-           OverlayAutoClose="true"
-           Fixed="true"
-           Width="min(28rem, 100vw)"
-           Elevation="4"
-           role="dialog"
-           aria-modal="true"
-           aria-labelledby="module-help-title">
-    @if (Session.IsHelpDrawerOpen)
-    {
-        <div class="help-drawer-content" @onkeydown="HandleKeyDownAsync">
-            <MudFocusTrap Class="help-drawer-focus" DefaultFocus="DefaultFocus.FirstChild">
-                <MudDrawerHeader>
-                    <div class="help-header">
-                        <MudIconButton Class="help-close" Icon="@MoIcons.Close"
-                                       OnClick="@(() => OpenChanged.InvokeAsync(false))"
-                                       aria-label="@L["Aria:CloseHelp"]" />
-                        <div>
-                            <span class="help-eyebrow">@L["Help:Eyebrow"]</span>
-                            <h2 id="module-help-title">@L["Help:Title"]</h2>
-                        </div>
-                    </div>
-                </MudDrawerHeader>
-                <div class="help-topics">
-                    <article><MoIcon Size="1.5rem" Icon="@MoIcons.Route" Style="color:var(--mud-palette-primary)" /><div><strong>@L["Help:CriticalPath:Title"]</strong><p>@L["Help:CriticalPath:Description"]</p></div></article>
-                    <article><MoIcon Size="1.5rem" Icon="@MoIcons.BadgeCheck" Style="color:var(--mud-palette-success)" /><div><strong>@L["Help:Outcome:Title"]</strong><p>@L["Help:Outcome:Description"]</p></div></article>
-                    <article><MoIcon Size="1.5rem" Icon="@MoIcons.FileSearch" Style="color:var(--mud-palette-info)" /><div><strong>@L["Help:Discovery:Title"]</strong><p>@L["Help:Discovery:Description"]</p></div></article>
-                    <article><MoIcon Size="1.5rem" Icon="@MoIcons.Shield" Style="color:var(--mud-palette-warning)" /><div><strong>@L["Help:Privacy:Title"]</strong><p>@L["Help:Privacy:Description"]</p></div></article>
-                </div>
-            </MudFocusTrap>
+@using Monica.UI.Shared.Components.Dialogs
+
+<MoSideSheet Open="@Session.IsHelpDrawerOpen" OpenChanged="@OpenChanged" Width="28rem" CloseLabel="@L["Aria:CloseHelp"]">
+    <TitleContent><div class="help-header"><span class="help-eyebrow">@L["Help:Eyebrow"]</span><h2>@L["Help:Title"]</h2></div></TitleContent>
+    <ChildContent>
+        <div class="help-topics">
+            <article><MoIcon Size="1.5rem" Icon="@MoIcons.Route" Style="color:var(--mud-palette-primary)" /><div><strong>@L["Help:CriticalPath:Title"]</strong><p>@L["Help:CriticalPath:Description"]</p></div></article>
+            <article><MoIcon Size="1.5rem" Icon="@MoIcons.BadgeCheck" Style="color:var(--mud-palette-success)" /><div><strong>@L["Help:Outcome:Title"]</strong><p>@L["Help:Outcome:Description"]</p></div></article>
+            <article><MoIcon Size="1.5rem" Icon="@MoIcons.FileSearch" Style="color:var(--mud-palette-info)" /><div><strong>@L["Help:Discovery:Title"]</strong><p>@L["Help:Discovery:Description"]</p></div></article>
+            <article><MoIcon Size="1.5rem" Icon="@MoIcons.Shield" Style="color:var(--mud-palette-warning)" /><div><strong>@L["Help:Privacy:Title"]</strong><p>@L["Help:Privacy:Description"]</p></div></article>
         </div>
-    }
-</MudDrawer>
+    </ChildContent>
+</MoSideSheet>
 
 @code {
     [Parameter, EditorRequired] public ModuleSystemWorkbenchSession Session { get; set; } = default!;
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
 
-    private Task HandleKeyDownAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape" ? OpenChanged.InvokeAsync(false) : Task.CompletedTask;
 }

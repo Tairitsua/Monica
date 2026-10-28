@@ -10,16 +10,6 @@ namespace Monica.JobScheduler.UI.UIJobScheduler.Executions.Support;
 /// </summary>
 internal static class ExecutionDetailDialogLauncher
 {
-    private static DialogOptions DialogOptions { get; } = new()
-    {
-        CloseButton = true,
-        CloseOnEscapeKey = true,
-        FullWidth = true,
-        MaxWidth = MaxWidth.False,
-        Position = DialogPosition.CenterRight,
-        BackgroundClass = "scheduler-execution-backdrop"
-    };
-
     /// <summary>
     /// Opens one execution-detail dialog and returns after the dialog is visible.
     /// </summary>
@@ -38,8 +28,7 @@ internal static class ExecutionDetailDialogLauncher
         };
         return dialogService.ShowAsync<ExecutionDetailDialog>(
             localizer["ExecutionDetail:Title"],
-            parameters,
-            DialogOptions);
+            parameters);
     }
 
     /// <summary>

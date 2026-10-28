@@ -1,6 +1,6 @@
 # Lease workbench
 
-Reference `Monica.Locker.UI` and call `AddLockerUI()` for `/leases` and `/leases/locks`. The first page shows configured authority observations, holder records, filters, and an exact-resource evidence drawer. The lock page compares the supported [critical-section lock contracts](lockers.md); it does not discover the installed provider or claim to show live lock holders. No lock inventory or forced-unlock API exists.
+Reference `Monica.Locker.UI` and call `AddLockerUI()` for `/leases` and `/leases/locks`. The first page shows configured authority observations, holder records, filters, and an exact-resource evidence sheet. It uses the [shared native side-sheet contract](../../monica-infra-ui/references/visual-components.md#modal-evidence-side-sheets), also used by JobScheduler, with route-owned selection and refresh. The lock page compares the supported [critical-section lock contracts](lockers.md); it does not discover the installed provider or claim to show live lock holders. No lock inventory or forced-unlock API exists.
 
 The UI requires explicit bindings through `AddLeaseDiagnostics`. It never selects a consumer's lease store, starts a coordinator, creates a table, or requires `AddLocker()`. Read [coordinator leases](leases.md) for provider registration, migrations and authority identity before exposing one.
 

@@ -1,6 +1,5 @@
 .seeder-page { width:100%; min-width:0; min-height:100%; font-family:var(--mud-typography-default-family); }
-.seeder-page ::deep .seeder-drawer-container { display:flex; flex-direction:column; width:100%; min-width:0; min-height:100%; padding:clamp(24px,2.3vw,36px); container:seeder-page / inline-size; }
-.seeder-page ::deep .mud-drawer.mud-drawer-pos-right.mud-drawer--closed { display:none; }
+.seeder-page .seeder-workspace { display:flex; flex-direction:column; width:100%; min-width:0; min-height:100%; padding:clamp(24px,2.3vw,36px); container:seeder-page / inline-size; }
 .seeder-page-header { display:flex; align-items:center; justify-content:space-between; gap:24px; min-width:0; padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--mud-palette-divider); }
 .seeder-page-heading { min-width:0; }
 .seeder-page-eyebrow { display:block; margin-bottom:12px; color:var(--mud-palette-primary); font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
@@ -19,5 +18,4 @@
 .seeder-page ::deep .seeder-page-refresh-alert .mud-alert-message,.seeder-page ::deep .seeder-page-error { max-width:100%; overflow-wrap:anywhere; }
 @container seeder-page (max-width:950px) { .seeder-overview-grid { grid-template-columns:1fr; } }
 @container seeder-page (max-width:600px) { .seeder-page-header { align-items:flex-start; gap:20px; } .seeder-page-actions { padding-top:20px; } .seeder-overview-grid { gap:20px; } }
-@media(max-width:700px) { .seeder-page ::deep .seeder-drawer-container { padding:22px 16px; } .seeder-page-content { gap:20px; } .seeder-page-header { align-items:flex-start; flex-direction:column; gap:18px; } .seeder-page-actions { padding:0; } }
-@media(prefers-reduced-motion:reduce) { .seeder-page ::deep .mud-drawer.mud-drawer-temporary,.seeder-page ::deep .mud-overlay,.seeder-page ::deep .mud-overlay-scrim { animation:none!important; transition:none!important; } }
+@media(max-width:700px) { .seeder-page .seeder-workspace { padding:22px 16px; } .seeder-page-content { gap:20px; } .seeder-page-header { align-items:flex-start; flex-direction:column; gap:18px; } .seeder-page-actions { padding:0; } }

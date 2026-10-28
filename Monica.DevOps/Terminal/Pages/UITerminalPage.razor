@@ -90,25 +90,10 @@
                     }
                 </div>
             </div>
-            <MudDrawer Open="@(_context is not null && _modal)" OpenChanged="DrawerChanged" Anchor="Anchor.End" Variant="DrawerVariant.Temporary"
-                       Overlay="false" Fixed="true" Width="min(35rem, var(--terminal-owner-width))" Elevation="4" Class="terminal-native-drawer"
-                       Style="@DrawerStyle"
-                       role="dialog" aria-modal="true" aria-labelledby="terminal-context-title">
-                @if (_context is not null && _modal)
-                {
-                    <div class="terminal-context-drawer" @onkeydown="ContextKeyDownAsync">
-                        <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild" Class="terminal-context-focus">
-                            <TerminalContextPanel Session="session" Environment="visit.Environment" History="@(_context == "history")"
-                                Result="_inspectedResult" CurrentCommand="_inspectedCommand" InspectedSessionName="@_inspectedSessionName" InspectedSessionId="@_inspectedSessionId" Disabled="@(!visit.CanChangeSession)" Close="CloseContext" Reuse="ReuseAsync" />
-                        </MudFocusTrap>
-                    </div>
-                }
-            </MudDrawer>
             @if (_context is not null && _modal)
             {
-                <div class="terminal-backdrop-owner" @onwheel:preventDefault @ontouchmove:preventDefault>
-                    <MudOverlay Visible="true" Absolute="true" DarkBackground="true" AutoClose="true" OnClosed="CloseContext" />
-                </div>
+                <TerminalContextPanel Modal="true" Session="session" Environment="visit.Environment" History="@(_context == "history")"
+                    Result="_inspectedResult" CurrentCommand="_inspectedCommand" InspectedSessionName="@_inspectedSessionName" InspectedSessionId="@_inspectedSessionId" Disabled="@(!visit.CanChangeSession)" Close="CloseContext" Reuse="ReuseAsync" />
             }
         }
         else
@@ -150,8 +135,6 @@
     private string? _inspectedSessionName;
     private string? _inspectedSessionId;
     private Exception? _loggedNotification;
-    private string DrawerStyle => "top: var(--terminal-owner-top); height: var(--terminal-owner-height); bottom: auto; transition: none; animation: none;" +
-        (_context is not null && _modal ? "right: var(--terminal-owner-right);" : string.Empty);
 
     protected override void OnInitialized() => _visit = new(TerminalFacade, BrowserStorage, work => InvokeAsync(work), PublishVisitAsync);
 
@@ -283,8 +266,6 @@
     }
     private void CompactChanged(bool compact) { if (_disposed) return; _compact = compact; if (_context is not null && compact) _modal = true; }
     private void FlowChanged(bool flow) { if (!_disposed) _flow = flow; }
-    private void DrawerChanged(bool open) { if (!open) CloseContext(); }
-    private Task ContextKeyDownAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseContext(); return Task.CompletedTask; }
     public ValueTask DisposeAsync()
     {
         if (_retirement is not null) return new(_retirement);

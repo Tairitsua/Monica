@@ -5,6 +5,7 @@
     }
   },
   "Common": {
+    "Close": "关闭",
     "Initializing": "初始化中",
     "GoHome": "返回首页"
   },

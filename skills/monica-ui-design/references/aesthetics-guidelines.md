@@ -27,6 +27,14 @@ This reference covers building and verifying a browser prototype once the [desig
 - Give an overlay an accessible name, initial focus, focus containment while open and focus return on close, following the [interaction contract](../../monica-ui-development/references/monica-workbench-design-language.md#preserve-interaction-and-runtime-state).
 - A prototype may approximate a primitive's paint, but its handoff names the MudBlazor control and the keyboard and focus behavior to verify on the installed version.
 
+## Inspectors and drawers
+
+Before designing a modal evidence inspector, inspect the existing JobScheduler execution-detail sheet and the target implementation's [shared visual owners](../../monica-infra-ui/references/visual-components.md). Reuse `Monica.UI.Shared.Components.Dialogs.MoSideSheet`, the shared component built on native MudDialog. Keep native MudDrawer for navigation or intentionally bounded panels; its layout behavior is not a replacement for the modal inspector lifecycle. A new page owns its evidence and actions, not another drawer shell, overlay, focus trap, close control, viewport sizing or scrolling implementation. Navigation drawers and deliberately bounded page panels retain their distinct native owners.
+
+The prototype may simulate the shared sheet's appearance and interaction, but its handoff must name `MoSideSheet` and map the design to its title, stationary header, scrolling body or native tab panels, and optional footer slots. Native tab labels and content stay together through `TabPanels`; do not build empty tabs disconnected from the visible evidence. Do not translate prototype overlay markup into a separate production drawer. Extend a shared owner only when a demonstrated requirement is missing, migrate equivalent callers, and remove the retired page-specific geometry.
+
+Verify the panel at the viewport edge with full viewport height after scrolling the underlying page. Keep its heading and Close control stationary while one body region scrolls. Check desktop, the intermediate sidebar width and phone, plus Escape, backdrop dismissal, focus containment and return, nested confirmation, route changes and back/forward. Inspect live bounds and scroll owners; a plausible screenshot alone is insufficient.
+
 ## Reflow
 
 - Reflow from the page's own width with container queries; the shell's navigation changes the width a page receives at the same viewport.

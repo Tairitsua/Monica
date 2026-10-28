@@ -45,6 +45,7 @@
 
 /* Shared visual-language roles for operational pages. */
 @import url('./components/mo-visual-language.css');
+@import url('./components/mo-side-sheet.css');
 
 @import url('./markdown/mo-markdown-default.css');
 @import url('./markdown/mo-markdown-hermes-teal.css');

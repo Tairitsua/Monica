@@ -26,6 +26,29 @@ Other reusable owners have distinct contracts:
 - `MoContentState` owns [loading and empty content regions](content-states.md).
 - `MoTimeFormatter` owns [timestamp display](time-display.md); precision and calendar semantics remain explicit.
 - `MoJson` owns [JSON viewing and editing](json.md), and `MoIcon` owns [icon rendering](icons.md).
+- Modal evidence inspectors use the [native side-sheet contract](#modal-evidence-side-sheets); navigation drawers retain their own layout owner.
+
+## Modal evidence side sheets
+
+Use `Monica.UI.Shared.Components.Dialogs.MoSideSheet` for modal evidence inspectors. It composes native `MudDialog` and requires the normal Monica UI providers and theme assets. Its provider portal stays outside page container-query and scroll bounds. The shared component owns focus, Escape/backdrop dismissal, the localized Close control, viewport geometry and one scrolling body. Navigation drawers and intentionally inline panels retain their native layout owners.
+
+```razor
+@using Monica.UI.Shared.Components.Dialogs
+
+<MoSideSheet @bind-Open="_open" Title="@L["Inspector:Title"]">
+    <ChildContent>@EvidenceContent</ChildContent>
+</MoSideSheet>
+```
+
+The example's localizer, `_open` state and `EvidenceContent` belong to the caller. `Open` defaults to false; inline callers bind `Open`/`OpenChanged` or unmount on dismissal. Accept the false notification before reopening. The component drains opening and closes its inline portal on disposal, including a reference produced after retirement. Callers retain query selection, reads, refresh, mutations and any nested confirmation lifetime.
+
+`TitleContent` replaces the text heading; `HeaderContent` holds a stationary toolbar; `ChildContent` scrolls; `FooterContent` holds stationary actions. For tabbed evidence, supply native `MudTabPanel` children through `TabPanels` instead of `ChildContent`, and bind `ActiveTabIndex`/`ActiveTabIndexChanged` (index defaults to zero). The shared `MudTabs` keeps the tab bar stationary and scrolls the panels without breaking native tab associations or keyboard behavior. Do not split native tabs from their content.
+
+The title supplies the live accessible name. `Width` defaults to `480px` and is capped at the viewport. `CloseLabel` optionally supplies a contextual localized label. `Dismissible` defaults to true; false disables Close, Escape and backdrop dismissal while the caller completes admitted work. It does not block route retirement or cancel business work. Keep feature composition inside these slots; the shared component owns outer padding, body scrolling and reduced-motion styling. Do not add another overlay, focus trap, Escape handler or scrolling body.
+
+A component rooted in `MoSideSheet` can also be opened with `IDialogService.ShowAsync<T>(title, parameters)` without special dialog options. In that mode `Open` is ignored and the caller owns the returned native reference and retires it with its route. JobScheduler's `ExecutionDetailDialog` and Locker's `LeaseEvidence` demonstrate service-opened and inline ownership respectively. Use ordinary `MudDialog` for confirmations; keep its reference with the feature that owns the decision.
+
+Module System and Help, HealthCheck, Seeder, Kubernetes and Terminal's modal context use the same component. Verify affected callers after changing it: page scroll before opening, stationary heading/tabs/footer while the body scrolls, desktop and phone bounds, live evidence/title changes, Escape/backdrop/focus return, nested confirmation, disabled dismissal during work, and route/back/forward cleanup. `components/mo-side-sheet.css` owns the shared frame; never copy it into feature CSS.
 
 ## Compose a localized finding
 

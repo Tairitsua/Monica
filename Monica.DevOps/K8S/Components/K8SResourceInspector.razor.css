@@ -1,63 +1,3 @@
-.k8s-inspector-host ::deep .k8s-resource-sheet.mud-drawer.mud-drawer-temporary {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    height: 100dvh;
-    max-height: 100dvh;
-    border: 0;
-    border-inline-start: 1px solid var(--mud-palette-divider);
-    border-radius: 0 !important;
-    overflow: hidden;
-    background: var(--mud-palette-surface);
-    color: var(--mud-palette-text-primary);
-    box-shadow: var(--mud-elevation-12);
-}
-
-.k8s-inspector-host ::deep .k8s-resource-sheet > .mud-drawer-content {
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.k8s-inspector-host ::deep .mud-overlay { backdrop-filter: blur(2px); }
-
-.inspector-content {
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    font-family: var(--mo-font-family-body, var(--mud-typography-default-family));
-}
-
-.inspector-content ::deep .inspector-focus,
-.inspector-content ::deep .mud-focus-trap-child-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-}
-
-.inspector-heading {
-    display: flex;
-    align-items: flex-start;
-    flex-shrink: 0;
-    gap: 16px;
-    padding: 25px 26px 20px;
-    border-bottom: 1px solid var(--mud-palette-divider);
-}
-
-.inspector-identity { order: 0; min-width: 0; flex: 1; }
-.inspector-heading ::deep .inspector-close {
-    order: 1;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    padding: 6px;
-    color: var(--mud-palette-text-secondary);
-    background: color-mix(in srgb, var(--mud-palette-text-primary) 5%, var(--mud-palette-surface));
-}
-
 :where(.resource-kind, .relation-chip) { --resource-role: var(--mud-palette-primary); }
 .kind-service { --resource-role: var(--mud-palette-info); }
 .kind-statefulset { --resource-role: var(--mud-palette-secondary); }
@@ -102,32 +42,7 @@
 }
 .inspector-provenance b { font-weight: 400; font-family: var(--mo-font-family-mono); }
 
-.inspector-content ::deep .inspector-tabs { flex: 1 1 auto; min-height: 0; min-width: 0; }
-.inspector-content ::deep .mud-tabs-tabbar {
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--mud-palette-divider);
-    background: var(--mud-palette-surface);
-}
-.inspector-content ::deep .mud-tabs-tabbar-inner { padding-inline: 20px; }
-.inspector-content ::deep .mud-tab {
-    min-height: 44px;
-    padding: 10px 12px;
-    font-family: var(--mo-font-family-body, var(--mud-typography-default-family));
-    font-size: 13px;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--mud-palette-text-secondary);
-}
-.inspector-content ::deep .mud-tab.mud-tab-active { color: var(--mud-palette-text-primary); background: transparent; }
-.inspector-content ::deep .mud-tabs-panels {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-.inspector-tab-body { display: grid; gap: 24px; min-width: 0; padding: 24px 26px 30px; }
+.inspector-tab-body { display: grid; gap: 24px; min-width: 0; }
 .inspector-tab-body ::deep .mo-vl-callout p { margin: 0; }
 .inspector-tab-body ::deep .inspector-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .inspector-tab-body ::deep .mo-vl-fact:nth-child(2n) { border-inline-end: 0; }
@@ -182,11 +97,11 @@
 .pod-issue { margin: 12px 0 0; padding: 9px 12px; background: color-mix(in srgb, var(--mud-palette-warning) 10%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--mud-palette-warning) 35%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .pod-evidence ::deep .pod-describe { margin-top: 7px; }
 :where(.inspector-content) ::deep .pod-state-badge { --pod-state-role: var(--mud-palette-text-secondary); }
-.inspector-content ::deep .pod-state-badge.mud-chip-color-info { --pod-state-role: var(--mud-palette-info); }
-.inspector-content ::deep .pod-state-badge.mud-chip-color-success { --pod-state-role: var(--mud-palette-success); }
-.inspector-content ::deep .pod-state-badge.mud-chip-color-warning { --pod-state-role: var(--mud-palette-warning); }
-.inspector-content ::deep .pod-state-badge.mud-chip-color-error { --pod-state-role: var(--mud-palette-error); }
-.inspector-content ::deep .pod-state-badge.mud-chip {
+.inspector-navigation ::deep .pod-state-badge.mud-chip-color-info { --pod-state-role: var(--mud-palette-info); }
+.inspector-navigation ::deep .pod-state-badge.mud-chip-color-success { --pod-state-role: var(--mud-palette-success); }
+.inspector-navigation ::deep .pod-state-badge.mud-chip-color-warning { --pod-state-role: var(--mud-palette-warning); }
+.inspector-navigation ::deep .pod-state-badge.mud-chip-color-error { --pod-state-role: var(--mud-palette-error); }
+.inspector-navigation ::deep .pod-state-badge.mud-chip {
     border: 0;
     background-color: color-mix(in srgb, var(--pod-state-role) 12%, var(--mud-palette-surface)) !important;
     color: color-mix(in srgb, var(--pod-state-role) 40%, var(--mud-palette-text-primary)) !important;
@@ -194,7 +109,7 @@
 }
 .describe-output { min-width: 0; max-width: 100%; overflow-x: auto; background: var(--mud-palette-background); border: 1px solid var(--mud-palette-divider); }
 .describe-output pre { margin: 0; padding: 16px; white-space: pre; font: 12px/1.8 var(--mo-font-family-mono); }
-.inspector-footer { flex-shrink: 0; padding: 15px 20px; border-top: 1px solid var(--mud-palette-divider); background: var(--mud-palette-surface); }
+.inspector-footer { width:100%; min-width:0; }
 .inspector-footer p { margin: 0 0 10px; color: var(--mud-palette-text-secondary); font-size: 12px; }
 .inspector-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .inspector-actions ::deep .inspector-operation.mud-button-root:not(:disabled):not(.mud-disabled) {
@@ -209,13 +124,11 @@
 .inspector-actions ::deep .inspector-operation .mud-button-label { color: inherit; }
 .inspector-actions ::deep .footer-close { margin-inline-start: auto; }
 @media (max-width: 600px) {
-    .inspector-heading { padding: 20px 18px 16px; gap: 10px; }
     .inspector-identity h2 { font-size: 21px; }
-    .inspector-tab-body { padding: 20px 18px 24px; gap: 22px; }
-    .inspector-content ::deep .mud-tab { padding: 9px 12px; font-size: 12px; }
+    .inspector-tab-body { gap: 22px; }
+    .inspector-navigation ::deep .mud-tab { padding: 9px 12px; font-size: 12px; }
     .inspector-tab-body ::deep .mo-vl-fact { padding: 11px 12px; }
     .inspector-tab-body ::deep .mo-vl-fact dd { font-size: 17px; }
     .inspector-tab-body ::deep .mo-vl-fact:nth-child(4) dd { font-size: 12px; }
-    .inspector-footer { padding: 12px 16px; }
     .inspector-actions { gap: 7px; }
 }

@@ -1,13 +1,13 @@
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Components.Dialogs
 
-<MudDialog Gutters="false" TitleClass="pa-0" ContentClass="pa-0" Class="scheduler-execution-sheet">
+<MoSideSheet>
     <TitleContent>
         <div class="execution-detail__dialog-title" data-state="@_state?.Execution?.State.ToString().ToLowerInvariant()">
             <span class="execution-detail__seal"><MoIcon Icon="@MoIcons.ClipboardCheck" Size="18px" /></span>
             <div class="execution-detail__identity">
                 <p>@L["ExecutionDetail:Title"] · @(_state?.Execution is { } selected ? JobSchedulerUiPresentation.GetJobDisplayName(selected.Template) : "—")</p>
-                <MoDialogHeading Text="@($"#{JobSchedulerUiPresentation.ShortIdentity(InstanceId)}")" />
+                <h2 class="mo-dialog-heading">#@JobSchedulerUiPresentation.ShortIdentity(InstanceId)</h2>
                 @if (_state?.Execution is { } headerExecution)
                 {
                     <div class="execution-detail__flags"><span data-state="@headerExecution.State.ToString().ToLowerInvariant()">@L[$"ExecutionStates:{headerExecution.State}"]</span><small>@L[$"ExecutionOrigins:{headerExecution.Origin}"]</small></div>
@@ -15,7 +15,7 @@
             </div>
         </div>
     </TitleContent>
-    <DialogContent>
+    <ChildContent>
         <div class="execution-detail__viewport">
             @if (_state is not { } state || !state.AccessChecked || state.IsLoading && !state.HasLoadedSnapshot)
             {
@@ -96,5 +96,5 @@
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@L["Executions:SnapshotUnavailable"]</MudAlert>
             }
         </div>
-    </DialogContent>
-</MudDialog>
+    </ChildContent>
+</MoSideSheet>

@@ -1,14 +1,12 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DevOps.Localization
 @using Monica.DevOps.Terminal.Models
+@using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<TerminalResource> L
 
-<section class="terminal-context" aria-labelledby="terminal-context-title">
-    <header>
-        <MudIconButton Icon="@MoIcons.Close" OnClick="Close" aria-label="@L["Actions:CloseContext"]" />
-        <div><h2 id="terminal-context-title">@(Result is not null ? L["Labels:LatestResult"] : CurrentCommand is not null ? L["Labels:CurrentCommand"] : History ? L["Labels:History"] : L["Labels:SessionHost"])</h2><span class="terminal-context__session">@(InspectedSessionName ?? Session.Name)</span></div>
-    </header>
-    <div class="terminal-context__body">
+@{
+    RenderFragment heading = @<div class="terminal-context-title"><h2 id="terminal-context-title">@(Result is not null ? L["Labels:LatestResult"] : CurrentCommand is not null ? L["Labels:CurrentCommand"] : History ? L["Labels:History"] : L["Labels:SessionHost"])</h2><span class="terminal-context__session">@(InspectedSessionName ?? Session.Name)</span></div>;
+    RenderFragment evidence = @<div>
         @if (Result is not null || CurrentCommand is not null)
         {
             <div class="terminal-facts"><h3>@L["Labels:Command"]</h3><code>@(Result?.Command ?? CurrentCommand!.Command)</code></div>
@@ -64,10 +62,28 @@
             }
             <div class="terminal-facts"><h3>@L["Behavior:Title"]</h3><p>@L["Behavior:Shell"]</p><p>@L["Behavior:Directory"]</p><p>@L["Behavior:Lifetime"]</p><p>@L["Behavior:Partition"]</p></div>
         }
-    </div>
-</section>
+    </div>;
+}
+
+@if (Modal)
+{
+    <MoSideSheet Open="true" OpenChanged="@(open => open ? Task.CompletedTask : Close.InvokeAsync())"
+                 Width="35rem" CloseLabel="@L["Actions:CloseContext"]" TitleContent="heading" ChildContent="evidence" />
+}
+else
+{
+    <section class="terminal-context" aria-labelledby="terminal-context-title">
+        <header>
+            <MudIconButton Icon="@MoIcons.Close" OnClick="Close" aria-label="@L["Actions:CloseContext"]" />
+            @heading
+        </header>
+        <div class="terminal-context__body">@evidence</div>
+    </section>
+}
 
 @code {
+    /// <summary>Uses the shared modal side sheet instead of the workspace's inline context panel.</summary>
+    [Parameter] public bool Modal { get; set; }
     [Parameter, EditorRequired] public TerminalSessionSnapshot Session { get; set; } = default!;
     [Parameter] public TerminalEnvironmentSnapshot? Environment { get; set; }
     [Parameter] public bool History { get; set; }

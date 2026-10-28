@@ -5,6 +5,7 @@
     }
   },
   "Common": {
+    "Close": "Close",
     "Initializing": "Initializing",
     "GoHome": "Go to home"
   },

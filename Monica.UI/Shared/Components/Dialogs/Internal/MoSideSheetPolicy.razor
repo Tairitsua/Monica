@@ -1,0 +1,15 @@
+@attribute [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+
+@code {
+    [CascadingParameter] private IMudDialogInstance DialogInstance { get; set; } = default!;
+    [Parameter, EditorRequired] public DialogOptions Options { get; set; } = default!;
+    private DialogOptions? _applied;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_applied == Options) return;
+        _applied = Options;
+        // This runs inside the native portal, including when its inline owner changes dismissal policy.
+        await DialogInstance.SetOptionsAsync(Options);
+    }
+}

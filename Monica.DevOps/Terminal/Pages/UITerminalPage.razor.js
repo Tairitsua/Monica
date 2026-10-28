@@ -17,16 +17,10 @@ export function createTerminalScroller(element, receiver) {
 
     const atEnd = () => element.scrollHeight - element.scrollTop - element.clientHeight <= 24;
     const capacity = () => {
-        const ownerBounds = owner.getBoundingClientRect();
         const bodyBounds = workspace.getBoundingClientRect();
         const pageBounds = page.getBoundingClientRect();
         const bottomInset = parseFloat(getComputedStyle(page).paddingBottom);
         const height = owner.clientHeight - (bodyBounds.top - pageBounds.top) - bottomInset;
-        page.style.setProperty("--terminal-owner-top", `${ownerBounds.top}px`);
-        page.style.setProperty("--terminal-owner-right", `${window.innerWidth - ownerBounds.right}px`);
-        page.style.setProperty("--terminal-owner-left", `${ownerBounds.left}px`);
-        page.style.setProperty("--terminal-owner-width", `${ownerBounds.width}px`);
-        page.style.setProperty("--terminal-owner-height", `${ownerBounds.height}px`);
         const main = workspace.querySelector(".terminal-main");
         const fixedHeight = [...main.children].filter(child => !child.classList.contains("terminal-transcript"))
             .reduce((total, child) => total + child.getBoundingClientRect().height, 0);

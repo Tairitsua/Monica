@@ -37,7 +37,7 @@
     }
     else if (_session is not null)
     {
-        <MudDrawerContainer Class="workbench-drawer-container">
+        <div class="workbench-content">
             <ModuleWorkbenchHeader Session="@_session"
                                    RefreshRequested="@Refresh"
                                    ExportRequested="@ExportAsync"
@@ -111,7 +111,7 @@
                                          ModuleSelected="@SelectModule"
                                          NavigateToDependencies="@OpenSelectedDependencies" />
             <ModuleWorkbenchHelpDrawer Session="@_session" OpenChanged="@OnHelpOpenChanged" />
-        </MudDrawerContainer>
+        </div>
     }
 </div>
 

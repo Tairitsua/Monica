@@ -1,238 +1,219 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<SeederResource> L
 
-<MudDrawer Open="@Session.IsDetailsOpen"
-           Class="mo-viewport-drawer"
-           OpenChanged="@OnOpenChangedAsync"
-           Anchor="Anchor.End"
-           Variant="DrawerVariant.Temporary"
-           Overlay="true"
-           OverlayAutoClose="true"
-           Fixed="true"
-           Width="min(34rem, 100vw)"
-           Elevation="2">
-    @if (Session is { IsDetailsOpen: true, SelectedSeeder: { } seeder })
-    {
-        <div class="seeder-detail-focus-boundary">
-            <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild">
-                <div id="seeder-detail-dialog"
-                     class="seeder-detail-drawer"
-                     role="dialog"
-                     aria-modal="true"
-                     aria-labelledby="seeder-detail-title"
-                     @onkeydown="HandleDrawerKeyDownAsync">
-                    <header class="seeder-detail-header">
-                        <div class="seeder-detail-header__copy">
-                            <p class="seeder-detail-eyebrow">@L["Details:Eyebrow"]</p>
-                            <h2 class="seeder-detail-name" id="seeder-detail-title">@seeder.SeederName</h2>
-                            <code class="seeder-detail-type">@seeder.SeederTypeName</code>
-                            <div class="seeder-detail-status">
-                                <span class="seeder-state" data-status="@seeder.Status"><i aria-hidden="true"></i>@L.GetText(seeder.Status)</span>
-                                <span>@L.FormatSeederAttemptsSummary(seeder.Attempts, seeder.MaxAttempts)</span>
-                            </div>
-                        </div>
-                        <MudIconButton Icon="@MoIcons.Close"
-                                       Size="Size.Small"
-                                       OnClick="@CloseDetailsAsync"
-                                       aria-label="@L["Actions:Close"]" />
-                    </header>
+@using Monica.UI.Shared.Components.Dialogs
 
-                    <div class="seeder-detail-content"
-                         role="region"
-                         aria-labelledby="seeder-detail-title"
-                         tabindex="0">
-                        <section class="seeder-detail-section" aria-labelledby="seeder-execution-title">
-                            <header class="seeder-detail-section-heading">
-                                <h3 id="seeder-execution-title">@L["Manual:Title"]</h3>
-                            </header>
-                            <p>@L["Manual:Effects"]</p>
-                            @if (!string.IsNullOrWhiteSpace(seeder.ActivationReason))
-                            {
-                                <MudAlert Severity="Severity.Info">@seeder.ActivationReason</MudAlert>
-                            }
-                            @if (Session.ExecutionError is { } executionError)
-                            {
-                                <MudAlert Severity="Severity.Error">@L["Manual:Failed", executionError]</MudAlert>
-                            }
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       Disabled="@(!Session.CanRunSelected)" OnClick="@RunSelectedAsync">
-                                @(Session.IsExecuting ? L["Manual:Running"] : L["Manual:Run"])
-                            </MudButton>
-                        </section>
-                        <section class="seeder-detail-section seeder-timing-field" aria-labelledby="seeder-timing-title">
-                            <header class="seeder-detail-section-heading">
-                                <h3 id="seeder-timing-title"><MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />@L["Details:Timing:Title"]</h3>
-                            </header>
-                            <div class="seeder-timing-duration">
-                                <span>@L["Details:Timing:Duration"]</span>
-                                <strong>@L.FormatSeederDuration(seeder.Duration)</strong>
-                            </div>
-                            <dl class="seeder-timing-dates">
-                                <div>
-                                    <dt>@L["Details:Timing:StartedAt"]</dt>
-                                    <dd>@UiTime.Format(seeder.StartedAtUtc)</dd>
-                                </div>
-                                <div>
-                                    <dt>@L["Details:Timing:CompletedAt"]</dt>
-                                    <dd>@UiTime.Format(seeder.CompletedAtUtc)</dd>
-                                </div>
-                            </dl>
-                        </section>
-
-                        <section class="seeder-detail-section" aria-labelledby="seeder-policy-title">
-                            <header class="seeder-detail-section-heading">
-                                <h3 id="seeder-policy-title"><MoIcon Icon="@MoIcons.Sliders" Size="1.25rem" />@L["Details:Policy:Title"]</h3>
-                            </header>
-                            <dl class="seeder-detail-facts seeder-policy-facts">
-                                <div>
-                                    <dt>@L["Details:Policy:ExecutionMode"]</dt>
-                                    <dd>
-                                        <span>@L.GetText(seeder.ExecutionMode)</span>
-                                        <span class="seeder-policy-origin" data-source="@seeder.ExecutionModeSource">@L.GetText(seeder.ExecutionModeSource)</span>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>@L["Details:Policy:Criticality"]</dt>
-                                    <dd>
-                                        <span>@L.GetText(seeder.Criticality)</span>
-                                        <span class="seeder-policy-origin" data-source="@seeder.CriticalitySource">@L.GetText(seeder.CriticalitySource)</span>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>@L["Details:Policy:FailureBehavior"]</dt>
-                                    <dd>
-                                        <span>@L.GetText(seeder.FailureBehavior)</span>
-                                        <span class="seeder-policy-origin" data-source="@seeder.FailureBehaviorSource">@L.GetText(seeder.FailureBehaviorSource)</span>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>@L["Details:Policy:MaxAttempts"]</dt>
-                                    <dd>
-                                        <span>@seeder.MaxAttempts</span>
-                                        <span class="seeder-policy-origin" data-source="@seeder.MaxAttemptsSource">@L.GetText(seeder.MaxAttemptsSource)</span>
-                                    </dd>
-                                </div>
-                            </dl>
-                        </section>
-
-                        <section class="seeder-detail-section" aria-labelledby="seeder-dependencies-title">
-                            <header class="seeder-detail-section-heading">
-                                <h3 id="seeder-dependencies-title"><MoIcon Icon="@MoIcons.Workflow" Size="1.25rem" />@L["Details:Dependencies:Title"]</h3>
-                                <span>@seeder.Dependencies.Length</span>
-                            </header>
-                            @if (seeder.Dependencies.Length == 0)
-                            {
-                                <p class="seeder-detail-empty">@L["Details:Dependencies:None"]</p>
-                            }
-                            else
-                            {
-                                <ul class="seeder-dependency-list">
-                                    @foreach (var dependency in seeder.Dependencies)
-                                    {
-                                        var dependencySnapshot = FindDependency(dependency);
-                                        <li @key="dependency">
-                                            <div class="seeder-dependency-evidence">
-                                                <code>@dependency</code>
-                                                @if (dependencySnapshot is not null)
-                                                {
-                                                    <span class="seeder-state" data-status="@dependencySnapshot.Status"><i aria-hidden="true"></i>@L.GetText(dependencySnapshot.Status)</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="seeder-dependency-unknown">@L["Common:Unknown"]</span>
-                                                }
-                                            </div>
-                                            @if (!string.IsNullOrWhiteSpace(dependencySnapshot?.ErrorMessage))
-                                            {
-                                                <p class="seeder-dependency-diagnostic">@dependencySnapshot.ErrorMessage</p>
-                                            }
-                                        </li>
-                                    }
-                                </ul>
-                            }
-                        </section>
-
-                        <section class="seeder-detail-section" aria-labelledby="seeder-attempts-title">
-                            <header class="seeder-detail-section-heading">
-                                <h3 id="seeder-attempts-title"><MoIcon Icon="@MoIcons.History" Size="1.25rem" />@L["Details:Attempts:Title"]</h3>
-                                <span>@L.FormatSeederRecordedAttempts(seeder.AttemptHistory.Length)</span>
-                            </header>
-                            @if (seeder.AttemptHistory.Length == 0)
-                            {
-                                <p class="seeder-detail-empty">@L["Details:Attempts:None"]</p>
-                            }
-                            else
-                            {
-                                <ol class="seeder-attempt-list">
-                                    @foreach (var attempt in seeder.AttemptHistory.OrderBy(static attempt => attempt.AttemptNumber))
-                                    {
-                                        <li data-testid="seeder-attempt-row" data-status="@attempt.Status" @key="attempt.AttemptNumber">
-                                            <span class="seeder-attempt-marker" aria-hidden="true">@attempt.AttemptNumber</span>
-                                            <div class="seeder-attempt-record">
-                                                <div class="seeder-attempt-heading">
-                                                    <strong>@L["Details:Attempts:Number", attempt.AttemptNumber]</strong>
-                                                    <span class="seeder-state" data-status="@attempt.Status"><i aria-hidden="true"></i>@L.GetText(attempt.Status)</span>
-                                                </div>
-                                                <dl class="seeder-attempt-facts">
-                                                    <div>
-                                                        <dt>@L["Details:Timing:StartedAt"]</dt>
-                                                        <dd>@UiTime.Format(attempt.StartedAtUtc)</dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt>@L["Details:Timing:CompletedAt"]</dt>
-                                                        <dd>@UiTime.Format(attempt.CompletedAtUtc)</dd>
-                                                    </div>
-                                                    <div class="seeder-attempt-duration">
-                                                        <dt>@L["Details:Timing:Duration"]</dt>
-                                                        <dd>@L.FormatSeederDuration(attempt.Duration)</dd>
-                                                    </div>
-                                                </dl>
-                                                @if (!string.IsNullOrWhiteSpace(attempt.ErrorType) ||
-                                                     !string.IsNullOrWhiteSpace(attempt.ErrorMessage))
-                                                {
-                                                    <div class="seeder-attempt-error">
-                                                        @if (!string.IsNullOrWhiteSpace(attempt.ErrorType))
-                                                        {
-                                                            <code>@attempt.ErrorType</code>
-                                                        }
-                                                        @if (!string.IsNullOrWhiteSpace(attempt.ErrorMessage))
-                                                        {
-                                                            <p>@attempt.ErrorMessage</p>
-                                                        }
-                                                    </div>
-                                                }
-                                            </div>
-                                        </li>
-                                    }
-                                </ol>
-                            }
-                        </section>
-
-                        @if (!string.IsNullOrWhiteSpace(seeder.ErrorType) || !string.IsNullOrWhiteSpace(seeder.ErrorMessage))
-                        {
-                            <section class="seeder-detail-section seeder-final-diagnostic" aria-labelledby="seeder-error-title">
-                                <header class="seeder-detail-section-heading">
-                                    <h3 id="seeder-error-title"><MoIcon Icon="@MoIcons.Bug" Size="1.25rem" />@L["Details:Error:Title"]</h3>
-                                </header>
-                                <dl class="seeder-detail-error">
-                                    <div>
-                                        <dt>@L["Details:Error:Type"]</dt>
-                                        <dd><code>@seeder.ErrorType</code></dd>
-                                    </div>
-                                    <div>
-                                        <dt>@L["Details:Error:Message"]</dt>
-                                        <dd>@seeder.ErrorMessage</dd>
-                                    </div>
-                                </dl>
-                                <p class="seeder-detail-error-hint">@L["Details:Error:LogsHint"]</p>
-                            </section>
-                        }
+@if (Session is { IsDetailsOpen: true, SelectedSeeder: { } seeder })
+{
+    <MoSideSheet Open="true" OpenChanged="OnOpenChangedAsync" Width="34rem" CloseLabel="@L["Actions:Close"]">
+        <TitleContent>
+            <header class="seeder-detail-header">
+                <div class="seeder-detail-header__copy">
+                    <p class="seeder-detail-eyebrow">@L["Details:Eyebrow"]</p>
+                    <h2 class="seeder-detail-name" id="seeder-detail-title">@seeder.SeederName</h2>
+                    <code class="seeder-detail-type">@seeder.SeederTypeName</code>
+                    <div class="seeder-detail-status">
+                        <span class="seeder-state" data-status="@seeder.Status"><i aria-hidden="true"></i>@L.GetText(seeder.Status)</span>
+                        <span>@L.FormatSeederAttemptsSummary(seeder.Attempts, seeder.MaxAttempts)</span>
                     </div>
                 </div>
-            </MudFocusTrap>
-        </div>
-    }
-</MudDrawer>
+            </header>
+        </TitleContent>
+        <ChildContent>
+            <div class="seeder-detail-content"
+                 role="region"
+                 aria-labelledby="seeder-detail-title"
+                 tabindex="0">
+                <section class="seeder-detail-section" aria-labelledby="seeder-execution-title">
+                    <header class="seeder-detail-section-heading">
+                        <h3 id="seeder-execution-title">@L["Manual:Title"]</h3>
+                    </header>
+                    <p>@L["Manual:Effects"]</p>
+                    @if (!string.IsNullOrWhiteSpace(seeder.ActivationReason))
+                    {
+                        <MudAlert Severity="Severity.Info">@seeder.ActivationReason</MudAlert>
+                    }
+                    @if (Session.ExecutionError is { } executionError)
+                    {
+                        <MudAlert Severity="Severity.Error">@L["Manual:Failed", executionError]</MudAlert>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="@(!Session.CanRunSelected)" OnClick="@RunSelectedAsync">
+                        @(Session.IsExecuting ? L["Manual:Running"] : L["Manual:Run"])
+                    </MudButton>
+                </section>
+                <section class="seeder-detail-section seeder-timing-field" aria-labelledby="seeder-timing-title">
+                    <header class="seeder-detail-section-heading">
+                        <h3 id="seeder-timing-title"><MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />@L["Details:Timing:Title"]</h3>
+                    </header>
+                    <div class="seeder-timing-duration">
+                        <span>@L["Details:Timing:Duration"]</span>
+                        <strong>@L.FormatSeederDuration(seeder.Duration)</strong>
+                    </div>
+                    <dl class="seeder-timing-dates">
+                        <div>
+                            <dt>@L["Details:Timing:StartedAt"]</dt>
+                            <dd>@UiTime.Format(seeder.StartedAtUtc)</dd>
+                        </div>
+                        <div>
+                            <dt>@L["Details:Timing:CompletedAt"]</dt>
+                            <dd>@UiTime.Format(seeder.CompletedAtUtc)</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="seeder-detail-section" aria-labelledby="seeder-policy-title">
+                    <header class="seeder-detail-section-heading">
+                        <h3 id="seeder-policy-title"><MoIcon Icon="@MoIcons.Sliders" Size="1.25rem" />@L["Details:Policy:Title"]</h3>
+                    </header>
+                    <dl class="seeder-detail-facts seeder-policy-facts">
+                        <div>
+                            <dt>@L["Details:Policy:ExecutionMode"]</dt>
+                            <dd>
+                                <span>@L.GetText(seeder.ExecutionMode)</span>
+                                <span class="seeder-policy-origin" data-source="@seeder.ExecutionModeSource">@L.GetText(seeder.ExecutionModeSource)</span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>@L["Details:Policy:Criticality"]</dt>
+                            <dd>
+                                <span>@L.GetText(seeder.Criticality)</span>
+                                <span class="seeder-policy-origin" data-source="@seeder.CriticalitySource">@L.GetText(seeder.CriticalitySource)</span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>@L["Details:Policy:FailureBehavior"]</dt>
+                            <dd>
+                                <span>@L.GetText(seeder.FailureBehavior)</span>
+                                <span class="seeder-policy-origin" data-source="@seeder.FailureBehaviorSource">@L.GetText(seeder.FailureBehaviorSource)</span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>@L["Details:Policy:MaxAttempts"]</dt>
+                            <dd>
+                                <span>@seeder.MaxAttempts</span>
+                                <span class="seeder-policy-origin" data-source="@seeder.MaxAttemptsSource">@L.GetText(seeder.MaxAttemptsSource)</span>
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="seeder-detail-section" aria-labelledby="seeder-dependencies-title">
+                    <header class="seeder-detail-section-heading">
+                        <h3 id="seeder-dependencies-title"><MoIcon Icon="@MoIcons.Workflow" Size="1.25rem" />@L["Details:Dependencies:Title"]</h3>
+                        <span>@seeder.Dependencies.Length</span>
+                    </header>
+                    @if (seeder.Dependencies.Length == 0)
+                    {
+                        <p class="seeder-detail-empty">@L["Details:Dependencies:None"]</p>
+                    }
+                    else
+                    {
+                        <ul class="seeder-dependency-list">
+                            @foreach (var dependency in seeder.Dependencies)
+                            {
+                                var dependencySnapshot = FindDependency(dependency);
+                                <li @key="dependency">
+                                    <div class="seeder-dependency-evidence">
+                                        <code>@dependency</code>
+                                        @if (dependencySnapshot is not null)
+                                        {
+                                            <span class="seeder-state" data-status="@dependencySnapshot.Status"><i aria-hidden="true"></i>@L.GetText(dependencySnapshot.Status)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="seeder-dependency-unknown">@L["Common:Unknown"]</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(dependencySnapshot?.ErrorMessage))
+                                    {
+                                        <p class="seeder-dependency-diagnostic">@dependencySnapshot.ErrorMessage</p>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <section class="seeder-detail-section" aria-labelledby="seeder-attempts-title">
+                    <header class="seeder-detail-section-heading">
+                        <h3 id="seeder-attempts-title"><MoIcon Icon="@MoIcons.History" Size="1.25rem" />@L["Details:Attempts:Title"]</h3>
+                        <span>@L.FormatSeederRecordedAttempts(seeder.AttemptHistory.Length)</span>
+                    </header>
+                    @if (seeder.AttemptHistory.Length == 0)
+                    {
+                        <p class="seeder-detail-empty">@L["Details:Attempts:None"]</p>
+                    }
+                    else
+                    {
+                        <ol class="seeder-attempt-list">
+                            @foreach (var attempt in seeder.AttemptHistory.OrderBy(static attempt => attempt.AttemptNumber))
+                            {
+                                <li data-testid="seeder-attempt-row" data-status="@attempt.Status" @key="attempt.AttemptNumber">
+                                    <span class="seeder-attempt-marker" aria-hidden="true">@attempt.AttemptNumber</span>
+                                    <div class="seeder-attempt-record">
+                                        <div class="seeder-attempt-heading">
+                                            <strong>@L["Details:Attempts:Number", attempt.AttemptNumber]</strong>
+                                            <span class="seeder-state" data-status="@attempt.Status"><i aria-hidden="true"></i>@L.GetText(attempt.Status)</span>
+                                        </div>
+                                        <dl class="seeder-attempt-facts">
+                                            <div>
+                                                <dt>@L["Details:Timing:StartedAt"]</dt>
+                                                <dd>@UiTime.Format(attempt.StartedAtUtc)</dd>
+                                            </div>
+                                            <div>
+                                                <dt>@L["Details:Timing:CompletedAt"]</dt>
+                                                <dd>@UiTime.Format(attempt.CompletedAtUtc)</dd>
+                                            </div>
+                                            <div class="seeder-attempt-duration">
+                                                <dt>@L["Details:Timing:Duration"]</dt>
+                                                <dd>@L.FormatSeederDuration(attempt.Duration)</dd>
+                                            </div>
+                                        </dl>
+                                        @if (!string.IsNullOrWhiteSpace(attempt.ErrorType) ||
+                                             !string.IsNullOrWhiteSpace(attempt.ErrorMessage))
+                                        {
+                                            <div class="seeder-attempt-error">
+                                                @if (!string.IsNullOrWhiteSpace(attempt.ErrorType))
+                                                {
+                                                    <code>@attempt.ErrorType</code>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(attempt.ErrorMessage))
+                                                {
+                                                    <p>@attempt.ErrorMessage</p>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ol>
+                    }
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(seeder.ErrorType) || !string.IsNullOrWhiteSpace(seeder.ErrorMessage))
+                {
+                    <section class="seeder-detail-section seeder-final-diagnostic" aria-labelledby="seeder-error-title">
+                        <header class="seeder-detail-section-heading">
+                            <h3 id="seeder-error-title"><MoIcon Icon="@MoIcons.Bug" Size="1.25rem" />@L["Details:Error:Title"]</h3>
+                        </header>
+                        <dl class="seeder-detail-error">
+                            <div>
+                                <dt>@L["Details:Error:Type"]</dt>
+                                <dd><code>@seeder.ErrorType</code></dd>
+                            </div>
+                            <div>
+                                <dt>@L["Details:Error:Message"]</dt>
+                                <dd>@seeder.ErrorMessage</dd>
+                            </div>
+                        </dl>
+                        <p class="seeder-detail-error-hint">@L["Details:Error:LogsHint"]</p>
+                    </section>
+                }
+            </div>
+        </ChildContent>
+    </MoSideSheet>
+}
 
 @code {
     private async Task RunSelectedAsync() => await Session.RunSelectedAsync();
@@ -249,11 +230,6 @@
     private Task OnOpenChangedAsync(bool open) => open || !Session.IsDetailsOpen
         ? Task.CompletedTask
         : CloseDetailsAsync();
-
-    private Task HandleDrawerKeyDownAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape"
-            ? CloseDetailsAsync()
-            : Task.CompletedTask;
 
     private Task CloseDetailsAsync() => Session.CloseDetailsAsync();
 }
