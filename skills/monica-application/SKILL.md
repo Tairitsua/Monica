@@ -19,6 +19,7 @@ Compose existing ProjectUnits and documented infrastructure capabilities first. 
 - Split role placement or migration from existing service hosts: use `$monica-application-microservice`.
 - Combined role placement or migration from merged monolith projects: use `$monica-application-modular-monolith`.
 - Startup versus managed settings, environment-file selection, or the local Manual profile: read [startup and local execution](references/04-startup-and-local-execution.md).
+- Migration project placement, schema/history ownership, database consolidation or deployment preflight: read [database layout and migrations](references/05-database-migrations.md), then the project's migration and deployment guidance.
 - Feature implementation or review of handlers, entities, repositories, events, jobs, seeders, host services, CRUD adapters, controllers, Facades, and other support types: use `$monica-application-project-unit-development`.
 - Sociable application tests, `MonicaTestApplicationFactory`, handler or repository scenarios, database isolation, and migration away from mock-heavy tests: use `$monica-application-unit-testing`.
 - Consumer setup and use of Monica infrastructure: route to `$monica-infra-persistence`, `$monica-infra-messaging`, `$monica-infra-jobs`, `$monica-infra-configuration`, `$monica-infra-hosting`, `$monica-infra-observability`, `$monica-infra-ai`, `$monica-infra-web`, or `$monica-infra-ui` for the capability in use.

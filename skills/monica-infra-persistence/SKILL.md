@@ -10,6 +10,7 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 | Task | Read |
 | --- | --- |
 | Register a context, choose its provider mode, or use repositories | [Repositories](references/repositories.md) |
+| Place migration projects, consolidate databases, or define schema/history ownership | [Application migrations](../monica-application/references/05-database-migrations.md) |
 | Inspect registered contexts, provider sessions, migration history, or migration updates | [Repository diagnostics](references/repository-diagnostics.md) |
 | Set Shared/Independent boundaries, compose one database, select participants, or understand rollback | [Transactions](references/transactions.md) |
 | Store binary objects or select a Minio provider | [Blob storage](references/blob-storage.md) |

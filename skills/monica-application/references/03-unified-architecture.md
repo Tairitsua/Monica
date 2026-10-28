@@ -184,9 +184,7 @@ HTTP ingress requires both a local implementation and active handler-role owners
 
 Operations select persistence through their owning domain, never through current AppId, artifact name or selected role list. Domain roles share that domain's stores. A domain may own current/history contexts or several stores; a new role or executable does not create another database.
 
-Keep actual migration projects at top-level `src/Migrations/Migrations.Domain{Domain}`. The domain owns all its context factories, migration chains and snapshots in that project. Preserve issued migration IDs, context identities, migration assembly names, history settings and shared-table ownership. Current/history chains remain separate even when they share the migration assembly. Do not create empty migration projects or one migration project per role.
-
-Design-time factories compose persistence without starting roles, jobs, channels or subscribers. MigrationRunner performs explicit selected migrations with preflight, ordering and dry-run behavior where adopted. Business replicas do not automatically apply schema migrations. Framework store migrations retain their established owners.
+Keep domain-owned migration projects at top-level `src/Migrations/Migrations.Domain{Domain}` regardless of role or physical database placement. Follow [database layout and migrations](05-database-migrations.md) for context chains, design-time composition, history and shared-table ownership, runner preflight, and database consolidation. Business replicas consume explicitly prepared schemas; they do not automatically apply migrations.
 
 Prefer one relational database unless data isolation, capacity or independent operations justify separation. Keep domain-owned contexts, tables/schemas and migration chains; use published APIs across domains rather than peer repositories or direct table access. Domain and role boundaries do not require separate databases.
 
