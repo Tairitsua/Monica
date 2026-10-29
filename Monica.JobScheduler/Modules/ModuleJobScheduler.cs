@@ -514,7 +514,10 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     /// <summary>Gets or sets slots reserved from ordinary reads, admission and maintenance for renewal/completion. The default is two.</summary>
     public int ReservedLeaseStoreOperations { get; set; } = 2;
 
-    /// <summary>Gets or sets the total local admission, transaction and retry budget for a relational store operation. The default is five seconds.</summary>
+    /// <summary>
+    /// Gets or sets the total local admission, transaction and retry budget for a relational store operation.
+    /// Completion and release use <see cref="ExecutionFinalizationTimeout"/> instead. The default is five seconds.
+    /// </summary>
     public TimeSpan StoreOperationTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
@@ -544,10 +547,11 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public TimeSpan ExecutionLeaseRenewalTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Gets or sets the maximum wait for recording completion or releasing a stopped attempt. Expired finalization
-    /// is observed in the background and durable recovery remains authoritative. The default is five seconds.
+    /// Gets or sets the maximum wait for recording completion or releasing a stopped attempt, including relational
+    /// store admission, commands and retries. This budget does not extend the execution lease. Expired finalization
+    /// is observed in the background and durable recovery remains authoritative. The default is 30 seconds.
     /// </summary>
-    public TimeSpan ExecutionFinalizationTimeout { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan ExecutionFinalizationTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Gets or sets the delay applied by the durable store before a failed attempt becomes retryable. The default is

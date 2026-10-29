@@ -631,6 +631,55 @@ public sealed class JobExecutionWorkerHostedServiceTests
     }
 
     [Fact]
+    public async Task ExecuteLeaseAsync_WhenCompletionTakesAlmostThirtySeconds_ShouldNotRequestRestart()
+    {
+        var time = new ControllableTimeProvider(NOW);
+        var probe = new CompletionProbe();
+        using var host = CreateJobHost<CompletingRecurringJob, CompletionProbe>(probe);
+        var definition = CreateDefinition<CompletingRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        var completionStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<JobAttemptCompletionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completionToken = CancellationToken.None;
+        store.CompleteAttemptAsync(Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                completionToken = call.Arg<CancellationToken>();
+                completionStarted.TrySetResult();
+                return completion.Task;
+            });
+        var applicationLifetime = CreateApplicationLifetime(out _);
+        var (worker, options) = CreateWorker(store, [definition],
+            host.Services.GetRequiredService<IServiceScopeFactory>(), null, applicationLifetime, time);
+        using var workerStop = new CancellationTokenSource();
+        var attempt = worker.ExecuteLeaseAsync(
+            CreateLease(definition.Declaration.JobKey, TimeSpan.FromHours(1), options.Value.ExecutionLeaseDuration),
+            workerStop.Token);
+
+        try
+        {
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            probe.Completion.TrySetResult();
+            await completionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(29));
+
+            attempt.IsCompleted.Should().BeFalse();
+            completionToken.IsCancellationRequested.Should().BeFalse();
+            completion.TrySetResult(new JobAttemptCompletionResult { Status = JobAttemptCompletionStatus.Applied });
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            applicationLifetime.DidNotReceive().StopApplication();
+        }
+        finally
+        {
+            probe.Completion.TrySetResult();
+            completion.TrySetResult(new JobAttemptCompletionResult { Status = JobAttemptCompletionStatus.Applied });
+            await workerStop.CancelAsync();
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteLeaseAsync_WhenCompletionNeverReturns_ShouldCancelTheIndependentFinalizationBudget()
     {
         var time = new ControllableTimeProvider(NOW);

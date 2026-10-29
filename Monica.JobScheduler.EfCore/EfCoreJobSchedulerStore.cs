@@ -43,6 +43,7 @@ public sealed partial class EfCoreJobSchedulerStore(
         ?? JobExecutionHistoryLimits.DEFAULT_MAX_MESSAGE_LENGTH);
     private string? _providerName;
     private readonly TimeSpan _operationTimeout = options?.Value.StoreOperationTimeout ?? TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _finalizationTimeout = options?.Value.ExecutionFinalizationTimeout ?? TimeSpan.FromSeconds(30);
     private readonly SemaphoreSlim _allOperations = new(options?.Value.MaxConcurrentStoreOperations ?? 8);
     private readonly SemaphoreSlim _ordinaryOperations = new((options?.Value.MaxConcurrentStoreOperations ?? 8)
         - (options?.Value.ReservedLeaseStoreOperations ?? 2));
@@ -108,7 +109,13 @@ public sealed partial class EfCoreJobSchedulerStore(
         CancellationToken cancellationToken, JobCoordinatorLeaseKey? coordinatorLease = null,
         [CallerMemberName] string operationName = "") =>
         RunStoreOperationAsync(operationName, operationName is nameof(RenewLeaseAsync) or nameof(CompleteAttemptAsync)
-            or nameof(ReleaseLeaseAsync), token => WriteCoreAsync(operation, token, coordinatorLease), cancellationToken);
+            or nameof(ReleaseLeaseAsync), token => WriteCoreAsync(operation, token,
+                GetOperationTimeout(operationName), coordinatorLease), cancellationToken);
+
+    private TimeSpan GetOperationTimeout(string operationName) =>
+        operationName is nameof(CompleteAttemptAsync) or nameof(ReleaseLeaseAsync)
+            ? _finalizationTimeout
+            : _operationTimeout;
 
     private async Task<TResult> RunStoreOperationAsync<TResult>(string operationName, bool critical,
         Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
@@ -116,7 +123,7 @@ public sealed partial class EfCoreJobSchedulerStore(
         var started = Stopwatch.GetTimestamp();
         var outcome = "failed";
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(_operationTimeout);
+        deadline.CancelAfter(GetOperationTimeout(operationName));
         var ordinaryEntered = false;
         var allEntered = false;
         try
@@ -148,12 +155,13 @@ public sealed partial class EfCoreJobSchedulerStore(
     private async Task<TResult> WriteCoreAsync<TResult>(
         Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken,
+        TimeSpan operationTimeout,
         JobCoordinatorLeaseKey? coordinatorLease = null)
     {
         for (var attempt = 1; ; attempt++)
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(_operationTimeout);
+            if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(operationTimeout);
             await using var transaction = dbContext.Database.IsRelational()
                 ? await dbContext.Database.BeginTransactionAsync(
                     UsesNativeRowLocks(dbContext) ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,

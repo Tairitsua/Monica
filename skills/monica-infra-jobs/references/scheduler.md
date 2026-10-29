@@ -58,10 +58,12 @@ The worker establishes supervision before dispatching user code, including its s
 | `ExecutionLeaseSafetyMargin` | 2 s | Reserved before conservatively estimated expiry |
 | `ExecutionCancellationGracePeriod` | 15 s | Includes user cancellation callbacks and is capped by confirmed lease runway |
 | `ExecutionLeaseRenewalTimeout` | 5 s | An unresponsive renewal does not block supervision or spawn overlapping renewals |
-| `ExecutionFinalizationTimeout` | 5 s | Bounds completion/release and triggers admission shutdown if the store does not exit |
+| `ExecutionFinalizationTimeout` | 30 s | Bounds completion/release, including EF store admission, commands and retries; triggers admission shutdown if the store does not exit |
 | `MaxConcurrentStoreOperations` | 8 | Total per-process relational operation admission |
 | `ReservedLeaseStoreOperations` | 2 | Slots ordinary operations cannot consume; reserved for renewal/completion |
-| `StoreOperationTimeout` | 5 s | Includes admission waiting, transaction work and bounded transient retries |
+| `StoreOperationTimeout` | 5 s | Includes admission waiting, transaction work and bounded transient retries for operations other than completion/release |
+
+Completion and release use `ExecutionFinalizationTimeout` throughout the worker and EF store, so the ordinary five-second store budget does not cancel finalization early. An earlier caller cancellation still applies. This wait does not renew or extend the execution lease: the store rejects a finalization whose lease has expired or changed, and durable recovery may retry the execution. Increasing this timeout tolerates transient storage delays; it does not guarantee exactly-once business effects or change the shutdown policy for job code that ignores cancellation.
 
 The store creates and disposes a context per operation, with no connection held during user code. Claim, coordinator acquisition and recovery share one `StoreOperationTimeout` across their initial read and all following transactions; moving to another job does not reset that request deadline. It retries known transaction conflicts and narrowly identified scheduler identity races; arbitrary update, connection, or unknown commit errors are not blindly replayed. When Vastbase omits structured constraint metadata, the fallback requires its exact known primary-key error and a matching tracked scheduler insertion. An unrecognized response fails closed. Application code still owns business idempotence because a lost lease cannot undo external side effects. Durable execution logging remains awaited and never becomes a lossy buffer.
 

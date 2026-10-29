@@ -1,5 +1,6 @@
 using System.Data.Common;
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Monica.JobScheduler.Models.Execution;
 using Monica.Modules;
@@ -9,10 +10,90 @@ using Xunit;
 namespace Test.Monica.JobScheduler.Stores;
 
 /// <summary>
-/// Verifies request deadlines without losing grants committed by earlier claim transactions.
+/// Verifies store request deadlines and the independent budget for finalizing stopped attempts.
 /// </summary>
 public sealed class EfCoreJobSchedulerStoreDeadlineTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Finalization_WhenOrdinaryStoreBudgetExpires_ShouldStillComplete(bool release)
+    {
+        var blocked = new BlockedTransactions();
+        var now = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero);
+        await using var fixture = await StoreFixture.CreateEfCoreAsync(now,
+            new ModuleJobSchedulerOption { StoreOperationTimeout = TimeSpan.FromSeconds(2) }, blocked);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("slow-finalization"));
+        await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "slow-finalization", instanceId: "execution");
+        var lease = (await fixture.ClaimAsync(StoreFixture.OWNER_A, "worker", ["slow-finalization"]))
+            .Should().ContainSingle().Subject;
+        var token = TestContext.Current.CancellationToken;
+        blocked.Armed = true;
+        var finalization = release
+            ? fixture.Store.ReleaseLeaseAsync(lease.LeaseKey, token)
+            : fixture.Store.CompleteAttemptAsync(new JobAttemptCompletion
+            {
+                LeaseKey = lease.LeaseKey,
+                Outcome = JobAttemptOutcome.Succeeded
+            }, token);
+
+        try
+        {
+            await blocked.FirstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+            // The second transaction waits for its real ordinary deadline. Finalization must survive that budget.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                fixture.Store.RenewLeaseAsync(lease.LeaseKey, TimeSpan.FromMinutes(1), token));
+            finalization.IsCompleted.Should().BeFalse();
+            blocked.FirstToken.IsCancellationRequested.Should().BeFalse();
+            blocked.FirstCommandTimeout.Should().Be(30);
+            blocked.LaterCommandTimeout.Should().Be(2);
+        }
+        finally
+        {
+            blocked.Armed = false;
+            blocked.ReleaseFirst.TrySetResult();
+            await finalization.WaitAsync(TimeSpan.FromSeconds(10), token);
+        }
+
+        (await finalization).Status.Should().Be(JobAttemptCompletionStatus.Applied);
+        var execution = await fixture.Store.GetExecutionAsync(StoreFixture.SCOPE, "execution", token);
+        execution!.State.Should().Be(release ? JobExecutionState.Queued : JobExecutionState.Succeeded);
+        execution.LeaseExpiresAtUtc.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Finalization_WhenConfiguredBudgetExpires_ShouldCancelWithoutApplyingOutcome(bool release)
+    {
+        var blocked = new BlockedTransactions();
+        var now = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero);
+        await using var fixture = await StoreFixture.CreateEfCoreAsync(now,
+            new ModuleJobSchedulerOption { ExecutionFinalizationTimeout = TimeSpan.FromSeconds(1) }, blocked);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("blocked-finalization"));
+        await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "blocked-finalization", instanceId: "execution");
+        var lease = (await fixture.ClaimAsync(StoreFixture.OWNER_A, "worker", ["blocked-finalization"]))
+            .Should().ContainSingle().Subject;
+        var token = TestContext.Current.CancellationToken;
+        blocked.Armed = true;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => release
+            ? fixture.Store.ReleaseLeaseAsync(lease.LeaseKey, token)
+            : fixture.Store.CompleteAttemptAsync(new JobAttemptCompletion
+            {
+                LeaseKey = lease.LeaseKey,
+                Outcome = JobAttemptOutcome.Succeeded
+            }, token));
+
+        blocked.FirstToken.IsCancellationRequested.Should().BeTrue();
+        blocked.FirstCommandTimeout.Should().Be(1);
+        token.IsCancellationRequested.Should().BeFalse();
+        blocked.Armed = false;
+        var execution = await fixture.Store.GetExecutionAsync(StoreFixture.SCOPE, "execution", token);
+        execution!.State.Should().Be(JobExecutionState.Running);
+        execution.LeaseExpiresAtUtc.Should().Be(lease.Execution.LeaseExpiresAtUtc);
+    }
+
     [Fact]
     public async Task ClaimAsync_WhenLaterJobWaitsPastTheRequestDeadline_ShouldReturnPriorCommittedGrants()
     {
@@ -51,6 +132,37 @@ public sealed class EfCoreJobSchedulerStoreDeadlineTests
             .Status.Should().Be(JobLeaseRenewalStatus.Active);
         (await fixture.ClaimAsync(StoreFixture.OWNER_A, "next-worker", ["second-job"], maxCount: 1))
             .Should().ContainSingle().Which.Execution.InstanceId.Should().Be("second-execution");
+    }
+
+    private sealed class BlockedTransactions : DbTransactionInterceptor
+    {
+        private int _transactionCount;
+        internal bool Armed { get; set; }
+        internal TaskCompletionSource FirstEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource ReleaseFirst { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal CancellationToken FirstToken { get; private set; }
+        internal int? FirstCommandTimeout { get; private set; }
+        internal int? LaterCommandTimeout { get; private set; }
+
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection, TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result, CancellationToken cancellationToken = default)
+        {
+            if (!Armed) return result;
+            if (Interlocked.Increment(ref _transactionCount) == 1)
+            {
+                FirstToken = cancellationToken;
+                FirstCommandTimeout = eventData.Context!.Database.GetCommandTimeout();
+                FirstEntered.TrySetResult();
+                await ReleaseFirst.Task.WaitAsync(cancellationToken);
+            }
+            else
+            {
+                LaterCommandTimeout = eventData.Context!.Database.GetCommandTimeout();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            return result;
+        }
     }
 
     private sealed class LaterClaimTransaction : DbTransactionInterceptor
