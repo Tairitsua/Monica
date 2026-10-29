@@ -32,6 +32,8 @@ using Monica.Repository.Inbox.Services;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Monica.Tool.Extensions;
+using Monica.Repository.Snapshots.Models;
+using Monica.Repository.Snapshots.Services;
 
 namespace Monica.Repository.Persistence.Services;
 
@@ -65,6 +67,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     bool IRepositoryModelFeatures.ExcludeOutboxFromMigrations => OutboxOptions?.ExcludeFromMigrations == true;
     bool IRepositoryModelFeatures.ExcludeInboxFromMigrations => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>()?.Options.ExcludeFromMigrations == true;
     bool IRepositoryModelFeatures.ExcludeLeasesFromMigrations => OutboxOptions?.LeaseTable.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.HasSnapshots => CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>() is not null;
+    bool IRepositoryModelFeatures.ExcludeSnapshotsFromMigrations => CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>()?.ExcludeFromMigrations == true;
     bool IOutboxStoreContext.HasOutbox => OutboxOptions is not null;
     bool IOutboxStoreContext.HasPendingOutboxMessages => _pendingMessages.Count != 0;
     bool IInboxStoreContext.HasInbox => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>() is not null;
@@ -238,6 +242,17 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         builder.ApplyEntitySeparateConfigurations(Options, Logger);
 
         OnModelCreatingExtend(builder);
+        if (CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>() is { } snapshotTable)
+        {
+            var versions = builder.Entity<RepositorySnapshotVersion>();
+            versions.ToMonicaInfrastructureTable("MonicaSnapshotVersions", table =>
+            {
+                if (snapshotTable.ExcludeFromMigrations) table.ExcludeFromMigrations();
+            });
+            versions.HasKey(x => new { x.SourceId, x.DatasetKey });
+            versions.Property(x => x.SourceId).HasMaxLength(200).IsRequired();
+            versions.Property(x => x.DatasetKey).HasMaxLength(200).IsRequired();
+        }
         if (OutboxOptions is not null)
         {
             builder.ConfigureMonicaLeases(OutboxOptions.LeaseTable);
@@ -344,6 +359,48 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         if (!_saving) ValidateSave();
     }
 
+    /// <summary>Executes a controlled set-based/native write and declares its complete snapshot dependency effects before I/O.</summary>
+    /// <remarks>Call from a named repository method inside a managed UnitOfWork. Declarations are conservative even if no row changes.
+    /// This does not synthesize per-entity audit, synchronization or domain events skipped by bulk SQL. The delegate must use this context's transaction.</remarks>
+    public async Task<TResult> ExecuteSnapshotWriteAsync<TResult>(IReadOnlyCollection<Type> affectedEntityTypes,
+        Func<CancellationToken, Task<TResult>> write, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(affectedEntityTypes);
+        ArgumentNullException.ThrowIfNull(write);
+        if (affectedEntityTypes.Count == 0) throw new ArgumentException("Declare at least one affected entity type.", nameof(affectedEntityTypes));
+        ValidateDatabaseAccess();
+        var manager = CachedServiceProvider.GetRequiredService<UnitOfWorkManager>();
+        if (!manager.IsActive || Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Controlled snapshot writes require an active managed transaction.");
+        if (affectedEntityTypes.Any(type => !Model.GetEntityTypes().Any(entity => type.IsAssignableFrom(entity.ClrType))))
+            throw new ArgumentException("Every affected entity type must be mapped by this context.", nameof(affectedEntityTypes));
+        CaptureSnapshotChanges(affectedEntityTypes);
+        try { return await write(cancellationToken); }
+        catch (Exception exception)
+        {
+            manager.MarkRollbackOnly(ExecutionTransactionFailure.FromException("SnapshotBulkWrite", exception));
+            throw;
+        }
+    }
+
+    private void CaptureSnapshotChanges(IEnumerable<Type> entityTypes)
+    {
+        if (CachedServiceProvider.GetService<SnapshotRegistration<TDbContext>>() is { } registration)
+            CachedServiceProvider.GetRequiredService<SnapshotTransaction>().Capture(this, registration, entityTypes);
+    }
+
+    /// <summary>Checks staged and already-flushed changes affecting a registered dataset in this operation.</summary>
+    /// <remarks>Use only to select an explicit application-owned current-state read. This method never merges business state into shared snapshots.</remarks>
+    public bool HasUncommittedSnapshotChanges(string datasetKey)
+    {
+        ValidateDatabaseAccess();
+        var registration = CachedServiceProvider.GetService<SnapshotRegistration<TDbContext>>()
+            ?? throw new InvalidOperationException("This context has no registered snapshot datasets.");
+        var dataset = registration.Datasets.SingleOrDefault(x => x.Key == datasetKey)
+            ?? throw new ArgumentException("Unknown snapshot dataset.", nameof(datasetKey));
+        return CachedServiceProvider.GetRequiredService<SnapshotTransaction>().HasChanges(this, registration.SourceId, dataset);
+    }
+
     void IRepositoryContextLifetime.MarkDatabaseFailure(ExecutionTransactionFailure failure)
         => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
             failure with { DbContextType = GetType().FullName });
@@ -364,6 +421,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             // belong to those actual saves, never to both the aggregate tracker and its physical trackers.
             IReadOnlyList<PersistenceChange> changes = this is IRepositoryContextAdapter { CoordinatesSave: true }
                 ? [] : PersistencePolicies.Apply(this, AuditPropertySetter, CachedServiceProvider.GetServices<IPersistencePolicy>());
+            CaptureSnapshotChanges(changes.Select(change => change.Entry.Metadata.ClrType));
             ChangeTracker.AutoDetectChangesEnabled = false;
             var outbox = OutboxOptions;
             var switches = CachedServiceProvider.GetServices<IEntityEventPublishSwitch>().ToArray();
@@ -411,6 +469,9 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             ChangeTracker.DetectChanges();
             if (ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
+                CaptureSnapshotChanges(ChangeTracker.Entries()
+                    .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                    .Select(entry => entry.Metadata.ClrType));
                 if (useAsync) await base.SaveChangesAsync(true, token);
                 else base.SaveChanges(true);
             }

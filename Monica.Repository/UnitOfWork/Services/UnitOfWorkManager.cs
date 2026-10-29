@@ -14,6 +14,7 @@ using Monica.Repository.Persistence.Models;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Repository.UnitOfWork.Models;
+using Monica.Repository.Snapshots.Services;
 
 namespace Monica.Repository.UnitOfWork.Services;
 
@@ -29,6 +30,7 @@ public sealed class UnitOfWorkManager(
     private bool _active;
     private bool _terminal;
     private UnitOfWorkScopeOptions _options = new();
+    internal IReadOnlyList<DbContext> ParticipatingContexts => _contexts;
 
     /// <inheritdoc />
     public IUnitOfWork? Current => _active ? this : null;
@@ -84,6 +86,8 @@ public sealed class UnitOfWorkManager(
             {
                 await domainEvents.DrainAsync(configuration.Value.MaximumDomainEvents, cancellationToken);
                 await FlushAsync(cancellationToken);
+                if (services.GetService<SnapshotTransaction>() is { } snapshots)
+                    await snapshots.FinalizeAsync(cancellationToken);
             }
             if (_transaction is not null) await _transaction.CommitAsync(cancellationToken);
             return result;

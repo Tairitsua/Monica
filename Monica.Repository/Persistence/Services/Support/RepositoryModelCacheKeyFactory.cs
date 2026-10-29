@@ -10,6 +10,8 @@ internal interface IRepositoryModelFeatures
     bool ExcludeOutboxFromMigrations { get; }
     bool ExcludeInboxFromMigrations { get; }
     bool ExcludeLeasesFromMigrations { get; }
+    bool HasSnapshots { get; }
+    bool ExcludeSnapshotsFromMigrations { get; }
     object ModelCacheKey { get; }
 }
 
@@ -19,6 +21,6 @@ internal sealed class RepositoryModelCacheKeyFactory : IModelCacheKeyFactory
         => context is IRepositoryModelFeatures features
             ? (features.ModelCacheKey, features.HasOutbox, features.HasInbox,
                 features.ExcludeOutboxFromMigrations, features.ExcludeInboxFromMigrations,
-                features.ExcludeLeasesFromMigrations, designTime)
+                features.ExcludeLeasesFromMigrations, features.HasSnapshots, features.ExcludeSnapshotsFromMigrations, designTime)
             : (context.GetType(), false, designTime);
 }

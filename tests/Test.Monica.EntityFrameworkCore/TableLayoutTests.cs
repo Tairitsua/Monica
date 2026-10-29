@@ -91,8 +91,11 @@ public sealed class TableLayoutTests
         var builder = Options("postgres").UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra"))
             .UseMonicaMigrationHistory("Flight")
             .UseNpgsql("Host=localhost;Database=unused", p => p.MigrationsHistoryTable("Changed"));
-        using var context = new LayoutContext(builder.Options);
-        Assert.Throws<InvalidOperationException>(() => context.Model);
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var context = new LayoutContext(builder.Options);
+            _ = context.Model;
+        });
     }
 
     [Fact]
