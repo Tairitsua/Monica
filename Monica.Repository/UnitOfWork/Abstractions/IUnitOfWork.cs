@@ -1,3 +1,5 @@
+using Monica.Core.Execution;
+
 namespace Monica.Repository.UnitOfWork.Abstractions;
 
 /// <summary>
@@ -12,6 +14,10 @@ public interface IUnitOfWork
     /// <summary>Flushes staged changes without committing. Throws after failure or completion.</summary>
     Task<int> FlushAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Prevents commit, including when a nested failure was caught by its caller.</summary>
-    void MarkRollbackOnly();
+    /// <summary>Gets the first failure that required rollback, or null while the transaction is healthy.</summary>
+    ExecutionTransactionFailure? FirstFailure { get; }
+
+    /// <summary>Prevents commit and retains the first failure, even when its caller handles it.</summary>
+    /// <param name="failure">Failure details, or null to record an explicit rollback request. Later calls never overwrite the first cause.</param>
+    void MarkRollbackOnly(ExecutionTransactionFailure? failure = null);
 }

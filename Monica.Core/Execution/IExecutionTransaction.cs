@@ -7,6 +7,10 @@ public interface IExecutionTransaction
     /// <summary>Gets whether this scope currently owns an active physical transaction.</summary>
     bool IsActive { get; }
 
-    /// <summary>Prevents the operation from committing, including when a nested failure is handled by its caller.</summary>
-    void MarkRollbackOnly();
+    /// <summary>Gets the first failure that required rollback, or null while the transaction is healthy.</summary>
+    ExecutionTransactionFailure? FirstFailure { get; }
+
+    /// <summary>Prevents commit and retains the first failure, even when its caller handles it.</summary>
+    /// <param name="failure">Failure details, or null to record an explicit rollback request. Later calls never overwrite the first cause.</param>
+    void MarkRollbackOnly(ExecutionTransactionFailure? failure = null);
 }

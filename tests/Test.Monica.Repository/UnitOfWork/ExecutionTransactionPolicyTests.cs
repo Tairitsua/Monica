@@ -31,7 +31,7 @@ public sealed class ExecutionTransactionPolicyTests
                 await scope.Resolve<IMediator>().Send(new RequiredIsolation(), token));
             return;
         }
-        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
+        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<IUnitOfWorkManager>().RunAsync(
                 () => throw new Xunit.Sdk.XunitException("An incompatible nested transaction must not execute."),

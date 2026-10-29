@@ -11,6 +11,8 @@ monica.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
 
 With the switch enabled, an exception response contains `metadata.diagnostics`, an `ExceptionDiagnosticDocument` with `schemaVersion: 1`, a root `exceptionId`, optional request context, and an `exceptions` catalog. Each entry has an `id`, CLR `type`, its own `message`, its own `stackTrace` array, and optional `innerExceptionIds`. Runtime exceptions are captured once by object identity at response projection: the same propagated exception and shared causes use the same ID, while distinct exceptions with identical text remain distinct. Aggregate exceptions retain their direct causes. This avoids copying `Exception.ToString()` into each boundary or chain node; repeated frames within one actual stack remain meaningful evidence and are retained.
 
+For a failed local transaction, `TransactionRollbackOnlyException` identifies the rejected action and the first failure's operation, reason, and correlations. Its inner exception is the original failure even when application code caught it earlier; the catalog preserves that original stack by identity. Result-only rollback causes have a status and message but no artificial inner exception. The scoped failure snapshot and structured transaction log are described in [first-failure diagnostics](../../monica-infra-persistence/references/transactions.md#first-failure-diagnostics).
+
 The following diagnostic metadata fragment shows a wrapper and its cause. Call-chain nodes, when enabled, refer to the same catalog through `exceptionId`:
 
 ```json

@@ -6,6 +6,7 @@ Start with the failed boundary and inspect its owning contract:
 | --- | --- |
 | Repository write is missing or a save fails | Context registration mode and ownership in [repositories](repositories.md); returned result envelope, flush behavior, and fresh-scope retry in [transactions](transactions.md) |
 | Operation rolls back unexpectedly | Nested failure, participant selection, and physical connection identity in [transactions](transactions.md) |
+| A later Outbox/save/commit rejection hides an earlier caught failure | Inspect `TransactionRollbackOnlyException.FirstFailure`, its `InnerException`, and transaction/trace IDs. The first rollback cause is retained even when later work fails; see [first-failure diagnostics](transactions.md#first-failure-diagnostics). |
 | A DbContext is not a participant in the active transaction | Compare the error's context, logical transaction owner and selected participants; inspect the consumer's domain mapping, actual DI scope, connection instance and any physical sharding adapter. Same database names alone do not establish participation. |
 | A Shared call rejects a remote or independent store | Check resolved role/authority routing and whether a caller transaction is active. Co-locate compatible participants for atomic work, or explicitly select Independent when separate commit is intended. |
 | Event is not delivered or is delivered again | Primary-context outbox/inbox setup, migrations, and staging in [transactional events](transactional-events.md); then EventBus transport and worker health |

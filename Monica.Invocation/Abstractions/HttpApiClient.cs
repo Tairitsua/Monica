@@ -50,7 +50,8 @@ public abstract class HttpApiClient(ICachedServiceProvider serviceProvider, Http
         var options = CachedServiceProvider.GetRequiredService<IOptions<ModuleApiClientOption>>().Value;
         return ApiTransactionPolicy.ExecuteAsync(CachedServiceProvider, Transaction,
             () => CachedServiceProvider.GetRequiredService<IRemoteCallClient>().InvokeAsync<TResponse>(
-                HttpClient, createRequest, context with { Transport = options.ProviderTransport }, cancellationToken), remote: true);
+                HttpClient, createRequest, context with { Transport = options.ProviderTransport }, cancellationToken),
+            remote: true, operation: context.Operation);
     }
 
     /// <summary>

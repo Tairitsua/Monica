@@ -1,4 +1,5 @@
 using Monica.Locker.EfCore;
+using Monica.Core.Execution;
 using Monica.EntityFrameworkCore.Extensions;
 using System.Transactions;
 using System.Linq.Expressions;
@@ -312,6 +313,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
     private void ValidateSave()
     {
+        CachedServiceProvider.GetService<UnitOfWorkManager>()?.ThrowIfRollbackOnly("access the database");
         if (_saveFailed) throw new InvalidOperationException("This context's save failed. Dispose it and retry in a fresh scope.");
         if (_saving) throw new InvalidOperationException("Recursive or concurrent saves are not supported.");
         if (this is IRepositoryContextAdapter { TransactionOwner: { } owner }
@@ -342,8 +344,9 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         if (!_saving) ValidateSave();
     }
 
-    void IRepositoryContextLifetime.MarkDatabaseFailure()
-        => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly();
+    void IRepositoryContextLifetime.MarkDatabaseFailure(ExecutionTransactionFailure failure)
+        => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
+            failure with { DbContextType = GetType().FullName });
 
     private async Task<int> SaveCoreAsync(bool useAsync, bool acceptAll, CancellationToken token)
     {
@@ -428,7 +431,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         {
             failure = exception;
             _saveFailed = true;
-            CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly();
+            CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
+                ExecutionTransactionFailure.FromException("SaveChanges", exception) with { DbContextType = GetType().FullName });
             try
             {
                 if (ownedTransaction is not null)

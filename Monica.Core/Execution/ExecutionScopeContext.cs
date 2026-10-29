@@ -10,27 +10,42 @@ public sealed class ExecutionScopeContext
     private readonly AsyncLocal<Scope?> _current = new();
 
     /// <summary>Gets the current scope, or null outside execution. An escaped, completed execution is rejected.</summary>
-    public IServiceProvider? Services => _current.Value switch
+    private Scope? Current => _current.Value switch
     {
         { Disposed: true } => throw new InvalidOperationException("The execution scope has completed. Await nested calls before returning."),
-        { } scope => scope.Services,
+        { } scope => scope,
         _ => null
     };
 
+    /// <summary>Gets the borrowed service scope, or null outside execution.</summary>
+    public IServiceProvider? Services => Current?.Services;
+
+    /// <summary>Gets the current operation's immutable metadata, or null outside a described execution.</summary>
+    public ExecutionDescriptor? Operation => Current?.Operation;
+
+    /// <summary>Gets the current execution identity, or null outside a described execution.</summary>
+    public Guid? InvocationId => Current?.InvocationId;
+
     /// <summary>Enters a borrowed scope until the returned lease is disposed, restoring its parent afterward.</summary>
-    /// <remarks>Dispose in nesting order and await all child work before releasing the lease.</remarks>
-    public IDisposable Enter(IServiceProvider services)
+    /// <remarks>
+    /// Dispose in nesting order and await all child work before releasing the lease. When operation metadata is
+    /// omitted it is inherited only within the same provider; independent scopes do not inherit their caller's operation.
+    /// </remarks>
+    public IDisposable Enter(IServiceProvider services, ExecutionDescriptor? operation = null, Guid? invocationId = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         var parent = _current.Value;
-        var scope = new Scope(services);
+        var inherit = operation is null && parent is { Disposed: false } && ReferenceEquals(parent.Services, services);
+        var scope = new Scope(services, inherit ? parent!.Operation : operation, inherit ? parent!.InvocationId : invocationId);
         _current.Value = scope;
         return new Lease(() => { scope.Disposed = true; _current.Value = parent; });
     }
 
-    private sealed class Scope(IServiceProvider services)
+    private sealed class Scope(IServiceProvider services, ExecutionDescriptor? operation, Guid? invocationId)
     {
         public IServiceProvider Services { get; } = services;
+        public ExecutionDescriptor? Operation { get; } = operation;
+        public Guid? InvocationId { get; } = invocationId;
         public bool Disposed { get; set; }
     }
 

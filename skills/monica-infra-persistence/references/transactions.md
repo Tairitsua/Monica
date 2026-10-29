@@ -158,6 +158,31 @@ public Task<Res> Handle(ApproveOrder request, CancellationToken cancellationToke
 
 The application owns these context and request types. Types must be distinct registered `DbContext` types. The first context owns the physical transaction and any Inbox/Outbox rows; additional participants must share the **same `DbConnection` instance** and relational provider. Independent databases cannot form this local transaction. An empty selection uses the registered-context default. `None` rejects an explicit nonempty context selection.
 
+## First-failure diagnostics
+
+The first failure that actually requires rollback is retained as `IUnitOfWork.FirstFailure` and `IExecutionTransaction.FirstFailure`. `ExecutionTransactionFailure` snapshots the source, reason, optional result status, operation name/key, invocation ID, timestamp, and current trace/span. Database command failures also record the context type and command ID. No request, result payload, SQL text, or parameters are captured. The original exception instance is retained with its original stack until the owning DI scope is disposed; this is diagnostic state, not persisted transaction history.
+
+Subsequent failures and explicit rollback requests cannot overwrite this snapshot. A handled Query business rejection does not create one. Independent failures do not mark their caller's transaction. When already-failed work attempts Outbox publishing, Inbox handling, database access, flush, or commit, Monica throws `TransactionRollbackOnlyException` with the transaction ID, rejected action, and the same `FirstFailure`. Its `InnerException` is the original exception; a result-only failure instead retains its status and message without manufacturing an exception. An original exception that escapes immediately is rethrown unchanged. Completed scopes still reject reuse; resolve a fresh scope for retries.
+
+Custom database/provider paths that bypass EF interceptors must supply their cause when marking rollback. For example, inside an existing operation:
+
+```csharp
+try
+{
+    await providerWrite(cancellationToken);
+}
+catch (Exception exception)
+{
+    unitOfWork.Current?.MarkRollbackOnly(
+        ExecutionTransactionFailure.FromException("ProviderWrite", exception));
+    throw;
+}
+```
+
+Use `ExecutionTransactionFailure.FromResult("StageOrder", failureResult)` for a returned failure requiring rollback, or `new ExecutionTransactionFailure("Validation", "Required invariant failed.")` for an explicit reason. The optional `Operation` identifies a more specific operation when no execution descriptor owns that boundary. Calling `MarkRollbackOnly()` without details still prevents commit, but records only an explicit rollback request. Never copy headers, credentials, request payloads or SQL into a reason. These types are in `Monica.Core.Execution`; `unitOfWork` is the existing scoped `IUnitOfWorkManager`. Custom implementations of the transaction interfaces must implement the optional failure argument and `FirstFailure`; rebuild consumers with this contract.
+
+The first mark emits one structured Debug log under `UnitOfWorkManager`. Later rejection exceptions carry the cause even with Debug logging disabled. The existing [exception response diagnostics](../../monica-infra-hosting/references/exception-diagnostics.md) project the wrapper and original cause by identity, with bounded output and the host's existing visibility setting. No extra exception serialization or successful-path change-tracker scan is introduced. `tests/Test.Monica.Application/TransactionFailureDiagnosticsTests.cs` verifies caught Query/SQL/cancellation faults, later Outbox/save/flush/commit rejection, result snapshots, original stack preservation, and Independent isolation.
+
 ## Explicit callers and scope lifetime
 
 For work outside an execution adapter, resolve `IUnitOfWorkManager` and the repository from the **same scope** and use the same transaction engine explicitly:

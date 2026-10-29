@@ -15,13 +15,15 @@ public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkMana
     : IExecutionBehavior<TInput, TResult>
 {
     /// <inheritdoc />
-    public Task<TResult> ExecuteAsync(
+    public async Task<TResult> ExecuteAsync(
         ExecutionContext<TInput> context,
         ExecutionDelegate<TResult> next)
     {
         // None does not open a transaction, but nested entries still validate participation and failures.
         if (context.Descriptor.TransactionMode == ExecutionTransactionMode.None && unitOfWorkManager.Current is null)
-            return next();
+            return await next();
+        using var execution = (services?.GetService(typeof(ExecutionScopeContext)) as ExecutionScopeContext)
+            ?.Enter(services!, context.Descriptor, context.InvocationId);
         context.Features.TryGet<UnitOfWorkScopeOptions>(out var options);
         if (options is null)
         {
@@ -33,6 +35,6 @@ public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkMana
         }
         if (context.Descriptor.IsReadOnly)
             options = (options ?? new UnitOfWorkScopeOptions()) with { IsReadOnly = true };
-        return unitOfWorkManager.RunAsync(next.Invoke, options, context.CancellationToken);
+        return await unitOfWorkManager.RunAsync(next.Invoke, options, context.CancellationToken);
     }
 }

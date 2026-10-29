@@ -14,7 +14,7 @@ internal static class ApiTransactionPolicy
     }
 
     public static async Task<T> ExecuteAsync<T>(IServiceProvider services, ApiTransaction transaction, Func<Task<T>> invoke,
-        bool remote = false, bool isReadOnly = false)
+        bool remote = false, bool isReadOnly = false, string? operation = null)
     {
         Validate(transaction);
         var boundary = GetActiveTransaction(services, transaction);
@@ -23,12 +23,12 @@ internal static class ApiTransactionPolicy
             if (remote) EnsureRemoteAllowed(services, transaction);
             var result = await invoke();
             if (ExecutionOutcomePolicy.RequiresRollback(result, isReadOnly))
-                boundary?.MarkRollbackOnly();
+                boundary?.MarkRollbackOnly(ExecutionTransactionFailure.FromResult("ApiInvocation", result) with { Operation = operation });
             return result;
         }
-        catch
+        catch (Exception exception)
         {
-            boundary?.MarkRollbackOnly();
+            boundary?.MarkRollbackOnly(ExecutionTransactionFailure.FromException("ApiInvocation", exception) with { Operation = operation });
             throw;
         }
     }

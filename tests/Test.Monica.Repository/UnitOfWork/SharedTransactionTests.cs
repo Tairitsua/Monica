@@ -267,13 +267,16 @@ public sealed class SharedTransactionTests
         using var host = CreateHost(connection, connection);
         await using var operation = host.Services.CreateAsyncScope();
         var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(() =>
+        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(() =>
         {
             operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().ValidateDatabaseAccess();
             var nonParticipant = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
-            Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
+            var original = Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
+            Assert.Same(original, manager.Current!.FirstFailure!.Exception);
             return Task.CompletedTask;
         }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token));
+        Assert.Equal("Participation", rollback.FirstFailure.Source);
+        Assert.Equal(typeof(SecondDbContext).FullName, rollback.FirstFailure.DbContextType);
     }
 
     private static IHost CreateHost(SqliteConnection first, SqliteConnection second,

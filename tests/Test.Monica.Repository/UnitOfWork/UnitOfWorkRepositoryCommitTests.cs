@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monica.Core.Execution;
 using Microsoft.AspNetCore.Mvc;
 using Monica.Core.Execution.Mvc;
 using Monica.Core.Results;
@@ -77,7 +78,7 @@ public sealed class UnitOfWorkRepositoryCommitTests
     public async Task RunAsync_WhenNestedFailureIsCaught_ShouldPreventCommit()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(async scope =>
+        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
         {
             var manager = scope.Resolve<IUnitOfWorkManager>();
             try
@@ -91,6 +92,7 @@ public sealed class UnitOfWorkRepositoryCommitTests
             }
             catch (ApplicationException) { }
         }, cancellationToken: Token));
+        Assert.Equal("nested failure", Assert.IsType<ApplicationException>(rollback.InnerException).Message);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
             Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
     }
@@ -121,12 +123,13 @@ public sealed class UnitOfWorkRepositoryCommitTests
     public async Task ValidateDatabaseAccess_WhenOperationIsRollbackOnly_ShouldRejectNativeAccess()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(scope =>
+        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(scope =>
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             db.ValidateDatabaseAccess();
             scope.Resolve<IUnitOfWorkManager>().Current!.MarkRollbackOnly();
-            Assert.Throws<InvalidOperationException>(db.ValidateDatabaseAccess);
+            var rejected = Assert.Throws<TransactionRollbackOnlyException>(db.ValidateDatabaseAccess);
+            Assert.Equal("Explicit", rejected.FirstFailure.Source);
             return Task.CompletedTask;
         }, cancellationToken: Token));
     }

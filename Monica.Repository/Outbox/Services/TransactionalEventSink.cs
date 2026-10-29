@@ -1,4 +1,5 @@
 using Monica.EventBus.Abstractions;
+using Monica.Core.Execution;
 using Monica.EventBus.Models;
 using Monica.Repository.UnitOfWork.Services;
 
@@ -21,9 +22,9 @@ internal sealed class TransactionalEventSink(UnitOfWorkManager unitOfWork) : ITr
             }
             return ValueTask.CompletedTask;
         }
-        catch
+        catch (Exception exception)
         {
-            unitOfWork.MarkRollbackOnly();
+            unitOfWork.MarkRollbackOnly(ExecutionTransactionFailure.FromException("Outbox", exception));
             throw;
         }
     }

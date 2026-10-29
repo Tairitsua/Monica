@@ -90,7 +90,7 @@ public sealed class QueryTransactionTests
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var scope = app.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
+        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
         {
             scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "must roll back" });
             await manager.Current!.FlushAsync(token);
@@ -110,7 +110,7 @@ public sealed class QueryTransactionTests
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var scope = app.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
+        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
         {
             scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "must roll back" });
             await manager.Current!.FlushAsync(token);

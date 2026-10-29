@@ -71,6 +71,8 @@ Published requests explicitly declare Query/Command intent through `IQuery<TResp
 
 When adopting explicit transaction participation, rebuild Protocol and every consuming host with matching Invocation and generator versions. Generated interfaces now include typed `WithTransaction` views; custom `IApplicationApiInvoker` and `ILocalApiInvoker` implementations must accept and honor `ApiTransaction`. Existing nested remote writes that relied on implicit independent commit must choose Independent explicitly. There is no compatibility switch that silently weakens Shared.
 
+A Shared failure records its target operation and original exception or result status/message through `IExecutionTransaction.MarkRollbackOnly(failure)`. If the execution or database boundary already recorded a cause, the API boundary cannot overwrite it. This includes role/authority routing rejection before dispatch; later Outbox or commit errors retain that first cause. Use the [first-failure diagnostic contract](../../monica-infra-persistence/references/transactions.md#first-failure-diagnostics) when inspecting `FirstFailure` or implementing a custom transaction owner. Independent calls do not write failure state into their caller's transaction.
+
 Existing hosts that have not adopted the application model can still select client transport and handler assemblies explicitly:
 
 ```csharp
