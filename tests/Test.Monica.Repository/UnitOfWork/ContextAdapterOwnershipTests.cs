@@ -55,16 +55,25 @@ public sealed class ContextAdapterOwnershipTests
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await using var other = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
         using var host = CreateHost(connection);
+        await using (var setup = host.Services.CreateAsyncScope())
+            await setup.ServiceProvider.GetRequiredService<OwnerContext>().Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         await using var scope = host.Services.CreateAsyncScope();
         var owner = scope.ServiceProvider.GetRequiredService<OwnerContext>();
         await using var physical = CreatePhysical(scope.ServiceProvider, shareConnection ? connection : other, owner);
-        await scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>().RunAsync(async () =>
+        var manager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
         {
+            owner.Rows.Add(new GeneratedKeyRow { Title = "must roll back" });
+            await manager.Current!.FlushAsync(TestContext.Current.CancellationToken);
             await Assert.ThrowsAsync<NotSupportedException>(() => physical.Rows.CountAsync(TestContext.Current.CancellationToken));
             physical.Add(new GeneratedKeyRow { Title = "rejected" });
             await Assert.ThrowsAsync<NotSupportedException>(() => physical.SaveChangesAsync(TestContext.Current.CancellationToken));
-        }, cancellationToken: TestContext.Current.CancellationToken);
+        }, cancellationToken: TestContext.Current.CancellationToken));
+        await using var verification = host.Services.CreateAsyncScope();
+        Assert.Empty(await verification.ServiceProvider.GetRequiredService<OwnerContext>().Rows
+            .ToListAsync(TestContext.Current.CancellationToken));
     }
 
     private static IHost CreateHost(SqliteConnection connection)

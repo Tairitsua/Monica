@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Monica.Core.Mediator;
 using Monica.Tool.Extensions;
 
 namespace Monica.Core.Execution;
@@ -73,6 +74,9 @@ public sealed class ExecutionDescriptor
         ContractType = contractType;
         EntryMethod = entryMethod;
         InputType = inputType;
+        IsReadOnly = typeof(IQueryRequest).IsAssignableFrom(inputType);
+        if (IsReadOnly && typeof(ICommandRequest).IsAssignableFrom(inputType))
+            throw new InvalidOperationException($"Request '{inputType.FullName}' cannot be both a Query and a Command.");
         ResultType = resultType;
         IsBusinessOperation = isBusinessOperation;
         var transaction = entryMethod?.GetCustomAttribute<ExecutionTransactionAttribute>(inherit: true);
@@ -222,6 +226,9 @@ public sealed class ExecutionDescriptor
     /// Gets the pipeline input type.
     /// </summary>
     public Type InputType { get; }
+
+    /// <summary>Gets whether the input declares read-only Query semantics, independently of its transaction mode.</summary>
+    public bool IsReadOnly { get; }
 
     /// <summary>
     /// Gets the pipeline result type.

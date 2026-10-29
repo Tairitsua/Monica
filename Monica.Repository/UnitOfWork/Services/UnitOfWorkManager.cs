@@ -54,7 +54,8 @@ public sealed class UnitOfWorkManager(
             {
                 if (options is not null) await JoinAsync(options, cancellationToken);
                 var nestedResult = await work();
-                if (IsFailure(nestedResult)) MarkRollbackOnly();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ExecutionOutcomePolicy.RequiresRollback(nestedResult, options?.IsReadOnly == true)) MarkRollbackOnly();
                 return nestedResult;
             }
             catch { MarkRollbackOnly(); throw; }
@@ -67,14 +68,18 @@ public sealed class UnitOfWorkManager(
             await BeginAsync(options ?? new(), cancellationToken);
             _active = true;
             var result = await work();
-            if (IsFailure(result))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ExecutionOutcomePolicy.RequiresRollback(result, _options.IsReadOnly))
             {
                 await RollbackAsync();
                 return result;
             }
             if (_rollbackOnly) throw new InvalidOperationException("A nested operation failed; the transaction is rollback-only.");
-            await domainEvents.DrainAsync(configuration.Value.MaximumDomainEvents, cancellationToken);
-            await FlushAsync(cancellationToken);
+            if (!_options.IsReadOnly)
+            {
+                await domainEvents.DrainAsync(configuration.Value.MaximumDomainEvents, cancellationToken);
+                await FlushAsync(cancellationToken);
+            }
             if (_transaction is not null) await _transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -235,6 +240,4 @@ public sealed class UnitOfWorkManager(
         if (_transaction is not null) await _transaction.RollbackAsync(CancellationToken.None);
     }
 
-    private static bool IsFailure<T>(T result) => result is IExecutionOutcome { ShouldRollback: true }
-        || result is IResultEnvelope envelope && !envelope.IsOk();
 }

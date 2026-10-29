@@ -34,10 +34,10 @@ Search the repository's shared test layer (for example Platform.Testing or Platf
 Use `$monica-infra-persistence` for the current repository and UnitOfWork contracts; this section identifies the test boundary those contracts require.
 
 - IRepository<TEntity> exposes Add/Remove; keyed repositories load tracked aggregates with FindAsync/GetAsync. Mutate the loaded instance. No detached Update or repository save is required.
-- application.ExecuteAsync creates a fresh scope and calls the production IExecutionPipeline. Resolve the handler inside its callback. Exceptions, cancellation and failed Monica result envelopes roll back; an early FlushAsync or direct context save stays inside that transaction.
+- application.ExecuteAsync creates a fresh scope and calls the production IExecutionPipeline. Resolve the handler inside its callback. Exceptions, cancellation and failed Command results roll back; a handled Query business rejection may leave its caller's transaction healthy according to the [transaction outcome policy](../monica-infra-persistence/references/transactions.md). An early FlushAsync or direct context save stays inside that transaction.
 - AddRepositoryDbContext defaults to UnitOfWork participation and enables the module. Independently managed infrastructure stores explicitly use Default. Multiple business contexts require explicit operation selection.
-- Completed/faulted operation scopes are terminal. Each retry or independent operation gets a fresh scope. A caught nested failure still prevents commit.
-- For mediator-specific behavior, resolve IMediator in a fresh scope and Send the actual request. Published Query requests are read-only by application convention regardless of HTTP method and avoid an automatic write transaction.
+- Completed/faulted operation scopes are terminal. Each retry or independent operation gets a fresh scope. Catching a nested execution fault or a failed Command does not recover the transaction.
+- For mediator-specific behavior, resolve IMediator in a fresh scope and Send the actual request. IQuery<T> and IQuery requests explicitly declare read-only intent regardless of HTTP method or name: they do not start a transaction by default, but join an existing Shared transaction. Test explicit consistency transactions separately; Independent creates a fresh scope without forcing a Query transaction.
 - For direct read-only calls, use application.CreateScope and resolve the service there. Direct resolution alone does not invoke the pipeline.
 - Native EF queries stay in infrastructure; business query interfaces return materialized projections. Do not enumerate an IQueryable after its scope is disposed.
 

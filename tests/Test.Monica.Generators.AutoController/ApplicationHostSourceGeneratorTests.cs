@@ -197,7 +197,7 @@ public sealed class ApplicationHostSourceGeneratorTests
     {
         var ordinary = OrdinaryRole + """
 
-            internal sealed record QuerySupport : Monica.Core.Mediator.IRequest<int>;
+            internal sealed record QuerySupport : Monica.Core.Mediator.IRequest<int>, global::Monica.Core.Mediator.IQueryRequest;
             internal sealed class SupportHandler : Monica.Core.Mediator.IRequestHandler<QuerySupport, int>
             {
                 public System.Threading.Tasks.Task<int> Handle(QuerySupport request, System.Threading.CancellationToken token)
@@ -233,7 +233,7 @@ public sealed class ApplicationHostSourceGeneratorTests
 
             internal static class PrivateOperations
             {
-                {{accessibility}} sealed record QueryHidden : Monica.Application.Abstractions.IResultRequest<int>;
+                {{accessibility}} sealed record QueryHidden : Monica.Application.Abstractions.IQuery<int>;
                 private sealed class HiddenHandler : Monica.Application.Abstractions.ApplicationService<QueryHidden, int>
                 {
                     public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
@@ -467,16 +467,16 @@ public sealed class ApplicationHostSourceGeneratorTests
         {
             /// <summary>Reads the ordinary order total.</summary>
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Post, "queries/Total")]
-            public sealed record QueryGetTotal : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryGetTotal : Monica.Application.Abstractions.IQuery<int>;
 
             /// <summary>Reads the chat-owned total.</summary>
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Get, "queries/ChatTotal")]
             [Monica.ApplicationModel.Annotations.RunOnRole("ordering.chat")]
-            public sealed record QueryGetChatTotal : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryGetChatTotal : Monica.Application.Abstractions.IQuery<int>;
         }
         namespace Scenario.Internal
         {
-            public sealed record QueryProbe : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryProbe : Monica.Application.Abstractions.IQuery<int>;
         }
         """;
 }

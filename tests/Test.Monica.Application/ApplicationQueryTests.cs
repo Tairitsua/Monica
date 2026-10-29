@@ -64,10 +64,10 @@ public sealed class ApplicationQueryTests
 }
 
 [ApiEndpoint(ApiHttpMethod.Get, "probe-get")]
-public sealed record QueryGet : IRequest<string>;
+public sealed record QueryGet : IRequest<string>, global::Monica.Core.Mediator.IQueryRequest;
 [ApiEndpoint(ApiHttpMethod.Post, "probe")]
-public sealed record QueryPost : IRequest<string>;
+public sealed record QueryPost : IRequest<string>, global::Monica.Core.Mediator.IQueryRequest;
 [ApiEndpoint(ApiHttpMethod.Get, "probe")]
-public sealed record CommandGet : IRequest<string>;
+public sealed record CommandGet : IRequest<string>, global::Monica.Core.Mediator.ICommandRequest;
 [ApiEndpoint(ApiHttpMethod.Post, "probe-override")]
-public sealed record QueryOverride : IRequest<string>;
+public sealed record QueryOverride : IRequest<string>, global::Monica.Core.Mediator.IQueryRequest;

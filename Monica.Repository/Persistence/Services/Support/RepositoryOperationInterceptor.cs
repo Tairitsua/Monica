@@ -6,6 +6,7 @@ namespace Monica.Repository.Persistence.Services.Support;
 internal interface IRepositoryContextLifetime
 {
     void ValidateDatabaseAccess();
+    void MarkDatabaseFailure();
 }
 
 /// <summary>
@@ -56,4 +57,24 @@ internal sealed class RepositoryOperationInterceptor : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
         CancellationToken cancellationToken = default)
         => ValueTask.FromResult(ScalarExecuting(command, eventData, result));
+
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
+        => (eventData.Context as IRepositoryContextLifetime)?.MarkDatabaseFailure();
+
+    public override Task CommandFailedAsync(DbCommand command, CommandErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        CommandFailed(command, eventData);
+        return Task.CompletedTask;
+    }
+
+    public override void CommandCanceled(DbCommand command, CommandEndEventData eventData)
+        => (eventData.Context as IRepositoryContextLifetime)?.MarkDatabaseFailure();
+
+    public override Task CommandCanceledAsync(DbCommand command, CommandEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        CommandCanceled(command, eventData);
+        return Task.CompletedTask;
+    }
 }

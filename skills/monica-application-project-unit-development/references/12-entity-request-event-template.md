@@ -20,7 +20,7 @@ namespace $ContractNamespace$.Requests;
     Description = "Requests the $FeatureName$ query use case.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [ProjectUnitRequirement("$RequirementId$")]
-public sealed record Query$FeatureName$(long Id) : IResultRequest<$ResponseName$>;
+public sealed record Query$FeatureName$(long Id) : IQuery<$ResponseName$>;
 
 /// <summary>Executes the $FeatureName$ action.</summary>
 [ApiEndpoint(ApiHttpMethod.Post, "commands/$FeatureName$")]
@@ -29,7 +29,7 @@ public sealed record Query$FeatureName$(long Id) : IResultRequest<$ResponseName$
     Description = "Requests the $FeatureName$ command use case.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [ProjectUnitRequirement("$RequirementId$")]
-public sealed record Command$FeatureName$(long Id, string Reason) : IResultRequest;
+public sealed record Command$FeatureName$(long Id, string Reason) : ICommand;
 ```
 
 Rules:

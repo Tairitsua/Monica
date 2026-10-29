@@ -9,41 +9,47 @@ using Xunit;
 
 namespace Test.Monica.Core.Mediator;
 
-public sealed class ReadOnlyRequestConventionTests
+public sealed class RequestIntentTests
 {
     [Fact]
-    public async Task Send_WhenConventionMarksRequestReadOnly_ShouldSkipAutomaticTransaction()
+    public async Task Send_WhenRequestDeclaresBothIntents_ShouldRejectBeforeHandler()
     {
-        using var host = BuildHost<ConventionMarkedRequest>();
+        using var host = BuildHost<ConflictingRequest>();
+        using var scope = host.Services.CreateScope();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => SendAsync<ConflictingRequest>(scope));
+    }
+
+    [Fact]
+    public async Task Send_WhenRequestDeclaresQuery_ShouldSkipAutomaticTransaction()
+    {
+        using var host = BuildHost<ReadProjectionRequest>();
         using var scope = host.Services.CreateScope();
 
-        (await SendAsync<ConventionMarkedRequest>(scope))
+        (await SendAsync<ReadProjectionRequest>(scope))
             .Should().Be(nameof(ExecutionTransactionMode.None));
     }
 
     [Fact]
-    public async Task Send_WhenConventionMarksRequestReadOnly_ShouldStillHonorExplicitTransactionOverride()
+    public async Task Send_WhenQueryExplicitlyRequestsTransaction_ShouldHonorOverride()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services
-            .AddTransient<IRequestHandler<ConventionMarkedRequest, string>, ForcedWriteHandler<ConventionMarkedRequest>>();
-        builder.Services.AddSingleton<IReadOnlyRequestConvention>(
-            new DelegatingReadOnlyConvention(requestType => requestType == typeof(ConventionMarkedRequest)));
+            .AddTransient<IRequestHandler<ReadProjectionRequest, string>, ConsistentReadHandler<ReadProjectionRequest>>();
         builder.AddMonica(monica =>
         {
             monica.AddMediator();
-            monica.AddExecutionPipeline().AddBehavior<TransactionModeBehavior<ConventionMarkedRequest>>();
+            monica.AddExecutionPipeline().AddBehavior<TransactionModeBehavior<ReadProjectionRequest>>();
         });
 
         using var host = builder.Build();
         using var scope = host.Services.CreateScope();
 
-        (await SendAsync<ConventionMarkedRequest>(scope))
+        (await SendAsync<ReadProjectionRequest>(scope))
             .Should().Be(nameof(ExecutionTransactionMode.Automatic));
     }
 
     [Fact]
-    public async Task Send_WhenNoConventionOrAttributeApplies_ShouldDefaultToAutomatic()
+    public async Task Send_WhenRequestIsUnclassified_ShouldDefaultToAutomatic()
     {
         using var host = BuildHost<PlainRequest>();
         using var scope = host.Services.CreateScope();
@@ -56,8 +62,6 @@ public sealed class ReadOnlyRequestConventionTests
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddTransient<IRequestHandler<TRequest, string>, NoOpHandler<TRequest>>();
-        builder.Services.AddSingleton<IReadOnlyRequestConvention>(
-            new DelegatingReadOnlyConvention(requestType => requestType == typeof(ConventionMarkedRequest)));
         builder.AddMonica(monica =>
         {
             monica.AddMediator();
@@ -70,9 +74,11 @@ public sealed class ReadOnlyRequestConventionTests
         => scope.ServiceProvider.GetRequiredService<IMediator>()
             .Send(new TRequest(), TestContext.Current.CancellationToken);
 
-    private sealed record ConventionMarkedRequest : IRequest<string>;
+    private sealed record ReadProjectionRequest : IRequest<string>, IQueryRequest;
 
     private sealed record PlainRequest : IRequest<string>;
+
+    private sealed record ConflictingRequest : IRequest<string>, IQueryRequest, ICommandRequest;
 
     private sealed class NoOpHandler<TRequest> : IRequestHandler<TRequest, string>
         where TRequest : IRequest<string>
@@ -80,16 +86,11 @@ public sealed class ReadOnlyRequestConventionTests
         public Task<string> Handle(TRequest request, CancellationToken cancellationToken) => Task.FromResult("handled");
     }
 
-    private sealed class ForcedWriteHandler<TRequest> : IRequestHandler<TRequest, string>
+    private sealed class ConsistentReadHandler<TRequest> : IRequestHandler<TRequest, string>
         where TRequest : IRequest<string>
     {
         [ExecutionTransaction(ExecutionTransactionMode.Automatic)]
         public Task<string> Handle(TRequest request, CancellationToken cancellationToken) => Task.FromResult("handled");
-    }
-
-    private sealed class DelegatingReadOnlyConvention(Func<Type, bool> predicate) : IReadOnlyRequestConvention
-    {
-        public bool IsReadOnly(Type requestType) => predicate(requestType);
     }
 
     private sealed class TransactionModeBehavior<TRequest> : IExecutionBehavior<TRequest, string>

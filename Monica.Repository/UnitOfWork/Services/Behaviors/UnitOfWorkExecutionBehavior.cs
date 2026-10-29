@@ -31,6 +31,8 @@ public sealed class UnitOfWorkExecutionBehavior<TInput, TResult>(IUnitOfWorkMana
             if (selected is not null || context.Descriptor.TransactionIsolationLevel is not null)
                 options = new UnitOfWorkScopeOptions(selected, context.Descriptor.TransactionIsolationLevel);
         }
+        if (context.Descriptor.IsReadOnly)
+            options = (options ?? new UnitOfWorkScopeOptions()) with { IsReadOnly = true };
         return unitOfWorkManager.RunAsync(next.Invoke, options, context.CancellationToken);
     }
 }

@@ -38,7 +38,7 @@ public sealed class GeneratorContractValidationTests
 
         /// <summary>Uses a type suffix that cannot become a method name.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-        public sealed record Query123Orders : IResultRequest<string>;
+        public sealed record Query123Orders : IQuery<string>;
         """;
 
     private const string NestedPublishedRequestNamespace = """
@@ -57,7 +57,7 @@ public sealed class GeneratorContractValidationTests
         {
             /// <summary>Attempts to publish a request below the strict Requests namespace.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-            public sealed record QueryInternalOrders : IResultRequest<string>;
+            public sealed record QueryInternalOrders : IQuery<string>;
 
             public sealed class QueryHandlerInternalOrders
                 : ApplicationService<QueryInternalOrders, string>
@@ -83,7 +83,7 @@ public sealed class GeneratorContractValidationTests
 
         /// <summary>Uses an invalid route prefix.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-        public sealed record QueryInvalidPrefix : IResultRequest<string>;
+        public sealed record QueryInvalidPrefix : IQuery<string>;
 
         public sealed class QueryHandlerInvalidPrefix
             : ApplicationService<QueryInvalidPrefix, string>
@@ -118,7 +118,7 @@ public sealed class GeneratorContractValidationTests
         {
             /// <summary>Uses a custom envelope without a remote failure factory.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-            public sealed record QueryOrders : IRequest<global::Scenario.Results.CustomEnvelope>;
+            public sealed record QueryOrders : IRequest<global::Scenario.Results.CustomEnvelope>, global::Monica.Core.Mediator.IQueryRequest;
         }
         """;
 
@@ -136,7 +136,7 @@ public sealed class GeneratorContractValidationTests
 
         /// <summary>Exposes a route property that model binding cannot update.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-        public sealed class QueryReadOnlyOrder : IResultRequest<string>
+        public sealed class QueryReadOnlyOrder : IQuery<string>
         {
             public QueryReadOnlyOrder(long value)
             {

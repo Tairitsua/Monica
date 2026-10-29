@@ -342,6 +342,9 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         if (!_saving) ValidateSave();
     }
 
+    void IRepositoryContextLifetime.MarkDatabaseFailure()
+        => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly();
+
     private async Task<int> SaveCoreAsync(bool useAsync, bool acceptAll, CancellationToken token)
     {
         if (!acceptAll) throw new NotSupportedException("RepositoryDbContext requires acceptAllChangesOnSuccess=true. Retry failures in a fresh scope.");

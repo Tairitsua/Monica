@@ -7,6 +7,17 @@ namespace Test.Monica.Generators.AutoController;
 
 public sealed class RequestOwnedWebApiGeneratorTests
 {
+    [Theory]
+    [InlineData("IResultRequest<IReadOnlyList<OrderDto>>")]
+    [InlineData("ICommand<IReadOnlyList<OrderDto>>")]
+    [InlineData("IQuery<IReadOnlyList<OrderDto>>, global::Monica.Core.Mediator.ICommandRequest")]
+    public void Run_WhenQueryIntentIsMissingOrConflicting_ShouldRejectEndpoint(string contract)
+    {
+        var run = RunGenerators(PublishedOrderingScenario.Replace(
+            "QueryGetOrders : IQuery<IReadOnlyList<OrderDto>>", "QueryGetOrders : " + contract));
+        run.DriverDiagnostics.Should().Contain(diagnostic => diagnostic.Id == "AC1028");
+    }
+
     [Fact]
     public void Run_WhenExplicitHttpMappingHasNoPublicationConfig_ShouldGenerateOnlyStableContracts()
     {
@@ -294,11 +305,11 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Gets all published orders.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders", Binding = ApiRequestBinding.Query)]
-            public sealed record QueryGetOrders : IResultRequest<IReadOnlyList<OrderDto>>;
+            public sealed record QueryGetOrders : IQuery<IReadOnlyList<OrderDto>>;
 
             /// <summary>Creates one published order.</summary>
             [ApiEndpoint(ApiHttpMethod.Post, "orders", Binding = ApiRequestBinding.Body)]
-            public sealed record CommandCreateOrder(string Number) : IResultRequest<OrderDto>;
+            public sealed record CommandCreateOrder(string Number) : ICommand<OrderDto>;
         }
 
         namespace Scenario.Application
@@ -349,14 +360,14 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Gets orders through the published contract.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "published-orders")]
-            public sealed record QueryGetPublishedOrders : IResultRequest<IReadOnlyList<string>>;
+            public sealed record QueryGetPublishedOrders : IQuery<IReadOnlyList<string>>;
         }
 
         namespace Scenario.Local.Requests
         {
             /// <summary>Gets process-local health details.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "local-health")]
-            public sealed record QueryGetLocalHealth : IResultRequest<string>;
+            public sealed record QueryGetLocalHealth : IQuery<string>;
         }
 
         namespace Scenario.Application
@@ -408,7 +419,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
                 ApiHttpMethod.Get,
                 "orders/{OrderId}",
                 Binding = ApiRequestBinding.Query)]
-            public sealed record QueryOrderById(long OrderId) : IResultRequest<OrderDto>;
+            public sealed record QueryOrderById(long OrderId) : IQuery<OrderDto>;
         }
 
         namespace Scenario.Application
@@ -441,23 +452,23 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Gets an item.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "items/{Id}")]
-            public sealed record QueryGetItem(long Id) : IResultRequest<string>;
+            public sealed record QueryGetItem(long Id) : IQuery<string>;
 
             /// <summary>Creates an item.</summary>
             [ApiEndpoint(ApiHttpMethod.Post, "items/{Id}")]
-            public sealed record CommandCreateItem(long Id) : IResultRequest;
+            public sealed record CommandCreateItem(long Id) : ICommand;
 
             /// <summary>Replaces an item.</summary>
             [ApiEndpoint(ApiHttpMethod.Put, "items/{Id}")]
-            public sealed record CommandReplaceItem(long Id) : IResultRequest;
+            public sealed record CommandReplaceItem(long Id) : ICommand;
 
             /// <summary>Updates an item.</summary>
             [ApiEndpoint(ApiHttpMethod.Patch, "items/{Id}")]
-            public sealed record CommandUpdateItem(long Id) : IResultRequest;
+            public sealed record CommandUpdateItem(long Id) : ICommand;
 
             /// <summary>Deletes an item.</summary>
             [ApiEndpoint(ApiHttpMethod.Delete, "items/{Id}")]
-            public sealed record CommandDeleteItem(long Id) : IResultRequest;
+            public sealed record CommandDeleteItem(long Id) : ICommand;
         }
 
         namespace Scenario.Application
@@ -537,24 +548,24 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Returns a result without data.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "no-content")]
-            public sealed record QueryNoContent : IResultRequest;
+            public sealed record QueryNoContent : IQuery;
 
             /// <summary>Returns a typed result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "typed")]
-            public sealed record QueryTyped : IResultRequest<global::Scenario.Alpha.SharedDto>;
+            public sealed record QueryTyped : IQuery<global::Scenario.Alpha.SharedDto>;
 
             /// <summary>Returns a paged result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "paged")]
-            public sealed record QueryPaged : IRequest<ResPaged<global::Scenario.Alpha.SharedDto>>;
+            public sealed record QueryPaged : IRequest<ResPaged<global::Scenario.Alpha.SharedDto>>, global::Monica.Core.Mediator.IQueryRequest;
 
             /// <summary>Returns a custom result envelope.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "custom")]
-            public sealed record QueryCustom : IRequest<global::Scenario.Results.CustomEnvelope<global::Scenario.Beta.SharedDto>>;
+            public sealed record QueryCustom : IRequest<global::Scenario.Results.CustomEnvelope<global::Scenario.Beta.SharedDto>>, global::Monica.Core.Mediator.IQueryRequest;
 
             /// <summary>Returns a nested generic result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "nested")]
             public sealed record QueryNested
-                : IResultRequest<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>;
+                : IQuery<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>;
         }
 
         namespace Scenario.Application
@@ -608,7 +619,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Uploads one local form payload.</summary>
             [ApiEndpoint(ApiHttpMethod.Post, "local-upload", Binding = ApiRequestBinding.Form)]
-            public sealed record CommandUpload(string Name) : IResultRequest;
+            public sealed record CommandUpload(string Name) : ICommand;
         }
 
         namespace Scenario.Application
@@ -639,7 +650,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Deletes items in bulk.</summary>
             [ApiEndpoint(ApiHttpMethod.Delete, "items/bulk")]
-            public sealed record CommandDeleteItems(List<string> Ids) : IResultRequest;
+            public sealed record CommandDeleteItems(List<string> Ids) : ICommand;
         }
 
         namespace Scenario.Application
@@ -670,7 +681,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Deletes items in bulk.</summary>
             [ApiEndpoint(ApiHttpMethod.Delete, "items/bulk", Binding = ApiRequestBinding.Body)]
-            public sealed record CommandDeleteItems(List<string> Ids) : IResultRequest;
+            public sealed record CommandDeleteItems(List<string> Ids) : ICommand;
         }
 
         namespace Scenario.Application
@@ -715,7 +726,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Gets one order through custom transports.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-            public sealed record QueryOrder(long Id) : IResultRequest<string>;
+            public sealed record QueryOrder(long Id) : IQuery<string>;
         }
         """;
 
@@ -732,7 +743,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
         /// <summary>Has no endpoint declaration.</summary>
-        public sealed record QueryMissingEndpoint : IResultRequest<string>;
+        public sealed record QueryMissingEndpoint : IQuery<string>;
 
         public sealed class QueryHandlerMissingEndpoint : ApplicationService<QueryMissingEndpoint, string>
         {
@@ -755,7 +766,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         /// <summary>Owns its endpoint contract.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-        public sealed record QueryLegacyHandler : IResultRequest<string>;
+        public sealed record QueryLegacyHandler : IQuery<string>;
 
         public sealed class QueryHandlerLegacyHandler : ApplicationService<QueryLegacyHandler, string>
         {
@@ -778,7 +789,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         /// <summary>Has an endpoint but no assembly configuration.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-        public sealed record QueryMissingConfiguration : IResultRequest<string>;
+        public sealed record QueryMissingConfiguration : IQuery<string>;
 
         public sealed class QueryHandlerMissingConfiguration : ApplicationService<QueryMissingConfiguration, string>
         {
@@ -800,7 +811,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         /// <summary>Uses an invalid route placeholder.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{MissingId}")]
-        public sealed record QueryMissingPlaceholder(long Id) : IResultRequest<string>;
+        public sealed record QueryMissingPlaceholder(long Id) : IQuery<string>;
 
         public sealed class QueryHandlerMissingPlaceholder : ApplicationService<QueryMissingPlaceholder, string>
         {
@@ -822,7 +833,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         /// <summary>Uses an invalid route.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "$ROUTE$")]
-        public sealed record QueryInvalidRoute(long? Id) : IResultRequest<string>;
+        public sealed record QueryInvalidRoute(long? Id) : IQuery<string>;
 
         public sealed class QueryHandlerInvalidRoute : ApplicationService<QueryInvalidRoute, string>
         {
@@ -842,7 +853,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>Attempts to publish form binding.</summary>
             [ApiEndpoint(ApiHttpMethod.Post, "upload", Binding = ApiRequestBinding.Form)]
-            public sealed record CommandPublishedForm(string Name) : IResultRequest;
+            public sealed record CommandPublishedForm(string Name) : ICommand;
         }
         """;
 
@@ -857,7 +868,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         namespace Scenario.PublishedLanguages.DomainOrdering.Requests
         {
             [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-            public sealed record QueryMissingSummary : IResultRequest<string>;
+            public sealed record QueryMissingSummary : IQuery<string>;
         }
         """;
 
@@ -873,13 +884,13 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             /// <summary>First duplicate operation.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "first")]
-            public sealed record QueryFind : IResultRequest<string>;
+            public sealed record QueryFind : IQuery<string>;
         }
         namespace Second.PublishedLanguages.DomainOrdering.Requests
         {
             /// <summary>Second duplicate operation.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "second")]
-            public sealed record QueryFind : IResultRequest<string>;
+            public sealed record QueryFind : IQuery<string>;
         }
         """;
 }

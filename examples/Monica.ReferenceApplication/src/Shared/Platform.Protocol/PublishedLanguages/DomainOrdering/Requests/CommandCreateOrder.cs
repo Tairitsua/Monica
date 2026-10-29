@@ -14,4 +14,4 @@ namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 public sealed record CommandCreateOrder(
     string OrderNumber,
     string CustomerName,
-    decimal Total) : IResultRequest<OrderDto>;
+    decimal Total) : ICommand<OrderDto>;

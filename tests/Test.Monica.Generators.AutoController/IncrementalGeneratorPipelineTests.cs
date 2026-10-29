@@ -368,7 +368,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Gets one order without depending on unrelated source.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id:int}")]
-            public sealed record QueryGetOrder(int Id) : IResultRequest<string>;
+            public sealed record QueryGetOrder(int Id) : IQuery<string>;
         }
 
         namespace Scenario.Application
@@ -418,7 +418,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Gets one order from a separately configured assembly.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id:int}")]
-            public sealed record QueryGetConfiguredOrder(int Id) : IResultRequest<string>;
+            public sealed record QueryGetConfiguredOrder(int Id) : IQuery<string>;
         }
 
         namespace Scenario.Application
@@ -447,7 +447,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Loads the exact published order summary from Protocol XML.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-            public sealed record QueryGetPublishedOrder(long Id) : IResultRequest<string>;
+            public sealed record QueryGetPublishedOrder(long Id) : IQuery<string>;
         }
         """;
 
@@ -523,7 +523,7 @@ public sealed class IncrementalGeneratorPipelineTests
             /// <summary>Gets an order in a constructor-only result envelope.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
             public sealed record QueryGetOrder(long Id)
-                : IRequest<global::Scenario.Results.PositionalEnvelope<string>>;
+                : IRequest<global::Scenario.Results.PositionalEnvelope<string>>, global::Monica.Core.Mediator.IQueryRequest;
         }
         """;
 
@@ -538,7 +538,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Uses an invalid scalar API result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/count")]
-            public sealed record QueryCountOrders : IRequest<int>;
+            public sealed record QueryCountOrders : IRequest<int>, global::Monica.Core.Mediator.IQueryRequest;
         }
         """;
 
@@ -556,11 +556,11 @@ public sealed class IncrementalGeneratorPipelineTests
 
         /// <summary>Gets an order by identifier.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "Orders/{Id:int}")]
-        public sealed record QueryGetOrder(int Id) : IResultRequest<string>;
+        public sealed record QueryGetOrder(int Id) : IQuery<string>;
 
         /// <summary>Gets an order by number.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{OrderNumber:int}")]
-        public sealed record QueryFindOrder(int OrderNumber) : IResultRequest<string>;
+        public sealed record QueryFindOrder(int OrderNumber) : IQuery<string>;
 
         public sealed class QueryHandlerGetOrder : ApplicationService<QueryGetOrder, string>
         {
@@ -587,23 +587,23 @@ public sealed class IncrementalGeneratorPipelineTests
 
         /// <summary>Gets an integer order identifier.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id:int}")]
-        public sealed record QueryIntegerOrder(int Id) : IResultRequest<string>;
+        public sealed record QueryIntegerOrder(int Id) : IQuery<string>;
 
         /// <summary>Gets a GUID order identifier.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id:guid}")]
-        public sealed record QueryGuidOrder(Guid Id) : IResultRequest<string>;
+        public sealed record QueryGuidOrder(Guid Id) : IQuery<string>;
 
         /// <summary>Gets an optional order identifier.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id?}")]
-        public sealed record QueryOptionalOrder(int? Id) : IResultRequest<string>;
+        public sealed record QueryOptionalOrder(int? Id) : IQuery<string>;
 
         /// <summary>Gets an order catch-all path.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{*Path}")]
-        public sealed record QueryOrderPath(string Path) : IResultRequest<string>;
+        public sealed record QueryOrderPath(string Path) : IQuery<string>;
 
         /// <summary>Gets an order using a default region.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/region/{Region=global}")]
-        public sealed record QueryOrderRegion(string? Region) : IResultRequest<string>;
+        public sealed record QueryOrderRegion(string? Region) : IQuery<string>;
 
         public sealed class QueryHandlerIntegerOrder : ApplicationService<QueryIntegerOrder, string>
         {
@@ -656,7 +656,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Gets one order through an invalid custom transport.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-            public sealed record QueryGetOrder(long Id) : IResultRequest<string>;
+            public sealed record QueryGetOrder(long Id) : IQuery<string>;
         }
         """;
 
@@ -687,7 +687,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Gets one order through a generic custom transport.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-            public sealed record QueryGetOrder(long Id) : IResultRequest<string>;
+            public sealed record QueryGetOrder(long Id) : IQuery<string>;
         }
         """;
 
@@ -718,7 +718,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             /// <summary>Gets one order through a file-local custom transport.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-            public sealed record QueryGetOrder(long Id) : IResultRequest<string>;
+            public sealed record QueryGetOrder(long Id) : IQuery<string>;
         }
         """;
 }

@@ -49,7 +49,6 @@ public class ModuleApplication : MonicaModule<ModuleApplicationOption>
     {
         context.Services.TryAddScoped<IApplicationCallerContext, ApplicationCallerContext>();
         context.Services.Replace(ServiceDescriptor.Scoped<ILocalApiInvoker, ApplicationLocalApiInvoker>());
-        context.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadOnlyRequestConvention, ApplicationQueryConvention>());
     }
 }
 

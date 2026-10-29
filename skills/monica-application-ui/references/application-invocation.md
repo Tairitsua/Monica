@@ -1,6 +1,6 @@
 # Application Invocation
 
-`ApplicationService` and `IResultRequest` belong to `Monica.Application.Abstractions`. UI and application services consume the same generated `I{Domain}CommandApi` and `I{Domain}QueryApi` contracts from Protocol. Do not introduce a per-page forwarding Facade or another generic business-facing dispatch interface.
+`ApplicationService`, `IQuery<TResponse>` and `ICommand<TResponse>`/`ICommand` belong to `Monica.Application.Abstractions`. UI and application services consume the same generated `I{Domain}CommandApi` and `I{Domain}QueryApi` contracts from Protocol. Do not introduce a per-page forwarding Facade or another generic business-facing dispatch interface.
 
 ## Published contracts and adapters
 

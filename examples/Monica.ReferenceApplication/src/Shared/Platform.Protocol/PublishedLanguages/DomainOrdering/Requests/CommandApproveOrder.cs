@@ -9,4 +9,4 @@ namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 /// </summary>
 /// <param name="OrderId">The order identifier.</param>
 [ApiEndpoint(ApiHttpMethod.Post, "commands/ApproveOrder")]
-public sealed record CommandApproveOrder(Guid OrderId) : IResultRequest<OrderDto>;
+public sealed record CommandApproveOrder(Guid OrderId) : ICommand<OrderDto>;

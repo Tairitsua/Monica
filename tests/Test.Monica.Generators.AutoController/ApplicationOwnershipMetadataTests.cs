@@ -197,7 +197,7 @@ public sealed class ApplicationOwnershipMetadataTests
             {{contractAttribute}}
             namespace Scenario.Local;
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Get, "probe")]
-            public sealed record QueryProbe : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryProbe : Monica.Application.Abstractions.IQuery<int>;
             internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<QueryProbe, int>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(

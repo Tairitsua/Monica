@@ -23,8 +23,8 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - Declare business collaborators in the constructor, preferably a primary constructor, and inject only dependencies the handler uses. Current-user access and ID generation are explicit application dependencies; do not add them to a shared service base or resolve them through `IServiceProvider` / `CachedServiceProvider`.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
-- Make the request implement `IResultRequest<TResponse>` or `IResultRequest`. Generated API method names always remove the request type's `Command` or `Query` prefix; choose the request name accordingly.
-- Published Query requests default to read-only independently of HTTP. Explicit concrete-handler ExecutionTransaction metadata overrides the default. Internal unmarked reads can use ExecutionTransactionMode.None; ordinary writes need no attribute. See the [transaction contract](../../monica-infra-persistence/references/transactions.md).
+- Make the request implement `IQuery<TResponse>` or `ICommand<TResponse>`/`ICommand` according to its intent. Generated API method names always remove the request type's `Command` or `Query` prefix; choose the request name accordingly.
+- Typed Query requests default to no root transaction independently of HTTP, publication and naming. Explicit concrete-handler ExecutionTransaction metadata may request a read-only consistency transaction. Ordinary queries and commands need no transaction attribute; orchestration commands may still select None. See the [transaction contract](../../monica-infra-persistence/references/transactions.md).
 - Keep the handler focused on orchestration. Entities own their invariants; select a DomainService only for a meaningful domain rule with no natural entity owner.
 - Catch exceptions only when you are adding boundary-specific context. Do not smother useful failures.
 - Use `Monica.Application.Abstractions` for application primitives; compose `AddApplication()` for shared execution without HTTP.
@@ -62,7 +62,7 @@ namespace $ApplicationNamespace$.HandlersQuery;
     Description = "Requests the $FeatureName$ use case.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [ProjectUnitRequirement("$RequirementId$")]
-public sealed record Query$FeatureName$(long Id) : IResultRequest<$ResponseName$>;
+public sealed record Query$FeatureName$(long Id) : IQuery<$ResponseName$>;
 
 [ProjectUnitMetadata(
     "$FeatureName$",
@@ -109,7 +109,7 @@ namespace $ApplicationNamespace$.HandlersCommand;
     Description = "Requests the $FeatureName$ use case.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [ProjectUnitRequirement("$RequirementId$")]
-public sealed record Command$FeatureName$(long Id) : IResultRequest;
+public sealed record Command$FeatureName$(long Id) : ICommand;
 
 [ProjectUnitMetadata(
     "$FeatureName$",

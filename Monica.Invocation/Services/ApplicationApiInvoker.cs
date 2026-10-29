@@ -28,7 +28,7 @@ internal sealed class ApplicationApiInvoker(
         CancellationToken cancellationToken = default, ApiTransaction transaction = ApiTransaction.Shared)
         where TResponse : class, IRemoteResultEnvelope<TResponse>
         => ApiTransactionPolicy.ExecuteAsync(services, transaction,
-            () => InvokeCoreAsync(request, endpoint, cancellationToken, transaction));
+            () => InvokeCoreAsync(request, endpoint, cancellationToken, transaction), isReadOnly: request is IQueryRequest);
 
     private async Task<TResponse> InvokeCoreAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,
         CancellationToken cancellationToken, ApiTransaction transaction) where TResponse : class, IRemoteResultEnvelope<TResponse>

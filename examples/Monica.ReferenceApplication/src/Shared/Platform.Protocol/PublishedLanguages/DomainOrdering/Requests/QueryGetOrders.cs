@@ -9,4 +9,4 @@ namespace Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 /// so mediated dispatch opens no automatic write transaction.
 /// </summary>
 [ApiEndpoint(ApiHttpMethod.Post, "queries/GetOrders")]
-public sealed record QueryGetOrders : IResultRequest<IReadOnlyList<OrderDto>>;
+public sealed record QueryGetOrders : IQuery<IReadOnlyList<OrderDto>>;

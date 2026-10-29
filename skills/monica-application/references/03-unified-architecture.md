@@ -171,7 +171,7 @@ Required execution placement remains exceptional:
 ```csharp
 [ApiEndpoint(ApiHttpMethod.Post, "messages/send")]
 [Monica.ApplicationModel.Annotations.RunOnRole(ProductRoles.MessageConnection)]
-public sealed record CommandSendMessage(Guid MessageId) : IResultRequest;
+public sealed record CommandSendMessage(Guid MessageId) : ICommand;
 ```
 
 Use this only when execution needs the role's live resources or ownership, not to force remote calls merely because another artifact omits a handler. Persisting a message can remain ordinary local work while sending over an owned socket requires that role. The request's required role must agree with its handler's owner. The generated client executes such an operation locally only when its implementation is present and its required role is active; otherwise it calls the configured owner. Remote failure never falls back locally. Direct mediator execution does not provide remote routing and cannot bypass a required role.

@@ -135,13 +135,13 @@ public sealed class ApplicationApiGenerationTests
         {
             /// <summary>Reads the order total.</summary>
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Post, "queries/Total")]
-            public sealed record QueryTotal : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryTotal : Monica.Application.Abstractions.IQuery<int>;
         }
         namespace Scenario.PublishedLanguages.DomainUnused.Requests
         {
             /// <summary>An operation owned by another service.</summary>
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Post, "queries/Other")]
-            public sealed record QueryOther : Monica.Application.Abstractions.IResultRequest<int>;
+            public sealed record QueryOther : Monica.Application.Abstractions.IQuery<int>;
         }
         """;
 

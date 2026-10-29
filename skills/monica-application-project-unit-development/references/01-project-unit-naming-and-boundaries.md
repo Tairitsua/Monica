@@ -19,7 +19,7 @@ These conventions mirror the current `Monica.ProjectUnits` naming diagnostics. C
 | `RecurringJob` | Class name starts with `Worker` | `Worker*` |
 | `TriggeredJob` | Class name starts with `Job` | `Job*` |
 | `HostedService` | No native naming diagnostic | `{Purpose}HostedService` for resource lifecycle; `{Purpose}BackgroundService` for a continuous loop |
-| `RequestDto` | Implements `IResultRequest<T>` or `IResultRequest` | Prefer `Command*`, `Query*`, or `Request*` |
+| `RequestDto` | Implements `IQuery<T>` or `ICommand<T>`/`ICommand`; these retain `IResultRequestBase` discovery | Prefer `Command*`, `Query*`, or `Request*` |
 
 Naming checks are disabled until the host enables `ConventionOptions.EnableNameConvention`. A rule inherits the global `NameConventionMode` unless it explicitly overrides that mode; Strict rejects violations and Warning retains a diagnostic. The Options prefix applies to application-authored `[Configuration]` ProjectUnits of both Startup and Managed kinds, not Monica/Microsoft option types. Preserve issued section paths and definition keys when renaming a Managed type; see the [configuration template](16-configuration-template.md).
 

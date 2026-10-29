@@ -30,7 +30,7 @@ The execution adapters choose these defaults:
 
 | Entry point | Default |
 | --- | --- |
-| Mediator handler | `Automatic`; a registered `IReadOnlyRequestConvention` selects `None` for reads, including published Query requests with the application convention, independently of HTTP method |
+| Mediator handler | `IQueryRequest` defaults to `None`; commands and unclassified internal requests default to `Automatic`, independently of HTTP method, endpoint publication or naming |
 | MVC action | `None` for GET, HEAD, and OPTIONS; `Automatic` for other HTTP methods |
 | EventBus handler | `Automatic` |
 | JobScheduler job | `None` |
@@ -73,12 +73,23 @@ var result = await inventoryApi
 | Active transaction; compatible local target | Join the same physical transaction; outermost owner commits | Resolve a fresh scope, handlers and contexts; commit independently |
 | Active transaction; target uses another connection | Reject before target business execution | Execute and commit independently |
 | Active transaction; target is remote | Reject before sending HTTP and mark the caller rollback-only | Receiver owns its operation and commit |
-| Child fails and caller handles the result/exception | Shared transaction remains rollback-only | Caller decides whether to continue; child rolls back |
+| Command fails, Query has an execution fault, or a child throws/cancels | Shared transaction remains rollback-only even when caught | Caller decides whether to continue; the child's transaction rolls back |
+| Query returns a handled business rejection | Caller decides whether to continue; an already failed transaction stays failed | Caller decides whether to continue |
 | Child succeeds and caller later rolls back | Roll back both | Previously committed child changes remain |
 
 An independent query or `None` entry gets a fresh scope without being forced to open a write transaction. `None` does not suspend the caller's transaction and cannot substitute for Independent. For an orchestration with no outer database writes, `None` plus independently transactional child calls avoids holding a parent transaction across those calls. Independent does not supply retries, compensation or durable orchestration. A remote timeout can leave its commit outcome unknown; retain business idempotency and recovery. On the same database, an independent child must not wait for locks held by its awaiting parent.
 
 Role and authority routing still select the destination. `RunOnRole` can remain local when the implementation and required active role are present; it does not always imply HTTP. A shared call with an active transaction that resolves remotely fails even when both hosts use the same database or logical AppId. No transaction is transmitted, no role/authority constraint is bypassed, and Shared never falls back to Independent. Without an active caller transaction, a normal root remote call remains valid.
+
+## Query contracts and failure propagation
+
+Application requests declare `IQuery<TResponse>`/`IQuery` or `ICommand<TResponse>`/`ICommand` from `Monica.Application.Abstractions`. These retain the standard result envelope. A custom `IRequest<TResult>` uses the corresponding `IQueryRequest` or `ICommandRequest` marker from `Monica.Core.Mediator`. A request cannot declare both. Generated endpoints require exactly one intent matching their existing Query/Command name prefix; HTTP verb and name alone no longer establish intent. Rebuild protocols and all consumers together. The old name-based application convention and `IReadOnlyRequestConvention` are removed.
+
+Ordinary queries need no `ExecutionTransaction(None)` attribute. They do not start a root transaction, but a local Shared query joins an active caller transaction and can read writes already flushed on that connection. Do not detach queries automatically: an independent scope cannot observe the caller's uncommitted writes. A query needing consistent multi-statement reads may explicitly select `Automatic`, participants and a provider-supported isolation level. Its root owns transaction completion but does not drain write-side domain events or automatically flush contexts. Query intent forbids business writes regardless of transaction mode; this release does not scan change trackers, parse SQL or enforce a database-level read-only session. Review and test the contract, including direct SQL and external side effects.
+
+For a Query, a returned `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `Conflict`, `PayloadTooLarge` or `UnsupportedMediaType` is a handled client/business rejection: it does not alone mark a shared transaction rollback-only. The caller must inspect the result and decide whether to continue or return failure. `TooManyRequests`, server/dependency failures, undefined statuses and explicit `IExecutionOutcome.ShouldRollback` remain rollback outcomes. Exceptions and cancellation still invalidate shared work. Repository command-failure/cancellation callbacks mark the active transaction before application code can disguise a SQL fault as a business rejection. Once rollback-only, no later Query result clears the flag. Commands retain failure-induced rollback. Explicit transaction scopes can declare `UnitOfWorkScopeOptions.IsReadOnly` for the same Query contract.
+
+This policy is shared by Mediator/execution and API invocation, so direct sends and generated local calls agree. It changes no remote-sharing guarantee: an active Shared transaction still rejects a remote Query before HTTP is sent. Independent remains the explicit choice when separate visibility or a remote/database boundary is acceptable; it does not force a query to open a transaction.
 
 ## Prefer one database unless separation is needed
 
@@ -121,7 +132,7 @@ public Task<Res> Handle(RefreshOrderCache request, CancellationToken cancellatio
 
 Here `RefreshOrderCache` and `cache` are application-owned request and cache abstractions; the command updates only the cache. `None` skips Monica's automatic outer UnitOfWork, including its domain-event drain, flush, and commit. It is useful for:
 
-- A handler that only reads, updates a cache, or calls an external service and has no local database changes to commit.
+- A non-Query handler that updates a cache or calls an external service and has no local database changes to commit. Typed Queries already default to None.
 - An orchestrator such as an import where each item must commit independently and partial success is acceptable. Mark the outer method `None` and call each generated command through `WithTransaction(ApiTransaction.Independent)`. Earlier committed items remain committed when a later item fails.
 
 `None` does not suspend an enclosing transaction or prevent writes. A nested operation in the same scope can still use its caller's transaction. A staged repository change in a standalone `None` operation is not automatically saved; keep ordinary database commands on `Automatic`. Disabling the boundary for performance also removes its consistency and save behavior; measure any benefit against the operation's requirements.
@@ -161,6 +172,6 @@ await unitOfWork.RunAsync(() =>
 
 Supply `UnitOfWorkScopeOptions(DbContextTypes: [typeof(OrdersDbContext)])` when an explicit caller needs context selection. `UnitOfWorkScopeOptions` also supplies isolation and command-timeout settings. A pipeline caller's explicit execution feature takes precedence over the method's context selection.
 
-A nested `RunAsync` joins the active transaction and can select additional compatible participants; it cannot replace isolation or command timeout. Even a caught nested failure leaves the outer operation rollback-only. The manager becomes terminal after completion or failure, so retry or verify committed state in a fresh DI scope. `Current.FlushAsync()` and direct `SaveChangesAsync()` flush changes inside the active transaction; neither commits it. A failed save faults the context. `SaveChanges(false)` and concurrent/recursive saves are unsupported. For durable delivery within this boundary, read [transactional events](transactional-events.md).
+A nested `RunAsync` joins the active transaction and can select additional compatible participants; it cannot replace isolation or command timeout. A caught nested command/execution failure leaves the outer operation rollback-only; declared Query business rejections follow the policy above. The manager becomes terminal after completion or failure, so retry or verify committed state in a fresh DI scope. `Current.FlushAsync()` and direct `SaveChangesAsync()` flush changes inside the active transaction; neither commits it. A failed save faults the context. `SaveChanges(false)` and concurrent/recursive saves are unsupported. For durable delivery within this boundary, read [transactional events](transactional-events.md).
 
 Policy declaration and resolution: `Monica.Core/Execution/ExecutionTransactionAttribute.cs` and `ExecutionDescriptor.cs`. Transaction semantics: `Monica.Repository/UnitOfWork/Services/UnitOfWorkManager.cs` and `Services/Behaviors/UnitOfWorkExecutionBehavior.cs`. `tests/Test.Monica.Repository/UnitOfWork/UnitOfWorkRepositoryCommitTests.cs`, `ExecutionTransactionPolicyTests.cs`, and `SharedTransactionTests.cs` exercise saving, isolation, rollback, and shared connections. `tests/Test.Monica.Application/TransactionBoundaryTests.cs` verifies generated calls, fresh scopes, identity, independent commit, cancellation restoration, and atomic Inbox/business/Outbox effects. `tests/Test.Monica.ApplicationInvocation/ApplicationInvocationTests.cs` verifies role and authority routing before remote dispatch.

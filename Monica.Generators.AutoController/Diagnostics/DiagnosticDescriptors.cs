@@ -6,6 +6,11 @@ internal static class DiagnosticDescriptors
 {
     private const string CATEGORY = "RequestOwnedWebApi";
 
+    public static readonly DiagnosticDescriptor InvalidRequestIntent = Create(
+        "AC1028",
+        "Endpoint request intent is missing or inconsistent",
+        "Endpoint request '{0}' must declare exactly one Query or Command contract matching its name. Use IQuery<T>/ICommand<T>/ICommand, or IQueryRequest/ICommandRequest with a custom IRequest<TResult>.");
+
     public static readonly DiagnosticDescriptor LegacyHandlerAttribute = Create(
         "AC1002",
         "Handler contains endpoint metadata",

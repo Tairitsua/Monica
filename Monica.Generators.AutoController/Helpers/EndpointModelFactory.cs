@@ -114,6 +114,11 @@ internal static class EndpointModelFactory
                 resultContractCount);
         }
 
+        var isQuery = HasRequestMarker(request, "IQueryRequest");
+        var isCommand = HasRequestMarker(request, "ICommandRequest");
+        if (isQuery == isCommand || isQuery != (requestKind == "Query"))
+            return Failure(DiagnosticDescriptors.InvalidRequestIntent, location, requestDisplayName);
+
         if (!TryReadEndpointAttribute(
                 endpointAttribute,
                 out var method,
@@ -324,6 +329,10 @@ internal static class EndpointModelFactory
 
         return null;
     }
+
+    private static bool HasRequestMarker(INamedTypeSymbol request, string marker)
+        => request.AllInterfaces.Any(contract => contract.Name == marker
+            && contract.ContainingNamespace.ToDisplayString() == "Monica.Core.Mediator");
 
     private static bool TryReadEndpointAttribute(
         AttributeData attribute,

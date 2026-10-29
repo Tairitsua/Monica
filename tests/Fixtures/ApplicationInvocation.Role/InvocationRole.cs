@@ -14,12 +14,12 @@ namespace ApplicationInvocation.Fixtures;
 
 /// <summary>Reads ordinary state without requiring its ingress role to be active.</summary>
 [ApiEndpoint(ApiHttpMethod.Post, "invocation/ordinary")]
-public sealed record QueryOrdinary(string Name) : IResultRequest<int>;
+public sealed record QueryOrdinary(string Name) : IQuery<int>;
 
 /// <summary>Executes an operation requiring its role's runtime ownership.</summary>
 [ApiEndpoint(ApiHttpMethod.Post, "invocation/constrained")]
 [RunOnRole("ordering.invocation")]
-public sealed record CommandConstrained(int Value) : IResultRequest<int>;
+public sealed record CommandConstrained(int Value) : ICommand<int>;
 
 public sealed class InvocationLedger : ISingletonDependency
 {

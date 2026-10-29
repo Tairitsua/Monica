@@ -41,6 +41,29 @@ public sealed class ApplicationInvocationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Query_WhenAuthorityRoutesRemotelyWithActiveTransaction_ShouldRequireIndependent(bool independent)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var host = await new InvocationApplicationFactory(authority: true, transactions: true)
+            .CreateAsync(cancellationToken: token);
+        PrepareCaller(host);
+        host.Services.GetRequiredService<AuthorityChoice>().Destination = new ApplicationInvocationDestination("remote", "primary");
+        await using var scope = host.CreateScope(token);
+        var operation = () => scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
+        {
+            var result = await scope.Resolve<IApplicationApiInvoker>().InvokeAsync(new QueryOrdinary("query"), OrdinaryEndpoint, token,
+                independent ? ApiTransaction.Independent : ApiTransaction.Shared);
+            Assert.Equal(ResStatus.Ok, result.Status);
+        }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token);
+        if (independent) await operation();
+        else Assert.Contains("Independent", (await Assert.ThrowsAsync<InvalidOperationException>(operation)).Message);
+        Assert.Equal(independent ? 1 : 0, host.Services.GetRequiredService<RecordingTransport>().Calls.Count);
+        Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().OrdinaryCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Shared_WhenRoleOrAuthorityRoutesRemotely_ShouldRejectBeforeSendingEvenWhenCaught(bool authority)
     {
         var token = TestContext.Current.CancellationToken;
@@ -445,7 +468,7 @@ public sealed class ApplicationInvocationTests
     }
 }
 
-public sealed record QueryRemoteOnly(int Value) : IResultRequest<int>;
+public sealed record QueryRemoteOnly(int Value) : IQuery<int>;
 
 public sealed class RemoteOnlyInvocationManifest : IApplicationManifest
 {

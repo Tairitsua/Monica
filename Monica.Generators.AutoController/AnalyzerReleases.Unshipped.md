@@ -31,4 +31,5 @@ AC1024 | RequestOwnedWebApi | Error | Application role refers to an undefined do
 AC1025 | RequestOwnedWebApi | Error | Request execution requirement conflicts with its handler role
 AC1026 | RequestOwnedWebApi | Error | Generated application API contains a request without an owned handler
 AC1027 | RequestOwnedWebApi | Error | Missing, stale, or inconsistent application ownership catalog metadata
+AC1028 | RequestOwnedWebApi | Error | Missing or conflicting Query/Command request intent
 AC1099 | RequestOwnedWebApi | Error | Request-owned API generation failed

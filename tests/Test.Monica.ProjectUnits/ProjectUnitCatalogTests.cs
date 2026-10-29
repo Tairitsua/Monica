@@ -637,7 +637,7 @@ public sealed class ProjectUnitCatalogTests
         public Task HandleEventAsync(EventChanged<int> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    public sealed class QueryDownload : IRequest<byte[]>;
+    public sealed class QueryDownload : IRequest<byte[]>, global::Monica.Core.Mediator.IQueryRequest;
 
     public sealed class QueryHandlerDownload : CustomApplicationService<QueryDownload, byte[]>
     {

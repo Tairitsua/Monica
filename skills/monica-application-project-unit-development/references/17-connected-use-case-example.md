@@ -27,7 +27,7 @@ namespace Domains.Ordering.Application.HandlersCommand
     [ProjectUnitMetadata("Approve Order Command",
         Description = "Requests approval of an existing order.", Tags = ["ordering", "approval"])]
     [ProjectUnitRequirement("$RequirementId$")]
-    public sealed record CommandApproveOrder(long Id) : IResultRequest;
+    public sealed record CommandApproveOrder(long Id) : ICommand;
 
     [ProjectUnitMetadata("Approve Order",
         Description = "Loads the order and coordinates its approval transition.", Tags = ["ordering", "approval"])]
@@ -50,7 +50,7 @@ namespace Domains.Ordering.Application.HandlersQuery
     [ProjectUnitMetadata("Order Summary Query",
         Description = "Requests an order summary without persistence internals.", Tags = ["ordering", "approval"])]
     [ProjectUnitRequirement("$RequirementId$")]
-    public sealed record QueryGetOrder(long Id) : IResultRequest<OrderSummary>;
+    public sealed record QueryGetOrder(long Id) : IQuery<OrderSummary>;
 
     [ProjectUnitMetadata("Get Order Summary",
         Description = "Returns a materialized order summary from its owning repository.", Tags = ["ordering", "approval"])]
