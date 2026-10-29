@@ -108,10 +108,13 @@ public sealed class TableLayoutTests
     [Fact]
     public void CompiledModel_WhenImplicitLayoutDiffers_ShouldRejectBeforeUsingIt()
     {
-        using var context = new CompiledContext(new DbContextOptionsBuilder<CompiledContext>()
-            .UseNpgsql("Host=localhost;Database=unused")
-            .UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra")).Options);
-        Assert.Throws<InvalidOperationException>(() => context.Model);
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var context = new CompiledContext(new DbContextOptionsBuilder<CompiledContext>()
+                .UseNpgsql("Host=localhost;Database=unused")
+                .UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra")).Options);
+            _ = context.Model;
+        });
     }
 
     [Fact]
