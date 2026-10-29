@@ -12,12 +12,15 @@ namespace Test.Monica.Framework.ChainTracing;
 
 public sealed class ChainTracingExecutionBehaviorTests
 {
-    [Fact]
-    public async Task ExecuteAsync_WhenResultIsSuccessfulEnvelope_ShouldCompleteSuccessfulTrace()
+    [Theory]
+    [InlineData(ResStatus.Ok)]
+    [InlineData(ResStatus.Created)]
+    public async Task ExecuteAsync_WhenResultIsSuccessfulEnvelope_ShouldCompleteSuccessfulTrace(ResStatus status)
     {
         var tracing = new TrackingChainTracing();
         var behavior = new ChainTracingExecutionBehavior<string, Res<string>>(tracing);
         var expected = Res.Ok<string>("payload");
+        expected.Status = status;
         expected.Message = "done";
 
         var result = await behavior.ExecuteAsync(
@@ -28,7 +31,7 @@ public sealed class ChainTracingExecutionBehaviorTests
         tracing.BeginCount.Should().Be(1);
         tracing.EndCount.Should().Be(1);
         tracing.EndSuccess.Should().BeTrue();
-        tracing.EndResult.Should().Contain("String(Ok)");
+        tracing.EndResult.Should().Contain($"String({status})");
         tracing.EndResult.Should().Contain("[done]");
         tracing.EndException.Should().BeNull();
     }
@@ -68,7 +71,7 @@ public sealed class ChainTracingExecutionBehaviorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenResultIsNotEnvelope_ShouldBypassTracing()
+    public async Task ExecuteAsync_WhenResultIsNotEnvelope_ShouldCompleteSuccessfulTrace()
     {
         var tracing = new TrackingChainTracing();
         var behavior = new ChainTracingExecutionBehavior<string, string>(tracing);
@@ -78,8 +81,41 @@ public sealed class ChainTracingExecutionBehaviorTests
             () => Task.FromResult("result"));
 
         result.Should().Be("result");
-        tracing.BeginCount.Should().Be(0);
-        tracing.EndCount.Should().Be(0);
+        tracing.BeginCount.Should().Be(1);
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenOutcomeRequestsRollback_ShouldCompleteFailedTrace()
+    {
+        var tracing = new TrackingChainTracing();
+        var behavior = new ChainTracingExecutionBehavior<string, FailedOutcome>(tracing);
+
+        await behavior.ExecuteAsync(
+            CreateContext<LocalComponent, FailedOutcome>(),
+            () => Task.FromResult(new FailedOutcome()));
+
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCanceled_ShouldRetainCancellationAndRethrow()
+    {
+        var tracing = new TrackingChainTracing();
+        var behavior = new ChainTracingExecutionBehavior<string, ExecutionUnit>(tracing);
+        var expected = new OperationCanceledException("canceled");
+
+        var action = () => behavior.ExecuteAsync(
+            CreateContext<LocalComponent, ExecutionUnit>(),
+            () => Task.FromException<ExecutionUnit>(expected));
+
+        (await action.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(expected);
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeFalse();
+        tracing.EndException.Should().BeSameAs(expected);
+        tracing.EndResult.Should().Contain("canceled");
     }
 
     [Fact]
@@ -196,6 +232,11 @@ public sealed class ChainTracingExecutionBehaviorTests
         public void Execute()
         {
         }
+    }
+
+    private sealed class FailedOutcome : IExecutionOutcome
+    {
+        public bool ShouldRollback => true;
     }
 
     private sealed class RemoteComponent : IApplicationApi

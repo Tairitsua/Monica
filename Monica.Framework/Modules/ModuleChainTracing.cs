@@ -7,7 +7,6 @@ using Monica.Core.Execution;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
-using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Providers.AspNetCore;
 using Monica.Framework.ChainTracing.Providers.Execution;
@@ -56,7 +55,9 @@ public class ModuleChainTracing : MonicaModule<ModuleChainTracingOption>, IWebMo
 public static class ModuleChainTracingRegistrationExtensions
 {
     /// <summary>
-    /// Traces business operations executed through Monica's execution pipeline.
+    /// Traces all business operations executed through Monica's execution pipeline, including Task-based
+    /// event handlers and jobs. An execution creates and completes its own chain when none is inherited.
+    /// This integration does not persist background chains or attach HTTP response metadata.
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseExecutionTracing(
         this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
@@ -65,9 +66,7 @@ public static class ModuleChainTracingRegistrationExtensions
             .AddBehavior(
                 typeof(ChainTracingExecutionBehavior<,>),
                 ExecutionBehaviorOrder.Diagnostics,
-                static descriptor =>
-                    descriptor.IsBusinessOperation
-                    && typeof(IResultEnvelope).IsAssignableFrom(descriptor.ResultType));
+                static descriptor => descriptor.IsBusinessOperation);
         return module;
     }
 
@@ -104,7 +103,9 @@ public static class ModuleChainTracingRegistrationExtensions
     }
 
     /// <summary>
-    /// Enables EF Core command tracing support.
+    /// Registers a scoped EF Core command interceptor. Attach it to the application's DbContext options
+    /// to capture SQL beneath an active controller, execution, or explicit chain scope. Commands without
+    /// an active parent are skipped; this integration never creates a chain root.
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseDatabaseTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {

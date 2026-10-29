@@ -121,6 +121,72 @@ public sealed class ChainTracingDbCommandInterceptorTests
             .Which.Message.Should().Be("batch 2 failed", "aggregating a later failure must retain its diagnostic cause");
     }
 
+    [Fact]
+    public async Task Completion_InAnotherAsyncContext_ShouldCompleteTheCapturedNode()
+    {
+        var tracing = CreateTracing();
+        var interceptor = CreateInterceptor(tracing);
+        using var command = CreateCommand("SELECT 42");
+
+        var chain = await Task.Run(() =>
+        {
+            using var parent = tracing.BeginScope("Origin", "Handler");
+            Executing(interceptor, command);
+            return tracing.GetCurrentChain()!;
+        }, TestContext.Current.CancellationToken);
+
+        tracing.GetCurrentChain().Should().BeNull();
+        Executed(interceptor, command);
+        Executed(interceptor, command); // A duplicate terminal callback must not count as another execution.
+
+        var node = chain.Root!.Children!.Should().ContainSingle().Subject;
+        node.EndTime.Should().NotBeNull();
+        node.Result.Should().Contain("Success");
+        node.RepeatCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RepeatedCommands_CompletingOutOfOrder_ShouldPreserveFailureAndCount()
+    {
+        var tracing = CreateTracing();
+        var interceptor = CreateInterceptor(tracing);
+        using var parent = tracing.BeginScope("Parallel batch", "Handler");
+        using var first = CreateCommand("INSERT INTO Flight (A) VALUES (@p0)");
+        using var second = CreateCommand(first.CommandText);
+        Executing(interceptor, first);
+        Executing(interceptor, second);
+        var exception = new InvalidOperationException("second command failed first");
+        interceptor.CommandFailed(second, new CommandErrorEventData(
+            null!, null!, null!, second, "test", null, DbCommandMethod.ExecuteNonQuery,
+            Guid.NewGuid(), Guid.NewGuid(), exception, false, true, DateTimeOffset.UtcNow,
+            TimeSpan.FromMilliseconds(5), CommandSource.LinqQuery));
+
+        Executed(interceptor, first);
+
+        var node = DatabaseChildrenOf(tracing).Should().ContainSingle().Subject;
+        node.RepeatCount.Should().Be(1);
+        node.IsFailed.Should().BeTrue();
+        node.Exception.Should().BeSameAs(exception);
+    }
+
+    [Fact]
+    public void Commands_WithSameLongPrefix_ShouldKeepSeparateNodes()
+    {
+        var tracing = CreateTracing();
+        var interceptor = CreateInterceptor(tracing);
+        using var parent = tracing.BeginScope("Queries", "Handler");
+        var prefix = "SELECT " + new string(' ', 200);
+        using var first = CreateCommand(prefix + "1");
+        using var second = CreateCommand(prefix + "2");
+
+        Executing(interceptor, first);
+        Executed(interceptor, first);
+        Executing(interceptor, second);
+        Executed(interceptor, second);
+
+        DatabaseChildrenOf(tracing).Should().HaveCount(2);
+    }
+
     private static List<ChainTraceNode> DatabaseChildrenOf(IChainTracing tracing)
     {
         var parent = tracing.GetCurrentNode()!;

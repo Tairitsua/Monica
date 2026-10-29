@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Data;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Monica.Framework.ChainTracing.Abstractions;
@@ -9,9 +11,10 @@ using Monica.Tool.Extensions;
 namespace Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
 
 /// <summary>
-/// Records EF Core command execution inside the current chain-tracing context. All command kinds
-/// (reader, non-query, scalar) and all terminal paths (executed, failed, canceled) are paired so the
-/// command-to-trace map never leaks entries. Repeated commands with the same shape inside one ambient
+/// Records EF Core commands beneath an active chain-tracing scope; commands without a parent are skipped.
+/// Completion belongs to the node captured at command start, independently of the callback's async context.
+/// All command kinds (reader, non-query, scalar) and terminal paths (executed, failed, canceled) are paired
+/// to release command tracking on completion. Repeated commands with the same shape inside one ambient
 /// scope aggregate onto a single node (with a repeat count), so batch writers inserting tens of
 /// thousands of rows cannot balloon the chain or the diagnostic response.
 /// </summary>
@@ -21,78 +24,67 @@ public class ChainTracingDbCommandInterceptor(
     IChainTracing chainTracing,
     ILogger<ChainTracingDbCommandInterceptor> logger) : DbCommandInterceptor
 {
-    private const int SHAPE_KEY_LENGTH = 200;
+    private readonly ConcurrentDictionary<DbCommand, ChainTraceNode> _commandTraces = new(ReferenceEqualityComparer.Instance);
+    private readonly ConditionalWeakTable<ChainTraceNode, Dictionary<(CommandType Type, string Text), ChainTraceNode>> _scopeTraces = new();
 
-    private readonly ConcurrentDictionary<object, string> _commandTraceMap = new();
-    private readonly ConcurrentDictionary<string, string> _shapeTraceIds = new();
-    private readonly ConcurrentDictionary<object, byte> _aggregatedCommands = new();
-
-    private string StartCommandTrace(DbCommand command)
+    private void StartCommandTrace(DbCommand command)
     {
         try
         {
-            // Batch writers repeat the same command shape many times (EF batches roughly 42 rows per
-            // INSERT); aggregate repeats onto the first node, keyed by the ambient scope so the same
-            // query issued by different handlers keeps its own node.
-            var shapeKey = command.CommandText.Length <= SHAPE_KEY_LENGTH
-                ? command.CommandText
-                : command.CommandText[..SHAPE_KEY_LENGTH];
-            var scopeKey = $"{chainTracing.GetCurrentNode()?.TraceId ?? "root"}|{shapeKey}";
-
-            if (_shapeTraceIds.TryGetValue(scopeKey, out var aggregatedTraceId))
+            // EF may invoke start and completion in separate async contexts. An interceptor cannot
+            // create an ambient root for its caller; the controller or business execution owns it.
+            if (chainTracing.GetCurrentChain() is not { EndTime: null } context
+                || chainTracing.GetCurrentNode() is not { EndTime: null } parent)
             {
-                _aggregatedCommands[command] = 0;
-                _commandTraceMap[command] = aggregatedTraceId;
-                return aggregatedTraceId;
+                return;
             }
 
-            var extraInfo = new
+            // Weak ownership prevents a reused interceptor from retaining completed chains. Use the
+            // entire command text so unrelated commands with a common prefix never share a node.
+            var shapes = _scopeTraces.GetValue(parent, static _ => new());
+            lock (shapes)
             {
-                command.CommandTimeout,
-                ParameterCount = command.Parameters.Count,
-                Parameters = command.Parameters.Cast<DbParameter>()
-                    .Take(10)
-                    .Select(p => new
+                var shape = (command.CommandType, command.CommandText);
+                if (!shapes.TryGetValue(shape, out var node))
+                {
+                    var extraInfo = new
                     {
-                        Name = p.ParameterName,
-                        DbType = p.DbType.ToString(),
-                        Value = p.Value?.ToString()?.LimitMaxLength(100, "...")
-                    })
-                    .ToArray()
-            };
+                        command.CommandTimeout,
+                        ParameterCount = command.Parameters.Count,
+                        Parameters = command.Parameters.Cast<DbParameter>()
+                            .Take(10)
+                            .Select(p => new
+                            {
+                                Name = p.ParameterName,
+                                DbType = p.DbType.ToString(),
+                                Value = p.Value?.ToString()?.LimitMaxLength(100, "...")
+                            })
+                            .ToArray()
+                    };
 
-            var traceId = chainTracing.BeginTrace(
-                command.CommandText.LimitMaxLength(1000, "..."),
-                null,
-                extraInfo,
-                EChainTracingType.Database);
+                    var traceId = chainTracing.BeginTrace(
+                        command.CommandText.LimitMaxLength(1000, "..."),
+                        null,
+                        extraInfo,
+                        EChainTracingType.Database);
 
-            _shapeTraceIds[scopeKey] = traceId;
-            _commandTraceMap[command] = traceId;
-            return traceId;
+                    // Capture limits return synthetic identifiers without allocating a node.
+                    if (!context.NodeMap.TryGetValue(traceId, out node)) return;
+                    shapes.Add(shape, node);
+                }
+
+                _commandTraces[command] = node;
+            }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to record the start of a database command trace.");
-            return string.Empty;
         }
     }
 
     private void Complete(DbCommand command, CommandEventData eventData, object? result = null, bool isCanceled = false)
     {
-        if (!_commandTraceMap.TryRemove(command, out var traceId))
-        {
-            return;
-        }
-
-        var aggregated = _aggregatedCommands.TryRemove(command, out _);
-        FinishCommandTrace(traceId, eventData, result, isCanceled, aggregated);
-    }
-
-    private void FinishCommandTrace(string traceId, CommandEventData eventData, object? result = null,
-        bool isCanceled = false, bool aggregated = false)
-    {
-        if (string.IsNullOrEmpty(traceId))
+        if (!_commandTraces.TryRemove(command, out var node))
         {
             return;
         }
@@ -130,39 +122,25 @@ public class ChainTracingDbCommandInterceptor(
                 resultDescription = "Unknown";
             }
 
-            if (aggregated)
+            // Database nodes never occupy the ambient scope. Complete the captured leaf directly,
+            // including repeats that finish out of order, without moving any caller's current node.
+            lock (node)
             {
-                AggregateRepeat(traceId, success, resultDescription, exception);
-            }
-            else
-            {
-                chainTracing.EndTrace(traceId, resultDescription, success, exception);
+                var endTime = DateTime.UtcNow;
+                if (node.EndTime.HasValue) node.AddRepeat(!success, endTime);
+                else node.EndTime = endTime;
+
+                if (!success) node.IsFailed = true;
+                node.Exception ??= exception;
+                node.Result = node.RepeatCount > 0
+                    ? $"{resultDescription} ×{node.RepeatCount + 1}"
+                    : resultDescription;
             }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to record the end of a database command trace.");
         }
-    }
-
-    /// <summary>
-    /// Folds a repeated command onto its aggregated node: the repeat count grows, the node window
-    /// extends to this execution's completion, and the result description carries the latest execution.
-    /// </summary>
-    /// <param name="traceId">The aggregated node's trace identifier.</param>
-    /// <param name="success">Whether the repeated execution succeeded.</param>
-    /// <param name="resultDescription">The repeated execution's result description.</param>
-    /// <param name="exception">The repeated execution's failure, when present.</param>
-    private void AggregateRepeat(string traceId, bool success, string resultDescription, Exception? exception)
-    {
-        if (chainTracing.GetCurrentChain()?.NodeMap.TryGetValue(traceId, out var node) is not true || node is null)
-        {
-            return;
-        }
-
-        node.AddRepeat(!success, DateTime.UtcNow);
-        node.Exception ??= exception;
-        node.Result = $"{resultDescription} ×{node.RepeatCount + 1}";
     }
 
     public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
