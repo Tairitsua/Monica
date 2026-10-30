@@ -22,7 +22,7 @@ namespace Monica.JobScheduler.Facades;
 /// The facade never reconstructs scheduler state from events or caches. Every operation delegates to the unified
 /// scheduler store, which owns admission, definition, policy, execution, lease, and cancellation atomicity.
 /// </remarks>
-public sealed class JobSchedulerFacade(
+public sealed partial class JobSchedulerFacade(
     IJobSchedulerStore store,
     IOptions<ModuleJobSchedulerOption> options,
     TimeProvider timeProvider,

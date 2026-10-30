@@ -1,0 +1,100 @@
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<JobSchedulerResource> L
+@implements IAsyncDisposable
+
+<MudDialog DefaultFocus="DefaultFocus.None">
+    <TitleContent><h2 class="cleanup-dialog-title">@L["Cleanup:Preview"]</h2></TitleContent>
+    <DialogContent>
+        <div class="cleanup-dialog">
+            @if (_plan is { } plan)
+            {
+                <p>@L["Cleanup:PreviewSummary", plan.Items.Count, plan.Eligible.Count, plan.Items.Count - plan.Eligible.Count]</p>
+                <MoFactGrid Facts="@(new MoFact[] { new(L["Cleanup:WillRemove"], plan.Eligible.Count.ToString()), new(L["Cleanup:WillCancel"], plan.QueuedCount.ToString()), new(L["Cleanup:History"], plan.HistoryCount.ToString()) })" />
+                <ul class="cleanup-plan-list">
+                    @foreach (var item in plan.Items)
+                    {
+                        <li><div><b>@(item.Definition?.Declaration.JobName ?? item.Id.JobKey)</b><code>@item.Id.OwnerKey / @item.Id.JobKey</code></div><MoValueMark Role="@DefinitionCleanupPresentation.Role(item.State)">@(item.CanRemove(plan.CancelQueued) ? L["Cleanup:WillRemove"] : DefinitionCleanupPresentation.Label(L, item.State))</MoValueMark></li>
+                    }
+                </ul>
+                <MudCheckBox T="bool" Value="@_cancelQueued" ValueChanged="QueueChoiceAsync" Disabled="@_busy" Label="@L["Cleanup:CancelQueued"]" />
+                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Cleanup:Consequences"]">@L["Cleanup:ConsequenceBody"]</MoSemanticCallout>
+                @if (!plan.WithinCancellationLimit) { <MudAlert Severity="Severity.Warning" Icon="@MoIcons.Warning">@L["Cleanup:CancellationLimit", JobDefinitionCleanupRequest.MAX_QUEUED_CANCELLATIONS]</MudAlert> }
+                <MudCheckBox T="bool" @bind-Value="_acknowledged" Disabled="@_busy" Label="@L["Cleanup:Acknowledge"]" />
+            }
+            @if (_busy) { <MudProgressLinear Indeterminate="true" aria-label="@L["Cleanup:Loading"]" /> }
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <SchedulerDecisionBackButton Disabled="@_busy" OnClick="Back" />
+        @if (_needsRebuild) { <MudButton Color="Color.Primary" Disabled="@_busy" OnClick="RebuildAsync">@L["Cleanup:Rebuild"]</MudButton> }
+        <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@MoIcons.Delete" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">@L["Cleanup:ConfirmRemoval", _plan?.Eligible.Count ?? 0]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>Gets the exact selection frozen before dialog admission.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobId> Ids { get; set; } = [];
+    /// <summary>Gets the authorized, route-owned preview producer. It must drain when its route retires.</summary>
+    [Parameter, EditorRequired] public Func<IReadOnlyList<JobId>, bool, Task<JobDefinitionCleanupPlan?>> Preview { get; set; } = null!;
+    /// <summary>Gets the authorized producer that atomically rechecks the accepted preview.</summary>
+    [Parameter, EditorRequired] public Func<JobDefinitionCleanupPlan, Task<JobDefinitionMaintenanceResult?>> Apply { get; set; } = null!;
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = null!;
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private JobId[] _ids = [];
+    private JobDefinitionCleanupPlan? _plan;
+    private bool _busy, _cancelQueued, _acknowledged, _needsRebuild;
+    private string? _error;
+    private bool CanConfirm => !_busy && !_needsRebuild && _acknowledged && _plan is { WithinCancellationLimit: true } plan && plan.Eligible.Count > 0;
+
+    protected override async Task OnInitializedAsync() { _ids = Ids.ToArray(); await RebuildAsync(); }
+    private Task QueueChoiceAsync(bool value) { _cancelQueued = value; return RebuildAsync(); }
+    private Task RebuildAsync() => RunAsync(async () =>
+    {
+        var plan = await Preview(_ids, _cancelQueued);
+        _lifetime.TryApply(() =>
+        {
+            _plan = plan; _acknowledged = false; _needsRebuild = plan is null;
+            _error = plan is null ? L["Cleanup:Unavailable"].Value : null;
+        });
+    });
+    private Task ConfirmAsync()
+    {
+        if (!CanConfirm || _plan is not { } exact) return Task.CompletedTask;
+        return RunAsync(async () =>
+        {
+            var result = await Apply(exact);
+            if (_lifetime.IsRetired) return;
+            if (result?.Status == JobDefinitionMaintenanceStatus.Applied) Dialog.Close(DialogResult.Ok(result));
+            else _lifetime.TryApply(() =>
+            {
+                _acknowledged = false; _needsRebuild = true;
+                if (result is null) _plan = null;
+                _error = result?.Status == JobDefinitionMaintenanceStatus.Changed ? L["Cleanup:Changed"]
+                    : result?.Status == JobDefinitionMaintenanceStatus.Blocked ? L["Cleanup:Blocked"] : L["Cleanup:Unavailable"];
+            });
+        });
+    }
+    private async Task RunAsync(Func<Task> operation)
+    {
+        if (_busy || _lifetime.IsRetired) return;
+        _busy = true;
+        try
+        {
+            await _lifetime.RunAsync(async _ =>
+            {
+                await Dialog.SetOptionsAsync(Dialog.Options with { CloseOnEscapeKey = false });
+                await operation();
+                if (!_lifetime.IsRetired) await Dialog.SetOptionsAsync(Dialog.Options with { CloseOnEscapeKey = true });
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        finally { _lifetime.TryApply(() => _busy = false); }
+    }
+    private void Back() { if (!_busy) Dialog.Cancel(); }
+    /// <summary>Drains preview and apply producers before native dialog resources are released.</summary>
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(static () => { });
+}

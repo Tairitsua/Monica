@@ -24,6 +24,9 @@ public sealed record JobDefinition
     /// </summary>
     public bool IsPresent { get; init; }
 
+    /// <summary>Gets when the definition last became absent. Null means present or legacy transition metadata is unavailable.</summary>
+    public DateTimeOffset? AbsentSinceUtc { get; init; }
+
     /// <summary>
     /// Gets when the owner's coordinator last confirmed its manifest in UTC. Stale observation indicates missing
     /// publication evidence, not proven process failure, and never blocks lease recovery by itself.

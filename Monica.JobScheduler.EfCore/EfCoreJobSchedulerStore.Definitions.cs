@@ -23,6 +23,8 @@ public sealed partial class EfCoreJobSchedulerStore
         return WriteAsync(async (dbContext, token) =>
         {
             var owner = await LockOwnerAsync(dbContext, normalized.SchedulerScopeKey, normalized.OwnerKey, token);
+            if (owner?.RetiredAtUtcTicks is not null)
+                throw new InvalidOperationException($"Owner '{normalized.OwnerKey}' is retired and cannot publish definitions.");
             var now = await GetUtcNowAsync(dbContext, token);
             var manifestHash = normalized.ComputeManifestHash();
             if (owner is not null && owner.ManifestHash != manifestHash
@@ -89,6 +91,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 {
                     markedAbsent++;
                     entity.IsPresent = false;
+                    entity.AbsentSinceUtcTicks = ToTicks(now);
                     entity.LastObservedAtUtcTicks = ToTicks(now);
                 }
                 if (existingCursors.Remove(entity.JobKey, out var cursor))
@@ -126,6 +129,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 // Declaration fields follow the code; operator policy is sticky and never overwritten by a sync.
                 entity.DeclarationJson = Serialize(declaration);
                 entity.IsPresent = true;
+                entity.AbsentSinceUtcTicks = null;
                 entity.LastObservedAtUtcTicks = ToTicks(now);
                 if (declaration.JobType != JobType.Recurring
                     && existingCursors.Remove(declaration.JobKey, out var cursor))
@@ -359,6 +363,7 @@ public sealed partial class EfCoreJobSchedulerStore
         Declaration = declaration,
         Policy = ToPolicy(entity),
         IsPresent = entity.IsPresent,
+        AbsentSinceUtc = FromTicks(entity.AbsentSinceUtcTicks),
         LastObservedAtUtc = FromTicks(entity.LastObservedAtUtcTicks)
     };
 

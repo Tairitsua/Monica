@@ -7,4 +7,5 @@ internal sealed class JobSchedulerOwnerEntity
     public string ManifestHash { get; set; } = null!;
     public long ManifestPublishedAtUtcTicks { get; set; }
     public long LastObservedAtUtcTicks { get; set; }
+    public long? RetiredAtUtcTicks { get; set; }
 }

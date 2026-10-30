@@ -101,6 +101,7 @@ internal sealed class ExecutionStateTestBoundary
 
     internal sealed class ControlledAccess : IJobSchedulerUiAccess
     {
+        public Task<bool> IsDefinitionMaintenanceAuthorizedAsync(CancellationToken cancellationToken = default) => IsAuthorizedAsync(cancellationToken);
         private int _calls;
         internal bool Authorized { get; set; } = true;
         internal Func<CancellationToken, Task<bool>>? Authorize { get; set; }

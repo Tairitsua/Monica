@@ -374,6 +374,8 @@ public sealed partial class InMemoryJobSchedulerStore
 
         lock (_gate)
         {
+            if (_retiredOwners.ContainsKey((request.SchedulerScopeKey, request.OwnerKey)))
+                return Task.FromResult<IReadOnlyList<JobExecutionLease>>([]);
             if (request.OwnerManifestHash is { } expectedManifest
                 && (!_owners.TryGetValue((request.SchedulerScopeKey, request.OwnerKey), out var owner)
                     || owner.Hash != expectedManifest))

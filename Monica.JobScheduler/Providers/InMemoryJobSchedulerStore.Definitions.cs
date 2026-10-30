@@ -27,6 +27,8 @@ public sealed partial class InMemoryJobSchedulerStore
             ValidateCoordinatorLeaseUnsafe(normalized.CoordinatorLease);
             var now = UtcNow;
             var identity = (normalized.SchedulerScopeKey, normalized.OwnerKey);
+            if (_retiredOwners.ContainsKey(identity))
+                throw new InvalidOperationException($"Owner '{normalized.OwnerKey}' is retired and cannot publish definitions.");
             var manifestHash = normalized.ComputeManifestHash();
             var hasOwner = _owners.TryGetValue(identity, out var owner);
             if (hasOwner && owner.Hash != manifestHash && owner.Hash != normalized.ExpectedPreviousManifestHash)
@@ -56,7 +58,11 @@ public sealed partial class InMemoryJobSchedulerStore
             foreach (var existing in existingDefinitions.Where(definition =>
                          !presentKeys.Contains(definition.Declaration.JobKey)))
             {
-                _definitions[DefinitionKeyOf(existing)] = existing with { IsPresent = false, LastObservedAtUtc = now };
+                _definitions[DefinitionKeyOf(existing)] = existing with
+                {
+                    IsPresent = false, LastObservedAtUtc = now,
+                    AbsentSinceUtc = existing.IsPresent ? now : existing.AbsentSinceUtc
+                };
                 _recurringCursors.Remove(DefinitionKeyOf(existing));
                 if (existing.IsPresent)
                 {
@@ -74,6 +80,7 @@ public sealed partial class InMemoryJobSchedulerStore
                     {
                         Declaration = declaration,
                         IsPresent = true,
+                        AbsentSinceUtc = null,
                         LastObservedAtUtc = now
                     };
                     _definitions[key] = updated;

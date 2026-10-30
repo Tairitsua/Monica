@@ -107,6 +107,7 @@ public interface IJobExecutionStore
     /// </summary>
     /// <remarks>
     /// Only queued executions whose owner matches the request and whose job key is locally executable are claimable.
+    /// A durably retired owner cannot claim queued work, including requests without a manifest hash.
     /// </remarks>
     Task<IReadOnlyList<JobExecutionLease>> ClaimAsync(
         JobClaimRequest request,

@@ -98,6 +98,54 @@ public sealed class ExternalJobSchedulerManifestFenceTests
         });
     }
 
+    [Theory]
+    [InlineData(ExternalSchedulerDatabase.POSTGRES)]
+    [InlineData(ExternalSchedulerDatabase.VASTBASE)]
+    public async Task RetireOwner_WhenAClaimIsWaitingForItsGate_ShouldFenceTheClaimAndPermitReviewedCleanup(string provider)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var pause = new ClaimGatePause();
+        var fixture = await ExternalSchedulerStoreFixture.CreateAsync(provider, token, pause);
+        await ExternalSchedulerScenario.RunAsync(fixture, async () =>
+        {
+            var claimant = fixture.CreateStore();
+            var maintainer = fixture.CreateStore();
+            await maintainer.SyncOwnerSnapshotAsync(new(SCOPE, OWNER,
+                [new() { JobKey = JOB, JobName = "Retirement race", JobType = JobType.Triggered, JobArgsKey = "Args" }]), token);
+            await maintainer.EnqueueAsync(new() { SchedulerScopeKey = SCOPE, OwnerKey = OWNER, JobKey = JOB, InstanceId = INSTANCE, JobArgs = "{}" }, token);
+            var preview = await maintainer.PreviewOwnerRetirementAsync(SCOPE, OWNER, token);
+            preview.CanRetire.Should().BeTrue();
+            pause.Arm();
+            // Even a direct store caller without a manifest hash must respect durable retirement.
+            var claim = claimant.ClaimAsync(new() { SchedulerScopeKey = SCOPE, OwnerKey = OWNER, JobKeys = [JOB],
+                WorkerInstanceId = "stale-worker", MaxCount = 1, LeaseDuration = TimeSpan.FromMinutes(2) }, token);
+            Exception? failure = null;
+            try
+            {
+                await pause.Reached.WaitAsync(TimeSpan.FromSeconds(4), token);
+                (await maintainer.RetireOwnerAsync(SCOPE, OWNER, preview.Stamp, token)).Status.Should().Be(JobDefinitionMaintenanceStatus.Applied);
+                pause.Resume();
+                (await claim).Should().BeEmpty();
+                var inventory = await maintainer.QueryDefinitionCleanupAsync(SCOPE, new(), TimeSpan.FromMinutes(1), token);
+                inventory.Counts[JobDefinitionCleanupState.Queued].Should().Be(1);
+                var cleanup = await maintainer.PreviewDefinitionCleanupAsync(SCOPE, [new(OWNER, JOB)], true, token);
+                (await maintainer.RemoveDefinitionsAsync(SCOPE, cleanup.ToRequest(), token)).Status.Should().Be(JobDefinitionMaintenanceStatus.Applied);
+                (await maintainer.GetDefinitionAsync(SCOPE, OWNER, JOB, token)).Should().BeNull();
+                var retained = await maintainer.GetExecutionAsync(SCOPE, INSTANCE, token);
+                retained!.State.Should().Be(JobExecutionState.Cancelled);
+                retained.History.Should().NotBeEmpty();
+                (await maintainer.GetOwnerManifestHashAsync(SCOPE, OWNER, token)).Should().NotBeNull();
+            }
+            catch (Exception exception) { failure = exception; throw; }
+            finally
+            {
+                pause.Resume();
+                try { await claim; }
+                catch when (failure is not null) { }
+            }
+        });
+    }
+
     private static void Add(DbCommand command, string name, object value)
     {
         var parameter = command.CreateParameter();

@@ -11,6 +11,28 @@ namespace Monica.JobScheduler.Abstractions;
 /// </summary>
 public interface IJobSchedulerStore : IJobDefinitionStore, IJobExecutionStore, IJobSchedulerAnalyticsStore
 {
+    /// <summary>Queries bounded cleanup candidates with complete counts. Stale observations only identify owners requiring confirmation.</summary>
+    Task<JobDefinitionCleanupSnapshot> QueryDefinitionCleanupAsync(string schedulerScopeKey,
+        JobDefinitionCleanupQuery query, TimeSpan ownerStaleAfter, CancellationToken cancellationToken = default);
+
+    /// <summary>Reviews at most 100 exact definitions, including protected and missing targets. Counts are authoritative, not sampled.</summary>
+    Task<JobDefinitionCleanupPlan> PreviewDefinitionCleanupAsync(string schedulerScopeKey,
+        IReadOnlyList<JobId> ids, bool cancelQueued, CancellationToken cancellationToken = default);
+
+    /// <summary>Atomically revalidates and removes an exact reviewed set, its policies, cursors and idle gates. Preserves executions and owner fences.</summary>
+    /// <remarks>Any changed target rejects the entire request. Running claims, even expired ones, must finish or be recovered first. Cancellation is bounded to 1,000 queued instances.</remarks>
+    Task<JobDefinitionMaintenanceResult> RemoveDefinitionsAsync(string schedulerScopeKey,
+        JobDefinitionCleanupRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Observes the exact publication and active-work prerequisites for explicit owner retirement.</summary>
+    Task<JobOwnerRetirementPreview> PreviewOwnerRetirementAsync(string schedulerScopeKey, string ownerKey,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>After publisher shutdown, revalidates the preview and durably rejects all subsequent owner publication. Retains queued instances and history.</summary>
+    /// <remarks>Retirement is explicit, never inferred from age. A retired identity has no automatic reactivation path.</remarks>
+    Task<JobDefinitionMaintenanceResult> RetireOwnerAsync(string schedulerScopeKey, string ownerKey,
+        string expectedStamp, CancellationToken cancellationToken = default);
+
     /// <summary>Gets role leases bound to this store's correctness authority, distinct from job execution claims.</summary>
     IExclusiveLeaseStore CoordinatorLeases { get; }
 

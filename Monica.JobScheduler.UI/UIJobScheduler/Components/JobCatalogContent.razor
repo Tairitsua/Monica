@@ -26,7 +26,7 @@
                 }
                 @if (_state.PresentFilter == false)
                 {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Catalog:AbsentViewNotice"]</MudAlert>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Catalog:AbsentViewNotice"] <a href="/job-scheduler/cleanup">@L["Cleanup:Title"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></a></MudAlert>
                 }
                 @if (_state.HasLoadedFacets)
                 {

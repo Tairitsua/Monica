@@ -411,13 +411,12 @@ public sealed partial class EfCoreJobSchedulerStore
                     // Publication locks every existing Gate before replacing the manifest. Reading it after this
                     // lock prevents a claim that observed an old manifest from granting work after replacement.
                     // This is an MVCC read, not an Owner lock, so publication's Owner-to-Gate order cannot invert.
-                    if (request.OwnerManifestHash is { } expectedManifest)
-                    {
-                        var accepted = await context.SchedulerOwners.AsNoTracking()
-                            .Where(row => row.SchedulerScopeKey == request.SchedulerScopeKey && row.OwnerKey == request.OwnerKey)
-                            .Select(row => row.ManifestHash).SingleOrDefaultAsync(token);
-                        if (accepted != expectedManifest) return Array.Empty<JobExecutionLease>();
-                    }
+                    var accepted = await context.SchedulerOwners.AsNoTracking()
+                        .Where(row => row.SchedulerScopeKey == request.SchedulerScopeKey && row.OwnerKey == request.OwnerKey)
+                        .Select(row => new { row.ManifestHash, row.RetiredAtUtcTicks }).SingleOrDefaultAsync(token);
+                    if (accepted?.RetiredAtUtcTicks is not null
+                        || (request.OwnerManifestHash is { } expectedManifest && accepted?.ManifestHash != expectedManifest))
+                        return Array.Empty<JobExecutionLease>();
                     afterJob = gate.JobKey;
                     visited.Add(gate.JobKey);
                     var now = await GetUtcNowAsync(context, token);

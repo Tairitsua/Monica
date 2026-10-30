@@ -1,0 +1,26 @@
+@inject IStringLocalizer<JobSchedulerResource> L
+@implements IAsyncDisposable
+
+<MudButton @ref="_button" Disabled="@Disabled" OnClick="OnClick">@L["Cleanup:Back"]</MudButton>
+
+@code {
+    /// <summary>Gets whether an admitted decision is still in progress.</summary>
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>Gets the native dialog cancellation action.</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private MudButton? _button;
+    private bool _focused;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // As a descendant of MudDialog's focus trap, this runs after that trap saves the opener.
+        // Focusing from the outer dialog component instead makes the trap save this Back button itself.
+        if (_focused || Disabled || _button is null || _lifetime.IsRetired) return;
+        _focused = true;
+        await _lifetime.RunAsync(async _ => await _button.FocusAsync());
+    }
+
+    /// <summary>Drains the one native focus request before the action is released.</summary>
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(static () => { });
+}

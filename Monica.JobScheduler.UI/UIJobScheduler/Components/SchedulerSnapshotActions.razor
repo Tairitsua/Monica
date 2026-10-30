@@ -9,11 +9,14 @@
         {
             <button type="button" class="snapshot-actions__auto" aria-pressed="@((automatic).ToString().ToLowerInvariant())" @onclick="@(() => AutoRefreshChanged.InvokeAsync(!automatic))"><i class="@(automatic ? "is-live" : null)"></i>@L[automatic ? "Workspace:AutoRefresh" : "Workspace:AutoPaused"]</button>
         }
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@IsLoading" OnClick="RefreshRequested">@L["Common:Refresh"]</MudButton>
+        <MudButton Variant="@(PrimaryAction is null ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@IsLoading" OnClick="RefreshRequested">@L["Common:Refresh"]</MudButton>
+        @PrimaryAction
     </div>
 </SectionContent>
 
 @code {
+    /// <summary>Gets an optional page-owned primary action; refresh becomes secondary when supplied.</summary>
+    [Parameter] public RenderFragment? PrimaryAction { get; set; }
     /// <summary>Gets the workspace that refreshes local readiness with each accepted page capture.</summary>
     [CascadingParameter] public SchedulerWorkspace? Workspace { get; set; }
     protected override Task OnParametersSetAsync() => Workspace?.ObserveCaptureAsync(CapturedAtUtc) ?? Task.CompletedTask;

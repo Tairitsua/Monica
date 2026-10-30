@@ -49,6 +49,10 @@ public sealed class ModuleJobSchedulerUI : MonicaModule<ModuleJobSchedulerUIOpti
 
     private static void RegisterNavigation(INavigationRegistryBuilder registry)
     {
+        registry.RegisterLocalizedPage<JobDefinitionCleanupPage, JobSchedulerResource>(
+            JobDefinitionCleanupPage.PAGE_URL, "Cleanup:Title", MoIcons.Archive,
+            BuiltInNavigationCategoryIds.TaskScheduling, addToNav: true, navOrder: 105,
+            accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleJobSchedulerUIOption>));
         registry.RegisterLocalizedPage<SchedulerOverviewPage, JobSchedulerResource>(
             SchedulerOverviewPage.PAGE_URL,
             "Pages:Overview:Title",
@@ -107,6 +111,7 @@ public sealed class ModuleJobSchedulerUI : MonicaModule<ModuleJobSchedulerUIOpti
         context.Services.TryAddScoped<SchedulerTimePresentation>();
         context.Services.TryAddScoped<SchedulerOverviewPageStateFactory>();
         context.Services.TryAddScoped<JobCatalogPageStateFactory>();
+        context.Services.TryAddScoped<JobDefinitionCleanupPageStateFactory>();
         context.Services.TryAddScoped<JobDefinitionDetailPageStateFactory>();
         context.Services.TryAddScoped<JobExecutionsStateFactory>();
         context.Services.TryAddScoped<SchedulerStatisticsPageStateFactory>();
@@ -125,6 +130,10 @@ public sealed class ModuleJobSchedulerUIOption : ModuleOptions<ModuleJobSchedule
     /// effective policy denies access.
     /// </summary>
     public string? AuthorizationPolicyOverride { get; set; }
+
+    /// <summary>Gets or sets an additional policy required for definition cleanup and owner retirement. Null inherits operational access; denial keeps the cleanup page read-only.</summary>
+    /// <remarks>The shared operational Development/debug authorization bypass applies to this policy too.</remarks>
+    public string? DefinitionMaintenanceAuthorizationPolicy { get; set; }
 
     /// <summary>
     /// Gets or sets the overview and active execution inspector refresh interval. The default is five seconds.
