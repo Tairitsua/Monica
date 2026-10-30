@@ -10,6 +10,7 @@ Use this skill as the entry point for work on Monica itself: infrastructure modu
 ## Routing
 
 - Exact Monica source or an unavailable named skill/reference: use `$monica-guide source resolve --repository monica --json` as a read-only locator, then read canonical `skills/<name>/SKILL.md` and the specified reference.
+- Coding standards, responsibility ownership, failure behavior, and focused simplification: apply `$monica-coding-standards` during framework implementation and review.
 - Module architecture, folder boundaries, Facades, Providers, public/internal placement, page decomposition: use `$monica-architecture`.
 - Module registration, `Res` and `Res<T>`, services, registration extensions, hosted services, runtime module behavior: use `$monica-development`.
 - Independent NuGet packages, publisher-first IDs, third-party module keys, compatibility branding, licensing, scaffolding, and publishing: use `$monica-third-party-module-development`.

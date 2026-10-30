@@ -5,7 +5,7 @@ description: Design or review Monica framework module boundaries, public and int
 
 # Monica Module Architecture
 
-Choose boundaries from the capability being built. Start with a few root layers; introduce feature folders when independent subdomains emerge. Keep `Modules/Module{Name}.cs` focused on module strategy, options, registration, dependencies, and DI. Keep project-level localization markers and JSON in `Localization/`, including in feature-oriented projects.
+Choose boundaries from the capability being built. Apply `$monica-coding-standards` to responsibility ownership, abstraction choices, and supported behavior. Start with a few root layers; introduce feature folders when independent subdomains emerge. Keep `Modules/Module{Name}.cs` focused on module strategy, options, registration, dependencies, and DI. Keep project-level localization markers and JSON in `Localization/`, including in feature-oriented projects.
 
 The host-facing path is `Minimal API or UI → Facade → internal Service → Provider`. Facades live in the infrastructure module, expose `Res`/`Res<T>` where the public boundary uses result envelopes, and stay thin. Other modules use public `Abstractions/` and `Models/` rather than another module's Facade. Internal services use ordinary .NET returns and exceptions; providers implement replaceable infrastructure strategies rather than business orchestration. Public developer-facing attributes belong in `Annotations/`. See [module-layout.md](references/module-layout.md) for folder and visibility decisions, and `$monica-development` for runtime registration and result semantics.
 

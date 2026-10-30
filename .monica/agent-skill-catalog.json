@@ -201,6 +201,7 @@
       "managed": true,
       "routes": [
         "monica-guide",
+        "monica-coding-standards",
         "monica-architecture",
         "monica-development",
         "monica-third-party-module-development",
@@ -226,6 +227,7 @@
       ],
       "dependencies": {
         "required": [
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-unit-testing"
@@ -275,13 +277,27 @@
         "external": []
       }
     },
+    "monica-coding-standards": {
+      "path": "skills/monica-coding-standards",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [],
+        "recommended": [],
+        "conditional": [],
+        "external": []
+      }
+    },
     "monica-architecture": {
       "path": "skills/monica-architecture",
       "role": "capability",
       "ownership": "monica",
       "managed": true,
       "dependencies": {
-        "required": [],
+        "required": [
+          "monica-coding-standards"
+        ],
         "recommended": [
           "monica-development"
         ],
@@ -824,11 +840,6 @@
     }
   },
   "externalSkills": {
-    "code-simplifier": {
-      "ownership": "external",
-      "managed": false,
-      "purpose": "Optional behavior-preserving cleanup after implementation."
-    },
     "github": {
       "ownership": "external",
       "managed": false,
@@ -913,6 +924,7 @@
           "monica-guide",
           "monica-troubleshooting",
           "monica-framework",
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-third-party-module-development",
@@ -976,6 +988,7 @@
           "monica-guide",
           "monica-troubleshooting",
           "monica-framework",
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-opentelemetry",

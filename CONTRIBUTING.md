@@ -95,9 +95,8 @@ BREAKING CHANGE: replace ambient Mo registration with builder.AddMonica(monica =
 
 ## Coding Standards
 
-- Use English for code comments, XML documentation, and developer-facing annotations.
-- Prefer primary constructors for dependency-injected classes with a single constructor.
-- Follow the [framework coding contracts](skills/monica-development/references/coding-contracts.md) for public XML documentation, options, registration methods, and C# conventions.
+- Follow the [Monica coding standards](skills/monica-coding-standards/SKILL.md) for responsibility ownership, simplification, validation, and failure behavior.
+- Follow their [C# contracts](skills/monica-coding-standards/references/csharp-contracts.md) for public XML documentation, options, registration methods, and language conventions.
 - Facades may return `Res` or `Res<T>`; internal services should use standard .NET return types and exceptions.
 - Keep UI colors on MudBlazor palette variables or the approved Monica theme token contract.
 

@@ -6,7 +6,8 @@ Monica is modular .NET infrastructure for agent-driven development. `Monica.slnx
 
 - Code comments and XML documentation in this repository are also English; sibling and consumer repositories own their own conventions.
 - Prefer clear boundaries and behavior on the types that own it. Simplify the design instead of accumulating workarounds. Breaking changes are allowed unless the task requires compatibility; keep refactoring within the requested scope.
-- Document public and developer-facing contracts, including meaningful option defaults, registration prerequisites, and lifecycle/ownership constraints. Use the [coding contracts](skills/monica-development/references/coding-contracts.md) when changing C# APIs.
+- Apply the [Monica coding standards](skills/monica-coding-standards/SKILL.md) when designing, implementing, reviewing, or simplifying framework code. Breaking changes are allowed unless the task requires compatibility; keep refactoring within the requested scope.
+- Document public and developer-facing contracts, including meaningful option defaults, registration prerequisites, and lifecycle/ownership constraints. Use the [C# contracts](skills/monica-coding-standards/references/csharp-contracts.md) when changing C# APIs.
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before committing or preparing a release; follow its Conventional Commit policy.
 
 ## Task routing
@@ -21,7 +22,7 @@ Load the skills relevant to the current work; details belong there rather than i
 | Framework tests and shared test infrastructure | `monica-unit-testing` |
 | Canonical skills, public guidance, or documentation ownership | `monica-docs-authoring` |
 | Guide engine, setup, or release contracts | `monica-guide`; engine changes use its framework-development reference |
-| Focused simplification of selected code | `code-simplifier`; architecture redesign uses `monica-architecture` |
+| Coding standards, code review, and focused simplification | `monica-coding-standards`; module-boundary redesign uses `monica-architecture` |
 
 For exact dependency behavior, use `inspect-dependency-source` when available and resolve the version actually in use. For uncertain Microsoft APIs, use `microsoft-docs` or `microsoft-code-reference` with official sources. Read dependency versions from project/package metadata instead of copying them into these instructions.
 
