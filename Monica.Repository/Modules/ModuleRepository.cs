@@ -131,22 +131,15 @@ public static class ModuleRepositoryRegistrationExtensions
             context.Services.TryAddSingleton(
                 typeof(IDbContextOperation<TDbContext>),
                 typeof(ScopedDbContextOperation<TDbContext>));
-            context.Services.AddDbContext<TDbContext>(
-                (serviceProvider, builder) => ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction));
+            context.Services.AddDbContext<TDbContext>((serviceProvider, builder) =>
+                {
+                    builder.UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>());
+                    ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction);
+                }, contextLifetime: ServiceLifetime.Scoped, optionsLifetime: ServiceLifetime.Transient);
             context.Services.RemoveAll<IDbContextFactory<TDbContext>>();
             context.Services.AddSingleton<IDbContextFactory<TDbContext>, OwnedScopeDbContextFactory<TDbContext>>();
 
-            //TODO Use Module to optimize automatic registration
             var options = new EfRepositoryRegistrationOptions(typeof(TDbContext), context.Services);
-
-            context.Services.AddTransient(serviceProvider =>
-            {
-                var builder = new DbContextOptionsBuilder<TDbContext>()
-                    .UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>())
-                    .UseApplicationServiceProvider(serviceProvider);
-                ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction);
-                return builder.Options;
-            });
 
             new EfCoreRepositoryRegistrar(options).AddRepositories();
 

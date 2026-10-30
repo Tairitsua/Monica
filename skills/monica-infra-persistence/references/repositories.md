@@ -21,6 +21,8 @@ builder.AddMonica(monica =>
 
 The core `IRepository<TEntity>` stages `Add`/`Remove`; `IRepository<TEntity,TKey>` additionally loads a tracked aggregate by key. Domain-specific repositories add purposeful tracked queries. The repository interface deliberately has no `Save` method; [transactions](transactions.md) owns the commit. Registration supplies a local database boundary, not a distributed transaction or an EventBus transport. Add [transactional events](transactional-events.md) when outbox, inbox, or entity projections must join the commit.
 
+Repository contexts use EF's standard options composition, including `ConfigureDbContext<TContext>` contributions. Contexts remain scoped and options are transient; options callbacks resolve scoped dependencies from the requesting scope. The owned factory creates a fresh scope and consumes the same options pipeline instead of constructing a separate options builder. Disposing a factory-created context also disposes that scope. Registration, configuration contribution, scoped connection identity, and factory disposal are covered by `tests/Test.Monica.Repository/Hosting/RepositoryOptionsCompositionTests.cs`.
+
 ## Configure a default detail graph
 
 `EfRepository<TDbContext,TEntity>` exposes a no-tracking `Query` and a `Details` query that calls `ApplyDetails(Query)`. The default `ApplyDetails` returns its input unchanged. Override it on the concrete repository when an entity has a canonical eager-loading graph; `Order` and its `Lines` navigation here are application-owned types:
