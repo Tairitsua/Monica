@@ -1,25 +1,33 @@
 @using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<JobSchedulerResource> L
+@inject IStringLocalizer<Monica.UI.Localization.SharedResource> SharedL
 @implements IAsyncDisposable
 
-<MudDialog DefaultFocus="DefaultFocus.None">
-    <TitleContent><h2 class="cleanup-dialog-title">@L["Cleanup:Preview"]</h2></TitleContent>
+<MudDialog DefaultFocus="DefaultFocus.None" Class="cleanup-decision-surface" TitleClass="cleanup-decision-title" ContentClass="cleanup-decision-content" ActionsClass="cleanup-decision-actions">
+    <TitleContent><div class="cleanup-decision-heading mo-vl-role--primary"><span class="cleanup-role-tile"><MoIcon Icon="@MoIcons.ListChecks" Size="16px" /></span><div><h2 class="cleanup-dialog-title">@L["Cleanup:Preview"]</h2><p>@L["Cleanup:PreviewDescription"]</p></div><MudIconButton Class="cleanup-decision-close" Icon="@MoIcons.Close" Disabled="@_busy" aria-label="@SharedL["Common:Close"]" OnClick="Back" /></div></TitleContent>
     <DialogContent>
         <div class="cleanup-dialog">
             @if (_plan is { } plan)
             {
-                <p>@L["Cleanup:PreviewSummary", plan.Items.Count, plan.Eligible.Count, plan.Items.Count - plan.Eligible.Count]</p>
-                <MoFactGrid Facts="@(new MoFact[] { new(L["Cleanup:WillRemove"], plan.Eligible.Count.ToString()), new(L["Cleanup:WillCancel"], plan.QueuedCount.ToString()), new(L["Cleanup:History"], plan.HistoryCount.ToString()) })" />
+                <div class="cleanup-plan-heading"><div><strong>@RemovalLabel(plan.Eligible.Count)</strong><p>@L["Cleanup:PreviewSummary", plan.Items.Count, plan.Eligible.Count, plan.Items.Count - plan.Eligible.Count]</p></div><span class="cleanup-status cleanup-status--pill mo-vl-role--neutral">@L["Cleanup:ProtectedCount", plan.Items.Count - plan.Eligible.Count]</span></div>
+                <ul class="cleanup-plan-effects">
+                    <li><MoIcon Icon="@MoIcons.Archive" Size="15px" />@L["Cleanup:RetainedCount", plan.HistoryCount]</li>
+                    <li><MoIcon Icon="@MoIcons.Package" Size="15px" />@L["Cleanup:PolicyCount", plan.Eligible.Count]</li>
+                    @if (plan.QueuedCount > 0) { <li><MoIcon Icon="@MoIcons.StopCircle" Size="15px" />@L["Cleanup:CancelCount", plan.QueuedCount]</li> }
+                </ul>
+                @if (plan.Items.Any(item => item.QueuedCount > 0 && item.Definition?.IsPresent == false))
+                {
+                    <MudCheckBox T="bool" Value="@_cancelQueued" ValueChanged="QueueChoiceAsync" Disabled="@_busy" Color="Color.Primary" Size="Size.Small" AriaLabel="@L["Cleanup:CancelQueued"]"><b class="cleanup-choice-label">@L["Cleanup:CancelQueued"]</b><small class="cleanup-choice-help">@L["Cleanup:CancelQueuedHelp"]</small></MudCheckBox>
+                }
                 <ul class="cleanup-plan-list">
                     @foreach (var item in plan.Items)
                     {
-                        <li><div><b>@(item.Definition?.Declaration.JobName ?? item.Id.JobKey)</b><code>@item.Id.OwnerKey / @item.Id.JobKey</code></div><MoValueMark Role="@DefinitionCleanupPresentation.Role(item.State)">@(item.CanRemove(plan.CancelQueued) ? L["Cleanup:WillRemove"] : DefinitionCleanupPresentation.Label(L, item.State))</MoValueMark></li>
+                        <li><div><b>@(item.Definition?.Declaration.JobName ?? item.Id.JobKey)</b><code>@item.Id.OwnerKey / @item.Id.JobKey</code></div><div><span class="cleanup-status @((item.CanRemove(plan.CancelQueued) ? MoVisualRole.Success : MoVisualRole.Warning).ToCssClass())">@(item.CanRemove(plan.CancelQueued) ? L["Cleanup:WillRemove"] : L["Cleanup:Protected"])</span><small>@(item.CanRemove(plan.CancelQueued) ? L["Cleanup:HistoryKept"] : DefinitionCleanupPresentation.Reason(L, item.State))</small></div></li>
                     }
                 </ul>
-                <MudCheckBox T="bool" Value="@_cancelQueued" ValueChanged="QueueChoiceAsync" Disabled="@_busy" Label="@L["Cleanup:CancelQueued"]" />
-                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Cleanup:Consequences"]">@L["Cleanup:ConsequenceBody"]</MoSemanticCallout>
+                <p class="cleanup-plan-note">@L["Cleanup:ConsequenceBody"]</p>
                 @if (!plan.WithinCancellationLimit) { <MudAlert Severity="Severity.Warning" Icon="@MoIcons.Warning">@L["Cleanup:CancellationLimit", JobDefinitionCleanupRequest.MAX_QUEUED_CANCELLATIONS]</MudAlert> }
-                <MudCheckBox T="bool" @bind-Value="_acknowledged" Disabled="@_busy" Label="@L["Cleanup:Acknowledge"]" />
+                <MudCheckBox T="bool" @bind-Value="_acknowledged" Disabled="@_busy" Color="Color.Primary" Size="Size.Small" Label="@L["Cleanup:Acknowledge"]" />
             }
             @if (_busy) { <MudProgressLinear Indeterminate="true" aria-label="@L["Cleanup:Loading"]" /> }
             @if (_error is not null)
@@ -31,7 +39,7 @@
     <DialogActions>
         <SchedulerDecisionBackButton Disabled="@_busy" OnClick="Back" />
         @if (_needsRebuild) { <MudButton Color="Color.Primary" Disabled="@_busy" OnClick="RebuildAsync">@L["Cleanup:Rebuild"]</MudButton> }
-        <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@MoIcons.Delete" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">@L["Cleanup:ConfirmRemoval", _plan?.Eligible.Count ?? 0]</MudButton>
+        <MudButton Class="cleanup-confirm-remove" Color="Color.Error" Variant="Variant.Filled" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">@RemovalLabel(_plan?.Eligible.Count ?? 0)</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -49,6 +57,7 @@
     private bool _busy, _cancelQueued, _acknowledged, _needsRebuild;
     private string? _error;
     private bool CanConfirm => !_busy && !_needsRebuild && _acknowledged && _plan is { WithinCancellationLimit: true } plan && plan.Eligible.Count > 0;
+    private string RemovalLabel(int count) => count == 1 ? L["Cleanup:ConfirmRemovalSingle"] : L["Cleanup:ConfirmRemoval", count];
 
     protected override async Task OnInitializedAsync() { _ids = Ids.ToArray(); await RebuildAsync(); }
     private Task QueueChoiceAsync(bool value) { _cancelQueued = value; return RebuildAsync(); }

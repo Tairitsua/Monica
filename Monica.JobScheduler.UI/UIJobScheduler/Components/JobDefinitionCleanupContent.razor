@@ -1,5 +1,4 @@
 @using Monica.UI.Shared.Components.Visual
-@using Monica.UI.Shared.Components.Dialogs
 @inject JobDefinitionCleanupPageStateFactory Factory
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation Clock
@@ -31,30 +30,39 @@
                 }
                 <div class="cleanup-filters">
                     <span>@L["Cleanup:Scope"]</span>
-                    <MudSelect T="string" Value="@(Owner ?? string.Empty)" ValueChanged="ChangeOwner" Label="@L["Cleanup:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Disabled="@state.Busy" AdornmentIcon="@MoIcons.ChevronDown">
-                        <MudSelectItem Value="@(string.Empty)">@L["Cleanup:AllOwners"]</MudSelectItem>
-                        @foreach (var owner in state.Snapshot?.Owners ?? []) { <MudSelectItem Value="@owner">@owner</MudSelectItem> }
-                    </MudSelect>
-                    <MudTextField T="string" Value="@_search" ValueChanged="@(value => _search = value)" Label="@L["Cleanup:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense" OnKeyDown="SearchKey" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
-                    <MudButton Variant="Variant.Text" Disabled="@state.Busy" OnClick="SearchAsync">@L["Cleanup:ApplySearch"]</MudButton>
+                    <div class="cleanup-owner-filter">
+                        <MudSelect T="string" Value="@(Owner ?? string.Empty)" ValueChanged="ChangeOwner" aria-label="@L["Cleanup:Owner"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Disabled="@state.Busy" AdornmentIcon="@MoIcons.ChevronDown">
+                            <MudSelectItem Value="@(string.Empty)">@L["Cleanup:AllOwners"]</MudSelectItem>
+                            @foreach (var owner in state.Snapshot?.Owners ?? []) { <MudSelectItem Value="@owner">@owner</MudSelectItem> }
+                        </MudSelect>
+                    </div>
+                    <div class="cleanup-search">
+                        <MudTextField T="string" Value="@_search" ValueChanged="@(value => _search = value)" Placeholder="@L["Cleanup:Search"]" aria-label="@L["Cleanup:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" OnDebounceIntervalElapsed="SearchChanged" OnKeyDown="SearchKey" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
+                    </div>
+                    @if (Owner is not null || !string.IsNullOrEmpty(Search) || Query.State is not null)
+                    {
+                        <MudButton Size="Size.Small" OnClick="ResetFilters">@L["Cleanup:ResetFilters"]</MudButton>
+                    }
                 </div>
                 @if (state.Snapshot is { } snapshot)
                 {
                     <section class="cleanup-signature" aria-label="@L["Cleanup:Readiness"]">
                         <div class="cleanup-decision">
-                            <p>@L["Cleanup:ReadyCount"]</p>
+                            <p class="cleanup-display-label">@L["Cleanup:ReadyCount"]</p>
                             <div class="cleanup-number">@snapshot.Counts.GetValueOrDefault(JobDefinitionCleanupState.Ready)<small>@L["Cleanup:DefinitionsUnit"]</small></div>
-                            <p>@L["Cleanup:Coverage", snapshot.Counts.Values.Sum(), snapshot.ScopeDefinitionCount]</p>
+                            <p class="cleanup-population">@L["Cleanup:Coverage", snapshot.Counts.Values.Sum(), snapshot.ScopeDefinitionCount]</p>
                             <p class="cleanup-finding">@L["Cleanup:Finding", snapshot.Counts.GetValueOrDefault(JobDefinitionCleanupState.Ready), snapshot.Counts.GetValueOrDefault(JobDefinitionCleanupState.Queued), snapshot.Counts.GetValueOrDefault(JobDefinitionCleanupState.Running), snapshot.Counts.GetValueOrDefault(JobDefinitionCleanupState.OwnerUnconfirmed)]</p>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@MoIcons.ListChecks" Disabled="@(!state.CanWrite || state.Busy)" OnClick="SelectReady">@L["Cleanup:SelectReady"]</MudButton>
+                            <div class="cleanup-ready-action"><MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@MoIcons.ListChecks" Disabled="@(!state.CanWrite || state.Busy || !snapshot.Items.Any(item => item.State == JobDefinitionCleanupState.Ready))" OnClick="SelectReady">@L["Cleanup:SelectReady"]</MudButton></div>
                         </div>
                         <div class="cleanup-lanes">
                             <p>@L["Cleanup:MarksCoverage", snapshot.Items.Count, snapshot.TotalCount]</p>
                             @foreach (var kind in DefinitionCleanupPresentation.States)
                             {
-                                <div class="cleanup-lane" data-state="@kind">
-                                    <button class="cleanup-lane-label" type="button" @onclick="@(() => FilterState(kind))"><MoValueMark Role="@DefinitionCleanupPresentation.Role(kind)">@Label(kind)</MoValueMark><span>@Reason(kind)</span></button>
-                                    <b>@snapshot.Counts.GetValueOrDefault(kind)</b>
+                                <div class="cleanup-lane @DefinitionCleanupPresentation.Role(kind).ToCssClass()" data-state="@kind">
+                                    <button class="cleanup-lane-label" type="button" @onclick="@(() => FilterState(kind))">
+                                        <span class="cleanup-role-tile"><MoIcon Icon="@DefinitionCleanupPresentation.Icon(kind)" Size="16px" /></span>
+                                        <span><b>@Label(kind)</b><small>@Reason(kind)</small></span><strong>@snapshot.Counts.GetValueOrDefault(kind)</strong>
+                                    </button>
                                     <div class="cleanup-marks">
                                         @foreach (var item in snapshot.Items.Where(item => item.State == kind))
                                         {
@@ -64,6 +72,47 @@
                                 </div>
                             }
                         </div>
+                    </section>
+                    <section class="cleanup-inventory">
+                        <header>
+                            <h2>@L["Cleanup:Inventory"] <small>@snapshot.TotalCount</small></h2>
+                            @if (state.Selected.Count > 0)
+                            {
+                                <div class="cleanup-selection" role="status"><MoValueMark Role="MoVisualRole.Primary">@L["Cleanup:Selection", state.Selected.Count, JobDefinitionCleanupRequest.MAX_DEFINITIONS]</MoValueMark><MudButton Size="Size.Small" OnClick="ClearSelection">@L["Cleanup:ClearSelection"]</MudButton></div>
+                            }
+                        </header>
+                        <div class="cleanup-chips" role="group" aria-label="@L["Cleanup:Declaration"]">
+                            <MoFilterChip Pill Label="@L["Cleanup:All"]" Count="@snapshot.Counts.Values.Sum()" Role="MoVisualRole.Primary" Selected="@(Query.State is null)" SelectedChanged="@(_ => FilterState(null))" />
+                            @foreach (var kind in DefinitionCleanupPresentation.States)
+                            {
+                                <MoFilterChip Pill Label="@Label(kind)" Count="@snapshot.Counts.GetValueOrDefault(kind)" Selected="@(Query.State == kind)" Role="@DefinitionCleanupPresentation.Role(kind)" SelectedChanged="@(selected => FilterState(selected ? kind : null))" />
+                            }
+                        </div>
+                        <MudTable T="JobDefinitionCleanupItem" Items="@snapshot.Items" RowsPerPage="20" Elevation="0" Square Hover="true" Breakpoint="Breakpoint.None" Loading="@state.Busy" RowClassFunc="RowClass">
+                            <ColGroup><col class="cleanup-col-select" /><col class="cleanup-col-job" /><col class="cleanup-col-evidence" /><col class="cleanup-col-work" /><col class="cleanup-col-history" /><col class="cleanup-col-action" /></ColGroup>
+                            <HeaderContent>
+                                <MudTh><MudCheckBox T="bool?" Value="@PageSelection" ValueChanged="TogglePage" TriState Size="Size.Small" Disabled="@(!state.CanWrite || state.Busy || snapshot.Items.Count == 0)" aria-label="@L["Cleanup:SelectPage"]" aria-checked="@(PageSelection is null ? "mixed" : PageSelection == true ? "true" : "false")" /></MudTh>
+                                <MudTh>@L["Cleanup:Identity"]</MudTh><MudTh>@L["Cleanup:Declaration"]</MudTh><MudTh>@L["Cleanup:Activity"]</MudTh><MudTh>@L["Cleanup:History"]</MudTh><MudTh>@L["Cleanup:NextStep"]</MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="item">
+                                <MudTd Class="cleanup-check-cell"><MudCheckBox T="bool" Value="@state.Selected.Contains(item.Id)" ValueChanged="@(value => Toggle(item.Id, value))" Size="Size.Small" Disabled="@(!state.CanWrite || state.Busy || (state.Selected.Count >= 100 && !state.Selected.Contains(item.Id)))" aria-label="@L["Cleanup:SelectNamed", item.Id.JobKey]" /></MudTd>
+                                <MudTd Class="cleanup-job-cell"><div class="cleanup-identity"><button type="button" @onclick="@(() => Inspect(item.Id))">@item.Definition?.Declaration.JobName</button><code>@item.Id.OwnerKey</code><span>@item.Id.JobKey</span></div></MudTd>
+                                <MudTd DataLabel="@L["Cleanup:Declaration"]"><div class="cleanup-evidence"><span class="cleanup-status @DefinitionCleanupPresentation.DeclarationRole(item).ToCssClass()">@DefinitionCleanupPresentation.Declaration(L, item)</span><small>@L[item.Definition?.IsPresent == true ? "Cleanup:LastObserved" : "Cleanup:AbsentSince"]</small><time>@Timestamp(item)</time></div></MudTd>
+                                <MudTd DataLabel="@L["Cleanup:Activity"]"><div class="cleanup-active">
+                                    @if (item.QueuedCount > 0) { <span><MoValueMark Role="MoVisualRole.Warning">@item.QueuedCount</MoValueMark>@L["Cleanup:Queued"]</span> }
+                                    @if (item.RunningCount > 0) { <span><MoValueMark Role="MoVisualRole.Info">@item.RunningCount</MoValueMark>@L["Cleanup:Running"]</span> }
+                                    @if (item.QueuedCount == 0 && item.RunningCount == 0) { <span class="cleanup-muted">@L["Cleanup:NoActive"]</span> }
+                                </div></MudTd>
+                                <MudTd DataLabel="@L["Cleanup:History"]" Class="cleanup-history-cell"><div class="cleanup-history"><b>@item.HistoryCount</b><small>@L["Cleanup:TerminalExecutions"]</small></div></MudTd>
+                                <MudTd DataLabel="@L["Cleanup:NextStep"]"><MudButton Size="Size.Small" Variant="Variant.Outlined" EndIcon="@MoIcons.ArrowRight" OnClick="@(() => Inspect(item.Id))">@L["Cleanup:Inspect"]</MudButton></MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent><div class="cleanup-empty"><MoIcon Icon="@MoIcons.Archive" Size="32px" /><h3>@L[snapshot.ScopeDefinitionCount == 0 ? "Cleanup:EmptyScope" : snapshot.Counts.Values.Sum() == 0 && Owner is null && string.IsNullOrEmpty(Search) ? "Cleanup:NoCandidates" : "Cleanup:NoMatches"]</h3><p>@L["Cleanup:EmptyBody"]</p><MudButton Variant="Variant.Outlined" OnClick="ResetFilters">@L["Cleanup:ResetFilters"]</MudButton></div></NoRecordsContent>
+                        </MudTable>
+                        @if (snapshot.TotalCount > 20)
+                        {
+                            <div class="cleanup-pagination"><MudPagination Count="@((snapshot.TotalCount + 19) / 20)" Selected="@Query.PageNumber" SelectedChanged="ChangePage" Disabled="@state.Busy" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></div>
+                        }
+                        <footer><MoIcon Icon="@MoIcons.Archive" Size="14px" /><span>@L["Cleanup:RetentionNote"]</span></footer>
                     </section>
                     @if (state.Receipt is { } receipt)
                     {
@@ -75,87 +124,10 @@
                             <div class="cleanup-receipt-links">@foreach (var id in receipt.Definitions) { <a href="@Ledger(id)">@id.JobKey <MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a> }</div>
                         </section>
                     }
-                    <section class="cleanup-inventory">
-                        <header><h2>@L["Cleanup:Inventory"] <small>@snapshot.TotalCount</small></h2>
-                            <div class="cleanup-chips">
-                                <MoFilterChip Label="@L["Cleanup:All"]" Count="@snapshot.Counts.Values.Sum()" Role="MoVisualRole.Primary" Selected="@(Query.State is null)" SelectedChanged="@(_ => FilterState(null))" />
-                                @foreach (var kind in DefinitionCleanupPresentation.States)
-                                {
-                                    <MoFilterChip Label="@Label(kind)" Count="@snapshot.Counts.GetValueOrDefault(kind)" Selected="@(Query.State == kind)" Role="@DefinitionCleanupPresentation.Role(kind)" SelectedChanged="@(_ => FilterState(kind))" />
-                                }
-                            </div>
-                        </header>
-                        @if (state.Selected.Count > 0)
-                        {
-                            <div class="cleanup-selection" role="status"><span>@L["Cleanup:Selection", state.Selected.Count, JobDefinitionCleanupRequest.MAX_DEFINITIONS]</span><MudButton Size="Size.Small" OnClick="ClearSelection">@L["Cleanup:ClearSelection"]</MudButton></div>
-                        }
-                        <MudTable T="JobDefinitionCleanupItem" Items="@snapshot.Items" RowsPerPage="20" Elevation="0" Hover="true" Breakpoint="Breakpoint.Md" Loading="@state.Busy">
-                            <HeaderContent><MudTh>@L["Cleanup:Select"]</MudTh><MudTh>@L["Cleanup:Identity"]</MudTh><MudTh>@L["Cleanup:Declaration"]</MudTh><MudTh>@L["Cleanup:Activity"]</MudTh><MudTh>@L["Cleanup:History"]</MudTh><MudTh>@L["Cleanup:NextStep"]</MudTh></HeaderContent>
-                            <RowTemplate Context="item">
-                                <MudTd DataLabel="@L["Cleanup:Select"]"><MudCheckBox T="bool" Value="@state.Selected.Contains(item.Id)" ValueChanged="@(value => Toggle(item.Id, value))" Disabled="@(!state.CanWrite || state.Busy || (state.Selected.Count >= 100 && !state.Selected.Contains(item.Id)))" aria-label="@L["Cleanup:SelectNamed", item.Id.JobKey]" /></MudTd>
-                                <MudTd DataLabel="@L["Cleanup:Identity"]"><div class="cleanup-identity"><b>@item.Definition?.Declaration.JobName</b><code>@item.Id.OwnerKey</code><span>@item.Id.JobKey</span></div></MudTd>
-                                <MudTd DataLabel="@L["Cleanup:Declaration"]"><div class="cleanup-evidence"><MoValueMark Role="@DefinitionCleanupPresentation.Role(item.State)">@Label(item.State)</MoValueMark><small>@L[item.Definition?.IsPresent == true ? "Cleanup:LastObserved" : "Cleanup:AbsentSince"]</small><time>@Timestamp(item)</time></div></MudTd>
-                                <MudTd DataLabel="@L["Cleanup:Activity"]"><span>@L["Cleanup:ActiveCounts", item.QueuedCount, item.RunningCount]</span></MudTd>
-                                <MudTd DataLabel="@L["Cleanup:History"]"><div class="cleanup-history"><b>@item.HistoryCount</b><small>@L["Cleanup:TerminalExecutions"]</small></div></MudTd>
-                                <MudTd DataLabel="@L["Cleanup:NextStep"]"><MudButton Size="Size.Small" Variant="Variant.Outlined" EndIcon="@MoIcons.ArrowRight" OnClick="@(() => Inspect(item.Id))">@L["Cleanup:Inspect"]</MudButton></MudTd>
-                            </RowTemplate>
-                            <NoRecordsContent><div class="cleanup-empty"><MoIcon Icon="@MoIcons.Archive" Size="32px" /><h3>@L[snapshot.ScopeDefinitionCount == 0 ? "Cleanup:EmptyScope" : snapshot.Counts.Values.Sum() == 0 && Owner is null && string.IsNullOrEmpty(Search) ? "Cleanup:NoCandidates" : "Cleanup:NoMatches"]</h3><p>@L["Cleanup:EmptyBody"]</p></div></NoRecordsContent>
-                        </MudTable>
-                        @if (snapshot.TotalCount > 20)
-                        {
-                            <div class="cleanup-pagination"><MudPagination Count="@((snapshot.TotalCount + 19) / 20)" Selected="@Query.PageNumber" SelectedChanged="ChangePage" Disabled="@state.Busy" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></div>
-                        }
-                        <footer>@L["Cleanup:RetentionNote"]</footer>
-                    </section>
                 }
                 else if (state.Busy) { <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="@L["Cleanup:Loading"]" /> }
             }
         </div>
-        <MoSideSheet Open="@IsInspecting" OpenChanged="InspectorVisibilityChanged" Title="@L["Cleanup:EvidenceTitle"]" Width="560px">
-            <HeaderContent>
-                @if (Inspected is { } heading) { <div class="cleanup-sheet-identity"><h3>@heading.Definition?.Declaration.JobName</h3><code>@heading.Id.JobKey</code></div> }
-            </HeaderContent>
-            <ChildContent>
-                @if (Inspected is { } item)
-                {
-                    <div class="cleanup-sheet">
-                        <MoSemanticCallout Severity="@DefinitionCleanupPresentation.Role(item.State)" Title="@Label(item.State)">@Reason(item.State)</MoSemanticCallout>
-                        @if (item.Definition is not null && item.ManifestHash is not null)
-                        {
-                        <h3>@L["Cleanup:Checks"]</h3>
-                        <ul class="cleanup-checks">
-                            <li><MoIcon Icon="@(item.Definition?.IsPresent == false ? MoIcons.Check : MoIcons.Info)" Size="18px" />@L[item.Definition?.IsPresent == false ? "Cleanup:CheckAbsent" : "Cleanup:CheckPublished"]</li>
-                            <li><MoIcon Icon="@(item.RunningCount == 0 && item.ActiveLeaseCount == 0 ? MoIcons.Check : MoIcons.Info)" Size="18px" />@L["Cleanup:CheckActivity", item.RunningCount, item.ActiveLeaseCount]</li>
-                            <li><MoIcon Icon="@(item.QueuedCount == 0 ? MoIcons.Check : MoIcons.Warning)" Size="18px" />@L["Cleanup:CheckQueue", item.QueuedCount]</li>
-                        </ul>
-                        <MoFactGrid Facts="@(new MoFact[] { new(L["Cleanup:Queued"], item.QueuedCount.ToString()), new(L["Cleanup:Running"], item.RunningCount.ToString()), new(L["Cleanup:History"], item.HistoryCount.ToString()) })" />
-                        }
-                        <dl class="cleanup-details">
-                            <div><dt>@L["Cleanup:Owner"]</dt><dd><code>@item.Id.OwnerKey</code></dd></div>
-                            <div><dt>@L["Cleanup:JobKey"]</dt><dd><code>@item.Id.JobKey</code></dd></div>
-                            @if (item.Definition is { } definition)
-                            {
-                                <div><dt>@L[definition.IsPresent ? "Cleanup:LastObserved" : "Cleanup:AbsentSince"]</dt><dd>@Timestamp(item)</dd></div>
-                                <div><dt>@L["Cleanup:PolicyImpact"]</dt><dd>@L[definition.Policy.Overrides.HasAnyOverride ? "Cleanup:PolicyOverrides" : "Cleanup:PolicyDefault"]</dd></div>
-                            }
-                        </dl>
-                        <details><summary>@L["Cleanup:Publication"]</summary><code class="cleanup-manifest">@(item.ManifestHash ?? L["Cleanup:Unknown"].Value)</code><p>@Clock.FormatTimestamp(item.ManifestPublishedAtUtc)</p></details>
-                        <p class="cleanup-note">@L["Cleanup:RetentionNote"]</p>
-                        @if (item.State == JobDefinitionCleanupState.OwnerUnconfirmed)
-                        {
-                            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Cleanup:RetireTitle"]"><p>@L["Cleanup:RetireHint"]</p><MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="@(!state.CanWrite || state.Busy)" OnClick="@(() => RetireOwnerAsync(item.Id.OwnerKey))">@L["Cleanup:RetireAction"]</MudButton></MoSemanticCallout>
-                        }
-                    </div>
-                }
-                else { <p>@L["Cleanup:Loading"]</p> }
-            </ChildContent>
-            <FooterContent>
-                @if (Inspected is { } item)
-                {
-                    <MudButton Href="@Ledger(item.Id)" EndIcon="@MoIcons.ArrowUpRight">@L["Workspace:OpenLedger"]</MudButton>
-                    @if (item.Definition is not null) { <MudButton Href="@($"/job-scheduler/jobs/{Uri.EscapeDataString(item.Id.OwnerKey)}/{Uri.EscapeDataString(item.Id.JobKey)}")">@L["Cleanup:OpenDefinition"]</MudButton> }
-                }
-            </FooterContent>
-        </MoSideSheet>
+        <DefinitionCleanupEvidence Open="@IsInspecting" OpenChanged="InspectorVisibilityChanged" Item="@Inspected" CanMaintain="@(state.CanWrite && !state.Busy)" PreviewRequested="PreviewItemAsync" RetirementRequested="RetireOwnerAsync" />
     </SchedulerAccessBoundary>
 }

@@ -1,24 +1,25 @@
 @using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<JobSchedulerResource> L
+@inject IStringLocalizer<Monica.UI.Localization.SharedResource> SharedL
 @inject SchedulerTimePresentation Clock
 @implements IAsyncDisposable
 
-<MudDialog DefaultFocus="DefaultFocus.None">
-    <TitleContent><h2 class="cleanup-dialog-title">@L["Cleanup:RetireTitle"]</h2></TitleContent>
+<MudDialog DefaultFocus="DefaultFocus.None" Class="cleanup-decision-surface" TitleClass="cleanup-decision-title" ContentClass="cleanup-decision-content" ActionsClass="cleanup-decision-actions">
+    <TitleContent><div class="cleanup-decision-heading mo-vl-role--warning"><span class="cleanup-role-tile"><MoIcon Icon="@MoIcons.ShieldCheck" Size="16px" /></span><div><h2 class="cleanup-dialog-title">@L["Cleanup:RetireTitle"]</h2><p>@L["Cleanup:RetireDescription"]</p></div><MudIconButton Class="cleanup-decision-close" Icon="@MoIcons.Close" Disabled="@_busy" aria-label="@SharedL["Common:Close"]" OnClick="Back" /></div></TitleContent>
     <DialogContent>
         <div class="cleanup-dialog">
-            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Cleanup:RetireAction"]">@L["Cleanup:RetireBody"]</MoSemanticCallout>
             @if (_preview is { } preview)
             {
                 <code class="cleanup-owner-name">@_owner</code>
-                <MoFactGrid Facts="@(new MoFact[] { new(L["Cleanup:DefinitionsUnit"], preview.DefinitionCount.ToString()), new(L["Cleanup:Queued"], preview.QueuedCount.ToString()), new(L["Cleanup:Running"], preview.RunningCount.ToString()) })" />
-                <p>@L["Cleanup:LastObserved"] · @Clock.FormatTimestamp(preview.LastObservedAtUtc)</p>
+                <p>@L["Cleanup:RetirePopulation", preview.DefinitionCount, preview.QueuedCount, preview.RunningCount]</p>
+                <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Cleanup:RetirementEffects"]">@L["Cleanup:RetireBody"]</MoSemanticCallout>
+                <p class="cleanup-choice-help">@L["Cleanup:LastObserved"] · @Clock.FormatTimestamp(preview.LastObservedAtUtc)</p>
                 @if (!preview.CanRetire)
                 {
                     <MudAlert Severity="Severity.Warning" Icon="@MoIcons.Warning">@L[preview.HasActivePublisher ? "Cleanup:PublisherActive" : "Cleanup:RetirementBlocked"]</MudAlert>
                 }
-                <MudTextField T="string" @bind-Value="_typedOwner" Immediate="true" Label="@L["Cleanup:TypeOwner"]" Variant="Variant.Outlined" Disabled="@_busy" autocomplete="off" />
-                <MudCheckBox T="bool" @bind-Value="_stopped" Label="@L["Cleanup:PublishersStopped"]" Disabled="@_busy" />
+                <MudCheckBox T="bool" @bind-Value="_stopped" Label="@L["Cleanup:PublishersStopped"]" Color="Color.Primary" Size="Size.Small" Disabled="@_busy" />
+                <MudTextField T="string" @bind-Value="_typedOwner" Immediate="true" Label="@L["Cleanup:TypeOwner"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@_busy" autocomplete="off" spellcheck="false" />
             }
             @if (_busy) { <MudProgressLinear Indeterminate="true" aria-label="@L["Cleanup:Loading"]" /> }
             @if (_error is not null) { <MudAlert Severity="Severity.Error" Icon="@MoIcons.Error">@_error</MudAlert> }
@@ -26,8 +27,8 @@
     </DialogContent>
     <DialogActions>
         <SchedulerDecisionBackButton Disabled="@_busy" OnClick="Back" />
-        <MudButton Disabled="@_busy" OnClick="RebuildAsync">@L["Cleanup:Rebuild"]</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">@L["Cleanup:ConfirmRetirement"]</MudButton>
+        @if (_needsRebuild || _preview?.CanRetire == false) { <MudButton Disabled="@_busy" OnClick="RebuildAsync">@L["Cleanup:Rebuild"]</MudButton> }
+        <MudButton Class="cleanup-confirm-remove" Color="Color.Error" Variant="Variant.Filled" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">@L["Cleanup:ConfirmRetirement"]</MudButton>
     </DialogActions>
 </MudDialog>
 

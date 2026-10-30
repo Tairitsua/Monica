@@ -1,6 +1,6 @@
 @* Compact filter toggle whose pressed state preserves the option's semantic palette role. *@
 <button type="button"
-        class="mo-vl-chip @Role.ToCssClass() @Class"
+        class="mo-vl-chip @Role.ToCssClass() @(Pill ? "mo-vl-chip--pill" : null) @Class"
         aria-pressed="@PressedText"
         aria-label="@AriaLabel"
         @onclick="ToggleAsync">
@@ -30,6 +30,9 @@
 
     /// <summary>Gets or sets a value indicating whether a semantic dot renders inside the chip.</summary>
     [Parameter] public bool ShowDot { get; set; }
+
+    /// <summary>Gets or sets the capsule silhouette for compact filter rails. Defaults to false.</summary>
+    [Parameter] public bool Pill { get; set; }
 
     /// <summary>Gets or sets the exact record count for this option; a true zero stays readable and operable.</summary>
     [Parameter] public int? Count { get; set; }

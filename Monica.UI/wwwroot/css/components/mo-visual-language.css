@@ -139,6 +139,7 @@ button.mo-vl-spine-node { cursor: pointer; }
 .mo-vl-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .mo-vl-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 11px; border: 1px solid var(--mud-palette-divider); border-radius: 6px; background: var(--mud-palette-surface); color: var(--mud-palette-text-secondary); font-family: inherit; font-size: .75rem; line-height: 1.5; cursor: pointer; }
 .mo-vl-chip:hover { border-color: var(--mud-palette-lines-inputs); color: var(--mud-palette-text-primary); }
+.mo-vl-chip--pill { border-radius: 999px; min-height: 30px; padding: 4px 11px; }
 .mo-vl-chip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--mo-vl-role) 35%, var(--mud-palette-divider)); background: color-mix(in srgb, var(--mo-vl-role) 10%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--mo-vl-role) 45%, var(--mud-palette-text-primary)); font-weight: 500; }
 .mo-vl-chip[aria-pressed="true"].mo-vl-role--neutral { border-color: var(--mud-palette-text-primary); background: var(--mud-palette-text-primary); color: var(--mud-palette-surface); }
 .mo-vl-chip-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--mo-vl-role); }

@@ -76,6 +76,8 @@ public partial class JobDefinitionCleanupContent
     private void ChangeOwner(string? value) => Navigate(new() { ["owner"] = value == string.Empty ? null : value, ["page"] = null });
     private void FilterState(JobDefinitionCleanupState? value) => Navigate(new() { ["state"] = value?.ToString(), ["page"] = null });
     private void ChangePage(int page) => Navigate(new() { ["page"] = page });
+    private void ResetFilters() => Navigate(new() { ["owner"] = null, ["q"] = null, ["state"] = null, ["page"] = null });
+    private void SearchChanged(string value) { _search = value; SearchAsync(); }
     private void SearchAsync() => Navigate(new() { ["q"] = string.IsNullOrWhiteSpace(_search) ? null : _search, ["page"] = null });
     private void SearchKey(KeyboardEventArgs args) { if (args.Key == "Enter") SearchAsync(); }
     private void Inspect(JobId id) => Navigate(new() { ["inspectOwner"] = id.OwnerKey, ["inspectJob"] = id.JobKey });
@@ -87,6 +89,16 @@ public partial class JobDefinitionCleanupContent
     private void SelectReady() => _state?.SelectReadyPage();
     private void ClearSelection() => _state?.ClearSelection();
     private void Toggle(JobId id, bool selected) => _state?.Toggle(id, selected);
+    private bool? PageSelection => _state?.Snapshot is { Items.Count: > 0 } snapshot
+        ? snapshot.Items.All(item => _state.Selected.Contains(item.Id)) ? true
+        : snapshot.Items.Any(item => _state.Selected.Contains(item.Id)) ? null : false : false;
+    private void TogglePage(bool? value)
+    {
+        if (_state is not { CanWrite: true, Busy: false, Snapshot: { } snapshot } state) return;
+        var select = PageSelection != true;
+        foreach (var item in snapshot.Items) state.Toggle(item.Id, select);
+    }
+    private string RowClass(JobDefinitionCleanupItem item, int index) => _state?.Selected.Contains(item.Id) == true ? "cleanup-row is-selected" : "cleanup-row";
     private string Label(JobDefinitionCleanupState state) => DefinitionCleanupPresentation.Label(L, state);
     private string Reason(JobDefinitionCleanupState state) => DefinitionCleanupPresentation.Reason(L, state);
     private static string Ledger(JobId id) => SchedulerRouteBuilder.Ledger(new()
@@ -99,6 +111,8 @@ public partial class JobDefinitionCleanupContent
         ? _cleanupDialog!.OpenAsync(state.Selected.ToArray()) : Task.CompletedTask;
     private Task RetireOwnerAsync(string owner) => _state is { CanWrite: true, Busy: false }
         ? _ownerDialog!.OpenAsync(owner) : Task.CompletedTask;
+    private Task PreviewItemAsync(JobId id) => _state is { CanWrite: true, Busy: false }
+        ? _cleanupDialog!.OpenAsync([id]) : Task.CompletedTask;
 
     private Task<IDialogReference> OpenCleanupDialogAsync(JobId[] ids) => Dialogs.ShowAsync<DefinitionCleanupDialog>(L["Cleanup:Preview"],
         new DialogParameters<DefinitionCleanupDialog>

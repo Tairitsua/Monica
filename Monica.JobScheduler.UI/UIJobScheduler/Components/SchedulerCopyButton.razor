@@ -3,8 +3,10 @@
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<JobSchedulerResource> L
 @implements IAsyncDisposable
-<button type="button" class="scheduler-copy" disabled="@_busy" aria-label="@L["Workspace:CopyJobKey"]" @onclick="CopyAsync"><MoIcon Icon="@MoIcons.Copy" Size="13px" /></button>
+<button type="button" class="scheduler-copy" disabled="@_busy" aria-label="@(Label ?? L["Workspace:CopyJobKey"].Value)" @onclick="CopyAsync"><MoIcon Icon="@MoIcons.Copy" Size="13px" /></button>
 @code {
+    /// <summary>Gets an optional localized action label; omission uses the job-key copy label.</summary>
+    [Parameter] public string? Label { get; set; }
     /// <summary>Gets the exact value copied to the browser clipboard.</summary>
     [Parameter,EditorRequired] public string Value { get; set; } = string.Empty;
     private readonly SchedulerOperationLifetime _lifetime = new();
@@ -17,7 +19,7 @@
             var copied=false;
             try { copied=await JS.InvokeAsync<bool>("MoClipboard.copyText",token,value); }
             catch (JSException) { }
-            if (!_lifetime.IsRetired) Snackbar.Add(L[copied ? "Catalog:Actions:CopiedKey" : "Catalog:Actions:CopyKeyFailed"],copied ? Severity.Success : Severity.Warning);
+            if (!_lifetime.IsRetired) Snackbar.Add(L[copied ? "Workspace:CopySuccess" : "Workspace:CopyFailure"],copied ? Severity.Success : Severity.Warning);
         }); }
         catch(OperationCanceledException) when (_lifetime.IsRetired) { }
         finally { _busy=false; }

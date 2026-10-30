@@ -7,6 +7,22 @@ namespace Monica.JobScheduler.UI.UIJobScheduler.Support;
 
 internal static class DefinitionCleanupPresentation
 {
+    internal static string Icon(JobDefinitionCleanupState state) => state switch
+    {
+        JobDefinitionCleanupState.Ready => Monica.UI.Icons.MoIcons.Check,
+        JobDefinitionCleanupState.Queued => Monica.UI.Icons.MoIcons.Hourglass,
+        JobDefinitionCleanupState.Running => Monica.UI.Icons.MoIcons.HeartPulse,
+        JobDefinitionCleanupState.Published => Monica.UI.Icons.MoIcons.ShieldCheck,
+        _ => Monica.UI.Icons.MoIcons.Info
+    };
+
+    internal static string Declaration(IStringLocalizer<JobSchedulerResource> localizer, JobDefinitionCleanupItem item) =>
+        localizer[item.ManifestHash is null ? "Cleanup:Unknown"
+            : item.Definition?.IsPresent == false ? "Cleanup:Unpublished" : "Cleanup:States:Published"];
+
+    internal static MoVisualRole DeclarationRole(JobDefinitionCleanupItem item) => item.ManifestHash is null
+        ? MoVisualRole.Neutral : item.Definition?.IsPresent == false ? MoVisualRole.Success
+        : item.State == JobDefinitionCleanupState.OwnerUnconfirmed ? MoVisualRole.Neutral : MoVisualRole.Primary;
     internal static readonly JobDefinitionCleanupState[] States = [JobDefinitionCleanupState.Ready,
         JobDefinitionCleanupState.Queued, JobDefinitionCleanupState.Running, JobDefinitionCleanupState.OwnerUnconfirmed];
 
