@@ -64,9 +64,9 @@ await context.ExecuteSnapshotWriteAsync([typeof(Product)], ct => context.Set<Pro
     .Where(x => x.Id == id).ExecuteUpdateAsync(update => update.SetProperty(x => x.Name, name), ct), token);
 ```
 
-This requires an active managed transaction even when no snapshot registration is present. It marks declared dependencies conservatively, including zero-row updates. A thrown write marks the operation rollback-only. Declare cascade-affected types too. Tracked changes are captured automatically at save; repository callers never manually increment versions. Native writes do not refresh EF's tracked instances: current-state loaders must combine transaction-visible SQL with pending property changes instead of allowing unchanged tracked values to hide a bulk update.
+This requires an active managed transaction even when no snapshot registration is present. It marks declared dependencies conservatively, including zero-row updates. A thrown write marks the operation rollback-only. Declare cascade-affected types too. Tracked changes are captured automatically at save; repository callers never manually increment versions. Native writes do not refresh EF's tracked instances. For calculations after writes, pass the updated business data explicitly; when complete transaction-visible data is required, flush through the operation and use a purpose-specific repository read. Do not make snapshot reads silently switch to SQL or merge tracked changes.
 
-Use `context.HasUncommittedSnapshotChanges(datasetKey)` only to choose a business-owned current-state read. It inspects both staged and already-flushed changes in the active operation and never publishes them. Test fixture seeding of a registered dataset must also run through `application.ExecuteAsync`; the ordinary test `SeedAsync` helper does not start this transaction.
+`context.HasUncommittedSnapshotChanges(datasetKey)` inspects both staged and already-flushed changes in the active operation; it does not publish them or change snapshot read semantics. Test fixture seeding of a registered dataset must also run through `application.ExecuteAsync`; the ordinary test `SeedAsync` helper does not start this transaction.
 
 ## Read and projection ownership
 
