@@ -104,8 +104,11 @@ public sealed class TableLayoutTests
         using var source = new LayoutContext(Options("postgres").UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra")).Options);
         using var matching = new LayoutContext(Options("postgres").UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra")).UseModel(source.Model).Options);
         Assert.Same(source.Model, matching.Model);
-        using var mismatched = new LayoutContext(Options("postgres").UseMonicaTableLayout(InfrastructureTableLayout.DefaultSchema).UseModel(source.Model).Options);
-        Assert.Throws<InvalidOperationException>(() => mismatched.Model);
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var mismatched = new LayoutContext(Options("postgres").UseMonicaTableLayout(InfrastructureTableLayout.DefaultSchema).UseModel(source.Model).Options);
+            _ = mismatched.Model;
+        });
     }
 
     [Fact]

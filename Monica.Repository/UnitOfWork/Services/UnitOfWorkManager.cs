@@ -89,6 +89,7 @@ public sealed class UnitOfWorkManager(
                 if (services.GetService<SnapshotTransaction>() is { } snapshots)
                     await snapshots.FinalizeAsync(cancellationToken);
             }
+            ThrowIfRollbackOnly("commit");
             if (_transaction is not null) await _transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -199,19 +200,26 @@ public sealed class UnitOfWorkManager(
         return primary;
     }
 
-    internal void ValidateSave(DbContext context)
+    /// <summary>Validates participant access and reports whether the physical transaction is owned by this operation.</summary>
+    internal bool ValidateSave(DbContext context)
     {
         EnsureUsable();
         ThrowIfRollbackOnly("access the database");
         var owner = context is IRepositoryContextAdapter { TransactionOwner: { } transactionOwner } ? transactionOwner : context;
-        if (_transaction is not null && !_contexts.Contains(owner))
+        if (_transaction is null) return false;
+        if (!_contexts.Contains(owner)
+            || context.Database.ProviderName != _contexts[0].Database.ProviderName
+            || !ReferenceEquals(context.Database.GetDbConnection(), _contexts[0].Database.GetDbConnection())
+            || context.Database.CurrentTransaction is not { } current
+            || !ReferenceEquals(current.GetDbTransaction(), _transaction.GetDbTransaction()))
         {
             var exception = new InvalidOperationException($"DbContext '{context.GetType().FullName}' (transaction owner '{owner.GetType().FullName}') " +
-                $"is not a participant in active transaction '{Id}'. Participants: {string.Join(", ", _contexts.Select(x => x.GetType().FullName))}. " +
+                $"must be a selected participant using active transaction '{Id}'. Participants: {string.Join(", ", _contexts.Select(x => x.GetType().FullName))}. " +
                 "Select the executing domain's context and share its connection, or call through WithTransaction(ApiTransaction.Independent).");
             MarkRollbackOnly(ExecutionTransactionFailure.FromException("Participation", exception) with { DbContextType = context.GetType().FullName });
             throw exception;
         }
+        return true;
     }
 
     private void EnsureUsable()

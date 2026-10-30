@@ -17,7 +17,7 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 | Set Shared/Independent boundaries, compose one database, select participants, or understand rollback | [Transactions](references/transactions.md) |
 | Store binary objects or select a Minio provider | [Blob storage](references/blob-storage.md) |
 | Choose before-commit effects or committed delivery; configure outbox, inbox, and projections | [Transactional events](references/transactional-events.md) |
-| Diagnose a failed save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |
+| Diagnose a failed or slow save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |
 
 For key-value storage, use [state stores](../monica-infra-hosting/references/state-stores.md); for application placement, use ProjectUnit development in `$monica-application-project-unit-development`. For module implementation, use `$monica-framework`, then `$monica-development`.
 

@@ -1,7 +1,6 @@
 using Monica.Locker.EfCore;
 using Monica.Core.Execution;
 using Monica.EntityFrameworkCore.Extensions;
-using System.Transactions;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
@@ -40,8 +39,8 @@ namespace Monica.Repository.Persistence.Services;
 /// <summary>
 /// Base DbContext for Monica repositories. Persistence concepts — audit stamping, soft-delete rewriting,
 /// concurrency stamps, and optional durable notification capture — are intrinsic to
-/// <see cref="SaveChangesAsync(bool, CancellationToken)"/> and apply on every save path, with or without
-/// a scoped operation. External notification delivery runs separately after commit.
+/// <see cref="SaveChangesAsync(bool, CancellationToken)"/>. Storage policies apply on every save path;
+/// durable notification capture requires a managed UnitOfWork transaction. External delivery runs after commit.
 /// </summary>
 public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContext> options, ICachedServiceProvider serviceProvider)
     : DbContext(options), IRepositoryModelFeatures, IRepositoryContextLifetime, IOutboxStoreContext, IInboxStoreContext
@@ -301,13 +300,15 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
 
     /// <summary>
-    /// Saves through fixed persistence policies. Outbox snapshots and business rows share a transaction.
+    /// Saves through fixed persistence policies. Outbox snapshots and business rows share the managed UnitOfWork transaction.
     /// No transport is invoked. A failed save faults this context; retry in a fresh scope.
     /// </summary>
     /// <remarks>
     /// SaveChanges(false) is deliberately unsupported: accepting business changes between two internal flushes
     /// is necessary for generated-key outbox capture. Use a transaction and a fresh context when retrying.
-    /// A caller-owned transaction is never committed here.
+    /// Managed saves omit automatic savepoints because any failure requires the whole operation to roll back.
+    /// Other saves retain EF's transaction and savepoint behavior. This method never commits a caller-owned transaction
+    /// or starts an additional transaction merely because Outbox is configured.
     /// </remarks>
     public sealed override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         => SaveCoreAsync(true, acceptAllChangesOnSuccess, cancellationToken);
@@ -326,7 +327,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         _pendingMessages.Add(captured);
     }
 
-    private void ValidateSave()
+    private bool ValidateSave()
     {
         CachedServiceProvider.GetService<UnitOfWorkManager>()?.ThrowIfRollbackOnly("access the database");
         if (_saveFailed) throw new InvalidOperationException("This context's save failed. Dispose it and retry in a fresh scope.");
@@ -338,7 +339,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 || Database.CurrentTransaction is not { } physicalTransaction
                 || !ReferenceEquals(physicalTransaction.GetDbTransaction(), transaction.GetDbTransaction())))
             throw new NotSupportedException("A physical context must share its logical owner's connection and transaction.");
-        CachedServiceProvider.GetService<UnitOfWorkManager>()?.ValidateSave(this);
+        return CachedServiceProvider.GetService<UnitOfWorkManager>()?.ValidateSave(this) == true;
     }
 
     /// <summary>
@@ -354,7 +355,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     /// <exception cref="NotSupportedException">A physical adapter does not share its owner's connection and transaction.</exception>
     public void ValidateDatabaseAccess()
     {
-        // Save owns its internal commands and rollback/savepoint cleanup. Outside it, native EF access
+        // Save validates its transaction before executing internal commands. Outside it, native EF access
         // must obey the same operation lifetime and participant selection as tracked saves.
         if (!_saving) ValidateSave();
     }
@@ -408,15 +409,15 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     private async Task<int> SaveCoreAsync(bool useAsync, bool acceptAll, CancellationToken token)
     {
         if (!acceptAll) throw new NotSupportedException("RepositoryDbContext requires acceptAllChangesOnSuccess=true. Retry failures in a fresh scope.");
-        ValidateSave();
+        var managedTransaction = ValidateSave();
         _saving = true;
         var autoDetect = ChangeTracker.AutoDetectChangesEnabled;
-        IDbContextTransaction? ownedTransaction = null;
-        IDbContextTransaction? externalTransaction = null;
-        string? savepoint = null;
-        Exception? failure = null;
+        var autoSavepoints = Database.AutoSavepointsEnabled;
         try
         {
+            token.ThrowIfCancellationRequested();
+            // The operation owns recovery across both business and Outbox flushes. A failed context cannot retry.
+            if (managedTransaction) Database.AutoSavepointsEnabled = false;
             // Sharding coordinators delegate their EF save to physical RepositoryDbContexts. Policies
             // belong to those actual saves, never to both the aggregate tracker and its physical trackers.
             IReadOnlyList<PersistenceChange> changes = this is IRepositoryContextAdapter { CoordinatesSave: true }
@@ -436,27 +437,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 if (projectedChanges.Length != 0)
                     CachedServiceProvider.GetRequiredService<UnitOfWorkManager>().RequireOutboxOwner();
             }
-            if (outbox is not null)
-            {
-                if (!Database.IsRelational()) throw new NotSupportedException("Transactional outbox requires a relational provider.");
-                externalTransaction = Database.CurrentTransaction;
-                if (externalTransaction is null)
-                {
-                    // Some relational adapters support local EF transactions without System.Transactions enlistment.
-                    if (System.Transactions.Transaction.Current is not null
-                        || this.GetService<IDbContextTransactionManager>() is ITransactionEnlistmentManager { EnlistedTransaction: not null })
-                        throw new NotSupportedException("Outbox saves require an explicit EF transaction, not an ambient system transaction.");
-                    ownedTransaction = useAsync ? await Database.BeginTransactionAsync(token) : Database.BeginTransaction();
-                }
-                else
-                {
-                    if (!externalTransaction.SupportsSavepoints)
-                        throw new NotSupportedException("Outbox capture inside an existing transaction requires savepoint support.");
-                    savepoint = "monica_" + Guid.NewGuid().ToString("N");
-                    if (useAsync) await externalTransaction.CreateSavepointAsync(savepoint, token);
-                    else externalTransaction.CreateSavepoint(savepoint);
-                }
-            }
+            if (outbox is not null && !Database.IsRelational())
+                throw new NotSupportedException("Transactional outbox requires a relational provider.");
 
             var affected = useAsync ? await base.SaveChangesAsync(true, token) : base.SaveChanges(true);
             if (useAsync) await CaptureEntityEventsAsync(changes, switches, token);
@@ -475,58 +457,21 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 if (useAsync) await base.SaveChangesAsync(true, token);
                 else base.SaveChanges(true);
             }
-            if (ownedTransaction is not null)
-            {
-                if (useAsync) await ownedTransaction.CommitAsync(token);
-                else ownedTransaction.Commit();
-            }
-            if (savepoint is not null)
-            {
-                if (useAsync) await externalTransaction!.ReleaseSavepointAsync(savepoint, token);
-                else externalTransaction!.ReleaseSavepoint(savepoint);
-            }
             _pendingMessages.Clear();
             return affected;
         }
         catch (Exception exception)
         {
-            failure = exception;
             _saveFailed = true;
             CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
                 ExecutionTransactionFailure.FromException("SaveChanges", exception) with { DbContextType = GetType().FullName });
-            try
-            {
-                if (ownedTransaction is not null)
-                {
-                    if (useAsync) await ownedTransaction.RollbackAsync(CancellationToken.None);
-                    else ownedTransaction.Rollback();
-                }
-                else if (savepoint is not null)
-                {
-                    if (useAsync) await externalTransaction!.RollbackToSavepointAsync(savepoint, CancellationToken.None);
-                    else externalTransaction!.RollbackToSavepoint(savepoint);
-                }
-            }
-            catch (Exception cleanup) { exception.Data["Monica.Repository.SaveRollbackException"] = cleanup; }
             throw;
         }
         finally
         {
             ChangeTracker.AutoDetectChangesEnabled = autoDetect;
+            if (managedTransaction) Database.AutoSavepointsEnabled = autoSavepoints;
             _saving = false;
-            if (ownedTransaction is not null)
-            {
-                try
-                {
-                    if (useAsync) await ownedTransaction.DisposeAsync();
-                    else ownedTransaction.Dispose();
-                }
-                catch (Exception cleanup)
-                {
-                    if (failure is not null) failure.Data["Monica.Repository.SaveDisposeException"] = cleanup;
-                    Logger.LogError(cleanup, "Transaction cleanup failed after the save outcome was established.");
-                }
-            }
         }
     }
 
