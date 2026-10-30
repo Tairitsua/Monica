@@ -519,7 +519,8 @@ public sealed class ModuleEventBusKafkaOption : MinimalApiModuleOptions<ModuleEv
     public TimeSpan ProducerFlushTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Gets or sets the delay between native Kafka consumer retry attempts after an error.
+    /// Gets or sets the delay between native Kafka transport recovery attempts after an error.
+    /// Processing retries use ModuleEventBusOption.MessageRetryCount and run within the delivery.
     /// </summary>
     public TimeSpan ConsumerErrorBackoff { get; set; } = TimeSpan.FromSeconds(5);
 

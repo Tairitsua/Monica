@@ -6,6 +6,7 @@ using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
+using Monica.EventBus.Services.Support;
 using Monica.Repository.Inbox.Annotations;
 using Monica.Repository.Inbox.Models;
 using Monica.Testing.Hosting;
@@ -50,11 +51,15 @@ public sealed class InboxExecutionTests
     }
 
     [Fact]
-    public async Task Receive_WhenBusinessRejectedAfterFlush_ShouldRollBackBeforePropagatingToTransport()
+    public async Task Receive_WhenRetriesExhaustAfterFlush_ShouldRollBackEachAttemptInFreshScope()
     {
         await using var app = await new RepositoryScenarioFactory(
             inbox: true,
-            configure: services => services.AddScoped<RejectingInboxHandler>()).CreateAsync(cancellationToken: Token);
+            configure: services =>
+            {
+                services.AddSingleton<InboxRetryProbe>();
+                services.AddScoped<RejectingInboxHandler>();
+            }).CreateAsync(cancellationToken: Token);
         EventMessage message;
         await using (var scope = app.CreateScope(Token))
         {
@@ -63,9 +68,13 @@ public sealed class InboxExecutionTests
         }
 
         var exception = await Assert.ThrowsAsync<BusinessException>(() =>
-            app.Services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, Token));
+            app.Services.GetRequiredService<EventMessageRetryPolicy>().ExecuteAsync(
+                () => app.Services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, Token), Token));
 
         Assert.Equal("The notice violates a business rule.", exception.Message);
+        var contexts = app.Services.GetRequiredService<InboxRetryProbe>().ContextIds;
+        Assert.Equal(2, contexts.Count);
+        Assert.Equal(2, contexts.Distinct().Count());
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
         {
             Assert.Empty(await db.HardDeleteRows.ToListAsync(ct));
@@ -141,12 +150,19 @@ public sealed class SecondInboxHandler(TestRepositoryDbContext db) : IDistribute
 public sealed record RejectedInboxNotice(string Value);
 
 [Inbox("tests.inbox.rejected")]
-public sealed class RejectingInboxHandler(TestRepositoryDbContext db) : IDistributedEventHandler<RejectedInboxNotice>
+public sealed class RejectingInboxHandler(TestRepositoryDbContext db, InboxRetryProbe probe)
+    : IDistributedEventHandler<RejectedInboxNotice>
 {
     public async Task HandleEventAsync(RejectedInboxNotice eventData, CancellationToken cancellationToken)
     {
+        probe.ContextIds.Add(db.ContextId.InstanceId);
         db.HardDeleteRows.Add(new HardDeleteRow { Title = eventData.Value });
         await db.SaveChangesAsync(cancellationToken);
         throw new BusinessException("The notice violates a business rule.");
     }
+}
+
+public sealed class InboxRetryProbe
+{
+    public List<Guid> ContextIds { get; } = [];
 }

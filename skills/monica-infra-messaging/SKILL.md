@@ -9,7 +9,7 @@ Choose the communication boundary before the transport; database-coupled deliver
 
 | Task | Read |
 | --- | --- |
-| Notify typed handlers, classify rejected deliveries, or configure dead-letter handling | [EventBus](references/event-bus.md) |
+| Notify typed handlers, bound processing retries, or configure dead-letter handling | [EventBus](references/event-bus.md) |
 | Inspect EventBus subscriptions, transport status, providers, or diagnostic listeners | [EventBus diagnostics](references/event-bus-diagnostics.md) |
 | Configure the Kafka console or inspect broker clusters, topics, consumer groups, and offset samples | [Kafka console](references/kafka-console.md) |
 | Call another application's published request contract and await a result | [RPC client](references/rpc.md) |

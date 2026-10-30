@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.EventBus.Abstractions;
@@ -22,6 +21,7 @@ namespace Monica.EventBus.Kafka.Providers.ConfluentKafka;
 internal sealed class KafkaEventBusSubscriptionHostedService(
     IEventSubscriptionRegistry subscriptionManager,
     IEventReceiveDispatcher dispatcher,
+    EventMessageRetryPolicy retryPolicy,
     ITopicSubscriptionStatusStore topicStatusStore,
     IObservableInstanceRegistry observableManager,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
@@ -155,15 +155,16 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     failure =>
                     {
                         TopicStatusStore.ReportError(ServiceKey, topicConsumer.TopicName,
-                            $"Permanently rejected Kafka message {metadata.MessageId} at {result.TopicPartitionOffset}",
+                            $"Retry budget exhausted for Kafka message {metadata.MessageId} at {result.TopicPartitionOffset}",
                             failure);
-                        RecordState($"Permanently rejected Kafka message for topic {topicConsumer.TopicName}",
+                        RecordState($"Retry budget exhausted for Kafka message for topic {topicConsumer.TopicName}",
                             HostedServiceState.Degraded, failure);
                         Logger.LogError(failure,
-                            "Permanently rejected Kafka message {MessageId} at {TopicPartitionOffset}; skipping delivery " +
+                            "Retry budget exhausted for Kafka message {MessageId} at {TopicPartitionOffset}; skipping delivery " +
                             "(ServiceKey: {ServiceKey})",
                             metadata.MessageId, result.TopicPartitionOffset, ServiceKey ?? "default");
-                    });
+                    },
+                    retryPolicy, cancellationToken);
 
                 if (processed)
                 {
@@ -211,31 +212,50 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     }
 
     internal static async Task<bool> CommitAfterHandlingAsync(
-        Func<Task> handle, Action commit, Action rewind, Action<Exception> reject)
+        Func<Task> handle, Action commit, Action rewind, Action<Exception> reject,
+        EventMessageRetryPolicy retryPolicy,
+        CancellationToken cancellationToken = default)
     {
+        var processed = true;
         try
         {
-            var processed = true;
             try
             {
-                await handle();
+                await retryPolicy.ExecuteAsync(handle, cancellationToken);
             }
-            catch (Exception failure) when (failure is BusinessException or EventMessageDeserializationException)
+            catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
             {
-                // Classify only handler failures, after its transaction and scope have unwound.
+                // End exhausted processing only after the last attempt's transaction and scope unwind.
+                cancellationToken.ThrowIfCancellationRequested();
                 reject(failure);
                 processed = false;
             }
 
-            commit();
-            return processed;
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller disposes this consumer without advancing its broker position.
+            throw;
         }
         catch (Exception failure)
         {
-            // A retryable handler failure or failed offset commit must retain the same delivery identity.
+            // Failure to record the terminal disposition must retain the same delivery identity.
             RewindOrThrow(rewind, failure);
             throw;
         }
+
+        try
+        {
+            commit();
+        }
+        catch (Exception failure)
+        {
+            RewindOrThrow(rewind, failure);
+            throw;
+        }
+
+        return processed;
     }
 
     private static void RewindOrThrow(Action rewind, Exception? originalFailure)

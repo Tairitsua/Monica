@@ -39,40 +39,37 @@ Implement `IDistributedEventHandler<TEvent>` for distributed receives and make s
 
 For a database write that must publish only after commit, mark the event `[Outbox]`, enable outbox on the primary UnitOfWork context, and publish through the scoped gateway inside that operation. A successful outbox `PublishAsync` means the prepared payload was staged, not committed or transported. Worker delivery can retry, so consumers need idempotency; `[Inbox]` supplies durable handler deduplication when configured. Follow the persistence skill's [transactional-events reference](../../monica-infra-persistence/references/transactional-events.md) for migration and transaction ownership.
 
-## Rejected deliveries and retries
+## Processing retries and dead letters
 
-Throw `Monica.Core.ExceptionHandling.Exceptions.BusinessException` only when retrying the same delivery cannot resolve a business-rule rejection. Built-in distributed providers treat it as permanent after the handler operation and its scope have unwound. They also treat `EventMessageDeserializationException` as permanent. A malformed or null event body must not keep a Kafka partition pinned indefinitely.
-
-| Receive outcome | Dapr streaming provider | Native Kafka provider |
-| --- | --- | --- |
-| Handler completes | `Success` | Commit offset |
-| `BusinessException` or malformed event body | Log and return `Drop`; Dapr forwards to the configured dead-letter topic, or discards when none is configured | Log and commit offset, allowing the next record to proceed |
-| Other exception, timeout, or cancellation | Request `Retry` | Rewind without acknowledging; retry after backoff, or stop during shutdown |
-
-Native Kafka currently has no dead-letter destination option. Its permanent rejections are discarded after their offset commit succeeds. An offset-commit failure remains retryable even after a business rejection; if rewind fails, the consumer stops rather than risking acknowledgment of later records. Dapr and Kafka retain the exception in topic diagnostics and log message identity and topic information; rejected deliveries are not counted as successfully processed messages. Broker delivery is still at least once: an acknowledgment failure can cause a rejected message to reappear.
-
-For Dapr, configure the existing option when rejected message bodies must be retained:
+`ModuleEventBusOption.MessageRetryCount` is the single processing retry budget for Dapr and native Kafka. It defaults to **1 retry after the first attempt** (at most two attempts). Set it to **0** to disable retries; negative values fail policy activation. All processing failures consume the same budget: `BusinessException`, ordinary exceptions, timeout, malformed payloads, and a handler's independent cancellation. There is no business-exception classification or unlimited processing mode.
 
 ```csharp
 builder.AddMonica(monica =>
-    monica.AddEventBus().UseDaprProvider(options =>
-        options.DeadLetterTopicSuffix = ".dead-letter"));
+    monica.AddEventBus(options => options.MessageRetryCount = 1)
+        .UseDaprProvider(options => options.DeadLetterTopicSuffix = ".dead-letter"));
 ```
 
-The default suffix is `null`. A configured suffix must be non-empty and contain no whitespace. Each source topic uses `<topic><suffix>`; a topic already ending in the suffix has no further dead-letter target. Provision broker topics and their retention separately. `Drop` delegates terminal forwarding to Dapr; Monica does not republish the payload itself. Configure Dapr resiliency and component retry limits separately for transient failures; setting a suffix does not define a retry budget. See the [Dapr streaming response contract](https://v1-16.docs.dapr.io/developing-applications/sdks/dotnet/dotnet-messaging/dotnet-messaging-pubsub-howto/).
+Retries run immediately within one transport delivery, invoking the receive dispatcher again with the same message identity and original body. Each invocation deserializes again and activates fresh handler scopes and transactions. No message-ID cache or persistent retry counter is needed. A successful retry ends processing immediately. The budget applies to the entire delivery, so handlers that already succeeded may be invoked again; use Inbox or another idempotency boundary for effects that must not repeat.
 
-Do not wrap every failed `Res`, `InvalidOperationException`, database error, or remote-call error in `BusinessException`. The framework cannot infer permanence from an exception message or arbitrary inner exception. Unknown failures remain retryable, so classify a known business rejection at the application boundary:
+| Receive outcome | Dapr streaming provider | Native Kafka provider |
+| --- | --- | --- |
+| Any attempt completes | `Success` | Commit offset |
+| Processing retry budget exhausted | Log and return `Drop`; Dapr forwards to the configured dead-letter topic, or discards when none is configured | Log and commit offset, allowing the next record to proceed |
+| Transport/host stops or subscription is removed | Stop attempts and return `Retry` when the stream can still acknowledge | Stop without committing or seeking |
 
-```csharp
-if (notice.RequiredReference is null)
-{
-    throw new BusinessException("The notice has no required reference.");
-}
-```
+Cancellation of the transport lifetime is shutdown, not a processing failure. An exception or canceled task produced by a handler while the transport remains active is an ordinary failed attempt. This preserves messages during normal host restarts without depending on the handler's exception type.
 
-This rejects the entire transport delivery: subsequent handlers for that topic are not invoked, and any earlier handler's separately committed work is not undone. The failing handler's transaction, including its Inbox receipt, rolls back. If an invalid business document must be saved or an alarm raised, model that as a handled outcome, persist it and return normally so its transaction and Inbox receipt commit. Do not throw after staging those effects. Local EventBus calls continue to propagate exceptions to their caller; publishing and Outbox send retries are unchanged.
+Dapr's `MessageHandlingTimeout` remains 30 seconds by default and now applies **per attempt**. Monica owns this deadline; the SDK callback token represents stream lifetime only. Each attempt receives a fresh linked cancellation token. On timeout Monica cancels the attempt and stops waiting. A handler that does not honor cancellation may continue, retaining its scope until it finishes and potentially overlapping a retry or terminal forwarding. Its late completion cannot change the delivery result. Handlers must pass cancellation to I/O and protect repeatable side effects. Native Kafka counts thrown timeout failures against the same budget; it does not impose a separate handler execution deadline.
 
-Source and checks: `Monica.EventBus/Abstractions/IEventBus.cs`, `Abstractions/Handlers/ILocalEventHandler.cs` and `IDistributedEventHandler.cs`, `Monica.EventBus/Modules/ModuleEventBus.cs`, `Monica.Dapr/Services/DaprEventBusSubscriptionHostedService.cs`, `Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedService.cs`, `tests/Test.Monica.Dapr/Services/DaprEventBusSubscriptionHostedServiceTests.cs`, `tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedServiceTests.cs`, `tests/Test.Monica.Repository/UnitOfWork/InboxExecutionTests.cs`, `tests/Test.Monica.EventBus/Services/EventBusAutoDiscoveryLifecycleTests.cs`, `tests/Test.Monica.EventBus/Modules/ModuleEventBusCompositionTests.cs`, and `OutboxGatewayTests.cs`.
+Native Kafka currently has no dead-letter destination option. Its exhausted processing failures are discarded after their offset commit succeeds. A failed offset commit remains a transport failure; a failed rewind stops the consumer before it can acknowledge later records. Dapr and Kafka retain the final exception in topic diagnostics and log message identity and topic information; exhausted deliveries are not counted as successfully processed messages.
+
+Dapr's `DeadLetterTopicSuffix` defaults to `null`. A configured suffix must be non-empty and contain no whitespace. Each source topic uses `<topic><suffix>`; a topic already ending in the suffix has no further dead-letter target. Provision broker topics and retention separately. `Drop` delegates terminal forwarding to Dapr; Monica does not republish the payload itself. See the [Dapr streaming response contract](https://github.com/dapr/dotnet-sdk/blob/386b0ed7487ea365341f0ac52c4ba4df3593b635/src/Dapr.Messaging/PublishSubscribe/TopicResponseAction.cs#L31) and [dead-letter configuration](https://docs.dapr.io/developing-applications/building-blocks/pubsub/pubsub-deadletter/).
+
+The limit bounds processing attempts **per transport delivery**, not broker redelivery across crashes, failed acknowledgments, or connection recovery. Those events can deliver the same message again with a fresh budget; broker delivery remains at least once. Dapr resiliency, broker retry configuration, native Kafka reconnection and offset-commit recovery remain transport concerns. This policy does not claim a durable, cross-restart attempt limit.
+
+The failing handler's transaction, including its Inbox receipt, rolls back; an earlier handler's separately committed work is not undone. If an invalid business document must be saved or an alarm raised, persist it as a handled outcome and return normally so its transaction and Inbox receipt commit. Local EventBus calls still propagate exceptions to their caller; publishing and Outbox send retries are unchanged.
+
+Behavioral checks: [shared retry budget](../../../tests/Test.Monica.EventBus/Services/EventMessageRetryPolicyTests.cs), [Dapr responses, deadlines and dead letters](../../../tests/Test.Monica.Dapr/Services/DaprEventBusSubscriptionHostedServiceTests.cs), [Kafka retries, cancellation and acknowledgment](../../../tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedServiceTests.cs), and [Inbox rollback across fresh retry scopes](../../../tests/Test.Monica.Repository/UnitOfWork/InboxExecutionTests.cs).
 
 For registered-handler inspection, independent transport health, live change-feed ownership, and diagnostic publishing, use [EventBus diagnostics](event-bus-diagnostics.md).
 

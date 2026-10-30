@@ -1,13 +1,11 @@
 namespace Monica.Core.ExceptionHandling.Exceptions;
 
 /// <summary>
-/// Represents a business-rule rejection that retrying the same operation cannot resolve.
+/// Represents an operation rejected by a business rule.
 /// </summary>
 /// <remarks>
-/// Built-in distributed EventBus consumers treat this exception as a permanent delivery failure after the handler
-/// operation has unwound: they log the failure and discard the delivery, or use the provider's configured dead-letter
-/// destination. Local EventBus calls still propagate it to their caller. Do not use this type for transient dependency
-/// failures, timeouts, or cancellation.
+/// The HTTP exception handler projects the message as a failed result. This type does not select an EventBus
+/// retry or dead-letter policy; distributed consumers apply their configured retry budget to every processing failure.
 /// </remarks>
 /// <param name="message">The business rule that prevented the operation.</param>
 public class BusinessException(string? message) : Exception(message)
