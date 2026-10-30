@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Monica.Core;
 using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.Execution;
@@ -40,7 +41,8 @@ public class ModuleChainTracing : MonicaModule<ModuleChainTracingOption>, IWebMo
     public override void ConfigureServices(ModuleContext<ModuleChainTracingOption> context)
     {
         var services = context.Services;
-        services.AddSingleton<IChainTracing, AsyncLocalChainTracingService>();
+        services.AddSingleton<AsyncLocalChainTracingService>();
+        services.AddSingleton<IChainTracing>(provider => provider.GetRequiredService<AsyncLocalChainTracingService>());
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -103,13 +105,21 @@ public static class ModuleChainTracingRegistrationExtensions
     }
 
     /// <summary>
-    /// Registers a scoped EF Core command interceptor. Attach it to the application's DbContext options
-    /// to capture SQL beneath an active controller, execution, or explicit chain scope. Commands without
-    /// an active parent are skipped; this integration never creates a chain root.
+    /// Automatically attaches host-owned connection, command, and reader tracing to standard EF Core
+    /// DbContext options composition, including factories and pools. An active business chain is required.
+    /// Third-party or manually built options use the UseChainTracing options extension. Repeated selection
+    /// is idempotent. No connection, transaction, retry, or result-consumption behavior is changed.
     /// </summary>
-    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseDatabaseTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
+    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseEntityFrameworkCoreTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
-        module.ConfigureServices(context => { context.Services.TryAddScoped<ChainTracingDbCommandInterceptor>(); });
+        module.ConfigureServices(context =>
+        {
+            context.Services.TryAddSingleton<DatabaseTraceRecorder>();
+            context.Services.TryAddSingleton<ChainTracingDbConnectionInterceptor>();
+            context.Services.TryAddSingleton<ChainTracingDbCommandInterceptor>();
+            context.Services.TryAddEnumerable(ServiceDescriptor.Singleton(
+                typeof(IDbContextOptionsConfiguration<>), typeof(ChainTracingDbContextOptionsConfiguration<>)));
+        });
         return module;
     }
 

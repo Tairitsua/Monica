@@ -12,7 +12,6 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Extensions;
 using Monica.Framework.ChainTracing.Models;
-using Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
 using Monica.Modules;
 using Monica.Testing.Hosting;
 using Xunit;
@@ -81,10 +80,10 @@ public sealed class ChainTracingDatabaseExecutionTests
 
         captured.Should().NotBeNull();
         captured!.EndTime.Should().NotBeNull();
-        captured.NodeMap.Should().HaveCount(2);
+        captured.NodeMap.Should().HaveCount(outcome == "success" ? 4 : 3);
         captured.NodeMap.Values.Should().OnlyContain(node => node.EndTime != null);
         captured.Root!.Exception.Should().BeSameAs(thrown);
-        var sql = captured.Root.Children!.Should().ContainSingle().Subject;
+        var sql = captured.Root.Children!.Single(node => node.Database?.Phase == DatabaseTracePhase.CommandExecute);
         sql.Type.Should().Be(EChainTracingType.Database);
         if (thrown is not null)
         {
@@ -125,7 +124,7 @@ public sealed class ChainTracingDatabaseExecutionTests
         foreach (var chain in chains)
         {
             chain.EndTime.Should().NotBeNull();
-            chain.Root!.Children!.Should().ContainSingle().Which.RepeatCount.Should().Be(2);
+            chain.Root!.Children!.Should().HaveCount(3).And.OnlyContain(node => node.RepeatCount == 2);
             chain.NodeMap.Values.Should().OnlyContain(node => node.EndTime != null);
         }
         factory.Logs.Warnings.Should().BeEmpty();
@@ -152,7 +151,7 @@ public sealed class ChainTracingDatabaseExecutionTests
         caller!.EndTime.Should().BeNull();
         var execution = caller.Children!.Should().ContainSingle().Subject;
         execution.EndTime.Should().NotBeNull();
-        execution.Children!.Should().ContainSingle().Which.EndTime.Should().NotBeNull();
+        execution.Children!.Should().HaveCount(3).And.OnlyContain(node => node.EndTime != null);
         factory.Logs.Warnings.Should().BeEmpty();
     }
 
@@ -214,14 +213,13 @@ public sealed class ChainTracingDatabaseExecutionTests
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
             => builder.AddChainTracing(options => options.MaxNodeCount = maxNodeCount)
-                .UseExecutionTracing().UseDatabaseTracing();
+                .UseExecutionTracing().UseEntityFrameworkCoreTracing();
 
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
-            services.AddDbContext<TracingDbContext>((provider, options) => options.UseSqlite("Data Source=:memory:")
-                .AddInterceptors(provider.GetRequiredService<ChainTracingDbCommandInterceptor>(),
-                    new SecondCommandInterceptor(cancelOnCommand)));
+            services.AddDbContext<TracingDbContext>(options => options.UseSqlite("Data Source=:memory:")
+                .AddInterceptors(new SecondCommandInterceptor(cancelOnCommand)));
         }
     }
 

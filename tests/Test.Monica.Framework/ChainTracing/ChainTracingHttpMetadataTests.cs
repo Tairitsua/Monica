@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -11,7 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Execution.Mvc;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
-using Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
 using Monica.Modules;
 using Monica.Testing.Hosting;
 using Xunit;
@@ -47,6 +47,12 @@ public sealed class ChainTracingHttpMetadataTests
             chain.GetProperty("duration").GetString().Should().NotBeNullOrWhiteSpace();
             Nodes(chain).Should().Contain(node =>
                 node.GetProperty("operation").GetString()!.Contains("SELECT 42", StringComparison.Ordinal));
+            chain.GetProperty("durationMs").GetDouble().Should().BeGreaterThanOrEqualTo(0);
+            var database = Nodes(chain).Where(node => node.TryGetProperty("database", out _)).ToArray();
+            database.Select(node => node.GetProperty("database").GetProperty("phase").GetString())
+                .Should().Equal("connection.open", "command.execute", "reader.consume");
+            database.Should().OnlyContain(node => node.GetProperty("database").GetProperty("pendingCount").GetInt32() == 0);
+            database[0].GetProperty("database").GetProperty("poolWaitMs").ValueKind.Should().Be(JsonValueKind.Null);
         }
         else
         {
@@ -70,6 +76,13 @@ public sealed class ChainTracingHttpMetadataTests
     {
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
+            builder.AddJsonSerialization(options =>
+            {
+                options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
+                options.EnableGlobalEnumToString = true;
+                options.EnableEnumFormatValue = true;
+                options.EnumTypeToIgnore = [typeof(ResStatus)];
+            });
             builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = exposeDiagnostics)
                 .UseResultFieldNames(names => names.Status = "code");
             builder.AddControllers().ConfigMvcBuilder(mvc =>
@@ -77,7 +90,7 @@ public sealed class ChainTracingHttpMetadataTests
             builder.AddChainTracing()
                 .UseControllerTracing()
                 .AttachControllerTraceMetadata()
-                .UseDatabaseTracing()
+                .UseEntityFrameworkCoreTracing()
                 .ConfigureEndpoints(context => context.ApplicationBuilder.UseEndpoints(endpoints =>
                     endpoints.MapControllers()));
         }
@@ -85,9 +98,8 @@ public sealed class ChainTracingHttpMetadataTests
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
-            services.AddDbContext<ChainTracingHttpProbeDbContext>((provider, options) => options
-                .UseSqlite("Data Source=:memory:")
-                .AddInterceptors(provider.GetRequiredService<ChainTracingDbCommandInterceptor>()));
+            services.AddDbContext<ChainTracingHttpProbeDbContext>(options => options
+                .UseSqlite("Data Source=:memory:"));
         }
     }
 }

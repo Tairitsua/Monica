@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Data;
 using System.Data.Common;
+using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,6 +13,7 @@ using Monica.Framework.ChainTracing.Extensions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
 using Monica.Framework.ChainTracing.Services;
+using Monica.Framework.ChainTracing.Services.Support;
 using Monica.Modules;
 using Xunit;
 
@@ -23,6 +25,7 @@ namespace Test.Monica.Framework.ChainTracing;
 /// </summary>
 public sealed class ChainTracingDbCommandInterceptorTests
 {
+    private static readonly Guid ConnectionId = Guid.NewGuid();
     [Fact]
     public void RepeatedCommands_WithSameShapeInSameScope_ShouldAggregateOntoOneNode()
     {
@@ -39,6 +42,17 @@ public sealed class ChainTracingDbCommandInterceptorTests
 
         DatabaseChildrenOf(tracing).Should().ContainSingle()
             .Which.RepeatCount.Should().Be(49, "49 later batches aggregate onto the first node");
+        var details = DatabaseChildrenOf(tracing).Single().Database!;
+        details.ExecutionCount.Should().Be(50);
+        details.PendingCount.Should().Be(0);
+        details.TotalDurationMs.Should().Be(250);
+        details.MaxDurationMs.Should().Be(5);
+        details.WindowDurationMs.Should().Be(DatabaseChildrenOf(tracing).Single().DurationMs);
+        details.CommandId.Should().BeNull("a group no longer identifies one command");
+        var restored = JsonSerializer.Deserialize<ChainTraceNode>(JsonSerializer.Serialize(DatabaseChildrenOf(tracing).Single()))!;
+        restored.Database!.TotalDurationMs.Should().Be(250);
+        restored.Database.ExecutionCount.Should().Be(50);
+        restored.DurationMs.Should().Be(DatabaseChildrenOf(tracing).Single().DurationMs);
     }
 
     [Fact]
@@ -187,6 +201,62 @@ public sealed class ChainTracingDbCommandInterceptorTests
         DatabaseChildrenOf(tracing).Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task ReaderCompletion_InAnotherAsyncContext_ShouldAttachToCapturedParentAndCompleteOnce()
+    {
+        var tracing = CreateTracing();
+        var interceptor = CreateInterceptor(tracing);
+        using var command = CreateCommand("SELECT 42");
+        using var table = new DataTable();
+        using var reader = table.CreateDataReader();
+        var chain = await Task.Run(() =>
+        {
+            tracing.BeginTrace("Origin", "Handler");
+            interceptor.ReaderExecuting(command, Data(command), default);
+            return tracing.GetCurrentChain()!;
+        }, TestContext.Current.CancellationToken);
+
+        tracing.GetCurrentChain().Should().BeNull();
+        interceptor.ReaderExecuted(command, ExecutedData(command), reader);
+        var consumption = chain.Root!.Children!.Single(node => node.Database!.Phase == DatabaseTracePhase.ReaderConsume);
+        consumption.Parent.Should().BeSameAs(chain.Root);
+        consumption.Database!.PendingCount.Should().Be(1);
+        consumption.DurationMs.Should().BeNull();
+        using var replacedReader = table.CreateDataReader();
+        var closing = new DataReaderClosingEventData(null!, null!, command, replacedReader, null,
+            Guid.NewGuid(), ConnectionId, false, 0, 0, DateTimeOffset.UtcNow);
+        interceptor.DataReaderClosing(command, closing, default);
+        interceptor.DataReaderClosing(command, closing, default);
+        consumption.Database.ExecutionCount.Should().Be(1);
+        consumption.Database.PendingCount.Should().Be(0);
+        consumption.IsFailed.Should().NotBeTrue();
+        consumption.Result.Should().Be("Closed");
+        tracing.GetCurrentChain().Should().BeNull();
+    }
+
+    [Fact]
+    public void Aggregation_WhenOneExecutionStillPending_ShouldNotPublishACompletedWindowAsTheNodeDuration()
+    {
+        var tracing = CreateTracing();
+        var interceptor = CreateInterceptor(tracing);
+        using var parent = tracing.BeginScope("Batch", "Handler");
+        using var first = CreateCommand("SELECT 42");
+        using var second = CreateCommand("SELECT 42");
+        Executing(interceptor, first);
+        Executing(interceptor, second);
+        Executed(interceptor, first);
+        var node = DatabaseChildrenOf(tracing).Single();
+        node.Database!.PendingCount.Should().Be(1);
+        node.Database.ExecutionCount.Should().Be(1);
+        node.Database.TotalDurationMs.Should().Be(5);
+        node.Database.WindowDurationMs.Should().NotBeNull();
+        node.DurationMs.Should().BeNull();
+        Executed(interceptor, second);
+        node.Database.PendingCount.Should().Be(0);
+        node.Database.TotalDurationMs.Should().Be(10);
+        node.DurationMs.Should().NotBeNull();
+    }
+
     private static List<ChainTraceNode> DatabaseChildrenOf(IChainTracing tracing)
     {
         var parent = tracing.GetCurrentNode()!;
@@ -197,7 +267,7 @@ public sealed class ChainTracingDbCommandInterceptorTests
 
     private static ChainTracingDbCommandInterceptor CreateInterceptor(AsyncLocalChainTracingService tracing)
     {
-        return new ChainTracingDbCommandInterceptor(tracing,
+        return new ChainTracingDbCommandInterceptor(new DatabaseTraceRecorder(tracing),
             NullLogger<ChainTracingDbCommandInterceptor>.Instance);
     }
 
@@ -215,7 +285,7 @@ public sealed class ChainTracingDbCommandInterceptorTests
     {
         return new CommandEventData(
             null!, null!, null!, command, "test", null, DbCommandMethod.ExecuteNonQuery,
-            Guid.NewGuid(), Guid.NewGuid(), false, true,
+            Guid.NewGuid(), ConnectionId, false, true,
             DateTimeOffset.UtcNow, CommandSource.LinqQuery);
     }
 

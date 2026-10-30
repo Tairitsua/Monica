@@ -1,151 +1,87 @@
-using System.Collections.Concurrent;
-using System.Data;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Models;
+using Monica.Framework.ChainTracing.Services.Support;
 using Monica.Tool.Extensions;
 
 namespace Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
 
-/// <summary>
-/// Records EF Core commands beneath an active chain-tracing scope; commands without a parent are skipped.
-/// Completion belongs to the node captured at command start, independently of the callback's async context.
-/// All command kinds (reader, non-query, scalar) and terminal paths (executed, failed, canceled) are paired
-/// to release command tracking on completion. Repeated commands with the same shape inside one ambient
-/// scope aggregate onto a single node (with a repeat count), so batch writers inserting tens of
-/// thousands of rows cannot balloon the chain or the diagnostic response.
-/// </summary>
-/// <param name="chainTracing">The chain tracing service.</param>
-/// <param name="logger">The logger.</param>
-public class ChainTracingDbCommandInterceptor(
-    IChainTracing chainTracing,
+/// <summary>Captures command execution and reader lifetime beneath the original business node.</summary>
+internal sealed class ChainTracingDbCommandInterceptor(
+    DatabaseTraceRecorder recorder,
     ILogger<ChainTracingDbCommandInterceptor> logger) : DbCommandInterceptor
 {
-    private readonly ConcurrentDictionary<DbCommand, ChainTraceNode> _commandTraces = new(ReferenceEqualityComparer.Instance);
-    private readonly ConditionalWeakTable<ChainTraceNode, Dictionary<(CommandType Type, string Text), ChainTraceNode>> _scopeTraces = new();
+    private readonly ConditionalWeakTable<DbCommand, CommandTrace> _commands = new();
+    // EF retains the command through reader disposal, even if another interceptor replaces the reader.
+    private readonly ConditionalWeakTable<DbCommand, DatabaseTraceOperation> _readers = new();
 
-    private void StartCommandTrace(DbCommand command)
+    private void StartCommandTrace(DbCommand command, CommandEventData data)
     {
         try
         {
-            // EF may invoke start and completion in separate async contexts. An interceptor cannot
-            // create an ambient root for its caller; the controller or business execution owns it.
-            if (chainTracing.GetCurrentChain() is not { EndTime: null } context
-                || chainTracing.GetCurrentNode() is not { EndTime: null } parent)
-            {
-                return;
-            }
-
-            // Weak ownership prevents a reused interceptor from retaining completed chains. Use the
-            // entire command text so unrelated commands with a common prefix never share a node.
-            var shapes = _scopeTraces.GetValue(parent, static _ => new());
-            lock (shapes)
-            {
-                var shape = (command.CommandType, command.CommandText);
-                if (!shapes.TryGetValue(shape, out var node))
-                {
-                    var extraInfo = new
-                    {
-                        command.CommandTimeout,
-                        ParameterCount = command.Parameters.Count,
-                        Parameters = command.Parameters.Cast<DbParameter>()
-                            .Take(10)
-                            .Select(p => new
-                            {
-                                Name = p.ParameterName,
-                                DbType = p.DbType.ToString(),
-                                Value = p.Value?.ToString()?.LimitMaxLength(100, "...")
-                            })
-                            .ToArray()
-                    };
-
-                    var traceId = chainTracing.BeginTrace(
-                        command.CommandText.LimitMaxLength(1000, "..."),
-                        null,
-                        extraInfo,
-                        EChainTracingType.Database);
-
-                    // Capture limits return synthetic identifiers without allocating a node.
-                    if (!context.NodeMap.TryGetValue(traceId, out node)) return;
-                    shapes.Add(shape, node);
-                }
-
-                _commandTraces[command] = node;
-            }
+            var contextType = data.Context?.GetType().FullName;
+            var shape = command.CommandType + ":" + command.CommandText;
+            var operation = recorder.Start(DatabaseTracePhase.CommandExecute,
+                command.CommandText.LimitMaxLength(1000, "..."), shape,
+                contextType, data.ConnectionId, data.CommandId,
+                new { command.CommandTimeout, ParameterCount = command.Parameters.Count });
+            if (operation is not null)
+                _commands.Add(command, new CommandTrace(operation, shape, contextType, data.ConnectionId, data.CommandId));
         }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to record the start of a database command trace.");
-        }
+        catch (Exception error) { logger.LogWarning(error, "Failed to start database command tracing."); }
     }
 
-    private void Complete(DbCommand command, CommandEventData eventData, object? result = null, bool isCanceled = false)
+    private void Complete(DbCommand command, CommandEndEventData data, object? result = null, bool isCanceled = false)
     {
-        if (!_commandTraces.TryRemove(command, out var node))
-        {
-            return;
-        }
-
+        if (!_commands.TryGetValue(command, out var state) || !_commands.Remove(command)) return;
         try
         {
-            string resultDescription;
-            var success = true;
-            Exception? exception = null;
-
-            if (eventData is CommandEndEventData endEvent)
+            var error = (data as CommandErrorEventData)?.Exception;
+            state.Operation.Complete(isCanceled || error is OperationCanceledException ? "Canceled"
+                : error is null ? "Success" : "Failed", error, data.Duration);
+            if (error is null && !isCanceled && result is DbDataReader)
             {
-                resultDescription = "Success";
-
-                if (eventData is CommandErrorEventData errorEvent)
-                {
-                    success = false;
-                    exception = errorEvent.Exception;
-                    resultDescription = "Error";
-                }
-                else if (isCanceled)
-                {
-                    success = false;
-                    resultDescription = "Canceled";
-                }
-                else if (result is int affectedRows)
-                {
-                    resultDescription += $"[AffectedRows:{affectedRows}]";
-                }
-
-                resultDescription += $"[{endEvent.Duration.TotalMilliseconds:0.##}ms]";
-            }
-            else
-            {
-                resultDescription = "Unknown";
-            }
-
-            // Database nodes never occupy the ambient scope. Complete the captured leaf directly,
-            // including repeats that finish out of order, without moving any caller's current node.
-            lock (node)
-            {
-                var endTime = DateTime.UtcNow;
-                if (node.EndTime.HasValue) node.AddRepeat(!success, endTime);
-                else node.EndTime = endTime;
-
-                if (!success) node.IsFailed = true;
-                node.Exception ??= exception;
-                node.Result = node.RepeatCount > 0
-                    ? $"{resultDescription} ×{node.RepeatCount + 1}"
-                    : resultDescription;
+                var consumption = recorder.Start(DatabaseTracePhase.ReaderConsume, "ConsumeResult", state.Shape,
+                    state.ContextType, state.ConnectionId, state.CommandId, origin: state.Operation);
+                if (consumption is not null) _readers.Add(command, consumption);
             }
         }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to record the end of a database command trace.");
-        }
+        catch (Exception error) { logger.LogWarning(error, "Failed to complete database command tracing."); }
     }
+
+    private void CompleteReader(DbCommand command)
+    {
+        if (!_readers.TryGetValue(command, out var operation) || !_readers.Remove(command)) return;
+        try { operation.Complete("Closed"); }
+        catch (Exception error) { logger.LogWarning(error, "Failed to complete database reader tracing."); }
+    }
+
+    public override InterceptionResult DataReaderClosing(DbCommand command, DataReaderClosingEventData eventData,
+        InterceptionResult result)
+    {
+        if (!result.IsSuppressed) CompleteReader(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult> DataReaderClosingAsync(DbCommand command,
+        DataReaderClosingEventData eventData, InterceptionResult result)
+        => ValueTask.FromResult(DataReaderClosing(command, eventData, result));
+
+    public override InterceptionResult DataReaderDisposing(DbCommand command, DataReaderDisposingEventData eventData,
+        InterceptionResult result)
+    {
+        if (!result.IsSuppressed) CompleteReader(command);
+        return result;
+    }
+
+    private sealed record CommandTrace(DatabaseTraceOperation Operation, string Shape, string? ContextType,
+        Guid ConnectionId, Guid CommandId);
 
     public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.NonQueryExecuting(command, eventData, result);
     }
 
@@ -158,7 +94,7 @@ public class ChainTracingDbCommandInterceptor(
 
     public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
     }
 
@@ -171,7 +107,7 @@ public class ChainTracingDbCommandInterceptor(
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.ReaderExecuting(command, eventData, result);
     }
 
@@ -184,7 +120,7 @@ public class ChainTracingDbCommandInterceptor(
 
     public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
     }
 
@@ -197,7 +133,7 @@ public class ChainTracingDbCommandInterceptor(
 
     public override InterceptionResult<object> ScalarExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.ScalarExecuting(command, eventData, result);
     }
 
@@ -210,7 +146,7 @@ public class ChainTracingDbCommandInterceptor(
 
     public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
     {
-        StartCommandTrace(command);
+        StartCommandTrace(command, eventData);
         return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
     }
 

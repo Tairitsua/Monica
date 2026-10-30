@@ -44,38 +44,8 @@ public class AsyncLocalChainTracingService(IOptions<ModuleChainTracingOption> op
         {
             var context = _chainContext.Value ??= new ChainTraceContext();
 
-            if (IsMaxDepthReached())
-            {
-                WarnOnce(context, "Chain depth reached the {Limit} limit; skipping further nodes below {Handler}.{Operation}.",
-                    _options.MaxChainDepth, handler, operation);
-                return Guid.NewGuid().ToString("N"); // Return a synthetic TraceId so follow-up calls stay safe.
-            }
-
-            if (IsMaxNodeCountReached())
-            {
-                WarnOnce(context, "Chain node count reached the {Limit} limit; skipping {Handler}.{Operation}.",
-                    _options.MaxNodeCount, handler, operation);
-                return Guid.NewGuid().ToString("N"); // Return a synthetic TraceId so follow-up calls stay safe.
-            }
-
-            var node = new ChainTraceNode
-            {
-                Handler = handler,
-                Operation = operation,
-                Type = type,
-                StartExtraInfo = extraInfo,
-                StartTime = DateTime.UtcNow
-            };
-
-            context.AddNode(node, _currentNode.Value);
-
-            // Capture origin and time once so later response projection preserves the request's provenance.
-            if (ReferenceEquals(context.Root, node))
-            {
-                node.Service = string.IsNullOrEmpty(_options.ServiceName) ? null : _options.ServiceName;
-                node.Timestamp = new DateTimeOffset(node.StartTime);
-                node.ServiceVersion = string.IsNullOrWhiteSpace(_options.ServiceVersion) ? null : _options.ServiceVersion;
-            }
+            var node = CreateNode(context, _currentNode.Value, operation, handler, extraInfo, type);
+            if (node is null) return Guid.NewGuid().ToString("N");
 
             if (ChainTraceContext.CanHaveChildOperations(type))
             {
@@ -91,6 +61,52 @@ public class AsyncLocalChainTracingService(IOptions<ModuleChainTracingOption> op
         {
             logger.LogError(ex, "Failed to start chain node {Handler}.{Operation}.", handler, operation);
             return Guid.NewGuid().ToString("N"); // Return a synthetic TraceId so follow-up calls stay safe.
+        }
+    }
+
+    // A database callback may run under a different ExecutionContext. Attach to its captured owner
+    // directly, without replacing that flow's ambient scope or bypassing capture limits.
+    internal ChainTraceNode? BeginDatabaseTrace(ChainTraceContext context, ChainTraceNode parent,
+        string operation, object? extraInfo)
+        => CreateNode(context, parent, operation, null, extraInfo, EChainTracingType.Database);
+
+    private ChainTraceNode? CreateNode(ChainTraceContext context, ChainTraceNode? parent,
+        string operation, string? handler, object? extraInfo, EChainTracingType type)
+    {
+        lock (context)
+        {
+            if (type == EChainTracingType.Database && (context.EndTime is not null || parent?.EndTime is not null))
+                return null;
+            if ((parent?.Depth ?? 0) >= _options.MaxChainDepth)
+            {
+                WarnOnce(context, "Chain depth reached the {Limit} limit; skipping further nodes below {Handler}.{Operation}.",
+                    _options.MaxChainDepth, handler, operation);
+                return null;
+            }
+            if (context.NodeMap.Count >= _options.MaxNodeCount)
+            {
+                WarnOnce(context, "Chain node count reached the {Limit} limit; skipping {Handler}.{Operation}.",
+                    _options.MaxNodeCount, handler, operation);
+                return null;
+            }
+
+            var node = new ChainTraceNode
+            {
+                Handler = handler,
+                Operation = operation,
+                Type = type,
+                StartExtraInfo = extraInfo,
+                StartTime = DateTime.UtcNow
+            };
+            node.InitializeTiming(context.Root);
+            context.AddNode(node, parent);
+            if (ReferenceEquals(context.Root, node))
+            {
+                node.Service = string.IsNullOrEmpty(_options.ServiceName) ? null : _options.ServiceName;
+                node.Timestamp = new DateTimeOffset(node.StartTime);
+                node.ServiceVersion = string.IsNullOrWhiteSpace(_options.ServiceVersion) ? null : _options.ServiceVersion;
+            }
+            return node;
         }
     }
 
