@@ -67,9 +67,10 @@ public sealed class UnitOfWorkManager(
                 await RollbackAsync();
                 return result;
             }
-            if (_rollbackOnly) throw new InvalidOperationException("A nested operation failed; the transaction is rollback-only.");
+            ThrowIfRollbackOnly("commit");
             await domainEvents.DrainAsync(configuration.Value.MaximumDomainEvents, cancellationToken);
             await FlushAsync(cancellationToken);
+            ThrowIfRollbackOnly("commit");
             if (_transaction is not null) await _transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -146,13 +147,32 @@ public sealed class UnitOfWorkManager(
         return primary;
     }
 
-    internal void ValidateSave(DbContext context)
+    /// <summary>Validates participant access and reports whether the physical transaction is owned by this operation.</summary>
+    internal bool ValidateSave(DbContext context)
     {
         EnsureUsable();
-        if (_rollbackOnly) throw new InvalidOperationException("The operation is rollback-only. Dispose the scope before retrying.");
+        ThrowIfRollbackOnly("access the database");
         var owner = context is IRepositoryContextAdapter { TransactionOwner: { } transactionOwner } ? transactionOwner : context;
-        if (_transaction is not null && !_contexts.Contains(owner))
-            throw new InvalidOperationException("This DbContext is not a participant in the active transaction.");
+        if (_transaction is null) return false;
+        if (!_contexts.Contains(owner)
+            || context.Database.ProviderName != _contexts[0].Database.ProviderName
+            || !ReferenceEquals(context.Database.GetDbConnection(), _contexts[0].Database.GetDbConnection())
+            || context.Database.CurrentTransaction is not { } current
+            || !ReferenceEquals(current.GetDbTransaction(), _transaction.GetDbTransaction()))
+        {
+            var exception = new InvalidOperationException($"DbContext '{context.GetType().FullName}' (transaction owner '{owner.GetType().FullName}') " +
+                $"must be a selected participant using active transaction '{Id}'. Participants: {string.Join(", ", _contexts.Select(x => x.GetType().FullName))}. " +
+                "Select the operation's contexts and share their connection, or use a separate scope for independent work.");
+            MarkRollbackOnly();
+            throw exception;
+        }
+        return true;
+    }
+
+    internal void ThrowIfRollbackOnly(string action)
+    {
+        if (_rollbackOnly)
+            throw new InvalidOperationException($"Cannot {action}: the operation is rollback-only. Dispose the scope before retrying.");
     }
 
     private void EnsureUsable()

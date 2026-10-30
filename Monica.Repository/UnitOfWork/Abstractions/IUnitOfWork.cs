@@ -13,5 +13,10 @@ public interface IUnitOfWork
     Task<int> FlushAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Prevents commit, including when a nested failure was caught by its caller.</summary>
+    /// <remarks>
+    /// Records failure without throwing or immediately rolling back. The operation owner performs rollback.
+    /// Save callbacks must throw when they cannot continue; a callback that only marks rollback is rejected
+    /// with InvalidOperationException when its EF flush returns. Catching the rejection does not restore health.
+    /// </remarks>
     void MarkRollbackOnly();
 }

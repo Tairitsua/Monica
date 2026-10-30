@@ -159,9 +159,10 @@ public sealed class SharedTransactionTests
     [Fact]
     public async Task RunAsync_WhenPrimaryWasFlushedFirst_ShouldFlushLaterParticipantProjectionOnOwner()
     {
+        var observer = new SaveTransactionObserver();
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync(TestContext.Current.CancellationToken);
-        using var host = CreateHost(connection, connection, withOutbox: true);
+        using var host = CreateHost(connection, connection, withOutbox: true, observer: observer);
         await using (var setup = host.Services.CreateAsyncScope())
             await setup.ServiceProvider.GetRequiredService<TestRepositoryDbContext>()
                 .Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
@@ -182,6 +183,8 @@ public sealed class SharedTransactionTests
         Assert.Equal(2, await db.HardDeleteRows.CountAsync(TestContext.Current.CancellationToken));
         var message = Assert.Single(await db.Set<OutboxMessage>().ToListAsync(TestContext.Current.CancellationToken));
         Assert.Equal("tests.notice.v1", message.EventName);
+        Assert.Equal(0, observer.Savepoints);
+        Assert.Equal(0, observer.Releases);
     }
 
     [Fact]
@@ -267,28 +270,64 @@ public sealed class SharedTransactionTests
         using var host = CreateHost(connection, connection);
         await using var operation = host.Services.CreateAsyncScope();
         var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-        await manager.RunAsync(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(() =>
         {
             operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().ValidateDatabaseAccess();
             var nonParticipant = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
             Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
             return Task.CompletedTask;
-        }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token);
+        }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token));
+    }
+
+    [Fact]
+    public async Task SaveChanges_WhenSelectedContextDetachesTransaction_ShouldRejectAndRollBack()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(token);
+        using var host = CreateHost(connection, connection);
+        await using (var setup = host.Services.CreateAsyncScope())
+            await setup.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().Database.EnsureCreatedAsync(token);
+        await using (var operation = host.Services.CreateAsyncScope())
+        {
+            var primary = operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>();
+            var secondary = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
+            var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
+            {
+                primary.Add(new HardDeleteRow { Title = "must roll back" });
+                await primary.SaveChangesAsync(token);
+                await secondary.Database.UseTransactionAsync(null, token);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => secondary.SaveChangesAsync(token));
+                Assert.True(secondary.Database.AutoSavepointsEnabled);
+            }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext), typeof(SecondDbContext)]), token));
+        }
+        await using var verify = host.Services.CreateAsyncScope();
+        Assert.Empty(await verify.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().HardDeleteRows.ToListAsync(token));
     }
 
     private static IHost CreateHost(SqliteConnection first, SqliteConnection second,
         DbContextProviderType secondParticipation = DbContextProviderType.UnitOfWork,
         bool withOutbox = false,
         bool withInbox = false,
-        DbContextProviderType firstParticipation = DbContextProviderType.UnitOfWork)
+        DbContextProviderType firstParticipation = DbContextProviderType.UnitOfWork,
+        SaveTransactionObserver? observer = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.AddMonica(monica =>
         {
             if (withInbox) monica.ConfigureTypeDiscovery(options => options.Add(typeof(SharedInboxHandler).Assembly));
             var repository = monica.AddRepository()
-                .AddRepositoryDbContext<TestRepositoryDbContext>((_, db) => db.UseSqlite(first), firstParticipation)
-                .AddRepositoryDbContext<SecondDbContext>((_, db) => db.UseSqlite(second), secondParticipation);
+                .AddRepositoryDbContext<TestRepositoryDbContext>((_, db) =>
+                {
+                    db.UseSqlite(first);
+                    if (observer is not null) db.AddInterceptors(observer);
+                }, firstParticipation)
+                .AddRepositoryDbContext<SecondDbContext>((_, db) =>
+                {
+                    db.UseSqlite(second);
+                    if (observer is not null) db.AddInterceptors(observer);
+                }, secondParticipation);
             if (withOutbox)
             {
                 monica.AddEventBus().UseNoOpDistributedEventBus();

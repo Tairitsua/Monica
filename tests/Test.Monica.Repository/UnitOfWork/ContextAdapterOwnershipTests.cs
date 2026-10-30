@@ -10,6 +10,7 @@ using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Testing.Hosting;
+using Test.Monica.Repository.Hosting;
 using Test.Monica.Repository.Persistence;
 using Xunit;
 
@@ -22,6 +23,7 @@ public sealed class ContextAdapterOwnershipTests
     [InlineData(true)]
     public async Task PhysicalSave_WhenEnlisted_ShouldBelongToTheLogicalOperation(bool fail)
     {
+        var observer = new SaveTransactionObserver();
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         using var host = CreateHost(connection);
@@ -30,19 +32,22 @@ public sealed class ContextAdapterOwnershipTests
         await using (var scope = host.Services.CreateAsyncScope())
         {
             var owner = scope.ServiceProvider.GetRequiredService<OwnerContext>();
-            await using var physical = CreatePhysical(scope.ServiceProvider, connection, owner);
+            await using var physical = CreatePhysical(scope.ServiceProvider, connection, owner, observer);
             var manager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
             var execute = () => manager.RunAsync(async () =>
             {
                 await physical.Database.UseTransactionAsync(owner.Database.CurrentTransaction!.GetDbTransaction(), TestContext.Current.CancellationToken);
                 physical.Add(new GeneratedKeyRow { Title = "physical" });
                 await physical.SaveChangesAsync(TestContext.Current.CancellationToken);
+                Assert.True(physical.Database.AutoSavepointsEnabled);
                 if (fail) throw new ApplicationException("rollback");
             }, cancellationToken: TestContext.Current.CancellationToken);
             if (fail) await Assert.ThrowsAsync<ApplicationException>(execute);
             else await execute();
             await Assert.ThrowsAsync<InvalidOperationException>(() => physical.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
+        Assert.Equal(0, observer.Savepoints);
+        Assert.Equal(0, observer.Releases);
         await using var verification = host.Services.CreateAsyncScope();
         Assert.Equal(fail ? 0 : 1, await verification.ServiceProvider.GetRequiredService<OwnerContext>()
             .Rows.CountAsync(TestContext.Current.CancellationToken));
@@ -75,9 +80,13 @@ public sealed class ContextAdapterOwnershipTests
         return builder.Build();
     }
 
-    private static PhysicalContext CreatePhysical(IServiceProvider services, SqliteConnection connection, DbContext owner)
-        => new(new DbContextOptionsBuilder<PhysicalContext>().UseSqlite(connection).Options,
-            services.GetRequiredService<ICachedServiceProvider>(), owner);
+    private static PhysicalContext CreatePhysical(IServiceProvider services, SqliteConnection connection, DbContext owner,
+        SaveTransactionObserver? observer = null)
+    {
+        var options = new DbContextOptionsBuilder<PhysicalContext>().UseSqlite(connection);
+        if (observer is not null) options.AddInterceptors(observer);
+        return new(options.Options, services.GetRequiredService<ICachedServiceProvider>(), owner);
+    }
 
     public sealed class OwnerContext(DbContextOptions<OwnerContext> options, ICachedServiceProvider services)
         : RepositoryDbContext<OwnerContext>(options, services)
