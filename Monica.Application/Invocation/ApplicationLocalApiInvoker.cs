@@ -27,13 +27,15 @@ internal sealed class ApplicationLocalApiInvoker(
         ArgumentNullException.ThrowIfNull(request);
         if (!Enum.IsDefined(transaction)) throw new ArgumentOutOfRangeException(nameof(transaction));
         cancellationToken.ThrowIfCancellationRequested();
-        if (transaction == ApiTransaction.Shared && operation.Services is { } activeServices)
+        if (transaction == ApiTransaction.Shared && operation.GetActiveUnitOfWorkServices() is { } activeServices)
         {
             // Nested failures must unwind the existing pipeline before any boundary maps them to results.
             return await activeServices.GetRequiredService<IMediator>().Send(request, cancellationToken);
         }
 
-        var principal = operation.Services is { } parent
+        var parent = operation.Services;
+        var presentationBoundary = parent is null || transaction == ApiTransaction.Independent;
+        var principal = parent is not null
             ? parent.GetRequiredService<ICurrentPrincipalAccessor>().Principal
             : await caller.GetPrincipalAsync(cancellationToken);
         using var identity = principalContext.Use(principal);
@@ -51,7 +53,7 @@ internal sealed class ApplicationLocalApiInvoker(
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (presentationBoundary)
         {
             var failure = await services.GetRequiredService<IExceptionHandlerService>()
                 .HandleAsync(null, exception, cancellationToken);
@@ -59,6 +61,7 @@ internal sealed class ApplicationLocalApiInvoker(
             result.Metadata = failure.Metadata;
         }
 
+        if (!presentationBoundary) return result;
         return result.PrepareForPresentation(services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions,
             services.GetRequiredService<IResultErrorMessageProvider>(), ResultTraceId.Capture(null));
     }

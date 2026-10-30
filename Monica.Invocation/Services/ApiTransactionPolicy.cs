@@ -17,7 +17,7 @@ internal static class ApiTransactionPolicy
         bool remote = false, bool isReadOnly = false, string? operation = null)
     {
         Validate(transaction);
-        var boundary = GetActiveTransaction(services, transaction);
+        var boundary = GetActiveUnitOfWork(services, transaction);
         try
         {
             if (remote) EnsureRemoteAllowed(services, transaction);
@@ -35,15 +35,15 @@ internal static class ApiTransactionPolicy
 
     public static void EnsureRemoteAllowed(IServiceProvider services, ApiTransaction transaction)
     {
-        if (GetActiveTransaction(services, transaction) is not null)
+        if (GetActiveUnitOfWork(services, transaction) is { IsActive: true })
             throw new InvalidOperationException("A Shared API call cannot cross a remote boundary while a local transaction is active. " +
                 "Use WithTransaction(ApiTransaction.Independent) when independent commit is intended.");
     }
 
-    private static IExecutionTransaction? GetActiveTransaction(IServiceProvider services, ApiTransaction transaction)
+    private static IExecutionTransaction? GetActiveUnitOfWork(IServiceProvider services, ApiTransaction transaction)
     {
         if (transaction != ApiTransaction.Shared) return null;
-        var activeServices = services.GetService<ExecutionScopeContext>()?.Services ?? services;
-        return activeServices.GetService<IExecutionTransaction>() is { IsActive: true } boundary ? boundary : null;
+        var activeServices = services.GetRequiredService<ExecutionScopeContext>().GetActiveUnitOfWorkServices(services);
+        return activeServices?.GetRequiredService<IExecutionTransaction>();
     }
 }

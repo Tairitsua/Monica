@@ -10,7 +10,8 @@ public interface IApplicationApiInvoker
 {
     /// <summary>Invokes the operation with its shared HTTP mapping and caller cancellation.</summary>
     /// <remarks>
-    /// Shared is the default and rejects remote dispatch during an active local transaction. Independent isolates
+    /// Shared joins an active local unit of work or creates a fresh local operation scope when none is active.
+    /// It is the default and rejects remote dispatch during an active physical transaction. Independent isolates
     /// local execution in a fresh operation and leaves remote execution owned by the receiver. It never bypasses role routing.
     /// </remarks>
     Task<TResponse> InvokeAsync<TResponse>(IRequest<TResponse> request, ApiHttpEndpoint endpoint,

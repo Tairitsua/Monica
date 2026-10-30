@@ -4,7 +4,8 @@ namespace Monica.Invocation.Models;
 public enum ApiTransaction
 {
     /// <summary>
-    /// Joins the current local operation, or starts a root operation when none exists. This is the default.
+    /// Joins the active local unit of work, or resolves a fresh operation scope when none is active. This is the default.
+    /// The target's execution policy decides whether a new operation opens a transaction.
     /// An active transaction cannot cross an HTTP boundary or enlist an independent database connection.
     /// </summary>
     Shared,

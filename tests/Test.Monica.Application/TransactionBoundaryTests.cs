@@ -162,11 +162,11 @@ public sealed class TransactionBoundaryTests
     }
 }
 
-internal sealed class TransactionFactory(bool sharedConnection = true) : MonicaTestApplicationFactory<CommandHandlerCoordinate>
+internal class TransactionFactory(bool sharedConnection = true, bool application = true) : MonicaTestApplicationFactory<CommandHandlerCoordinate>
 {
     protected override void ConfigureMonica(IMonicaBuilder builder)
     {
-        builder.AddApplication();
+        if (application) builder.AddApplication();
         builder.AddApiClient().ConfigDomainInfoProvider(new TestingRpcDomains()).UseLocalTransport();
         builder.AddEventBus().UseNoOpDistributedEventBus();
         builder.AddRepository()
@@ -203,13 +203,16 @@ public sealed class TransactionSecondaryContext(DbContextOptions<TransactionSeco
     public DbSet<OperationEntry> Entries => Set<OperationEntry>();
 }
 
-public sealed class TransactionScope
+public sealed class TransactionScope : IDisposable
 {
     public Guid Id { get; } = Guid.NewGuid();
+    public bool IsDisposed { get; private set; }
+    public void Dispose() => IsDisposed = true;
 }
 
 public sealed class TransactionLedger
 {
+    public List<(TransactionScope Scope, CancellationToken Token)> ChildExecutions { get; } = [];
     public int ChildCalls { get; set; }
     public Guid ParentScope { get; set; }
     public Guid ChildScope { get; set; }
@@ -253,6 +256,7 @@ public sealed class CommandHandlerTransactionChild(TransactionSecondaryContext d
     public override async Task<Res<TransactionReceipt>> Handle(CommandTransactionChild request, CancellationToken cancellationToken)
     {
         ledger.ChildCalls++;
+        ledger.ChildExecutions.Add((scope, cancellationToken));
         ledger.ChildScope = scope.Id;
         ledger.ChildUser = principal.Principal.Identity?.Name;
         ledger.GrandchildScope = (await queries.TransactionScope(new(), cancellationToken)).Data;

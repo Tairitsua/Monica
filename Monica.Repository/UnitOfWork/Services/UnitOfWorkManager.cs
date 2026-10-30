@@ -38,6 +38,12 @@ public sealed class UnitOfWorkManager(
     public Guid Id { get; } = Guid.NewGuid();
 
     /// <inheritdoc />
+    public bool IsOperationActive
+    {
+        get { EnsureUsable(); return _active; }
+    }
+
+    /// <inheritdoc />
     public bool IsActive => _active && _transaction is not null;
 
     /// <inheritdoc />

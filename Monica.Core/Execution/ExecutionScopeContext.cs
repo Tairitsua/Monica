@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Monica.Core.Execution;
 
 /// <summary>Tracks the borrowed dependency scope of an awaited execution within one host.</summary>
@@ -25,6 +27,19 @@ public sealed class ExecutionScopeContext
 
     /// <summary>Gets the current execution identity, or null outside a described execution.</summary>
     public Guid? InvocationId => Current?.InvocationId;
+
+    /// <summary>Gets the dependency scope of the active logical unit of work, or null when none has started.</summary>
+    /// <param name="fallbackServices">The caller-owned scope to inspect when no execution scope is entered.</param>
+    /// <remarks>
+    /// An execution scope alone does not establish a unit of work. An active unit of work is shared even before it
+    /// opens a physical transaction or after it becomes rollback-only. This method never creates or resets a scope.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The execution or its unit of work has already ended.</exception>
+    public IServiceProvider? GetActiveUnitOfWorkServices(IServiceProvider? fallbackServices = null)
+    {
+        var services = Services ?? fallbackServices;
+        return services?.GetService<IExecutionTransaction>() is { IsOperationActive: true } ? services : null;
+    }
 
     /// <summary>Enters a borrowed scope until the returned lease is disposed, restoring its parent afterward.</summary>
     /// <remarks>

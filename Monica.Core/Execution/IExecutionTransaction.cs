@@ -1,9 +1,17 @@
 namespace Monica.Core.Execution;
 
-/// <summary>Exposes the current scope's local transaction boundary without a persistence-provider dependency.</summary>
-/// <remarks>The transaction owner registers this scoped service. Absence means no managed local transaction.</remarks>
+/// <summary>Exposes the current scope's logical unit of work and physical transaction without a persistence-provider dependency.</summary>
+/// <remarks>The transaction owner registers this scoped service. Absence means no managed unit of work.</remarks>
 public interface IExecutionTransaction
 {
+    /// <summary>Gets whether this scope has an active logical unit of work that nested local calls must join.</summary>
+    /// <remarks>
+    /// A unit of work can be active before it enlists a database. Rollback-only work remains active until its owner
+    /// finishes; it must never be mistaken for a new independent operation.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The scope's unit of work has already completed or failed.</exception>
+    bool IsOperationActive { get; }
+
     /// <summary>Gets whether this scope currently owns an active physical transaction.</summary>
     bool IsActive { get; }
 

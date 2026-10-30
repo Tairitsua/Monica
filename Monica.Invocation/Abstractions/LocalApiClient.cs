@@ -10,8 +10,8 @@ namespace Monica.Invocation.Abstractions;
 /// Base type for explicitly selected in-process application API clients.
 /// </summary>
 /// <remarks>
-/// Generated Local implementations use ILocalApiInvoker. Application hosts establish an outer operation scope
-/// and reuse it for nested calls. No HTTP serialization or remote transport is involved.
+/// Generated Local implementations use ILocalApiInvoker. Shared calls join an active logical unit of work;
+/// calls without one own fresh operation scopes. No HTTP serialization or remote transport is involved.
 /// </remarks>
 public abstract class LocalApiClient(ICachedServiceProvider serviceProvider) : ApiClient(serviceProvider)
 {

@@ -69,7 +69,8 @@ var result = await inventoryApi
 
 | Invocation | Shared (default) | Independent |
 | --- | --- | --- |
-| No active transaction | Execute an ordinary root at the selected target | Execute an independent root at the selected target |
+| No active unit of work | Resolve a fresh operation scope at the selected local target; the target's policy decides whether to open a transaction | Execute an independent root at the selected target |
+| Active logical unit of work, no database enlisted yet | Reuse its scope; a compatible child may enlist the first database | Resolve a fresh scope and complete separately |
 | Active transaction; compatible local target | Join the same physical transaction; outermost owner commits | Resolve a fresh scope, handlers and contexts; commit independently |
 | Active transaction; target uses another connection | Reject before target business execution | Execute and commit independently |
 | Active transaction; target is remote | Reject before sending HTTP and mark the caller rollback-only | Receiver owns its operation and commit |
@@ -77,7 +78,20 @@ var result = await inventoryApi
 | Query returns a handled business rejection | Caller decides whether to continue; an already failed transaction stays failed | Caller decides whether to continue |
 | Child succeeds and caller later rolls back | Roll back both | Previously committed child changes remain |
 
-An independent query or `None` entry gets a fresh scope without being forced to open a write transaction. `None` does not suspend the caller's transaction and cannot substitute for Independent. For an orchestration with no outer database writes, `None` plus independently transactional child calls avoids holding a parent transaction across those calls. Independent does not supply retries, compensation or durable orchestration. A remote timeout can leave its commit outcome unknown; retain business idempotency and recovery. On the same database, an independent child must not wait for locks held by its awaiting parent.
+A job or other `None` orchestration has a dependency scope without an automatic outer unit of work. Its default Shared API calls each own a fresh scope, so sequential commands can commit separately without reusing a completed manager. A Query or `None` target still opens no automatic write transaction. For example, inside such an orchestration:
+
+```csharp
+var first = await inventoryApi.ReserveStock(firstRequest, cancellationToken);
+var second = await inventoryApi.ReserveStock(secondRequest, cancellationToken);
+```
+
+The requests and API are application-owned contracts. Handle each returned outcome according to the business workflow; a later failure cannot undo an earlier committed step. If both steps must succeed together, declare an Automatic outer operation and keep the default Shared calls. Without an active unit of work, nested Local APIs also get separate scoped services: pass data explicitly and use the application context contributor for trusted tenant/caller context instead of relying on mutable scoped state to cross API boundaries.
+
+`None` does not suspend an already active unit of work and cannot substitute for Independent. Select Independent when a child must complete separately even inside an active parent. Independent does not supply retries, compensation or durable orchestration. A remote timeout can leave its commit outcome unknown; retain business idempotency and recovery. On the same database, an independent child must not wait for locks held by its awaiting parent.
+
+Scope selection uses the logical unit of work, not merely the presence of an ambient execution scope or physical database transaction. `IExecutionTransaction.IsOperationActive` remains true before database enlistment and while rollback-only; `IsActive` reports an active physical transaction. A completed manager rejects the logical-state query instead of silently starting another operation. Custom transaction owners must implement both facts. Local invokers choose the scope before resolving handlers and dependencies; fresh scopes never reset an old manager, event queue, or snapshot transaction.
+
+`tests/Test.Monica.Application/Invocation/LocalApiOperationScopeTests.cs` covers both Local invokers through a real job execution boundary, separate commits and disposal, transaction-free queries, exception/cancellation propagation, logical participation before enlistment, and rejection of a completed caller scope.
 
 Role and authority routing still select the destination. `RunOnRole` can remain local when the implementation and required active role are present; it does not always imply HTTP. A shared call with an active transaction that resolves remotely fails even when both hosts use the same database or logical AppId. No transaction is transmitted, no role/authority constraint is bypassed, and Shared never falls back to Independent. Without an active caller transaction, a normal root remote call remains valid.
 

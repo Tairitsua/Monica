@@ -71,7 +71,7 @@ Worker polling backs off with jitter within `WorkerPollInterval`; execution-slot
 
 Relational operation telemetry uses meter `Monica.JobScheduler.Store` (`JobSchedulerStoreMetricNames`): operation duration in seconds, operation outcomes, and transaction retries. Subscribe with the host's exporter; operation/outcome tags contain no execution IDs, lease tokens, or arguments. Read-only probes and transaction commands have their own bounded operation observations. Pair these with actual provider SQL/connection evidence when measuring throughput or contention.
 
-Jobs default to no automatic application UnitOfWork. Use the persistence [transaction contract](../../monica-infra-persistence/references/transactions.md) when job work needs automatic saving, context selection, or independently committed child operations.
+Jobs default to no automatic application UnitOfWork. Default Shared Local API calls then own fresh scopes per invocation, allowing sequential commands to commit separately. Use the persistence [transaction contract](../../monica-infra-persistence/references/transactions.md#shared-and-independent-api-calls) to choose an Automatic outer boundary for atomic work or Independent children inside an active parent.
 
 Triggered jobs derive from `TriggeredJob<TArgs>` with JSON-serializable reference-type args and override `ExecuteAsync(TArgs, CancellationToken)`. Put this job in the host's type-discovery scope:
 

@@ -9,7 +9,10 @@ namespace Monica.Invocation.Abstractions;
 public interface ILocalApiInvoker
 {
     /// <summary>Invokes an operation with caller cancellation and explicit transaction participation.</summary>
-    /// <remarks>Shared retains the active scope; Independent resolves the target and its dependencies in a fresh scope.</remarks>
+    /// <remarks>
+    /// Shared retains an active logical unit of work's scope; otherwise it resolves the target and its dependencies
+    /// in a fresh scope. Independent always uses a fresh scope. The target's policy decides whether to open a transaction.
+    /// </remarks>
     Task<TResult> InvokeAsync<TResult>(IRequest<TResult> request, CancellationToken cancellationToken = default,
         ApiTransaction transaction = ApiTransaction.Shared)
         where TResult : class, IRemoteResultEnvelope<TResult>;

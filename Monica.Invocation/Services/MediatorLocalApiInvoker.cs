@@ -7,7 +7,7 @@ using Monica.Invocation.Models;
 
 namespace Monica.Invocation.Services;
 
-/// <summary>Default Local adapter for hosts that already own the execution scope.</summary>
+/// <summary>Local adapter that joins an active unit of work or owns a fresh invocation scope.</summary>
 internal sealed class MediatorLocalApiInvoker(IServiceProvider services, IServiceScopeFactory scopes, ExecutionScopeContext operation) : ILocalApiInvoker
 {
     public async Task<TResult> InvokeAsync<TResult>(IRequest<TResult> request, CancellationToken cancellationToken = default,
@@ -16,8 +16,8 @@ internal sealed class MediatorLocalApiInvoker(IServiceProvider services, IServic
     {
         ApiTransactionPolicy.Validate(transaction);
         cancellationToken.ThrowIfCancellationRequested();
-        if (transaction == ApiTransaction.Shared)
-            return await (operation.Services ?? services).GetRequiredService<IMediator>().Send(request, cancellationToken);
+        if (transaction == ApiTransaction.Shared && operation.GetActiveUnitOfWorkServices(services) is { } sharedServices)
+            return await sharedServices.GetRequiredService<IMediator>().Send(request, cancellationToken);
         await using var scope = scopes.CreateAsyncScope();
         using var lease = operation.Enter(scope.ServiceProvider);
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(request, cancellationToken);
