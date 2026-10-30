@@ -20,5 +20,10 @@ public interface IExecutionTransaction
 
     /// <summary>Prevents commit and retains the first failure, even when its caller handles it.</summary>
     /// <param name="failure">Failure details, or null to record an explicit rollback request. Later calls never overwrite the first cause.</param>
+    /// <remarks>
+    /// Records state without throwing, so exception handlers can preserve the original exception and result
+    /// boundaries can return a failed outcome. Code that cannot continue must still propagate its failure.
+    /// The transaction owner performs rollback when the operation ends.
+    /// </remarks>
     void MarkRollbackOnly(ExecutionTransactionFailure? failure = null);
 }
