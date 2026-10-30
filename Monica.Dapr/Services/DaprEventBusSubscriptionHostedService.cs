@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Dapr.Abstractions;
@@ -29,6 +28,7 @@ internal class DaprEventBusSubscriptionHostedService(
     ITopicSubscriptionStatusStore topicStatusStore,
     IHostApplicationLifetime applicationLifetime,
     IEventReceiveDispatcher dispatcher,
+    EventMessageRetryPolicy retryPolicy,
     IObservableInstanceRegistry observableManager,
     IDaprSidecarHealthCoordinator healthCoordinator,
     IOptions<ModuleDaprEventBusOption> options,
@@ -219,58 +219,52 @@ internal class DaprEventBusSubscriptionHostedService(
             }
 
             var metadata = CreateMetadata(message, eventType, ServiceKey);
-            var handlingTask = HandleExternalMessageAsync(
-                new EventMessage(metadata, EventSubscriptionScope.Distributed, message.Data), ct);
-
             try
             {
-                // The Dapr SDK only cancels this token; it still awaits the callback indefinitely.
-                // Bound our wait while allowing the handler task to retain and dispose its scope when it finishes.
-                await handlingTask.WaitAsync(ct);
+                await retryPolicy.ExecuteAsync(HandleAttemptAsync, ct);
 
                 TopicStatusStore.ReportMessageProcessed(ServiceKey, message.Topic);
 
                 return TopicResponseAction.Success;
             }
-            catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+            catch (Exception) when (ct.IsCancellationRequested)
             {
-                _ = ObserveLateMessageHandlingAsync(handlingTask, message.Topic);
-
-                TopicStatusStore.ReportError(ServiceKey, message.Topic, $"Dapr message handling deadline elapsed for topic {message.Topic}", ex);
-                RecordState(
-                    $"Dapr message handling deadline elapsed for topic {message.Topic}",
-                    HostedServiceState.Degraded,
-                    ex);
-                Logger.LogWarning(
-                    ex,
-                    "Dapr message handling deadline elapsed for topic {Topic}; requesting retry",
-                    message.Topic);
+                // The SDK token now represents stream shutdown, not an attempt deadline.
                 return TopicResponseAction.Retry;
             }
-            catch (Exception ex) when (ex is BusinessException or EventMessageDeserializationException)
+            catch (Exception ex)
             {
                 var deadLetterTopic = _deadLetterTopicPolicy.Resolve(message.Topic);
                 TopicStatusStore.ReportError(ServiceKey, message.Topic,
-                    $"Permanently rejected Dapr message {metadata.MessageId} for topic {message.Topic}", ex);
-                RecordState($"Permanently rejected Dapr message for topic {message.Topic}",
+                    $"Retry budget exhausted for Dapr message {metadata.MessageId} on topic {message.Topic}", ex);
+                RecordState($"Dapr message retry budget exhausted for topic {message.Topic}",
                     HostedServiceState.Degraded, ex);
-                Logger.Log(ex is BusinessException ? LogLevel.Error : LogLevel.Warning, ex,
-                    "Permanently rejected Dapr message {MessageId} on topic {Topic}; returning Drop " +
+                Logger.LogError(ex,
+                    "Retry budget exhausted for Dapr message {MessageId} on topic {Topic}; returning Drop " +
                     "(ServiceKey: {ServiceKey}, DeadLetterTopic: {DeadLetterTopic})",
                     metadata.MessageId, message.Topic, ServiceKey ?? "default", deadLetterTopic);
                 // Dapr owns forwarding Drop responses to the configured dead-letter topic.
                 return TopicResponseAction.Drop;
             }
-            catch (Exception ex)
-            {
-                TopicStatusStore.ReportError(ServiceKey, message.Topic, $"Error handling Dapr message for topic {message.Topic}", ex);
-                RecordState($"Error handling Dapr message for topic {message.Topic}",
-                    HostedServiceState.Degraded, ex);
 
-                Logger.LogError(ex,
-                    "Error handling Dapr message for topic {Topic}; requesting retry",
-                    message.Topic);
-                return TopicResponseAction.Retry;
+            async Task HandleAttemptAsync()
+            {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                deadline.CancelAfter(_options.MessageHandlingTimeout);
+                var handlingTask = HandleExternalMessageAsync(
+                    new EventMessage(metadata, EventSubscriptionScope.Distributed, message.Data), deadline.Token);
+                try
+                {
+                    await handlingTask.WaitAsync(deadline.Token);
+                    deadline.Token.ThrowIfCancellationRequested();
+                }
+                catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+                {
+                    // A non-cooperative handler retains its own scope until it finishes. Its late
+                    // completion cannot turn this timed-out attempt into a successful delivery.
+                    _ = ObserveLateMessageHandlingAsync(handlingTask, message.Topic);
+                    throw;
+                }
             }
         }
     }
@@ -392,13 +386,13 @@ internal class DaprEventBusSubscriptionHostedService(
         }
         catch (OperationCanceledException)
         {
-            // Cooperative cancellation after the callback returned Retry is expected.
+            // Cooperative cancellation after the attempt ended is expected.
         }
         catch (Exception ex)
         {
             Logger.LogWarning(
                 ex,
-                "Dapr message handling for topic {Topic} faulted after the callback returned Retry",
+                "Dapr message handling for topic {Topic} faulted after its attempt ended",
                 topicName);
         }
     }

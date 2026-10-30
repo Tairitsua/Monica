@@ -116,11 +116,11 @@ Topic runtime health aggregates active owner groups. A healthy owner cannot hide
 
 ## Kafka delivery, limits, and lifecycle
 
-The native producer sends the captured UTF-8 business JSON as the Kafka value. It supplies required `monica-message-id`, `monica-source`, and `monica-event-name` headers, plus optional `traceparent` and `tracestate`. The receiver requires the three native headers and preserves their identity. A missing native header, unknown receiver, removed target, retryable handler failure, or cancellation fails delivery without committing the record. A null or malformed body with valid native headers, or a permanent business rejection, follows the rejection policy below. Event name, exact event type, topic, owner, and bus must all match the subscription.
+The native producer sends the captured UTF-8 business JSON as the Kafka value. It supplies required `monica-message-id`, `monica-source`, and `monica-event-name` headers, plus optional `traceparent` and `tracestate`. The receiver requires the three native headers and preserves their identity. Missing native headers, unknown receivers, removed targets, malformed bodies, and handler exceptions all follow the finite processing retry policy below. Transport shutdown leaves the record unacknowledged. Event name, exact event type, topic, owner, and bus must all match the subscription.
 
 The producer enables idempotence and requests `Acks.All`; successful ordinary publication means Kafka acknowledged delivery, not that any business handler completed. Producer idempotence does not deduplicate a later Outbox replay or a new producer session. Cancellation may end the caller's wait after the native send was queued, while that send still completes. Outbox retries therefore retain the original message ID/source, and durable consumers still need Inbox or another verified idempotency boundary.
 
-Automatic consumer offset commits and offset storage are disabled. The worker awaits all targeted handler operations, including their transaction completion, checks cancellation, and only then commits the record's next offset. A retryable processing or transient commit failure rewinds the original record before retrying. Lost partition ownership is handled without seeking a partition that moved elsewhere; the worker recreates an unsafe consumer and resumes from committed offsets. A crash after business commit but before Kafka acknowledgment can redeliver the same message. Inbox must cover the intended transactional effects; unprotected external side effects can repeat.
+Automatic consumer offset commits and offset storage are disabled. The worker awaits all targeted handler operations, including their transaction completion, checks cancellation, and only then commits the record's next offset. Processing retries occur before acknowledgment within the current delivery. An exhausted processing failure is logged and acknowledged; a transient commit failure rewinds the original record before transport redelivery. Lost partition ownership is handled without seeking a partition that moved elsewhere; the worker recreates an unsafe consumer and resumes from committed offsets. A crash after business commit but before Kafka acknowledgment can redeliver the same message. Inbox must cover the intended transactional effects; unprotected external side effects can repeat.
 
 The current message factory sets the transport key to the event contract's CLR name; a prepared message may supply its own `TransportKey`, and the native provider falls back to the declared event name when absent. Ordering is per Kafka partition. Do not infer an aggregate-ID partitioning policy from the business DTO.
 
@@ -136,14 +136,14 @@ These defaults belong to `ModuleEventBusKafkaOption`:
 | `ConsumerFetchMaxBytes` | 50 MiB fetch-response target; the first batch can exceed it to preserve progress |
 | `ConsumerMaxPollInterval` | 5 minutes; allow the complete handler transaction time and at least the session timeout |
 | `ConsumerSessionTimeout` | 45 seconds; the broker's group limits must admit it |
-| `ConsumerErrorBackoff` | 5 seconds between consumer retry attempts |
+| `ConsumerErrorBackoff` | 5 seconds between transport recovery attempts; separate from processing retries |
 | `AdminRequestTimeout` | 10 seconds; also supplies native socket timeout, normalized to at least one second |
 | `ConnectionSetupTimeout` | 5 seconds, normalized to at least one second and capped by the effective admin request timeout |
 | `ProducerFlushTimeout` | 10 seconds maximum producer flush wait during disposal |
 
 Producer delivery and consumer session/poll timeouts must be between one second and `Int32.MaxValue` milliseconds; message/fetch sizes must be positive. Valid existing committed offsets take precedence over `AutoOffsetReset`. Increasing client sizes does not increase broker/topic limits. Supply broker addresses, security protocol, SASL credentials/mechanism, and CA path through the selected `KafkaClusterConfig` as required by the deployment.
 
-The provider owns its lazy producer and consumer tasks. Producer disposal blocks new queue admission, flushes for at most `ProducerFlushTimeout`, then disposes the native handle. Subscription removal and host shutdown cancel and await their consumers; handlers must pass cancellation to I/O so draining can finish. Consumers deliberately dispose without `Consumer.Close()` to avoid the native leave-group crash path; takeover can wait for the broker's session timeout instead of an immediate graceful leave. No unprocessed or canceled delivery is acknowledged to accelerate shutdown.
+The provider owns its lazy producer and consumer tasks. Producer disposal blocks new queue admission, flushes for at most `ProducerFlushTimeout`, then disposes the native handle. Subscription removal and host shutdown cancel and await their consumers; handlers must pass cancellation to I/O so draining can finish. Consumers deliberately dispose without `Consumer.Close()` to avoid the native leave-group crash path; takeover can wait for the broker's session timeout instead of an immediate graceful leave. No delivery interrupted by transport shutdown is acknowledged to accelerate shutdown.
 
 ## Switching an existing Dapr Kafka deployment
 
@@ -154,43 +154,40 @@ Dapr publication writes a CloudEvent envelope; native Kafka publication uses raw
 3. While the new groups are stopped, explicitly provision the recorded handoff offsets for every required owner/bus group. The default `Error` policy exposes an uninitialized partition; `Earliest` or `Latest` must not choose the production cutover position.
 4. Start native consumers, confirm their actual groups, assignments, and offsets, then enable native publication and resume business writes. Compare Outbox backlog, group lag, Inbox receipts, and business results.
 
-An old envelope left behind is rejected and retried without acknowledgment. Rollback also needs a controlled pause, format verification, and an explicit offset handoff; flipping the provider setting alone does not make the two wire formats interchangeable.
+An old envelope left behind exhausts the same finite retry budget and is then logged and discarded. Drain verification before cutover is therefore essential; the new receiver will not hold the partition indefinitely for old envelopes. Rollback also needs a controlled pause, format verification, and an explicit offset handoff; flipping the provider setting alone does not make the two wire formats interchangeable.
 
 Source and checks: [EventBus API](../../../Monica.EventBus/Abstractions/IEventBus.cs), [subscription ownership](../../../Monica.EventBus/Services/EventSubscriptionRegistry.cs), [owner annotation](../../../Monica.EventBus/Annotations/EventSubscriptionOwnerAttribute.cs), [receive dispatcher](../../../Monica.EventBus/Services/EventReceiveDispatcher.cs), [Kafka registration and options](../../../Monica.EventBus.Kafka/Modules/ModuleEventBusKafka.cs), [Kafka client configuration](../../../Monica.EventBus.Kafka/Services/Support/KafkaClientConfigFactory.cs), [native producer](../../../Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusProvider.cs), [native consumers](../../../Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedService.cs), and [Dapr producer](../../../Monica.Dapr/Services/DaprEventBusProvider.cs). Behavioral checks: [discovery lifecycle](../../../tests/Test.Monica.EventBus/Services/EventBusAutoDiscoveryLifecycleTests.cs), [owner routing and lifecycle](../../../tests/Test.Monica.EventBus/Services/EventReceiveDispatcherTests.cs), [module composition](../../../tests/Test.Monica.EventBus/Modules/ModuleEventBusCompositionTests.cs), [Outbox gateway](../../../tests/Test.Monica.EventBus/Modules/OutboxGatewayTests.cs), [Kafka configuration](../../../tests/Test.Monica.EventBus.Kafka/Services/Support/KafkaClientConfigFactoryTests.cs), [producer ownership](../../../tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusProviderTests.cs), and [consumer acknowledgment/lifecycle](../../../tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedServiceTests.cs).
-## Rejected deliveries and retries
+## Processing retries and dead letters
 
-Throw `Monica.Core.ExceptionHandling.Exceptions.BusinessException` only when retrying the same delivery cannot resolve a business-rule rejection. Built-in distributed providers treat it as permanent after the handler operation and its scope have unwound. They also treat `EventMessageDeserializationException` as permanent. With valid native headers, a malformed or null event body must not keep a Kafka partition pinned indefinitely. Missing native headers are a protocol mismatch and remain retryable: do not silently discard undrained Dapr CloudEvents during provider cutover.
-
-| Receive outcome | Dapr streaming provider | Native Kafka provider |
-| --- | --- | --- |
-| Handler completes | `Success` | Commit offset |
-| `BusinessException` or malformed event body | Log and return `Drop`; Dapr forwards to the configured dead-letter topic, or discards when none is configured | Log and commit offset, allowing the next record to proceed |
-| Other exception, timeout, or cancellation | Request `Retry` | Rewind without acknowledging; retry after backoff. Caller cancellation stops without committing or seeking |
-
-Native Kafka currently has no dead-letter destination option. Its permanent rejections are discarded after their offset commit succeeds. An offset-commit failure remains retryable even after a business rejection; ownership loss restarts the consumer without seeking a transferred partition, and failed rewind also requires a fresh consumer before any later acknowledgment. Dapr and Kafka retain the exception in topic diagnostics and log message identity and topic information; rejected deliveries are not counted as successfully processed messages. Broker delivery is still at least once: an acknowledgment failure can cause a rejected message to reappear.
-
-For Dapr, configure the existing option when rejected message bodies must be retained:
+`ModuleEventBusOption.MessageRetryCount` is the single processing retry budget for Dapr and native Kafka. It defaults to **1 retry after the first attempt** (at most two attempts). Set it to **0** to disable retries; negative values fail policy activation. All processing failures consume the same budget: `BusinessException`, ordinary exceptions, timeout, malformed payloads or native headers, and a handler's independent cancellation. There is no business-exception classification or unlimited processing mode.
 
 ```csharp
 builder.AddMonica(monica =>
-    monica.AddEventBus().UseDaprProvider(options =>
-        options.DeadLetterTopicSuffix = ".dead-letter"));
+    monica.AddEventBus(options => options.MessageRetryCount = 1)
+        .UseDaprProvider(options => options.DeadLetterTopicSuffix = ".dead-letter"));
 ```
 
-The default suffix is `null`. A configured suffix must be non-empty and contain no whitespace. Each source topic uses `<topic><suffix>`; a topic already ending in the suffix has no further dead-letter target. Provision broker topics and their retention separately. `Drop` delegates terminal forwarding to Dapr; Monica does not republish the payload itself. Configure Dapr resiliency and component retry limits separately for transient failures; setting a suffix does not define a retry budget. See the [Dapr streaming response contract](https://v1-16.docs.dapr.io/developing-applications/sdks/dotnet/dotnet-messaging/dotnet-messaging-pubsub-howto/).
+Retries run immediately within one transport delivery, invoking the receive dispatcher again with the same message identity and original body. Each invocation deserializes again and activates fresh handler scopes and transactions. No message-ID cache or persistent retry counter is needed. A successful retry ends processing immediately. The budget applies to the entire delivery, so handlers that already succeeded may be invoked again; use Inbox or another idempotency boundary for effects that must not repeat.
 
-Do not wrap every failed `Res`, `InvalidOperationException`, database error, or remote-call error in `BusinessException`. The framework cannot infer permanence from an exception message or arbitrary inner exception. Unknown failures remain retryable, so classify a known business rejection at the application boundary:
+| Receive outcome | Dapr streaming provider | Native Kafka provider |
+| --- | --- | --- |
+| Any attempt completes | `Success` | Commit offset |
+| Processing retry budget exhausted | Log and return `Drop`; Dapr forwards to the configured dead-letter topic, or discards when none is configured | Log and commit offset, allowing the next record to proceed |
+| Transport/host stops or subscription is removed | Stop attempts and return `Retry` when the stream can still acknowledge | Stop without committing or seeking |
 
-```csharp
-if (notice.RequiredReference is null)
-{
-    throw new BusinessException("The notice has no required reference.");
-}
-```
+Cancellation of the transport lifetime is shutdown, not a processing failure. An exception or canceled task produced by a handler while the transport remains active is an ordinary failed attempt. This preserves messages during normal host restarts without depending on the handler's exception type.
 
-This rejects the entire transport delivery: subsequent handlers for that topic are not invoked, and any earlier handler's separately committed work is not undone. The failing handler's transaction, including its Inbox receipt, rolls back. If an invalid business document must be saved or an alarm raised, model that as a handled outcome, persist it and return normally so its transaction and Inbox receipt commit. Do not throw after staging those effects. Local EventBus calls continue to propagate exceptions to their caller; publishing and Outbox send retries are unchanged.
+Dapr's `MessageHandlingTimeout` remains 30 seconds by default and now applies **per attempt**. Monica owns this deadline; the SDK callback token represents stream lifetime only. Each attempt receives a fresh linked cancellation token. On timeout Monica cancels the attempt and stops waiting. A handler that does not honor cancellation may continue, retaining its scope until it finishes and potentially overlapping a retry or terminal forwarding. Its late completion cannot change the delivery result. Handlers must pass cancellation to I/O and protect repeatable side effects. Native Kafka counts thrown timeout failures against the same budget; it does not impose a separate handler execution deadline. Include all attempts in `ConsumerMaxPollInterval` sizing.
 
-Rejection checks: [Dapr response and dead-letter policy](../../../tests/Test.Monica.Dapr/Services/DaprEventBusSubscriptionHostedServiceTests.cs), [Kafka rejection, cancellation, and ownership](../../../tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedServiceTests.cs), and [Inbox rollback](../../../tests/Test.Monica.Repository/UnitOfWork/InboxExecutionTests.cs).
+Native Kafka currently has no dead-letter destination option. Its exhausted processing failures are discarded after their offset commit succeeds. A failed offset commit remains a transport failure; ownership loss restarts the consumer without seeking a transferred partition, and failed rewind requires a fresh consumer before any later acknowledgment. Dapr and Kafka retain the final exception in topic diagnostics and log message identity and topic information; exhausted deliveries are not counted as successfully processed messages.
+
+Dapr's `DeadLetterTopicSuffix` defaults to `null`. A configured suffix must be non-empty and contain no whitespace. Each source topic uses `<topic><suffix>`; a topic already ending in the suffix has no further dead-letter target. Provision broker topics and retention separately. `Drop` delegates terminal forwarding to Dapr; Monica does not republish the payload itself. See the [Dapr streaming response contract](https://github.com/dapr/dotnet-sdk/blob/386b0ed7487ea365341f0ac52c4ba4df3593b635/src/Dapr.Messaging/PublishSubscribe/TopicResponseAction.cs#L31) and [dead-letter configuration](https://docs.dapr.io/developing-applications/building-blocks/pubsub/pubsub-deadletter/).
+
+The limit bounds processing attempts **per transport delivery**, not broker redelivery across crashes, failed acknowledgments, or connection recovery. Those events can deliver the same message again with a fresh budget; broker delivery remains at least once. Dapr resiliency, broker retry configuration, native Kafka reconnection and offset-commit recovery remain transport concerns. This policy does not claim a durable, cross-restart attempt limit.
+
+The failing handler's transaction, including its Inbox receipt, rolls back; an earlier handler's separately committed work is not undone. If an invalid business document must be saved or an alarm raised, persist it as a handled outcome and return normally so its transaction and Inbox receipt commit. Local EventBus calls still propagate exceptions to their caller; publishing and Outbox send retries are unchanged.
+
+Behavioral checks: [shared retry budget](../../../tests/Test.Monica.EventBus/Services/EventMessageRetryPolicyTests.cs), [Dapr responses, deadlines and dead letters](../../../tests/Test.Monica.Dapr/Services/DaprEventBusSubscriptionHostedServiceTests.cs), [Kafka retries, cancellation and ownership](../../../tests/Test.Monica.EventBus.Kafka/Providers/ConfluentKafka/KafkaEventBusSubscriptionHostedServiceTests.cs), and [Inbox rollback across fresh retry scopes](../../../tests/Test.Monica.Repository/UnitOfWork/InboxExecutionTests.cs).
 
 For registered-handler inspection, independent transport health, live change-feed ownership, and diagnostic publishing, use [EventBus diagnostics](event-bus-diagnostics.md).
 

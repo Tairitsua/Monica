@@ -10,11 +10,12 @@ public interface IDistributedEventHandler<in TEvent> : IEventHandler<TEvent>
     /// Handles a distributed event.
     /// </summary>
     /// <remarks>
-    /// Throw <see cref="Monica.Core.ExceptionHandling.Exceptions.BusinessException"/> for a permanent business
-    /// rejection. Built-in providers log and discard that delivery, or forward it to a configured dead-letter topic,
-    /// after the handler's transaction and scope have unwound. Other exceptions remain retryable. A rejection ends
-    /// the current transport delivery, so later handlers for the same topic are not invoked. Handle and persist an
-    /// expected business outcome inside the handler when it must commit an alarm, rejected record, or Inbox receipt.
+    /// Built-in providers apply <see cref="Monica.Modules.ModuleEventBusOption.MessageRetryCount"/> to every
+    /// processing failure, including business exceptions, timeout and independent handler cancellation. Each retry
+    /// invokes the receive pipeline again with fresh scopes. Exhaustion logs and ends delivery, using the provider's
+    /// configured dead-letter destination when available. Transport shutdown leaves delivery unacknowledged.
+    /// Handle and persist an expected business outcome normally when an alarm, rejected record or Inbox receipt
+    /// must commit. Earlier handlers can run again on retry, so protect repeatable side effects with idempotency.
     /// </remarks>
     /// <param name="eventData">Event payload.</param>
     /// <param name="cancellationToken">

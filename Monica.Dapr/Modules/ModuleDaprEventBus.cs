@@ -113,14 +113,34 @@ public static class ModuleDaprEventBusRegistrationExtensions
 
 public class ModuleDaprEventBusOption : ModuleOptions<ModuleDaprEventBus>
 {
+    private TimeSpan _messageHandlingTimeout = TimeSpan.FromSeconds(30);
+
     public string PubSubName { get; set; } = "pubsub";
 
     /// <summary>
-    /// Gets or sets the message-handling deadline passed to the Dapr streaming subscription. Defaults to 30 seconds.
-    /// When the deadline elapses, Monica stops awaiting the handler and requests a retry. The same cancellation token
-    /// is passed to the handler for cooperative shutdown, but non-cooperative handler code may continue running.
+    /// Gets or sets the deadline for each message-processing attempt. Defaults to 30 seconds.
+    /// Each retry gets a fresh deadline and cancellation token. Timeout consumes the shared
+    /// <see cref="ModuleEventBusOption.MessageRetryCount"/> budget. Monica stops awaiting a timed-out
+    /// handler, which retains its scope until it finishes; non-cooperative code can overlap a retry.
+    /// Handlers must honor cancellation and protect side effects with idempotency where needed.
+    /// Use <see cref="Timeout.InfiniteTimeSpan"/> to disable the deadline; otherwise the value must be
+    /// nonnegative and no greater than 4,294,967,294 milliseconds, the cancellation timer's limit.
     /// </summary>
-    public TimeSpan MessageHandlingTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan MessageHandlingTimeout
+    {
+        get => _messageHandlingTimeout;
+        set
+        {
+            if (value != Timeout.InfiniteTimeSpan &&
+                (value < TimeSpan.Zero || value.TotalMilliseconds > uint.MaxValue - 1))
+            {
+                throw new ArgumentOutOfRangeException(nameof(MessageHandlingTimeout), value,
+                    "The message-handling timeout must fit the cancellation timer or be Timeout.InfiniteTimeSpan.");
+            }
+
+            _messageHandlingTimeout = value;
+        }
+    }
 
     /// <summary>
     /// Maximum number of messages to queue for processing. Defaults to 100.
@@ -138,9 +158,10 @@ public class ModuleDaprEventBusOption : ModuleOptions<ModuleDaprEventBus>
     /// Defaults to <see langword="null" />, which disables dead-letter forwarding. For example, the suffix
     /// <c>.dead-letter</c> maps <c>orders</c> to <c>orders.dead-letter</c>. A subscription whose source topic already
     /// ends with this suffix is treated as terminal and receives no further dead-letter target, preventing recursive
-    /// forwarding. BusinessException and malformed event bodies return Drop immediately: Dapr forwards them to this
-    /// destination when configured, or discards them otherwise. Other handler failures request retry.
-    /// Configuring this option does not provision broker topics or define Dapr retry limits; the host must
+    /// forwarding. All processing failures return Drop after the shared
+    /// <see cref="ModuleEventBusOption.MessageRetryCount"/> budget is exhausted: Dapr forwards them to this
+    /// destination when configured, or discards them otherwise.
+    /// Configuring this option does not provision broker topics or define transport recovery limits; the host must
     /// deploy those resources separately before enabling forwarding. A configured suffix must be non-empty and contain
     /// no whitespace; invalid values are rejected when the subscription hosted service is activated.
     /// </summary>
