@@ -307,6 +307,9 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     /// SaveChanges(false) is deliberately unsupported: accepting business changes between two internal flushes
     /// is necessary for generated-key outbox capture. Use a transaction and a fresh context when retrying.
     /// Managed saves omit automatic savepoints because any failure requires the whole operation to roll back.
+    /// Save callbacks must throw when they cannot continue. Their original exception is propagated unchanged.
+    /// If a callback only marks the operation rollback-only, the save rejects completion after the EF flush
+    /// instead of returning success. Catching either failure does not make the operation committable.
     /// Other saves retain EF's transaction and savepoint behavior. This method never commits a caller-owned transaction
     /// or starts an additional transaction merely because Outbox is configured.
     /// </remarks>
@@ -410,6 +413,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     {
         if (!acceptAll) throw new NotSupportedException("RepositoryDbContext requires acceptAllChangesOnSuccess=true. Retry failures in a fresh scope.");
         var managedTransaction = ValidateSave();
+        var unitOfWork = CachedServiceProvider.GetService<UnitOfWorkManager>();
         _saving = true;
         var autoDetect = ChangeTracker.AutoDetectChangesEnabled;
         var autoSavepoints = Database.AutoSavepointsEnabled;
@@ -441,6 +445,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 throw new NotSupportedException("Transactional outbox requires a relational provider.");
 
             var affected = useAsync ? await base.SaveChangesAsync(true, token) : base.SaveChanges(true);
+            unitOfWork?.ThrowIfRollbackOnly("complete saving changes");
             if (useAsync) await CaptureEntityEventsAsync(changes, switches, token);
             else CaptureEntityEvents(changes, switches);
             if (outbox is not null)
@@ -457,6 +462,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 if (useAsync) await base.SaveChangesAsync(true, token);
                 else base.SaveChanges(true);
             }
+            unitOfWork?.ThrowIfRollbackOnly("complete saving changes");
             _pendingMessages.Clear();
             return affected;
         }

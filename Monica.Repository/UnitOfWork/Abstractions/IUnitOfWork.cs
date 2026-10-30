@@ -19,5 +19,10 @@ public interface IUnitOfWork
 
     /// <summary>Prevents commit and retains the first failure, even when its caller handles it.</summary>
     /// <param name="failure">Failure details, or null to record an explicit rollback request. Later calls never overwrite the first cause.</param>
+    /// <remarks>
+    /// Records state without throwing, so exception handlers can preserve the original exception and result
+    /// boundaries can return a failed outcome. Save callbacks that cannot continue must throw their failure.
+    /// The execution boundary owns rollback; this method does not immediately roll back the database transaction.
+    /// </remarks>
     void MarkRollbackOnly(ExecutionTransactionFailure? failure = null);
 }
