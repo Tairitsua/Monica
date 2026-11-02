@@ -60,6 +60,11 @@ internal sealed class ProjectUnitFactory(ProjectUnitCatalog catalog)
             return UnitDomainEventHandler.Create(shape, catalog, distributedHandler.GenericArguments[0]);
         }
 
+        if (FindInterface(shape, typeof(IDistributedBatchEventHandler<>)) is { ClosedInterface.FullName: not null } batchHandler)
+        {
+            return UnitDomainEventHandler.Create(shape, catalog, batchHandler.GenericArguments[0], isBatch: true);
+        }
+
         if (FindInterface(shape, typeof(ILocalEventHandler<>)) is { ClosedInterface.FullName: not null } localHandler)
         {
             return UnitLocalEventHandler.Create(shape, catalog, localHandler.GenericArguments[0]);

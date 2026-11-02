@@ -9,14 +9,14 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 
 | Task | Read |
 | --- | --- |
-| Register a context, choose its provider mode, or use repositories | [Repositories](references/repositories.md) |
+| Register a context, stage aggregate ranges, or insert prepared rows with optional audit properties | [Repositories](references/repositories.md) |
 | Cache immutable repository projections using transactional dataset versions | [Repository snapshots](references/repository-snapshots.md) |
 | Place infrastructure tables and per-context history across relational providers | [Infrastructure table layout](references/infrastructure-table-layout.md) |
 | Place migration projects, consolidate databases, or define schema/history ownership | [Application migrations](../monica-application/references/05-database-migrations.md) |
 | Inspect registered contexts, provider sessions, migration history, or migration updates | [Repository diagnostics](references/repository-diagnostics.md) |
 | Set Shared/Independent boundaries, compose one database, select participants, or understand rollback | [Transactions](references/transactions.md) |
 | Store binary objects or select a Minio provider | [Blob storage](references/blob-storage.md) |
-| Choose before-commit effects or committed delivery; configure outbox, inbox, and projections | [Transactional events](references/transactional-events.md) |
+| Choose before-commit effects or committed delivery; configure outbox, batch inbox, and projections | [Transactional events](references/transactional-events.md) |
 | Diagnose a failed or slow save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |
 
 For key-value storage, use [state stores](../monica-infra-hosting/references/state-stores.md); for application placement, use ProjectUnit development in `$monica-application-project-unit-development`. For module implementation, use `$monica-framework`, then `$monica-development`.

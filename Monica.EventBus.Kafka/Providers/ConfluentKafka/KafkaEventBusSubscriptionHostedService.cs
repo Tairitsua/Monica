@@ -52,6 +52,8 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     protected override bool GroupSubscriptionsByWorkloadOwner => true;
 
+    protected override bool SupportsBatchReceiving => true;
+
     protected override Task CreateExternalSubscriptionForTopicAsync(SubscriptionGroup group, Type eventType, CancellationToken cancellationToken)
     {
         var consumer = new TopicConsumer(group.TopicName, cancellationToken, ConsumeAsync, group.WorkloadOwner);
@@ -132,35 +134,74 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         var cluster = clusterConfigProvider.GetDirectEventBusCluster();
         var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey, topicConsumer.WorkloadOwner);
         var hasProvenHealthy = false;
+        var assignmentVersion = 0;
         using var consumer = new ConsumerBuilder<string, string>(consumerConfig)
             .SetPartitionsAssignedHandler((_, partitions) =>
             {
+                assignmentVersion++;
                 hasProvenHealthy = true;
                 ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Healthy,
                     $"Kafka group '{consumerConfig.GroupId}' assigned {partitions.Count} partition(s)");
             })
             .SetPartitionsRevokedHandler((_, _) =>
             {
+                assignmentVersion++;
                 hasProvenHealthy = false;
                 ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Subscribing,
                     $"Kafka group '{consumerConfig.GroupId}' is rebalancing");
             })
             .SetPartitionsLostHandler((_, _) =>
             {
+                assignmentVersion++;
                 hasProvenHealthy = false;
                 ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Recovering,
                     $"Kafka group '{consumerConfig.GroupId}' lost partition ownership");
             })
             .Build();
         consumer.Subscribe(topicConsumer.TopicName);
+        ConsumeResult<string, string>? pending = null;
+        var batchSubscription = SubscriptionManager.GetAll().SingleOrDefault(subscription => subscription.IsBatch
+            && subscription.Scope == EventSubscriptionScope.Distributed && subscription.ServiceKey == ServiceKey
+            && subscription.TopicName == topicConsumer.TopicName && subscription.WorkloadOwner == topicConsumer.WorkloadOwner
+            && subscription.State == EventSubscriptionState.Active);
 
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                var result = consumer.Consume(cancellationToken);
+                var result = pending ?? consumer.Consume(cancellationToken);
+                pending = null;
                 if (result?.Message is null)
                 {
+                    continue;
+                }
+                if (batchSubscription is not null)
+                {
+                    try
+                    {
+                        var batch = KafkaEventBatchReceiver.Collect(consumer, result, options.Value.ReceiveBatch,
+                            () => assignmentVersion, cancellationToken);
+                        pending = batch.Pending;
+                        foreach (var partition in batch.PartitionGroups)
+                        {
+                            await KafkaEventBatchReceiver.DeliverAsync(partition,
+                                records => Dispatcher.DispatchBatchAsync(
+                                    records.Select(record => CreateReceivedMessage(record, ServiceKey)).ToArray(), batchSubscription.Id, cancellationToken),
+                                (record, count) =>
+                                {
+                                    consumer.Commit(record);
+                                    for (var index = 0; index < count; index++)
+                                        TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                                }, retryPolicy, cancellationToken);
+                        }
+                    }
+                    catch (KafkaEventBatchReceiver.KafkaBatchProcessingException) { throw; }
+                    catch (KafkaConsumerRestartRequiredException) { throw; }
+                    catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Collection may have read ahead. Recreate instead of advancing past any retained record.
+                        throw new KafkaConsumerRestartRequiredException("Kafka batch collection failed before acknowledgment.", failure);
+                    }
                     continue;
                 }
                 var processed = await CommitAfterHandlingAsync(
@@ -204,6 +245,11 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             catch (KafkaConsumerRestartRequiredException)
             {
                 // After a failed seek, this consumer cannot safely commit any later offset.
+                throw;
+            }
+            catch (KafkaEventBatchReceiver.KafkaBatchProcessingException)
+            {
+                // Exhaustion is terminal for this topic/owner; an operator can repair and restart it.
                 throw;
             }
             catch (KafkaException ex) when (IsOwnershipLoss(ex))

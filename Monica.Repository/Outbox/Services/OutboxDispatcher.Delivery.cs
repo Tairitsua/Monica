@@ -1,8 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
+using Monica.EventBus.Services.Support;
 using Monica.Repository.Outbox.Models;
 
 namespace Monica.Repository.Outbox.Services;
@@ -14,12 +14,14 @@ public sealed partial class OutboxDispatcher<TDbContext>
 
     /// <summary>
     /// Runs one bounded pass, claiming only available delivery slots. Failed attempts count toward the limit;
-    /// the result counts successful acknowledgments. Each send owns an independent scope. Delivery remains at least once.
+    /// the result counts successful acknowledgments. Compatible distributed messages use bounded transport batches;
+    /// local deliveries and providers without batch support keep independent scopes. Delivery remains at least once.
     /// </summary>
     /// <remarks>
     /// Must run outside an ambient transaction: claims must commit before any external delivery starts.
     /// All passes share this dispatcher's capacity. A timed-out send retains its slot and scope until it actually
-    /// finishes; a pass returns without claiming more messages when all slots are occupied.
+    /// finishes; a pass returns without claiming more messages when all slots are occupied. Accepted messages use
+    /// bounded EF conditional updates; a native bulk-insert provider is not required for acknowledgment.
     /// </remarks>
     public async Task<int> DrainAsync(int maximumMessages = 100, CancellationToken cancellationToken = default)
     {
@@ -55,10 +57,10 @@ public sealed partial class OutboxDispatcher<TDbContext>
                         {
                             remaining -= claimed.Count;
                             cursor = claimed.Max(message => message.Sequence);
-                            foreach (var message in claimed)
+                            foreach (var batch in CreateDeliveryBatches(claimed, scope.ServiceProvider))
                             {
-                                reserved--;
-                                active.Add(DeliverAsync(message, started, stopping.Token));
+                                reserved -= batch.Length;
+                                active.Add(DeliverAsync(batch, started, stopping.Token));
                             }
                         }
                     }
@@ -91,7 +93,28 @@ public sealed partial class OutboxDispatcher<TDbContext>
         return reserved;
     }
 
-    private async Task<int> DeliverAsync(OutboxMessage candidate, long claimStarted, CancellationToken cancellationToken)
+    private static IEnumerable<OutboxMessage[]> CreateDeliveryBatches(List<OutboxMessage> candidates, IServiceProvider services)
+    {
+        var messages = candidates.Select(candidate => candidate.ToEventMessage()).ToArray();
+        var offset = 0;
+        while (offset < messages.Length)
+        {
+            var message = messages[offset];
+            var count = 1;
+            if (message.Scope == EventSubscriptionScope.Distributed && offset + 1 < messages.Length)
+            {
+                var transport = message.Metadata.ServiceKey is { } key
+                    ? services.GetKeyedService<IEventTransport>(key) : services.GetService<IEventTransport>();
+                if (transport is IEventBatchTransport batchTransport)
+                    count = batchTransport.BatchLimits.GetBatchSizes(
+                        new ArraySegment<EventMessage>(messages, offset, messages.Length - offset)).First();
+            }
+            yield return candidates.GetRange(offset, count).ToArray();
+            offset += count;
+        }
+    }
+
+    private async Task<int> DeliverAsync(IReadOnlyList<OutboxMessage> candidates, long claimStarted, CancellationToken cancellationToken)
     {
         CancellationTokenSource? timeout = null;
         CancellationTokenSource? deadline = null;
@@ -106,71 +129,75 @@ public sealed partial class OutboxDispatcher<TDbContext>
             timeout = new CancellationTokenSource(remaining, time);
             deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
             var token = deadline.Token;
-            delivery = SendAndSettleAsync(candidate, token, cancellationToken);
+            delivery = SendAndSettleAsync(candidates, token, cancellationToken);
             try { return await delivery.WaitAsync(token); }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                logger.LogWarning("Outbox delivery deadline elapsed for message {MessageId}; its slot remains occupied until the send finishes.", candidate.MessageId);
+                logger.LogWarning("Outbox delivery deadline elapsed for {Count} message(s), starting with {MessageId}; capacity remains occupied until sending finishes.", candidates.Count, candidates[0].MessageId);
                 return 0;
             }
         }
         finally
         {
             // Waiting can end before sending. The real operation retains its scope, cancellation sources and slot.
-            _ = ReleaseDeliverySlotAsync(delivery ?? Task.FromResult(0), timeout, deadline, candidate.MessageId);
+            _ = ReleaseDeliverySlotAsync(delivery ?? Task.FromResult(0), timeout, deadline, candidates);
         }
     }
 
     private async Task ReleaseDeliverySlotAsync(Task<int> delivery, CancellationTokenSource? timeout,
-        CancellationTokenSource? deadline, string messageId)
+        CancellationTokenSource? deadline, IReadOnlyList<OutboxMessage> candidates)
     {
         try { await delivery; }
         catch (OperationCanceledException) { }
-        catch (Exception exception) { logger.LogError(exception, "Outbox delivery operation failed for message {MessageId}.", messageId); }
+        catch (Exception exception) { logger.LogError(exception, "Outbox delivery operation failed, starting with message {MessageId}.", candidates[0].MessageId); }
         finally
         {
             deadline?.Dispose();
             timeout?.Dispose();
-            _deliverySlots.Release();
+            _deliverySlots.Release(candidates.Count);
         }
     }
 
-    private async Task<int> SendAndSettleAsync(OutboxMessage candidate, CancellationToken deadline,
+    private async Task<int> SendAndSettleAsync(IReadOnlyList<OutboxMessage> candidates, CancellationToken deadline,
         CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var db = services.GetRequiredService<TDbContext>();
-        var rows = db.Set<OutboxMessage>();
         var options = registration.Options;
+        IReadOnlyList<EventSendResult> results;
         try
         {
             deadline.ThrowIfCancellationRequested();
+            var candidate = candidates[0];
             var message = candidate.ToEventMessage();
-            Task delivery;
             if (message.Scope == EventSubscriptionScope.Local)
-                delivery = options.SharedStoreKey is null
+            {
+                await (options.SharedStoreKey is null
                     ? services.GetRequiredService<IEventReceiveDispatcher>().DispatchAsync(message, deadline)
                     : services.GetRequiredService<IEventReceiveDispatcher>().DispatchSelectedAsync(message,
-                        services.GetRequiredService<OutboxDeliveryCapabilities>().SelectLocal(candidate), deadline);
+                        services.GetRequiredService<OutboxDeliveryCapabilities>().SelectLocal(candidate), deadline));
+                results = [EventSendResult.Accepted];
+            }
             else if (message.Scope == EventSubscriptionScope.Distributed)
             {
                 var transport = message.Metadata.ServiceKey is { } key
                     ? services.GetRequiredKeyedService<IEventTransport>(key)
                     : services.GetRequiredService<IEventTransport>();
-                delivery = transport.SendAsync(message, deadline);
+                if (candidates.Count == 1)
+                {
+                    await transport.SendAsync(message, deadline);
+                    results = [EventSendResult.Accepted];
+                }
+                else
+                {
+                    results = await ((IEventBatchTransport)transport).SendBatchAsync(
+                        candidates.Select(row => row.ToEventMessage()).ToArray(), deadline);
+                    EventTransportBatch.ValidateResults(results, candidates.Count);
+                }
             }
             else throw new InvalidOperationException($"Unknown outbox delivery scope '{message.Scope}'.");
-            await delivery;
-            deadline.ThrowIfCancellationRequested();
-            var acknowledgedAt = time.GetUtcNow().UtcDateTime;
-            return await rows.Where(x => x.Sequence == candidate.Sequence && x.LeaseId == candidate.LeaseId
-                    && x.DeliveredAtUtc == null)
-                .ExecuteUpdateAsync(update => update.SetProperty(x => x.DeliveredAtUtc, acknowledgedAt)
-                    .SetProperty(x => x.LeaseId, (Guid?)null)
-                    .SetProperty(x => x.LeaseUntilUtc, (DateTime?)null)
-                    .SetProperty(x => x.LastError, (string?)null), deadline);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -178,44 +205,12 @@ public sealed partial class OutboxDispatcher<TDbContext>
         }
         catch (Exception exception)
         {
-            var timedOut = deadline.IsCancellationRequested || exception is OperationCanceledException;
-            if (timedOut && !deadline.IsCancellationRequested)
-                logger.LogWarning(exception, "Outbox delivery deadline elapsed for message {MessageId}; lease expiry will permit retry.", candidate.MessageId);
-            else if (!timedOut)
-                logger.LogError(exception, "Outbox delivery failed for message {MessageId}; it remains due for retry.", candidate.MessageId);
-            var error = exception.ToString();
-            if (error.Length > 1000) error = error[..1000];
-            try
-            {
-                var owned = rows.Where(x => x.Sequence == candidate.Sequence && x.LeaseId == candidate.LeaseId);
-                if (timedOut)
-                {
-                    // A late completion never acknowledges or clears a timed-out claim.
-                    await owned.ExecuteUpdateAsync(update => update.SetProperty(x => x.LastError, error), CancellationToken.None);
-                }
-                else
-                {
-                    var backoff = Math.Min(options.RetryMaxDelay.TotalMilliseconds,
-                        options.RetryBaseDelay.TotalMilliseconds * Math.Pow(2, Math.Min(candidate.Attempts - 1, 16)));
-                    var jittered = Math.Min(options.RetryMaxDelay.TotalMilliseconds,
-                        backoff * (0.8 + Random.Shared.NextDouble() * 0.4));
-                    // Retry eligibility must use the same clock as claiming. This extra read is only on failure.
-                    var retryClock = UsesNativeClaims(db)
-                        ? await ReadStoreScalarAsync<DateTime>(db,
-                            "SELECT (clock_timestamp() AT TIME ZONE 'UTC')", CancellationToken.None)
-                        : time.GetUtcNow().UtcDateTime;
-                    var retryAt = retryClock.AddMilliseconds(jittered);
-                    await owned.ExecuteUpdateAsync(update => update.SetProperty(x => x.LeaseId, (Guid?)null)
-                        .SetProperty(x => x.LeaseUntilUtc, (DateTime?)null)
-                        .SetProperty(x => x.NextAttemptAtUtc, retryAt)
-                        .SetProperty(x => x.LastError, error), CancellationToken.None);
-                }
-            }
-            catch (Exception cleanup)
-            {
-                logger.LogError(cleanup, "Failed to update outbox claim for message {MessageId}; lease expiry will permit retry.", candidate.MessageId);
-            }
-            return 0;
+            // A thrown batch call has no trustworthy per-entry outcome. Keep those claims until expiry.
+            var result = candidates.Count > 1 || exception is OperationCanceledException
+                ? EventSendResult.Unknown(exception) : EventSendResult.Failed(exception);
+            results = Enumerable.Repeat(result, candidates.Count).ToArray();
         }
+
+        return await SettleAsync(db, candidates, results, deadline, cancellationToken);
     }
 }

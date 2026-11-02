@@ -245,7 +245,9 @@ public sealed class ProjectUnitUseCaseTemplateTests
             public CancellationToken LastToken { get; private set; }
 
             public void Add(Order value) => throw new NotSupportedException();
+            public void AddRange(IEnumerable<Order> values) => throw new NotSupportedException();
             public void Remove(Order value) => throw new NotSupportedException();
+            public void RemoveRange(IEnumerable<Order> values) => throw new NotSupportedException();
 
             public Task<Order?> FindAsync(long id, CancellationToken cancellationToken = default)
             {

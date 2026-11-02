@@ -91,7 +91,7 @@ public sealed class KafkaEventBusProviderTests
     }
 
     [Fact]
-    public async Task SendAsync_WhenNativeWaitIsCanceled_ShouldPropagateCancellation()
+    public async Task SendAsync_WhenCanceledAfterAdmission_ShouldRetainNativeSendBeforePropagatingCancellation()
     {
         var producer = Substitute.For<IProducer<string, string>>();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -110,7 +110,157 @@ public sealed class KafkaEventBusProviderTests
         await started.Task.WaitAsync(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
 
+        Assert.False(delivery.IsCompleted);
+        acknowledgment.SetResult(new DeliveryResult<string, string>());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery);
+    }
+
+    [Fact]
+    public async Task SendBatchAsync_WhenAcknowledgmentsArriveOutOfOrder_ShouldQueueTogetherAndCorrelateEveryResult()
+    {
+        var producer = Substitute.For<IProducer<string, string>>();
+        var pending = Enumerable.Range(0, 3).Select(_ =>
+            new TaskCompletionSource<DeliveryResult<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)).ToArray();
+        var sent = new List<Message<string, string>>();
+        producer.ProduceAsync(Arg.Any<string>(), Arg.Any<Message<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                Assert.False(call.ArgAt<CancellationToken>(2).IsCancellationRequested);
+                sent.Add(call.ArgAt<Message<string, string>>(1));
+                return pending[sent.Count - 1].Task;
+            });
+        using var provider = CreateProvider(_ => producer);
+        var messages = Enumerable.Range(0, 3).Select(index => PreparedMessage() with
+        {
+            Metadata = PreparedMessage().Metadata with { MessageId = $"message-{index}", TransportKey = $"key-{index}" }
+        }).ToArray();
+        var delivery = provider.SendBatchAsync(messages, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, sent.Count);
+        Assert.False(delivery.IsCompleted);
+        var rejected = new ProduceException<string, string>(new Error(ErrorCode.Local_QueueFull),
+            new DeliveryResult<string, string> { Status = PersistenceStatus.NotPersisted });
+        var unknown = new ProduceException<string, string>(new Error(ErrorCode.Local_MsgTimedOut),
+            new DeliveryResult<string, string> { Status = PersistenceStatus.PossiblyPersisted });
+        pending[2].SetException(unknown);
+        pending[1].SetException(rejected);
+        pending[0].SetResult(new DeliveryResult<string, string> { Status = PersistenceStatus.Persisted });
+
+        var results = await delivery;
+        Assert.Equal([EventSendStatus.Accepted, EventSendStatus.Failed, EventSendStatus.Unknown],
+            results.Select(result => result.Status));
+        Assert.Same(rejected, results[1].Error);
+        Assert.Same(unknown, results[2].Error);
+        for (var index = 0; index < messages.Length; index++)
+        {
+            Assert.Equal(messages[index].Metadata.MessageId, Header(sent[index], "monica-message-id"));
+            Assert.Equal(messages[index].Metadata.Source, Header(sent[index], "monica-source"));
+            Assert.Equal(messages[index].Metadata.TransportKey, sent[index].Key);
+            Assert.Equal(messages[index].Metadata.TraceParent, Header(sent[index], "traceparent"));
+            Assert.Equal(Encoding.UTF8.GetString(messages[index].Body.Span), sent[index].Value);
+        }
+    }
+
+    [Fact]
+    public async Task SendBatchAsync_WhenCanceledDuringAdmission_ShouldDrainQueuedSendsAndSkipRemainingRecords()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var producer = Substitute.For<IProducer<string, string>>();
+        var acknowledgment = new TaskCompletionSource<DeliveryResult<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        producer.ProduceAsync(Arg.Any<string>(), Arg.Any<Message<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cancellation.Cancel();
+                return acknowledgment.Task;
+            });
+        using var provider = CreateProvider(_ => producer);
+        var delivery = provider.SendBatchAsync([PreparedMessage(), PreparedMessage()], cancellation.Token);
+
+        Assert.False(delivery.IsCompleted);
+        acknowledgment.SetResult(new DeliveryResult<string, string>());
+        var results = await delivery;
+
+        Assert.Equal(EventSendStatus.Accepted, results[0].Status);
+        Assert.Equal(EventSendStatus.Failed, results[1].Status);
+        Assert.IsType<OperationCanceledException>(results[1].Error);
+        Assert.Single(producer.ReceivedCalls(), call => call.GetMethodInfo().Name == "ProduceAsync");
+    }
+
+    [Fact]
+    public async Task SendBatchAsync_WhenLaterMessageHasInvalidIdentity_ShouldSendNothing()
+    {
+        var created = 0;
+        using var provider = CreateProvider(_ =>
+        {
+            created++;
+            return Substitute.For<IProducer<string, string>>();
+        });
+        var invalid = PreparedMessage() with { Metadata = PreparedMessage().Metadata with { MessageId = null } };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.SendBatchAsync(
+            [PreparedMessage(), invalid], TestContext.Current.CancellationToken));
+        Assert.Equal(0, created);
+        Assert.Empty(await provider.SendBatchAsync([], TestContext.Current.CancellationToken));
+        Assert.Equal(0, created);
+    }
+
+    [Fact]
+    public async Task BulkPublishAsync_WhenInputExceedsGroupLimit_ShouldWaitBeforeAdmittingNextGroup()
+    {
+        var producer = Substitute.For<IProducer<string, string>>();
+        var pending = new TaskCompletionSource<DeliveryResult<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sent = 0;
+        producer.ProduceAsync(Arg.Any<string>(), Arg.Any<Message<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ++sent <= 2 ? pending.Task : Task.FromResult(new DeliveryResult<string, string>()));
+        var factory = Substitute.For<IEventMessageFactory>();
+        factory.Prepare(typeof(string), Arg.Any<object>(), EventSubscriptionScope.Distributed, null, null)
+            .Returns(_ => PreparedMessage());
+        using var provider = CreateProvider(_ => producer, new ModuleEventBusKafkaOption
+        {
+            PublishBatch = new EventBatchLimits(2)
+        }, factory);
+
+        var publishing = provider.BulkPublishAsync(typeof(string), ["first", "second", "third"],
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(2, sent);
+        pending.SetResult(new DeliveryResult<string, string>());
+        await publishing;
+        Assert.Equal(3, sent);
+    }
+
+    [Fact]
+    public async Task Dispose_WhenFlushLeavesUnreportedSends_ShouldResolveUnknownOnlyAfterNativeDisposal()
+    {
+        var producer = Substitute.For<IProducer<string, string>>();
+        var pending = new TaskCompletionSource<DeliveryResult<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken nativeLifetime = default;
+        producer.ProduceAsync(Arg.Any<string>(), Arg.Any<Message<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                nativeLifetime = call.ArgAt<CancellationToken>(2);
+                return pending.Task.WaitAsync(nativeLifetime);
+            });
+        var disposed = false;
+        producer.Flush(Arg.Any<TimeSpan>()).Returns(_ =>
+        {
+            Assert.False(nativeLifetime.IsCancellationRequested);
+            return 2;
+        });
+        producer.When(instance => instance.Dispose()).Do(_ =>
+        {
+            Assert.False(nativeLifetime.IsCancellationRequested);
+            disposed = true;
+        });
+        using var provider = CreateProvider(_ => producer);
+        var delivery = provider.SendBatchAsync([PreparedMessage(), PreparedMessage()], TestContext.Current.CancellationToken);
+        Assert.False(delivery.IsCompleted);
+
+        provider.Dispose();
+        var results = await delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.True(disposed);
+        Assert.All(results, result => Assert.Equal(EventSendStatus.Unknown, result.Status));
+        producer.Received(1).Dispose();
     }
 
     [Theory]
@@ -168,7 +318,7 @@ public sealed class KafkaEventBusProviderTests
     }
 
     private static KafkaEventBusProvider CreateProvider(Func<ProducerConfig, IProducer<string, string>> factory,
-        ModuleEventBusKafkaOption? options = null)
+        ModuleEventBusKafkaOption? options = null, IEventMessageFactory? messageFactory = null)
     {
         var cluster = Substitute.For<IKafkaClusterConfigProvider>();
         cluster.GetDirectEventBusCluster().Returns(new KafkaClusterConfig
@@ -181,7 +331,7 @@ public sealed class KafkaEventBusProviderTests
             Substitute.For<IEventHandlerInvoker>(),
             Substitute.For<IEventSubscriptionRegistry>(),
             cluster,
-            Substitute.For<IEventMessageFactory>(),
+            messageFactory ?? Substitute.For<IEventMessageFactory>(),
             Options.Create(options ?? new ModuleEventBusKafkaOption()),
             NullLoggerFactory.Instance,
             factory);

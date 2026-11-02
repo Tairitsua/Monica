@@ -47,6 +47,10 @@ public interface IEventSubscription : IAsyncDisposable
     /// </summary>
     Type? HandlerType { get; }
 
+    /// <summary>Whether this subscription explicitly uses the distributed batch handler contract.</summary>
+    bool IsBatch => HandlerType is { } handlerType
+        && typeof(IDistributedBatchEventHandler<>).MakeGenericType(EventType).IsAssignableFrom(handlerType);
+
     /// <summary>
     /// Handler factory for creating/managing handler instances.
     /// </summary>

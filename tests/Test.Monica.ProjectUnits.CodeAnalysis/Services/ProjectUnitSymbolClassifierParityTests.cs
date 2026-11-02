@@ -82,6 +82,8 @@ public sealed class ProjectUnitSymbolClassifierParityTests
             ProjectUnitSourceType.Seeder,
             [SeederExecutionPoints.Run.Value]));
         sourceUnits["Samples.SamplePlainHostedService"].ExecutionPoints.Should().BeEmpty();
+        sourceUnits["Samples.SampleBatchHandler"].Should().BeEquivalentTo(new Classification(
+            ProjectUnitSourceType.DomainEventHandler, [EventBusExecutionPoints.DistributedBatchHandler.Value]));
         sourceUnits["Samples.SampleMonicaHostedService"].Should().BeEquivalentTo(new Classification(
             ProjectUnitSourceType.HostedService,
             [
@@ -305,6 +307,11 @@ public sealed class ProjectUnitSymbolClassifierParityTests
         {
             public Task HandleEventAsync(SampleEvent eventData, CancellationToken cancellationToken)
                 => Task.CompletedTask;
+        }
+        public sealed class SampleBatchHandler : DomainBatchEventHandler<SampleEvent>
+        {
+            public override Task HandleBatchAsync(System.Collections.Generic.IReadOnlyList<SampleEvent> events,
+                CancellationToken cancellationToken) => Task.CompletedTask;
         }
         public sealed class SampleEntity : Entity<int> { }
         public sealed class SampleDbContext(

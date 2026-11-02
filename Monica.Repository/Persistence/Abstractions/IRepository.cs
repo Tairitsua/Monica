@@ -11,8 +11,12 @@ public interface IRepository<TEntity> : ITransientDependency where TEntity : cla
 {
     /// <summary>Stages a new aggregate and its new owned graph.</summary>
     void Add(TEntity entity);
+    /// <summary>Stages aggregates with the same graph and save-policy semantics as Add; no native bulk execution occurs.</summary>
+    void AddRange(IEnumerable<TEntity> entities);
     /// <summary>Stages removal using the aggregate's configured deletion policy.</summary>
     void Remove(TEntity entity);
+    /// <summary>Stages aggregate removals under the normal deletion policy; persistence belongs to the operation boundary.</summary>
+    void RemoveRange(IEnumerable<TEntity> entities);
 }
 
 /// <summary>Loads a single-key aggregate into the current operation's identity map.</summary>

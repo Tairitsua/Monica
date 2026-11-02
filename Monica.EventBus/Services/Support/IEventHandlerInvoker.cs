@@ -14,7 +14,7 @@ public interface IEventHandlerInvoker
     /// Invokes the exact local or distributed handler contract selected by the subscription.
     /// </summary>
     /// <param name="eventHandler">The resolved handler instance.</param>
-    /// <param name="eventData">The event payload.</param>
+    /// <param name="eventData">The event payload, or an IReadOnlyList&lt;object&gt; for an explicit batch subscription.</param>
     /// <param name="eventType">The exact event type used for dispatch.</param>
     /// <param name="subscription">The subscription that selected the handler contract.</param>
     /// <param name="serviceProvider">The scope that owns the handler and pipeline behaviors.</param>
@@ -81,14 +81,16 @@ public sealed class EventHandlerInvoker : IEventHandlerInvoker
                 eventType),
             CreateExecutorIfImplemented(
                 handlerType,
-                typeof(IDistributedEventHandler<>).MakeGenericType(eventType),
-                eventType));
+                typeof(IDistributedBatchEventHandler<>).MakeGenericType(eventType),
+                eventType, batch: true)
+            ?? CreateExecutorIfImplemented(
+                handlerType, typeof(IDistributedEventHandler<>).MakeGenericType(eventType), eventType));
     }
 
     private static IEventHandlerMethodExecutor? CreateExecutorIfImplemented(
         Type handlerType,
         Type handlerContract,
-        Type eventType)
+        Type eventType, bool batch = false)
     {
         if (!handlerContract.IsAssignableFrom(handlerType))
         {
@@ -96,7 +98,7 @@ public sealed class EventHandlerInvoker : IEventHandlerInvoker
         }
 
         return (IEventHandlerMethodExecutor?)Activator.CreateInstance(
-            typeof(EventHandlerMethodExecutor<>).MakeGenericType(eventType));
+            (batch ? typeof(EventBatchHandlerMethodExecutor<>) : typeof(EventHandlerMethodExecutor<>)).MakeGenericType(eventType));
     }
 
     private sealed record HandlerExecutors(

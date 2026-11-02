@@ -12,6 +12,7 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.Results;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Models;
 using Monica.EventBus.Kafka.Abstractions;
 using Monica.EventBus.Kafka.Facades;
 using Monica.EventBus.Kafka.Localization;
@@ -493,9 +494,24 @@ public sealed class ModuleEventBusKafkaOption : MinimalApiModuleOptions<ModuleEv
     public int ProducerMessageMaxBytes { get; set; } = 1_000_000;
 
     /// <summary>
+    /// Bounds each prepared send group: 100 messages and 1 MiB of captured body/metadata by default.
+    /// Ordinary BulkPublishAsync splits its input; Outbox also caps groups by its available DeliveryConcurrency.
+    /// Protocol framing and broker limits remain separate. Replace with positive limits to tune batching.
+    /// </summary>
+    public EventBatchLimits PublishBatch { get; set; } = new();
+
+    /// <summary>
+    /// Bounds collection for explicit distributed batch handlers: 100 records, 1 MiB and 50 ms by default.
+    /// Single-event subscriptions retain their existing receive behavior. Each batch has one partition and
+    /// transaction; exhausted singleton failures stop that topic/owner consumer without acknowledging it.
+    /// </summary>
+    public KafkaEventBatchOptions ReceiveBatch { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the native producer delivery deadline including retries, two minutes by default.
-    /// Keep this below the repository Outbox delivery lease. Cancellation may end the caller's wait
-    /// while the queued native produce operation still completes, so durable receivers require Inbox deduplication.
+    /// Keep this below the repository Outbox delivery lease. Cancellation stops admission; transport tasks
+    /// retain admitted native sends until delivery reports arrive. Outbox may stop waiting earlier while retaining
+    /// capacity. Ambiguous acknowledgments and Outbox replay still require receiver deduplication.
     /// </summary>
     public TimeSpan ProducerDeliveryTimeout { get; set; } = TimeSpan.FromMinutes(2);
 

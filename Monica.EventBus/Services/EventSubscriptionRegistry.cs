@@ -4,6 +4,7 @@ using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
 using Monica.EventBus.Models.Internal;
@@ -22,6 +23,7 @@ public class EventSubscriptionRegistry(
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<Guid, IObserver<EventSubscriptionChange>> _observers = new();
     private int _isDispatchingNotifications;
+    private readonly object _registrationLock = new();
 
     #region EventSubscription CRUD
 
@@ -68,9 +70,21 @@ public class EventSubscriptionRegistry(
             }
         });
  
-        if (!_subscriptions.TryAdd(subscription.Id, subscription))
+        lock (_registrationLock)
         {
-            throw new InvalidOperationException($"EventSubscription {subscription.Id} already exists");
+            var isBatch = ((IEventSubscription)subscription).IsBatch;
+            if (isBatch && (typeof(IDistributedEventHandler<>).MakeGenericType(descriptor.EventType).IsAssignableFrom(handler)
+                || typeof(ILocalEventHandler<>).MakeGenericType(descriptor.EventType).IsAssignableFrom(handler)))
+                throw new InvalidOperationException("A batch handler cannot also implement a single-event contract for the same event.");
+            if (isBatch && descriptor.Scope != EventSubscriptionScope.Distributed)
+                throw new InvalidOperationException("Batch handlers require a distributed subscription.");
+            if (descriptor.Scope == EventSubscriptionScope.Distributed && _subscriptions.Values.Any(existing =>
+                    existing.Scope == descriptor.Scope && existing.ServiceKey == descriptor.ServiceKey
+                    && existing.TopicName == descriptor.TopicName && existing.WorkloadOwner == descriptor.WorkloadOwner
+                    && (isBatch || ((IEventSubscription)existing).IsBatch)))
+                throw new InvalidOperationException("A batch subscription must exclusively own its topic, bus and workload-owner group. Use a separate owner for another consumer.");
+            if (!_subscriptions.TryAdd(subscription.Id, subscription))
+                throw new InvalidOperationException($"EventSubscription {subscription.Id} already exists");
         }
 
         logger.LogDebug(

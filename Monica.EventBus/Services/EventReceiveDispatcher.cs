@@ -15,6 +15,38 @@ public sealed class EventReceiveDispatcher(
     IJsonSerializerOptionsProvider jsonOptions,
     ILogger<EventReceiveDispatcher> logger) : IEventReceiveDispatcher
 {
+    /// <inheritdoc />
+    public Task DispatchBatchAsync(IReadOnlyList<EventMessage> messages, EventSubscriptionId subscriptionId,
+        CancellationToken cancellationToken = default)
+        => DispatchBatchCoreAsync(messages, subscriptionId, allowHeld: false, cancellationToken);
+
+    /// <inheritdoc />
+    public Task DispatchTestBatchAsync(IReadOnlyList<EventMessage> messages, EventSubscriptionId subscriptionId,
+        CancellationToken cancellationToken = default)
+        => DispatchBatchCoreAsync(messages, subscriptionId, allowHeld: true, cancellationToken);
+
+    private async Task DispatchBatchCoreAsync(IReadOnlyList<EventMessage> messages, EventSubscriptionId id,
+        bool allowHeld, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (messages.Count == 0) throw new ArgumentException("A receive batch cannot be empty.", nameof(messages));
+        var subscription = registry.GetById(id)
+            ?? throw new InvalidOperationException($"Event subscription '{id}' no longer exists.");
+        if (!subscription.IsBatch || subscription.Scope != EventSubscriptionScope.Distributed
+            || (subscription.State != EventSubscriptionState.Active
+                && !(allowHeld && subscription.State == EventSubscriptionState.Held)))
+            throw new InvalidOperationException($"Event subscription '{id}' is not eligible for batch delivery.");
+        var inputs = messages.ToArray();
+        foreach (var message in inputs)
+            if (message.Scope != subscription.Scope || message.Metadata.TopicName != subscription.TopicName
+                || message.Metadata.ServiceKey != subscription.ServiceKey)
+                throw new ArgumentException("A receive batch must match the selected subscription's scope, topic and bus.", nameof(messages));
+        var payloads = inputs.Select(message => Deserialize(message, subscription.EventType)).ToArray();
+        await EventHandlerDispatcher.DispatchBatchAsync(subscription, invoker, payloads,
+            inputs.Select(message => message.Metadata).ToArray(), cancellationToken, allowHeld).ConfigureAwait(false);
+    }
+
     public Task DispatchAsync(EventMessage message, CancellationToken cancellationToken)
         => DispatchCoreAsync(message, filterWorkloadOwner: false, workloadOwner: null, cancellationToken);
 
@@ -89,6 +121,14 @@ public sealed class EventReceiveDispatcher(
                 $"Topic '{metadata.TopicName}' resolves to multiple event contract types.");
         }
         var eventType = eventTypes[0];
+        var eventData = Deserialize(message, eventType);
+        await EventHandlerDispatcher.DispatchSubscriptionsAsync(
+            subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken, allowHeld);
+    }
+
+    private object Deserialize(EventMessage message, Type eventType)
+    {
+        var metadata = message.Metadata;
         var declaredName = EventNameAttribute.GetNameOrDefault(eventType);
         if (!string.Equals(declaredName, metadata.EventName, StringComparison.Ordinal))
         {
@@ -106,7 +146,6 @@ public sealed class EventReceiveDispatcher(
             throw new EventMessageDeserializationException(
                 $"Event '{metadata.EventName}' could not be deserialized.", ex);
         }
-        await EventHandlerDispatcher.DispatchSubscriptionsAsync(
-            subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken, allowHeld);
+        return eventData;
     }
 }

@@ -20,6 +20,8 @@ using Monica.Core.Modularity.Models;
 using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.Repository;
+using Monica.Repository.Bulk.Abstractions;
+using Monica.Repository.Bulk.Services;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Services;
 using Monica.Repository.Facades;
@@ -56,6 +58,7 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
     public override void ConfigureServices(ModuleContext<ModuleRepositoryOption> context)
     {
         var services = context.Services;
+        services.TryAddSingleton<IBulkWriter, BulkWriter>();
         services.AddOptions<SequentialGuidGeneratorOptions>();
         services.TryAddTransient<IGuidGenerator, SequentialGuidGenerator>();
         services.TryAddSingleton<IRepositoryDbContextRegistry, RepositoryDbContextRegistry>();
@@ -79,7 +82,8 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(InboxExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork + 100,
                 static descriptor => (descriptor.Point == EventBusExecutionPoints.LocalHandler
-                    || descriptor.Point == EventBusExecutionPoints.DistributedHandler)
+                    || descriptor.Point == EventBusExecutionPoints.DistributedHandler
+                    || descriptor.Point == EventBusExecutionPoints.DistributedBatchHandler)
                     && (Attribute.IsDefined(descriptor.ComponentType, typeof(InboxAttribute), inherit: true)
                         || descriptor.EntryMethod?.IsDefined(typeof(InboxAttribute), inherit: true) == true)));
     }

@@ -7,9 +7,9 @@ namespace Monica.ProjectUnits.CodeAnalysis.Models;
 public static class ProjectUnitSourceAnalysisContract
 {
     /// <summary>
-    /// Version 7 discovers native IRequest&lt;TResponse&gt; payloads used by custom-result application services.
+    /// Version 8 classifies explicit distributed batch handlers and their execution point and event association.
     /// </summary>
-    public const string Version = "monica-project-units-source/v7";
+    public const string Version = "monica-project-units-source/v8";
 
     /// <summary>Architectural roles the current source classifier can produce.</summary>
     public static IReadOnlySet<ProjectUnitSourceType> DiscoverableUnitTypes { get; } = new[]

@@ -14,8 +14,9 @@ namespace Monica.ProjectUnits.Models;
 /// </summary>
 public class UnitDomainEventHandler : ProjectUnit
 {
-    internal UnitDomainEventHandler(BusinessTypeShape shape, ProjectUnitCatalog catalog)
-        : base(shape, EProjectUnitType.DomainEventHandler, catalog, EventBusExecutionPoints.DistributedHandler)
+    internal UnitDomainEventHandler(BusinessTypeShape shape, ProjectUnitCatalog catalog, bool isBatch = false)
+        : base(shape, EProjectUnitType.DomainEventHandler, catalog,
+            isBatch ? EventBusExecutionPoints.DistributedBatchHandler : EventBusExecutionPoints.DistributedHandler)
     {
     }
 
@@ -37,9 +38,9 @@ public class UnitDomainEventHandler : ProjectUnit
     internal static ProjectUnit Create(
         BusinessTypeShape shape,
         ProjectUnitCatalog catalog,
-        Type eventType)
+        Type eventType, bool isBatch = false)
     {
-        var unit = new UnitDomainEventHandler(shape, catalog);
+        var unit = new UnitDomainEventHandler(shape, catalog, isBatch);
         unit.CheckNameConventionMode();
         unit.EventType = eventType;
         return unit;

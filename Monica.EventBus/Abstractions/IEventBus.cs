@@ -34,6 +34,10 @@ public interface IEventBus
     /// <remarks>
     /// Subscriptions are matched by the exact published event type and topic. Do not subscribe
     /// to a base event type expecting handlers to receive derived event instances.
+    /// Outbox events are captured together before staging. Immediate publication may partially succeed:
+    /// Kafka and Dapr send bounded groups and stop after an unsuccessful group. Native groups report failures
+    /// through AggregateException; singleton sends retain provider exceptions. Successful neighbors may already be accepted; this is not a transaction
+    /// or a batch-consumer contract. Use Outbox for automatic retries with stable identities.
     /// </remarks>
     /// <typeparam name="TEvent">Event type</typeparam>
     /// <param name="eventDataList">Collection of event data</param>
@@ -113,6 +117,8 @@ public interface IEventBus
     /// <remarks>
     /// The supplied <paramref name="eventType"/> is the exact dispatch key. Passing a derived
     /// type will not trigger handlers registered for a base event type.
+    /// Immediate bulk publication can partially succeed; send groups do not define consumer batches or
+    /// transactions. Outbox captures the complete collection before staging independent messages.
     /// </remarks>
     /// <param name="eventType">Event type</param>
     /// <param name="eventDataList">Collection of event data</param>

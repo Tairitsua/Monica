@@ -6,7 +6,10 @@ namespace Monica.Repository.Persistence.Services.Support;
 
 internal interface IRepositoryContextLifetime
 {
+    Type RegistrationType { get; }
+    IServiceProvider Services { get; }
     void ValidateDatabaseAccess();
+    void PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes);
     void MarkDatabaseFailure(ExecutionTransactionFailure failure);
 }
 

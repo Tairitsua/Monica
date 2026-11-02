@@ -7,6 +7,14 @@ namespace Monica.Repository.Outbox.Models;
 public sealed class RepositoryOutboxOptions
 {
     /// <summary>
+    /// Uses the context's registered native insert provider for prepared Outbox rows; false keeps EF insertion.
+    /// Requires a provider registered on Repository and an active managed transaction on a physical context.
+    /// Does not change message identity, capture,
+    /// delivery, or audit fields. Native failures never fall back to EF. Both synchronous and asynchronous saves are supported.
+    /// </summary>
+    public bool UseBulkInsert { get; set; }
+
+    /// <summary>
     /// Stable identity of a shared physical Outbox, or null for a context-owned store (the default).
     /// Automatic contributions with the same key share one delivery/maintenance loop per host after validating
     /// their physical target and operational settings. This does not enable a held context's worker.
@@ -37,8 +45,10 @@ public sealed class RepositoryOutboxOptions
 
     /// <summary>
     /// Maximum simultaneous deliveries per dispatcher across all drain invocations; defaults to one. Timed-out
-    /// sends retain capacity until they finish. Claims only free slots. Increasing this value overlaps independent scopes;
-    /// it does not guarantee ordering, including messages with the same transport key.
+    /// sends retain capacity until they finish. Claims only free slots. Compatible distributed messages use their
+    /// transport's batch capability within this message budget; each batch also obeys that transport's count/byte limits.
+    /// Local and non-batch deliveries keep independent scopes. Increasing this value does not guarantee ordering,
+    /// including messages with the same transport key. A native batch retains all its slots until it finishes.
     /// </summary>
     public int DeliveryConcurrency { get; set; } = 1;
 

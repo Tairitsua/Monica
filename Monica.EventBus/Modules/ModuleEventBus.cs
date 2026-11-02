@@ -51,6 +51,8 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
             sp.GetRequiredService<LocalEventBus>(), sp.GetRequiredService<IEventMessageFactory>(), sp));
         services.AddScoped<EventDeliveryContext>();
         services.AddScoped<IEventDeliveryContext>(sp => sp.GetRequiredService<EventDeliveryContext>());
+        services.AddScoped<EventBatchDeliveryContext>();
+        services.AddScoped<IEventBatchDeliveryContext>(sp => sp.GetRequiredService<EventBatchDeliveryContext>());
         services.AddSingleton<IEventMessageFactory, EventMessageFactory>();
         services.AddSingleton<IEventReceiveDispatcher, EventReceiveDispatcher>();
         services.AddSingleton<EventMessageRetryPolicy>();

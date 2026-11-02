@@ -8,6 +8,7 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Dapr.Services;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Models;
 using Monica.EventBus.Services;
 
 // ReSharper disable once CheckNamespace
@@ -116,6 +117,14 @@ public class ModuleDaprEventBusOption : ModuleOptions<ModuleDaprEventBus>
     private TimeSpan _messageHandlingTimeout = TimeSpan.FromSeconds(30);
 
     public string PubSubName { get; set; } = "pubsub";
+
+    /// <summary>
+    /// Bounds prepared send groups: 100 messages and 1 MiB of captured body/metadata by default, excluding
+    /// CloudEvent/protocol framing. Bulk publication requires a sidecar supporting Dapr's bulk publish API;
+    /// the component determines broker-side batching. Outbox also limits groups to its free delivery capacity.
+    /// A failed native batch never falls back to single sends. Replace with positive limits to tune batching.
+    /// </summary>
+    public EventBatchLimits PublishBatch { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the deadline for each message-processing attempt. Defaults to 30 seconds.

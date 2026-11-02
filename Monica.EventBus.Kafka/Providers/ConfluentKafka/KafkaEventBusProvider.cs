@@ -32,11 +32,13 @@ public sealed class KafkaEventBusProvider(
     IOptions<ModuleEventBusKafkaOption> options,
     ILoggerFactory loggerFactory,
     string? serviceKey = null)
-    : DistributedEventBusBase(serviceScopeFactory, eventHandlerInvoker, subscriptionManager, loggerFactory, serviceKey), IEventTransport, IDisposable
+    : DistributedEventBusBase(serviceScopeFactory, eventHandlerInvoker, subscriptionManager, loggerFactory, serviceKey), IEventBatchTransport, IDisposable
 {
     // Starting a produce request and disposing the native handle must be mutually exclusive. Once
     // queued, librdkafka owns the delivery and Flush drains it during shutdown.
     private readonly object _producerLifetimeLock = new();
+    // Canceled only after native disposal, never by a publishing caller or an Outbox deadline.
+    private readonly CancellationTokenSource _producerStopped = new();
     private readonly Lazy<IProducer<string, string>> _producer = new(() =>
     {
         var cluster = clusterConfigProvider.GetDirectEventBusCluster();
@@ -44,6 +46,10 @@ public sealed class KafkaEventBusProvider(
         return new ProducerBuilder<string, string>(config).Build();
     });
     private bool _isDisposed;
+
+    /// <inheritdoc />
+    public EventBatchLimits BatchLimits { get; } = options.Value.PublishBatch
+        ?? throw new ArgumentException("Kafka publish batch limits are required.", nameof(options));
 
     internal KafkaEventBusProvider(
         IServiceScopeFactory serviceScopeFactory,
@@ -65,6 +71,57 @@ public sealed class KafkaEventBusProvider(
 
     /// <inheritdoc />
     public async Task SendAsync(EventMessage message, CancellationToken cancellationToken)
+    {
+        var record = PrepareRecord(message);
+        await StartProduce(message.Metadata.TopicName, record, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<EventSendResult>> SendBatchAsync(IReadOnlyList<EventMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        BatchLimits.Validate(messages);
+        // Validate and prepare every record before admitting the first native send.
+        var records = messages.Select(PrepareRecord).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        var sends = new Task<EventSendResult>[records.Length];
+        for (var index = 0; index < records.Length; index++)
+        {
+            try
+            {
+                // Queue the bounded group before awaiting acknowledgments; librdkafka batches broker requests.
+                sends[index] = ObserveDeliveryAsync(StartProduce(messages[index].Metadata.TopicName,
+                    records[index], cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                // Admission failed: retain other admitted sends and their independent results.
+                sends[index] = Task.FromResult(EventSendResult.Failed(exception));
+            }
+        }
+        return await Task.WhenAll(sends);
+    }
+
+    private static async Task<EventSendResult> ObserveDeliveryAsync(Task<DeliveryResult<string, string>> delivery)
+    {
+        try
+        {
+            await delivery;
+            return EventSendResult.Accepted;
+        }
+        catch (ProduceException<string, string> exception)
+            when (exception.DeliveryResult.Status == PersistenceStatus.NotPersisted)
+        {
+            return EventSendResult.Failed(exception);
+        }
+        catch (Exception exception)
+        {
+            return EventSendResult.Unknown(exception);
+        }
+    }
+
+    private Message<string, string> PrepareRecord(EventMessage message)
     {
         if (message.Scope != EventSubscriptionScope.Distributed || message.Metadata.ServiceKey != ServiceKey)
         {
@@ -92,9 +149,12 @@ public sealed class KafkaEventBusProvider(
             headers.Add("tracestate", Encoding.UTF8.GetBytes(metadata.TraceState));
         }
 
-        await StartProduce(metadata.TopicName,
-            metadata.TransportKey ?? metadata.EventName,
-            Encoding.UTF8.GetString(message.Body.Span), headers, cancellationToken);
+        return new Message<string, string>
+        {
+            Key = metadata.TransportKey ?? metadata.EventName,
+            Value = Encoding.UTF8.GetString(message.Body.Span),
+            Headers = headers
+        };
     }
 
     /// <inheritdoc />
@@ -109,33 +169,23 @@ public sealed class KafkaEventBusProvider(
     {
         var messages = eventDataList.Select(eventData => messageFactory.Prepare(
             eventType, eventData, EventSubscriptionScope.Distributed, topicName, ServiceKey)).ToArray();
-        foreach (var message in messages)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await SendAsync(message, cancellationToken);
-        }
+        await EventTransportBatch.PublishAsync(this, messages, cancellationToken);
     }
 
     private Task<DeliveryResult<string, string>> StartProduce(
         string topicName,
-        string key,
-        string payload,
-        Headers? headers,
+        Message<string, string> message,
         CancellationToken cancellationToken)
     {
         lock (_producerLifetimeLock)
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
             cancellationToken.ThrowIfCancellationRequested();
-            return _producer.Value.ProduceAsync(
-                topicName,
-                new Message<string, string>
-                {
-                    Key = key,
-                    Value = payload,
-                    Headers = headers
-                },
-                cancellationToken);
+            // Request cancellation cancels only the native API's managed waiter, so do not pass it through.
+            // Disposal is different: once the handle is destroyed, missing reports can no longer arrive.
+            var producer = _producer.Value;
+            cancellationToken.ThrowIfCancellationRequested();
+            return producer.ProduceAsync(topicName, message, _producerStopped.Token);
         }
     }
 
@@ -152,6 +202,7 @@ public sealed class KafkaEventBusProvider(
             _isDisposed = true;
             if (!_producer.IsValueCreated)
             {
+                _producerStopped.Dispose();
                 return;
             }
 
@@ -161,7 +212,14 @@ public sealed class KafkaEventBusProvider(
             }
             finally
             {
-                _producer.Value.Dispose();
+                try
+                {
+                    _producer.Value.Dispose();
+                    // Flush can time out. Confluent suppresses delivery callbacks after handle destruction;
+                    // unblock those waiters as unknown only after native sending has actually stopped.
+                    _producerStopped.Cancel();
+                }
+                finally { _producerStopped.Dispose(); }
             }
         }
     }

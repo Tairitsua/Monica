@@ -15,6 +15,7 @@ internal sealed class ProjectUnitSymbolClassifier
     private const string CONFIGURATION_ATTRIBUTE = "Monica.Configuration.Annotations.ConfigurationAttribute";
     private const string CRUD_APPLICATION_SERVICE = "Monica.WebApi.AutoControllers.Abstractions.ICrudApplicationService";
     private const string DISTRIBUTED_EVENT_HANDLER = "Monica.EventBus.Abstractions.Handlers.IDistributedEventHandler`1";
+    private const string DISTRIBUTED_BATCH_EVENT_HANDLER = "Monica.EventBus.Abstractions.Handlers.IDistributedBatchEventHandler`1";
     private const string DOMAIN_EVENT = "Monica.EventBus.Events.IDomainEvent";
     private const string DOMAIN_EVENT_BASE = "Monica.EventBus.Events.DomainEvent";
     private const string DOMAIN_SERVICE = "Monica.Application.Abstractions.DomainService";
@@ -186,6 +187,12 @@ internal sealed class ProjectUnitSymbolClassifier
                 AnalyzeConstructorDependencies: true);
         }
 
+        if (symbol.FindInterface(DISTRIBUTED_BATCH_EVENT_HANDLER) is not null)
+        {
+            return new(ProjectUnitSourceType.DomainEventHandler, ["eventbus.distributed-batch-handler"],
+                AnalyzeConstructorDependencies: true);
+        }
+
         if (symbol.FindInterface(LOCAL_EVENT_HANDLER) is not null)
         {
             return new(
@@ -280,7 +287,8 @@ internal sealed class ProjectUnitSymbolClassifier
                 }
                 break;
             case ProjectUnitSourceType.DomainEventHandler:
-                if (symbol.FindInterface(DISTRIBUTED_EVENT_HANDLER)?.TypeArguments.FirstOrDefault() is INamedTypeSymbol distributedEvent)
+                if ((symbol.FindInterface(DISTRIBUTED_EVENT_HANDLER) ?? symbol.FindInterface(DISTRIBUTED_BATCH_EVENT_HANDLER))
+                    ?.TypeArguments.FirstOrDefault() is INamedTypeSymbol distributedEvent)
                 {
                     dependencies.Add(new(distributedEvent, "ProjectUnit.EventHandler.Event.NotFound"));
                 }

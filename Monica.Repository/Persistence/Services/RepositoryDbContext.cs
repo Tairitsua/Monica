@@ -33,6 +33,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Monica.Tool.Extensions;
 using Monica.Repository.Snapshots.Models;
 using Monica.Repository.Snapshots.Services;
+using Monica.Repository.Bulk.Abstractions;
 
 namespace Monica.Repository.Persistence.Services;
 
@@ -58,6 +59,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
     private bool _saveFailed;
     private bool _saving;
+    Type IRepositoryContextLifetime.RegistrationType => typeof(TDbContext);
+    IServiceProvider IRepositoryContextLifetime.Services => CachedServiceProvider.UnderlyingProvider;
     private readonly List<OutboxMessage> _pendingMessages = [];
     private RepositoryOutboxOptions? OutboxOptions => CachedServiceProvider.GetService<OutboxRegistration<TDbContext>>()?.Options;
     private RepositoryEntityEventOptions? EntityEventOptions => CachedServiceProvider.GetService<RepositoryEntityEventOptionsRegistration<TDbContext>>()?.Options;
@@ -371,20 +374,29 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     {
         ArgumentNullException.ThrowIfNull(affectedEntityTypes);
         ArgumentNullException.ThrowIfNull(write);
+        PrepareNativeWrite(affectedEntityTypes);
+        try { return await write(cancellationToken); }
+        catch (Exception exception)
+        {
+            ((IRepositoryContextLifetime)this).MarkDatabaseFailure(
+                ExecutionTransactionFailure.FromException("SnapshotBulkWrite", exception));
+            throw;
+        }
+    }
+
+    void IRepositoryContextLifetime.PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes)
+        => PrepareNativeWrite(affectedEntityTypes);
+
+    private void PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes)
+    {
         if (affectedEntityTypes.Count == 0) throw new ArgumentException("Declare at least one affected entity type.", nameof(affectedEntityTypes));
         ValidateDatabaseAccess();
         var manager = CachedServiceProvider.GetRequiredService<UnitOfWorkManager>();
         if (!manager.IsActive || Database.CurrentTransaction is null)
-            throw new InvalidOperationException("Controlled snapshot writes require an active managed transaction.");
+            throw new InvalidOperationException("Native writes require an active managed transaction.");
         if (affectedEntityTypes.Any(type => !Model.GetEntityTypes().Any(entity => type.IsAssignableFrom(entity.ClrType))))
             throw new ArgumentException("Every affected entity type must be mapped by this context.", nameof(affectedEntityTypes));
         CaptureSnapshotChanges(affectedEntityTypes);
-        try { return await write(cancellationToken); }
-        catch (Exception exception)
-        {
-            manager.MarkRollbackOnly(ExecutionTransactionFailure.FromException("SnapshotBulkWrite", exception));
-            throw;
-        }
     }
 
     private void CaptureSnapshotChanges(IEnumerable<Type> entityTypes)
@@ -451,7 +463,15 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             if (outbox is not null)
             {
                 if (_pendingMessages.Count != 0)
-                    Set<OutboxMessage>().AddRange(_pendingMessages);
+                {
+                    if (outbox.UseBulkInsert)
+                    {
+                        var insert = CachedServiceProvider.GetRequiredService<IBulkWriter>().Insert(this, _pendingMessages);
+                        if (useAsync) await insert.ExecuteAsync(token);
+                        else insert.Execute(token);
+                    }
+                    else Set<OutboxMessage>().AddRange(_pendingMessages);
+                }
             }
             ChangeTracker.DetectChanges();
             if (ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))

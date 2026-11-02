@@ -36,6 +36,34 @@ namespace Test.Monica.Dapr.Services;
 public sealed class DaprEventBusSubscriptionHostedServiceTests
 {
     [Fact]
+    public async Task Subscription_WhenBatchHandlerSelected_ShouldReportUnsupportedBeforeAttachingToDapr()
+    {
+        using var fixture = await CreateFixtureAsync((_, _) => Task.CompletedTask);
+        await fixture.AddSubscriptionAsync("test.batch", batch: true);
+        var status = fixture.TopicStatusStore.Get(null, "test.batch");
+        Assert.NotNull(status);
+        Assert.Equal(TopicSubscriptionRuntimeState.Failed, status.State);
+        Assert.Contains("does not support distributed batch receiving", status.LastErrorMessage);
+        Assert.False(fixture.Client.HasSubscriptionForTopic("test.batch"));
+    }
+
+    private sealed class UnsupportedBatchHandler : IDistributedBatchEventHandler<TestEvent>
+    {
+        public Task HandleBatchAsync(IReadOnlyList<TestEvent> events, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Unsupported batch handler must not run.");
+    }
+
+    [Fact]
+    public async Task Subscription_WhenBatchOwnerSharesExistingDaprTopic_ShouldStopItsSingleCallback()
+    {
+        using var fixture = await CreateFixtureAsync((_, _) => Task.CompletedTask);
+        await fixture.AddSubscriptionAsync("test.progress", batch: true, owner: "batch-owner");
+        Assert.Equal(TopicSubscriptionRuntimeState.Failed, fixture.TopicStatusStore.Get(null, "test.progress")!.State);
+        Assert.Equal(1, fixture.Client.SubscriptionCount);
+        Assert.Equal(1, fixture.Client.DisposedSubscriptionCount);
+    }
+
+    [Fact]
     public void CreateMetadata_PreservesNativeIdentitySourceAndTrace()
     {
         var message = new TopicMessage(
@@ -876,13 +904,15 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             return service.StopAsync(cancellationToken);
         }
 
-        public async Task<IEventSubscription> AddSubscriptionAsync(string topicName)
+        public async Task<IEventSubscription> AddSubscriptionAsync(string topicName, bool batch = false, string? owner = null)
         {
             var subscription = await registry.SubscribeAsync(new EventSubscriptionDescriptor
             {
                 EventType = typeof(TestEvent),
                 TopicName = topicName,
-                HandlerFactory = new DelegateHandlerFactory(
+                WorkloadOwner = owner,
+                HandlerFactory = batch ? new IocEventHandlerFactory(
+                    serviceProvider.GetRequiredService<IServiceScopeFactory>(), typeof(UnsupportedBatchHandler)) : new DelegateHandlerFactory(
                     (_, _) => Task.CompletedTask,
                     serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                     () => { }),

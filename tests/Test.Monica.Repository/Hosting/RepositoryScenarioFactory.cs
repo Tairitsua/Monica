@@ -21,7 +21,9 @@ internal sealed class RepositoryScenarioFactory(
     Action<IServiceCollection>? configure = null,
     Action<RepositoryOutboxOptions>? configureOutbox = null,
     Action<RepositoryEntityEventOptions>? configureProjections = null,
-    bool manual = false) : MonicaTestApplicationFactory<TestRepositoryDbContext>
+    bool manual = false,
+    Action<ModuleRegistration<ModuleRepository, ModuleRepositoryOption>>? configureRepository = null)
+    : MonicaTestApplicationFactory<TestRepositoryDbContext>
 {
     protected override void ConfigureHost(WebApplicationBuilder builder)
     {
@@ -33,6 +35,7 @@ internal sealed class RepositoryScenarioFactory(
     {
         var repository = builder.AddRepository()
             .AddRepositoryDbContext<TestRepositoryDbContext>((_, db) => db.UseSqlite("Data Source=unused"));
+        configureRepository?.Invoke(repository);
         if (outbox)
         {
             builder.AddEventBus().UseNoOpDistributedEventBus();

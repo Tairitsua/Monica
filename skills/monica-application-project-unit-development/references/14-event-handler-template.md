@@ -10,6 +10,7 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 ## Rules
 
 - Use `DomainEventHandler<TEvent>` for distributed events.
+- Use `DomainBatchEventHandler<TEvent>` only for an explicit consumer that combines database work. Keep the `DomainEventHandler` naming prefix and ProjectUnit metadata; implement `HandleBatchAsync(IReadOnlyList<TEvent>, CancellationToken)` and select its transaction context on that method. Follow [batch receive prerequisites and limits](../../monica-infra-messaging/references/event-bus.md#explicit-batch-consumers) and [batch Inbox](../../monica-infra-persistence/references/transactional-events.md#inbox-and-timestamp-behavior). Keep ordinary handlers for independent reactions that gain nothing from combining work.
 - Use `LocalEventHandler<TEvent>` for in-process reactions.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the handler instance; do not access it from a constructor.
@@ -48,6 +49,31 @@ public sealed class DomainEventHandlerOrderApproved(DomainNotifyWarehouse domain
     }
 }
 ```
+
+## Batch Handler Example
+
+```csharp
+using Monica.Core.Execution;
+using Monica.ProjectUnits.Annotations;
+using Monica.Repository.Inbox.Annotations;
+using Monica.WebApi.Abstractions;
+
+[ProjectUnitMetadata("Record Order Notices", Description = "Stores new notices and their Inbox receipts in one transaction.")]
+[Inbox("orders.record-notices.v1")]
+public sealed class DomainEventHandlerRecordNotices(IRepositoryNotice repository)
+    : DomainBatchEventHandler<EventOrderNotice>
+{
+    [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = new[] { typeof(OrdersDbContext) })]
+    public override Task HandleBatchAsync(IReadOnlyList<EventOrderNotice> events, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        repository.AddRange(events.Select(item => new Notice(item.OrderId, item.Text)));
+        return Task.CompletedTask;
+    }
+}
+```
+
+Register `AddInbox<OrdersDbContext>()` and its schema before receiving. The operation boundary owns saving and committing the group; do not commit per item. `AddRange` retains entity projections. Native bulk writes require the separate persistence contract and do not automatically generate entity events.
 
 ## Local Handler Example
 

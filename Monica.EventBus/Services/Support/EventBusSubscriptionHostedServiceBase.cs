@@ -53,6 +53,9 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     /// <summary>Whether each stable workload owner needs an independent external subscription.</summary>
     protected virtual bool GroupSubscriptionsByWorkloadOwner => false;
 
+    /// <summary>Whether this provider owns collection and acknowledgment for explicit batch subscriptions.</summary>
+    protected virtual bool SupportsBatchReceiving => false;
+
     /// <summary>Identifies one physical subscription within this bus instance.</summary>
     protected readonly record struct SubscriptionGroup(string TopicName, string? WorkloadOwner);
 
@@ -63,6 +66,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     {
         public required Type EventType { get; init; }
         public required HashSet<EventSubscriptionId> SubscriptionIds { get; init; }
+        public bool RequiresBatchReceiving { get; set; }
         public TopicSubscriptionRuntimeState RuntimeState { get; set; } = TopicSubscriptionRuntimeState.Subscribing;
     }
 
@@ -213,6 +217,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                     }
 
                     // Add to existing topic's reference set
+                    topicInfo.RequiresBatchReceiving |= subscription.IsBatch;
                     if (!topicInfo.SubscriptionIds.Add(subscription.Id))
                     {
                         Logger.LogWarning(
@@ -231,6 +236,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                     var newTopicInfo = new TopicSubscriptionInfo
                     {
                         EventType = eventType,
+                        RequiresBatchReceiving = subscription.IsBatch,
                         SubscriptionIds = [subscription.Id]
                     };
                     _topicSubscriptions[group] = newTopicInfo;
@@ -240,6 +246,16 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                         "Created new topic {Topic} for subscription {EventSubscriptionId}",
                         topicName, subscription.Id);
                 }
+            }
+
+            if (subscription.IsBatch && !SupportsBatchReceiving)
+            {
+                // Providers that collapse owners by topic must also stop an existing single-message
+                // subscription, otherwise its callback could acknowledge unsupported batch handlers.
+                await RemoveExternalSubscriptionForTopicAsync(group, cancellationToken);
+                var error = new NotSupportedException($"{ServiceName} does not support distributed batch receiving. Select a supported provider or a single-event handler.");
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Failed, error.Message, error);
+                throw error;
             }
 
             // Create external subscription if this is the first subscription for the topic
@@ -414,7 +430,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     protected virtual async Task RecreateExternalSubscriptionsAsync(CancellationToken cancellationToken)
     {
         var topics = _topicSubscriptions
-            .Select(p => (Group: p.Key, p.Value.EventType))
+            .Select(p => (Group: p.Key, p.Value.EventType, p.Value.RequiresBatchReceiving))
             .ToList();
 
         if (topics.Count == 0)
@@ -426,9 +442,15 @@ public abstract class EventBusSubscriptionHostedServiceBase(
 
         await DisposeExternalSubscriptionsAsync(cancellationToken);
 
-        foreach (var (group, eventType) in topics)
+        foreach (var (group, eventType, requiresBatch) in topics)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (requiresBatch && !SupportsBatchReceiving)
+            {
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Failed,
+                    $"{ServiceName} does not support distributed batch receiving; no external subscription was created.");
+                continue;
+            }
 
             ReportSubscriptionState(
                 group, TopicSubscriptionRuntimeState.Subscribing,

@@ -17,11 +17,13 @@ namespace Test.Monica.Repository.Snapshots;
 internal sealed class SnapshotScenarioFactory(ProjectionProbe? probe = null, SnapshotClock? clock = null,
     string? databasePath = null, int maximumEntries = 128,
     Action<RepositorySnapshotOptions<SnapshotTestDbContext>>? configure = null,
-    IInterceptor? interceptor = null) : MonicaTestApplicationFactory<SnapshotTestDbContext>
+    IInterceptor? interceptor = null,
+    Action<ModuleRegistration<ModuleRepository, ModuleRepositoryOption>>? configureRepository = null)
+    : MonicaTestApplicationFactory<SnapshotTestDbContext>
 {
     protected override void ConfigureMonica(IMonicaBuilder builder)
     {
-        builder.AddRepository()
+        var repository = builder.AddRepository()
             .AddRepositoryDbContext<SnapshotTestDbContext>((_, db) =>
             {
                 db.UseSqlite($"Data Source={databasePath ?? "unused"};Pooling=False");
@@ -36,6 +38,7 @@ internal sealed class SnapshotScenarioFactory(ProjectionProbe? probe = null, Sna
                 options.AddProjection<MapDefinition>();
                 configure?.Invoke(options);
             });
+        configureRepository?.Invoke(repository);
     }
     protected override void ConfigureServices(IServiceCollection services)
     {
