@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("guide_bundle_profiles", ROOT / "scripts" / "build_monica_guide_bundle.py")
+SPEC = importlib.util.spec_from_file_location("guide_bundle_profiles", ROOT / "scripts" / "build_framework_bundle.py")
 assert SPEC is not None and SPEC.loader is not None
 BUNDLE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BUNDLE)

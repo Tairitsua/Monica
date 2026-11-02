@@ -28,7 +28,6 @@ THEME_DEFINITION_DIRS = {
     REPO_ROOT / "Monica.UI" / "wwwroot" / "css" / "themes",
     REPO_ROOT / "Monica.UI" / "wwwroot" / "css" / "markdown",
     # Guide is a standalone wizard with its own two-mode theme and no Monica.UI dependency.
-    REPO_ROOT / "Monica.Guide.App" / "wwwroot" / "css" / "themes" / "guide",
 }
 THEME_DEFINITION_FILES = {
     REPO_ROOT / "Monica.UI" / "wwwroot" / "css" / "mo-theme-main.css",
