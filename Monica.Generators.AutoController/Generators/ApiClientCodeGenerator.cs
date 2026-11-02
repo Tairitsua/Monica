@@ -131,6 +131,7 @@ internal static class ApiClientCodeGenerator
         var builder = CreateFileBuilder();
         builder.Append("namespace ").Append(contractNamespaceRoot).AppendLine(".Contracts;");
         builder.AppendLine();
+        builder.AppendLine("/// <summary>Published application operations with explicit per-call transaction participation.</summary>");
         builder.Append("public interface ").Append(interfaceName)
             .AppendLine(" : global::Monica.Invocation.Abstractions.IApplicationApi");
         builder.AppendLine("{");

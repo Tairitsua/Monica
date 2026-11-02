@@ -1240,10 +1240,11 @@
   },
   "distribution": {
     "repository": "Tairitsua/Monica",
-    "installer": {
-      "assetNameTemplate": "monica-guide-v{version}-{rid}.zip",
+    "productBundle": {
+      "assetNameTemplate": "monica-framework-v{version}-{rid}.zip",
       "sha256SumsAsset": "SHA256SUMS"
     },
-    "immutableSkillUrlTemplate": "https://github.com/Tairitsua/Monica/tree/{tag}/skills/{skill}"
+    "immutableSkillUrlTemplate": "https://github.com/Tairitsua/Monica/tree/{tag}/skills/{skill}",
+    "clientDownloadUrl": "https://monica.dpdns.org/downloads"
   }
 }

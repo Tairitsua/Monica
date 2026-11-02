@@ -1,12 +1,7 @@
-"""Assemble the unified Monica Guide release bundle.
+"""Build a verified Framework skill bundle, independently of the Monica Guide client.
 
-The bundle is the self-describing artifact the shared guide engine installs: a
-framework-dependent ``setup/`` publish tree (``Monica.Guide.exe`` on Windows,
-``Monica.Guide`` elsewhere) beside the projected ``skills/`` catalog, with an
-engine-schema ``release-manifest.json`` covering every file byte for byte. The
-canonical ``.monica/agent-skill-catalog.json`` stays the single authoring
-source; this script projects it into the installer catalog with engine-scheme
-digests (``relativePath \\0 content \\0`` per file).
+The Framework repository owns canonical skills and their immutable manifest.
+The standalone Guide downloads and installs this data-only product bundle.
 """
 
 from __future__ import annotations
@@ -25,25 +20,19 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = REPOSITORY_ROOT / ".monica" / "agent-skill-catalog.json"
-ASSEMBLY_VERSION_PROJ = REPOSITORY_ROOT / "scripts" / "read_assembly_version.proj"
 
 PRODUCT_ID = "Tairitsua.Monica"
 PRODUCT_NAME = "Monica"
 SUPPORTED_HOSTS = ["claude", "codex"]
 
-# The portable platform matrix mirrors KnownAgentProducts.PortablePlatforms.
-PLATFORMS: dict[str, dict[str, str]] = {
-    "win-x64": {"entry": "Monica.Guide.exe"},
-    "linux-x64": {"entry": "Monica.Guide"},
-    "osx-arm64": {"entry": "Monica.Guide"},
-}
+# Platform slices match the public product catalog.
+PLATFORMS = ("win-x64", "linux-x64", "osx-arm64")
 
 TAG_PATTERN = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$")
-CLR_ASSEMBLY_VERSION = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
 
 
 class BundleError(Exception):
-    """Raised when the guide bundle cannot be assembled or verified."""
+    """Raised when the Framework bundle cannot be assembled or verified."""
 
 
 def fail(message: str) -> None:
@@ -72,52 +61,6 @@ def engine_tree_digest(entries: list[tuple[str, bytes]]) -> str:
         digest.update(content)
         digest.update(b"\0")
     return digest.hexdigest()
-
-
-def read_clr_assembly_version(assembly_path: Path) -> str:
-    """Read AssemblyName.Version through the MSBuild GetAssemblyIdentity task.
-
-    MSBuild resolves the version from the PE metadata without loading the
-    assembly or any dependency, and runs wherever the .NET SDK does.
-    """
-
-    if not assembly_path.is_file():
-        fail(f"Published CLR assembly is missing: {assembly_path}")
-    report_path = assembly_path.parent / f".{assembly_path.name}.assembly-version.txt"
-    completed = subprocess.run(
-        [
-            "dotnet",
-            "msbuild",
-            str(ASSEMBLY_VERSION_PROJ),
-            "-nologo",
-            "-verbosity:quiet",
-            f"-p:AssemblyPath={assembly_path}",
-            f"-p:ReportPath={report_path}",
-        ],
-        cwd=REPOSITORY_ROOT,
-        stdin=subprocess.DEVNULL,
-        text=True,
-        capture_output=True,
-        timeout=120,
-    )
-    version = ""
-    if completed.returncode == 0 and report_path.is_file():
-        identity = report_path.read_text(encoding="utf-8").strip()
-        report_path.unlink(missing_ok=True)
-        match = re.search(r"Version=(\d+\.\d+\.\d+\.\d+)", identity)
-        if match:
-            version = match.group(1)
-    if not CLR_ASSEMBLY_VERSION.fullmatch(version):
-        detail = completed.stderr.strip() or completed.stdout.strip() or "no version returned"
-        fail(f"Cannot inspect CLR assembly version for {assembly_path.name}: {detail}")
-    return version
-
-
-def required_runtime_for(dotnet_sdk: str) -> str:
-    segments = dotnet_sdk.split(".")
-    if len(segments) < 2 or not all(segment.isdigit() for segment in segments[:2]):
-        fail(f"--dotnet-sdk must be a numeric SDK version: {dotnet_sdk!r}")
-    return f"{segments[0]}.{segments[1]}"
 
 
 def require_clean_worktree(allow_dirty: bool) -> str:
@@ -277,7 +220,7 @@ def release_files(bundle: Path) -> list[dict]:
     return records
 
 
-def verify_bundle(bundle: Path, manifest: dict, projected: dict, entry_point: str) -> None:
+def verify_bundle(bundle: Path, manifest: dict, projected: dict, entry_point: str | None) -> None:
     """Recompute every recorded digest from the staged bytes before zipping."""
 
     catalog_path = bundle / "skills" / "catalog.json"
@@ -317,13 +260,8 @@ def verify_bundle(bundle: Path, manifest: dict, projected: dict, entry_point: st
     }:
         fail("Manifest skill projection does not exactly match the packaged catalog")
 
-    program_files = [
-        record for record in manifest["files"] if record["relativePath"].startswith("setup/")
-    ]
-    if manifest["programFiles"] != program_files:
-        fail("Manifest programFiles is not the exact setup/ subset of files")
-    if not (bundle / entry_point).is_file():
-        fail(f"Release entry point is missing: {entry_point}")
+    if manifest["programFiles"] or manifest["programEntryPoint"] is not None:
+        fail("A Framework skill bundle must not embed an executable")
 
 
 def deterministic_zip(bundle: Path, archive: Path, epoch: int, executable_entries: set[str]) -> None:
@@ -355,29 +293,20 @@ def command_build(args: argparse.Namespace) -> None:
         fail(f"Release tag must be SemVer with a v prefix: {args.tag!r}")
     if args.rid not in PLATFORMS:
         fail(f"--rid must be one of: {', '.join(PLATFORMS)}")
-    entry_name = PLATFORMS[args.rid]["entry"]
-    entry_point = f"setup/{entry_name}"
+    entry_point = None
     version = args.tag[1:]
-    publish = Path(args.publish_dir).resolve()
-    if not (publish / entry_name).is_file():
-        fail(f"Publish directory lacks {entry_name}: {publish}")
     output = Path(args.output_dir).resolve()
     if output == REPOSITORY_ROOT or REPOSITORY_ROOT not in output.parents:
         fail("--output must be a dedicated directory inside the repository.")
     output.mkdir(parents=True, exist_ok=True)
     commit = require_clean_worktree(args.allow_dirty)
-    assembly_version = read_clr_assembly_version(publish / "Monica.Guide.dll")
 
     catalog = load_json(CATALOG_PATH)
-    staging = output / f".monica-guide-{args.tag}-{args.rid}-staging"
+    staging = output / f".monica-framework-{args.tag}-{args.rid}-staging"
     if staging.exists():
         shutil.rmtree(staging)
     bundle = staging / "bundle"
-    shutil.copytree(
-        publish,
-        bundle / "setup",
-        ignore=shutil.ignore_patterns("*.pdb", "*.xml"),
-    )
+    bundle.mkdir(parents=True)
     for skill_name in sorted(catalog["skills"]):
         shutil.copytree(
             REPOSITORY_ROOT / "skills" / skill_name,
@@ -394,18 +323,18 @@ def command_build(args: argparse.Namespace) -> None:
         "productId": PRODUCT_ID,
         "productName": PRODUCT_NAME,
         "productVersion": version,
-        "assemblyVersion": assembly_version,
+        "assemblyVersion": None,
         "tag": args.tag,
         "sourceCommit": commit,
         "dotnetSdk": args.dotnet_sdk,
         "runtimeIdentifier": args.rid,
         "distributionKind": f"portable-{args.rid}",
         "selfContained": False,
-        "requiredRuntime": required_runtime_for(args.dotnet_sdk),
+        "requiredRuntime": None,
         "trimmed": False,
         "publishSingleFile": False,
         "programEntryPoint": entry_point,
-        "programFiles": [record for record in files if record["relativePath"].startswith("setup/")],
+        "programFiles": [],
         "supportedHosts": list(SUPPORTED_HOSTS),
         "supportedRoutes": [],
         "defaultRoutes": {},
@@ -429,7 +358,7 @@ def command_build(args: argparse.Namespace) -> None:
     (bundle / "release-manifest.json").write_bytes(json_bytes(manifest))
     verify_bundle(bundle, manifest, projected, entry_point)
 
-    archive = output / f"monica-guide-{args.tag}-{args.rid}.zip"
+    archive = output / f"monica-framework-{args.tag}-{args.rid}.zip"
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH") or 0)
     if not epoch:
         completed = subprocess.run(
@@ -440,7 +369,7 @@ def command_build(args: argparse.Namespace) -> None:
             text=True,
         )
         epoch = int(completed.stdout.strip())
-    deterministic_zip(bundle, archive, epoch, executable_entries={entry_point} if args.rid != "win-x64" else set())
+    deterministic_zip(bundle, archive, epoch, executable_entries=set())
     shutil.rmtree(staging)
     print(archive)
     print(f"{sha256_bytes(archive.read_bytes())}  {archive.name}")
@@ -450,18 +379,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build = subparsers.add_parser("build", help="Assemble and verify one guide bundle")
+    build = subparsers.add_parser("build", help="Assemble and verify one Framework skill bundle")
     build.add_argument("--tag", required=True, help="Release tag, for example v1.0.0-rc.12")
     build.add_argument(
         "--rid",
         required=True,
         choices=list(PLATFORMS),
         help="Target platform of the publish directory",
-    )
-    build.add_argument(
-        "--publish-dir",
-        required=True,
-        help="Framework-dependent publish directory for the selected platform",
     )
     build.add_argument(
         "--output-dir",

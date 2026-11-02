@@ -46,15 +46,16 @@
       "additionalProperties": false,
       "required": [
         "repository",
-        "installer",
-        "immutableSkillUrlTemplate"
+        "productBundle",
+        "immutableSkillUrlTemplate",
+        "clientDownloadUrl"
       ],
       "properties": {
         "repository": {
           "type": "string",
           "const": "Tairitsua/Monica"
         },
-        "installer": {
+        "productBundle": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -64,7 +65,7 @@
           "properties": {
             "assetNameTemplate": {
               "type": "string",
-              "const": "monica-guide-v{version}-{rid}.zip"
+              "const": "monica-framework-v{version}-{rid}.zip"
             },
             "sha256SumsAsset": {
               "type": "string",
@@ -75,6 +76,10 @@
         "immutableSkillUrlTemplate": {
           "type": "string",
           "const": "https://github.com/Tairitsua/Monica/tree/{tag}/skills/{skill}"
+        },
+        "clientDownloadUrl": {
+          "type": "string",
+          "const": "https://monica.dpdns.org/downloads"
         }
       }
     },

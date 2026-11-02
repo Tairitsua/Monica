@@ -52,3 +52,7 @@ powershell -File scripts/run-tests.ps1 -NoBuild
 ## Maintaining instructions
 
 Keep this file limited to stable repository-wide rules and task routing. Put implementation procedures in the owning skill, contributor/release workflows in `CONTRIBUTING.md`, and machine-specific setup in personal skills or user-level instructions. Dates, incident narratives, test counts, timings, and migration status belong in change history or memory. Update the existing owner instead of duplicating a rule. `CLAUDE.md` imports this file.
+
+## Standalone Guide ownership
+
+The Guide engine and client live in the sibling private `../Monica.Guide` repository. This repository publishes Framework code and skills-only bundles with `scripts/build_framework_bundle.py`; it does not build or distribute a Guide executable. Guide implementation fixes belong in its repository.
