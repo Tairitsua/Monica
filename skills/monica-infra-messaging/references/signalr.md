@@ -1,5 +1,7 @@
 # SignalR
 
+Detailed hub errors follow the Core-owned [application debug policy](../../monica-infra-hosting/references/debug-mode.md), defaulting to false. The previous unconditional enablement is removed. Global and mapped-hub native options must agree with that frozen policy; conflicts fail options validation. Test-token issuance, send metrics, and target-identifier capture remain independent.
+
 Use SignalR when the application sends typed methods to currently connected Web clients. Registration, hub mapping, and the host endpoint lifecycle are all required; the module alone does not create a callable hub.
 
 `monica.AddSignalR()` needs a web host and must be completed with `AddSignalR<TIHubOperator,THubOperator,TContract,TUser>()`, which registers SignalR services and satisfies the module's required feature. Map each hub with `MapSignalRHub<THub>("/path")`. `TContract` implements `ISignalRHubContract`, `TUser` implements `ICurrentUser`, and the operator implements `ISignalRHubOperator<TContract,TUser>`. Inject the operator to select users or connections and invoke typed client methods. When the Authentication module is present, mapped hub paths are added to its browser WebSocket query-token allowlist. `SignalRFacade` supplies hub, connection, and send diagnostics; pending send counters report Monica-observed tasks, not private SignalR transport queue depth.

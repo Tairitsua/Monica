@@ -3,6 +3,7 @@ using Monica.Invocation.Metrics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
@@ -20,7 +21,7 @@ internal sealed class RemoteCallFacade(
     IResultErrorMessageProvider messages,
     IJsonSerializerOptionsProvider serializer,
     IOptions<ModuleApiClientOption> options,
-    IOptions<ModuleResultEnvelopeOption> envelopeOptions,
+    IMonicaApplicationOptions applicationOptions,
     TimeProvider timeProvider,
     InvocationMetrics metrics,
     ILogger<RemoteCallFacade> logger) : IRemoteCallClient
@@ -61,7 +62,7 @@ internal sealed class RemoteCallFacade(
             // Diagnostic hosts keep a downstream's reserved details (for example its metadata.exception stack)
             // flowing; every other host still strips them at this boundary.
             result.PrepareForPresentation(serializer.SerializerOptions, messages, traceId, context.Service.Name,
-                context.Operation, exposeReservedDiagnostics: envelopeOptions.Value.ExposeDiagnosticDetails);
+                context.Operation, exposeReservedDiagnostics: applicationOptions.DebugMode);
             activity.SetStatus(result.IsOk() ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
             outcome = result.IsOk() ? "success" : "business_failure";
             return result;

@@ -683,6 +683,21 @@
     }
   },
   "Debug": {
+    "Policy": {
+      "Title": "Application debug mode",
+      "Description": "Application:DebugMode controls detailed client errors, API diagnostics and expression logs for registered capabilities. Authorization, sensitive-value reveal and autonomous work remain independent. Change deployment inputs and restart the host to apply this policy.",
+      "Actual": "Running value",
+      "ActualSource": "Startup source",
+      "Candidate": "Deployment candidate",
+      "CandidateSource": "Candidate source",
+      "Enabled": "Enabled",
+      "Disabled": "Disabled",
+      "Unavailable": "Unavailable",
+      "SourceCode": "Host code",
+      "SourceDefault": "Default (disabled)",
+      "InvalidCandidate": "The candidate is invalid or unavailable. Supply a boolean consistent with explicit host code; the running value is unchanged.",
+      "RestartRequired": "The deployment candidate differs from the running value. Restart is required."
+    },
     "Subtitle": "View the current Microsoft configuration debug output.",
     "SearchPlaceholder": "Search debug view",
     "Empty": "The debug view is empty.",

@@ -8,7 +8,7 @@ public sealed class OperationalPageAccessOption
     /// <summary>
     /// Gets or sets the default host authorization policy evaluated outside the Development environment.
     /// The default is <see langword="null"/>. Individual operational pages may override this value. A missing or blank
-    /// effective policy denies access outside Development unless <see cref="DebugMode"/> is enabled.
+    /// effective policy denies access outside Development unless <see cref="BypassAuthorization"/> is enabled.
     /// </summary>
     public string? AuthorizationPolicy { get; set; }
 
@@ -18,9 +18,9 @@ public sealed class OperationalPageAccessOption
     /// </summary>
     /// <remarks>
     /// This is an authorization bypass intended for explicitly trusted diagnostic hosts. It is independent from
-    /// <see cref="ModuleUIHostOption.EnableDebug"/>, which controls detailed Blazor and SignalR errors.
+    /// <see cref="Monica.Core.IMonicaApplicationOptions.DebugMode"/>, which controls additional diagnostic disclosure.
     /// </remarks>
-    public bool DebugMode { get; set; }
+    public bool BypassAuthorization { get; set; }
 
     internal string? ResolveAuthorizationPolicy(string? authorizationPolicyOverride)
     {

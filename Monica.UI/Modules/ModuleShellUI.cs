@@ -87,9 +87,9 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
         context.Services.AddScoped<NavigationSearchCatalog>();
         context.Services.AddScoped<ShellState>();
         context.Services.AddScoped<UserContextState>();
-        if (Option.OperationalPageAccess.DebugMode)
+        if (Option.OperationalPageAccess.BypassAuthorization)
         {
-            Logger.LogWarning("OperationalPageAccess.DebugMode is enabled. Monica operational diagnostics bypass authorization in every environment.");
+            Logger.LogWarning("OperationalPageAccess.BypassAuthorization is enabled. Monica operational diagnostics bypass authorization in every environment.");
         }
     }
 
@@ -167,7 +167,7 @@ public class ModuleShellUIOption : ModuleOptions<ModuleShellUI>
     /// <remarks>
     /// Development is accessible by default. Outside Development, pages use their optional policy override and then
     /// <see cref="OperationalPageAccessOption.AuthorizationPolicy"/>. Enabling
-    /// <see cref="OperationalPageAccessOption.DebugMode"/> bypasses both policies in every environment.
+    /// <see cref="OperationalPageAccessOption.BypassAuthorization"/> bypasses both policies in every environment.
     /// </remarks>
     public OperationalPageAccessOption OperationalPageAccess { get; } = new();
 

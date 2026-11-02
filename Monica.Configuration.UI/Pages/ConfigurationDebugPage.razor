@@ -11,6 +11,31 @@
         <Actions><MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Refresh" Disabled="@_loading" OnClick="LoadAsync">@L["Common:Actions:Refresh"]</MudButton></Actions>
     </ConfigurationPageHeader>
     <ConfigurationWorkbenchNavigation ActiveRoute="@PAGE_URL" />
+    @if (_debugModeState is { } policy)
+    {
+        <MudAlert Severity="@(policy.ActualValue ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined">
+            <MudText Typo="Typo.subtitle1">@L["Debug:Policy:Title"]</MudText>
+            <MudText Typo="Typo.body2">@L["Debug:Policy:Description"]</MudText>
+            <dl class="configuration-debug-summary configuration-debug-policy-values">
+                <div><dt>@L["Debug:Policy:Actual"]</dt><dd>@FormatDebugMode(policy.ActualValue)</dd></div>
+                <div><dt>@L["Debug:Policy:ActualSource"]</dt><dd>@FormatPolicySource(policy.ActualSource)</dd></div>
+                <div><dt>@L["Debug:Policy:Candidate"]</dt><dd>@FormatDebugMode(policy.CandidateValue)</dd></div>
+                <div><dt>@L["Debug:Policy:CandidateSource"]</dt><dd>@FormatPolicySource(policy.CandidateSource)</dd></div>
+            </dl>
+            @if (policy.CandidateError is not null)
+            {
+                <MudText Color="Color.Error">@L["Debug:Policy:InvalidCandidate"]</MudText>
+            }
+            else if (policy.RequiresRestart)
+            {
+                <MudText>@L["Debug:Policy:RestartRequired"]</MudText>
+            }
+        </MudAlert>
+    }
+    @if (_debugModeError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_debugModeError</MudAlert>
+    }
     <section class="configuration-debug-feature">
         <div class="configuration-debug-feature-context"><MoIcon Icon="@MoIcons.Braces" Size="1.5rem" /><p>@(Visibility.ShowSensitiveValues ? L["Debug:Workbench:FullVisibilityScope"] : L["Debug:Workbench:Scope"])</p>@if (_debugObservedAtUtc is { } observed) { <div class="configuration-debug-observation"><span>@L["Debug:Workbench:AcceptedAt"]</span><time datetime="@observed.ToString("O")">@TimeDisplay.Format(observed)</time></div> }</div>
         @if (_hasLoadedDebugView)

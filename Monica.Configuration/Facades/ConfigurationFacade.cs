@@ -6,6 +6,8 @@ using Monica.Configuration.Models;
 using Monica.Configuration.Models.Internal;
 using Monica.Configuration.Services;
 using Monica.Configuration.Services.Support;
+using Monica.Core;
+using Monica.Core.Configuration;
 using Monica.Core.Extensions;
 using Monica.Core.Results;
 using Monica.Tool.Extensions;
@@ -19,6 +21,11 @@ namespace Monica.Configuration.Facades;
 /// <remarks>Resolve this facade from the configured host. Startup inspection does not require a managed store.</remarks>
 public sealed class ConfigurationFacade(IServiceProvider services)
 {
+    /// <summary>Inspects the frozen Core debug policy, its source, and the current restart candidate without accessing a store.</summary>
+    /// <remarks>This deployment-owned policy cannot be changed through Managed configuration mutations.</remarks>
+    public Res<ApplicationDebugModeState> GetDebugModeState() =>
+        Res.Ok(services.GetRequiredService<MonicaApplication>().GetDebugModeState());
+
     private ConfigurationDefinitionResolver definitionResolver => services.GetRequiredService<ConfigurationDefinitionResolver>();
     private IConfigurationDefinitionRegistry definitionRegistry => services.GetRequiredService<IConfigurationDefinitionRegistry>();
     private IConfigurationDefinitionMaintenanceStore definitionMaintenanceStore => services.GetRequiredService<IConfigurationDefinitionMaintenanceStore>();

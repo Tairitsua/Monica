@@ -119,6 +119,8 @@
     "Empty": "尚未报告资源激活记录。"
   },
   "Overview": {
+    "DebugModeEnabled": "应用调试模式已开启。已注册能力可能对外提供堆栈、SQL 和参数值；授权仍独立控制。",
+    "DebugModeDisabled": "应用调试模式已关闭，服务端异常日志和追踪标识仍可用。修改 Application:DebugMode 并重启后可开启额外诊断。",
     "Kpis": {
       "Composition": "模块组合",
       "ActiveModules": "活动模块",

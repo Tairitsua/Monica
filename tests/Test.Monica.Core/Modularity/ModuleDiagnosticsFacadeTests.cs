@@ -222,7 +222,7 @@ public sealed class ModuleDiagnosticsFacadeTests
     }
 
     [Fact]
-    public void GetModuleOptions_WhenSensitiveDebugModeIsEnabled_ShouldRevealBoundedSensitiveValues()
+    public void GetModuleOptions_WhenSensitiveValueRevealIsEnabled_ShouldRevealBoundedSensitiveValues()
     {
         using var host = CreateHost(
             exposureMode: ModuleOptionDiagnosticsExposureMode.RevealSensitive,
@@ -293,7 +293,7 @@ public sealed class ModuleDiagnosticsFacadeTests
     }
 
     [Fact]
-    public void Composition_WhenSensitiveDebugModeRunsOutsideDevelopment_ShouldRejectTheHostConfiguration()
+    public void Composition_WhenSensitiveValueRevealRunsOutsideDevelopment_ShouldRejectTheHostConfiguration()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Environment.EnvironmentName = Environments.Production;

@@ -1,9 +1,11 @@
 # Call-chain tracing
 
+The [shared debug policy](../../monica-infra-hosting/references/debug-mode.md) controls response disclosure; it does not enable tracing instrumentation or change global logging levels.
+
 `AddChainTracing()` registers the chain service; integrations are explicit. For controller requests and business operations, add the following inside `builder.AddMonica(...)`:
 
 ```csharp
-monica.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+monica.ConfigureApplication(options => options.DebugMode = true);
 monica.AddChainTracing(options =>
     {
         options.ServiceName = "orders-api";
@@ -63,7 +65,7 @@ The former `UseDatabaseTracing()` and public concrete command interceptor are re
 
 For missing SQL nodes, check an active entry scope, capture limits, and whether a third-party options builder needs the explicit adapter. For missing remote nodes, inspect local trace IDs and the owning service. `tests/Test.Monica.Framework/ChainTracing/ChainTracingEfOptionsTests.cs` covers automatic/factory/pool/manual attachment, host isolation, and incomplete readers. `ChainTracingDatabaseExecutionTests.cs`, `ChainTracingDbCommandInterceptorTests.cs`, and `ChainTracingDbConnectionInterceptorTests.cs` cover async composition, background roots, aggregation, and terminal outcomes.
 
-The trace identifier remains public. Full `metadata.chain`, including SQL text, phase timing, and exception references, is attached only when `ModuleResultEnvelopeOption.ExposeDiagnosticDetails` is enabled; its default is `false`. Each local response owns one top-level chain. Failed nodes use `exceptionId` to reference the response's `metadata.diagnostics.exceptions` catalog instead of repeating exception strings. Capture occurs at final response projection so later propagation frames are retained. Detached node diagnostics in `chain_error` use the same local catalog. Failure summaries are short and do not embed remote JSON. For the exception catalog schema, visibility policy, and compatibility with legacy remote hosts, read [the hosting exception-diagnostics reference](../../monica-infra-hosting/references/exception-diagnostics.md).
+The trace identifier remains public. Full `metadata.chain`, including SQL text, phase timing, and exception references, is attached only when `Application:DebugMode` is enabled; its default is `false`. Each local response owns one top-level chain. Failed nodes use `exceptionId` to reference the response's `metadata.diagnostics.exceptions` catalog instead of repeating exception strings. Capture occurs at final response projection so later propagation frames are retained. Detached node diagnostics in `chain_error` use the same local catalog. Failure summaries are short and do not embed remote JSON. For the exception catalog schema, visibility policy, and compatibility with legacy remote hosts, read [the hosting exception-diagnostics reference](../../monica-infra-hosting/references/exception-diagnostics.md).
 
 Use `IChainTracing.MergeRemoteChain(traceId, remoteResult)` or the matching `ChainTracingScope` method to associate a returned remote result with its local invocation. The node records available remote service/correlation information and a structured `remote` response, including failures represented as result envelopes without a thrown local exception. A directly forwarded result is preserved under that invocation, or under the local root when no invocation is available, before attaching the local chain. Remote chains and catalogs remain inside their `remote` object; their `exceptionId` references resolve within that remote document. Reattaching the same response keeps one local chain rather than appending `chain_1`, `chain_2`, and duplicate stacks.
 

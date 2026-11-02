@@ -119,6 +119,8 @@
     "Empty": "No resource activation records have been reported."
   },
   "Overview": {
+    "DebugModeEnabled": "Application debug mode is enabled. Registered capabilities may disclose stack traces, SQL and parameter values; authorization remains independent.",
+    "DebugModeDisabled": "Application debug mode is disabled. Server exception logs and trace identifiers remain available. Change Application:DebugMode and restart to enable additional diagnostics.",
     "Kpis": {
       "Composition": "Module composition",
       "ActiveModules": "Active modules",

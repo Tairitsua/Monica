@@ -2,11 +2,10 @@ using System.Collections;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Monica.Core;
 using Monica.AutoModel.Abstractions;
 using Monica.AutoModel.Exceptions;
 using Monica.AutoModel.Models;
-using Monica.Modules;
 using Monica.Tool.Extensions;
 using Monica.Tool.Text;
 
@@ -16,11 +15,9 @@ public partial class ExpressionTokenizer<TModel>(
     IAutoModelSnapshot<TModel> snapshot,
     IAutoModelTypeConverter converter,
     IAutoModelTokenExpressionGen gen,
-    IOptions<ModuleAutoModelOption> options,
+    IMonicaApplicationOptions applicationOptions,
     ILogger<ExpressionTokenizer<TModel>> logger) : IAutoModelExpressionTokenizer<TModel>
 {
-    public ModuleAutoModelOption Options { get; } = options.Value;
-
     public void ExtractComponent(TokenizerContext context)
     {
         var fieldError = new StringBuilder();
@@ -81,7 +78,7 @@ public partial class ExpressionTokenizer<TModel>(
         if (finalError.Length > 0)
         {
 
-            if (Options.EnableDebugging)
+            if (applicationOptions.DebugMode)
             {
                 logger.LogError("Expression tokenize encountered error: {exp}\n Errors:\n{errors}",
                     context.OriginExpression, finalError.ToString().TrimEnd());

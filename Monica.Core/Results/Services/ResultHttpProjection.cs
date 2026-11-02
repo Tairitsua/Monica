@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results.Abstractions;
-using Monica.Modules;
 
 namespace Monica.Core.Results.Services;
 
@@ -24,7 +22,7 @@ public static class ResultHttpProjection
             context.RequestServices.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions,
             context.RequestServices.GetRequiredService<IResultErrorMessageProvider>(), ResultTraceId.Capture(context),
             exposeReservedDiagnostics: context.RequestServices
-                .GetRequiredService<IOptions<ModuleResultEnvelopeOption>>().Value.ExposeDiagnosticDetails);
+                .GetRequiredService<IMonicaApplicationOptions>().DebugMode);
 
     /// <summary>Resolves the transport status; unassigned or unsupported statuses are local contract errors.</summary>
     public static int GetStatusCode(IResultEnvelope response)

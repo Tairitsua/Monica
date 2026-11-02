@@ -75,6 +75,16 @@
     line-height: 1.2;
 }
 
+.configuration-debug-policy-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 16px;
+}
+
+.configuration-debug-policy-values dd {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
 .configuration-debug-ledger {
     min-width: 0;
     border: 1px solid var(--mud-palette-lines-default);
@@ -219,6 +229,12 @@
     }
     .configuration-debug-summary dd {
         font-size: 24px;
+    }
+    .configuration-debug-policy-values {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .configuration-debug-policy-values dd {
+        font-size: 16px;
     }
     .configuration-debug-filter {
         padding: 16px;

@@ -33,6 +33,7 @@ public sealed class MonicaApplication : IDisposable
     private MonicaCompositionState? _composition;
     private bool _applicationInputsFrozen;
     private bool _preparingApplication;
+    private string _debugModeSource = "Default";
     private readonly Lock _activationGate = new();
     private readonly Dictionary<string, ResourceActivation> _activationResources = new(StringComparer.Ordinal);
 
@@ -132,6 +133,9 @@ public sealed class MonicaApplication : IDisposable
         RejectRetiredStartupInput("Application:DeploymentScope", "Deployment:Scope");
         _applicationOptions.AppId = ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
         _applicationOptions.DeploymentScope = ResolveStartupIdentity("Deployment:Scope", _applicationOptions.DeploymentScope);
+        var debugMode = ResolveDebugMode(Composition.StartupConfiguration);
+        _applicationOptions.ResolveDebugMode(debugMode.Value);
+        _debugModeSource = debugMode.Source;
         var selected = Composition.StartupConfiguration.SelectCompleteSection("Application:AutonomousWork");
         if (selected is not null)
         {
@@ -142,6 +146,39 @@ public sealed class MonicaApplication : IDisposable
             if (_applicationOptions.ConfiguredAutonomousWork is { } configured && configured != value)
                 throw new InvalidOperationException("'Application:AutonomousWork' conflicts with explicitly configured execution policy.");
             _applicationOptions.AutonomousWork = value;
+        }
+    }
+
+    private (bool Value, string Source) ResolveDebugMode(ConfigurationSnapshot snapshot)
+    {
+        const string DEBUG_MODE_PATH = "Application:DebugMode";
+        var configured = _applicationOptions.ConfiguredDebugMode;
+        var selected = snapshot.SelectCompleteSection(DEBUG_MODE_PATH);
+        if (selected is null) return (configured ?? false, configured.HasValue ? "Code" : "Default");
+        var section = selected.GetSection(DEBUG_MODE_PATH);
+        if (!selected.TryGetShape(DEBUG_MODE_PATH, out var shape) || shape != ConfigurationValueShape.Scalar
+            || section.GetChildren().Any() || !bool.TryParse(section.Value, out var value))
+            throw new InvalidOperationException("'Application:DebugMode' must be a boolean startup value.");
+        if (configured is { } explicitValue && explicitValue != value)
+            throw new InvalidOperationException("'Application:DebugMode' conflicts with explicitly configured diagnostic policy.");
+        return (value, selected.Origin.SourcePath ?? selected.Origin.ProviderType.Name);
+    }
+
+    /// <summary>Inspects the frozen debug policy and the current deployment candidate without changing the running host.</summary>
+    /// <remarks>Reads accepted configuration providers on demand. Candidate failures remain visible and never replace the actual value.</remarks>
+    /// <exception cref="InvalidOperationException">Application inputs have not been frozen.</exception>
+    public ApplicationDebugModeState GetDebugModeState()
+    {
+        if (!_applicationInputsFrozen) throw new InvalidOperationException("Application inputs have not been frozen.");
+        try
+        {
+            var candidate = ResolveDebugMode(ConfigurationSnapshot.Capture((Microsoft.Extensions.Configuration.IConfigurationRoot)Composition.LiveConfiguration));
+            return new(Application.DebugMode, _debugModeSource, candidate.Value, candidate.Source, null);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentException)
+        {
+            return new(Application.DebugMode, _debugModeSource, null, null,
+                "The Application:DebugMode deployment candidate is invalid or unavailable. Supply a boolean consistent with explicit code configuration.");
         }
     }
 
@@ -182,6 +219,9 @@ public sealed class MonicaApplication : IDisposable
         TypeActivation ??= new StandaloneTypeActivationPolicy(_applicationOptions.AutonomousWork);
         _typeActivationFrozen = true;
         _applicationInputsFrozen = true;
+        if (_applicationOptions.DebugMode)
+            CreateLogger<MonicaApplication>().LogWarning(
+                "Application:DebugMode is enabled. Registered capabilities may expose stack traces, SQL and parameter values to clients. Authorization and autonomous work are unchanged.");
     }
 
     internal MonicaModuleSystemOptions ModuleSystemConfiguration => _moduleSystemOptions;
