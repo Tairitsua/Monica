@@ -85,7 +85,7 @@ public static class ModuleChainTracingRegistrationExtensions
 
     /// <summary>
     /// Completes controller tracing and attaches a public trace identifier to result envelopes. Hosts that
-    /// enable <see cref="ModuleResultEnvelopeOption.ExposeDiagnosticDetails"/> also expose the call chain
+    /// enable <see cref="Monica.Core.IMonicaApplicationOptions.DebugMode"/> also expose the call chain
     /// and a shared exception catalog. The same policy applies to exception-built responses.
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> AttachControllerTraceMetadata(

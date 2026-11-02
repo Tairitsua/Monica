@@ -102,11 +102,6 @@ public class ModuleAutoModelOption : MinimalApiModuleOptions<ModuleAutoModel>
     public bool EnableIgnorePrefixAutoAdjust { get; set; }
 
     /// <summary>
-    /// Enables debugging mode, for example by showing the expression generated from a filter.
-    /// </summary>
-    public bool EnableDebugging { get; set; }
-
-    /// <summary>
     /// Enables using the field display name as an activation name.
     /// </summary>
     [Obsolete("Not implemented yet.")]

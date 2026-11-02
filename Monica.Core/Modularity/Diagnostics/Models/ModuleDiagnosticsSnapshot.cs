@@ -75,6 +75,9 @@ public enum ModuleCompositionOutcome
 /// <summary>Contains bounded host metadata safe for the live diagnostics boundary.</summary>
 public sealed record ModuleDiagnosticsHostContext
 {
+    /// <summary>Gets the host's frozen Application:DebugMode policy. This does not grant access to diagnostics.</summary>
+    public bool DebugMode { get; init; }
+
     /// <summary>Gets the configured application display name.</summary>
     public string? ApplicationName { get; init; }
 

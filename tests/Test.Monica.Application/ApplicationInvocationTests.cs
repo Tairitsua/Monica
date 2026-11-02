@@ -174,7 +174,7 @@ internal sealed class InvocationFactory : MonicaTestApplicationFactory<CommandHa
         builder.AddApplicationUI();
         builder.AddApiClient().ConfigDomainInfoProvider(new TestingRpcDomains()).UseLocalTransport();
         builder.AddWebApi();
-        builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+        builder.ConfigureApplication(options => options.DebugMode = true);
         builder.AddRepository().AddRepositoryDbContext<OperationDbContext>((_, options) => options.UseSqlite("Data Source=unused"));
     }
 

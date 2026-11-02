@@ -1,3 +1,4 @@
+using Monica.Core;
 using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
@@ -72,8 +73,7 @@ public sealed class ChainTracingResultMetadataFilterTests
     {
         var tracing = CreateTracingWithDatabaseNode();
         var filter = new ChainTracingResultMetadataActionFilter(tracing,
-            new ChainResultMetadataAttacher(Options.Create(
-                new ModuleResultEnvelopeOption { ExposeDiagnosticDetails = exposeDiagnostics })));
+            new ChainResultMetadataAttacher(new MonicaApplicationOptions { DebugMode = exposeDiagnostics }));
         var response = Res.Fail("Safe failure");
         var context = ExecutedContext(response);
 
@@ -117,7 +117,7 @@ public sealed class ChainTracingResultMetadataFilterTests
     {
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
-            builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+            builder.ConfigureApplication(options => options.DebugMode = true);
             builder.AddChainTracing().UseControllerTracing().AttachControllerTraceMetadata();
         }
     }

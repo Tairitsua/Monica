@@ -64,6 +64,12 @@ public class ModuleSignalR : MonicaModule<ModuleSignalROption>, IWebHostRequired
     {
         var services = context.Services;
         var wireOptions = services.GetMonicaJsonSerializerOptions();
+        var debugMode = context.Application.Application.DebugMode;
+        services.AddOptions<HubOptions>()
+            .Configure(options => options.EnableDetailedErrors = debugMode)
+            .Validate(options => options.EnableDetailedErrors == debugMode,
+                "SignalR EnableDetailedErrors must match the frozen Application:DebugMode policy.")
+            .ValidateOnStart();
 
         services.AddOptions<JsonHubProtocolOptions>()
             .Configure(options => options.PayloadSerializerOptions.CopyFrom(wireOptions))
@@ -145,6 +151,7 @@ public static class ModuleSignalRRegistrationExtensions
     /// <remarks>
     /// JSON protocol contributions are applied in registration order after Monica's canonical wire contract. Monica
     /// seals the payload serializer options once, after every registered contribution has run.
+    /// Detailed errors are owned by Application:DebugMode. A conflicting HubOptions callback fails options validation.
     /// </remarks>
     public static ModuleRegistration<ModuleSignalR, ModuleSignalROption> AddSignalR<TIHubOperator, THubOperator, TContract, TUser>(this ModuleRegistration<ModuleSignalR, ModuleSignalROption> module,
         Action<HubOptions>? configure = null,
@@ -163,7 +170,6 @@ public static class ModuleSignalRRegistrationExtensions
 
             var signalRBuilder = context.Services.AddSignalR(options =>
             {
-                options.EnableDetailedErrors = true;
                 configure?.Invoke(options);
             });
 
@@ -218,6 +224,16 @@ public static class ModuleSignalRRegistrationExtensions
         module.Configure(options =>
         {
             options.HubRegistrations.Add(new SignalRHubRegistration(typeof(THub), pattern));
+        });
+        module.ConfigureServices(context =>
+        {
+            // Register the native typed-options setup so all global hub settings are inherited.
+            context.Services.AddSignalR().AddHubOptions<THub>(options =>
+                options.EnableDetailedErrors = context.Application.Application.DebugMode);
+            context.Services.AddOptions<HubOptions<THub>>()
+                .Validate(options => options.EnableDetailedErrors == context.Application.Application.DebugMode,
+                    "Hub EnableDetailedErrors must match the frozen Application:DebugMode policy.")
+                .ValidateOnStart();
         });
 
         module.ConfigureEndpoints(context =>

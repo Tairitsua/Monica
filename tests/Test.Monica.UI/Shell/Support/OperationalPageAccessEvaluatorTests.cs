@@ -30,13 +30,13 @@ public sealed class OperationalPageAccessEvaluatorTests
     [Theory]
     [InlineData("Staging")]
     [InlineData("Production")]
-    public async Task IsAuthorizedAsync_WhenDebugModeIsEnabled_ShouldBypassEveryPolicy(
+    public async Task IsAuthorizedAsync_WhenAuthorizationBypassIsEnabled_ShouldBypassEveryPolicy(
         string environmentName)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var shellOptions = new ModuleShellUIOption();
         shellOptions.OperationalPageAccess.AuthorizationPolicy = "missing-global-policy";
-        shellOptions.OperationalPageAccess.DebugMode = true;
+        shellOptions.OperationalPageAccess.BypassAuthorization = true;
         var evaluator = CreateEvaluator(environmentName, shellOptions, services);
 
         var isAuthorized = await evaluator.IsAuthorizedAsync(

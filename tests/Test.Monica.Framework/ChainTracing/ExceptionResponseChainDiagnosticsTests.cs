@@ -1,3 +1,4 @@
+using Monica.Core;
 using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
@@ -76,8 +77,7 @@ public sealed class ExceptionResponseChainDiagnosticsTests
 
     private static ChainResultMetadataAttacher CreateAttacher(bool exposeDiagnostics)
     {
-        return new ChainResultMetadataAttacher(Options.Create(
-            new ModuleResultEnvelopeOption { ExposeDiagnosticDetails = exposeDiagnostics }));
+        return new ChainResultMetadataAttacher(new MonicaApplicationOptions { DebugMode = exposeDiagnostics });
     }
 
     private static AsyncLocalChainTracingService CreateTracing()

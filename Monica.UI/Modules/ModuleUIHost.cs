@@ -1,6 +1,8 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Endpoints;
+using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,8 +72,20 @@ public class ModuleUIHost : MonicaModule<ModuleUIHostOption>, IWebHostRequiredMo
             throw new InvalidOperationException("The default UI layout must derive from LayoutComponentBase.");
         }
 
-        context.Services.AddRazorComponents().AddInteractiveServerComponents(options => options.DetailedErrors = Option.EnableDebug)
-            .AddHubOptions(options => options.EnableDetailedErrors = Option.EnableDebug);
+        var debugMode = context.Application.Application.DebugMode;
+        context.Services.AddRazorComponents()
+            .AddInteractiveServerComponents(options => options.DetailedErrors = debugMode)
+            .AddHubOptions(options => options.EnableDetailedErrors = debugMode);
+        context.Services.AddOptions<RazorComponentsServiceOptions>()
+            // ASP.NET Core initializes this value in post-configuration from its own configuration key.
+            .PostConfigure(options => options.DetailedErrors = debugMode)
+            .Validate(options => options.DetailedErrors == debugMode,
+                "Razor DetailedErrors must match the frozen Application:DebugMode policy.")
+            .ValidateOnStart();
+        context.Services.AddOptions<CircuitOptions>()
+            .Validate(options => options.DetailedErrors == debugMode,
+                "Circuit DetailedErrors must match the frozen Application:DebugMode policy.")
+            .ValidateOnStart();
         context.Services.AddSingleton<PageRegistry>();
         context.Services.AddSingleton<INavigationRegistryBuilder>(provider => provider.GetRequiredService<PageRegistry>());
         context.Services.AddSingleton<IPageCatalog>(provider => provider.GetRequiredService<PageRegistry>());
@@ -122,9 +136,6 @@ public class ModuleUIHostOption : ModuleOptions<ModuleUIHost>
     /// <summary>Default layout for product pages. Defaults to a layout that renders only its body.</summary>
     /// <remarks>Native @layout declarations take precedence. Shell-registered destinations use the Shell layout.</remarks>
     public Type DefaultLayout { get; set; } = typeof(BodyLayout);
-
-    /// <summary>Enables detailed circuit and hub errors. Defaults to false; avoid enabling in production.</summary>
-    public bool EnableDebug { get; set; }
 
     /// <summary>Discovers routes for both navigation and direct HTTP refresh, without creating menu entries.</summary>
     public void AddPageAssembly(Assembly assembly)

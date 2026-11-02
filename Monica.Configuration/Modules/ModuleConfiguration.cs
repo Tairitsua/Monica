@@ -275,6 +275,14 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         var scanner = _definitionScanner
             ?? throw new InvalidOperationException("Configuration definition discovery ran before host-builder configuration.");
         var analysis = ConfigurationDefinitionAnalysis.Create(scanner, optionsTypes);
+        foreach (var registration in analysis.Registrations.Where(registration => registration.Definition.Kind == ConfigurationKind.Managed))
+        {
+            var section = registration.Definition.SectionPath;
+            if (string.Equals(section, "Application", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(section, "Application:DebugMode", StringComparison.OrdinalIgnoreCase)
+                || section.StartsWith("Application:DebugMode:", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Managed configuration cannot own the Core startup policy 'Application:DebugMode'.");
+        }
         var conflicts = ValidateDefinitions(analysis.Registrations);
         Volatile.Write(ref _definitionAnalysis, analysis.WithSectionPathConflicts(conflicts));
     }

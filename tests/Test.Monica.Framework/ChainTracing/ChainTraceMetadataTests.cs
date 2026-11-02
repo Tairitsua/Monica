@@ -99,7 +99,7 @@ public sealed class ChainTraceMetadataTests
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
             builder.AddJsonSerialization(options => options.DateTimeFormat = DateTimeWireFormat.SpaceSeparatedWallClock);
-            builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = exposeDiagnostics);
+            builder.ConfigureApplication(options => options.DebugMode = exposeDiagnostics);
             builder.AddChainTracing(options =>
                 {
                     options.ServiceName = serviceName;

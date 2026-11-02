@@ -22,6 +22,7 @@ Start with composition for module-graph or host-lifecycle problems, then select 
 | Configure registry/worker roles or inspect registered services | [Service discovery](references/service-discovery.md) |
 | Store key-value state using a memory, distributed, or keyed provider | [State stores](references/state-stores.md) |
 | Inspect local or remote failures and choose response diagnostic visibility | [Exception diagnostics](references/exception-diagnostics.md) |
+| Configure unified debug disclosure, distinguish access/reveal policies, or inspect restart state | [Debug mode](references/debug-mode.md) |
 
 For database aggregates and write boundaries, use [persistence](../monica-infra-persistence/SKILL.md); for telemetry, use [observability](../monica-infra-observability/SKILL.md). For module implementation, use `$monica-framework`, then `$monica-development`.
 

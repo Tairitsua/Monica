@@ -1,3 +1,4 @@
+using Monica.Core;
 using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
@@ -263,7 +264,7 @@ public sealed class ChainResultMetadataAttacherTests
     private static JsonElement Serialize(Res response) => JsonSerializer.SerializeToElement(response, JSON);
 
     private static ChainResultMetadataAttacher CreateAttacher() => new(
-        Options.Create(new ModuleResultEnvelopeOption { ExposeDiagnosticDetails = true }),
+        new MonicaApplicationOptions { DebugMode = true },
         new JsonSerializerOptionsProvider(JSON, DateTimeWireFormat.Iso8601WallClock));
 
     private static AsyncLocalChainTracingService CreateTracing() => new(

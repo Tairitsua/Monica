@@ -83,7 +83,8 @@ public sealed class ChainTracingHttpMetadataTests
                 options.EnableEnumFormatValue = true;
                 options.EnumTypeToIgnore = [typeof(ResStatus)];
             });
-            builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = exposeDiagnostics)
+            builder.ConfigureApplication(options => options.DebugMode = exposeDiagnostics);
+            builder.AddResultEnvelope()
                 .UseResultFieldNames(names => names.Status = "code");
             builder.AddControllers().ConfigMvcBuilder(mvc =>
                 mvc.AddApplicationPart(typeof(ChainTracingHttpProbeController).Assembly));

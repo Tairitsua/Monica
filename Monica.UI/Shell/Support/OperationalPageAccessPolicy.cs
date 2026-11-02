@@ -46,7 +46,7 @@ public sealed class OperationalPageAccessEvaluator(
         cancellationToken.ThrowIfCancellationRequested();
 
         var accessOptions = shellOptions.Value.OperationalPageAccess;
-        if (accessOptions.DebugMode || environment.IsDevelopment())
+        if (accessOptions.BypassAuthorization || environment.IsDevelopment())
         {
             return true;
         }

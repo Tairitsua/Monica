@@ -400,6 +400,7 @@ internal sealed class ModuleDiagnosticsService
             {
                 ApplicationName = _application.Application.AppName ?? _hostEnvironment.ApplicationName,
                 ApplicationVersion = _application.Application.AppVersion,
+                DebugMode = _application.Application.DebugMode,
                 EnvironmentName = _hostEnvironment.EnvironmentName,
                 HostKind = source.Composition.HostBuilderType?.Name
             },

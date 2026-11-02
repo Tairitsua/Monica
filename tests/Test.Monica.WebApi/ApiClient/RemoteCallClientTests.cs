@@ -396,7 +396,8 @@ public sealed class RemoteCallClientTests
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
             builder.AddJsonSerialization(options => options.DefaultIgnoreCondition = ignoreCondition);
-            builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = exposeDiagnostics)
+            builder.ConfigureApplication(options => options.DebugMode = exposeDiagnostics);
+            builder.AddResultEnvelope()
                 .UseResultFieldNames(names => names.Status = "code");
             var rpc = builder.AddApiClient(options => options.MaxResponseBodyBytes = maxBytes)
                 .ConfigDomainInfoProvider(new Domains(registerClient)).ConfigHttpClientRegisterProvider<HttpProvider>();

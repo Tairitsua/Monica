@@ -6,6 +6,8 @@ Monica composes one host-owned module graph before the .NET host is built. A mod
 
 ## Start with the host boundary
 
+Use [unified debug mode](debug-mode.md) for `Application:DebugMode`, its startup-frozen lifetime, participating diagnostic capabilities, and independent authorization/sensitive-value policies.
+
 ```csharp
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;

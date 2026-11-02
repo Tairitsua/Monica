@@ -16,6 +16,9 @@
         .Where(static module => module.StartupWorkDurationMs > 0)
         .OrderByDescending(static module => module.StartupWorkDurationMs)
         .FirstOrDefault();
+    <MudAlert Severity="@(snapshot.Host.DebugMode ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Dense="true">
+        @(snapshot.Host.DebugMode ? L["Overview:DebugModeEnabled"] : L["Overview:DebugModeDisabled"])
+    </MudAlert>
     <section class="overview-score" aria-label="@L["Aria:SummaryMetrics"]">
         <div class="score-feature">
             <div class="score-lede">

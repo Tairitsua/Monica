@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core;
 using Monica.AutoModel.Abstractions;
 using Monica.AutoModel.Exceptions;
 using Monica.AutoModel.Models;
 using Monica.AutoModel.Services;
-using Monica.Modules;
 using Monica.Tool.Diagnostics;
 using Monica.Tool.Extensions;
 
@@ -13,13 +13,12 @@ namespace Monica.AutoModel.Providers;
 public class ExpressionNormalizerDynamicLinqProvider<TModel>(
     IAutoModelSnapshot<TModel> snapshot,
     IOptions<AutoModelExpressionOptions> expressionOptions,
-    IOptions<ModuleAutoModelOption> options,
+    IMonicaApplicationOptions applicationOptions,
     IAutoModelExpressionTokenizer<TModel> tokenizer,
     ILogger<ExpressionTokenizer<TModel>> logger)
     : IAutoModelExpressionNormalizer<TModel>
 {
     protected AutoModelExpressionOptions ExpressionOptions = expressionOptions.Value;
-    protected ModuleAutoModelOption Options = options.Value;
     protected bool LinqToObject = false;
 
     public List<AutoField> NormalizeLiteralSelect(string columns, bool isReverseSelect = false)
@@ -98,7 +97,7 @@ public class ExpressionNormalizerDynamicLinqProvider<TModel>(
             selectColumnExp = NormalizeLiteralSelect(selectColumns).Select(GetSelectExpression).StringJoin(",");
         }
         var expression = $"new {{ {selectColumnExp} }}";
-        if (Options.EnableDebugging)
+        if (applicationOptions.DebugMode)
         {
             logger.LogInformation("Select string: {filter}", expression);
         }
@@ -117,7 +116,7 @@ public class ExpressionNormalizerDynamicLinqProvider<TModel>(
             }
         }
         var result = tokenizer.GenFinalExpression(context);
-        if (Options.EnableDebugging)
+        if (applicationOptions.DebugMode)
         {
             logger.LogInformation("Filter string: {filter}", context.OriginExpression);
             logger.LogInformation(result.ToString());
@@ -150,7 +149,7 @@ public class ExpressionNormalizerDynamicLinqProvider<TModel>(
         //TODO improve performance
         var context = tokenizer.Tokenize(fuzzyColumnsList.Select(p => $"({p.DefaultActiveName} like \"{fuzzy}\")").StringJoin(" or "));
         var result = tokenizer.GenFinalExpression(context);
-        if (Options.EnableDebugging)
+        if (applicationOptions.DebugMode)
         {
             logger.LogInformation("Filter string: {filter}", context.OriginExpression);
             logger.LogInformation("Generated expression: {expression}", result.FinalExpression);

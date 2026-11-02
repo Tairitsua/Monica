@@ -5,7 +5,7 @@ using Monica.Core.Modularity.Abstractions;
 namespace Monica.Core;
 
 /// <summary>
-/// Read-only view of shared Monica application identity defaults.
+/// Read-only view of shared Monica application identity and startup policies.
 /// </summary>
 public interface IMonicaApplicationOptions
 {
@@ -39,6 +39,10 @@ public interface IMonicaApplicationOptions
 
     /// <summary>Gets whether this host may initiate shared or environmental work without an explicit request. Defaults to true.</summary>
     bool AutonomousWork { get; }
+
+    /// <summary>Gets whether this host exposes additional client diagnostics and expression-debug output. Defaults to false.</summary>
+    /// <remarks>Frozen at startup. Does not change authorization, sensitive-value reveal, logging levels, or autonomous work.</remarks>
+    bool DebugMode { get; }
 
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.
@@ -82,10 +86,10 @@ public interface IMonicaApplicationOptions
 }
 
 /// <summary>
-/// Mutable configuration model for shared Monica application identity defaults.
+/// Configuration model for shared Monica application identity and startup policies.
 /// Configure it through <see cref="IMonicaBuilder.ConfigureApplication"/>.
 /// </summary>
-/// <remarks>Identity freezes before owned application registrations; retained references reject subsequent mutation.</remarks>
+/// <remarks>Identity and policies freeze before owned application registrations; retained references reject subsequent mutation.</remarks>
 public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
 {
     private bool _frozen;
@@ -96,6 +100,8 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     private string? _domainName;
     private string? _deploymentScope;
     private bool? _autonomousWork;
+    private bool? _debugMode;
+    private bool? _resolvedDebugMode;
 
     /// <summary>
     /// Gets or sets the application project name.
@@ -147,6 +153,30 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     }
 
     internal bool? ConfiguredAutonomousWork => _autonomousWork;
+
+    /// <summary>Gets or sets the shared diagnostic policy. Defaults to false in every environment and build configuration.</summary>
+    /// <remarks>
+    /// Application:DebugMode supplies the canonical startup input; contradictory code configuration fails composition.
+    /// Enabled capabilities expose detailed Blazor and SignalR errors, bounded result and downstream diagnostics,
+    /// existing call-chain evidence, and AutoModel expression logs. Details may contain SQL, parameter values, paths,
+    /// and stack traces. Only already registered capabilities participate. Authorization, sensitive configuration
+    /// reveal, EF sensitive-data logging, log levels, and autonomous work retain their independent policies.
+    /// Changes require a host restart. Server exception logging and public trace identifiers remain available when false.
+    /// </remarks>
+    public bool DebugMode
+    {
+        get => _resolvedDebugMode ?? _debugMode ?? false;
+        set
+        {
+            if (_frozen) throw new InvalidOperationException("Application diagnostic policy is frozen before owned registration begins.");
+            _debugMode = value;
+            _resolvedDebugMode = null;
+        }
+    }
+
+    internal bool? ConfiguredDebugMode => _debugMode;
+
+    internal void ResolveDebugMode(bool value) => _resolvedDebugMode = value;
 
     internal void Freeze() => _frozen = true;
 

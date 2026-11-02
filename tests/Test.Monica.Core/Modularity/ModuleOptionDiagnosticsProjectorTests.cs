@@ -78,7 +78,7 @@ public sealed class ModuleOptionDiagnosticsProjectorTests
     }
 
     [Fact]
-    public void Project_WhenSensitiveDebugModeIsEnabled_ShouldRevealBoundedAddressCredentials()
+    public void Project_WhenSensitiveValueRevealIsEnabled_ShouldRevealBoundedAddressCredentials()
     {
         var diagnostics = ProjectAddresses(ModuleOptionDiagnosticsExposureMode.RevealSensitive);
 
@@ -159,7 +159,7 @@ public sealed class ModuleOptionDiagnosticsProjectorTests
     }
 
     [Fact]
-    public void Project_WhenDictionaryKeysAreRead_ShouldRevealThemOnlyInSensitiveDebugMode()
+    public void Project_WhenDictionaryKeysAreRead_ShouldRevealThemOnlyInSensitiveValueReveal()
     {
         const string secretKey = "opaque-secret-used-as-a-dictionary-key";
         var projector = new ModuleOptionDiagnosticsProjector();

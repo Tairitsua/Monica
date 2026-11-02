@@ -683,6 +683,21 @@
     }
   },
   "Debug": {
+    "Policy": {
+      "Title": "应用调试模式",
+      "Description": "Application:DebugMode 统一控制已注册能力的客户端详细错误、API 诊断和表达式日志。授权、敏感值显示与自主执行仍独立配置。修改部署输入并重启宿主后生效。",
+      "Actual": "当前生效值",
+      "ActualSource": "启动来源",
+      "Candidate": "部署候选值",
+      "CandidateSource": "候选值来源",
+      "Enabled": "已开启",
+      "Disabled": "已关闭",
+      "Unavailable": "不可用",
+      "SourceCode": "宿主代码",
+      "SourceDefault": "默认值（关闭）",
+      "InvalidCandidate": "候选值无效或不可用。请提供与宿主显式代码配置一致的布尔值；当前运行值保持不变。",
+      "RestartRequired": "部署候选值与当前生效值不同，需要重启宿主。"
+    },
     "Subtitle": "查看当前 Microsoft configuration debug 输出。",
     "SearchPlaceholder": "搜索调试视图",
     "Empty": "调试视图为空。",

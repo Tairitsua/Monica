@@ -1,14 +1,12 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.ExceptionHandling.Models;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
-using Monica.Modules;
 
 namespace Monica.Core.ExceptionHandling.Services;
 
@@ -16,7 +14,7 @@ internal class ExceptionHandlerService(
     ILogger<ExceptionHandlerService> logger,
     IHttpContextAccessor accessor,
     IEnumerable<IExceptionResponseMapper> mappers,
-    IOptions<ModuleResultEnvelopeOption> envelopeOptions,
+    IMonicaApplicationOptions applicationOptions,
     IJsonSerializerOptionsProvider serializer,
     IResultErrorMessageProvider messages,
     IExceptionResponseDiagnostics? diagnostics = null,
@@ -39,7 +37,7 @@ internal class ExceptionHandlerService(
     public Task<Res> HandleAsync(HttpContext? httpContext, Exception exception, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var exposeDiagnostics = envelopeOptions.Value.ExposeDiagnosticDetails;
+        var exposeDiagnostics = applicationOptions.DebugMode;
         var metadata = new List<KeyValuePair<string, object?>>();
         while (exception is ContextualException contextual)
         {

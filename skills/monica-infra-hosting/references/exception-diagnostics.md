@@ -1,10 +1,10 @@
 # Exception response diagnostics
 
-`AddExceptionHandling()` requires a Web host and converts unhandled failures into Monica result envelopes. Configure diagnostic visibility on `AddResultEnvelope(...)`; `ExposeDiagnosticDetails` defaults to `false` and does not follow the ASP.NET Core environment automatically. For a host whose consumers may inspect technical details, add these registrations inside the existing `builder.AddMonica(...)` callback:
+`AddExceptionHandling()` requires a Web host and converts unhandled failures into Monica result envelopes. The shared [application debug policy](debug-mode.md) owns diagnostic visibility and defaults to `false`, independently of the ASP.NET Core environment. For a host whose consumers may inspect technical details, configure it inside the existing `builder.AddMonica(...)` callback:
 
 ```csharp
 monica.AddExceptionHandling();
-monica.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+monica.ConfigureApplication(options => options.DebugMode = true);
 ```
 
 `BusinessException` represents a business-rule rejection. The HTTP exception handler projects it as `Res.Fail(business.Message)`. Its type does not select EventBus retry behavior; distributed consumers apply the same [finite processing retry budget](../../monica-infra-messaging/references/event-bus.md#processing-retries-and-dead-letters) to all failures. Response diagnostic visibility does not change delivery or retry decisions.
