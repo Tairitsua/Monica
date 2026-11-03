@@ -575,7 +575,8 @@
       "additionalProperties": false,
       "required": [
         "id",
-        "text"
+        "text",
+        "labels"
       ],
       "properties": {
         "id": {
@@ -585,6 +586,48 @@
         "text": {
           "type": "string",
           "minLength": 1
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "zh-CN",
+            "en-US"
+          ],
+          "properties": {
+            "zh-CN": {
+              "$ref": "#/$defs/instructionRuleLabel"
+            },
+            "en-US": {
+              "$ref": "#/$defs/instructionRuleLabel"
+            }
+          }
+        },
+        "context": {
+          "enum": [
+            "source-bindings",
+            "issue-policy"
+          ]
+        }
+      }
+    },
+    "instructionRuleLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "description"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
         }
       }
     },

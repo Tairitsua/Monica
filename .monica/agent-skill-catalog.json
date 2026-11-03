@@ -1133,7 +1133,7 @@
     }
   },
   "managedInstructions": {
-    "version": 5,
+    "version": 6,
     "markers": {
       "start": "<!-- monica-guide:managed:start -->",
       "end": "<!-- monica-guide:managed:end -->"
@@ -1148,27 +1148,103 @@
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
           },
           {
             "id": "monica-troubleshooting-routing",
-            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-application-routing",
-            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references. For business UI also load monica-application-ui; the same project specification owns presentation and backend."
+            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references. For business UI also load monica-application-ui; the same project specification owns presentation and backend.",
+            "labels": {
+              "en-US": {
+                "title": "Application development",
+                "description": "Load the shared application rules and project specification."
+              },
+              "zh-CN": {
+                "title": "应用研发规范",
+                "description": "开发前加载共享应用规范与项目规范。"
+              }
+            }
           },
           {
             "id": "monica-application-specification-evolution",
-            "text": "Compose existing ProjectUnits and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope."
+            "text": "Compose existing ProjectUnits and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope.",
+            "labels": {
+              "en-US": {
+                "title": "Confirm architecture changes",
+                "description": "Reuse existing capabilities; confirm changes to architectural rules."
+              },
+              "zh-CN": {
+                "title": "确认架构变更",
+                "description": "优先组合现有能力；变更架构规则时再确认。"
+              }
+            }
           },
           {
             "id": "reconcile-project-application-specification",
-            "text": "Reconcile impacted project application specification facts and rules with the implementation in the same change. Keep rule rationale with the rule and use Git/history or existing project decision evidence."
+            "text": "Reconcile impacted project application specification facts and rules with the implementation in the same change. Keep rule rationale with the rule and use Git/history or existing project decision evidence.",
+            "labels": {
+              "en-US": {
+                "title": "Keep project specs current",
+                "description": "Update affected project rules alongside implementation."
+              },
+              "zh-CN": {
+                "title": "同步项目规范",
+                "description": "实现变化时，一并维护受影响的项目规范。"
+              }
+            }
           }
         ]
       },
@@ -1182,23 +1258,89 @@
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
           },
           {
             "id": "monica-troubleshooting-routing",
-            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-framework-extension",
-            "text": "Use $monica-framework and $monica-third-party-module-development for extension implementation."
+            "text": "Use $monica-framework and $monica-third-party-module-development for extension implementation.",
+            "labels": {
+              "en-US": {
+                "title": "Extension development",
+                "description": "Use the framework and third-party module development skills."
+              },
+              "zh-CN": {
+                "title": "扩展模块研发",
+                "description": "使用框架与第三方模块研发技能。"
+              }
+            }
           },
           {
             "id": "immutable-nuget-packages",
-            "text": "Keep generated extension projects on immutable Monica NuGet packages; never replace them with local Monica project references."
+            "text": "Keep generated extension projects on immutable Monica NuGet packages; never replace them with local Monica project references.",
+            "labels": {
+              "en-US": {
+                "title": "Pinned package dependencies",
+                "description": "Keep extension projects on immutable Monica NuGet versions."
+              },
+              "zh-CN": {
+                "title": "固定包依赖",
+                "description": "扩展项目使用不可变的 Monica NuGet 版本。"
+              }
+            }
           }
         ]
       },
@@ -1212,23 +1354,89 @@
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
           },
           {
             "id": "monica-troubleshooting-routing",
-            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state."
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-framework-routing",
-            "text": "Use $monica-framework to route framework implementation and $monica-unit-testing for framework tests."
+            "text": "Use $monica-framework to route framework implementation and $monica-unit-testing for framework tests.",
+            "labels": {
+              "en-US": {
+                "title": "Framework development",
+                "description": "Use framework development and testing skills."
+              },
+              "zh-CN": {
+                "title": "框架研发指引",
+                "description": "使用框架研发与测试技能。"
+              }
+            }
           },
           {
             "id": "canonical-knowledge",
-            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical task reference and any affected read-when routes in the same change; follow monica-docs-authoring for topic boundaries and regenerate agent and website projections. Explain a no-impact decision when no knowledge change is needed."
+            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical task reference and any affected read-when routes in the same change; follow monica-docs-authoring for topic boundaries and regenerate agent and website projections. Explain a no-impact decision when no knowledge change is needed.",
+            "labels": {
+              "en-US": {
+                "title": "Maintain canonical guidance",
+                "description": "Keep owning references and their projections aligned with changes."
+              },
+              "zh-CN": {
+                "title": "维护框架指引",
+                "description": "更新能力时，同步所属参考文档与生成投影。"
+              }
+            }
           }
         ]
       }

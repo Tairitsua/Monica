@@ -726,6 +726,21 @@ def validate_catalog(validation: Validation, catalog: dict[str, Any]) -> None:
             all(rule.get("text") for rule in template.get("rules", [])),
             f"instruction template {template_name}: rule texts must be non-empty",
         )
+        contexts = [rule["context"] for rule in template.get("rules", []) if "context" in rule]
+        validation.check(
+            set(contexts) <= {"source-bindings", "issue-policy"} and len(contexts) == len(set(contexts)),
+            f"instruction template {template_name}: contexts must be supported and uniquely owned",
+        )
+        for rule in template.get("rules", []):
+            labels = rule.get("labels", {})
+            validation.check(
+                set(labels) == {"zh-CN", "en-US"} and all(
+                    label.get("title") and len(label["title"]) <= 80
+                    and label.get("description") and len(label["description"]) <= 180
+                    for label in labels.values()
+                ),
+                f"instruction template {template_name}: rule {rule['id']} requires concise zh-CN/en-US labels",
+            )
 
     bootstrap_path = catalog.get("prompts", {}).get("bootstrapAsset")
     bootstrap_schema_path = catalog.get("prompts", {}).get("bootstrapSchema")

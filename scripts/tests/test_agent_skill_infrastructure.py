@@ -345,7 +345,7 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
 
     def test_managed_instruction_rules_are_switchable_and_route_source_lookup_through_guide(self) -> None:
         instructions = self.catalog["managedInstructions"]
-        self.assertEqual(5, instructions["version"])
+        self.assertEqual(6, instructions["version"])
         for profile_name, template in instructions["templates"].items():
             rules = [rule["text"] for rule in template["rules"]]
             rule_ids = [rule["id"] for rule in template["rules"]]
@@ -354,6 +354,10 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
             joined = "\n".join(rules)
             self.assertIn("$monica-guide source resolve", joined, profile_name)
             self.assertIn("not write permission", joined, profile_name)
+            contexts = {rule["context"]: rule["id"] for rule in template["rules"] if "context" in rule}
+            self.assertEqual({"source-bindings": "resolve-pinned-source", "issue-policy": "issue-reporting-policy"}, contexts)
+            self.assertEqual(1, sum(rule.get("context") == "source-bindings" for rule in template["rules"]))
+            self.assertEqual(1, sum(rule.get("context") == "issue-policy" for rule in template["rules"]))
 
     def test_router_skill_references_exactly_match_catalog_routes(self) -> None:
         for skill_name, entry in self.catalog["skills"].items():
