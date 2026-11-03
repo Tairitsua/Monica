@@ -7,9 +7,9 @@ namespace Monica.ProjectUnits.CodeAnalysis.Models;
 public static class ProjectUnitSourceAnalysisContract
 {
     /// <summary>
-    /// Version 8 classifies explicit distributed batch handlers and their execution point and event association.
+    /// Version 9 includes declared member structure, documentation and source provenance.
     /// </summary>
-    public const string Version = "monica-project-units-source/v8";
+    public const string Version = "monica-project-units-source/v9";
 
     /// <summary>Architectural roles the current source classifier can produce.</summary>
     public static IReadOnlySet<ProjectUnitSourceType> DiscoverableUnitTypes { get; } = new[]
@@ -201,7 +201,23 @@ public sealed record ProjectUnitSourceUnit(
 {
     /// <summary>Declared outgoing symbols, including targets outside this analysis scope.</summary>
     public IReadOnlyList<ProjectUnitSourceReference> OutgoingReferences { get; init; } = [];
+
+    /// <summary>Readable properties, including inherited members; these are not an inferred database schema.</summary>
+    public IReadOnlyList<ProjectUnitSourceProperty> Properties { get; init; } = [];
+
+    /// <summary>Public or protected behavior declared by this unit, excluding generated members.</summary>
+    public IReadOnlyList<ProjectUnitSourceOperation> Operations { get; init; } = [];
 }
+
+/// <summary>One property observed through Roslyn. Null IsNullable means the source does not declare nullability.</summary>
+public sealed record ProjectUnitSourceProperty(
+    string Name, string Type, bool? IsNullable, bool IsRequired, string? Setter,
+    string DeclaringType, bool IsInherited, string? Description,
+    IReadOnlyList<string> Attributes, ProjectUnitSourceLocation? Source);
+
+/// <summary>A declared constructor or method signature and its authored documentation.</summary>
+public sealed record ProjectUnitSourceOperation(
+    string Name, string Signature, string? Description, ProjectUnitSourceLocation? Source);
 
 /// <summary>A scope-independent outgoing type reference. MissingDiagnosticCode identifies required unit associations.</summary>
 public sealed record ProjectUnitSourceReference(string AssemblyName, string RuntimeKey, string? MissingDiagnosticCode = null);

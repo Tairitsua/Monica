@@ -68,6 +68,8 @@ An empty catalog reports no data, not 100% coverage. Use [03-project-unit-contex
 - Declare `[Configuration]` directly on every configuration ProjectUnit; configuration identity is not inherited by derived options types.
 - Apply `[ExcludeFromBusinessTypeDiscovery]` directly to a runtime-only type that must be absent from both runtime and source ProjectUnit catalogs. The exclusion does not flow to derived types.
 - Use `ProjectUnitSourceAnalysisContract.DiscoverableUnitTypes` when validating a source-level create role; not every reserved `ProjectUnitSourceType` value is implemented by the current analyzer.
+
+Source analysis contract v9 also reports public instance properties (including inherited members), source nullability, required initialization, setter access, annotations, XML summaries and public/protected behavior signatures. Each available source location is retained. These are declared CLR facts, not inferred persistence mappings. For physical mappings use an explicitly selected EF design model through the persistence skill's [entity model inspection](../../monica-infra-persistence/references/repository-diagnostics.md#inspect-an-explicitly-selected-entity-design-model). Keep business meanings and null semantics near their chosen source or owned design; avoid copying type/schema inventories into every delivery plan.
 - Create a new `ApplicationService` when you need a new externally visible use case.
 - Create a `DomainService` only for a meaningful domain rule without a natural entity owner, including a rule reused across entry points or spanning aggregates. A one-entity transition normally stays on the entity and the handler calls it directly.
 - Create or extend an `Entity` when the rule belongs to the state owner itself.

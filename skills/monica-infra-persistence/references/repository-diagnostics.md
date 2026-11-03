@@ -23,6 +23,24 @@ app.Run();
 
 `AddRepositoryUI()` requires Repository, module-local localization, and the shell. The host owns access to these diagnostics and to any exposed facade operations; navigation visibility and the migration-production option are not authorization. Configure the host through shell and access in `$monica-infra-ui` (`references/shell-and-access.md`).
 
+## Inspect an explicitly selected entity design model
+
+Use `Monica.EntityFrameworkCore.EntityModelInspector` when tooling needs bounded, portable model evidence. The caller selects and safely creates the context; the inspector receives its design model and performs no database query, migration or host startup:
+
+```csharp
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Monica.EntityFrameworkCore;
+
+var snapshot = EntityModelInspector.Inspect(
+    context.GetService<IDesignTimeModel>().Model,
+    typeof(Order),
+    context.GetType().FullName!,
+    context.Database.ProviderName!);
+```
+
+The `monica-entity-model/v1` export includes the selected CLR entity and its owned dependents, inherited table mappings, property/column names, store types, nullability, shadow properties, concurrency tokens, length/precision, generation, SQL defaults/computed expressions, indexes and foreign keys. A single entity can span several tables. Runtime/compiled models can omit design metadata, so pass `IDesignTimeModel.Model`. Missing entities fail explicitly. Serialize the snapshot with the application's normal JSON options; a consumer such as Workflow must retain context/provider and source-revision provenance. The export describes the supplied model, never whether a deployed database matches it. Do not execute arbitrary application contexts merely for discovery.
+
 ## Navigate by the exact context identity
 
 The UI contributes four localized Monitor destinations:

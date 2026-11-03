@@ -28,6 +28,9 @@
 .mo-mermaid-reader__viewport.is-panning { cursor: grabbing; }
 .mo-mermaid-reader__canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
 .mo-mermaid-reader__canvas ::deep svg { display: block; margin: 0; max-width: none; }
+.mo-markdown-mermaid-block ::deep [data-mo-mermaid-node] { cursor: pointer; }
+.mo-markdown-mermaid-block ::deep [data-mo-mermaid-node]:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
+.mo-markdown-mermaid-block ::deep [data-mo-mermaid-node]:hover > rect { stroke: var(--mud-palette-primary); stroke-width: 2px; }
 .mo-mermaid-reader__footer { display: flex; flex: 0 0 auto; gap: 8px; align-items: center; padding: 9px 16px; border-top: 1px solid var(--mud-palette-lines-default); color: var(--mud-palette-text-secondary); background: var(--mud-palette-surface); font-size: 12px; line-height: 1.6; }
 .mo-mermaid-reader__footer > ::deep .mo-icon { flex: 0 0 auto; }
 @media (max-width:760px) {

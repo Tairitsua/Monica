@@ -219,7 +219,7 @@ function cloneDiagram(source) {
 }
 
 /** Owns browser producers only; the Blazor renderer owns the dialog and all DOM removal. */
-export function connectReader(root, surface, dialog) {
+export function connectReader(root, surface, dialog, nodeTarget = null) {
     const viewport = dialog.querySelector('[data-mo-mermaid-viewport]');
     const canvas = dialog.querySelector('[data-mo-mermaid-canvas]');
     const zoomLabel = dialog.querySelector('[data-mo-mermaid-zoom]');
@@ -238,12 +238,36 @@ export function connectReader(root, surface, dialog) {
     let opener;
     let pointer;
     let focusFrame = 0;
+    let nodeLabels = {};
+    let navigatingNode = false;
 
     function listen(element, event, handler, options = {}) {
         element.addEventListener(event, handler, { ...options, signal: listeners.signal });
     }
     function active() { return !retired && root.isConnected; }
-    function hasLink(target) { return target instanceof Element && Boolean(target.closest('a')); }
+    function hasLink(target) { return target instanceof Element && Boolean(target.closest('a, [data-mo-mermaid-node]')); }
+    function decorateNodes() {
+        for (const node of surface.querySelectorAll('g.node')) {
+            const alias = Object.keys(nodeLabels).find(key => /^[A-Za-z][A-Za-z0-9_]*$/.test(key)
+                && new RegExp(`^flowchart-${key}-\\d+$`).test(node.id));
+            if (!alias) continue;
+            node.dataset.moMermaidNode = alias;
+            node.setAttribute('tabindex', '0');
+            node.setAttribute('role', 'button');
+            node.setAttribute('aria-label', nodeLabels[alias]);
+        }
+    }
+    function activateNode(event) {
+        const node = event.target.closest?.('[data-mo-mermaid-node]');
+        const alias = node?.dataset.moMermaidNode;
+        if (!active() || !nodeTarget || !root.contains(node) || !Object.hasOwn(nodeLabels, alias)) return false;
+        event.preventDefault();
+        event.stopPropagation();
+        if (dialog.open) { navigatingNode = true; close(); }
+        // The .NET callback performs application navigation; no diagram-authored script is evaluated.
+        nodeTarget.invokeMethodAsync('ActivateNode', alias).catch(() => {});
+        return true;
+    }
     function fitScale() {
         return Math.min(MAX_SCALE, Math.max(0.000001,
             Math.min(Math.max(1, viewport.clientWidth - 48) / width,
@@ -317,6 +341,7 @@ export function connectReader(root, surface, dialog) {
     }
     function restoreFocus() {
         stopPan();
+        if (navigatingNode) { navigatingNode = false; return; }
         cancelAnimationFrame(focusFrame);
         focusFrame = requestAnimationFrame(() => {
             if (active()) (opener?.isConnected ? opener : surface).focus({ preventScroll: true });
@@ -332,10 +357,14 @@ export function connectReader(root, surface, dialog) {
         else if (name === 'reset') { fitted = false; center(1); }
     }
     listen(root, 'click', event => {
+        if (activateNode(event)) return;
         const button = event.target.closest?.('button[data-mo-mermaid-action]');
         if (button && root.contains(button)) { action(button.dataset.moMermaidAction, button); return; }
         if (surface.contains(event.target) && !hasLink(event.target)) open(surface);
     });
+    listen(root, 'keydown', event => {
+        if (['Enter', ' '].includes(event.key)) activateNode(event);
+    }, { capture: true });
     listen(surface, 'keydown', event => {
         if (event.target !== surface || !['Enter', ' '].includes(event.key)) return;
         event.preventDefault();
@@ -439,13 +468,15 @@ export function connectReader(root, surface, dialog) {
         // Do not close/remove/clear DOM here: this can run after the Blazor renderer removed it.
     }
     return {
-        async render(definition, theme) {
+        async render(definition, theme, nodes = null) {
             if (!active()) return false;
             const version = ++generation;
             const isCurrent = () => active() && version === generation;
             try {
                 const rendered = await renderMermaid(surface, definition, theme, isCurrent);
                 if (!isCurrent()) return false;
+                nodeLabels = nodes ?? {};
+                if (rendered) decorateNodes();
                 if (!rendered) close();
                 else if (dialog.open) { refreshClone(); if (fitted) fit(); else paint(); }
                 return rendered;

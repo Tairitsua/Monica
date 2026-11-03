@@ -217,7 +217,7 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
             candidates.Count,
             null,
             "Resolving ProjectUnit dependencies.");
-        var units = ResolveUnits(candidates, diagnostics);
+        var units = ResolveUnits(candidates, diagnostics, root);
         var isPartial = analyzedProjects != allProjects.Count
                         || diagnostics.Any(static diagnostic =>
                             diagnostic.Code is "ProjectUnit.Analysis.Project.Missing"
@@ -690,7 +690,8 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
 
     private static IReadOnlyList<ProjectUnitSourceUnit> ResolveUnits(
         IReadOnlyList<AnalyzedProjectUnitCandidate> candidates,
-        ICollection<ProjectUnitSourceDiagnostic> allDiagnostics)
+        ICollection<ProjectUnitSourceDiagnostic> allDiagnostics,
+        string root)
     {
         var byIdentity = new Dictionary<string, AnalyzedProjectUnitCandidate>(StringComparer.Ordinal);
         foreach (var candidate in candidates)
@@ -772,6 +773,8 @@ public sealed class ProjectUnitSourceAnalyzer : IProjectUnitSourceAnalyzer
                     dependedBy[key].Order(StringComparer.Ordinal).ToArray(),
                     diagnosticsByKey[key])
                 {
+                    Properties = ProjectUnitMemberReader.ReadProperties(symbol, root),
+                    Operations = ProjectUnitMemberReader.ReadOperations(symbol, root),
                     OutgoingReferences = candidate.Candidate.Dependencies.Select(dependency => new ProjectUnitSourceReference(
                         dependency.Symbol.ContainingAssembly.Name,
                         dependency.Symbol.GetRuntimeName(),

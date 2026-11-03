@@ -19,7 +19,7 @@
     <div class="mo-markdown-mermaid-frame">
         <div @ref="_containerRef"
              class="mo-markdown-mermaid-surface @(!_diagramReady ? "is-pending" : null)"
-             role="button" tabindex="@(_diagramReady ? "0" : "-1")"
+             role="@(Nodes?.Count > 0 ? "group" : "button")" tabindex="@(_diagramReady && Nodes?.Count is not > 0 ? "0" : "-1")"
              aria-disabled="@(_diagramReady ? "false" : "true")"
              aria-label="@L["Markdown:Mermaid:Open"]" aria-haspopup="dialog"></div>
         @if (_diagramReady)
@@ -57,6 +57,12 @@
     [Parameter, EditorRequired]
     public string Definition { get; set; } = string.Empty;
 
+    /// <summary>Validated flowchart aliases and accessible labels, provided by the embedding application.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Nodes { get; set; }
+
+    /// <summary>Host-owned navigation for a configured alias. The same callback works in the immersive reader.</summary>
+    [Parameter] public EventCallback<string> NodeActivated { get; set; }
+
     private readonly string _titleId = $"mo-mermaid-title-{Guid.NewGuid():N}";
     private readonly string _hintId = $"mo-mermaid-hint-{Guid.NewGuid():N}";
     private ElementReference _blockRef, _containerRef, _dialogRef;
@@ -65,6 +71,8 @@
     private Task _renderTask = Task.CompletedTask;
     private Task _themeChangeTask = Task.CompletedTask;
     private string? _lastDefinition, _renderError;
+    private string? _lastNodes;
+    private DotNetObjectReference<MoMarkdownMermaidBlock>? _callbackReference;
     private long _requestedVersion;
     private long _renderedVersion = -1;
     private bool _diagramReady, _disposed;
@@ -73,7 +81,10 @@
 
     protected override void OnParametersSet()
     {
-        if (string.Equals(_lastDefinition, Definition, StringComparison.Ordinal)) return;
+        var nodes = NodeActivated.HasDelegate && Nodes is not null
+            ? string.Join('\n', Nodes.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}\0{pair.Value}")) : string.Empty;
+        if (string.Equals(_lastDefinition, Definition, StringComparison.Ordinal) && _lastNodes == nodes) return;
+        _lastNodes = nodes;
         _lastDefinition = Definition;
         RequestDiagram();
     }
@@ -114,7 +125,8 @@
                     throw;
                 }
                 if (_disposed) return;
-                _controllerTask ??= module.InvokeAsync<IJSObjectReference>("connectReader", _blockRef, _containerRef, _dialogRef).AsTask();
+                _callbackReference ??= DotNetObjectReference.Create(this);
+                _controllerTask ??= module.InvokeAsync<IJSObjectReference>("connectReader", _blockRef, _containerRef, _dialogRef, _callbackReference).AsTask();
                 IJSObjectReference controller;
                 try
                 {
@@ -126,7 +138,7 @@
                     throw;
                 }
                 if (_disposed) return;
-                var rendered = await controller.InvokeAsync<bool>("render", definition, BuildThemePayload());
+                var rendered = await controller.InvokeAsync<bool>("render", definition, BuildThemePayload(), NodeActivated.HasDelegate ? Nodes : null);
                 if (_disposed) return;
                 if (version == _requestedVersion) _diagramReady = rendered;
             }
@@ -149,6 +161,12 @@
         if (_disposed) return;
         _themeChangeTask = ApplyThemeChangeAsync(_themeChangeTask);
     }
+
+    /// <summary>Accepts only current host bindings; callbacks are retired before their .NET target is disposed.</summary>
+    [JSInvokable]
+    public Task ActivateNode(string alias)
+        => !_disposed && NodeActivated.HasDelegate && Nodes?.ContainsKey(alias) == true
+            ? NodeActivated.InvokeAsync(alias) : Task.CompletedTask;
 
     private async Task ApplyThemeChangeAsync(Task previous)
     {
@@ -205,6 +223,7 @@
         {
             // The renderer owns DOM removal. Only release the observed module resource here.
             await DisposeModuleAsync();
+            _callbackReference?.Dispose();
         }
     }
 
