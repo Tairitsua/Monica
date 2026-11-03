@@ -23,7 +23,7 @@ Configure the **provider, layout, then history**, in that order, in runtime regi
 | `DefaultSchema` | Provider/context default namespace | Default namespace |
 | No layout call | Existing mappings remain | Existing mappings remain |
 
-Business entities are never rewritten. Prefer one physical application database where local atomic collaboration is needed, business tables in the default namespace, and descriptive business names instead of domain prefixes. Rename colliding persistent entities/tables by meaning; DTO names do not need global uniqueness. A provider's default namespace is still a schema such as PostgreSQL `public` when applicable.
+Business entities are never rewritten. Prefer one physical application database where local atomic collaboration is needed. The project may select the default namespace or stable per-domain schemas for business tables; descriptive business names still reflect their meaning. DTO names do not need global uniqueness. A provider's default namespace is still a schema such as PostgreSQL `public` when applicable. See the application migration contract in `$monica-application` (`references/05-database-migrations.md`) for choosing and changing business placement.
 
 Built-in capability adapters recognize the installed PostgreSQL, GaussDB, and SQLite provider types exactly. For another relational provider, supply `InfrastructureProviderCapabilities` explicitly; for example, a MySQL adapter uses `new(false, 64)` because its `SCHEMA` is a database synonym. Unknown providers may use `DefaultSchema` without capabilities, but need an identifier limit before opting into Monica history. Capabilities never come from a connection string or a substring of a provider name.
 
