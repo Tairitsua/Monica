@@ -4,7 +4,7 @@ Register [JobScheduler](scheduler.md) with a store and scope before exposing ope
 
 Trigger arguments and captured execution arguments use MoJson in `$monica-infra-ui` (`references/json.md`) for editing and viewing. Syntax feedback is independent of scheduler admission: optional blank arguments, payload rules and authorization remain owned by the scheduler UI.
 
-Execution inspectors use the [shared native side-sheet contract](../../monica-infra-ui/references/visual-components.md#modal-evidence-side-sheets), also used by Locker. `MoSideSheet` owns viewport geometry, native dismissal and body scrolling; the scheduler retains its exact execution identity, refresh and dialog-session lifetime.
+Execution inspectors use the shared native side-sheet contract in `$monica-infra-ui` (`references/visual-components.md`, "Modal evidence side sheets"), also used by Locker. `MoSideSheet` owns viewport geometry, native dismissal and body scrolling; the scheduler retains its exact execution identity, refresh and dialog-session lifetime.
 
 Workspace findings compose the shared MoRichFinding and MoValueMark contracts in `$monica-infra-ui` (`references/visual-components.md`). Localized resources own complete sentence order; the scheduler owns counts, evidence qualification, semantic roles and drilldown destinations. A zero count is a real observation, not missing evidence. Extend these shared owners instead of adding another scheduler-specific sentence renderer or emphasis stylesheet.
 
