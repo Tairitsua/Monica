@@ -14,9 +14,9 @@ public enum BuildingBlockKind
     /// </summary>
     None = 0,
     /// <summary>
-    /// Application service.
+    /// Application handler for one mediator request.
     /// </summary>
-    ApplicationService = 1,
+    ApplicationRequestHandler = 1,
     /// <summary>
     /// CRUD application service that participates in automatic controller generation.
     /// </summary>
@@ -34,9 +34,9 @@ public enum BuildingBlockKind
     /// </summary>
     DomainEvent = 5,
     /// <summary>
-    /// Distributed domain-event handler.
+    /// Distributed event handler, including explicit batch consumers.
     /// </summary>
-    DomainEventHandler = 6,
+    DistributedEventHandler = 6,
     /// <summary>
     /// Local event handler.
     /// </summary>

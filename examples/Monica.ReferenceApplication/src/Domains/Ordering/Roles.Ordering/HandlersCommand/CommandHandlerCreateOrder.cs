@@ -13,7 +13,7 @@ namespace Roles.Ordering.HandlersCommand;
 /// </summary>
 public sealed class CommandHandlerCreateOrder(
     IRepositoryOrder repository)
-    : ApplicationService<CommandCreateOrder, OrderDto>
+    : ApplicationRequestHandler<CommandCreateOrder, Result<OrderDto>>
 {
     /// <summary>
     /// Creates an order after applying entity and repository invariants.

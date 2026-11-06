@@ -198,7 +198,7 @@ public sealed class ApplicationOwnershipMetadataTests
             namespace Scenario.Local;
             [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Get, "probe")]
             public sealed record QueryProbe : Monica.Application.Abstractions.IQuery<int>;
-            internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<QueryProbe, int>
+            internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationRequestHandler<QueryProbe, Monica.Core.Results.Result<int>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     QueryProbe request, System.Threading.CancellationToken cancellationToken) => throw new System.NotImplementedException();

@@ -192,7 +192,7 @@ public sealed class BuildingBlockDashboardTests
             [
                 new BuildingBlockKindStatistics
                 {
-                    Kind = BuildingBlockKind.ApplicationService,
+                    Kind = BuildingBlockKind.ApplicationRequestHandler,
                     Count = 2,
                     Percentage = 100m
                 }
@@ -227,7 +227,7 @@ public sealed class BuildingBlockDashboardTests
             Key = key,
             Title = "Approve Order",
             Description = "Approves an eligible order.",
-            Kind = BuildingBlockKind.ApplicationService,
+            Kind = BuildingBlockKind.ApplicationRequestHandler,
             HasExplicitMetadata = true,
             RequirementCount = 2,
             MethodCount = 1,

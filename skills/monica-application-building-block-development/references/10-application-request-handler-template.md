@@ -1,4 +1,4 @@
-# ApplicationService Template
+# ApplicationRequestHandler Template
 
 The rules define the handler contract; snippets illustrate it. A DomainService is optional. The [connected example](17-connected-use-case-example.md) shows direct handler orchestration of a tracked entity transition and a materialized read.
 
@@ -19,11 +19,11 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 
 ## Rules
 
-- Use `ApplicationService<TRequest, TResponse>` or `ApplicationService<TRequest>` for ordinary `Result` boundaries. Native `CustomApplicationService<TRequest, TResult>` is available when an adopted contract needs an explicit custom mediator result; it remains the same application role and execution boundary, not a new service family.
+- Use `ApplicationRequestHandler<TRequest, TResponse>`; `TResponse` always names the complete mediator response. Ordinary boundaries use `Result<TData>` or `Result`; an adopted custom response uses its exact type with the same base. The request implements the matching `IRequest<TResponse>` contract. There is no separate custom handler family or implicit result wrapping.
 - Declare business collaborators in the constructor, preferably a primary constructor, and inject only dependencies the handler uses. Current-user access and ID generation are explicit application dependencies; do not add them to a shared service base or resolve them through `IServiceProvider` / `CachedServiceProvider`.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
-- Make the request implement `IQuery<TResponse>` or `ICommand<TResponse>`/`ICommand` according to its intent. Generated API method names always remove the request type's `Command` or `Query` prefix; choose the request name accordingly.
+- Make ordinary result requests implement `IQuery<TData>` or `ICommand<TData>`/`ICommand` according to their intent; `TData` is the payload inside the result envelope. Generated API method names always remove the request type's `Command` or `Query` prefix; choose the request name accordingly.
 - Typed Query requests default to no root transaction independently of HTTP, publication and naming. Explicit concrete-handler ExecutionTransaction metadata may request a read-only consistency transaction. Ordinary queries and commands need no transaction attribute; orchestration commands may still select None. See the [transaction contract](../../monica-infra-persistence/references/transactions.md).
 - Keep the handler focused on orchestration. Entities own their invariants; select a DomainService only for a meaningful domain rule with no natural entity owner.
 - Catch exceptions only when you are adding boundary-specific context. Do not smother useful failures.
@@ -32,7 +32,7 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 - Do not put MVC `[Http*]`, `[Route]`, or `[From*]` attributes on the handler. The handler owns execution only.
 - Published requests use the strict Protocol published-language namespace. Generate callers and receivers in the complete ApplicationHost from role metadata; Protocol itself chooses no transport.
 - Keep private HTTP-only requests beside their handlers outside PublishedLanguages. Put wire settings in HttpApiContract and publish owned receivers from the host.
-- A local-only `ApplicationService` needs no `[ApiEndpoint]` or Web API generation configuration. Plain `IRequestHandler<TRequest, TResult>` remains available for internal support operations; both shapes execute through the mediator, not direct calls.
+- A local-only `ApplicationRequestHandler` needs no `[ApiEndpoint]` or Web API generation configuration. Plain `IRequestHandler<TRequest, TResult>` remains available for internal support operations; both shapes execute through the mediator, not direct calls.
 - Place handlers in `HandlersCommand/` or `HandlersQuery/` directly under the owning Roles.* project.
 
 ## Generation and HTTP Mapping
@@ -70,7 +70,7 @@ public sealed record Query$FeatureName$(long Id) : IQuery<$ResponseName$>;
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
 public sealed class QueryHandler$FeatureName$($RepositoryName$ repository)
-    : ApplicationService<Query$FeatureName$, $ResponseName$>
+    : ApplicationRequestHandler<Query$FeatureName$, Result<$ResponseName$>>
 {
     public override async Task<Result<$ResponseName$>> Handle(
         Query$FeatureName$ request,
@@ -117,7 +117,7 @@ public sealed record Command$FeatureName$(long Id) : ICommand;
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
 public sealed class CommandHandler$FeatureName$(IRepositoryOrder repository)
-    : ApplicationService<Command$FeatureName$>
+    : ApplicationRequestHandler<Command$FeatureName$, Result>
 {
     public override async Task<Result> Handle(
         Command$FeatureName$ request,
@@ -132,6 +132,6 @@ public sealed class CommandHandler$FeatureName$(IRepositoryOrder repository)
 
 ## Notes
 
-- `Result.Success(value)` always carries data, including strings. Use `WithMessage` for a message and `Result.FromFailure<TResponse>` to forward an existing failure without losing metadata.
+- `Result.Success(value)` always carries data, including strings. Use `WithMessage` for a message and `Result.FromFailure<TData>` to forward an existing failure without losing metadata.
 - If a query becomes complex because of filtering, paging, or policy checks, extract that logic before the handler turns procedural.
 - API publication is namespace-driven, not handler-driven. Do not move a local request into `PublishedLanguages` merely to share a DTO.

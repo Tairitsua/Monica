@@ -67,12 +67,12 @@
       "LoadException": "Load exception: {0}"
     },
     "BuildingBlockKinds": {
-      "ApplicationService": "Application Service",
+      "ApplicationRequestHandler": "Application Request Handler",
       "CrudApplicationService": "CRUD Application Service",
       "DomainService": "Domain Service",
       "Repository": "Repository",
       "DomainEvent": "Domain Event",
-      "DomainEventHandler": "Domain Event Handler",
+      "DistributedEventHandler": "Distributed Event Handler",
       "LocalEventHandler": "Local Event Handler",
       "Seeder": "Seeder",
       "RecurringJob": "Recurring Job",

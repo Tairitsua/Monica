@@ -55,7 +55,7 @@ internal static class HostGenerationReader
                      .Distinct<IAssemblySymbol>(SymbolEqualityComparer.Default))
         {
             if (!Types(assembly.GlobalNamespace).Any(type => !type.IsAbstract && !type.IsGenericType &&
-                    ApplicationServiceSymbolHelper.TryGetContract(type, out var request, out _) && EndpointModelFactory.GetEndpointAttribute(request) is not null))
+                    ApplicationRequestHandlerSymbolHelper.TryGetContract(type, out var request, out _) && EndpointModelFactory.GetEndpointAttribute(request) is not null))
                 yield return DiagnosticSnapshot.Create(DiagnosticDescriptors.InvalidReceiverOwnership,
                     config.ApplicationSyntaxReference?.GetSyntax().GetLocation(), assembly.Name);
         }

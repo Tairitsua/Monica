@@ -15,7 +15,7 @@ namespace Roles.Ordering.HandlersCommand;
 public sealed class CommandHandlerApproveOrder(
     IRepositoryOrder repository,
     ILocalEventBus localEventBus)
-    : ApplicationService<CommandApproveOrder, OrderDto>
+    : ApplicationRequestHandler<CommandApproveOrder, Result<OrderDto>>
 {
     /// <summary>
     /// Approves the requested draft order.

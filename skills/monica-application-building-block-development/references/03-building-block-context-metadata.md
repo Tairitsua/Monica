@@ -26,6 +26,8 @@ Keep `Owner`, tags, requirement IDs, namespaces and CLR type names stable. Local
 ## Annotation Pattern
 
 ```csharp
+using Monica.Application.Abstractions;
+using Monica.Core.Results;
 using Monica.BuildingBlocks.Annotations;
 
 [BuildingBlockMetadata(
@@ -33,7 +35,7 @@ using Monica.BuildingBlocks.Annotations;
     Description = "$Description$",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
-public sealed class CommandHandlerApproveOrder : ApplicationService<CommandApproveOrder>
+public sealed class CommandHandlerApproveOrder : ApplicationRequestHandler<CommandApproveOrder, Result>
 {
     // Implementation omitted.
 }

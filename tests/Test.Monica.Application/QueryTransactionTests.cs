@@ -140,7 +140,7 @@ public sealed class QueryTransactionTests
 }
 
 public sealed class QueryHandlerReadTransaction(TransactionPrimaryContext db)
-    : ApplicationService<QueryReadTransaction, QueryTransactionReceipt>
+    : ApplicationRequestHandler<QueryReadTransaction, Result<QueryTransactionReceipt>>
 {
     public override async Task<Result<QueryTransactionReceipt>> Handle(QueryReadTransaction request, CancellationToken cancellationToken)
     {
@@ -160,7 +160,7 @@ public sealed class QueryHandlerReadTransaction(TransactionPrimaryContext db)
 }
 
 public sealed class QueryHandlerConsistentRead(TransactionPrimaryContext db)
-    : ApplicationService<QueryConsistentRead, QueryTransactionReceipt>
+    : ApplicationRequestHandler<QueryConsistentRead, Result<QueryTransactionReceipt>>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionPrimaryContext)],
         IsolationLevel = IsolationLevel.Serializable)]

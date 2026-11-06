@@ -375,7 +375,7 @@ public sealed class IncrementalGeneratorPipelineTests
         {
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
-            public sealed class QueryHandlerGetOrder : ApplicationService<QueryGetOrder, string>
+            public sealed class QueryHandlerGetOrder : ApplicationRequestHandler<QueryGetOrder, Result<string>>
             {
                 public override Task<Result<string>> Handle(
                     QueryGetOrder request,
@@ -426,7 +426,7 @@ public sealed class IncrementalGeneratorPipelineTests
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
             public sealed class QueryHandlerGetConfiguredOrder
-                : ApplicationService<QueryGetConfiguredOrder, string>
+                : ApplicationRequestHandler<QueryGetConfiguredOrder, Result<string>>
             {
                 public override Task<Result<string>> Handle(
                     QueryGetConfiguredOrder request,
@@ -463,7 +463,7 @@ public sealed class IncrementalGeneratorPipelineTests
         namespace Scenario.Service;
 
         public sealed class QueryHandlerGetPublishedOrder
-            : ApplicationService<QueryGetPublishedOrder, string>
+            : ApplicationRequestHandler<QueryGetPublishedOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(
                 QueryGetPublishedOrder request,
@@ -562,12 +562,12 @@ public sealed class IncrementalGeneratorPipelineTests
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{OrderNumber:int}")]
         public sealed record QueryFindOrder(int OrderNumber) : IQuery<string>;
 
-        public sealed class QueryHandlerGetOrder : ApplicationService<QueryGetOrder, string>
+        public sealed class QueryHandlerGetOrder : ApplicationRequestHandler<QueryGetOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryGetOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
-        public sealed class QueryHandlerFindOrder : ApplicationService<QueryFindOrder, string>
+        public sealed class QueryHandlerFindOrder : ApplicationRequestHandler<QueryFindOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryFindOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -605,27 +605,27 @@ public sealed class IncrementalGeneratorPipelineTests
         [ApiEndpoint(ApiHttpMethod.Get, "orders/region/{Region=global}")]
         public sealed record QueryOrderRegion(string? Region) : IQuery<string>;
 
-        public sealed class QueryHandlerIntegerOrder : ApplicationService<QueryIntegerOrder, string>
+        public sealed class QueryHandlerIntegerOrder : ApplicationRequestHandler<QueryIntegerOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryIntegerOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
-        public sealed class QueryHandlerGuidOrder : ApplicationService<QueryGuidOrder, string>
+        public sealed class QueryHandlerGuidOrder : ApplicationRequestHandler<QueryGuidOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryGuidOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
-        public sealed class QueryHandlerOptionalOrder : ApplicationService<QueryOptionalOrder, string>
+        public sealed class QueryHandlerOptionalOrder : ApplicationRequestHandler<QueryOptionalOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryOptionalOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
-        public sealed class QueryHandlerOrderPath : ApplicationService<QueryOrderPath, string>
+        public sealed class QueryHandlerOrderPath : ApplicationRequestHandler<QueryOrderPath, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryOrderPath request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
-        public sealed class QueryHandlerOrderRegion : ApplicationService<QueryOrderRegion, string>
+        public sealed class QueryHandlerOrderRegion : ApplicationRequestHandler<QueryOrderRegion, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryOrderRegion request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }

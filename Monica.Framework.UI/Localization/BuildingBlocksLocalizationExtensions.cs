@@ -36,12 +36,12 @@ public static class BuildingBlocksLocalizationExtensions
     {
         return kind switch
         {
-            BuildingBlockKind.ApplicationService => localizer["Shared:BuildingBlockKinds:ApplicationService"].Value,
+            BuildingBlockKind.ApplicationRequestHandler => localizer["Shared:BuildingBlockKinds:ApplicationRequestHandler"].Value,
             BuildingBlockKind.CrudApplicationService => localizer["Shared:BuildingBlockKinds:CrudApplicationService"].Value,
             BuildingBlockKind.DomainService => localizer["Shared:BuildingBlockKinds:DomainService"].Value,
             BuildingBlockKind.Repository => localizer["Shared:BuildingBlockKinds:Repository"].Value,
             BuildingBlockKind.DomainEvent => localizer["Shared:BuildingBlockKinds:DomainEvent"].Value,
-            BuildingBlockKind.DomainEventHandler => localizer["Shared:BuildingBlockKinds:DomainEventHandler"].Value,
+            BuildingBlockKind.DistributedEventHandler => localizer["Shared:BuildingBlockKinds:DistributedEventHandler"].Value,
             BuildingBlockKind.LocalEventHandler => localizer["Shared:BuildingBlockKinds:LocalEventHandler"].Value,
             BuildingBlockKind.Seeder => localizer["Shared:BuildingBlockKinds:Seeder"].Value,
             BuildingBlockKind.RecurringJob => localizer["Shared:BuildingBlockKinds:RecurringJob"].Value,

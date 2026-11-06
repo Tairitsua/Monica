@@ -111,7 +111,7 @@ public sealed class ApplicationApiGenerationTests
         var protocol = Emit(GeneratorTestHarness.Run(contracts, new ApiClientSourceGenerator()).OutputCompilation);
         var handlers = GeneratorTestHarness.RunWithReferences("""
             namespace Scenario.Handlers;
-            public sealed class TotalHandler : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryTotal, int>
+            public sealed class TotalHandler : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryTotal, Monica.Core.Results.Result<int>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryTotal request, System.Threading.CancellationToken cancellationToken)

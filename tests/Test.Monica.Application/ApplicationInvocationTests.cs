@@ -230,7 +230,7 @@ public sealed class OperationDbContext(DbContextOptions<OperationDbContext> opti
 
 [Authorize(Policy = "use")]
 public sealed class CommandHandlerStore(OperationDbContext db, OperationLease lease, ITestingQueryApi queries, ITestingCommandApi commands,
-    ICurrentPrincipalAccessor principal) : ApplicationService<CommandStore, OperationReceipt>
+    ICurrentPrincipalAccessor principal) : ApplicationRequestHandler<CommandStore, Result<OperationReceipt>>
 {
     public override async Task<Result<OperationReceipt>> Handle(CommandStore request, CancellationToken cancellationToken)
     {
@@ -249,7 +249,7 @@ public sealed class CommandHandlerStore(OperationDbContext db, OperationLease le
 
 [Authorize(Policy = "use")]
 public sealed class QueryHandlerIdentity(OperationLease lease, ICurrentPrincipalAccessor principal, ScopeLedger ledger)
-    : ApplicationService<QueryIdentity, OperationReceipt>
+    : ApplicationRequestHandler<QueryIdentity, Result<OperationReceipt>>
 {
     public override async Task<Result<OperationReceipt>> Handle(QueryIdentity request, CancellationToken cancellationToken)
     {

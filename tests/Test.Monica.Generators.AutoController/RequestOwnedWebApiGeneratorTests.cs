@@ -135,6 +135,29 @@ public sealed class RequestOwnedWebApiGeneratorTests
     }
 
     [Fact]
+    public void Run_WhenHandlersInheritProjectBase_ShouldPreserveExactResponsesAndEndpointContracts()
+    {
+        var direct = RunGenerators(ResultShapeScenario);
+        var inheritedSource = ResultShapeScenario.Replace(
+            ": ApplicationRequestHandler<", ": ProjectRequestHandler<", StringComparison.Ordinal) + """
+
+            public abstract class ProjectRequestHandler<TRequest, TResponse>
+                : global::Monica.Application.Abstractions.ApplicationRequestHandler<TRequest, TResponse>
+                where TRequest : global::Monica.Core.Mediator.IRequest<TResponse>
+            {
+            }
+            """;
+
+        var inherited = RunGenerators(inheritedSource);
+
+        direct.OutputErrors.Should().BeEmpty();
+        inherited.OutputErrors.Should().BeEmpty();
+        inherited.GeneratedSources.Should().BeEquivalentTo(direct.GeneratedSources);
+        inherited.RunResult.Diagnostics.Select(ToDiagnosticSnapshot)
+            .Should().Equal(direct.RunResult.Diagnostics.Select(ToDiagnosticSnapshot));
+    }
+
+    [Fact]
     public void Run_WhenTransportBaseTypesAreOverridden_ShouldUseTheConfiguredBases()
     {
         var run = RunGenerators(CustomTransportBaseScenario);
@@ -253,7 +276,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
     };
 
     [Fact]
-    public void Run_WhenApplicationServiceIsLocalOnly_ShouldCompileWithoutPublishingHttp()
+    public void Run_WhenApplicationRequestHandlerIsLocalOnly_ShouldCompileWithoutPublishingHttp()
     {
         var first = RunGenerators(MissingEndpointScenario);
         var second = RunGenerators(MissingEndpointScenario);
@@ -315,7 +338,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         namespace Scenario.Application
         {
             public sealed class QueryHandlerGetOrders
-                : ApplicationService<QueryGetOrders, IReadOnlyList<OrderDto>>
+                : ApplicationRequestHandler<QueryGetOrders, Result<IReadOnlyList<OrderDto>>>
             {
                 public override Task<Result<IReadOnlyList<OrderDto>>> Handle(
                     QueryGetOrders request,
@@ -323,7 +346,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             }
 
             public sealed class CommandHandlerCreateOrder
-                : ApplicationService<CommandCreateOrder, OrderDto>
+                : ApplicationRequestHandler<CommandCreateOrder, Result<OrderDto>>
             {
                 public override Task<Result<OrderDto>> Handle(
                     CommandCreateOrder request,
@@ -376,7 +399,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
             public sealed class QueryHandlerPublishedOrders
-                : ApplicationService<QueryGetPublishedOrders, IReadOnlyList<string>>
+                : ApplicationRequestHandler<QueryGetPublishedOrders, Result<IReadOnlyList<string>>>
             {
                 public override Task<Result<IReadOnlyList<string>>> Handle(
                     QueryGetPublishedOrders request,
@@ -384,7 +407,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             }
 
             public sealed class QueryHandlerLocalHealth
-                : ApplicationService<QueryGetLocalHealth, string>
+                : ApplicationRequestHandler<QueryGetLocalHealth, Result<string>>
             {
                 public override Task<Result<string>> Handle(
                     QueryGetLocalHealth request,
@@ -427,7 +450,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             using Scenario.PublishedLanguages.DomainOrdering.Models;
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
-            public sealed class QueryHandlerOrderById : ApplicationService<QueryOrderById, OrderDto>
+            public sealed class QueryHandlerOrderById : ApplicationRequestHandler<QueryOrderById, Result<OrderDto>>
             {
                 public override Task<Result<OrderDto>> Handle(
                     QueryOrderById request,
@@ -475,27 +498,27 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             using Scenario.Local.Requests;
 
-            public sealed class QueryHandlerGetItem : ApplicationService<QueryGetItem, string>
+            public sealed class QueryHandlerGetItem : ApplicationRequestHandler<QueryGetItem, Result<string>>
             {
                 public override Task<Result<string>> Handle(QueryGetItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
-            public sealed class CommandHandlerCreateItem : ApplicationService<CommandCreateItem>
+            public sealed class CommandHandlerCreateItem : ApplicationRequestHandler<CommandCreateItem, Result>
             {
                 public override Task<Result> Handle(CommandCreateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
-            public sealed class CommandHandlerReplaceItem : ApplicationService<CommandReplaceItem>
+            public sealed class CommandHandlerReplaceItem : ApplicationRequestHandler<CommandReplaceItem, Result>
             {
                 public override Task<Result> Handle(CommandReplaceItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
-            public sealed class CommandHandlerUpdateItem : ApplicationService<CommandUpdateItem>
+            public sealed class CommandHandlerUpdateItem : ApplicationRequestHandler<CommandUpdateItem, Result>
             {
                 public override Task<Result> Handle(CommandUpdateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
-            public sealed class CommandHandlerDeleteItem : ApplicationService<CommandDeleteItem>
+            public sealed class CommandHandlerDeleteItem : ApplicationRequestHandler<CommandDeleteItem, Result>
             {
                 public override Task<Result> Handle(CommandDeleteItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -572,31 +595,31 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             using Scenario.PublishedLanguages.DomainOrdering.Requests;
 
-            public sealed class QueryHandlerNoContent : ApplicationService<QueryNoContent>
+            public sealed class QueryHandlerNoContent : ApplicationRequestHandler<QueryNoContent, Result>
             {
                 public override Task<Result> Handle(QueryNoContent request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerTyped
-                : ApplicationService<QueryTyped, global::Scenario.Alpha.SharedDto>
+                : ApplicationRequestHandler<QueryTyped, Result<global::Scenario.Alpha.SharedDto>>
             {
                 public override Task<Result<global::Scenario.Alpha.SharedDto>> Handle(QueryTyped request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerPaged
-                : CustomApplicationService<QueryPaged, PagedResult<global::Scenario.Alpha.SharedDto>>
+                : ApplicationRequestHandler<QueryPaged, PagedResult<global::Scenario.Alpha.SharedDto>>
             {
                 public override Task<PagedResult<global::Scenario.Alpha.SharedDto>> Handle(QueryPaged request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerCustom
-                : CustomApplicationService<QueryCustom, global::Scenario.Results.CustomEnvelope<global::Scenario.Beta.SharedDto>>
+                : ApplicationRequestHandler<QueryCustom, global::Scenario.Results.CustomEnvelope<global::Scenario.Beta.SharedDto>>
             {
                 public override Task<global::Scenario.Results.CustomEnvelope<global::Scenario.Beta.SharedDto>> Handle(QueryCustom request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerNested
-                : ApplicationService<QueryNested, Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>
+                : ApplicationRequestHandler<QueryNested, Result<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>>
             {
                 public override Task<Result<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>> Handle(QueryNested request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -626,7 +649,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             using Scenario.Local.Requests;
 
-            public sealed class CommandHandlerUpload : ApplicationService<CommandUpload>
+            public sealed class CommandHandlerUpload : ApplicationRequestHandler<CommandUpload, Result>
             {
                 public override Task<Result> Handle(CommandUpload request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -657,7 +680,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             using Scenario.Local.Requests;
 
-            public sealed class CommandHandlerDeleteItems : ApplicationService<CommandDeleteItems>
+            public sealed class CommandHandlerDeleteItems : ApplicationRequestHandler<CommandDeleteItems, Result>
             {
                 public override Task<Result> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -688,7 +711,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         {
             using Scenario.Local.Requests;
 
-            public sealed class CommandHandlerDeleteItems : ApplicationService<CommandDeleteItems>
+            public sealed class CommandHandlerDeleteItems : ApplicationRequestHandler<CommandDeleteItems, Result>
             {
                 public override Task<Result> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -745,7 +768,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         /// <summary>Has no endpoint declaration.</summary>
         public sealed record QueryMissingEndpoint : IQuery<string>;
 
-        public sealed class QueryHandlerMissingEndpoint : ApplicationService<QueryMissingEndpoint, string>
+        public sealed class QueryHandlerMissingEndpoint : ApplicationRequestHandler<QueryMissingEndpoint, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryMissingEndpoint request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -768,7 +791,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
         public sealed record QueryLegacyHandler : IQuery<string>;
 
-        public sealed class QueryHandlerLegacyHandler : ApplicationService<QueryLegacyHandler, string>
+        public sealed class QueryHandlerLegacyHandler : ApplicationRequestHandler<QueryLegacyHandler, Result<string>>
         {
             [HttpGet("legacy")]
             public override Task<Result<string>> Handle(QueryLegacyHandler request, CancellationToken cancellationToken) => throw new NotImplementedException();
@@ -791,7 +814,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
         public sealed record QueryMissingConfiguration : IQuery<string>;
 
-        public sealed class QueryHandlerMissingConfiguration : ApplicationService<QueryMissingConfiguration, string>
+        public sealed class QueryHandlerMissingConfiguration : ApplicationRequestHandler<QueryMissingConfiguration, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryMissingConfiguration request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -813,7 +836,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{MissingId}")]
         public sealed record QueryMissingPlaceholder(long Id) : IQuery<string>;
 
-        public sealed class QueryHandlerMissingPlaceholder : ApplicationService<QueryMissingPlaceholder, string>
+        public sealed class QueryHandlerMissingPlaceholder : ApplicationRequestHandler<QueryMissingPlaceholder, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryMissingPlaceholder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -835,7 +858,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         [ApiEndpoint(ApiHttpMethod.Get, "$ROUTE$")]
         public sealed record QueryInvalidRoute(long? Id) : IQuery<string>;
 
-        public sealed class QueryHandlerInvalidRoute : ApplicationService<QueryInvalidRoute, string>
+        public sealed class QueryHandlerInvalidRoute : ApplicationRequestHandler<QueryInvalidRoute, Result<string>>
         {
             public override Task<Result<string>> Handle(QueryInvalidRoute request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }

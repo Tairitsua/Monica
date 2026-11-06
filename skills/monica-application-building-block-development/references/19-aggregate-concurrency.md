@@ -1,6 +1,6 @@
 # Aggregate Concurrency and Actor Migration
 
-ApplicationService, Entity/DomainService, Repository, and UnitOfWork compose ordinary aggregate operations. An Actor is a runtime choice, not a mandatory business Building Block. Replacing its adapter must preserve the actual concurrency, state, routing, and delivery guarantees in use.
+ApplicationRequestHandler, Entity/DomainService, Repository, and UnitOfWork compose ordinary aggregate operations. An Actor is a runtime choice, not a mandatory business Building Block. Replacing its adapter must preserve the actual concurrency, state, routing, and delivery guarantees in use.
 
 ## Protected boundary
 

@@ -28,20 +28,20 @@ public sealed class ApplicationHostSourceGeneratorTests
 
             namespace Scenario.Ordering;
             internal sealed class TotalHandler
-                : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Scenario.Payload<string?>?>
+                : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Monica.Core.Results.Result<Scenario.Payload<string?>?>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<Scenario.Payload<string?>?>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal request, System.Threading.CancellationToken token)
                     => throw new System.NotImplementedException();
             }
             internal sealed class OptionalCountHandler
-                : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetOptionalCount, int?>
+                : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetOptionalCount, Monica.Core.Results.Result<int?>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int?>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetOptionalCount request, System.Threading.CancellationToken token)
                     => throw new System.NotImplementedException();
             }
-            internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<Scenario.Internal.QueryProbe, int>
+            internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.Internal.QueryProbe, Monica.Core.Results.Result<int>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.Internal.QueryProbe request, System.Threading.CancellationToken token)
@@ -287,7 +287,7 @@ public sealed class ApplicationHostSourceGeneratorTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Run_WhenPlainMediatorHandlerConflictsWithApplicationService_ShouldRejectManifest(bool plainHandlerInHost)
+    public void Run_WhenPlainMediatorHandlerConflictsWithApplicationRequestHandler_ShouldRejectManifest(bool plainHandlerInHost)
     {
         const string plainHandler = """
 
@@ -353,7 +353,7 @@ public sealed class ApplicationHostSourceGeneratorTests
             internal static class PrivateOperations
             {
                 {{accessibility}} sealed record QueryHidden : Monica.Application.Abstractions.IQuery<int>;
-                private sealed class HiddenHandler : Monica.Application.Abstractions.ApplicationService<QueryHidden, int>
+                private sealed class HiddenHandler : Monica.Application.Abstractions.ApplicationRequestHandler<QueryHidden, Monica.Core.Results.Result<int>>
                 {
                     public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                         QueryHidden request, System.Threading.CancellationToken token)
@@ -550,13 +550,13 @@ public sealed class ApplicationHostSourceGeneratorTests
 
         namespace Scenario.Ordering;
         internal sealed class TotalHandler
-            : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, int>
+            : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Monica.Core.Results.Result<int>>
         {
             public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                 Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal request, System.Threading.CancellationToken token)
                 => throw new System.NotImplementedException();
         }
-        internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<Scenario.Internal.QueryProbe, int>
+        internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.Internal.QueryProbe, Monica.Core.Results.Result<int>>
         {
             public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                 Scenario.Internal.QueryProbe request, System.Threading.CancellationToken token)
@@ -570,7 +570,7 @@ public sealed class ApplicationHostSourceGeneratorTests
         internal static class ChatHandlers
         {
             internal sealed class TotalHandler
-                : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal, int>
+                : Monica.Application.Abstractions.ApplicationRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal, Monica.Core.Results.Result<int>>
             {
                 public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal request, System.Threading.CancellationToken token)

@@ -45,7 +45,7 @@ public sealed class RoleOwnedController : ControllerBase
     public string Get() => "role-owned";
 }
 
-public sealed class OrdinaryApiHandler(InvocationLedger calls) : ApplicationService<QueryOrdinary, int>
+public sealed class OrdinaryApiHandler(InvocationLedger calls) : ApplicationRequestHandler<QueryOrdinary, Result<int>>
 {
     public override Task<Result<int>> Handle(QueryOrdinary request, CancellationToken cancellationToken)
     {
@@ -55,7 +55,7 @@ public sealed class OrdinaryApiHandler(InvocationLedger calls) : ApplicationServ
     }
 }
 
-public sealed class ConstrainedApiHandler(InvocationLedger calls) : ApplicationService<CommandConstrained, int>
+public sealed class ConstrainedApiHandler(InvocationLedger calls) : ApplicationRequestHandler<CommandConstrained, Result<int>>
 {
     public override Task<Result<int>> Handle(CommandConstrained request, CancellationToken cancellationToken)
     {

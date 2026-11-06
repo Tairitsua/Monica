@@ -78,12 +78,17 @@ public sealed class BuildingBlockSymbolClassifierParityTests
             SourceBuildingBlockKind.HttpApi,
             [MvcExecutionPoints.Action.Value]));
         sourceUnits["Samples.SampleMediatedController"].ExecutionPoints.Should().BeEmpty();
+        sourceUnits["Samples.SampleCrudService"].Kind.Should().Be(SourceBuildingBlockKind.CrudApplicationService);
+        sourceUnits["Samples.CommandCustom"].Should().BeEquivalentTo(new Classification(
+            SourceBuildingBlockKind.ApplicationRequestHandler, [MediatorExecutionPoints.Request.Value]));
+        sourceUnits.Should().NotContainKey("Samples.SampleApplicationInfrastructure");
+        sourceUnits.Should().NotContainKey("Samples.SampleNativeHandler");
         sourceUnits["Samples.SampleSeeder"].Should().BeEquivalentTo(new Classification(
             SourceBuildingBlockKind.Seeder,
             [SeederExecutionPoints.Run.Value]));
         sourceUnits["Samples.SamplePlainHostedService"].ExecutionPoints.Should().BeEmpty();
         sourceUnits["Samples.SampleBatchHandler"].Should().BeEquivalentTo(new Classification(
-            SourceBuildingBlockKind.DomainEventHandler, [EventBusExecutionPoints.DistributedBatchHandler.Value]));
+            SourceBuildingBlockKind.DistributedEventHandler, [EventBusExecutionPoints.DistributedBatchHandler.Value]));
         sourceUnits["Samples.SampleMonicaHostedService"].Should().BeEquivalentTo(new Classification(
             SourceBuildingBlockKind.HostedService,
             [
@@ -269,14 +274,14 @@ public sealed class BuildingBlockSymbolClassifierParityTests
         public sealed class SampleRequest : IResultRequest { }
         public sealed class SampleTypedRequest : IResultRequest<string> { }
         public sealed class SampleNativeRequest : IRequest<byte[]> { }
-        public sealed class QueryHandlerDownload : CustomApplicationService<SampleNativeRequest, byte[]>
+        public sealed class QueryHandlerDownload : ApplicationRequestHandler<SampleNativeRequest, byte[]>
         {
             public override Task<byte[]> Handle(SampleNativeRequest request, CancellationToken cancellationToken)
                 => Task.FromResult(Array.Empty<byte>());
         }
 
-        public abstract class OurApplicationService<TRequest, TResponse> : ApplicationService<TRequest, TResponse>
-            where TRequest : IResultRequest<TResponse> { }
+        public abstract class OurApplicationRequestHandler<TRequest, TResponse> : ApplicationRequestHandler<TRequest, TResponse>
+            where TRequest : IRequest<TResponse> { }
 
         [BuildingBlockMetadata("  Custom command  ", Owner = " Flight Team ",
             Description = " Coordinates a custom command. ", Tags = [" flight ", "FLIGHT", "command"])]
@@ -284,7 +289,7 @@ public sealed class BuildingBlockSymbolClassifierParityTests
         [BuildingBlockRequirement("fips-flight-001")]
         [BuildingBlockRequirement("FIPS-FLIGHT-002")]
         public sealed class CommandCustom(SampleDomainService service)
-            : OurApplicationService<SampleTypedRequest, string>
+            : OurApplicationRequestHandler<SampleTypedRequest, Monica.Core.Results.Result<string>>
         {
             public override Task<Monica.Core.Results.Result<string>> Handle(
                 SampleTypedRequest request,
@@ -292,6 +297,12 @@ public sealed class BuildingBlockSymbolClassifierParityTests
         }
 
         public sealed class SampleCrudService : ApplicationService, ICrudApplicationService { }
+        public sealed class SampleApplicationInfrastructure : ApplicationService { }
+        public sealed class SampleNativeHandler : IRequestHandler<SampleNativeRequest, byte[]>
+        {
+            public Task<byte[]> Handle(SampleNativeRequest request, CancellationToken cancellationToken)
+                => Task.FromResult(Array.Empty<byte>());
+        }
         public sealed class SampleDirectController : ControllerBase { }
         [MediatedController] public sealed class SampleMediatedController : ControllerBase { }
         [Configuration(DisplayName = "Options")] public sealed class SampleOptions { }
@@ -308,7 +319,7 @@ public sealed class BuildingBlockSymbolClassifierParityTests
             public Task HandleEventAsync(SampleEvent eventData, CancellationToken cancellationToken)
                 => Task.CompletedTask;
         }
-        public sealed class SampleBatchHandler : DomainBatchEventHandler<SampleEvent>
+        public sealed class SampleBatchHandler : DistributedBatchEventHandler<SampleEvent>
         {
             public override Task HandleBatchAsync(System.Collections.Generic.IReadOnlyList<SampleEvent> events,
                 CancellationToken cancellationToken) => Task.CompletedTask;

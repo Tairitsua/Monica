@@ -10,12 +10,12 @@ using Monica.Tool.Extensions;
 namespace Monica.BuildingBlocks.Models;
 
 /// <summary>
-/// Describes a distributed domain-event handler and the event building block that it consumes.
+/// Describes a distributed event handler or explicit batch consumer and the event building block that it consumes.
 /// </summary>
-public class DomainEventHandlerBuildingBlock : BuildingBlock
+public class DistributedEventHandlerBuildingBlock : BuildingBlock
 {
-    internal DomainEventHandlerBuildingBlock(BusinessTypeShape shape, BuildingBlockCatalog catalog, bool isBatch = false)
-        : base(shape, BuildingBlockKind.DomainEventHandler, catalog,
+    internal DistributedEventHandlerBuildingBlock(BusinessTypeShape shape, BuildingBlockCatalog catalog, bool isBatch = false)
+        : base(shape, BuildingBlockKind.DistributedEventHandler, catalog,
             isBatch ? EventBusExecutionPoints.DistributedBatchHandler : EventBusExecutionPoints.DistributedHandler)
     {
     }
@@ -31,7 +31,7 @@ public class DomainEventHandlerBuildingBlock : BuildingBlock
     {
         return new BuildingBlockNamingRule
         {
-            Prefix = "DomainEventHandler"
+            Prefix = "DistributedEventHandler"
         };
     }
 
@@ -40,7 +40,7 @@ public class DomainEventHandlerBuildingBlock : BuildingBlock
         BuildingBlockCatalog catalog,
         Type eventType, bool isBatch = false)
     {
-        var unit = new DomainEventHandlerBuildingBlock(shape, catalog, isBatch);
+        var unit = new DistributedEventHandlerBuildingBlock(shape, catalog, isBatch);
         unit.CheckMode();
         unit.EventType = eventType;
         return unit;

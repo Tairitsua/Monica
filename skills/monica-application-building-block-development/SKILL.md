@@ -24,11 +24,11 @@ When adding or refactoring application EventBus events and consumers, including 
 - Add explicit `[BuildingBlockMetadata]` to each application-authored discovered building block and `[BuildingBlockRequirement]` for applicable actual requirement IDs, following the [metadata and coverage-debt rules](references/03-building-block-context-metadata.md). Do not inherit metadata or invent a requirement merely to fill the catalog.
 - Keep metadata, description, and requirement traceability explicit. Resolve optional ownership through the [metadata rules](references/03-building-block-context-metadata.md).
 - Construct result outcomes explicitly with `Result.Success(data)`, `Result.Failure<T>(message, status)`, or `Result.FromFailure<T>(source)`. Messages use `WithMessage`; success does not guarantee non-null data. Follow the [result contract](../monica-development/references/result-type-guide.md).
-- Make HTTP contracts request-owned. Put `[ApiEndpoint]` on the request type and keep route, verb, and binding off the `ApplicationService` handler.
+- Make HTTP contracts request-owned. Put `[ApiEndpoint]` on the request type and keep route, verb, and binding off the `ApplicationRequestHandler` handler.
 - A request is published for generated API clients only when it is attributed source in the exact namespace `*.PublishedLanguages.Domain{DomainName}.Requests`. Attributed requests outside that boundary remain local HTTP endpoints.
 - Generate interfaces in Protocol independently of placement. The complete `[ApplicationHost]` generates per-operation clients and owned receivers; ordinary calls prefer Local and RunOnRole is reserved for a real execution requirement. See [unified architecture](../monica-application/references/03-unified-architecture.md) and [API generation](../monica-infra-messaging/references/invocation.md).
-- Do not add MVC `[Http*]`, `[Route]`, or `[From*]` attributes to generated `ApplicationService` endpoints. The request contract is the single endpoint authority.
-- Use transport-independent ApplicationService for use cases. `[ApiEndpoint(ApiHttpMethod, route)]` publishes a domain interface for UI and application callers while retaining HTTP metadata without exposing receivers. Unattributed requests and plain IRequestHandler remain internal mediator operations.
+- Do not add MVC `[Http*]`, `[Route]`, or `[From*]` attributes to generated `ApplicationRequestHandler` endpoints. The request contract is the single endpoint authority.
+- Use transport-independent ApplicationRequestHandler for use cases. `[ApiEndpoint(ApiHttpMethod, route)]` publishes a domain interface for UI and application callers while retaining HTTP metadata without exposing receivers. Unattributed requests and plain IRequestHandler remain internal mediator operations.
 - For capability setup and runtime behavior, use `$monica-infra-configuration`, `$monica-infra-jobs`, `$monica-infra-messaging`, and `$monica-infra-web` as applicable. This skill owns the application building block's shape and placement.
 
 ## Reference Navigation
@@ -38,7 +38,7 @@ When adding or refactoring application EventBus events and consumers, including 
 - Building Block selection by feature shape: [02-building-block-composition-map.md](references/02-building-block-composition-map.md)
 - Metadata, ownership, and requirement traceability: [03-building-block-context-metadata.md](references/03-building-block-context-metadata.md)
 - Bounded CRUD, seeders, hosted services, controllers, internal mediator handlers, Facades, and support types: [04-adapters-lifecycle-and-support-types.md](references/04-adapters-lifecycle-and-support-types.md)
-- `ApplicationService` templates: [10-application-service-template.md](references/10-application-service-template.md)
+- `ApplicationRequestHandler` templates: [10-application-request-handler-template.md](references/10-application-request-handler-template.md)
 - `DomainService` templates: [11-domain-service-template.md](references/11-domain-service-template.md)
 - Entity, request, and event templates: [12-entity-request-event-template.md](references/12-entity-request-event-template.md)
 - Repository and DbContext templates: [13-repository-and-persistence-template.md](references/13-repository-and-persistence-template.md)

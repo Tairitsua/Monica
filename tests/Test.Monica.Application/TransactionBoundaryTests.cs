@@ -226,7 +226,7 @@ public sealed class TransactionLedger
 }
 
 public sealed class CommandHandlerCoordinate(TransactionPrimaryContext db, TransactionScope scope, TransactionLedger ledger,
-    ITestingCommandApi commands, ITestingQueryApi queries) : ApplicationService<CommandCoordinate, TransactionReceipt>
+    ITestingCommandApi commands, ITestingQueryApi queries) : ApplicationRequestHandler<CommandCoordinate, Result<TransactionReceipt>>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionPrimaryContext)])]
     public override async Task<Result<TransactionReceipt>> Handle(CommandCoordinate request, CancellationToken cancellationToken)
@@ -250,7 +250,7 @@ public sealed class CommandHandlerCoordinate(TransactionPrimaryContext db, Trans
 
 public sealed class CommandHandlerTransactionChild(TransactionSecondaryContext db, TransactionScope scope,
     TransactionLedger ledger, ITestingQueryApi queries, ICurrentPrincipalAccessor principal)
-    : ApplicationService<CommandTransactionChild, TransactionReceipt>
+    : ApplicationRequestHandler<CommandTransactionChild, Result<TransactionReceipt>>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionSecondaryContext)])]
     public override async Task<Result<TransactionReceipt>> Handle(CommandTransactionChild request, CancellationToken cancellationToken)
@@ -267,7 +267,7 @@ public sealed class CommandHandlerTransactionChild(TransactionSecondaryContext d
     }
 }
 
-public sealed class QueryHandlerTransactionScope(TransactionScope scope, TransactionLedger ledger) : ApplicationService<QueryTransactionScope, Guid>
+public sealed class QueryHandlerTransactionScope(TransactionScope scope, TransactionLedger ledger) : ApplicationRequestHandler<QueryTransactionScope, Result<Guid>>
 {
     public override async Task<Result<Guid>> Handle(QueryTransactionScope request, CancellationToken cancellationToken)
     {

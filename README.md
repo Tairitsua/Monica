@@ -104,7 +104,7 @@ The strategy declares hard dependencies and optional ordering in `Describe(Modul
 
 A Building Block is an application code element with a defined responsibility that Monica recognizes through a supported kind contract. The current discoverable kinds are:
 
-`ApplicationService` · `CrudApplicationService` · `DomainService` · `Repository` · `DomainEvent` · `DomainEventHandler` · `LocalEventHandler` · `Seeder` · `RecurringJob` · `TriggeredJob` · `HttpApi` · `Entity` · `RequestDto` · `Configuration` · `HostedService`
+`ApplicationRequestHandler` · `CrudApplicationService` · `DomainService` · `Repository` · `DomainEvent` · `DistributedEventHandler` · `LocalEventHandler` · `Seeder` · `RecurringJob` · `TriggeredJob` · `HttpApi` · `Entity` · `RequestDto` · `Configuration` · `HostedService`
 
 Each discovered Building Block can carry explicit agent context and requirement traceability:
 

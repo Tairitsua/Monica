@@ -92,13 +92,13 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
         try
         {
             if (handler is null || handler.IsAbstract || handler.IsGenericType) return null;
-            if (!ApplicationServiceSymbolHelper.TryGetContract(handler, out var request, out var handlerResult))
+            if (!ApplicationRequestHandlerSymbolHelper.TryGetContract(handler, out var request, out var handlerResult))
             {
                 return null;
             }
 
             var diagnostics = new List<DiagnosticSnapshot>();
-            foreach (var (attribute, name) in ApplicationServiceSymbolHelper.GetLegacyEndpointAttributes(handler!))
+            foreach (var (attribute, name) in ApplicationRequestHandlerSymbolHelper.GetLegacyEndpointAttributes(handler!))
             {
                 diagnostics.Add(DiagnosticSnapshot.Create(
                     DiagnosticDescriptors.LegacyHandlerAttribute,
@@ -163,7 +163,7 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
             return new AnalysisSnapshot<ControllerCandidate>(
                 new ControllerCandidate(
                     endpointAnalysis.Value,
-                    ApplicationServiceSymbolHelper.GetTags(handler!).ToImmutableArray()),
+                    ApplicationRequestHandlerSymbolHelper.GetTags(handler!).ToImmutableArray()),
                 deleteQueryWarning is null ? null : new[] { deleteQueryWarning });
         }
         catch (OperationCanceledException)

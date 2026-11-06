@@ -8,11 +8,11 @@ These conventions mirror the current `Monica.BuildingBlocks` naming diagnostics.
 
 | Kind | Default naming convention | Recommended naming |
 | --- | --- | --- |
-| `ApplicationService` | Class name contains `Handler` | Prefer `CommandHandler*` or `QueryHandler*` |
+| `ApplicationRequestHandler` | Class name contains `Handler` | Prefer `CommandHandler*` or `QueryHandler*` |
 | `DomainService` | Class name starts with `Domain` | `Domain*` |
 | `Repository` implementation | Class name starts with `Repository`; exact `I{ClassName}` interface is required for classification | `Repository{Aggregate}` and `IRepository{Aggregate}` |
 | `DomainEvent` | Class name starts with `Event` | `Event*` |
-| `DomainEventHandler` | Class name starts with `DomainEventHandler` | `DomainEventHandler*` |
+| `DistributedEventHandler` | Class name starts with `DistributedEventHandler` | `DistributedEventHandler*` |
 | `LocalEventHandler` | Class name starts with `LocalEventHandler` | `LocalEventHandler*` |
 | `Entity` | Namespace contains `Entities` | Place under `Entities/` |
 | `Configuration` | Class name starts with `Options` | `Options{Purpose}` |
@@ -51,7 +51,7 @@ Distinguish three naming decisions:
 
 | Type | Naming rule | Example |
 | --- | --- | --- |
-| Native capability | Keep its Monica name | `ApplicationService`, `DomainService`, `RecurringJob` |
+| Native capability | Keep its Monica name | `ApplicationRequestHandler`, `DomainService`, `RecurringJob` |
 | Reusable product specialization | Product identity plus a meaningful capability or kind | `{Product}Entity`, `{Product}EfRepository`, `I{Product}CurrentUser` |
 | Concrete business building block or support type | Keep its business meaning and the existing kind convention | `Order`, `IRepositoryOrder`, `RepositoryOrder`, `CommandHandlerApproveOrder` |
 
@@ -94,7 +94,7 @@ Use one domain-core/role layout in combined and split deployments. Keep leaf fol
 
 | Building Block | Placement |
 | --- | --- |
-| ApplicationService commands and queries | `Domains/{Domain}/Roles.{Domain}[.{Purpose}]/{HandlersCommand,HandlersQuery}/` |
+| ApplicationRequestHandler commands and queries | `Domains/{Domain}/Roles.{Domain}[.{Purpose}]/{HandlersCommand,HandlersQuery}/` |
 | Local event and external subscription entry points | The owning role's `HandlersEvent/` or `Subscribers/`, keeping local invariant behavior distinct from autonomous consumption |
 | RecurringJob / TriggeredJob | The owning role's `BackgroundWorkers/` or `Jobs/` |
 | Entity, value object and DomainService | `Domains/{Domain}/Domains.{Domain}/{Entities,ValueObjects,DomainServices}/` |
@@ -114,7 +114,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 ## Folder Scanability Rules
 
 - Prefer prefix naming inside a folder instead of adding sub-folders with one or two files.
-- Keep leaf folders directly recognizable in the IDE: `QueryHandlerGetOrder.cs`, `CommandHandlerApproveOrder.cs`, `DomainEventHandlerOrderApproved.cs`, `WorkerRefreshOrderSnapshot.cs`.
+- Keep leaf folders directly recognizable in the IDE: `QueryHandlerGetOrder.cs`, `CommandHandlerApproveOrder.cs`, `DistributedEventHandlerOrderApproved.cs`, `WorkerRefreshOrderSnapshot.cs`.
 - Use `HandlersEvent` as the standard event-handler folder name. Do not alternate between `HandlersEvent` and `EventHandlers`.
 - Keep AppHost or gateway projects composition-only. Registration extensions and host adapters are allowed there; business Building Blocks and domain behavior stay in their owners. Do not introduce a Monica module per business feature.
 - Put pure helper code in `Utilities/` with `Utils*` names. If a type starts accumulating orchestration or domain rules, move it into a `DomainService` or entity instead.
@@ -128,7 +128,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 - The domain core owns persistence in every deployment: implementations stay in `Domains/{Domain}/Domains.{Domain}/Repository/`; role libraries consume their narrow interfaces.
 - Keep libraries that are only used by one repository or adapter in the owning subdomain/service project. Do not move that implementation into `Platform` unless the implementation itself is project-common reusable infrastructure.
 - Keep request, response, and event contracts separate from persistence entities.
-- Keep endpoint metadata on the request contract. the single ApiEndpoint declares the operation and its HTTP mapping; optional shared wire settings stay with its assembly; generated `ApplicationService` handlers do not carry MVC endpoint or binding attributes.
+- Keep endpoint metadata on the request contract. the single ApiEndpoint declares the operation and its HTTP mapping; optional shared wire settings stay with its assembly; generated `ApplicationRequestHandler` handlers do not carry MVC endpoint or binding attributes.
 - Use `DateTime` for timezone-free wall-clock contract values and `DateTimeOffset` for instants or explicit offsets. Do not compensate for transport with ad hoc UTC/local conversions in handlers.
 - Publish a request to API clients only through the explicit `*.PublishedLanguages.Domain{DomainName}.Requests` namespace boundary. Local HTTP requests stay outside that namespace even when they reuse published DTOs.
 - Keep adapter code thin. Generated endpoint registration, API transports, or background-host wiring should not replace Building Blocks.
@@ -143,5 +143,5 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 ## Result Handling
 
 - For typed success results, use `return Result.Success(data);`, including string data. Use an explicit type argument when inference cannot express the declared payload type.
-- For typed failure results, use `return Result.Failure<TResponse>("message", status);`; no-data failures use `Result.Failure`. Forward an existing failure with `Result.FromFailure<TResponse>(source)` to preserve its status and metadata.
+- For typed failure results, use `return Result.Failure<TData>("message", status);`; no-data failures use `Result.Failure`. Forward an existing failure with `Result.FromFailure<TData>(source)` to preserve its status and metadata.
 - Messages use `WithMessage`. Do not return bare data or strings, erase payloads implicitly, or infer non-null data from success. Follow the [result contract](../../monica-development/references/result-type-guide.md).

@@ -7,7 +7,7 @@ using Platform.Protocol.PublishedLanguages.DomainOrdering.Requests;
 namespace Roles.Ordering.Reporting.HandlersQuery;
 
 /// <summary>Reads the overview locally even when this host does not carry the reporting role.</summary>
-public sealed class QueryHandlerGetOrderSummary(IRepositoryOrder repository) : ApplicationService<QueryGetOrderSummary, OrderSummaryDto>
+public sealed class QueryHandlerGetOrderSummary(IRepositoryOrder repository) : ApplicationRequestHandler<QueryGetOrderSummary, Result<OrderSummaryDto>>
 {
     /// <inheritdoc />
     public override async Task<Result<OrderSummaryDto>> Handle(QueryGetOrderSummary request, CancellationToken cancellationToken)

@@ -67,12 +67,12 @@
       "LoadException": "加载异常: {0}"
     },
     "BuildingBlockKinds": {
-      "ApplicationService": "应用服务",
+      "ApplicationRequestHandler": "应用请求处理程序",
       "CrudApplicationService": "CRUD应用服务",
       "DomainService": "领域服务",
       "Repository": "仓储",
       "DomainEvent": "领域事件",
-      "DomainEventHandler": "领域事件处理程序",
+      "DistributedEventHandler": "分布式事件处理程序",
       "LocalEventHandler": "本地事件处理程序",
       "Seeder": "种子数据",
       "RecurringJob": "定时作业",

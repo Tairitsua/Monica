@@ -7,9 +7,7 @@ namespace Monica.BuildingBlocks.CodeAnalysis.Services;
 internal sealed class BuildingBlockSymbolClassifier
 {
     private const string APPLICATION_SERVICE = "Monica.Application.Abstractions.ApplicationService";
-    private const string APPLICATION_SERVICE_GENERIC = "Monica.Application.Abstractions.ApplicationService`2";
-    private const string APPLICATION_SERVICE_WITHOUT_RESPONSE = "Monica.Application.Abstractions.ApplicationService`1";
-    private const string CUSTOM_APPLICATION_SERVICE_GENERIC = "Monica.Application.Abstractions.CustomApplicationService`2";
+    private const string APPLICATION_REQUEST_HANDLER = "Monica.Application.Abstractions.ApplicationRequestHandler`2";
     private const string DISTRIBUTED_EVENT_HANDLER_EXECUTION_POINT = "eventbus.distributed-handler";
     private const string CONTROLLER_BASE = "Microsoft.AspNetCore.Mvc.ControllerBase";
     private const string CONFIGURATION_ATTRIBUTE = "Monica.Configuration.Annotations.ConfigurationAttribute";
@@ -157,10 +155,10 @@ internal sealed class BuildingBlockSymbolClassifier
                 AnalyzeConstructorDependencies: true);
         }
 
-        if (isApplicationService)
+        if (symbol.FindBaseType(APPLICATION_REQUEST_HANDLER) is not null)
         {
             return new(
-                SourceBuildingBlockKind.ApplicationService,
+                SourceBuildingBlockKind.ApplicationRequestHandler,
                 [MEDIATOR_REQUEST_EXECUTION_POINT],
                 AnalyzeConstructorDependencies: true);
         }
@@ -182,14 +180,14 @@ internal sealed class BuildingBlockSymbolClassifier
         if (symbol.FindInterface(DISTRIBUTED_EVENT_HANDLER) is not null)
         {
             return new(
-                SourceBuildingBlockKind.DomainEventHandler,
+                SourceBuildingBlockKind.DistributedEventHandler,
                 [DISTRIBUTED_EVENT_HANDLER_EXECUTION_POINT],
                 AnalyzeConstructorDependencies: true);
         }
 
         if (symbol.FindInterface(DISTRIBUTED_BATCH_EVENT_HANDLER) is not null)
         {
-            return new(SourceBuildingBlockKind.DomainEventHandler, ["eventbus.distributed-batch-handler"],
+            return new(SourceBuildingBlockKind.DistributedEventHandler, ["eventbus.distributed-batch-handler"],
                 AnalyzeConstructorDependencies: true);
         }
 
@@ -276,17 +274,14 @@ internal sealed class BuildingBlockSymbolClassifier
         var dependencies = new List<BuildingBlockSymbolDependency>();
         switch (classification.Kind)
         {
-            case SourceBuildingBlockKind.ApplicationService:
-            case SourceBuildingBlockKind.CrudApplicationService:
-                var applicationServiceBase = symbol.FindBaseType(APPLICATION_SERVICE_GENERIC)
-                    ?? symbol.FindBaseType(APPLICATION_SERVICE_WITHOUT_RESPONSE)
-                    ?? symbol.FindBaseType(CUSTOM_APPLICATION_SERVICE_GENERIC);
-                if (applicationServiceBase?.TypeArguments.FirstOrDefault() is INamedTypeSymbol request)
+            case SourceBuildingBlockKind.ApplicationRequestHandler:
+                var requestHandlerBase = symbol.FindBaseType(APPLICATION_REQUEST_HANDLER);
+                if (requestHandlerBase?.TypeArguments.FirstOrDefault() is INamedTypeSymbol request)
                 {
-                    dependencies.Add(new(request, "BuildingBlock.ApplicationService.Request.NotFound"));
+                    dependencies.Add(new(request, "BuildingBlock.ApplicationRequestHandler.Request.NotFound"));
                 }
                 break;
-            case SourceBuildingBlockKind.DomainEventHandler:
+            case SourceBuildingBlockKind.DistributedEventHandler:
                 if ((symbol.FindInterface(DISTRIBUTED_EVENT_HANDLER) ?? symbol.FindInterface(DISTRIBUTED_BATCH_EVENT_HANDLER))
                     ?.TypeArguments.FirstOrDefault() is INamedTypeSymbol distributedEvent)
                 {

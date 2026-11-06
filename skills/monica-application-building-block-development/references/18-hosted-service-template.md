@@ -21,7 +21,7 @@ A service may retain immutable configuration, thread-safe infrastructure, and pr
 
 Use `ExecuteWorkItemAsync<TWorkItem>` or its typed-input/result overload for each finite operation. The framework creates and disposes an async scope and invokes the execution pipeline. Register work items as scoped or transient through normal DI. Their concrete `ExecuteAsync` methods own transaction overrides. Start/stop default to None; work items default to Automatic. A coordinator performing independently committed operations explicitly selects None and preserves those operations' commit boundaries.
 
-Work items may orchestrate bounded operations directly. Do not add a forwarding ApplicationService solely to wrap a work item. Independently callable use cases use ApplicationService; entities and meaningful DomainServices own rules. Never hold a transaction across the permanent loop or an idle wait.
+Work items may orchestrate bounded operations directly. Do not add a forwarding ApplicationRequestHandler solely to wrap a work item. Independently callable use cases use ApplicationRequestHandler; entities and meaningful DomainServices own rules. Never hold a transaction across the permanent loop or an idle wait.
 
 ## Continuous consumer example
 

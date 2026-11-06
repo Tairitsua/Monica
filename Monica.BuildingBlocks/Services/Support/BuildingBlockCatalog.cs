@@ -87,9 +87,9 @@ internal sealed class BuildingBlockCatalog : IBuildingBlockCatalog, IRequestFilt
         // only constructions of definitions already in this host's discovery scope; excluded contracts stay absent.
         var referencedTypes = _unitsByFullName.Values.Select(static unit => unit switch
         {
-            DomainEventHandlerBuildingBlock handler => handler.EventType,
+            DistributedEventHandlerBuildingBlock handler => handler.EventType,
             LocalEventHandlerBuildingBlock handler => handler.EventType,
-            ApplicationServiceBuildingBlock service => service.RequestType,
+            ApplicationRequestHandlerBuildingBlock service => service.RequestType,
             _ => null
         }).OfType<Type>().Distinct().ToArray();
         foreach (var type in referencedTypes)

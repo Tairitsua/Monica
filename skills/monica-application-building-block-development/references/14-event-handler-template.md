@@ -9,8 +9,8 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 
 ## Rules
 
-- Use `DomainEventHandler<TEvent>` for distributed events.
-- Use `DomainBatchEventHandler<TEvent>` only for an explicit consumer that combines database work. Keep the `DomainEventHandler` naming prefix and Building Block metadata; implement `HandleBatchAsync(IReadOnlyList<TEvent>, CancellationToken)` and select its transaction context on that method. Follow [batch receive prerequisites and limits](../../monica-infra-messaging/references/event-bus.md#explicit-batch-consumers) and [batch Inbox](../../monica-infra-persistence/references/transactional-events.md#inbox-and-timestamp-behavior). Keep ordinary handlers for independent reactions that gain nothing from combining work.
+- Use `DistributedEventHandler<TEvent>` for distributed events.
+- Use `DistributedBatchEventHandler<TEvent>` only for an explicit consumer that combines database work. Keep the `DistributedEventHandler` naming prefix and Building Block metadata; implement `HandleBatchAsync(IReadOnlyList<TEvent>, CancellationToken)` and select its transaction context on that method. Follow [batch receive prerequisites and limits](../../monica-infra-messaging/references/event-bus.md#explicit-batch-consumers) and [batch Inbox](../../monica-infra-persistence/references/transactional-events.md#inbox-and-timestamp-behavior). Keep ordinary handlers for independent reactions that gain nothing from combining work.
 - Use `LocalEventHandler<TEvent>` for in-process reactions.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the handler instance; do not access it from a constructor.
@@ -38,8 +38,8 @@ namespace $ApplicationNamespace$.HandlersEvent;
     Description = "Coordinates the warehouse reaction to an approved order.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
-public sealed class DomainEventHandlerOrderApproved(DomainNotifyWarehouse domainService)
-    : DomainEventHandler<EventOrderApproved>
+public sealed class DistributedEventHandlerOrderApproved(DomainNotifyWarehouse domainService)
+    : DistributedEventHandler<EventOrderApproved>
 {
     public override async Task HandleEventAsync(
         EventOrderApproved eventData,
@@ -60,8 +60,8 @@ using Monica.WebApi.Abstractions;
 
 [BuildingBlockMetadata("Record Order Notices", Description = "Stores new notices and their Inbox receipts in one transaction.")]
 [Inbox("orders.record-notices.v1")]
-public sealed class DomainEventHandlerRecordNotices(IRepositoryNotice repository)
-    : DomainBatchEventHandler<EventOrderNotice>
+public sealed class DistributedEventHandlerRecordNotices(IRepositoryNotice repository)
+    : DistributedBatchEventHandler<EventOrderNotice>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = new[] { typeof(OrdersDbContext) })]
     public override Task HandleBatchAsync(IReadOnlyList<EventOrderNotice> events, CancellationToken cancellationToken)

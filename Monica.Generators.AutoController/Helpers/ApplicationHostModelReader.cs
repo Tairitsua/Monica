@@ -113,7 +113,7 @@ internal static class ApplicationHostModelReader
                         handlersByRequest.Add(handledRequest, handlers = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default));
                     handlers.Add(handler);
                 }
-                if (!ApplicationServiceSymbolHelper.TryGetContract(handler, out var request, out var handlerResult)) continue;
+                if (!ApplicationRequestHandlerSymbolHelper.TryGetContract(handler, out var request, out var handlerResult)) continue;
                 if (exportOwnAssembly && !EndpointModelFactory.IsPublishedRequest(request)) continue;
                 var endpointAttribute = EndpointModelFactory.GetEndpointAttribute(request);
                 var requirement = Find(request, GeneratorConstants.RUN_ON_ROLE_ATTRIBUTE);
@@ -137,7 +137,7 @@ internal static class ApplicationHostModelReader
                     continue;
                 }
 
-                foreach (var (attribute, name) in ApplicationServiceSymbolHelper.GetLegacyEndpointAttributes(handler))
+                foreach (var (attribute, name) in ApplicationRequestHandlerSymbolHelper.GetLegacyEndpointAttributes(handler))
                     diagnostics.Add(DiagnosticSnapshot.Create(DiagnosticDescriptors.LegacyHandlerAttribute,
                         attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ?? hostLocation,
                         handler.ToDisplayString(), name));
@@ -162,7 +162,7 @@ internal static class ApplicationHostModelReader
                 operations.Add(new ApplicationOperationModel(
                     request.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), MetadataName(handler), assembly.Name,
                     owner.DomainId, owner.RoleId, requiredRole, endpoint, EndpointModelFactory.IsPublishedRequest(request) && endpoint is not null,
-                    ApplicationServiceSymbolHelper.GetTags(handler).ToImmutableArray()));
+                    ApplicationRequestHandlerSymbolHelper.GetTags(handler).ToImmutableArray()));
             }
         }
 

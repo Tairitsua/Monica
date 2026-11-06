@@ -49,7 +49,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor DuplicateRoute = Create(
         "AC1009",
         "Duplicate endpoint route",
-        "HTTP {0} route '{1}' is declared by multiple ApplicationService requests: {2}.");
+        "HTTP {0} route '{1}' is declared by multiple ApplicationRequestHandler requests: {2}.");
 
     public static readonly DiagnosticDescriptor DuplicateOperation = Create(
         "AC1010",
@@ -99,7 +99,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidReceiverOwnership = Create(
         "AC1020",
         "Invalid receiver ownership",
-        "Selected handler assembly '{0}' contains no concrete ApplicationService with an ApiEndpoint request. Select an implementation assembly, not a protocol assembly.");
+        "Selected handler assembly '{0}' contains no concrete ApplicationRequestHandler with an ApiEndpoint request. Select an implementation assembly, not a protocol assembly.");
 
     public static readonly DiagnosticDescriptor GenerationFailure = Create(
         "AC1099",

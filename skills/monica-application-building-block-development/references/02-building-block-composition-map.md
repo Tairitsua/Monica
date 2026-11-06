@@ -11,13 +11,13 @@ For a flow involving slow external I/O and durable writes, first select the exis
 Create:
 
 - `RequestDto`
-- `ApplicationService`
+- `ApplicationRequestHandler`
 - Optional `Repository` method for non-trivial querying
 - Optional `DomainService` for a meaningful domain policy with no natural state owner
 
 Load:
 
-- [10-application-service-template.md](10-application-service-template.md)
+- [10-application-request-handler-template.md](10-application-request-handler-template.md)
 - [12-entity-request-event-template.md](12-entity-request-event-template.md)
 - [13-repository-and-persistence-template.md](13-repository-and-persistence-template.md) when persistence changes are needed
 
@@ -26,7 +26,7 @@ Load:
 Create:
 
 - `RequestDto`
-- `ApplicationService`
+- `ApplicationRequestHandler`
 - Update or add `Entity`
 - Optional `Repository` for tracked loading and staging
 - Optional `DomainService` for a meaningful rule spanning aggregates or with no natural entity owner
@@ -34,7 +34,7 @@ Create:
 
 Load:
 
-- [10-application-service-template.md](10-application-service-template.md)
+- [10-application-request-handler-template.md](10-application-request-handler-template.md)
 - [12-entity-request-event-template.md](12-entity-request-event-template.md)
 - [13-repository-and-persistence-template.md](13-repository-and-persistence-template.md)
 - [11-domain-service-template.md](11-domain-service-template.md) only when such a domain rule exists
@@ -47,7 +47,7 @@ Create:
 - `Entity`
 - `Repository` interface and implementation
 - Persistence mapping or `DbContext` update
-- Optional `ApplicationService` if the aggregate also gets a new use case
+- Optional `ApplicationRequestHandler` if the aggregate also gets a new use case
 
 Load:
 
@@ -59,7 +59,7 @@ Load:
 Create:
 
 - `DomainEvent`
-- `DomainEventHandler` or `LocalEventHandler`
+- `DistributedEventHandler` or `LocalEventHandler`
 - Optional `DomainService` if the reaction contains reusable business logic
 - Optional `TriggeredJob` if the work needs the [independent execution lifecycle](15-job-template.md) of a job
 
@@ -93,7 +93,7 @@ Use [04-adapters-lifecycle-and-support-types.md](04-adapters-lifecycle-and-suppo
 - Continuous infrastructure or start/stop ownership: a [hosted service](18-hosted-service-template.md) with finite scoped work where required.
 - HTTP-specific transport behavior: a thin controller only when a request-owned endpoint does not express it.
 - Internal mediated operation: the existing `IRequestHandler` contract without HTTP exposure.
-- Public business UI/API entry: an ApplicationService reached through the generated domain client.
+- Public business UI/API entry: an ApplicationRequestHandler reached through the generated domain client.
 
 These choices preserve the existing kind and execution contracts. Use the native mechanism and the project's adopted placement; a different combination of these adapters does not itself require specification evolution.
 

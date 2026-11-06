@@ -56,7 +56,7 @@ public sealed class BuildingBlockUseCaseTemplateTests
             @interface.IsGenericType && @interface.GetGenericTypeDefinition() == typeof(IRepository<,>));
         repositoryUnit.EntityType.Should().Be(entityUnit.ClrType);
         repositoryUnit.Dependencies.Should().Contain(entityUnit);
-        catalog.GetAll<ApplicationServiceBuildingBlock>().Should().HaveCount(3);
+        catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Should().HaveCount(3);
         catalog.GetAll<RequestDtoBuildingBlock>().Should().HaveCount(2);
         catalog.GetAll<DomainServiceBuildingBlock>().Should().BeEmpty();
         catalog.GetAll().Should().HaveCount(7);
@@ -76,7 +76,7 @@ public sealed class BuildingBlockUseCaseTemplateTests
             runtimeUnit.RequirementIds.Should().Equal(sourceUnit.RequirementIds);
             runtimeUnit.Tags.Should().Equal(sourceUnit.Tags);
             runtimeUnit.Alerts.Should().BeEmpty();
-            if (runtimeUnit is ApplicationServiceBuildingBlock handler)
+            if (runtimeUnit is ApplicationRequestHandlerBuildingBlock handler)
             {
                 handler.RequestType.Should().NotBeNull();
                 handler.Dependencies.Should().Contain(unit => unit.ClrType == handler.RequestType);
@@ -117,14 +117,14 @@ public sealed class BuildingBlockUseCaseTemplateTests
         var queryType = assembly.GetType(
             "Domains.Ordering.Application.HandlersQuery.QueryGetOrder", throwOnError: true)!;
         var queryHandler = Activator.CreateInstance(queryHandlerType, repository)!;
-        catalog.GetAll<ApplicationServiceBuildingBlock>().Single(unit => unit.ClrType == commandHandlerType)
-            .ResponseType.Should().BeNull();
-        catalog.GetAll<ApplicationServiceBuildingBlock>().Single(unit => unit.ClrType == queryHandlerType)
-            .ResponseType.Should().Be(summaryType);
+        catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Single(unit => unit.ClrType == commandHandlerType)
+            .ResponseType.Should().Be(typeof(Result));
+        catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Single(unit => unit.ClrType == queryHandlerType)
+            .ResponseType.Should().Be(typeof(Result<>).MakeGenericType(summaryType));
 
         var customHandlerType = assembly.GetType(
             "Domains.Ordering.Application.HandlersQuery.CustomQueryHandlerGetOrder", throwOnError: true)!;
-        catalog.GetAll<ApplicationServiceBuildingBlock>().Single(unit => unit.ClrType == customHandlerType)
+        catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Single(unit => unit.ClrType == customHandlerType)
             .ResponseType.Should().Be(typeof(Result<>).MakeGenericType(summaryType));
         var customHandler = Activator.CreateInstance(customHandlerType, repository)!;
         var customResult = await InvokeHandlerAsync(
@@ -168,7 +168,7 @@ public sealed class BuildingBlockUseCaseTemplateTests
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
         var projectAssemblies = new[]
         {
-            typeof(ApplicationService<>).Assembly.Location,
+            typeof(ApplicationRequestHandler<,>).Assembly.Location,
             typeof(IRepository<>).Assembly.Location,
             typeof(DbContext).Assembly.Location,
             typeof(Result).Assembly.Location,
@@ -216,7 +216,7 @@ public sealed class BuildingBlockUseCaseTemplateTests
             Tags = ["ordering", "approval"])]
         [BuildingBlockRequirement("template-test.order-approval")]
         public sealed class CustomQueryHandlerGetOrder(IRepositoryOrder repository)
-            : CustomApplicationService<QueryGetOrder, Result<OrderSummary>>
+            : ApplicationRequestHandler<QueryGetOrder, Result<OrderSummary>>
         {
             public override async Task<Result<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
             {

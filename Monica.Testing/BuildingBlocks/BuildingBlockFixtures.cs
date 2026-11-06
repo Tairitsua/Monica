@@ -21,11 +21,11 @@ public static class BuildingBlockFixtures
     }
 
     /// <summary>
-    /// Creates a builder for a distributed domain event handler Building Block.
+    /// Creates a builder for a distributed event handler Building Block.
     /// </summary>
     /// <typeparam name="THandler">The event handler under test.</typeparam>
     /// <typeparam name="TEvent">The event payload handled by the Building Block.</typeparam>
-    public static BuildingBlockFixtureBuilder<THandler> DomainEventHandler<THandler, TEvent>()
+    public static BuildingBlockFixtureBuilder<THandler> DistributedEventHandler<THandler, TEvent>()
         where THandler : class, IDistributedEventHandler<TEvent>
     {
         return BuildingBlockFixture<THandler>.Builder();

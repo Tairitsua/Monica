@@ -33,7 +33,7 @@ namespace Domains.Ordering.Application.HandlersCommand
         Description = "Loads the order and coordinates its approval transition.", Tags = ["ordering", "approval"])]
     [BuildingBlockRequirement("$RequirementId$")]
     public sealed class CommandHandlerApproveOrder(IRepositoryOrder repository)
-        : ApplicationService<CommandApproveOrder>
+        : ApplicationRequestHandler<CommandApproveOrder, Result>
     {
         public override async Task<Result> Handle(CommandApproveOrder request, CancellationToken cancellationToken)
         {
@@ -56,7 +56,7 @@ namespace Domains.Ordering.Application.HandlersQuery
         Description = "Returns a materialized order summary from its owning repository.", Tags = ["ordering", "approval"])]
     [BuildingBlockRequirement("$RequirementId$")]
     public sealed class QueryHandlerGetOrder(IRepositoryOrder repository)
-        : ApplicationService<QueryGetOrder, OrderSummary>
+        : ApplicationRequestHandler<QueryGetOrder, Result<OrderSummary>>
     {
         public override async Task<Result<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
         {

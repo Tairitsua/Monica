@@ -10,13 +10,13 @@ Runtime and source discovery recognize the kinds below from inheritance, interfa
 
 | Kind | Base type or contract | Naming convention | Primary responsibility |
 | --- | --- | --- | --- |
-| `ApplicationService` | `ApplicationService<TRequest, TResponse>`, `ApplicationService<TRequest>`, or native `CustomApplicationService<TRequest, TResult>` | `CommandHandler*`, `QueryHandler*`, or another `*Handler*` name | Transport-independent mediator use-case orchestration (HTTP exposure is opt-in) with a deliberate result boundary |
-| `RequestDto` | `IQuery<TResponse>` or `ICommand<TResponse>`/`ICommand` | `Command*`, `Query*`, `Request*` | Stable request contract for a use case |
+| `ApplicationRequestHandler` | `ApplicationRequestHandler<TRequest, TResponse>`; `TResponse` is the complete mediator response | `CommandHandler*`, `QueryHandler*`, or another `*Handler*` name | Transport-independent mediator use-case orchestration (HTTP exposure is opt-in) with a deliberate result boundary |
+| `RequestDto` | `IQuery<TData>` or `ICommand<TData>`/`ICommand` | `Command*`, `Query*`, `Request*` | Stable request contract for a use case |
 | `DomainService` | `DomainService` | `Domain*` | Meaningful domain rule with no natural entity owner, often spanning aggregates |
 | `Entity` | `Entity<TKey>` or `Entity` plus `IEntity` | Place under `Entities/` | Own state, invariants, and behavior |
 | `Repository` | Minimal `IRepository<TEntity>` or keyed contract plus concrete implementation | `IRepository{Aggregate}` / exact `Repository{Aggregate}` | Tracked aggregate loading, staging, and materialized business reads |
 | `DomainEvent` | `DomainEvent` | `Event*` | An application fact or shared notification contract worth publishing or reacting to |
-| `DomainEventHandler` | `DomainEventHandler<TEvent>` | `DomainEventHandler*` | React to distributed events |
+| `DistributedEventHandler` | `DistributedEventHandler<TEvent>` | `DistributedEventHandler*` | React to distributed events |
 | `LocalEventHandler` | `LocalEventHandler<TEvent>` | `LocalEventHandler*` | React to in-process events |
 | `Configuration` | `[Configuration]` class | `Options*` | Typed deployment-owned Startup or runtime Managed settings |
 | `RecurringJob` | `RecurringJob` | `Worker*` | Scheduled background work |
@@ -50,7 +50,7 @@ using Monica.BuildingBlocks.Annotations;
     Description = "Approves an eligible order.",
     Tags = ["ordering", "approval"])]
 [BuildingBlockRequirement("ORD-REQ-001")]
-public sealed class CommandHandlerApproveOrder : ApplicationService<CommandApproveOrder>
+public sealed class CommandHandlerApproveOrder : ApplicationRequestHandler<CommandApproveOrder, Result>
 {
     // Implementation omitted.
 }
@@ -74,7 +74,7 @@ An empty catalog reports no data, not 100% coverage. Use [03-building-block-cont
 - Use `BuildingBlockSourceAnalysisContract.DiscoverableKinds` when validating a source-level create operation's kind; not every reserved `SourceBuildingBlockKind` value is implemented by the current analyzer.
 
 The `monica-building-blocks-source/v1` analysis contract reports public instance properties (including inherited members), source nullability, required initialization, setter access, annotations, XML summaries and public/protected behavior signatures. Each available source location is retained. These are declared CLR facts, not inferred persistence mappings. For physical mappings use an explicitly selected EF design model through the persistence skill's [entity model inspection](../../monica-infra-persistence/references/repository-diagnostics.md#inspect-an-explicitly-selected-entity-design-model). Keep business meanings and null semantics near their chosen source or owned design; avoid copying type/schema inventories into every delivery plan.
-- Create a new `ApplicationService` when you need a new externally visible use case.
+- Create a new `ApplicationRequestHandler` when you need a new externally visible use case.
 - Create a `DomainService` only for a meaningful domain rule without a natural entity owner, including a rule reused across entry points or spanning aggregates. A one-entity transition normally stays on the entity and the handler calls it directly.
 - Create or extend an `Entity` when the rule belongs to the state owner itself.
 - Create a `Repository` only when persistence access is needed. Do not hide pure business rules inside repositories.

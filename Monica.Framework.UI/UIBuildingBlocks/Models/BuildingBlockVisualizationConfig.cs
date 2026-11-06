@@ -10,12 +10,12 @@ public static class BuildingBlockVisualizationConfig
     {
         return kind switch
         {
-            BuildingBlockKind.ApplicationService => Color.Primary,
+            BuildingBlockKind.ApplicationRequestHandler => Color.Primary,
             BuildingBlockKind.CrudApplicationService => Color.Primary,
             BuildingBlockKind.DomainService => Color.Success,
             BuildingBlockKind.Repository => Color.Warning,
             BuildingBlockKind.DomainEvent => Color.Secondary,
-            BuildingBlockKind.DomainEventHandler => Color.Tertiary,
+            BuildingBlockKind.DistributedEventHandler => Color.Tertiary,
             BuildingBlockKind.LocalEventHandler => Color.Info,
             BuildingBlockKind.RecurringJob => Color.Info,
             BuildingBlockKind.TriggeredJob => Color.Success,
@@ -35,7 +35,7 @@ public static class BuildingBlockVisualizationConfig
 
     public static bool IsComplexKind(BuildingBlockKind kind)
     {
-        return kind is BuildingBlockKind.ApplicationService
+        return kind is BuildingBlockKind.ApplicationRequestHandler
             or BuildingBlockKind.CrudApplicationService
             or BuildingBlockKind.DomainService
             or BuildingBlockKind.RecurringJob
@@ -49,12 +49,12 @@ public static class BuildingBlockVisualizationConfig
     {
         return kind switch
         {
-            BuildingBlockKind.ApplicationService => "primary",
+            BuildingBlockKind.ApplicationRequestHandler => "primary",
             BuildingBlockKind.CrudApplicationService => "primary",
             BuildingBlockKind.DomainService => "success",
             BuildingBlockKind.Repository => "warning",
             BuildingBlockKind.DomainEvent => "secondary",
-            BuildingBlockKind.DomainEventHandler => "tertiary",
+            BuildingBlockKind.DistributedEventHandler => "tertiary",
             BuildingBlockKind.LocalEventHandler => "info",
             BuildingBlockKind.RecurringJob => "info",
             BuildingBlockKind.TriggeredJob => "success",
@@ -76,12 +76,12 @@ public static class BuildingBlockVisualizationConfig
     {
         return kind switch
         {
-            BuildingBlockKind.ApplicationService => MoIcons.Briefcase,
+            BuildingBlockKind.ApplicationRequestHandler => MoIcons.Briefcase,
             BuildingBlockKind.CrudApplicationService => MoIcons.NotebookEdit,
             BuildingBlockKind.DomainService => MoIcons.Building,
             BuildingBlockKind.Repository => MoIcons.Database,
             BuildingBlockKind.DomainEvent => MoIcons.Calendar,
-            BuildingBlockKind.DomainEventHandler => MoIcons.CalendarCheck,
+            BuildingBlockKind.DistributedEventHandler => MoIcons.CalendarCheck,
             BuildingBlockKind.LocalEventHandler => MoIcons.CalendarDays,
             BuildingBlockKind.RecurringJob => MoIcons.History,
             BuildingBlockKind.TriggeredJob => MoIcons.Clock,

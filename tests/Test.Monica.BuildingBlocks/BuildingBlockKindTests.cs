@@ -12,12 +12,12 @@ public sealed class BuildingBlockKindTests
         var expected = new Dictionary<BuildingBlockKind, int>
         {
             [BuildingBlockKind.None] = 0,
-            [BuildingBlockKind.ApplicationService] = 1,
+            [BuildingBlockKind.ApplicationRequestHandler] = 1,
             [BuildingBlockKind.CrudApplicationService] = 2,
             [BuildingBlockKind.DomainService] = 3,
             [BuildingBlockKind.Repository] = 4,
             [BuildingBlockKind.DomainEvent] = 5,
-            [BuildingBlockKind.DomainEventHandler] = 6,
+            [BuildingBlockKind.DistributedEventHandler] = 6,
             [BuildingBlockKind.LocalEventHandler] = 7,
             [BuildingBlockKind.Seeder] = 8,
             [BuildingBlockKind.RecurringJob] = 9,

@@ -16,7 +16,7 @@ A handler that loads one order and calls `order.Approve()` does not need a Domai
 - Use the inherited `Logger` in service methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
 - Start the class name with `Domain`.
-- Prefer normal return types and exceptions. Let `ApplicationService` translate failures into `Result`.
+- Prefer normal return types and exceptions. Let `ApplicationRequestHandler` translate failures into `Result`.
 - Keep persistence access delegated to repositories.
 - Keep state mutation on entities whenever the entity is the natural owner of the rule.
 

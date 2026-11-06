@@ -15,8 +15,8 @@ public sealed class BuildingBlockFilterPanelTests
     {
         BuildingBlockSummary[] units =
         [
-            CreateUnit("First service", BuildingBlockKind.ApplicationService),
-            CreateUnit("Second service", BuildingBlockKind.ApplicationService),
+            CreateUnit("First service", BuildingBlockKind.ApplicationRequestHandler),
+            CreateUnit("Second service", BuildingBlockKind.ApplicationRequestHandler),
             CreateUnit("Order", BuildingBlockKind.Entity)
         ];
         var selectedTypes = units.Select(static unit => unit.Kind).ToHashSet();
@@ -30,8 +30,8 @@ public sealed class BuildingBlockFilterPanelTests
         var chips = cut.FindComponents<MudChip<BuildingBlockKind>>();
         chips.Should().HaveCount(2);
         chips.Select(static chip => chip.Instance.Value).Should().BeEquivalentTo(
-            [BuildingBlockKind.ApplicationService, BuildingBlockKind.Entity]);
-        chips.Single(chip => chip.Instance.Value == BuildingBlockKind.ApplicationService)
+            [BuildingBlockKind.ApplicationRequestHandler, BuildingBlockKind.Entity]);
+        chips.Single(chip => chip.Instance.Value == BuildingBlockKind.ApplicationRequestHandler)
             .Find(".mud-chip-content")
             .TextContent
             .Should()

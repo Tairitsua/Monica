@@ -97,8 +97,8 @@ public sealed class BuildingBlockCatalogTests
     public void Discovery_WhenHandlersCloseDiscoveredGenericEvents_ShouldLinkEachExactPayloadOnce()
     {
         var catalog = CreateCatalog(
-            typeof(EventChanged<>), typeof(DomainEventHandlerTextChanged),
-            typeof(LocalEventHandlerTextChanged), typeof(DomainEventHandlerNumberChanged));
+            typeof(EventChanged<>), typeof(DistributedEventHandlerTextChanged),
+            typeof(LocalEventHandlerTextChanged), typeof(DistributedEventHandlerNumberChanged));
 
         var textEvent = catalog.FindByFullName<DomainEventBuildingBlock>(typeof(EventChanged<string>).FullName)!;
         var numberEvent = catalog.FindByFullName<DomainEventBuildingBlock>(typeof(EventChanged<int>).FullName)!;
@@ -109,33 +109,33 @@ public sealed class BuildingBlockCatalogTests
         numberEvent.ClrType.Should().Be(typeof(EventChanged<int>));
         catalog.FindByName(typeof(EventChanged<>).Name).Should().BeNull();
 
-        foreach (var handlerType in new[] { typeof(DomainEventHandlerTextChanged), typeof(LocalEventHandlerTextChanged) })
+        foreach (var handlerType in new[] { typeof(DistributedEventHandlerTextChanged), typeof(LocalEventHandlerTextChanged) })
         {
             var handler = catalog.FindByFullName(handlerType.FullName)!;
             handler.Dependencies.Should().Contain(textEvent);
             handler.Alerts.Should().NotContain(alert => alert.Source == "EventTypeAssociation");
         }
 
-        catalog.FindByFullName(typeof(DomainEventHandlerNumberChanged).FullName)!
+        catalog.FindByFullName(typeof(DistributedEventHandlerNumberChanged).FullName)!
             .Dependencies.Should().Contain(numberEvent);
     }
 
     [Fact]
     public void Discovery_WhenGenericEventDefinitionIsOutsideDiscovery_ShouldRetainAssociationWarning()
     {
-        var catalog = CreateCatalog(typeof(DomainEventHandlerTextChanged));
+        var catalog = CreateCatalog(typeof(DistributedEventHandlerTextChanged));
 
         catalog.GetAll<DomainEventBuildingBlock>().Should().BeEmpty();
-        catalog.FindByFullName(typeof(DomainEventHandlerTextChanged).FullName)!
+        catalog.FindByFullName(typeof(DistributedEventHandlerTextChanged).FullName)!
             .Alerts.Should().ContainSingle(alert => alert.Source == "EventTypeAssociation");
     }
 
     [Fact]
-    public void Discovery_WhenCustomServiceUsesNativeRequest_ShouldLinkItsRequestContract()
+    public void Discovery_WhenHandlerUsesNativeRequest_ShouldLinkItsRequestContract()
     {
         var catalog = CreateCatalog(typeof(QueryDownload), typeof(QueryHandlerDownload));
         var request = catalog.FindByFullName<RequestDtoBuildingBlock>(typeof(QueryDownload).FullName);
-        var service = catalog.FindByFullName<ApplicationServiceBuildingBlock>(typeof(QueryHandlerDownload).FullName)!;
+        var service = catalog.FindByFullName<ApplicationRequestHandlerBuildingBlock>(typeof(QueryHandlerDownload).FullName)!;
 
         request.Should().NotBeNull();
         service.Dependencies.Should().Contain(request!);
@@ -143,10 +143,53 @@ public sealed class BuildingBlockCatalogTests
         service.ResponseType.Should().Be(typeof(byte[]));
     }
 
+    [Theory]
+    [InlineData(typeof(QueryHandlerDownload), typeof(QueryDownload), typeof(byte[]))]
+    [InlineData(typeof(QueryHandlerReadText), typeof(QueryReadText), typeof(Result<string>))]
+    [InlineData(typeof(CommandHandlerApply), typeof(CommandApply), typeof(Result))]
+    [InlineData(typeof(QueryHandlerReadEnvelope), typeof(QueryReadEnvelope), typeof(CustomResponse))]
+    public void Discovery_WhenHandlerDeclaresResponse_ShouldRetainExactMediatorContract(
+        Type handlerType, Type requestType, Type responseType)
+    {
+        var catalog = CreateCatalog(handlerType, requestType);
+
+        var handler = catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Should().ContainSingle().Which;
+        handler.Kind.Should().Be(BuildingBlockKind.ApplicationRequestHandler);
+        handler.RequestType.Should().Be(requestType);
+        handler.ResponseType.Should().Be(responseType);
+        handler.ExecutionPoints.Should().Equal(MediatorExecutionPoints.Request.Value);
+        handler.Dependencies.Should().ContainSingle(unit => unit.ClrType == requestType);
+    }
+
+    [Fact]
+    public void Discovery_WhenOnlyApplicationInfrastructureBaseIsPresent_ShouldNotClaimRequestExecution()
+    {
+        var catalog = CreateCatalog(typeof(CommonApplicationInfrastructure), typeof(PriorityCrudApplicationService));
+
+        catalog.FindByFullName(typeof(CommonApplicationInfrastructure).FullName).Should().BeNull();
+        catalog.GetAll<ApplicationRequestHandlerBuildingBlock>().Should().BeEmpty();
+        catalog.GetAll<CrudApplicationServiceBuildingBlock>().Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData(typeof(DistributedEventHandlerSingleChanged), "eventbus.distributed-handler")]
+    [InlineData(typeof(DistributedEventHandlerBatchChanged), "eventbus.distributed-batch-handler")]
+    public void Discovery_WhenDistributedHandlerUsesSharedPrefix_ShouldAcceptSingleAndBatchConsumers(
+        Type handlerType, string executionPoint)
+    {
+        var catalog = CreateNamingCatalog(handlerType, BuildingBlockNamingMode.Strict);
+
+        var handler = catalog.GetAll<DistributedEventHandlerBuildingBlock>().Should().ContainSingle().Which;
+        handler.EventType.Should().Be(typeof(EventChanged<string>));
+        handler.Kind.Should().Be(BuildingBlockKind.DistributedEventHandler);
+        handler.ExecutionPoints.Should().Equal(executionPoint);
+        handler.Alerts.Should().NotContain(alert => alert.Source == "NamingConvention");
+    }
+
     [Fact]
     public void GetDomainEvents_WhenClosedPayloadHasRecursiveProperties_ShouldTerminateItsSampleGraph()
     {
-        var catalog = CreateCatalog(typeof(EventChanged<>), typeof(DomainEventHandlerNodeChanged));
+        var catalog = CreateCatalog(typeof(EventChanged<>), typeof(DistributedEventHandlerNodeChanged));
 
         var descriptor = CreateService(catalog).GetDomainEvents().Should().ContainSingle().Which;
 
@@ -610,6 +653,8 @@ public sealed class BuildingBlockCatalogTests
 
     public sealed class PriorityCrudApplicationService : ApplicationService, ICrudApplicationService;
 
+    public sealed class CommonApplicationInfrastructure : ApplicationService;
+
     [BuildingBlockMetadata("Changed payload")]
     public sealed class EventChanged<T> : DomainEvent
     {
@@ -621,12 +666,12 @@ public sealed class BuildingBlockCatalogTests
         public HierarchyNode? Parent { get; set; }
     }
 
-    public sealed class DomainEventHandlerNodeChanged : IDistributedEventHandler<EventChanged<HierarchyNode>>
+    public sealed class DistributedEventHandlerNodeChanged : IDistributedEventHandler<EventChanged<HierarchyNode>>
     {
         public Task HandleEventAsync(EventChanged<HierarchyNode> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    public sealed class DomainEventHandlerTextChanged : IDistributedEventHandler<EventChanged<string>>
+    public sealed class DistributedEventHandlerTextChanged : IDistributedEventHandler<EventChanged<string>>
     {
         public Task HandleEventAsync(EventChanged<string> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
     }
@@ -636,16 +681,57 @@ public sealed class BuildingBlockCatalogTests
         public Task HandleEventAsync(EventChanged<string> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    public sealed class DomainEventHandlerNumberChanged : IDistributedEventHandler<EventChanged<int>>
+    public sealed class DistributedEventHandlerNumberChanged : IDistributedEventHandler<EventChanged<int>>
     {
         public Task HandleEventAsync(EventChanged<int> eventData, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
+    public sealed class DistributedEventHandlerSingleChanged : DistributedEventHandler<EventChanged<string>>
+    {
+        public override Task HandleEventAsync(EventChanged<string> eventData, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    public sealed class DistributedEventHandlerBatchChanged : DistributedBatchEventHandler<EventChanged<string>>
+    {
+        public override Task HandleBatchAsync(IReadOnlyList<EventChanged<string>> events, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
     public sealed class QueryDownload : IRequest<byte[]>, global::Monica.Core.Mediator.IQueryRequest;
 
-    public sealed class QueryHandlerDownload : CustomApplicationService<QueryDownload, byte[]>
+    public sealed class QueryHandlerDownload : ApplicationRequestHandler<QueryDownload, byte[]>
     {
         public override Task<byte[]> Handle(QueryDownload request, CancellationToken cancellationToken) => Task.FromResult(Array.Empty<byte>());
+    }
+
+    public abstract class ProjectRequestHandler<TRequest, TResponse> : ApplicationRequestHandler<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>;
+
+    public sealed record QueryReadText : IQuery<string>;
+
+    public sealed class QueryHandlerReadText : ProjectRequestHandler<QueryReadText, Result<string>>
+    {
+        public override Task<Result<string>> Handle(QueryReadText request, CancellationToken cancellationToken)
+            => Task.FromResult(Result.Success("text"));
+    }
+
+    public sealed record CommandApply : ICommand;
+
+    public sealed class CommandHandlerApply : ApplicationRequestHandler<CommandApply, Result>
+    {
+        public override Task<Result> Handle(CommandApply request, CancellationToken cancellationToken)
+            => Task.FromResult(Result.Success());
+    }
+
+    public sealed record CustomResponse(string Value);
+
+    public sealed record QueryReadEnvelope : IRequest<CustomResponse>;
+
+    public sealed class QueryHandlerReadEnvelope : ApplicationRequestHandler<QueryReadEnvelope, CustomResponse>
+    {
+        public override Task<CustomResponse> Handle(QueryReadEnvelope request, CancellationToken cancellationToken)
+            => Task.FromResult(new CustomResponse("custom"));
     }
 
     public sealed class PrioritySeederHostedService : ISeeder, IHostedService

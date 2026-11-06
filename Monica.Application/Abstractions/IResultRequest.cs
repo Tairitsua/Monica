@@ -11,16 +11,16 @@ public interface IResultRequestBase
 }
 
 /// <summary>
-/// Request interface that returns a typed result.
+/// Request contract whose full mediator response is <see cref="Result{T}"/>.
 /// </summary>
-/// <typeparam name="TRequest">The response type for the request.</typeparam>
-public interface IResultRequest<TRequest> : IRequest<Result<TRequest>>, IResultRequestBase
+/// <typeparam name="TData">The data payload carried by the result envelope.</typeparam>
+public interface IResultRequest<TData> : IRequest<Result<TData>>, IResultRequestBase
 {
     
 }
 
 /// <summary>
-/// Simple request interface.
+/// Request contract whose full mediator response is <see cref="Result"/> without a data payload.
 /// </summary>
 public interface IResultRequest : IRequest<Result>, IResultRequestBase
 {

@@ -83,7 +83,7 @@ public sealed class GeneratorContractValidationTests
             public sealed record QueryInternalOrders : IQuery<string>;
 
             public sealed class QueryHandlerInternalOrders
-                : ApplicationService<QueryInternalOrders, string>
+                : ApplicationRequestHandler<QueryInternalOrders, Result<string>>
             {
                 public override Task<Result<string>> Handle(
                     QueryInternalOrders request,
@@ -109,7 +109,7 @@ public sealed class GeneratorContractValidationTests
         public sealed record QueryInvalidPrefix : IQuery<string>;
 
         public sealed class QueryHandlerInvalidPrefix
-            : ApplicationService<QueryInvalidPrefix, string>
+            : ApplicationRequestHandler<QueryInvalidPrefix, Result<string>>
         {
             public override Task<Result<string>> Handle(
                 QueryInvalidPrefix request,
@@ -170,7 +170,7 @@ public sealed class GeneratorContractValidationTests
         }
 
         public sealed class QueryHandlerReadOnlyOrder
-            : ApplicationService<QueryReadOnlyOrder, string>
+            : ApplicationRequestHandler<QueryReadOnlyOrder, Result<string>>
         {
             public override Task<Result<string>> Handle(
                 QueryReadOnlyOrder request,

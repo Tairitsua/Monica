@@ -14,12 +14,12 @@ public static class BuildingBlockSourceAnalysisContract
     /// <summary>Building-block kinds the current source classifier can produce.</summary>
     public static IReadOnlySet<SourceBuildingBlockKind> DiscoverableKinds { get; } = new[]
     {
-        SourceBuildingBlockKind.ApplicationService,
+        SourceBuildingBlockKind.ApplicationRequestHandler,
         SourceBuildingBlockKind.CrudApplicationService,
         SourceBuildingBlockKind.DomainService,
         SourceBuildingBlockKind.Repository,
         SourceBuildingBlockKind.DomainEvent,
-        SourceBuildingBlockKind.DomainEventHandler,
+        SourceBuildingBlockKind.DistributedEventHandler,
         SourceBuildingBlockKind.LocalEventHandler,
         SourceBuildingBlockKind.Seeder,
         SourceBuildingBlockKind.RecurringJob,
@@ -45,8 +45,8 @@ public enum SourceBuildingBlockKind
     /// <summary>No kind has been assigned.</summary>
     None = 0,
 
-    /// <summary>Application service.</summary>
-    ApplicationService = 1,
+    /// <summary>Application handler for one mediator request.</summary>
+    ApplicationRequestHandler = 1,
 
     /// <summary>CRUD application service that participates in automatic controller generation.</summary>
     CrudApplicationService = 2,
@@ -60,8 +60,8 @@ public enum SourceBuildingBlockKind
     /// <summary>Domain event.</summary>
     DomainEvent = 5,
 
-    /// <summary>Distributed domain-event handler.</summary>
-    DomainEventHandler = 6,
+    /// <summary>Distributed event handler, including explicit batch consumers.</summary>
+    DistributedEventHandler = 6,
 
     /// <summary>Local event handler.</summary>
     LocalEventHandler = 7,

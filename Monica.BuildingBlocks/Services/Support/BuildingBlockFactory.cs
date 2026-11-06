@@ -36,11 +36,14 @@ internal sealed class BuildingBlockFactory(BuildingBlockCatalog catalog)
         }
 
         // Ordering is semantic: more specific categories must claim a type before their broader alternatives.
-        if (shape.IsSubclassOf(typeof(ApplicationService)))
+        if (shape.IsSubclassOf(typeof(ApplicationService)) && shape.IsAssignableTo(typeof(ICrudApplicationService)))
         {
-            return shape.IsAssignableTo(typeof(ICrudApplicationService))
-                ? CrudApplicationServiceBuildingBlock.Create(shape, catalog)
-                : ApplicationServiceBuildingBlock.Create(shape, catalog);
+            return CrudApplicationServiceBuildingBlock.Create(shape, catalog);
+        }
+
+        if (FindGenericBase(shape, typeof(ApplicationRequestHandler<,>)) is { } requestHandler)
+        {
+            return ApplicationRequestHandlerBuildingBlock.Create(shape, catalog, requestHandler);
         }
 
         if (shape.IsAssignableTo(typeof(ControllerBase))
@@ -57,12 +60,12 @@ internal sealed class BuildingBlockFactory(BuildingBlockCatalog catalog)
 
         if (FindInterface(shape, typeof(IDistributedEventHandler<>)) is { ClosedInterface.FullName: not null } distributedHandler)
         {
-            return DomainEventHandlerBuildingBlock.Create(shape, catalog, distributedHandler.GenericArguments[0]);
+            return DistributedEventHandlerBuildingBlock.Create(shape, catalog, distributedHandler.GenericArguments[0]);
         }
 
         if (FindInterface(shape, typeof(IDistributedBatchEventHandler<>)) is { ClosedInterface.FullName: not null } batchHandler)
         {
-            return DomainEventHandlerBuildingBlock.Create(shape, catalog, batchHandler.GenericArguments[0], isBatch: true);
+            return DistributedEventHandlerBuildingBlock.Create(shape, catalog, batchHandler.GenericArguments[0], isBatch: true);
         }
 
         if (FindInterface(shape, typeof(ILocalEventHandler<>)) is { ClosedInterface.FullName: not null } localHandler)

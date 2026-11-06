@@ -15,7 +15,7 @@ namespace Roles.Ordering.HandlersQuery;
 public sealed class QueryHandlerGetOrders(
     IRepositoryOrder repository,
     IOptions<OptionsOrdering> options)
-    : ApplicationService<QueryGetOrders, IReadOnlyList<OrderDto>>
+    : ApplicationRequestHandler<QueryGetOrders, Result<IReadOnlyList<OrderDto>>>
 {
     /// <summary>
     /// Gets all known orders in reverse creation order.

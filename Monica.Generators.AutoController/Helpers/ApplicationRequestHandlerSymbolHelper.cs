@@ -6,7 +6,7 @@ using Monica.Generators.AutoController.Constants;
 
 namespace Monica.Generators.AutoController.Helpers;
 
-internal static class ApplicationServiceSymbolHelper
+internal static class ApplicationRequestHandlerSymbolHelper
 {
     private static readonly HashSet<string> LegacyEndpointAttributeNames = new(StringComparer.Ordinal)
     {
@@ -33,9 +33,9 @@ internal static class ApplicationServiceSymbolHelper
         for (var current = handler; current is not null; current = current.BaseType)
         {
             var definition = current.OriginalDefinition;
-            if (definition.Name == "CustomApplicationService" &&
+            if (definition.Name == "ApplicationRequestHandler" &&
                 definition.Arity == 2 &&
-                definition.ContainingNamespace.ToDisplayString() == GeneratorConstants.APPLICATION_SERVICE_NAMESPACE &&
+                definition.ContainingNamespace.ToDisplayString() == GeneratorConstants.APPLICATION_ABSTRACTIONS_NAMESPACE &&
                 current.TypeArguments[0] is INamedTypeSymbol requestType)
             {
                 request = requestType;

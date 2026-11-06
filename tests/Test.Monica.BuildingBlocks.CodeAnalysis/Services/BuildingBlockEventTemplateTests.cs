@@ -51,13 +51,13 @@ public sealed class BuildingBlockEventTemplateTests
             configurationDefinitionRegistry: null);
 
         var eventUnit = catalog.GetAll<DomainEventBuildingBlock>().Should().ContainSingle().Which;
-        var distributedUnit = catalog.GetAll<DomainEventHandlerBuildingBlock>().Should().ContainSingle().Which;
+        var distributedUnit = catalog.GetAll<DistributedEventHandlerBuildingBlock>().Should().ContainSingle().Which;
         var localUnit = catalog.GetAll<LocalEventHandlerBuildingBlock>().Should().ContainSingle().Which;
         eventUnit.ClrType.IsSubclassOf(typeof(DomainEvent)).Should().BeTrue();
         eventUnit.ClrType.Name.Should().Be("EventOrderApproved");
         eventUnit.ClrType.Namespace.Should().Be("Platform.Protocol.PublishedLanguages.DomainOrdering.Events");
         EventNameAttribute.GetNameOrDefault(eventUnit.ClrType).Should().Be("ordering.order-approved");
-        distributedUnit.ClrType.BaseType!.GetGenericTypeDefinition().Should().Be(typeof(DomainEventHandler<>));
+        distributedUnit.ClrType.BaseType!.GetGenericTypeDefinition().Should().Be(typeof(DistributedEventHandler<>));
         localUnit.ClrType.BaseType!.GetGenericTypeDefinition().Should().Be(typeof(LocalEventHandler<>));
         distributedUnit.EventType.Should().Be(eventUnit.ClrType);
         localUnit.EventType.Should().Be(eventUnit.ClrType);
@@ -78,7 +78,7 @@ public sealed class BuildingBlockEventTemplateTests
             sourceUnit.Owner.Should().BeNull();
             sourceUnit.RequirementIds.Should().Equal("ORD-REQ-001");
             sourceUnit.Diagnostics.Should().BeEmpty();
-            if (runtimeUnit is DomainEventHandlerBuildingBlock or LocalEventHandlerBuildingBlock)
+            if (runtimeUnit is DistributedEventHandlerBuildingBlock or LocalEventHandlerBuildingBlock)
             {
                 sourceUnit.Dependencies.Should().Contain(dependency =>
                     dependency.Symbol.GetRuntimeName() == eventUnit.Key);
@@ -131,7 +131,7 @@ public sealed class BuildingBlockEventTemplateTests
         var projectAssemblies = new[]
         {
             typeof(DomainEvent).Assembly.Location,
-            typeof(DomainEventHandler<>).Assembly.Location,
+            typeof(DistributedEventHandler<>).Assembly.Location,
             typeof(BuildingBlockMetadataAttribute).Assembly.Location,
             typeof(ICachedServiceProvider).Assembly.Location
         };
