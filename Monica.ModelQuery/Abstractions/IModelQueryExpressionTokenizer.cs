@@ -2,7 +2,7 @@ using Monica.ModelQuery.Models;
 
 namespace Monica.ModelQuery.Abstractions;
 
-public interface IModelQueryExpressionTokenizer<TModel>
+internal interface IModelQueryExpressionTokenizer<TModel>
 {
     /// <summary>
     /// Tokenizes the supplied filter expression.

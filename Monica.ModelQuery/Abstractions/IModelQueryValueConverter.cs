@@ -6,7 +6,7 @@ namespace Monica.ModelQuery.Abstractions;
 /// <summary>
 /// Converts raw filter values to typed ModelQuery values.
 /// </summary>
-public interface IModelQueryValueConverter
+internal interface IModelQueryValueConverter
 {
     /// <summary>
     /// Converts a raw field value.

@@ -43,7 +43,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <summary>
     /// Gets the model query operator for entity operations.
     /// </summary>
-    protected IQueryableModelQuery<TEntity> ModelQuery => CachedServiceProvider.GetRequiredService<IQueryableModelQuery<TEntity>>();
+    protected IModelQuery<TEntity> ModelQuery => CachedServiceProvider.GetRequiredService<IModelQuery<TEntity>>();
 
     /// <summary>
     /// Gets the unit of work manager.
@@ -81,6 +81,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     {
         ApplyHostPagingDefaults(input);
 
+        var selection = (input as IFieldSelectionRequest)?.GetFieldSelection();
+        if (selection is not null) ModelQuery.ResolveFields(selection);
+
         int? totalCount = null;
 
         FeatureSetting? featureSetting = null;
@@ -104,16 +107,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         var dynamicQuery = (IQueryable) query;
 
         // Cast to IQueryable so dynamic projection can be applied.
-        if (input is IHasRequestSelect select && select.HasUsingSelected())
+        if (selection is not null)
         {
-            if (!select.SelectColumns.IsNullOrWhiteSpace())
-            {
-                dynamicQuery = ModelQuery.SelectFields(query, select.SelectColumns);
-            }
-            else if (!select.SelectExceptColumns.IsNullOrWhiteSpace())
-            {
-                dynamicQuery = ModelQuery.SelectFieldsExcept(query, select.SelectExceptColumns);
-            }
+            dynamicQuery = ModelQuery.SelectFields(query, selection);
 
             if (featureSetting?.FeatureFlags?.HasFlag(ERequestFeature.Distinct) is true)
             {
@@ -237,11 +233,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         query = ApplySorting(query, input);
 
         // Handle dynamic selection for streaming
-        if (input is IHasRequestSelect select && select.HasUsingSelected())
+        if (input is IFieldSelectionRequest select && select.GetFieldSelection() is { } selection)
         {
-            var dynamicQuery = !select.SelectColumns.IsNullOrWhiteSpace()
-                ? ModelQuery.SelectFields(query, select.SelectColumns)
-                : ModelQuery.SelectFieldsExcept(query, select.SelectExceptColumns!);
+            var dynamicQuery = ModelQuery.SelectFields(query, selection);
 
             await foreach (var item in (dynamicQuery as IAsyncEnumerable<dynamic>)!.WithCancellation(cancellationToken))
             {
@@ -451,7 +445,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <returns><see langword="true"/> when sorting should be skipped; otherwise, <see langword="false"/>.</returns>
     protected virtual bool ShouldSkipSortingForProjectedShardingQuery(TGetListInput input)
     {
-        return input is IHasRequestSelect select && select.HasUsingSelected() && Repository.IsShardingTable;
+        return input is IFieldSelectionRequest select && select.GetFieldSelection() is not null && Repository.IsShardingTable;
     }
 
     /// <summary>
@@ -625,12 +619,12 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
 
         query = ApplyListInclude(query, input);
 
-        if (input is IHasRequestFilter filterRequest)
+        if (input is IModelFilterRequest filterRequest)
         {
             if (!string.IsNullOrEmpty(filterRequest.Filter))
             {
-                var result = ModelQuery.NormalizeFilter(filterRequest.Filter);
-                if (result.Context.Tokens.Any(p => p.FieldInfo?.ReflectionName == nameof(IHasSoftDelete.IsDeleted)))
+                var result = ModelQuery.ParseFilter(filterRequest.Filter);
+                if (result.ReferencedFields.Any(p => p.ReflectionName == nameof(IHasSoftDelete.IsDeleted)))
                 {
                     query = query.IncludeSoftDeleted(); // Important: this was observed to stop working with sharded tables.
                 }
@@ -638,18 +632,18 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
                 queryable = ModelQuery.ApplyFilter(queryable, result);
 
-                if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
+                if (!string.IsNullOrEmpty(filterRequest.SearchText))
                 {
-                    queryable = ModelQuery.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                    queryable = ModelQuery.ApplySearch(queryable, filterRequest.SearchText, filterRequest.SearchFields);
                 }
 
                 return await ApplyClientSideFilterAsync(input, queryable);
             }
 
-            if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
+            if (!string.IsNullOrEmpty(filterRequest.SearchText))
             {
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
-                queryable = ModelQuery.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                queryable = ModelQuery.ApplySearch(queryable, filterRequest.SearchText, filterRequest.SearchFields);
                 return await ApplyClientSideFilterAsync(input, queryable);
             }
         }

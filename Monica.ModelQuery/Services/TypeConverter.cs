@@ -9,7 +9,7 @@ using Monica.Tool.Text;
 
 namespace Monica.ModelQuery.Services;
 
-public class TypeConverter(IOptions<ModelQueryExpressionOptions> options) : IModelQueryValueConverter
+internal class TypeConverter(IOptions<ModelQueryExpressionOptions> options) : IModelQueryValueConverter
 {
     protected ModelQueryExpressionOptions Options = options.Value;
 

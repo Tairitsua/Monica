@@ -9,7 +9,7 @@ namespace Monica.ModelQuery.Utils;
 /// Used by DynamicLinq to generate lambda expressions.
 /// </summary>
 [DynamicLinqType]
-public static class LinqToObjectFunctions
+internal static class LinqToObjectFunctions
 {
     /// <summary>
     ///     <para>
@@ -164,7 +164,7 @@ public static class LinqToObjectFunctions
 /// Used by DynamicLinq to generate lambda expressions.
 /// </summary>
 [DynamicLinqType]
-public static class LinqToSqlFunctions
+internal static class LinqToSqlFunctions
 {
     public static bool Like(
         string? matchExpression,

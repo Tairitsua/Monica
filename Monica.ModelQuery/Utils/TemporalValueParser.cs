@@ -4,7 +4,7 @@ using Monica.Tool.Extensions;
 
 namespace Monica.ModelQuery.Utils;
 
-public static partial class TemporalValueParser
+internal static partial class TemporalValueParser
 {
 
     #region TimeOnly

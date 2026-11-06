@@ -11,7 +11,7 @@ using Monica.Tool.Diagnostics;
 
 namespace Monica.ModelQuery.Providers;
 
-public partial class ExpressionGeneratorDynamicLinqProvider(IOptions<ModelQueryExpressionOptions> expressionOptions) : IModelQueryExpressionGenerator
+internal partial class ExpressionGeneratorDynamicLinqProvider(IOptions<ModelQueryExpressionOptions> expressionOptions) : IModelQueryExpressionGenerator
 {
     protected ModelQueryExpressionOptions ExpressionOptions = expressionOptions.Value;
     private QueryFieldTypeInfo _fieldTypeInfo = null!;

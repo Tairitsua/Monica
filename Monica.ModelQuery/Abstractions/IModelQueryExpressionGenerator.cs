@@ -2,7 +2,7 @@ using Monica.ModelQuery.Models;
 
 namespace Monica.ModelQuery.Abstractions;
 
-public interface IModelQueryExpressionGenerator
+internal interface IModelQueryExpressionGenerator
 {
     /// <summary>
     /// Generates the expression for a single field condition.

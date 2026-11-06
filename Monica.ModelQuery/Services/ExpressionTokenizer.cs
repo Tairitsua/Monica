@@ -11,7 +11,7 @@ using Monica.Tool.Text;
 
 namespace Monica.ModelQuery.Services;
 
-public partial class ExpressionTokenizer<TModel>(
+internal partial class ExpressionTokenizer<TModel>(
     IModelQuerySnapshot<TModel> snapshot,
     IModelQueryValueConverter converter,
     IModelQueryExpressionGenerator gen,
@@ -126,7 +126,7 @@ public partial class ExpressionTokenizer<TModel>(
             token.Features |= EFieldConditionFeatures.Multi;
         }
 
-        if (token.Conditions == EFieldConditions.Like && !token.FieldInfo!.FuzzySearch.IsNotSupported)
+        if (token.Conditions == EFieldConditions.Like && !token.FieldInfo!.SearchInfo.IsNotSupported)
         {
             token.Features |= EFieldConditionFeatures.Fuzzy;
         }

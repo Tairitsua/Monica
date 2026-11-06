@@ -8,32 +8,32 @@ namespace Monica.ModelQuery.Models;
 /// <summary>
 /// Describes a field's CLR type, supported value classification, and collection or nullable features.
 /// </summary>
-public class QueryFieldTypeInfo
+public sealed class QueryFieldTypeInfo
 {
     /// <summary>
     /// Type that declares this field.
     /// </summary>
-    [JsonIgnore] public Type? DeclaringType { get; set; }
+    [JsonIgnore] public Type? DeclaringType { get; }
     /// <summary>
     /// Original field type.
     /// </summary>
-    [JsonIgnore] public Type OriginType { get; set; } = null!;
+    [JsonIgnore] public Type OriginType { get; }
 
     /// <summary>
     /// Underlying field type after unwrapping nullable and <see cref="IEnumerable"/> wrappers.
     /// </summary>
-    [JsonIgnore] public Type OriginUnderlyingType { get; set; } = null!;
+    [JsonIgnore] public Type OriginUnderlyingType { get; }
 
     /// <summary>
     /// Detected type features.
     /// </summary>
-    public ETypeFeatures TypeFeatures { get; set; }
+    public ETypeFeatures TypeFeatures { get; }
 
     /// <summary>
     /// Basic type classification.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public EBasicType BasicType { get; set; }
+    public EBasicType BasicType { get; }
 
     /// <summary>
     /// Name of the underlying field type.
@@ -47,15 +47,6 @@ public class QueryFieldTypeInfo
     public QueryFieldTypeInfo(Type parameterType, Type? declaringType)
     {
         DeclaringType = declaringType;
-        AutoSetTypeInfo(parameterType);
-    }
-
-    /// <summary>
-    /// Populates the type metadata from the supplied field type.
-    /// </summary>
-    /// <param name="parameterType">The field type to analyze.</param>
-    private void AutoSetTypeInfo(Type parameterType)
-    {
         OriginType = parameterType;
         BasicType = GetTypeClass(parameterType, out var underlyingType, out var features);
         TypeFeatures = features;
@@ -69,7 +60,7 @@ public class QueryFieldTypeInfo
     /// <param name="underlyingType">The extracted underlying type.</param>
     /// <param name="features">The detected type features.</param>
     /// <returns>The basic type classification.</returns>
-    public static EBasicType GetTypeClass(Type? parameterType, out Type underlyingType, out ETypeFeatures features)
+    internal static EBasicType GetTypeClass(Type? parameterType, out Type underlyingType, out ETypeFeatures features)
     {
         var origin = parameterType;
         if (origin == null) throw new Exception("传入的parameterType为null，无法判断SpecialKind");

@@ -19,7 +19,7 @@ public static class ModuleModelQueryBuilderExtensions
     extension(IMonicaBuilder builder)
     {
         /// <summary>
-        /// Registers model query metadata, filtering, fuzzy search, and field projection services.
+        /// Registers model query metadata, filtering, searching, and field projection services.
         /// The optional status endpoint follows the common minimal-API module settings.
         /// </summary>
         public ModuleRegistration<ModuleModelQuery, ModuleModelQueryOption> AddModelQuery(
@@ -42,9 +42,7 @@ public class ModuleModelQuery : MonicaModule<ModuleModelQueryOption>, IWebModule
         services.AddSingleton<IModelQuerySnapshotFactory>(provider =>
             provider.GetRequiredService<SnapshotFactoryMemoryProvider>());
         services.AddSingleton(typeof(IModelQuerySnapshot<>), typeof(SnapshotMemoryProvider<>));
-        services.AddTransient(typeof(IModelQueryExpressionNormalizer<>), typeof(ExpressionNormalizerDynamicLinqProvider<>));
-        services.AddTransient(typeof(IQueryableModelQuery<>), typeof(QueryableModelQueryDynamicLinqProvider<>));
-        services.AddTransient(typeof(IEnumerableModelQuery<>), typeof(EnumerableModelQueryDynamicLinqProvider<>));
+        services.AddTransient(typeof(IModelQuery<>), typeof(ModelQueryProvider<>));
         services.AddTransient(typeof(IModelQueryExpressionTokenizer<>),
             typeof(ModelQuery.Services.ExpressionTokenizer<>));
         services.AddTransient<IModelQueryExpressionGenerator, ExpressionGeneratorDynamicLinqProvider>();

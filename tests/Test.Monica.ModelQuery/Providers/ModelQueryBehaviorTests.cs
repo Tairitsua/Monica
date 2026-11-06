@@ -40,24 +40,22 @@ public sealed class ModelQueryBehaviorTests(ModelQueryTestApplicationFactory fac
     public async Task Query_WhenFieldHasExplicitNames_ShouldFilterSelectAndSearchByNameAndSelector()
     {
         await using var host = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        var memory = host.Services.GetRequiredService<IEnumerableModelQuery<NamedModel>>();
-        var queryable = host.Services.GetRequiredService<IQueryableModelQuery<NamedModel>>();
+        var query = host.Services.GetRequiredService<IModelQuery<NamedModel>>();
         NamedModel[] source = [new() { Code = "AX100", Region = "north" }, new() { Code = "BY200", Region = "south" }];
 
-        Assert.Equal("AX100", Assert.Single(memory.ApplyFilter(source, "number = \"AX100\"")).Code);
-        Assert.Equal("AX100", Assert.Single(memory.ApplyFilter(source, x => x.Code, EFieldConditions.Equal, "AX100")).Code);
-        Assert.Equal("AX100", Assert.Single(queryable.ApplyFilter(source.AsQueryable(), x => x.Code, EFieldConditions.Equal, "AX100")).Code);
-        Assert.Equal("AX100", Assert.Single(memory.ApplyFuzzy(source, "AX1", "orderNumber")).Code);
-        Assert.Equal("AX100", Assert.Single(memory.ApplyFuzzy(source, "AX1")).Code);
-        Assert.Equal(nameof(NamedModel.Code), Assert.Single(memory.GetFields("number")).ReflectionName);
-        Assert.Equal(nameof(NamedModel.Region), Assert.Single(memory.GetFieldsExcept("number", "orderNumber")).ReflectionName);
-        Assert.Equal(nameof(NamedModel.Region), Assert.Single(memory.NormalizeLiteralSelect("number", true)).ReflectionName);
+        Assert.Equal("AX100", Assert.Single(query.ApplyFilter(source, "number = \"AX100\"")).Code);
+        Assert.Equal("AX100", Assert.Single(query.ApplyFilter(source, x => x.Code, EFieldConditions.Equal, "AX100")).Code);
+        Assert.Equal("AX100", Assert.Single(query.ApplyFilter(source.AsQueryable(), x => x.Code, EFieldConditions.Equal, "AX100")).Code);
+        Assert.Equal("AX100", Assert.Single(query.ApplySearch(source, "AX1", ["orderNumber"])).Code);
+        Assert.Equal("AX100", Assert.Single(query.ApplySearch(source, "AX1")).Code);
+        Assert.Equal(nameof(NamedModel.Code), Assert.Single(query.ResolveFields(FieldSelection.Include("number"))).ReflectionName);
+        Assert.Equal(nameof(NamedModel.Region), Assert.Single(query.ResolveFields(FieldSelection.Exclude("number", "orderNumber"))).ReflectionName);
 
-        var (remaining, failed) = memory.NormalizeLiteralSelectWithoutException("number,missing", true);
-        Assert.Equal(nameof(NamedModel.Region), Assert.Single(remaining).ReflectionName);
-        Assert.Equal("missing", Assert.Single(failed));
-        Assert.Throws<ModelQueryNormalizationException>(() => memory.GetFieldsExcept("missing"));
-        var projected = Assert.Single(queryable.SelectFieldsExcept(source.AsQueryable(), "number").Cast<object>().Take(1));
+        var matches = query.MatchFields(["number", "missing"]);
+        Assert.Equal(nameof(NamedModel.Code), Assert.Single(matches.MatchedFields).ReflectionName);
+        Assert.Equal("missing", Assert.Single(matches.UnmatchedNames));
+        Assert.Throws<ModelQueryNormalizationException>(() => query.ResolveFields(FieldSelection.Exclude("missing")));
+        var projected = Assert.Single(query.SelectFields(source.AsQueryable(), FieldSelection.Exclude("number")).Cast<object>().Take(1));
         Assert.Null(projected.GetType().GetProperty(nameof(NamedModel.Code)));
         Assert.NotNull(projected.GetType().GetProperty(nameof(NamedModel.Region)));
     }
@@ -70,25 +68,28 @@ public sealed class ModelQueryBehaviorTests(ModelQueryTestApplicationFactory fac
         Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<DuplicateNamesModel>());
         Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<BlankNameModel>());
         Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<WhitespaceNameModel>());
-        Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<SeparatorNameModel>());
         Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<ParenthesisNameModel>());
     }
 
     [Fact]
-    public async Task Snapshot_WhenCustomSelectionSeparatorOccursInName_ShouldFailClearly()
+    public async Task FieldNames_WhenContainingFormerSelectionSeparators_ShouldWorkAsIndividualNames()
     {
-        await using var host = await new SeparatorFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        var snapshots = host.Services.GetRequiredService<IModelQuerySnapshotFactory>();
-        Assert.Throws<ModelQuerySnapshotException>(() => snapshots.PreloadSnapshot<CustomSeparatorNameModel>());
+        await using var host = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var commaQuery = host.Services.GetRequiredService<IModelQuery<SeparatorNameModel>>();
+        var pipeQuery = host.Services.GetRequiredService<IModelQuery<CustomSeparatorNameModel>>();
+        Assert.Single(commaQuery.ResolveFields(FieldSelection.Include("order,number")));
+        Assert.Single(pipeQuery.ResolveFields(FieldSelection.Include("order|number")));
+        Assert.Single(commaQuery.ApplyFilter(new[] { new SeparatorNameModel { Value = "A" } }, "order,number = \"A\""));
+        Assert.Single(pipeQuery.ApplyFilter(new[] { new CustomSeparatorNameModel { Value = "A" } }, "order|number = \"A\""));
     }
 
     [Fact]
-    public async Task SelectFieldsExcept_WhenCollectionNavigationIsExcluded_ShouldProjectRemainingFields()
+    public async Task SelectFields_WhenCollectionNavigationIsExcluded_ShouldProjectRemainingFields()
     {
         await using var host = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        var query = host.Services.GetRequiredService<IQueryableModelQuery<CollectionModel>>();
+        var query = host.Services.GetRequiredService<IModelQuery<CollectionModel>>();
         CollectionModel[] source = [new() { Name = "one" }];
-        var selected = Assert.Single(query.SelectFieldsExcept(source.AsQueryable(), "Children.Label").Cast<object>());
+        var selected = Assert.Single(query.SelectFields(source.AsQueryable(), FieldSelection.Exclude("Children.Label")).Cast<object>());
         Assert.Equal("one", selected.GetType().GetProperty(nameof(CollectionModel.Name))?.GetValue(selected));
     }
 
@@ -295,14 +296,4 @@ public sealed class ModelQueryBehaviorTests(ModelQueryTestApplicationFactory fac
             });
     }
 
-    private sealed class SeparatorFactory : MonicaTestApplicationFactory<ModuleModelQuery>
-    {
-        protected override void ConfigureMonica(IMonicaBuilder builder) => builder.AddModelQuery();
-
-        protected override void ConfigureServices(IServiceCollection services)
-        {
-            base.ConfigureServices(services);
-            services.Configure<ModelQueryExpressionOptions>(options => options.SelectSeparator = "|");
-        }
-    }
 }

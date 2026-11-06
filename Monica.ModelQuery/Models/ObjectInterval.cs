@@ -1,6 +1,6 @@
 namespace Monica.ModelQuery.Models;
 
-public class ObjectInterval(dynamic? leftValue, dynamic? rightValue, bool? isLeftOpen, bool? isRightOpen)
+internal class ObjectInterval(dynamic? leftValue, dynamic? rightValue, bool? isLeftOpen, bool? isRightOpen)
 {
     public dynamic? LeftValue { get; } = leftValue;
     public dynamic? RightValue { get; } = rightValue;

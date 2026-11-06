@@ -12,8 +12,7 @@ public class QueryFieldAttribute : Attribute
     /// <summary>
     /// The complete set of names accepted for the field, compared without regard to case. A nonempty set
     /// replaces the fallback property or navigation-path name; an empty or omitted set uses that fallback.
-    /// Names must be nonblank and unique across the model, and cannot contain whitespace, parentheses,
-    /// or the configured selection separator.
+    /// Names must be nonblank and unique across the model, and cannot contain whitespace or parentheses.
     /// </summary>
     public string[]? QueryNames { get; set; }
 
@@ -23,10 +22,10 @@ public class QueryFieldAttribute : Attribute
     public string? Title { get; set; }
 
     /// <summary>
-    /// Excludes this field from fuzzy searches that do not explicitly name their fields.
-    /// Explicit fuzzy field lists may still select it if its type supports fuzzy searching.
+    /// Excludes this field from searches that do not explicitly name their fields.
+    /// Explicit field lists may still select it if its type supports searching.
     /// </summary>
-    public bool ExcludeFromDefaultFuzzySearch { get; set; }
+    public bool ExcludeFromDefaultSearch { get; set; }
 
     /// <summary>
     /// Excludes the property from query metadata, even when it has this annotation.

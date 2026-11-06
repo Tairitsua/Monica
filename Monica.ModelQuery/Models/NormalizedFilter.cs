@@ -9,7 +9,7 @@ namespace Monica.ModelQuery.Models;
 /// <param name="finalExpression">The generated Dynamic LINQ expression.</param>
 /// <param name="params">The parameter values referenced by the expression.</param>
 /// <param name="context">The original expression and resolved tokens.</param>
-public class NormalizedFilter(string finalExpression, List<object?> @params, TokenizerContext context)
+internal class NormalizedFilter(string finalExpression, List<object?> @params, TokenizerContext context)
 {
     /// <summary>Gets or sets the generated Dynamic LINQ expression.</summary>
     public string FinalExpression { get; set; } = finalExpression;

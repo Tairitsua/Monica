@@ -8,12 +8,24 @@ namespace Monica.ModelQuery.Models;
 /// <summary>
 /// ModelQuery field metadata.
 /// </summary>
-public class QueryField
+public sealed class QueryField
 {
+    internal QueryField(string title, string reflectionName, QueryFieldTypeInfo typeInfo,
+        QueryFieldSearchInfo searchInfo, bool omitNavigationPrefix,
+        IEnumerable<(string PropertyName, bool IsCollection)>? navigationProperties, IEnumerable<string> queryNames)
+    {
+        Title = title;
+        ReflectionName = reflectionName;
+        TypeInfo = typeInfo;
+        SearchInfo = searchInfo;
+        OmitNavigationPrefix = omitNavigationPrefix;
+        NavigationProperties = navigationProperties is null ? null : Array.AsReadOnly(navigationProperties.ToArray());
+        QueryNames = Array.AsReadOnly(queryNames.ToArray());
+    }
     /// <summary>
     /// Names that can be used to reference this field in query expressions.
     /// </summary>
-    public HashSet<string> QueryNames { get; set; } = [];
+    public IReadOnlyList<string> QueryNames { get; }
 
     #region Navigation
 
@@ -22,16 +34,16 @@ public class QueryField
     /// together with a flag indicating whether each segment is an <c>ICollection</c>.
     /// </summary>
     [JsonIgnore]
-    public List<(string RefelectName, bool IsCollection)>? NavigationProperties { get; set; }
+    public IReadOnlyList<(string PropertyName, bool IsCollection)>? NavigationProperties { get; }
 
     [JsonInclude]
     private string? NavigationPropertiesFormat =>
-        NavigationProperties?.Select(p => p.IsCollection ? $"List<{p.RefelectName}>" : p.RefelectName).StringJoin('.');
+        NavigationProperties?.Select(p => p.IsCollection ? $"List<{p.PropertyName}>" : p.PropertyName).StringJoin('.');
 
 
     #region DynamicLinq Mode 1
 
-    public string GetConditionExpressionParam()
+    internal string GetConditionExpressionParam()
     {
         if (NavigationProperties is null) return ReflectionName;
         var sb = new StringBuilder().Append(ReflectionName);
@@ -45,7 +57,7 @@ public class QueryField
         return sb.ToString();
     }
 
-    public string BlendNavigationParam(string conditionExpression)
+    internal string BlendNavigationParam(string conditionExpression)
     {
         if (NavigationProperties is null) return conditionExpression;
         return CreateNavigationExpression();
@@ -53,7 +65,7 @@ public class QueryField
         string CreateNavigationExpression(string? prefix = null, int navigationIndex = 0)
         {
             var navigationInfo = NavigationProperties.ElementAtOrDefault(navigationIndex++);
-            var navigationName = navigationInfo.RefelectName;
+            var navigationName = navigationInfo.PropertyName;
             var isCollection = navigationInfo.IsCollection;
             if (navigationInfo == default) // Reached the actual field; no navigation segment remains.
             {
@@ -88,32 +100,32 @@ public class QueryField
     /// <summary>
     /// Display name of the field. Defaults to the reflected property name.
     /// </summary>
-    public required string Title { get; set; }
+    public string Title { get; }
     /// <summary>
     /// Reflected property name.
     /// </summary>
-    public required string ReflectionName { get; set; }
+    public string ReflectionName { get; }
 
     /// <summary>
-    /// Fuzzy-match configuration.
+    /// Search configuration.
     /// </summary>
-    public required QueryFieldFuzzySearchInfo FuzzySearch { get; set; }
+    public QueryFieldSearchInfo SearchInfo { get; }
 
     /// <summary>
     /// Field type metadata.
     /// </summary>
-    public required QueryFieldTypeInfo TypeInfo { get; set; }
+    public QueryFieldTypeInfo TypeInfo { get; }
     /// <summary>
     /// <inheritdoc cref="ModuleModelQueryOption.OmitNavigationPrefix"/>
     /// </summary>
-    public bool OmitNavigationPrefix { get; set; }
+    public bool OmitNavigationPrefix { get; }
 
     /// <summary>
     /// Gets the fallback query name derived from the reflected property and navigation path.
     /// Explicit query names replace this fallback and may leave it unavailable for lookup.
     /// </summary>
     public string DefaultQueryName =>
-        OmitNavigationPrefix ? ReflectionName : $"{NavigationProperties?.Select(s => s.RefelectName).StringJoin(".").BeIfNotEmpty("{0}.", true)}{ReflectionName}";
+        OmitNavigationPrefix ? ReflectionName : $"{NavigationProperties?.Select(s => s.PropertyName).StringJoin(".").BeIfNotEmpty("{0}.", true)}{ReflectionName}";
     public override string ToString()
     {
         return $"{NavigationPropertiesFormat?.BeIfNotEmpty("{0}.", true)}{ReflectionName}({string.Join(',', QueryNames)})[{TypeInfo}]";

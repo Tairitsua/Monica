@@ -3,7 +3,7 @@ using Monica.Tool.Extensions;
 
 namespace Monica.ModelQuery.Models;
 
-public class FieldToken(string fieldStr, string conditionStr, string valueStr, int start, int end)
+internal class FieldToken(string fieldStr, string conditionStr, string valueStr, int start, int end)
 {
     /// <summary>
     /// Field query name in the original expression.
@@ -71,7 +71,7 @@ public class FieldToken(string fieldStr, string conditionStr, string valueStr, i
     }
 }
 
-public class TokenizerContext(string originExpression)
+internal class TokenizerContext(string originExpression)
 {
     public string OriginExpression { get; set; } = originExpression;
 
@@ -99,7 +99,7 @@ public class TokenizerContext(string originExpression)
 /// Field condition features.
 /// </summary>
 [Flags]
-public enum EFieldConditionFeatures
+internal enum EFieldConditionFeatures
 {
     None,
     /// <summary>

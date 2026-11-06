@@ -25,10 +25,9 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
 
     public SnapshotMemoryProvider(
         IOptions<ModuleModelQueryOption> options,
-        IOptions<ModelQueryExpressionOptions> expressionOptions,
         SnapshotFactoryMemoryProvider snapshotFactory)
     {
-        (_snapshot, _fieldDictionary, _allQueryNames) = BuildSnapshot(options.Value, expressionOptions.Value);
+        (_snapshot, _fieldDictionary, _allQueryNames) = BuildSnapshot(options.Value);
         snapshotFactory.Register<TModel>(_snapshot);
     }
 
@@ -39,24 +38,16 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
     }
 
     private static (ModelQuerySnapshot Snapshot, FrozenDictionary<string, QueryField> Fields, IReadOnlyList<string> QueryNames)
-        BuildSnapshot(ModuleModelQueryOption options, ModelQueryExpressionOptions expressionOptions)
+        BuildSnapshot(ModuleModelQueryOption options)
     {
         Dictionary<string, QueryField> fieldDictionary = new(StringComparer.OrdinalIgnoreCase);
-        var model = new QueryModel()
-        {
-            FullTypeName = typeof(TModel).FullName ?? throw new InvalidOperationException(),
-            Name = typeof(TModel).Name
-        };
-        var snapshot = new ModelQuerySnapshot
-        {
-            Model = model,
-            Fields = []
-        };
-        var requireFieldAnnotation = options.RequireFieldAnnotation;
         var modelAttribute = typeof(TModel).GetCustomAttribute<QueryModelAttribute>();
+        var model = new QueryModel(typeof(TModel).FullName ?? throw new InvalidOperationException(),
+            modelAttribute?.Name ?? typeof(TModel).Name);
+        var fields = new List<QueryField>();
+        var requireFieldAnnotation = options.RequireFieldAnnotation;
         if (modelAttribute != null)
         {
-            snapshot.Model.Name = modelAttribute.Name ?? snapshot.Model.Name;
             requireFieldAnnotation = modelAttribute.RequireFieldAnnotationOverride ?? requireFieldAnnotation;
         }
 
@@ -64,7 +55,8 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
         List<string> allOriginQueryNames = [];
 
         ExtractFieldInfo(GetQueryFieldTypes(typeof(TModel)));
-        return (snapshot, fieldDictionary.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase), allOriginQueryNames.ToArray());
+        return (new ModelQuerySnapshot(model, fields), fieldDictionary.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase),
+            Array.AsReadOnly(allOriginQueryNames.ToArray()));
 
         void ExtractFieldInfo(IEnumerable<PropertyInfo> propertyInfos, PropertyInfo? fromNavigateProperty = null, List<(string, bool)>? previousNavigateTuples = null)
         {
@@ -104,30 +96,21 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
                 var queryNames = new List<string>();
                 try
                 {
-                    var field = new QueryField
-                    {
-                        OmitNavigationPrefix = fieldAttribute?.OmitNavigationPrefixOverride ?? modelAttribute?.OmitNavigationPrefixOverride ?? options.OmitNavigationPrefix,
-                        ReflectionName = p.Name,
-                        Title = fieldAttribute?.Title ?? p.Name,
-                        TypeInfo = new QueryFieldTypeInfo(p.PropertyType, p.DeclaringType),
-                        FuzzySearch = new QueryFieldFuzzySearchInfo(),
-                        NavigationProperties = previousNavigateTuples
-                    };
+                    var omitNavigationPrefix = fieldAttribute?.OmitNavigationPrefixOverride ?? modelAttribute?.OmitNavigationPrefixOverride ?? options.OmitNavigationPrefix;
+                    var typeInfo = new QueryFieldTypeInfo(p.PropertyType, p.DeclaringType);
                     if (fromNavigateProperty != null)
                     {
                         // Keep the navigation path for nested identifiers, even when prefixes are omitted.
                         if (p.Name.Equals("id", StringComparison.OrdinalIgnoreCase))
                         {
-                            field.OmitNavigationPrefix = false;
+                            omitNavigationPrefix = false;
                         }
                         else if (options.AutoQualifyConflictingNames && fieldDictionary.ContainsKey(p.Name))
                         {
-                            field.OmitNavigationPrefix = false;
+                            omitNavigationPrefix = false;
                         }
                     }
 
-
-                    CheckFuzzySearch(field);
 
                     if (fieldAttribute != null)
                     {
@@ -136,10 +119,14 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
                             queryNames.AddRange(fieldAttribute.QueryNames);
                         }
 
-                        field.FuzzySearch.IsIgnored = fieldAttribute.ExcludeFromDefaultFuzzySearch;
                     }
 
-
+                    var searchInfo = new QueryFieldSearchInfo(
+                        typeInfo.TypeFeatures.HasAnyFlag(ETypeFeatures.IsCollection, ETypeFeatures.IsClass) ||
+                        typeInfo.BasicType is EBasicType.IsChar or EBasicType.IsFloat or EBasicType.IsClass,
+                        fieldAttribute?.ExcludeFromDefaultSearch ?? false);
+                    var field = new QueryField(fieldAttribute?.Title ?? p.Name, p.Name, typeInfo, searchInfo,
+                        omitNavigationPrefix, previousNavigateTuples, queryNames);
                     if (queryNames.Count == 0)
                     {
                         var propertyName = field.DefaultQueryName;
@@ -154,18 +141,17 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
                     }
 
                     var invalidName = queryNames.FirstOrDefault(name =>
-                        name.Any(char.IsWhiteSpace) || name.Contains('(') || name.Contains(')') ||
-                        (!string.IsNullOrEmpty(expressionOptions.SelectSeparator) &&
-                         name.Contains(expressionOptions.SelectSeparator, StringComparison.Ordinal)));
+                        name.Any(char.IsWhiteSpace) || name.Contains('(') || name.Contains(')'));
                     if (invalidName != null)
                     {
                         throw new ModelQuerySnapshotException(
-                            displayMessage: "ModelQuery field query names cannot contain whitespace, parentheses, or the selection separator.",
+                            displayMessage: "ModelQuery field query names cannot contain whitespace or parentheses.",
                             technicalDetail: $"Type: {model.FullTypeName}; field: {field.ReflectionName}; query name: {invalidName}.");
                     }
 
-                    field.QueryNames = new HashSet<string>(queryNames, StringComparer.OrdinalIgnoreCase);
-                    snapshot.Fields.Add(field);
+                    field = new QueryField(field.Title, field.ReflectionName, typeInfo, searchInfo,
+                        omitNavigationPrefix, previousNavigateTuples, queryNames);
+                    fields.Add(field);
                     foreach (var name in queryNames)
                     {
                         if (!fieldDictionary.TryAdd(name, field))
@@ -193,18 +179,6 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
         }
     }
 
-    /// <summary>
-    /// Validates fuzzy-match support for a field.
-    /// </summary>
-    /// <param name="field">The field metadata to update.</param>
-    private static void CheckFuzzySearch(QueryField field)
-    {
-        if (field.TypeInfo.TypeFeatures.HasAnyFlag(ETypeFeatures.IsCollection, ETypeFeatures.IsClass))
-        {
-            field.FuzzySearch.IsNotSupported = true;
-        }
-    }
-
     public IReadOnlyList<string> GetAllQueryNames()
     {
         return _allQueryNames;
@@ -226,6 +200,6 @@ internal sealed class SnapshotMemoryProvider<TModel> : IModelQuerySnapshot<TMode
                 list.Add(field);
             }
         }
-        return list;
+        return list.AsReadOnly();
     }
 }

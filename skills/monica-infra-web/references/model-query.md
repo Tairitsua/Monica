@@ -1,6 +1,6 @@
 # Query model fields and data
 
-`Monica.ModelQuery` describes the queryable fields of an existing CLR model and uses those descriptions for filters, fuzzy matching and dynamic field selection. It does not generate application models or map objects. Register it independently with `AddModelQuery()` or use the Web API bundle, which includes it through AutoControllers.
+`Monica.ModelQuery` describes the queryable fields of an existing CLR model and uses those descriptions for filters, wildcard searches and dynamic field selection. Register it independently with `AddModelQuery()` or use the Web API bundle, which includes it through AutoControllers.
 
 ## Register and declare fields
 
@@ -33,50 +33,94 @@ public sealed class Order
 
 `[QueryField(Exclude = true)]` always excludes a property. Otherwise an explicit `[QueryField]` opts the property in even when it also has `[JsonIgnore]` or `[NotMapped]`. Without that annotation, those properties are excluded unless the corresponding module inclusion option is enabled. Dictionaries remain unsupported. This metadata policy is not an authorization boundary.
 
-## Choose the source shape
+## Compose queries
 
-Inject the service matching the caller's existing data source:
+Inject `IModelQuery<T>` for either source shape. `T` must be a reference type; the public generic constraint matches the registered provider's model contract:
 
 | Service | Operations |
 | --- | --- |
-| `IQueryableModelQuery<T>` | Composes `IQueryable<T>` filters and untyped `IQueryable` field projections; the source provider executes them when enumerated. |
-| `IEnumerableModelQuery<T>` | Filters or projects an in-memory `IEnumerable<T>`; `CompileFilter` returns a reusable `Func<T, bool>`. |
-| `IModelQuery<T>` | Common field resolution and filter normalization implemented by both services; choose a concrete source-shape interface for DI. |
+| `IModelQuery<T>` | Overloads compose `IQueryable<T>` or `IEnumerable<T>` filters, searches and field projections. `CompileFilter` returns a reusable in-memory predicate. |
 | `IModelQuerySnapshot<T>` | Looks up the host's cached field metadata and accepted query names. |
 | `IModelQuerySnapshotFactory` | Preloads a model with `PreloadSnapshot<T>()` or lists snapshots already activated in this host. |
 
-For an injected `IQueryableModelQuery<Order> query` and an existing `IQueryable<Order> orders`:
+For an injected `IModelQuery<Order> query` and an existing `IQueryable<Order> orders`:
 
 ```csharp
+using Monica.ModelQuery.Models;
+
 var filtered = query.ApplyFilter(orders, "total >= \"100\"");
-var matchingNumber = query.ApplyFuzzy(filtered, "SO-", "number");
-var selected = query.SelectFields(matchingNumber, "number,total");
-var withoutNumber = query.SelectFieldsExcept(filtered, "number");
+var matchingNumber = query.ApplySearch(filtered, "SO-%", ["number"]);
+var selected = query.SelectFields(matchingNumber, FieldSelection.Include("number", "total"));
+var withoutNumber = query.SelectFields(filtered, FieldSelection.Exclude("number"));
 ```
 
-ModelQuery composes the query; the caller owns enumeration, asynchronous database execution and cancellation. Query-provider translation still limits what a database can execute. The enumerable service deliberately uses in-memory expression semantics. Snapshots are cached per model per host, created lazily unless preloaded; query operators and normalizers are transient. Register options before host composition and do not mutate cached metadata returned by a snapshot.
+Composition remains deferred; the caller owns enumeration, asynchronous database execution and cancellation. The `IQueryable<T>` overload keeps the original provider and never falls back to client evaluation. Provider translation still limits which expressions can execute. The `IEnumerable<T>` overload deliberately uses in-memory semantics. Choose the source's static type intentionally: calling an enumerable overload on a database query asks for client-side filtering during enumeration. Snapshots are immutable, cached per model per host and created lazily unless preloaded; the query service is transient. Register options before host composition.
 
-`NormalizeFilter` returns a `NormalizedFilter`, which either service can accept in its `ApplyFilter` overload when the normalization semantics match the source. Invalid names, values or expressions raise the relevant `ModelQueryException` subtype. Internal query operations do not return `Result` envelopes; the application boundary owns any error projection.
+`ParseFilter` returns an immutable `ParsedFilter<T>` with `ReferencedFields`. It does not expose generated expressions, parameter lists or tokenizer state. Reuse it with `ApplyFilter` or `CompileFilter` within its creating host, including through another query-service instance; another host rejects it because its field configuration can differ. The service generates expressions for the selected source kind. Internal query operations return ordinary .NET values and throw exceptions; the application boundary owns error projection.
+
+```csharp
+var filter = query.ParseFilter("total >= \"100\"");
+var databaseQuery = query.ApplyFilter(orders, filter);
+var predicate = query.CompileFilter(filter);
+```
 
 ## Query names and navigation
 
-`QueryNames` is the complete set of explicit expression names, not an additive alias list. A nonempty array replaces the default reflected property name or navigation path. An omitted or empty array uses that default. Names resolve with ordinal case-insensitive comparison. Conflicts and names that cannot be used by the filter or selection grammar fail snapshot construction, including blank names, whitespace, parentheses and the configured selection separator. `GetAllQueryNames()` lists accepted names; `GetField(name)` returns null for an unknown name. A bare `GetFields(names)` snapshot lookup omits unknown names, while query-operator selection validates names and reports errors. Property-selector filter overloads resolve the selected CLR property path to its accepted query name, including when custom names replace the fallback.
+`QueryNames` is the complete set of explicit expression names, not an additive alias list. A nonempty array replaces the default reflected property name or navigation path. An omitted or empty array uses that default. Names resolve with ordinal case-insensitive comparison. Conflicts and names that cannot be used by the filter grammar fail snapshot construction, including blank names, whitespace and parentheses. `GetAllQueryNames()` lists accepted names; `GetField(name)` returns null for an unknown name. Property-selector filter overloads resolve the selected CLR property path to its accepted query name, including when custom names replace the fallback.
 
 By default a nested property is qualified, such as `Customer.Name`. `OmitNavigationPrefix` can shorten it to `Name`; precedence is field attribute, model attribute, then module. Omitting an attribute option inherits its parent value, while explicit `true` or `false` overrides it. Nested `Id` properties remain qualified. `AutoQualifyConflictingNames` can restore a navigation prefix when a short default name conflicts with a name already discovered; it does not silently rename explicit `QueryNames`. Any unresolved collision still fails.
 
-The model's display name defaults to its CLR short name when `[QueryModel]` omits `Name`. `ModelQuerySnapshot.Model` carries `QueryModel` metadata; its `Fields` are `QueryField` metadata with accepted `QueryNames`, `TypeInfo` and `FuzzySearch` information. Model names and field titles describe metadata; they do not rename CLR properties or dynamic projection output members.
+The model's display name defaults to its CLR short name when `[QueryModel]` omits `Name`. `ModelQuerySnapshot.Model` carries model metadata; its `Fields` contain immutable field descriptions, accepted `QueryNames`, type information and search capabilities. Nested metadata and collections are read-only. Model names and field titles describe metadata; they do not rename CLR properties or dynamic projection output members.
 
-## Expressions, fuzzy matching and selection
+## Filters and wildcard search
 
-Use the existing field-condition grammar: `field operator "value"`, combined with `and`, `or` and parentheses. Values are quoted even for numbers, for example `total >= "100"`. Conditions and conversion are defined by `EFieldConditions` and the model's field types; common forms include `=`, `>=`, `in`, `like` and `explike`. The naming migration does not introduce another expression language. `ModelQueryExpressionOptions` retains the existing separators and expression tokens.
+Use the existing field-condition grammar: `field operator "value"`, combined with `and`, `or` and parentheses. Existing boolean aliases `&&`, `||`, `&`, `|`, `AndAlso` and `OrElse` remain accepted between conditions. Values are quoted even for numbers, for example `total >= "100"`. Conditions and conversion are defined by `EFieldConditions` and the model's field types; common forms include `=`, `>=`, `in`, `like` and `explike`. The former bracketed raw Dynamic LINQ escape hatch (`[ ... ]`) is removed. Filter input must use the ModelQuery grammar and resolve against model fields.
 
-`ApplyFuzzy` searches eligible fields or an explicit field list separated by `ModelQueryExpressionOptions.SelectSeparator` (a comma by default). `ExcludeFromDefaultFuzzySearch = true` removes a field from the default all-field search; an explicit field list can still include it when its type supports fuzzy matching. Collections and unsupported fields are excluded from default fuzzy matching, and an explicitly selected unsupported field fails normalization. Custom query names are used consistently for field lookup and fuzzy matching.
+`ApplySearch` searches eligible fields or an explicit array of accepted query names, combining field matches with OR. `ExcludeFromDefaultSearch = true` removes a field from the default search; an explicit field list can still include it when its type supports searching. Collections and unsupported fields are excluded by default. Unknown names and explicitly selected unsupported fields fail clearly.
 
-`SelectFields` projects the named fields; `SelectFieldsExcept` projects their complement. Query names select CLR fields, so the output uses the existing projection member names. Direct projection of collection-navigation fields is unsupported; excluding those fields allows the remaining fields to be projected. `GetFieldsExcept` and reverse literal field resolution return metadata for the complement as well. Unknown selection names are errors, not silent partial projections.
+For string fields, a search value without `%` becomes `%value%`; a value containing `%` is used as supplied. `%` matches any number of characters and `_` matches a single character. This preserves the existing search-box behavior:
 
-`ApplyFilter(IQueryable<T>, string)` retains its existing bracketed raw Dynamic LINQ expression form (`[ ... ]`). That form does not use ModelQuery field-name resolution; requiring field annotations does not make this API an expression sandbox. The application owns which expression forms it accepts from callers.
+| Search text | Effective pattern | Meaning |
+| --- | --- | --- |
+| `SO-` | `%SO-%` | Contains `SO-`. |
+| `SO-%` | `SO-%` | Starts with `SO-`. |
+| `%001` | `%001` | Ends with `001`. |
+| `SO-%001` | `SO-%001` | Starts with `SO-` and ends with `001`. |
 
-Existing CRUD requests retain `IHasRequestFilter` and `IHasRequestSelect`, including `Filter`, `Fuzzy`, `FuzzyColumns`, `SelectColumns` and `SelectExceptColumns`. `SelectColumns` and `SelectExceptColumns` are alternative projections, not new wire names introduced by this migration.
+Search values are parameters, not filter-language fragments; quotation marks in ordinary search text remain data. Numeric and enum fields retain their type-specific search conversions. Database LIKE behavior follows its provider and collation; memory matching is case-insensitive. These APIs do not promise identical collation behavior across providers.
+
+## Select and resolve fields
+
+`SelectFields(source, FieldSelection.Include(...))` projects named fields. `FieldSelection.Exclude(...)` selects their complement. Field names are separate array items; a comma-separated string is not a field list. Selection is immutable and preserves the caller's selected-field order. Query names select CLR fields, so output retains the projection member names.
+
+`GetFields()` returns all field descriptions. `ResolveFields(selection)` strictly resolves a selection; unknown or blank names and an empty final selection fail. Direct projection through collection navigation is unsupported; excluding those fields permits projection of the remaining fields.
+
+Use `MatchFields(names)` only when the caller deliberately owns another field vocabulary, such as Excel export DTO properties. Its `MatchedFields` and `UnmatchedNames` make that split explicit. The caller must validate unmatched names against that other contract; this is not permission to silently discard invalid fields.
+
+## HTTP request contract
+
+| Interface | Property | Type and meaning |
+| --- | --- | --- |
+| `IModelFilterRequest` | `Filter` | Optional filter expression. |
+| `IModelFilterRequest` | `SearchText` | Optional search text, preserving `%` patterns. |
+| `IModelFilterRequest` | `SearchFields` | Optional `string[]` of search field names; omitted or empty selects default eligible fields. |
+| `IFieldSelectionRequest` | `IncludeFields` | Optional `string[]` of fields to project. |
+| `IFieldSelectionRequest` | `ExcludeFields` | Optional `string[]` of fields to omit. |
+
+`GetFieldSelection()` validates the selection request and returns an optional `FieldSelection`. Empty arrays mean no projection request. Both include and exclude arrays being nonempty is an error; a nonempty array cannot contain blank names. Pagination, sorting and CRUD features remain outside ModelQuery.
+
+JSON bodies use real arrays:
+
+```json
+{
+  "filter": "total >= \"100\"",
+  "searchText": "SO-%",
+  "searchFields": ["number"],
+  "includeFields": ["number", "total"]
+}
+```
+
+GET requests repeat a key for each item, for example `?searchText=SO-%25&searchFields=number&includeFields=number&includeFields=total`. The percent sign is URL-encoded once by the client. Frontend callers must migrate names and serialization together with the backend; old property aliases are not retained.
 
 ## Module options and diagnostics
 
@@ -97,8 +141,12 @@ Expression logging follows the frozen [application debug policy](../../monica-in
 
 ## Migrating earlier names
 
-Use package and namespace `Monica.ModelQuery`, `AddModelQuery`, `ModuleModelQueryOption`, `[QueryModel]` and `[QueryField]` in place of their AutoModel/AutoTable/AutoField names. Replace active-mode switches with `RequireFieldAnnotation` and activation-name members with `QueryNames`/`GetAllQueryNames`. The former database and memory operators become `IQueryableModelQuery<T>` and `IEnumerableModelQuery<T>`; field projection uses `SelectFields`/`SelectFieldsExcept`, and in-memory predicate compilation uses `CompileFilter`.
+Use package and namespace `Monica.ModelQuery`, `AddModelQuery`, `ModuleModelQueryOption`, `[QueryModel]` and `[QueryField]` in place of their AutoModel/AutoTable/AutoField names. Replace active-mode switches with `RequireFieldAnnotation` and activation-name members with `QueryNames`/`GetAllQueryNames`.
 
-No source compatibility aliases remain. The status route, `GetModelQueryStatus` endpoint name, default Swagger group and module diagnostic identity change with the new module. Update saved diagnostic links and explicit type references. The unimplemented title-as-name, required-filter and client-evaluation switches were removed rather than carried into the new contract. Business filter syntax and CRUD request member names remain unchanged.
+Replace source-specific operator interfaces with `IModelQuery<T>`, `ApplyFuzzy` with `ApplySearch`, and `NormalizeFilter` with `ParseFilter`. Replace `NormalizedFilter` access to tokens with `ParsedFilter<T>.ReferencedFields`. Use `FieldSelection` instead of selection strings, exclusion methods or reverse flags. `MatchFields` replaces tolerant normalization when a real second field vocabulary exists. Search annotations use `ExcludeFromDefaultSearch`.
+
+HTTP consumers migrate `Fuzzy` to `SearchText`, `FuzzyColumns` to `SearchFields`, `SelectColumns` to `IncludeFields`, and `SelectExceptColumns` to `ExcludeFields`; the three field lists become arrays. Ordinary filter grammar and search wildcards retain their meaning. Tokenizer/provider classes and mutable execution details are no longer consumer extension contracts.
+
+No source compatibility aliases remain. The status route, `GetModelQueryStatus` endpoint name, default Swagger group and module diagnostic identity follow the new module name. Update saved diagnostic links and explicit type references. The unimplemented title-as-name, required-filter and client-evaluation switches were removed rather than carried into the new contract. Preserve saved ordinary filter expressions, and migrate request names and field-list encoding with their consumers.
 
 Source owners: `Monica.ModelQuery/Modules/ModuleModelQuery.cs`, public `Abstractions/`, `Annotations/` and `Models/`; behavior checks live in `tests/Test.Monica.ModelQuery/`. AutoControllers consumes these services through `Monica.WebApi/AutoControllers/Services/AbstractKeyCrudApplicationService.cs`.

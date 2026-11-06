@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageDescription>Dynamic model filtering, fuzzy search, and field projection for Monica using System.Linq.Dynamic.</PackageDescription>
+    <PackageDescription>Dynamic model filtering, searching, and field projection for Monica.</PackageDescription>
   </PropertyGroup>
 
   <ItemGroup>

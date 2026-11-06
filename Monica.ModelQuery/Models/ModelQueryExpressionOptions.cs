@@ -2,12 +2,10 @@ namespace Monica.ModelQuery.Models;
 
 /// <summary>
 /// Configures the separators and tokens used when normalizing model query expressions.
-/// Configure these options before snapshots are created; their field names are validated against the selection separator.
+/// Configure these options before model query services are created.
 /// </summary>
 public class ModelQueryExpressionOptions
 {
-    /// <summary>Separates selected field names. Defaults to a comma.</summary>
-    public string SelectSeparator { get; set; } = ",";
     /// <summary>Separates values during multi-value conversion. Defaults to a comma.</summary>
     public string FilterMultiSeparator { get; set; } = ",";
     /// <summary>Identifies an existing wildcard in an <c>explike</c> value. Defaults to <c>%</c>.</summary>
