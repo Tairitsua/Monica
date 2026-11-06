@@ -1,0 +1,357 @@
+@using Monica.UI.Shared.Components.States
+@using System.Globalization
+@using Monica.Core.Results
+@using Monica.Framework.UI.UIBuildingBlocks.Services
+@using Monica.BuildingBlocks.Models
+@inject IBuildingBlocksUiDataSource DataSource
+@inject IStringLocalizer<BuildingBlocksResource> L
+@implements IDisposable
+
+<section class="bb-dashboard" data-testid="building-block-dashboard">
+    @if (_loading && _snapshot is null)
+    {
+        <div class="bb-dashboard__state" data-testid="building-block-dashboard-loading"><MoContentState Loading="true"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+            <p>@L["BuildingBlockDashboard:States:Loading"]</p>
+        </MoContentState></div>
+    }
+    @if (_error is not null)
+    {
+        <div class="bb-dashboard__error" data-testid="building-block-dashboard-error" role="status"><MoContentState>
+            <h2>@L["BuildingBlockDashboard:States:LoadFailedTitle"]</h2>
+            <p>@_error</p>
+            @if (_snapshot is not null)
+            {
+                <p>@L["BuildingBlockDashboard:States:Retained"]</p>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadDashboardAsync" Disabled="@_loading">
+                @L["BuildingBlockDashboard:Actions:Retry"]
+            </MudButton>
+        </MoContentState></div>
+    }
+    @if (_snapshot is not null)
+    {
+        <div class="bb-dashboard__board">
+            <section class="bb-dashboard__identity">
+                <div class="bb-dashboard__identity-heading">
+                    <span class="bb-dashboard__eyebrow">@L["BuildingBlockDashboard:Service:Eyebrow"]</span>
+                    <MoIcon Icon="@MoIcons.Workflow" Size="1.5rem" />
+                </div>
+                <h2>@_snapshot.Service.AppName</h2>
+                @if (!string.IsNullOrWhiteSpace(_snapshot.Service.AppVersion))
+                {
+                    <span class="bb-dashboard__version">@_snapshot.Service.AppVersion</span>
+                }
+                <div class="bb-dashboard__service">
+                    @if (ShouldShowProjectName(_snapshot.Service))
+                    {
+                        <span data-testid="building-block-service-project-name">@L["BuildingBlockDashboard:Service:ProjectName", _snapshot.Service.ProjectName]</span>
+                    }
+                    @if (ShouldShowAppId(_snapshot.Service))
+                    {
+                        <span data-testid="building-block-service-app-id">@L["BuildingBlockDashboard:Service:AppId", _snapshot.Service.AppId]</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_snapshot.Service.DomainName))
+                    {
+                        <span>@L["BuildingBlockDashboard:Service:Domain", _snapshot.Service.DomainName]</span>
+                    }
+                </div>
+                <div class="bb-dashboard__inventory" data-testid="building-block-dashboard-metrics">
+                    <div><strong>@_snapshot.TotalBuildingBlocks</strong><span>@L["BuildingBlockDashboard:Metrics:TotalBuildingBlocks"]</span></div>
+                    <div><strong>@_snapshot.DistinctKinds</strong><span>@L["BuildingBlockDashboard:Metrics:Kinds"]</span></div>
+                </div>
+                <p class="bb-dashboard__scope">@L["BuildingBlockDashboard:Service:Scope"]</p>
+                <div class="bb-dashboard__entry-links">
+                    <NavLink href="/building-blocks/catalog">@L["Page:Tabs:BuildingBlock"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></NavLink>
+                    <NavLink href="/building-blocks/graph">@L["Page:Tabs:ArchitectureVisualization"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></NavLink>
+                </div>
+                <MudButton Variant="Variant.Outlined" OnClick="LoadDashboardAsync" Disabled="@_loading"
+                           StartIcon="@MoIcons.Refresh" Class="bb-dashboard__refresh">
+                    @L["Shared:Actions:Refresh"]
+                </MudButton>
+            </section>
+            <section class="bb-dashboard__context" data-testid="building-block-coverage">
+                <header>
+                    <div><span class="bb-dashboard__eyebrow">@L["BuildingBlockDashboard:Sections:CoverageEyebrow"]</span><h3>@L["BuildingBlockDashboard:Sections:Coverage"]</h3></div>
+                    <span class="bb-dashboard__whole">@L["BuildingBlockDashboard:Sections:WholeCatalog"]</span>
+                </header>
+                <p>@L["BuildingBlockDashboard:Sections:CoverageHint"]</p>
+                <div class="bb-dashboard__coverage">
+                    @foreach (var metric in _snapshot.Coverage)
+                    {
+                        <div class="bb-dashboard__coverage-item">
+                            <div class="bb-dashboard__coverage-title">
+                                <h4>@GetCoverageTitle(metric.Kind)</h4>
+                                <strong>@FormatPercentage(metric.Percentage)</strong>
+                            </div>
+                            <span>@L["BuildingBlockDashboard:Coverage:Ratio", metric.Covered, metric.Total]</span>
+                            <MudProgressLinear Value="@ToDouble(metric.Percentage)" Color="@GetCoverageColor(metric.Kind)" Size="Size.Small" />
+                        </div>
+                    }
+                </div>
+
+            </section>
+                <section class="bb-dashboard__topology" data-testid="building-block-architecture-health">
+                    <h4>@L["BuildingBlockDashboard:Sections:ArchitectureHealth"]</h4>
+                    <p>@L["BuildingBlockDashboard:Sections:ArchitectureHealthHint"]</p>
+                    <dl>
+                        <div><dt>@L["BuildingBlockDashboard:Health:DependencyEdges"]</dt><dd>@_snapshot.Dependencies.EdgeCount</dd></div>
+                        <div><dt>@L["BuildingBlockDashboard:Health:IsolatedBuildingBlocks"]</dt><dd>@_snapshot.Dependencies.IsolatedBuildingBlockCount</dd></div>
+                        <div><dt>@L["BuildingBlockDashboard:Health:Errors"]</dt><dd data-severity="error">@_snapshot.Alerts.ErrorCount</dd></div>
+                        <div><dt>@L["BuildingBlockDashboard:Health:Warnings"]</dt><dd data-severity="warning">@_snapshot.Alerts.WarningCount</dd></div>
+                        <div><dt>@L["BuildingBlockDashboard:Health:Information"]</dt><dd>@_snapshot.Alerts.InformationCount</dd></div>
+                    </dl>
+                </section>
+        </div>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        @if (_snapshot.TotalBuildingBlocks == 0)
+        {
+            <div class="bb-dashboard__state" data-testid="building-block-dashboard-empty"><MoContentState>
+                <MoIcon Icon="@MoIcons.Package" Size="1.5rem" />
+                <h3>@L["BuildingBlockDashboard:States:EmptyTitle"]</h3>
+                <p>@L["BuildingBlockDashboard:States:EmptyDescription"]</p>
+            </MoContentState></div>
+        }
+        else
+        {
+            <section class="bb-dashboard__composition" data-testid="building-block-type-distribution">
+                <header><h3>@L["BuildingBlockDashboard:Sections:Distribution"]</h3><p>@L["BuildingBlockDashboard:Sections:DistributionHint"]</p></header>
+                <div class="bb-dashboard__segments" aria-hidden="true">
+                    @foreach (var statistic in _snapshot.Kinds)
+                    {
+                        <span style="@GetSegmentStyle(statistic)"></span>
+                    }
+                </div>
+                <ul class="bb-dashboard__type-ledger">
+                    @foreach (var statistic in _snapshot.Kinds)
+                    {
+                        <li>
+                            <span class="bb-dashboard__type-dot" style="@GetTypeColorStyle(statistic.Kind)" aria-hidden="true"></span>
+                            <span>@L.GetBuildingBlockKindText(statistic.Kind)</span>
+                            <strong>@statistic.Count</strong><span class="bb-dashboard__proportion">@FormatPercentage(statistic.Percentage)</span>
+                        </li>
+                    }
+                </ul>
+            </section>
+            <section class="bb-dashboard__attention" data-testid="building-block-coverage-gaps">
+                <header>
+                    <div><span class="bb-dashboard__eyebrow">@L["BuildingBlockDashboard:Sections:AttentionEyebrow"]</span><h3>@L["BuildingBlockDashboard:Sections:CoverageGaps"]</h3><p>@L["BuildingBlockDashboard:Sections:CoverageGapsHint"]</p></div>
+                    <span class="bb-dashboard__attention-total">@_snapshot.CoverageGaps.Count</span>
+                </header>
+                @if (_snapshot.CoverageGaps.Count == 0)
+                {
+                    <MoContentState Compact="true"><p>@L["BuildingBlockDashboard:States:NoCoverageGaps"]</p></MoContentState>
+                }
+                else
+                {
+                    <div class="bb-dashboard__gap-filters">
+                        <label class="bb-dashboard__gap-query">@L["BuildingBlockDashboard:Filters:Search"]<input type="search" value="@_gapQuery" @oninput="OnGapQueryChanged" placeholder="@L["BuildingBlockDashboard:Filters:Placeholder"]" /></label>
+                        <label>@L["BuildingBlockDashboard:Filters:Type"]
+                            <select value="@_gapType" @onchange="OnGapTypeChanged">
+                                <option value="">@L["BuildingBlockDashboard:Filters:AllTypes"]</option>
+                                @foreach (var type in _snapshot.Kinds)
+                                {
+                                    <option value="@type.Kind">@L.GetBuildingBlockKindText(type.Kind)</option>
+                                }
+                            </select>
+                        </label>
+                        <label>@L["BuildingBlockDashboard:Filters:Missing"]
+                            <select value="@_gapCoverage" @onchange="OnGapCoverageChanged">
+                                <option value="">@L["BuildingBlockDashboard:Filters:AllGaps"]</option>
+                                @foreach (var kind in Enum.GetValues<BuildingBlockCoverageKind>())
+                                {
+                                    <option value="@kind">@GetCoverageTitle(kind)</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="bb-dashboard__gap-alerts"><input type="checkbox" checked="@_gapOnlyAlerts" @onchange="OnGapAlertsChanged" />@L["BuildingBlockDashboard:Filters:OnlyAlerts"]</label>
+                    </div>
+                    <div class="bb-dashboard__gap-result">
+                        <span>@L["BuildingBlockDashboard:Gaps:VisibleCount", _filteredGaps.Count, _snapshot.CoverageGaps.Count]</span>
+                        @if (HasGapFilters)
+                        {
+                            <button type="button" @onclick="ResetGapFilters">@L["BuildingBlockDashboard:Filters:Reset"]</button>
+                        }
+                    </div>
+                    @if (_filteredGaps.Count == 0)
+                    {
+                        <div class="bb-dashboard__state" role="status"><MoContentState><p>@L["BuildingBlockDashboard:States:NoGapMatches"]</p><button type="button" @onclick="ResetGapFilters">@L["BuildingBlockDashboard:Filters:Reset"]</button></MoContentState></div>
+                    }
+                    else
+                    {
+                        <ul class="bb-dashboard__gap-list">
+                            @foreach (var gap in PagedGaps)
+                            {
+                                <li data-building-block-key="@gap.BuildingBlock.Key">
+                                    <div class="bb-dashboard__gap-identity"><strong>@gap.BuildingBlock.Title</strong><code>@gap.BuildingBlock.Key</code><span>@L.GetBuildingBlockKindText(gap.BuildingBlock.Kind)</span></div>
+                                    <div class="bb-dashboard__gap-evidence">
+                                        <div class="bb-dashboard__gap-reasons">
+                                            @foreach (var missing in gap.MissingCoverage)
+                                            {
+                                                <span>@L["BuildingBlockDashboard:Gaps:Missing", GetCoverageTitle(missing)]</span>
+                                            }
+                                        </div>
+                                        @if (gap.BuildingBlock.Alerts.Count != 0)
+                                        {
+                                            <span class="bb-dashboard__gap-diagnostic" data-severity="@GetAlertTone(gap.BuildingBlock)"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" />@L["BuildingBlockDashboard:Gaps:Alerts", gap.BuildingBlock.Alerts.Count]</span>
+                                        }
+                                    </div>
+                                    <MudIconButton Icon="@MoIcons.ArrowRight" Size="Size.Small" Color="Color.Primary"
+                                                   aria-label="@L["BuildingBlockDashboard:Actions:Inspect", gap.BuildingBlock.Title]" OnClick="@(() => OpenDetail(gap.BuildingBlock))" />
+                                </li>
+                            }
+                        </ul>
+                        <footer class="bb-dashboard__pager">
+                            <span>@L["BuildingBlockDashboard:Gaps:PageRange", _gapPage * _gapPageSize + 1, Math.Min((_gapPage + 1) * _gapPageSize, _filteredGaps.Count), _filteredGaps.Count]</span>
+                            <label>@L["BuildingBlockDashboard:Gaps:PageSize"]<select value="@_gapPageSize" @onchange="OnGapPageSizeChanged"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+                            <div class="bb-dashboard__page-actions">
+                                <button type="button" disabled="@(_gapPage == 0)" aria-label="@L["BuildingBlockDashboard:Gaps:FirstPage"]" @onclick="@(() => SetGapPage(0))"><MoIcon Icon="@MoIcons.FirstPage" Size="1.25rem" /></button>
+                                <button type="button" disabled="@(_gapPage == 0)" aria-label="@L["BuildingBlockDashboard:Gaps:PreviousPage"]" @onclick="@(() => SetGapPage(_gapPage - 1))"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.25rem" /></button>
+                                <span>@L["BuildingBlockDashboard:Gaps:PageNumber", _gapPage + 1, GapPageCount]</span>
+                                <button type="button" disabled="@(_gapPage >= GapPageCount - 1)" aria-label="@L["BuildingBlockDashboard:Gaps:NextPage"]" @onclick="@(() => SetGapPage(_gapPage + 1))"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button>
+                                <button type="button" disabled="@(_gapPage >= GapPageCount - 1)" aria-label="@L["BuildingBlockDashboard:Gaps:LastPage"]" @onclick="@(() => SetGapPage(GapPageCount - 1))"><MoIcon Icon="@MoIcons.LastPage" Size="1.25rem" /></button>
+                            </div>
+                        </footer>
+                    }
+                }
+            </section>
+        }
+    }
+</section>
+
+<BuildingBlockDetailDialog @bind-Visible="_detailDialogVisible" SelectedBuildingBlock="_selectedUnit" />
+
+@code {
+    private BuildingBlockDashboardSnapshot? _snapshot;
+    private string? _error;
+    private bool _loading;
+    private bool _disposed;
+    private int _loadVersion;
+    private bool _detailDialogVisible;
+    private BuildingBlockSummary? _selectedUnit;
+    private string _gapQuery = string.Empty;
+    private string _gapType = string.Empty;
+    private string _gapCoverage = string.Empty;
+    private bool _gapOnlyAlerts;
+    private int _gapPage;
+    private int _gapPageSize = 10;
+    private List<BuildingBlockCoverageGap> _filteredGaps = [];
+    private bool HasGapFilters => !string.IsNullOrEmpty(_gapQuery) || !string.IsNullOrEmpty(_gapType) || !string.IsNullOrEmpty(_gapCoverage) || _gapOnlyAlerts;
+    private int GapPageCount => Math.Max(1, (_filteredGaps.Count + _gapPageSize - 1) / _gapPageSize);
+    private IEnumerable<BuildingBlockCoverageGap> PagedGaps => _filteredGaps.Skip(_gapPage * _gapPageSize).Take(_gapPageSize);
+
+    protected override Task OnInitializedAsync() => LoadDashboardAsync();
+
+    private async Task LoadDashboardAsync()
+    {
+        if (_disposed || _loading) return;
+        var version = ++_loadVersion;
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await DataSource.GetDashboardAsync();
+            if (_disposed || version != _loadVersion) return;
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
+            {
+                _error = L["BuildingBlockDashboard:States:LoadFailed", error];
+                return;
+            }
+            _snapshot = snapshot;
+            if (!string.IsNullOrEmpty(_gapType) && !(_snapshot?.Kinds.Any(type => type.Kind.ToString() == _gapType) ?? false))
+            {
+                _gapType = string.Empty;
+            }
+            ApplyGapFilters(resetPage: false);
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed && version == _loadVersion) _error = L["BuildingBlockDashboard:States:LoadFailed", exception.Message];
+        }
+        finally
+        {
+            if (!_disposed && version == _loadVersion) _loading = false;
+        }
+    }
+
+    private void OnGapQueryChanged(ChangeEventArgs args) { _gapQuery = args.Value?.ToString() ?? string.Empty; ApplyGapFilters(); }
+    private void OnGapTypeChanged(ChangeEventArgs args) { _gapType = args.Value?.ToString() ?? string.Empty; ApplyGapFilters(); }
+    private void OnGapCoverageChanged(ChangeEventArgs args) { _gapCoverage = args.Value?.ToString() ?? string.Empty; ApplyGapFilters(); }
+    private void OnGapAlertsChanged(ChangeEventArgs args) { _gapOnlyAlerts = args.Value is true; ApplyGapFilters(); }
+    private void OnGapPageSizeChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var size) && size is 10 or 25 or 50)
+        {
+            _gapPageSize = size;
+            _gapPage = 0;
+        }
+    }
+    private void SetGapPage(int page) => _gapPage = Math.Clamp(page, 0, GapPageCount - 1);
+    private void ResetGapFilters()
+    {
+        _gapQuery = _gapType = _gapCoverage = string.Empty;
+        _gapOnlyAlerts = false;
+        ApplyGapFilters();
+    }
+    private void ApplyGapFilters(bool resetPage = true)
+    {
+        if (_disposed) return;
+        _filteredGaps = (_snapshot?.CoverageGaps ?? []).Where(gap =>
+            (string.IsNullOrWhiteSpace(_gapQuery) || gap.BuildingBlock.Title.Contains(_gapQuery, StringComparison.OrdinalIgnoreCase)
+                || gap.BuildingBlock.Key.Contains(_gapQuery, StringComparison.OrdinalIgnoreCase)
+                || (gap.BuildingBlock.Owner?.Contains(_gapQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (gap.BuildingBlock.Description?.Contains(_gapQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+                || gap.BuildingBlock.Tags.Any(tag => tag.Contains(_gapQuery, StringComparison.OrdinalIgnoreCase)))
+            && (string.IsNullOrEmpty(_gapType) || gap.BuildingBlock.Kind.ToString() == _gapType)
+            && (string.IsNullOrEmpty(_gapCoverage) || gap.MissingCoverage.Any(kind => kind.ToString() == _gapCoverage))
+            && (!_gapOnlyAlerts || gap.BuildingBlock.Alerts.Count != 0)).ToList();
+        _gapPage = resetPage ? 0 : Math.Clamp(_gapPage, 0, GapPageCount - 1);
+    }
+
+    private string GetCoverageTitle(BuildingBlockCoverageKind kind) => kind switch
+    {
+        BuildingBlockCoverageKind.Metadata => L["BuildingBlockDashboard:Coverage:Metadata"],
+        BuildingBlockCoverageKind.Description => L["BuildingBlockDashboard:Coverage:Description"],
+        BuildingBlockCoverageKind.Ownership => L["BuildingBlockDashboard:Coverage:Ownership"],
+        BuildingBlockCoverageKind.Requirements => L["BuildingBlockDashboard:Coverage:Requirements"],
+        _ => kind.ToString()
+    };
+    private static Color GetCoverageColor(BuildingBlockCoverageKind kind) => kind switch
+    {
+        BuildingBlockCoverageKind.Metadata => Color.Primary,
+        BuildingBlockCoverageKind.Description => Color.Info,
+        BuildingBlockCoverageKind.Ownership => Color.Success,
+        BuildingBlockCoverageKind.Requirements => Color.Secondary,
+        _ => Color.Default
+    };
+    private static string GetSegmentStyle(BuildingBlockKindStatistics statistic) =>
+        $"flex-grow:{statistic.Percentage.ToString(CultureInfo.InvariantCulture)};background:{GetTypeColor(statistic.Kind)}";
+    private static string GetTypeColorStyle(BuildingBlockKind type) => $"background:{GetTypeColor(type)}";
+    private static string GetTypeColor(BuildingBlockKind type) => BuildingBlockVisualizationConfig.GetKindColorRole(type) switch
+    {
+        "primary" => "var(--mud-palette-primary)",
+        "secondary" => "var(--mud-palette-secondary)",
+        "tertiary" => "var(--mud-palette-tertiary)",
+        "success" => "var(--mud-palette-success)",
+        "warning" => "var(--mud-palette-warning)",
+        "info" => "var(--mud-palette-info)",
+        "error" => "var(--mud-palette-error)",
+        _ => "var(--mud-palette-text-secondary)"
+    };
+    private static bool ShouldShowProjectName(BuildingBlockServiceIdentity service) => !string.Equals(service.ProjectName, service.AppName, StringComparison.OrdinalIgnoreCase);
+    private static bool ShouldShowAppId(BuildingBlockServiceIdentity service) => !string.Equals(service.AppId, service.AppName, StringComparison.OrdinalIgnoreCase) && !string.Equals(service.AppId, service.ProjectName, StringComparison.OrdinalIgnoreCase);
+    private static string FormatPercentage(decimal? percentage) => percentage is null ? "--" : $"{percentage:0.#}%";
+    private static double ToDouble(decimal? value) => value is null ? 0d : decimal.ToDouble(value.Value);
+    private static string GetAlertTone(BuildingBlockSummary unit) => unit.Alerts.Any(alert => alert.Level == EAlertLevel.Error) ? "error" : unit.Alerts.Any(alert => alert.Level == EAlertLevel.Warning) ? "warning" : "info";
+    private void OpenDetail(BuildingBlockSummary unit)
+    {
+        if (_disposed) return;
+        _selectedUnit = unit;
+        _detailDialogVisible = true;
+    }
+    public void Dispose() { _disposed = true; ++_loadVersion; }
+}

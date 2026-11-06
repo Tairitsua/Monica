@@ -58,10 +58,10 @@ public static class ReferenceApplicationComposition
             monica.AddSwagger(options => options.ApiVersion = "v1");
         }
         monica.AddUnitOfWork();
-        monica.AddProjectUnits(options =>
+        monica.AddBuildingBlocks(options =>
         {
-            options.ConventionOptions.EnableNameConvention = true;
-            options.ConventionOptions.NameConventionMode = ENameConventionMode.Strict;
+            options.Naming.Enabled = true;
+            options.Naming.Mode = BuildingBlockNamingMode.Strict;
         });
         monica.AddOpenTelemetry().UsePrometheusEndpoint();
     }
@@ -80,7 +80,7 @@ public static class ReferenceApplicationComposition
                 approveOrder = "/api/v1/Ordering/commands/ApproveOrder",
                 swagger = diagnostics.Value.EnableDiagnostics ? "/swagger" : null,
                 metrics = "/metrics",
-                projectUnits = "/framework/units",
+                buildingBlocks = "/framework/building-blocks",
                 readiness = "/health",
                 liveness = "/alive"
             },

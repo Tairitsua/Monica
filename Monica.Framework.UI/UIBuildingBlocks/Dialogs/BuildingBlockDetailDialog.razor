@@ -1,0 +1,366 @@
+@using Monica.UI.Shared.Components.States
+@using Monica.Core.Results
+@using Monica.Framework.UI.UIBuildingBlocks.Services
+@using Monica.BuildingBlocks.Models
+@inject IBuildingBlocksUiDataSource DataSource
+@inject IStringLocalizer<BuildingBlocksResource> L
+@implements IAsyncDisposable
+
+<MudDialog Visible="@Visible" VisibleChanged="HandleVisibleChangedAsync" Options="_dialogOptions" OnBackdropClick="CloseAsync">
+    <TitleContent>
+        <BuildingBlockDialogHeading Text="@L["BuildingBlockDetailDialog:Title"]" />
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MoContentState Loading="true" data-testid="building-block-detail-loading" role="status"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+                <p>@L["BuildingBlockDetailDialog:States:Loading"]</p>
+            </MoContentState>
+        }
+        else if (_loadError is not null)
+        {
+            <MoContentState data-testid="building-block-detail-error" role="status">@_loadError</MoContentState>
+        }
+        else if (_detail is not null)
+        {
+            var summary = _detail.Summary;
+            <article class="bb-dossier building-block-detail" data-testid="building-block-detail" data-building-block-key="@summary.Key">
+                <header class="bb-dossier__identity">
+                    <div class="bb-dossier__identity-top">
+                        <span class="bb-dossier__eyebrow">@L["BuildingBlockDetailDialog:Sections:Identity"]</span>
+                        <span class="bb-dossier__type">@L.GetBuildingBlockKindText(summary.Kind)</span>
+                    </div>
+                    <h3>@summary.Title</h3>
+                    <code>@summary.Key</code>
+                    <div class="bb-dossier__metadata" data-declared="@summary.HasExplicitMetadata.ToString().ToLowerInvariant()">
+                        <MoIcon Icon="@(summary.HasExplicitMetadata ? MoIcons.Success : MoIcons.Info)" Size="1.25rem" />
+                        @(summary.HasExplicitMetadata ? L["BuildingBlockDetailDialog:Badges:MetadataDeclared"] : L["BuildingBlockDetailDialog:Badges:MetadataMissing"])
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(summary.Description))
+                    {
+                        <p>@summary.Description</p>
+                    }
+                    else
+                    {
+                        <p class="bb-dossier__absence">@L["BuildingBlockDetailDialog:States:NoDescription"]</p>
+                    }
+                </header>
+                <dl class="bb-dossier__facts">
+                    <div><dt>@L["BuildingBlockDetailDialog:Fields:Owner"]</dt><dd>@(summary.Owner ?? L["Shared:Labels:NotDeclared"])</dd></div>
+                    <div><dt>@L["BuildingBlockDetailDialog:Fields:Dependencies"]</dt><dd>@summary.Dependencies.Count</dd></div>
+                    <div><dt>@L["BuildingBlockDetailDialog:Fields:DependedBy"]</dt><dd>@summary.DependedByCount</dd></div>
+                    <div><dt>@L["BuildingBlockDetailDialog:Fields:Methods"]</dt><dd>@summary.MethodCount</dd></div>
+                </dl>
+                <section class="bb-dossier__section bb-dossier__section--requirements">
+                    <header><span class="bb-dossier__section-icon"><MoIcon Icon="@MoIcons.ClipboardList" Size="1.25rem" /></span><div><h4>@L["BuildingBlockDetailDialog:Sections:Requirements"]</h4><p>@L["BuildingBlockDetailDialog:Sections:RequirementsHint"]</p></div><span class="bb-dossier__section-count">@_detail.Requirements.Count</span></header>
+                    @if (_detail.Requirements.Count == 0)
+                    {
+                        <div class="bb-dossier__requirements-empty">
+                            <MoContentState Compact="true">
+                                <MoIcon Icon="@MoIcons.Link" Size="1.5rem" />
+                                <p>@L["BuildingBlockDetailDialog:States:NoRequirements"]</p>
+                            </MoContentState>
+                        </div>
+                    }
+                    else
+                    {
+                        <ul class="bb-dossier__requirements">
+                            @foreach (var requirement in _detail.Requirements)
+                            {
+                                <li data-resolved="@requirement.IsResolved.ToString().ToLowerInvariant()">
+                                    <div>
+                                        @if (requirement.IsResolved)
+                                        {
+                                            <a href="@requirement.Href" target="_blank" rel="noopener noreferrer">@requirement.Title <MoIcon Icon="@MoIcons.ExternalLink" Size="1.25rem" /></a>
+                                        }
+                                        else
+                                        {
+                                            <span>@requirement.Title</span>
+                                        }
+                                        <code>@requirement.Id</code>
+                                    </div>
+                                    <span class="bb-dossier__resolution">@(requirement.IsResolved ? L["BuildingBlockDetailDialog:Badges:Resolved"] : L["BuildingBlockDetailDialog:Badges:Unresolved"])</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+                @if (summary.Tags.Count != 0)
+                {
+                    <section class="bb-dossier__tags"><h4>@L["BuildingBlockDetailDialog:Sections:Tags"]</h4><ul>@foreach (var tag in summary.Tags) { <li>@tag</li> }</ul></section>
+                }
+                <section class="bb-dossier__section bb-dossier__section--relationships">
+                    <header><span class="bb-dossier__section-icon"><MoIcon Icon="@MoIcons.Network" Size="1.25rem" /></span><div><h4>@L["BuildingBlockDetailDialog:Sections:Relationships"]</h4><p>@L["BuildingBlockDetailDialog:Sections:RelationshipsHint"]</p></div></header>
+                    <div class="bb-dossier__relationships">
+                        <div><h5>@L["BuildingBlockDetailDialog:Fields:Dependencies"] <span>@summary.Dependencies.Count</span></h5>
+                            @if (summary.Dependencies.Count == 0) { <p class="bb-dossier__absence">@L["Shared:Labels:None"]</p> }
+                            else
+                            {
+                                <ul class="bb-dossier__references">
+                                    @foreach (var reference in summary.Dependencies)
+                                    {
+                                        <li><button type="button" @onclick="@(() => InspectRelatedUnitAsync(reference.Key))"><span><strong>@reference.Title</strong><code>@reference.Key</code><small>@L.GetBuildingBlockKindText(reference.Kind)</small></span><MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></button></li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                        <div><h5>@L["BuildingBlockDetailDialog:Fields:DependedBy"] <span>@_detail.Dependents.Count</span></h5>
+                            @if (_detail.Dependents.Count == 0) { <p class="bb-dossier__absence">@L["Shared:Labels:None"]</p> }
+                            else
+                            {
+                                <ul class="bb-dossier__references">
+                                    @foreach (var reference in _detail.Dependents)
+                                    {
+                                        <li><button type="button" @onclick="@(() => InspectRelatedUnitAsync(reference.Key))"><span><strong>@reference.Title</strong><code>@reference.Key</code><small>@L.GetBuildingBlockKindText(reference.Kind)</small></span><MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></button></li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                </section>
+                @if (_detail.Configuration is not null)
+                {
+                    <section class="bb-dossier__section bb-dossier__configuration">
+                        <header><MoIcon Icon="@MoIcons.Settings" Size="1.25rem" /><div><h4>@L["BuildingBlockDetailDialog:Sections:Configuration"]</h4><p>@L["BuildingBlockDetailDialog:Sections:ConfigurationHint"]</p></div></header>
+                        <dl><div><dt>@L["BuildingBlockDetailDialog:Fields:DefinitionKey"]</dt><dd><code>@_detail.Configuration.DefinitionKey</code></dd></div><div><dt>@L["BuildingBlockDetailDialog:Fields:ConfigurationMode"]</dt><dd>@L.GetConfigurationModeText(_detail.Configuration.IsOffline)</dd></div></dl>
+                        @if (_detail.Configuration.Usages.Count != 0)
+                        {
+                            <ul class="bb-dossier__references">
+                                @foreach (var usage in _detail.Configuration.Usages)
+                                {
+                                        <li><button type="button" @onclick="@(() => InspectRelatedUnitAsync(usage.BuildingBlock.Key))"><span><strong>@usage.BuildingBlock.Title</strong><code>@usage.BuildingBlock.Key</code><small>@L.GetConfigurationUsageText(usage.UsageType)</small></span><MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></button></li>
+                                }
+                            </ul>
+                        }
+                    </section>
+                }
+                @if (_detail.ConstructorParameters.Count != 0 || _detail.Methods.Count != 0)
+                {
+                    <section class="bb-dossier__section">
+                        <header><span class="bb-dossier__section-icon"><MoIcon Icon="@MoIcons.Code" Size="1.25rem" /></span><div><h4>@L["BuildingBlockDetailDialog:Sections:TechnicalShape"]</h4><p>@L["BuildingBlockDetailDialog:Sections:TechnicalHint"]</p></div></header>
+                        @if (_detail.ConstructorParameters.Count != 0)
+                        {
+                            <h5>@L["BuildingBlockDetailDialog:Fields:ConstructorParameters"]</h5>
+                            <ul class="bb-dossier__parameters">@foreach (var parameter in _detail.ConstructorParameters) { <li><code>@parameter</code></li> }</ul>
+                        }
+                        @if (_detail.Methods.Count != 0)
+                        {
+                            <details class="bb-dossier__methods"><summary>@L["BuildingBlockDetailDialog:Sections:PublicMethods", _detail.Methods.Count]</summary>
+                                <ul>
+                                    @foreach (var method in _detail.Methods)
+                                    {
+                                        <li><code>@method.Signature</code><div class="bb-dossier__modifiers">
+                                            @if (method.IsAsync) { <span>@L.GetMethodModifierText(BuildingBlocksMethodModifier.Async)</span> }
+                                            @if (method.IsStatic) { <span>@L.GetMethodModifierText(BuildingBlocksMethodModifier.Static)</span> }
+                                            @if (method.IsVirtual) { <span>@L.GetMethodModifierText(BuildingBlocksMethodModifier.Virtual)</span> }
+                                            @if (method.IsAbstract) { <span>@L.GetMethodModifierText(BuildingBlocksMethodModifier.Abstract)</span> }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(method.Description)) { <p>@method.Description</p> }
+                                        </li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                    </section>
+                }
+                @if (summary.Alerts.Count != 0)
+                {
+                    <section class="bb-dossier__section"><header><MoIcon Icon="@MoIcons.Info" Size="1.25rem" /><h4>@L["BuildingBlockDetailDialog:Fields:Alerts"]</h4><span class="bb-dossier__section-count">@summary.Alerts.Count</span></header>
+                        <ul class="bb-dossier__alerts">
+                            @foreach (var alert in summary.Alerts)
+                            {
+                                <li data-severity="@GetAlertTone(alert.Level)"><strong>@L.GetAlertLevelText(alert.Level)</strong><p>@alert.Message</p>
+                                    @if (!string.IsNullOrWhiteSpace(alert.Source)) { <code>@alert.Source</code> }
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+            </article>
+        }
+    </DialogContent>
+    <DialogActions>
+        <div class="bb-dossier__actions">
+            @if (_detail is not null && OnNodeFocus.HasDelegate)
+            {
+                <MudButton Class="bb-dossier__focus" Variant="Variant.Text" StartIcon="@MoIcons.Focus" OnClick="FocusCurrentAsync">@L["BuildingBlockDetailDialog:Actions:FocusInGraph"]</MudButton>
+            }
+            <MudButton @ref="_closeButton" Class="bb-dossier__close" Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseAsync">@L["Shared:Actions:Close"]</MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public BuildingBlockSummary? SelectedBuildingBlock { get; set; }
+    [Parameter] public EventCallback<string> OnNodeFocus { get; set; }
+
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = true, CloseOnEscapeKey = true, CloseButton = true };
+    private DetailRequest? _loadRequest;
+    private MudButton? _closeButton;
+    private BuildingBlockDetail? _detail;
+    private string? _loadError;
+    private string? _selectedSourceKey;
+    private bool _loading;
+    private bool _wasVisible;
+    private bool _closing;
+    private bool _disposed;
+    private int _loadVersion;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_disposed) return;
+        if (!Visible)
+        {
+            _wasVisible = false;
+            await CancelPendingLoadAsync();
+            return;
+        }
+        var shouldLoad = SelectedBuildingBlock is not null && (!_wasVisible || !string.Equals(_selectedSourceKey, SelectedBuildingBlock.Key, StringComparison.Ordinal));
+        _wasVisible = true;
+        if (shouldLoad)
+        {
+            _selectedSourceKey = SelectedBuildingBlock!.Key;
+            await LoadDetailAsync(SelectedBuildingBlock.Key);
+        }
+    }
+
+    private async Task InspectRelatedUnitAsync(string key)
+    {
+        if (_disposed || !Visible || _closing) return;
+        // The close action stays mounted inside MudDialog's native focus trap while
+        // the clicked reference is replaced. Keep native Escape and focus return intact.
+        if (_closeButton is not null) await _closeButton.FocusAsync();
+        if (_disposed || !Visible || _closing) return;
+        await LoadDetailAsync(key);
+    }
+
+    private async Task LoadDetailAsync(string key)
+    {
+        if (_disposed || !Visible || _closing) return;
+        var request = new DetailRequest(++_loadVersion);
+        var previous = _loadRequest;
+        _loadRequest = request;
+        _loading = true;
+        _detail = null;
+        _loadError = null;
+        StateHasChanged();
+        try
+        {
+            if (previous is not null) await previous.CancelAsync();
+            if (!IsCurrent(request)) return;
+            var result = await DataSource.GetDetailAsync(key, request.Token);
+            if (!IsCurrent(request)) return;
+            var error = result.WithoutData();
+            var detail = result.Data;
+            if (result.IsFailure())
+            {
+                _loadError = L["BuildingBlockDetailDialog:States:LoadFailed", error];
+                return;
+            }
+            _detail = detail;
+        }
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (IsCurrent(request)) _loadError = L["BuildingBlockDetailDialog:States:LoadFailed", exception.Message];
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadRequest, request))
+            {
+                _loadRequest = null;
+                if (!_disposed)
+                {
+                    _loading = false;
+                    StateHasChanged();
+                }
+            }
+            await request.DisposeAsync();
+        }
+    }
+
+    private bool IsCurrent(DetailRequest request) => !_disposed && Visible && !_closing && request.Version == _loadVersion
+        && ReferenceEquals(_loadRequest, request) && !request.Token.IsCancellationRequested;
+
+    private async Task FocusCurrentAsync()
+    {
+        if (_disposed || _detail is null || !OnNodeFocus.HasDelegate) return;
+        var key = _detail.Summary.Key;
+        await CloseAsync();
+        if (!_disposed) await OnNodeFocus.InvokeAsync(key);
+    }
+
+    private Task HandleVisibleChangedAsync(bool visible) => visible || !Visible ? Task.CompletedTask : CloseAsync();
+
+    private async Task CloseAsync()
+    {
+        if (_disposed || _closing) return;
+        _closing = true;
+        Visible = false;
+        _wasVisible = false;
+        try
+        {
+            await CancelPendingLoadAsync();
+            if (!_disposed) await VisibleChanged.InvokeAsync(false);
+        }
+        finally { _closing = false; }
+    }
+
+    private async Task CancelPendingLoadAsync()
+    {
+        ++_loadVersion;
+        var request = _loadRequest;
+        _loadRequest = null;
+        _loading = false;
+        if (request is not null) await request.CancelAsync();
+    }
+
+    private static string GetAlertTone(EAlertLevel level) => level switch { EAlertLevel.Error => "error", EAlertLevel.Warning => "warning", _ => "info" };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        await CancelPendingLoadAsync();
+    }
+
+    // A request owns its source until its producer finishes. Cancellation callers never
+    // dispose a source that a newer interleaved load might replace.
+    private sealed class DetailRequest : IAsyncDisposable
+    {
+        private readonly CancellationTokenSource _source = new();
+        private readonly object _gate = new();
+        private Task? _cancelTask;
+        private bool _completed;
+        public DetailRequest(int version)
+        {
+            Version = version;
+            Token = _source.Token;
+        }
+
+        public int Version { get; }
+        public CancellationToken Token { get; }
+
+        public Task CancelAsync()
+        {
+            lock (_gate)
+            {
+                if (_completed) return Task.CompletedTask;
+                return _cancelTask ??= _source.CancelAsync();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Task? cancellation;
+            lock (_gate) { _completed = true; cancellation = _cancelTask; }
+            try
+            {
+                if (cancellation is not null) await cancellation;
+            }
+            finally { _source.Dispose(); }
+        }
+    }
+}

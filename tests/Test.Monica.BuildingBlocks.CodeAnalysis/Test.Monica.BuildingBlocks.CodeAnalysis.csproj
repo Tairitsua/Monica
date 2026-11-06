@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Test.Monica.BuildingBlocks.CodeAnalysis</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Monica.BuildingBlocks.CodeAnalysis\Monica.BuildingBlocks.CodeAnalysis.csproj" />
+    <ProjectReference Include="..\..\Monica.BuildingBlocks\Monica.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\skills\monica-application-building-block-development\references\12-entity-request-event-template.md"
+                      LogicalName="BuildingBlockTemplates.Events.md" />
+    <EmbeddedResource Include="..\..\skills\monica-application-building-block-development\references\14-event-handler-template.md"
+                      LogicalName="BuildingBlockTemplates.Handlers.md" />
+    <EmbeddedResource Include="..\..\skills\monica-application-building-block-development\references\17-connected-use-case-example.md"
+                      LogicalName="BuildingBlockTemplates.ConnectedUseCase.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.collector">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+</Project>

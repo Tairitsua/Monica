@@ -69,7 +69,7 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
         granular_skills = {
             "monica-application-microservice",
             "monica-application-modular-monolith",
-            "monica-application-project-unit-development",
+            "monica-application-building-block-development",
             "monica-application-unit-testing",
         }
         self.assertEqual([], validator.find_required_cycles(self.catalog["skills"]))
@@ -345,7 +345,7 @@ class AgentSkillInfrastructureTests(unittest.TestCase):
 
     def test_managed_instruction_rules_are_switchable_and_route_source_lookup_through_guide(self) -> None:
         instructions = self.catalog["managedInstructions"]
-        self.assertEqual(6, instructions["version"])
+        self.assertEqual(7, instructions["version"])
         for profile_name, template in instructions["templates"].items():
             rules = [rule["text"] for rule in template["rules"]]
             rule_ids = [rule["id"] for rule in template["rules"]]

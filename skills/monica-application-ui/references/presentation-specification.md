@@ -30,7 +30,7 @@ src/
     ├── Platform.Infrastructure/ # Only when product technical code has shared owners
     ├── Platform.Protocol/
     │   └── PublishedLanguages/DomainDelivery/{Requests,Models}/
-    ├── Platform.BuildingBlocks/ # Optional independent helpers
+    ├── Platform.Foundation/ # Optional independent helpers
     └── Platform.Testing/        # Optional shared test support
 ```
 

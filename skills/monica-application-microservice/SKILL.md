@@ -14,4 +14,4 @@ Apply the [shared specification](../monica-application/references/00-application
 - [Contracts and runtime composition](references/02-protocol-platform-and-service-contracts.md): preserve one published domain API, route only constrained operations remotely, and select ingress.
 - [Boundaries and persistence](references/03-service-boundaries-and-collaboration.md): preserve domain data ownership and explicit consistency across stores.
 
-Use `$monica-application-project-unit-development` for feature units and matching `monica-infra-*` skills for native registration. Existing service names, wire routes, durable identities and operating modes require deliberate preservation or an approved migration.
+Use `$monica-application-building-block-development` for feature units and matching `monica-infra-*` skills for native registration. Existing service names, wire routes, durable identities and operating modes require deliberate preservation or an approved migration.

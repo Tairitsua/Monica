@@ -1,10 +1,10 @@
 # Evolve an Application Specification
 
-Use this reference when source facts drift or a requirement cannot be met within the existing architectural contracts. Approval of a feature authorizes implementation through compliant ProjectUnit composition. It authorizes an architectural deviation only when the human's decision identifies that deviation and its scope.
+Use this reference when source facts drift or a requirement cannot be met within the existing architectural contracts. Approval of a feature authorizes implementation through compliant Building Block composition. It authorizes an architectural deviation only when the human's decision identifies that deviation and its scope.
 
 ## Try Existing Composition First
 
-Map the required state, rules, entry points, persistence, delivery, and lifetime to existing ProjectUnits and documented infrastructure capabilities. Combine them within their adopted contracts before proposing a new abstraction or specification rule. This is normal design work, not an extra approval document or mandatory checklist to show for every task.
+Map the required state, rules, entry points, persistence, delivery, and lifetime to existing Building Blocks and documented infrastructure capabilities. Combine them within their adopted contracts before proposing a new abstraction or specification rule. This is normal design work, not an extra approval document or mandatory checklist to show for every task.
 
 A new business workflow, concrete handler, event, job, state machine, or combination of those units is not a new architectural role. Selecting documented transaction modes, independent operation scopes, Outbox/Inbox delivery, or job execution is not a new execution model. Here **execution model** means the framework-level contract for dispatch, scope ownership, transaction participation, commit/rollback, or recovery; changing the business sequence while preserving those contracts stays within the existing model. Each capability's prerequisites still apply when composed.
 

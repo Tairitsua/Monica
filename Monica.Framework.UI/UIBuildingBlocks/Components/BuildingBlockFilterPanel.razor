@@ -1,0 +1,183 @@
+@using Monica.BuildingBlocks.Models
+@using MudBlazor.Extensions
+@inject IStringLocalizer<BuildingBlocksResource> L
+@implements IDisposable
+
+<div class="bb-filter-panel building-block-filter-panel">
+    <div class="bb-filter-panel__query">
+        <div class="bb-filter-panel__search">
+            <MudTextField T="string" @ref="_searchField" @bind-Value="_queryText"
+                          Label="@L["BuildingBlockFilterPanel:Fields:SearchLabel"]"
+                          HelperText="@L["BuildingBlockFilterPanel:Fields:SearchHelper"]"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search"
+                          Immediate="true" DebounceInterval="300"
+                          OnDebounceIntervalElapsed="OnFilterTextChangedAsync" />
+        </div>
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearSearchAsync"
+                   StartIcon="@MoIcons.Close">
+            @L["BuildingBlockFilterPanel:Actions:ClearSearch"]
+        </MudButton>
+    </div>
+    <details class="bb-filter-panel__facets" open>
+        <summary>@L["BuildingBlockFilterPanel:Sections:TypeFilter"] <span>@SelectedKinds.Count / @_kindOptions.Count</span></summary>
+        <div class="bb-filter-panel__type-actions">
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SelectAllTypesAsync">@L["Shared:Actions:SelectAll"]</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearAllTypesAsync">@L["Shared:Actions:Clear"]</MudButton>
+        </div>
+        <div class="bb-filter-panel__chips" tabindex="0" aria-label="@L["BuildingBlockFilterPanel:Sections:TypeFilter"]">
+            <MudChipSet CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" T="BuildingBlockKind" SelectionMode="SelectionMode.MultiSelection"
+                        SelectedValues="SelectedKinds" SelectedValuesChanged="OnSelectedKindsChangedAsync">
+                @foreach (var option in _kindOptions)
+                {
+                    <MudChip T="BuildingBlockKind" Value="@option.Kind" Size="Size.Small"
+                             Variant="Variant.Outlined"
+                             Icon="@BuildingBlockVisualizationConfig.GetKindIcon(option.Kind)">
+                        @L["BuildingBlockFilterPanel:Formats:TypeCount", L.GetBuildingBlockKindText(option.Kind), option.Count]
+                    </MudChip>
+                }
+            </MudChipSet>
+        </div>
+    </details>
+    <div class="bb-filter-panel__toggles">
+        <MudSwitch T="bool" Value="ShowOnlyWithDependencies" ValueChanged="OnShowOnlyWithDependenciesChangedAsync"
+                   Label="@L["BuildingBlockFilterPanel:Switches:OnlyDependencies"]" Color="Color.Primary" Size="Size.Small" />
+        <MudSwitch T="bool" Value="ShowOnlyWithAlerts" ValueChanged="OnShowOnlyWithAlertsChangedAsync"
+                   Label="@L["BuildingBlockFilterPanel:Switches:OnlyAlerts"]" Color="Color.Primary" Size="Size.Small" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyCollection<BuildingBlockSummary> BuildingBlocks { get; set; } = [];
+    [Parameter] public string FilterText { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> FilterTextChanged { get; set; }
+    [Parameter] public IReadOnlyCollection<BuildingBlockKind> SelectedKinds { get; set; } = new HashSet<BuildingBlockKind>();
+    [Parameter] public EventCallback<IReadOnlyCollection<BuildingBlockKind>> SelectedKindsChanged { get; set; }
+    [Parameter] public bool ShowOnlyWithDependencies { get; set; }
+    [Parameter] public EventCallback<bool> ShowOnlyWithDependenciesChanged { get; set; }
+    [Parameter] public bool ShowOnlyWithAlerts { get; set; }
+    [Parameter] public EventCallback<bool> ShowOnlyWithAlertsChanged { get; set; }
+    [Parameter] public EventCallback OnFiltersChanged { get; set; }
+
+    private MudTextField<string>? _searchField;
+    private IReadOnlyList<KindOption> _kindOptions = [];
+    private string _queryText = string.Empty;
+    private string _ownerQuery = string.Empty;
+    private bool _clearing;
+    private bool _disposed;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(FilterText, _ownerQuery, StringComparison.Ordinal))
+        {
+            _queryText = FilterText;
+            _ownerQuery = FilterText;
+        }
+        _kindOptions = BuildingBlocks
+            .Where(static unit => unit.Kind != BuildingBlockKind.None)
+            .GroupBy(static unit => unit.Kind)
+            .Select(static group => new KindOption(group.Key, group.Count()))
+            .OrderByDescending(static option => option.Count)
+            .ThenBy(static option => option.Kind)
+            .ToList();
+    }
+
+    private async Task OnFilterTextChangedAsync(string? value)
+    {
+        var query = value ?? string.Empty;
+        if (_disposed || _clearing || string.Equals(query, _ownerQuery, StringComparison.Ordinal)
+            || !string.Equals(query, _searchField?.GetState(field => field.Text) ?? string.Empty, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _queryText = query;
+        FilterText = query;
+        _ownerQuery = query;
+        await FilterTextChanged.InvokeAsync(query);
+        if (!_disposed && !_clearing)
+        {
+            await OnFiltersChanged.InvokeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Clears the native debounced input and publishes an empty query to its owner.
+    /// </summary>
+    /// <remarks>
+    /// This operation does not invoke <see cref="OnFiltersChanged"/>. A caller resetting
+    /// other constraints should await it, reset those constraints, and apply filters once.
+    /// The field owns its pending debounce; clearing its current text prevents an older
+    /// pending callback from restoring the previous query.
+    /// </remarks>
+    public async Task ClearQueryAsync()
+    {
+        if (_disposed || _clearing)
+        {
+            return;
+        }
+        _clearing = true;
+        try
+        {
+            if (_searchField is not null)
+            {
+                await _searchField.ClearAsync();
+            }
+            if (_disposed)
+            {
+                return;
+            }
+            _queryText = string.Empty;
+            _ownerQuery = string.Empty;
+            FilterText = string.Empty;
+            await FilterTextChanged.InvokeAsync(string.Empty);
+        }
+        finally
+        {
+            _clearing = false;
+        }
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        await ClearQueryAsync();
+        if (!_disposed)
+        {
+            await OnFiltersChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnSelectedKindsChangedAsync(IReadOnlyCollection<BuildingBlockKind> values)
+    {
+        if (_disposed) return;
+        SelectedKinds = values;
+        await SelectedKindsChanged.InvokeAsync(values);
+        if (!_disposed) await OnFiltersChanged.InvokeAsync();
+    }
+
+    private Task SelectAllTypesAsync() => OnSelectedKindsChangedAsync(_kindOptions.Select(static option => option.Kind).ToHashSet());
+    private Task ClearAllTypesAsync() => OnSelectedKindsChangedAsync(new HashSet<BuildingBlockKind>());
+
+    private async Task OnShowOnlyWithDependenciesChangedAsync(bool value)
+    {
+        if (_disposed) return;
+        ShowOnlyWithDependencies = value;
+        await ShowOnlyWithDependenciesChanged.InvokeAsync(value);
+        if (!_disposed) await OnFiltersChanged.InvokeAsync();
+    }
+
+    private async Task OnShowOnlyWithAlertsChangedAsync(bool value)
+    {
+        if (_disposed) return;
+        ShowOnlyWithAlerts = value;
+        await ShowOnlyWithAlertsChanged.InvokeAsync(value);
+        if (!_disposed) await OnFiltersChanged.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _searchField = null;
+    }
+
+    private sealed record KindOption(BuildingBlockKind Kind, int Count);
+}

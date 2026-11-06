@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Monica.Testing</RootNamespace>
-    <PackageDescription>Host-owned test applications, fast ProjectUnit harnesses, assertions, and deterministic seams for Monica.</PackageDescription>
+    <PackageDescription>Host-owned test applications, fast BuildingBlock harnesses, assertions, and deterministic seams for Monica.</PackageDescription>
   </PropertyGroup>
 
   <ItemGroup>

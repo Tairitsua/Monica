@@ -118,6 +118,6 @@ The event type must carry `[Outbox]` and stable `[EventName]` metadata. When tes
 
 Assert application.ModuleSnapshots for module registration. Resolve scoped repositories inside application.CreateScope; do not resolve them from the root Services provider.
 
-## Raw ProjectUnit Fast Path
+## Raw Building Block Fast Path
 
-Use ProjectUnitFixture<TUnit>.Builder().WithSubstitute<TCollaborator>(out var collaborator).Build() only for explicit collaboration. It does not validate transactions or production composition. Entity invariants can use ordinary constructors without a host.
+Use BuildingBlockFixture<TBuildingBlock>.Builder().WithSubstitute<TCollaborator>(out var collaborator).Build() only for explicit collaboration. It does not validate transactions or production composition. Entity invariants can use ordinary constructors without a host.

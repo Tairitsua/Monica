@@ -80,13 +80,13 @@ Default seams retain the real audit policy. Replace ICurrentUser, TimeProvider a
 ## Requirement and Unit Traits
 
 - Declare the governing requirement once per test class with `[Trait("REQ", "<requirement-id>")]`; add a method-level REQ trait only when one test exercises an additional requirement.
-- Add `[Trait("Unit", "<project-relative-path>::<runtime-key>")]` using the project-qualified catalog reference when `{TypeUnderTest}Tests` is absent or ambiguous. Class traits apply to every method; method traits add associations only for that method. Explicit Unit traits take precedence over naming inference.
+- Add `[Trait("BuildingBlock", "<project-relative-path>::<runtime-key>")]` using the project-qualified catalog reference when `{TypeUnderTest}Tests` is absent or ambiguous. Class traits apply to every method; method traits add associations only for that method. Explicit Unit traits take precedence over naming inference.
 - `REQ` and `Unit` declare separate relationships. A unit association does not imply verification of every requirement on that unit. `dotnet test --filter "REQ=<requirement-id>"` selects declared tests; verify the selected count and execution result before claiming coverage. Runtime result formats may expose traits for CI cross-checks.
 - Trait arguments must be constant, non-empty strings. Requirement IDs must resolve to current Knowledge; use the allocated opaque identity, not a historical title or rewritten ID. Other trait keys stay free for repository-local tooling.
 
 ## Smaller Boundaries
 
-Use raw ProjectUnitFixture<TUnit> only when collaborators are explicit and composition, discovery, proxies, transactions, hosted lifecycle and host ownership are outside the assertion. It does not supply a substitute production UoW. Entity/value-object invariant tests may construct objects directly.
+Use raw BuildingBlockFixture<TBuildingBlock> only when collaborators are explicit and composition, discovery, proxies, transactions, hosted lifecycle and host ownership are outside the assertion. It does not supply a substitute production UoW. Entity/value-object invariant tests may construct objects directly.
 
 Replace external boundaries, not domain services, repositories or policy logic. Avoid uncontrolled network/database access and hidden machine dependencies. Keep assertions in tests.
 

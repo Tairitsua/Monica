@@ -53,8 +53,8 @@
     <Project Path="tests/Test.Monica.Locker.Redis/Test.Monica.Locker.Redis.csproj" />
     <Project Path="tests/Test.Monica.Locker/Test.Monica.Locker.csproj" />
     <Project Path="tests/Test.Monica.Markdown/Test.Monica.Markdown.csproj" />
-    <Project Path="tests/Test.Monica.ProjectUnits.CodeAnalysis/Test.Monica.ProjectUnits.CodeAnalysis.csproj" />
-    <Project Path="tests/Test.Monica.ProjectUnits/Test.Monica.ProjectUnits.csproj" />
+    <Project Path="tests/Test.Monica.BuildingBlocks.CodeAnalysis/Test.Monica.BuildingBlocks.CodeAnalysis.csproj" />
+    <Project Path="tests/Test.Monica.BuildingBlocks/Test.Monica.BuildingBlocks.csproj" />
     <Project Path="tests/Test.Monica.AI/Test.Monica.AI.csproj" />
     <Project Path="tests/Test.Monica.AI.UI/Test.Monica.AI.UI.csproj" />
     <Project Path="tests/Test.Monica.Application/Test.Monica.Application.csproj" />
@@ -117,8 +117,8 @@
   <Project Path="Monica.OpenTelemetry.UI/Monica.OpenTelemetry.UI.csproj" />
   <Project Path="Monica.OpenTelemetry/Monica.OpenTelemetry.csproj" />
   <Project Path="Monica.Profiling/Monica.Profiling.csproj" />
-  <Project Path="Monica.ProjectUnits.CodeAnalysis/Monica.ProjectUnits.CodeAnalysis.csproj" />
-  <Project Path="Monica.ProjectUnits/Monica.ProjectUnits.csproj" />
+  <Project Path="Monica.BuildingBlocks.CodeAnalysis/Monica.BuildingBlocks.CodeAnalysis.csproj" />
+  <Project Path="Monica.BuildingBlocks/Monica.BuildingBlocks.csproj" />
   <Project Path="Monica.ServiceDiscovery/Monica.ServiceDiscovery.csproj" />
   <Project Path="Monica.Repository.UI/Monica.Repository.UI.csproj" />
   <Project Path="Monica.Repository/Monica.Repository.csproj" />

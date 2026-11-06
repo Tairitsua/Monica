@@ -11,7 +11,7 @@ src/
       Application/                         # Stable role IDs and existing domain identifiers
       PublishedLanguages/DomainOrdering/{Requests,Models,Events}/
     Platform.Infrastructure/               # Product technical code reused by multiple domain/role owners
-    Platform.BuildingBlocks/               # Optional product-independent, Monica-independent library
+    Platform.Foundation/               # Optional product-independent, Monica-independent library
     Platform.Testing/                      # Optional shared test support; no test cases
   Domains/
     Ordering/
@@ -44,11 +44,11 @@ Create only projects and folders with actual responsibilities. A role is already
 
 | Project | Responsibility and references |
 | --- | --- |
-| `Platform.Protocol` | Published requests, DTOs, events, stable role IDs, existing domain identifiers, and generated API interfaces. May use independent BuildingBlocks values and Monica contract/annotation APIs. No implementations, persistence bases, options, provider/UI setup, deployment addresses or environment files. |
-| `Platform.Infrastructure` | Product-specific technical code on Monica reused by multiple domains or roles: adapters, persistence bases and technical policies/contracts. May reference Protocol, BuildingBlocks and the Monica capabilities it uses; never domain cores, roles or hosts. |
-| `Platform.BuildingBlocks` | Optional code that could ship independently of this product and Monica, such as coordinate mathematics. May use third-party libraries; references no Monica or other Platform project. |
+| `Platform.Protocol` | Published requests, DTOs, events, stable role IDs, existing domain identifiers, and generated API interfaces. May use independent Foundation values and Monica contract/annotation APIs. No implementations, persistence bases, options, provider/UI setup, deployment addresses or environment files. |
+| `Platform.Infrastructure` | Product-specific technical code on Monica reused by multiple domains or roles: adapters, persistence bases and technical policies/contracts. May reference Protocol, Foundation and the Monica capabilities it uses; never domain cores, roles or hosts. |
+| `Platform.Foundation` | Optional code that could ship independently of this product and Monica, such as coordinate mathematics. May use third-party libraries; references no Monica or other Platform project. |
 | `Platform.Testing` | Optional shared fixtures, factories and doubles. May reference production projects and Monica.Testing. Contains no test cases and is never referenced by production. |
-| `Domains.{Domain}` | Domain rules and owned persistence, including repositories and contexts. May use Infrastructure, Protocol and BuildingBlocks; never references role implementations or peer domain implementations. |
+| `Domains.{Domain}` | Domain rules and owned persistence, including repositories and contexts. May use Infrastructure, Protocol and Foundation; never references role implementations or peer domain implementations. |
 | `Roles.{Domain}[.{Purpose}]` | Application handlers and role-owned runtime integrations. References its own domain core and shared contracts; never references peer roles or peer domain implementations. |
 | `Product.Host`, justified specialized hosts | Native composition of their actual local implementations, generated clients and local receivers. Whole-host module/provider choices, UI shell, middleware and product endpoints stay in the host's Composition folder. May reference an optional generated catalog and UI. |
 | `Product.ApplicationCatalog` | Optional host build artifact containing generated domain, role and operation ownership without runtime implementation dependencies. References Protocol normally and implementations as build-only metadata inputs. It is not a Platform responsibility. |
@@ -57,9 +57,9 @@ Create only projects and folders with actual responsibilities. A role is already
 
 Application collaboration uses generated published APIs. Shared same-domain invariants belong in the core and are directly reusable by its roles. Technical cross-domain coordination uses narrow owned technical contracts where user-command semantics do not fit. Moving foreign repositories behind a service locator does not preserve the boundary.
 
-The four Platform names describe allowed responsibilities, not four mandatory projects. Keep code with its only consumer until it has actual shared owners. Monica-based code useful to unrelated products belongs in Monica rather than in BuildingBlocks. Infrastructure does not select the entire host's modules or become a dependency barrel that makes Protocol transitively import runtime providers and UI. Reusable technical code does not justify moving one domain's repository into Platform.
+The four Platform names describe allowed responsibilities, not four mandatory projects. Keep code with its only consumer until it has actual shared owners. Monica-based code useful to unrelated products belongs in Monica rather than in Foundation. Infrastructure does not select the entire host's modules or become a dependency barrel that makes Protocol transitively import runtime providers and UI. Reusable technical code does not justify moving one domain's repository into Platform.
 
-Production dependency direction is Host → Roles → own Domain → Infrastructure → Protocol → BuildingBlocks; references may skip levels downward. No production library references a host or testing library, and domain cores never reference one another. Enforce those boundaries with focused project-reference checks, including a Protocol dependency allow-list and absence of copied environment files. Shared test support and executable tests follow [the production behavior owner](../../monica-application-unit-testing/references/project-naming.md).
+Production dependency direction is Host → Roles → own Domain → Infrastructure → Protocol → Foundation; references may skip levels downward. No production library references a host or testing library, and domain cores never reference one another. Enforce those boundaries with focused project-reference checks, including a Protocol dependency allow-list and absence of copied environment files. Shared test support and executable tests follow [the production behavior owner](../../monica-application-unit-testing/references/project-naming.md).
 
 ## Ownership, artifact composition and compiled metadata
 

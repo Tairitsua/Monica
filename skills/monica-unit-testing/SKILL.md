@@ -1,6 +1,6 @@
 ---
 name: monica-unit-testing
-description: Create, migrate, or review Monica framework tests and shared testing infrastructure, including host-owned scenarios, raw ProjectUnit fixtures, Roslyn source-generator tests, result assertions, and isolation.
+description: Create, migrate, or review Monica framework tests and shared testing infrastructure, including host-owned scenarios, raw BuildingBlock fixtures, Roslyn source-generator tests, result assertions, and isolation.
 ---
 
 # Monica Unit Testing
@@ -12,7 +12,7 @@ Use `Monica.Testing` as the shared toolkit and keep runnable framework tests und
 1. Read `<project-root>/tests/README.md` for the current project layout and execution rules.
 2. Classify the test before choosing infrastructure:
    - Pure logic: construct the value or service directly.
-   - Raw ProjectUnit collaboration: use `ProjectUnitFixture<TUnit>` and accept its activation limits.
+   - Raw Building Block collaboration: use `BuildingBlockFixture<TBuildingBlock>` and accept its activation limits.
    - Module wiring, options, conventional registration, proxies, hosted lifecycle, or cross-scope behavior: create a full host with `MonicaTestApplicationFactory<TDiscoveryAnchor>`.
    - Blazor behavior contract: use bUnit in the runnable UI test project only when the user explicitly requests UI testing or UI test additions.
    - Roslyn source-generator semantics: build an in-memory `CSharpCompilation` and run the generator through `GeneratorDriver`.
@@ -42,9 +42,9 @@ Default seams retain real audit policy; replace TimeProvider/current-user/ID inp
 
 When a handler host has multiple write contexts, put `[ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = new[] { typeof(PrimaryDbContext), typeof(ParticipantDbContext) })]` on its concrete execution method and test the real receive pipeline. The selected primary context owns Inbox and Outbox rows; verify its final flush after later participants stage projections. Follow the persistence [transaction contract](../monica-infra-persistence/references/transactions.md) for selection and explicit execution features.
 
-## Raw ProjectUnit Fast Path
+## Raw Building Block Fast Path
 
-`ProjectUnitFixture<TUnit>` is an explicitly raw fast-path harness. It creates a small Microsoft DI container, activates the target, and initializes Monica's cached-service-provider accessor where applicable.
+`BuildingBlockFixture<TBuildingBlock>` is an explicitly raw fast-path harness. It creates a small Microsoft DI container, activates the target, and initializes Monica's cached-service-provider accessor where applicable.
 
 Use it only when all collaborators are deliberately supplied and the assertion does not depend on:
 

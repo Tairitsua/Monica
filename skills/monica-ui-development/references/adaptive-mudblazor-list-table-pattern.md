@@ -105,7 +105,7 @@ Wrap the table in a page-specific container that owns the column contract:
 - Give long text columns flexible `minmax(..., fr)` tracks.
 - Give operational columns enough fixed/auto minimum width so they do not disappear: cron expression, next/last execution time, status, and actions are common examples.
 - Keep the action column wide enough for all visible buttons. Do not solve overlap by hiding actions.
-- Tune each table shape separately. Recurring definitions, trigger definitions, instances, and project units usually need different `--table-columns`.
+- Tune each table shape separately. Recurring definitions, trigger definitions, instances, and building blocks usually need different `--table-columns`.
 - Use page-level full width (`MaxWidth="MaxWidth.False"`) for dense list pages when the default container is the real bottleneck.
 
 ## Ellipsis Value Wrappers
@@ -141,9 +141,9 @@ Important details:
 For `MudDataGrid`, prefer the same wrapper principle but adapt selectors to the actual runtime DOM. Add `HeaderClass` and `CellClass` where useful, then style those classes through the scoped wrapper with `::deep`.
 
 ```razor
-<MudDataGrid Items="@_units" Class="project-units-monitor-grid">
+<MudDataGrid Items="@_units" Class="building-blocks-monitor-grid">
     <Columns>
-        <PropertyColumn Property="x => x.UnitName" HeaderClass="project-units-monitor-grid__name" CellClass="project-units-monitor-grid__name" />
+        <PropertyColumn Property="x => x.UnitName" HeaderClass="building-blocks-monitor-grid__name" CellClass="building-blocks-monitor-grid__name" />
     </Columns>
 </MudDataGrid>
 ```

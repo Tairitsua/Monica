@@ -36,7 +36,7 @@
         "Monica.Markdown",
         "Monica.OpenTelemetry",
         "Monica.OpenTelemetry.UI",
-        "Monica.ProjectUnits",
+        "Monica.BuildingBlocks",
         "Monica.Repository",
         "Monica.Repository.UI",
         "Monica.ServiceDiscovery",
@@ -98,9 +98,9 @@
       "reason": "The preview-first guide engine ships inside platform executables and consuming products, not as a NuGet package."
     },
     {
-      "project": "Monica.ProjectUnits.CodeAnalysis",
+      "project": "Monica.BuildingBlocks.CodeAnalysis",
       "tier": "labs",
-      "reason": "Source-level ProjectUnit analysis is an internal Monica.Workflow capability and is intentionally not published as a package."
+      "reason": "Source-level BuildingBlock analysis is an internal Monica.Workflow capability and is intentionally not published as a package."
     }
   ]
 }

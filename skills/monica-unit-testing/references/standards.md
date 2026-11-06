@@ -11,12 +11,12 @@
 | Behavior under test | Test boundary |
 |---|---|
 | Value objects, parsers, validators, deterministic support code | Direct construction |
-| One ProjectUnit with every collaborator supplied explicitly | Raw `ProjectUnitFixture<TUnit>` |
+| One Building Block with every collaborator supplied explicitly | Raw `BuildingBlockFixture<TBuildingBlock>` |
 | Module graph, options, DI registration, proxies, hosted lifecycle, or cross-scope behavior | `MonicaTestApplicationFactory<TDiscoveryAnchor>` scenario |
 | Blazor behavior contract, when UI testing is explicitly requested | bUnit in the UI test project |
 | Incremental source-generator input, diagnostic, or generated source | In-memory Roslyn `GeneratorDriver` |
 
-`ProjectUnitFixture<TUnit>` does not validate Monica composition. Do not add a separate `ApplicationServiceFixture`; application services use either the raw ProjectUnit fast path or a real scenario host according to the behavior being tested.
+`BuildingBlockFixture<TBuildingBlock>` does not validate Monica composition. Do not add a separate `ApplicationServiceFixture`; application services use either the raw Building Block fast path or a real scenario host according to the behavior being tested.
 
 ## Source-Generator Isolation
 

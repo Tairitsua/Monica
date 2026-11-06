@@ -19,6 +19,6 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 | Choose before-commit effects or committed delivery; configure outbox, batch inbox, and projections | [Transactional events](references/transactional-events.md) |
 | Diagnose a failed or slow save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |
 
-For key-value storage, use [state stores](../monica-infra-hosting/references/state-stores.md); for application placement, use ProjectUnit development in `$monica-application-project-unit-development`. For module implementation, use `$monica-framework`, then `$monica-development`.
+For key-value storage, use [state stores](../monica-infra-hosting/references/state-stores.md); for application placement, use Building Block development in `$monica-application-building-block-development`. For module implementation, use `$monica-framework`, then `$monica-development`.
 
 If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.

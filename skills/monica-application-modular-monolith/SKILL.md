@@ -14,4 +14,4 @@ Apply the [shared specification](../monica-application/references/00-application
 - [Published collaboration](references/02-protocol-platform-and-internal-collaboration.md): retain generated APIs and Local operation scopes.
 - [Boundaries and persistence](references/03-boundaries-dependencies-and-persistence.md): keep domain stores explicit and migrations independent of host startup.
 
-Use `$monica-application-project-unit-development` for feature units and matching `monica-infra-*` skills for native registration. Co-location does not grant peer repository access or atomic commits across independent stores.
+Use `$monica-application-building-block-development` for feature units and matching `monica-infra-*` skills for native registration. Co-location does not grant peer repository access or atomic commits across independent stores.

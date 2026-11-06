@@ -70,18 +70,18 @@ See [the repository migration guide](https://monica.dpdns.org/docs/guides/reposi
 - Keep mutable doubles and external resource names isolated per scenario.
 - Run independent scenarios in parallel; serialize only an explicitly shared external resource.
 
-## Raw ProjectUnit Fast Path
+## Raw Building Block Fast Path
 
-`ProjectUnitFixture<TUnit>` is a raw collaboration harness. It builds a small Microsoft DI provider, activates the target with `ActivatorUtilities`, and assigns Monica's cached service provider when supported.
+`Monica.Testing.BuildingBlocks.BuildingBlockFixture<TBuildingBlock>` is a raw collaboration harness. It builds a small Microsoft DI provider, activates the target with `ActivatorUtilities`, and assigns Monica's cached service provider when supported. The activated instance is available through `fixture.BuildingBlock`.
 
 Use it only when every collaborator is explicit and the test does not depend on module composition, type discovery, conventional registration, dynamic proxies, interceptors, options binding, hosted lifecycle, or host isolation.
 
-There is no separate application-service fixture. Application services use `ProjectUnitFixture<TUnit>` for honest raw collaboration tests or a full host scenario when Monica runtime behavior matters.
+There is no separate application-service fixture. Application services use `BuildingBlockFixture<TBuildingBlock>` for raw collaboration tests or a full host scenario when Monica runtime behavior matters.
 
 ## Shared Infrastructure
 
 - `Hosting/` — host factory, scenario application and scope, seam replacement, database isolation, deterministic logging and HTTP support
-- `ProjectUnits/` — raw ProjectUnit fixture and execution helpers
+- `BuildingBlocks/` — raw Building Block fixture and execution helpers
 - `Repository/` — direct DbContext and repository helpers
 - `Doubles/` — deterministic state, user, and event boundaries
 - `Results/` — explicit assertions for `Result`, `Result<T>`, and `PagedResult<T>`
@@ -91,8 +91,9 @@ UI-specific support lives in `Monica.Testing.UI` so non-UI tests do not acquire 
 
 ## Validation
 
-Run under WSL with a Windows path and keep one CLI test process active at a time:
+From the repository root, build and run the standard test gate sequentially:
 
-```bash
-dotnet test 'D:\Code\MoLibrary\Monica.slnx' --results-directory 'D:\Code\MoLibrary\tests\TestResults'
+```powershell
+dotnet build Monica.slnx -m -c Release
+powershell -File scripts/run-tests.ps1 -NoBuild
 ```

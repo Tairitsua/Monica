@@ -4,7 +4,7 @@
 
 A sociable scenario creates a complete Monica host, replaces only boundaries before host build, and resolves production handlers, domain services, repositories, mappers, options, and module services from DI.
 
-Use focused direct or raw ProjectUnit tests only when host composition adds no relevant behavior.
+Use focused direct or raw Building Block tests only when host composition adds no relevant behavior.
 
 ## Project Layout
 
@@ -51,7 +51,7 @@ Do not replace application services, domain services, repositories, or mappers u
 
 ## Fast Path
 
-Use `ProjectUnitFixture<TUnit>` only as a raw activation harness with explicit collaborators. Its assertions must not claim to cover Monica module wiring, type discovery, conventional registration, dynamic proxies, interceptors, options binding, hosted lifecycle, or host isolation.
+Use `BuildingBlockFixture<TBuildingBlock>` only as a raw activation harness with explicit collaborators. Its assertions must not claim to cover Monica module wiring, type discovery, conventional registration, dynamic proxies, interceptors, options binding, hosted lifecycle, or host isolation.
 
 Do not maintain a parallel `ApplicationServiceFixture<THandler>` abstraction.
 
@@ -66,14 +66,14 @@ Do not maintain a parallel `ApplicationServiceFixture<THandler>` abstraction.
 
 ## Trait Rules
 
-Two trait keys are reserved for linking test classes into the ProjectUnit chain: `[ProjectUnitRequirement]` ties units to requirement IDs, and test classes declare the same IDs plus the unit under test.
+Two trait keys are reserved for linking test classes into the Building Block chain: `[BuildingBlockRequirement]` ties units to requirement IDs, and test classes declare the same IDs plus the unit under test.
 
 - `REQ` — the governing requirement ID of the spec under test. Class-level declares the default for every test in the class; a method-level `[Trait("REQ", "...")]` adds a requirement only one test exercises.
 - `Unit` — the project-qualified catalog reference `<workspace-relative-project.csproj>::<runtime-key>`. Required when the class name does not follow `{TypeUnderTest}Tests`, or when the stem names more than one unit. Runtime keys alone do not disambiguate projects.
 
 ```csharp
 [Trait("REQ", "FIPS-REQ-FLIGHT-20260920-531942")]
-[Trait("Unit", "src/Domains/Flight/Roles.Flight/Roles.Flight.csproj::Roles.Flight.HandlersCommand.CommandHandlerUpdateFlight")]
+[Trait("BuildingBlock", "src/Domains/Flight/Roles.Flight/Roles.Flight.csproj::Roles.Flight.HandlersCommand.CommandHandlerUpdateFlight")]
 public sealed class FlightPlanAppServiceTests
 {
     [Fact]

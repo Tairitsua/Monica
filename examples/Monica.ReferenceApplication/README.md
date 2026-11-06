@@ -32,7 +32,7 @@ src/
     Program.cs                       # Native host lifecycle
 ```
 
-Create shared projects only when they contain real shared code. Protocol directly references Monica's application and event contract types and the API generator. The core, roles and host directly reference the capabilities they use. This example has no reusable product infrastructure, independent BuildingBlocks, shared testing library or migration project to extract. Four allowed Platform responsibilities do not require four empty projects.
+Create shared projects only when they contain real shared code. Protocol directly references Monica's application and event contract types and the API generator. The core, roles and host directly reference the capabilities they use. This example has no reusable product infrastructure, independent foundation library, shared testing library or migration project to extract. Four allowed Platform responsibilities do not require four empty projects.
 
 Each core/role assembly declares `ApplicationDomain` or `ApplicationRole`. The host's `[assembly: ApplicationHost]` generates its manifest and operation callers/receivers from the referenced implementations. Protocol independently generates the stable Ordering API interfaces. The host includes both roles; each role references only its own core and published contracts. The UI references Protocol and Monica.Application.UI.
 
@@ -89,4 +89,4 @@ The reporting job uses the native `JobSchedulerFacade.RunRecurringNowAsync` oper
 dotnet test tests/Test.Monica.Reference.Api -c Release
 ```
 
-Diagnostics include [Swagger](http://localhost:5275/swagger), [ProjectUnits](http://localhost:5275/framework/units), [metrics](http://localhost:5275/metrics), [readiness](http://localhost:5275/health) and [liveness](http://localhost:5275/alive). See the [unified application specification](../../skills/monica-application/references/03-unified-architecture.md) for project boundaries and the shared local-development contract.
+Diagnostics include [Swagger](http://localhost:5275/swagger), [Building Blocks](http://localhost:5275/framework/building-blocks), [metrics](http://localhost:5275/metrics), [readiness](http://localhost:5275/health) and [liveness](http://localhost:5275/alive). See the [unified application specification](../../skills/monica-application/references/03-unified-architecture.md) for project boundaries and the shared local-development contract.

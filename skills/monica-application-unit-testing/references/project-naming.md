@@ -9,7 +9,7 @@ A runnable application test project is named `Test.{ProductionProjectName}`, usi
 | Entities, domain rules, repositories, persistence mappings, or domain-owned passive synchronization | Domain core | `Test.Domains.User` |
 | Commands, queries, role-owned HTTP adapters, subscriptions, jobs, or workers | Role implementation | `Test.Roles.User`, `Test.Roles.User.Realtime` |
 | Published DTOs, request contracts, or serialization rules owned by shared contracts | Protocol project | `Test.Platform.Protocol` |
-| Shared technical behavior or product infrastructure adapters | Exact shared library | `Test.Platform.BuildingBlocks`, `Test.Platform.Infrastructure` |
+| Shared technical behavior or product infrastructure adapters | Exact shared library | `Test.Platform.Foundation`, `Test.Platform.Infrastructure` |
 | Actual executable composition, provider selection, startup inputs, local profile, generated manifest, role activation or ingress wiring | Business host and its Composition folder | `Test.Product.Host` |
 | Presentation behavior, when UI tests are explicitly requested | Actual UI project | `Test.Product.UI` |
 | Migration behavior or a tool's own behavior | Actual migration or tool project | `Test.Migrations.DomainUser`, `Test.MigrationRunner` |

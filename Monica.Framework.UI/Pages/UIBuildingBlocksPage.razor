@@ -1,0 +1,20 @@
+@attribute [Route(PAGE_URL)]
+
+@using Monica.Framework.UI.UIBuildingBlocks.Components
+@inject IStringLocalizer<BuildingBlocksResource> L
+
+<PageTitle>@L["Pages:BuildingBlocks:Overview:Title"]</PageTitle>
+
+<BuildingBlocksWorkspace ActiveRoute="@PAGE_URL">
+    <header class="building-blocks-overview-heading">
+        <span class="building-blocks-overview-heading__eyebrow">@L["Page:Header:Eyebrow"]</span>
+        <h1>@L["Page:Header:Title"]</h1>
+        <p>@L["Page:Header:Description"]</p>
+    </header>
+
+    <BuildingBlockDashboard />
+</BuildingBlocksWorkspace>
+
+@code {
+    public const string PAGE_URL = "/building-blocks";
+}

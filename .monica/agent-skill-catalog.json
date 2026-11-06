@@ -74,7 +74,7 @@
         "monica-guide",
         "monica-application-microservice",
         "monica-application-modular-monolith",
-        "monica-application-project-unit-development",
+        "monica-application-building-block-development",
         "monica-application-unit-testing",
         "monica-infra-persistence",
         "monica-infra-messaging",
@@ -135,7 +135,7 @@
       "dependencies": {
         "required": [
           "monica-application",
-          "monica-application-project-unit-development"
+          "monica-application-building-block-development"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -152,7 +152,7 @@
       "dependencies": {
         "required": [
           "monica-application",
-          "monica-application-project-unit-development"
+          "monica-application-building-block-development"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -161,8 +161,8 @@
         "external": []
       }
     },
-    "monica-application-project-unit-development": {
-      "path": "skills/monica-application-project-unit-development",
+    "monica-application-building-block-development": {
+      "path": "skills/monica-application-building-block-development",
       "role": "capability",
       "ownership": "monica",
       "managed": true,
@@ -745,20 +745,20 @@
           "auto-model",
           "model-query",
           "web-api",
-          "project-units",
+          "building-blocks",
           "execution-pipeline"
         ],
         "sourcePaths": [
           "Monica.WebApi",
           "Monica.ModelQuery",
           "Monica.Authority",
-          "Monica.ProjectUnits",
+          "Monica.BuildingBlocks",
           "Monica.Core/Execution",
           "Monica.Core/Modules/ModuleExecutionPipeline.cs",
           "Monica.Framework.UI/UIExecutionPipeline",
-          "Monica.Framework.UI/UIProjectUnits",
+          "Monica.Framework.UI/UIBuildingBlocks",
           "Monica.Framework.UI/Modules/ModuleExecutionPipelineUI.cs",
-          "Monica.Framework.UI/Modules/ModuleProjectUnitsUI.cs",
+          "Monica.Framework.UI/Modules/ModuleBuildingBlocksUI.cs",
           "Monica.Application"
         ]
       }
@@ -870,7 +870,7 @@
           "monica-guide",
           "monica-troubleshooting",
           "monica-application",
-          "monica-application-project-unit-development",
+          "monica-application-building-block-development",
           "monica-infra-hosting",
           "monica-infra-persistence",
           "monica-infra-messaging",
@@ -1127,14 +1127,10 @@
     "monica-business-modular-monolith": {
       "canonical": "monica-application-modular-monolith",
       "diagnostic": "Retired skill name; install or invoke $monica-application-modular-monolith."
-    },
-    "monica-project-unit-development": {
-      "canonical": "monica-application-project-unit-development",
-      "diagnostic": "Retired skill name; install or invoke $monica-application-project-unit-development."
     }
   },
   "managedInstructions": {
-    "version": 6,
+    "version": 7,
     "markers": {
       "start": "<!-- monica-guide:managed:start -->",
       "end": "<!-- monica-guide:managed:end -->"
@@ -1207,7 +1203,7 @@
           },
           {
             "id": "monica-application-routing",
-            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references. For business UI also load monica-application-ui; the same project specification owns presentation and backend.",
+            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and BuildingBlock references. For business UI also load monica-application-ui; the same project specification owns presentation and backend.",
             "labels": {
               "en-US": {
                 "title": "Application development",
@@ -1221,7 +1217,7 @@
           },
           {
             "id": "monica-application-specification-evolution",
-            "text": "Compose existing ProjectUnits and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope.",
+            "text": "Compose existing Building Blocks and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope.",
             "labels": {
               "en-US": {
                 "title": "Confirm architecture changes",

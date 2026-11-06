@@ -1,10 +1,10 @@
 # Monica Testing
 
-This directory contains Monica's runnable test projects and shared execution conventions. The testing model separates direct logic tests, raw ProjectUnit collaboration tests, complete host-owned scenarios, and Blazor component tests so each assertion uses the correct runtime boundary.
+This directory contains Monica's runnable test projects and shared execution conventions. The testing model separates direct logic tests, raw BuildingBlock collaboration tests, complete host-owned scenarios, and Blazor component tests so each assertion uses the correct runtime boundary.
 
 ## Scope
 
-- `Monica.Testing` provides host-owned scenario infrastructure, raw ProjectUnit fixtures, result assertions, repository helpers, and deterministic boundary doubles.
+- `Monica.Testing` provides host-owned scenario infrastructure, raw BuildingBlock fixtures, result assertions, repository helpers, and deterministic boundary doubles.
 - `Monica.Testing.UI` provides reusable UI test support without adding UI dependencies to the core toolkit.
 - `tests/Test.Monica.*` contains runnable framework test projects.
 - Real external integration, browser automation, and end-to-end suites are outside this unit-test layer.
@@ -14,12 +14,12 @@ This directory contains Monica's runnable test projects and shared execution con
 | Behavior | Boundary |
 |---|---|
 | Value object, parser, validator, or deterministic support logic | Construct directly |
-| One ProjectUnit with explicit collaborators | Raw `ProjectUnitFixture<TUnit>` |
+| One BuildingBlock with explicit collaborators | Raw `BuildingBlockFixture<TUnit>` |
 | Module graph, options, registration, hosted lifecycle, or cross-scope behavior | Full `MonicaTestApplicationFactory<TDiscoveryAnchor>` scenario |
 | Blazor component or page shell | bUnit in a UI test project |
 | Source-generator input, diagnostics, generated source, or same-compilation binding | In-memory Roslyn `GeneratorDriver` |
 
-`ProjectUnitFixture<TUnit>` uses a small raw Microsoft DI container. It does not prove Monica type discovery, conventional registration, module options, hosted lifecycle, or host ownership. There is no separate `ApplicationServiceFixture<THandler>`; apply the same boundary decision to application services as to every other ProjectUnit.
+`BuildingBlockFixture<TUnit>` uses a small raw Microsoft DI container. It does not prove Monica type discovery, conventional registration, module options, hosted lifecycle, or host ownership. There is no separate `ApplicationServiceFixture<THandler>`; apply the same boundary decision to application services as to every other BuildingBlock.
 
 ## Host-Owned Scenario Model
 
@@ -108,10 +108,10 @@ Mirror source folders such as `Modules/`, `Facades/`, `Services/`, `Providers/`,
 2. Reference `Monica.Testing` and the production project.
 3. Reference `Monica.Testing.UI` and bUnit only for UI tests.
 4. Add a `MonicaTestApplicationFactory<TDiscoveryAnchor>` only when host composition is part of the behavior.
-5. Add direct or raw ProjectUnit tests where the smaller boundary is honest.
+5. Add direct or raw BuildingBlock tests where the smaller boundary is honest.
 6. Keep scenario-specific seams in the runnable project; promote only genuinely reusable infrastructure to the shared toolkit.
 
-Source-generator tests are the exception to the host and ProjectUnit boundaries above. Keep them in a dedicated `Test.Monica.{GeneratorProject}` project, instantiate the incremental generator directly, and run it against an in-memory `CSharpCompilation`. Assert the updated compilation as well as generated text so same-compilation references are proven. Repeated identical runs must remain deterministic and must not create repository files; reserve solution-build tests for behavior owned by analyzer packaging or MSBuild targets.
+Source-generator tests are the exception to the host and BuildingBlock boundaries above. Keep them in a dedicated `Test.Monica.{GeneratorProject}` project, instantiate the incremental generator directly, and run it against an in-memory `CSharpCompilation`. Assert the updated compilation as well as generated text so same-compilation references are proven. Repeated identical runs must remain deterministic and must not create repository files; reserve solution-build tests for behavior owned by analyzer packaging or MSBuild targets.
 
 ## Opt-in native lease tests and measurements
 
