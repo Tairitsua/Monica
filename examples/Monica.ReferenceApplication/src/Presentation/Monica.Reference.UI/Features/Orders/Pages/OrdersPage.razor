@@ -78,16 +78,16 @@ else
     {
         var result = await Commands.CreateOrder(_form.ToRequest(), _lifetime.Token);
         if (_retired) return;
-        Present(result.ToRes());
-        if (result.IsOk()) { _form = new(); await LoadAsync(); }
+        Present(result.WithoutData());
+        if (result.IsSuccess()) { _form = new(); await LoadAsync(); }
     });
 
     private Task ApproveAsync(Guid id) => RunAsync(async () =>
     {
         var result = await Commands.ApproveOrder(new CommandApproveOrder(id), _lifetime.Token);
         if (_retired) return;
-        Present(result.ToRes());
-        if (result.IsOk()) await LoadAsync();
+        Present(result.WithoutData());
+        if (result.IsSuccess()) await LoadAsync();
     });
 
     private Task RunAsync(Func<Task> action)
@@ -109,11 +109,11 @@ else
         var orders = await Queries.GetOrders(new QueryGetOrders(), _lifetime.Token);
         var summary = await Queries.GetOrderSummary(new QueryGetOrderSummary(), _lifetime.Token);
         if (_retired) return;
-        if (orders.IsOk()) _orders = orders.Data ?? []; else Present(orders.ToRes());
-        if (summary.IsOk()) _summary = summary.Data; else Present(summary.ToRes());
+        if (orders.IsSuccess()) _orders = orders.Data ?? []; else Present(orders.WithoutData());
+        if (summary.IsSuccess()) _summary = summary.Data; else Present(summary.WithoutData());
     }
 
-    private void Present(Res result) { _failed = !result.IsOk(); _message = _failed ? result.Message : L["Ordering:Saved"]; }
+    private void Present(Result result) { _failed = !result.IsSuccess(); _message = _failed ? result.Message : L["Ordering:Saved"]; }
 
     public async ValueTask DisposeAsync()
     {

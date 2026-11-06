@@ -13,7 +13,7 @@ internal class ValidationExceptionMapper(IRequestRejectionFactory rejections) : 
         HttpContext? httpContext,
         Exception exception,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out Res? response)
+        [NotNullWhen(true)] out Result? response)
     {
         switch (exception)
         {

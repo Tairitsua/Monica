@@ -145,14 +145,15 @@
     private void LoadSampleJson()
     {
         if (Inactive || _commandBusy || _replayLocalMessage || _subscriptionId is not { } id) return;
-        if (TestService.CreateRuntimeJsonSample(id).IsFailed(out var error, out var sample))
+        var result = TestService.CreateRuntimeJsonSample(id);
+        if (result.IsFailure())
         {
             _jsonPayload = "{}";
             _hasValidationError = true;
-            _validationMessage = error.Message;
+            _validationMessage = result.Message;
             return;
         }
-        _jsonPayload = sample ?? "{}";
+        _jsonPayload = result.Data ?? "{}";
         _hasValidationError = false;
         _validationMessage = L["SubscriptionTestDialog:Messages:SampleGenerated"];
     }
@@ -160,10 +161,11 @@
     private void ValidateJson()
     {
         if (Inactive || _commandBusy || _subscriptionId is not { } id) return;
-        if (TestService.ValidateRuntimePayload(id, _jsonPayload).IsFailed(out var error))
+        var result = TestService.ValidateRuntimePayload(id, _jsonPayload);
+        if (result.IsFailure())
         {
             _hasValidationError = true;
-            _validationMessage = error.Message ?? L["SubscriptionTestDialog:Messages:JsonValidationFailed"];
+            _validationMessage = result.Message ?? L["SubscriptionTestDialog:Messages:JsonValidationFailed"];
             Snackbar.Add(_validationMessage, Severity.Error);
             return;
         }
@@ -181,7 +183,8 @@
         {
             var result = await TestService.PublishRuntimePayloadAsync(id, payload, _lifetimeToken);
             if (Inactive) return;
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 _hasValidationError = true;
                 _validationMessage = error.Message ?? L["SubscriptionTestDialog:Messages:PublishFailed"];
@@ -209,13 +212,14 @@
             return Task.CompletedTask;
         if (!_replayLocalMessage)
         {
-            if (TestService.PrepareLocalTestMessage(id, _jsonPayload).IsFailed(out var error, out var prepared))
+            var result = TestService.PrepareLocalTestMessage(id, _jsonPayload);
+            if (result.IsFailure())
             {
                 _hasValidationError = true;
-                _validationMessage = error.Message;
+                _validationMessage = result.Message;
                 return Task.CompletedTask;
             }
-            _localMessage = prepared;
+            _localMessage = result.Data;
         }
         if (_localMessage is not { } message) return Task.CompletedTask;
         _deliveringLocally = true;
@@ -223,7 +227,8 @@
         {
             var result = await TestService.DeliverLocalTestMessageAsync(id, message, _lifetimeToken);
             if (Inactive) return;
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 _hasValidationError = true;
                 _validationMessage = error.Message;
@@ -246,7 +251,9 @@
             var result = await TestService.StartRuntimeListenerAsync(id);
             // The scoped service owns this listener, including a start completed after close.
             if (Inactive) return;
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
             {
                 Snackbar.Add(error.Message ?? L["SubscriptionTestDialog:Messages:StartListeningFailed"], Severity.Error);
                 return;
@@ -264,7 +271,8 @@
         {
             var result = await TestService.StopRuntimeListenerAsync(id);
             if (Inactive) return;
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 Snackbar.Add(error.Message ?? L["SubscriptionTestDialog:Messages:StopListeningFailed"], Severity.Error);
                 return;

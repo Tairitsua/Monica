@@ -119,7 +119,9 @@ internal sealed class ExecutionDetailState(
                     if (!authorization.IsAuthorized) return new(false, null, authorization.Error);
                     var result = await facade.CancelExecutionAsync(InstanceId, cancellationToken: token);
                     token.ThrowIfCancellationRequested();
-                    if (result.IsFailed(out var error, out var cancellation)) return new(true, null, error.Message);
+                    var error = result.WithoutData();
+                    var cancellation = result.Data;
+                    if (result.IsFailure() || cancellation is null) return new(true, null, error.Message ?? "The cancellation request returned no data.");
                     status = cancellation.Status;
                 }
                 finally { _mutationGate.Release(); }
@@ -167,7 +169,9 @@ internal sealed class ExecutionDetailState(
             }
             var result = await facade.GetExecutionAsync(InstanceId, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var execution))
+            var error = result.WithoutData();
+            var execution = result.Data;
+            if (result.IsFailure())
             {
                 _lifetime.TryApply(() =>
                 {

@@ -202,13 +202,14 @@
 
         try
         {
-            if ((await MonitorService.GetInstanceHistoryAsync(Instance.InstanceId, 100)).IsFailed(out var error, out var history))
+            var result = await MonitorService.GetInstanceHistoryAsync(Instance.InstanceId, 100);
+            if (result.IsFailure())
             {
-                Snackbar.Add(L["Detail:Messages:LoadHistoryFailed", error], Severity.Error);
+                Snackbar.Add(L["Detail:Messages:LoadHistoryFailed", result.Message ?? string.Empty], Severity.Error);
                 return;
             }
 
-            _history = history ?? new();
+            _history = result.Data ?? new();
         }
         finally
         {
@@ -226,13 +227,14 @@
 
         try
         {
-            if ((await MonitorService.GetInstanceExceptionsAsync(Instance.InstanceId)).IsFailed(out var error, out var exceptions))
+            var result = await MonitorService.GetInstanceExceptionsAsync(Instance.InstanceId);
+            if (result.IsFailure())
             {
-                Snackbar.Add(L["Detail:Messages:LoadExceptionsFailed", error], Severity.Error);
+                Snackbar.Add(L["Detail:Messages:LoadExceptionsFailed", result.Message ?? string.Empty], Severity.Error);
                 return;
             }
 
-            _exceptions = exceptions ?? new();
+            _exceptions = result.Data ?? new();
         }
         finally
         {

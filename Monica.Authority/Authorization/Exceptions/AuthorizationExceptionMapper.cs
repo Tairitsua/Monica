@@ -16,12 +16,12 @@ internal class AuthorizationExceptionMapper(AuthorityMessageLocalizer authorityL
         HttpContext? httpContext,
         Exception exception,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out Res? response)
+        [NotNullWhen(true)] out Result? response)
     {
         switch (exception)
         {
             case BusinessException businessError:
-                response = Res.Fail(businessError.Message);
+                response = Result.Failure(businessError.Message);
                 return true;
 
             case AuthorizationException { Type: AuthorizationException.ExceptionType.NotLogin }:
@@ -42,19 +42,19 @@ internal class AuthorizationExceptionMapper(AuthorityMessageLocalizer authorityL
 
             case AuthorizationException authorizationException:
             {
-                response = Res.Fail(
+                response = Result.Failure(
                         authorizationException.GetTitle(authorityLocalizer),
-                        ResStatus.Forbidden)
+                        ResultStatus.Forbidden)
                     .SetError(new ResultError(ResultErrorCodes.Forbidden, ResultTraceId.Capture(httpContext)));
                 return true;
             }
 
             case SecurityTokenArgumentException tokenMalformedException:
-                response = new Res(authorityLocalizer.GetTokenExceptionMessage(), ResStatus.Unauthorized);
+                response = Result.Failure(authorityLocalizer.GetTokenExceptionMessage(), ResultStatus.Unauthorized);
                 return true;
 
             case SecurityTokenException:
-                response = new Res(authorityLocalizer.GetTokenExceptionMessage(), ResStatus.Unauthorized);
+                response = Result.Failure(authorityLocalizer.GetTokenExceptionMessage(), ResultStatus.Unauthorized);
                 return true;
 
             default:

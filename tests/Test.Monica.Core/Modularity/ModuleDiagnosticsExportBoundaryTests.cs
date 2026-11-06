@@ -46,12 +46,12 @@ public sealed class ModuleDiagnosticsExportBoundaryTests
         var export = facade.CreateExport();
 
         rawFailure.Should().Contain(RAW_FAILURE_SENTINEL).And.Contain(RAW_PATH_SENTINEL);
-        inventory.Status.Should().Be(ResStatus.Ok);
+        inventory.Status.Should().Be(ResultStatus.Ok);
         var assemblyPath = inventory.Data!.Assemblies
             .Single(assembly => assembly.Name == typeof(ModuleDiagnosticsExportBoundaryTests).Assembly.GetName().Name)
             .Location;
         assemblyPath.Should().NotBeNullOrWhiteSpace();
-        export.Status.Should().Be(ResStatus.Ok);
+        export.Status.Should().Be(ResultStatus.Ok);
         export.Data!.Outcome.Should().Be(
             global::Monica.Core.Modularity.Diagnostics.Models.ModuleCompositionOutcome.Failed);
 

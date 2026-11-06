@@ -79,36 +79,37 @@ public sealed class LogReadingSession : IAsyncDisposable
     /// before comparing a new route's requested source with the reader's source.
     /// </summary>
     /// <remarks>Cancellation and retirement follow the same admission contract as other session operations.</remarks>
-    public Task<Res<ScreenLogSnapshot>> SynchronizeAsync(CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> SynchronizeAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(token =>
         {
             token.ThrowIfCancellationRequested();
-            return Task.FromResult((Res<ScreenLogSnapshot>)GetSnapshot());
+            return Task.FromResult(Result.Success(GetSnapshot()));
         }, cancellationToken);
 
     /// <summary>Replaces this reader's window with up to the effective display limit of latest complete physical lines.</summary>
-    public Task<Res<ScreenLogSnapshot>> InitializeAsync(int requestedLines, CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> InitializeAsync(int requestedLines, CancellationToken cancellationToken = default)
         => ExecuteAsync(async token =>
         {
             var candidate = _tail.CreateCursorCopy();
             var result = await candidate.ReadLatestLinesAsync(Math.Clamp(requestedLines, 1, _buffer.MaxDisplayLines), token).ConfigureAwait(false);
-            if (result.IsFailed(out var error, out var read)) { RecordFailure(error.Message); return (Res<ScreenLogSnapshot>)error; }
+            if (result.IsFailure()) { RecordFailure(result.Message); return Result.FromFailure<ScreenLogSnapshot>(result); }
+            var read = result.Data;
             token.ThrowIfCancellationRequested();
             _tail = candidate;
             _buffer.Reset(read.Lines, read.StartLineNumber);
-            return (Res<ScreenLogSnapshot>)AdoptRead(read);
+            return Result.Success(AdoptRead(read));
         }, cancellationToken);
 
     /// <summary>Polls this reader's selected source once, independently of whether following is enabled.</summary>
-    public Task<Res<ScreenLogSnapshot>> RefreshAsync(CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> RefreshAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(RefreshCoreAsync, cancellationToken);
 
     /// <summary>Starts this reader's following loop. The request token controls admission; the reader lifetime owns ongoing work.</summary>
-    public Task<Res> StartAsync(CancellationToken cancellationToken = default)
+    public Task<Result> StartAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(async token =>
         {
             token.ThrowIfCancellationRequested();
-            if (_running) return Res.Ok();
+            if (_running) return Result.Success();
             await StopFollowingAsync().ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             _followingCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -116,19 +117,19 @@ public sealed class LogReadingSession : IAsyncDisposable
             _running = true;
             Publish();
             _followingTask = Task.Run(() => FollowAsync(followingToken), CancellationToken.None);
-            return Res.Ok();
+            return Result.Success();
         }, cancellationToken);
 
     /// <summary>Stops and drains this session's following loop; other readers are unaffected.</summary>
-    public Task<Res> PauseAsync(CancellationToken cancellationToken = default)
-        => ExecuteAsync(async _ => { await StopFollowingAsync().ConfigureAwait(false); Publish(); return Res.Ok(); }, cancellationToken);
+    public Task<Result> PauseAsync(CancellationToken cancellationToken = default)
+        => ExecuteAsync(async _ => { await StopFollowingAsync().ConfigureAwait(false); Publish(); return Result.Success(); }, cancellationToken);
 
     /// <summary>
     /// Prepares a new independent cursor and adopts it only after a successful read. Missing sources are
     /// an explicit successful missing state. A canceled or failed read preserves the previous evidence.
     /// The previous following loop is drained before the new source is adopted; the new source starts paused.
     /// </summary>
-    public Task<Res<ScreenLogSnapshot>> SwitchToFileAsync(string relativePath, int initialLines, CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> SwitchToFileAsync(string relativePath, int initialLines, CancellationToken cancellationToken = default)
         => ExecuteAsync(async token =>
         {
             LogTailService candidate;
@@ -139,44 +140,46 @@ public sealed class LogReadingSession : IAsyncDisposable
                 candidate.SwitchToFile(path);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
-            { RecordFailure(ex.Message); return (Res<ScreenLogSnapshot>)$"Failed to select log file: {ex.Message}"; }
+            { RecordFailure(ex.Message); return Result.Failure<ScreenLogSnapshot>($"Failed to select log file: {ex.Message}"); }
             var result = await candidate.ReadLatestLinesAsync(Math.Clamp(initialLines, 1, _buffer.MaxDisplayLines), token).ConfigureAwait(false);
-            if (result.IsFailed(out var error, out var read)) { RecordFailure(error.Message); return (Res<ScreenLogSnapshot>)error; }
+            if (result.IsFailure()) { RecordFailure(result.Message); return Result.FromFailure<ScreenLogSnapshot>(result); }
+            var read = result.Data;
             token.ThrowIfCancellationRequested();
             await StopFollowingAsync().ConfigureAwait(false);
             if (token.IsCancellationRequested) { Publish(); token.ThrowIfCancellationRequested(); }
             _tail = candidate;
             _buffer.Reset(read.Lines, read.StartLineNumber);
-            return (Res<ScreenLogSnapshot>)AdoptRead(read);
+            return Result.Success(AdoptRead(read));
         }, cancellationToken);
 
     /// <summary>Matches keyword text ordinally across the verbatim physical line; severity is an independent exact parsed-level filter.</summary>
-    public Task<Res<ScreenLogSnapshot>> UpdateFilterAsync(string? keyword, bool onlyCapture, LogSeverity? severity = null,
+    public Task<Result<ScreenLogSnapshot>> UpdateFilterAsync(string? keyword, bool onlyCapture, LogSeverity? severity = null,
         CancellationToken cancellationToken = default)
         => ExecuteAsync(token =>
         {
             token.ThrowIfCancellationRequested();
             _buffer.ApplyFilter(LogFilterState.Create(keyword, onlyCapture, severity));
-            return Task.FromResult((Res<ScreenLogSnapshot>)Publish());
+            return Task.FromResult(Result.Success(Publish()));
         }, cancellationToken);
 
     /// <summary>Loads earlier physical lines from the same verified observed generation, leaving following state unchanged.</summary>
-    public Task<Res<int>> LoadMoreLinesAsync(int lineCount = 50, CancellationToken cancellationToken = default)
-        => ExecuteAsync<Res<int>>(async token =>
+    public Task<Result<int>> LoadMoreLinesAsync(int lineCount = 50, CancellationToken cancellationToken = default)
+        => ExecuteAsync<Result<int>>(async token =>
         {
             var before = GetSnapshot();
-            if (before.FirstRetainedLineNumber is not { } first || first <= 1) return 0;
+            if (before.FirstRetainedLineNumber is not { } first || first <= 1) return Result.Success(0);
             if (!await _tail.IsCurrentAsync(before.Source!.Generation, token).ConfigureAwait(false))
-                return "The log source changed; refresh before loading earlier lines.";
+                return Result.Failure<int>("The log source changed; refresh before loading earlier lines.");
             var result = await _tail.ReadLinesBeforeAsync(first, Math.Clamp(lineCount, 1, _buffer.MaxRetainedLines), token).ConfigureAwait(false);
-            if (result.IsFailed(out var error, out var read)) { RecordFailure(error.Message); return error; }
+            if (result.IsFailure()) { RecordFailure(result.Message); return Result.FromFailure<int>(result); }
+            var read = result.Data;
             if (!await _tail.IsCurrentAsync(before.Source.Generation, token).ConfigureAwait(false))
-                return "The log source changed during the history read; no history was adopted.";
+                return Result.Failure<int>("The log source changed during the history read; no history was adopted.");
             token.ThrowIfCancellationRequested();
-            if (read.Lines.Count == 0) return 0;
+            if (read.Lines.Count == 0) return Result.Success(0);
             _buffer.Prepend(read.Lines, read.StartLineNumber);
             Publish();
-            return read.Lines.Count;
+            return Result.Success(read.Lines.Count);
         }, cancellationToken);
 
     /// <summary>Freezes a retained physical line and its observed source generation for later context inspection.</summary>
@@ -195,31 +198,32 @@ public sealed class LogReadingSession : IAsyncDisposable
     /// Source generation and verbatim target text are verified before adoption. Appends are allowed;
     /// source switches, observable replacement and changed target text return a failed result.
     /// </summary>
-    public Task<Res<ContextLogResult>> ReadContextAsync(LogLineRequest request, int contextLines = 50,
+    public Task<Result<ContextLogResult>> ReadContextAsync(LogLineRequest request, int contextLines = 50,
         CancellationToken cancellationToken = default)
-        => ExecuteAsync<Res<ContextLogResult>>(async token =>
+        => ExecuteAsync<Result<ContextLogResult>>(async token =>
         {
             ArgumentNullException.ThrowIfNull(request);
-            if (request.AbsoluteLineNumber < 1 || contextLines < 0) return "Log context requires a positive target line and nonnegative context count.";
+            if (request.AbsoluteLineNumber < 1 || contextLines < 0) return Result.Failure<ContextLogResult>("Log context requires a positive target line and nonnegative context count.");
             var source = GetSnapshot().Source;
             if (source is null || source != request.Source || !await _tail.IsCurrentAsync(request.Source.Generation, token).ConfigureAwait(false))
-                return "This line belongs to a changed log source. Refresh and select the line again.";
+                return Result.Failure<ContextLogResult>("This line belongs to a changed log source. Refresh and select the line again.");
             var result = await _files.ReadContextAsync(source.FilePath, request.AbsoluteLineNumber, contextLines, token).ConfigureAwait(false);
-            if (result.IsFailed(out var error, out var context)) return error;
+            if (result.IsFailure()) return result;
+            var context = result.Data;
             var target = context.Lines.FirstOrDefault(line => line.IsContextTarget);
             if (target?.Raw != request.Raw || !await _tail.IsCurrentAsync(source.Generation, token).ConfigureAwait(false))
-                return "The log source or target text changed during the context read; no context was adopted.";
+                return Result.Failure<ContextLogResult>("The log source or target text changed during the context read; no context was adopted.");
             token.ThrowIfCancellationRequested();
-            return context with { Source = source, ReadAt = DateTimeOffset.UtcNow };
+            return Result.Success(context with { Source = source, ReadAt = DateTimeOffset.UtcNow });
         }, cancellationToken);
 
     /// <summary>Exports a frozen copy of all retained raw lines from this reader, independent of visible filters.</summary>
-    public Task<Res<LogExportResult>> ExportBufferAsync(CancellationToken cancellationToken = default)
+    public Task<Result<LogExportResult>> ExportBufferAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(token =>
         {
             token.ThrowIfCancellationRequested();
             var snapshot = GetSnapshot();
-            return Task.FromResult((Res<LogExportResult>)ExportLines(snapshot, snapshot.RetainedLines));
+            return Task.FromResult(Result.Success(ExportLines(snapshot, snapshot.RetainedLines)));
         }, cancellationToken);
 
     /// <summary>Exports only the visible physical lines in the supplied immutable snapshot, normalized as UTF-8 with LF separators.</summary>
@@ -230,11 +234,11 @@ public sealed class LogReadingSession : IAsyncDisposable
     }
 
     /// <summary>Lists the shared catalog without changing this reader's source or following state.</summary>
-    public Task<Res<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
+    public Task<Result<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(token => _files.ListFilesAsync(token), cancellationToken);
 
     /// <summary>The caller owns and must dispose a returned live download stream.</summary>
-    public Task<Res<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
+    public Task<Result<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
         => ExecuteAsync(token => _files.OpenFileAsync(relativePath, token), cancellationToken);
 
     /// <summary>Subscribes to this reader's immutable snapshots. Disposing the subscription does not stop following.</summary>
@@ -315,16 +319,17 @@ public sealed class LogReadingSession : IAsyncDisposable
         }
     }
 
-    private async Task<Res<ScreenLogSnapshot>> RefreshCoreAsync(CancellationToken token)
+    private async Task<Result<ScreenLogSnapshot>> RefreshCoreAsync(CancellationToken token)
     {
         var candidate = _tail.CreateCursorCopy();
         var result = await candidate.ReadNextAsync(token).ConfigureAwait(false);
-        if (result.IsFailed(out var error, out var read)) { RecordFailure(error.Message); return error; }
+        if (result.IsFailure()) { RecordFailure(result.Message); return Result.FromFailure<ScreenLogSnapshot>(result); }
+        var read = result.Data;
         token.ThrowIfCancellationRequested();
         _tail = candidate;
         if (read.SourceReset) _buffer.Reset(read.Lines, read.StartLineNumber);
         else _buffer.AppendRange(read.Lines, read.StartLineNumber);
-        return AdoptRead(read);
+        return Result.Success(AdoptRead(read));
     }
 
     private ScreenLogSnapshot AdoptRead(LogReadResult read)

@@ -30,16 +30,18 @@ monica.AddAI().AddOpenAIProvider(options =>
 
 The application workflow is:
 
-1. Create a base with `KnowledgeBaseFacade.CreateAsync(id, name, description)` and check the `Res` result. Import selected Markdown documents with `KnowledgeDocumentFacade.ImportMarkdownDocumentsAsync(...)` after configuring a Markdown document group, or use `UploadDocumentAsync(...)` for source text. Uploads and imports add pending inventory; they do not index vectors.
+1. Create a base with `KnowledgeBaseFacade.CreateAsync(id, name, description)` and check the `Result` result. Import selected Markdown documents with `KnowledgeDocumentFacade.ImportMarkdownDocumentsAsync(...)` after configuring a Markdown document group, or use `UploadDocumentAsync(...)` for source text. Uploads and imports add pending inventory; they do not index vectors.
 2. Select an available embedding provider/model for that base with `EmbeddingModelFacade.GetEmbeddingModelsAsync()` and `SetKnowledgeBaseEmbeddingModelAsync(kbId, providerId, modelName)`. The binding belongs to the knowledge base. Changing it with the default `clearIndex: true` clears existing index state and requires reindexing.
-3. Read document IDs from `KnowledgeDocumentFacade.GetDocumentInventoryAsync(kbId)`. Use `RAGIndexingFacade.IndexDocumentAsync(kbId, documentId)` for one queued document or `StartBatchAsync(kbId)` for a tracked batch. `QueueDocumentForReindexAsync` and `QueueKnowledgeBaseForReindexAsync` reset existing work when content or indexing policy changes. Inspect each returned `Res`; a pending or failed document is not searchable merely because it appears in inventory.
-4. Query with scoped `RAGSearchFacade.SearchAsync(query, knowledgeBaseIds, topK, ct: cancellationToken)`. It returns `Res<IReadOnlyList<TextSearchResult>>`; the default `topK` is 5. Pass only the bases the caller may search. `RAGIndexingFacade.GetDocumentChunksAsync(...)` helps inspect source/chunk correspondence when results look wrong.
+3. Read document IDs from `KnowledgeDocumentFacade.GetDocumentInventoryAsync(kbId)`. Use `RAGIndexingFacade.IndexDocumentAsync(kbId, documentId)` for one queued document or `StartBatchAsync(kbId)` for a tracked batch. `QueueDocumentForReindexAsync` and `QueueKnowledgeBaseForReindexAsync` reset existing work when content or indexing policy changes. Inspect each returned `Result`; a pending or failed document is not searchable merely because it appears in inventory.
+4. Query with scoped `RAGSearchFacade.SearchAsync(query, knowledgeBaseIds, topK, ct: cancellationToken)`. It returns `Result<IReadOnlyList<TextSearchResult>>`; the default `topK` is 5. Pass only the bases the caller may search. `RAGIndexingFacade.GetDocumentChunksAsync(...)` helps inspect source/chunk correspondence when results look wrong.
 
 ```csharp
 var search = await ragSearch.SearchAsync(
     "How are orders approved?", ["orders"], ct: cancellationToken);
-if (search.IsFailed(out var error, out var hits))
-    throw new InvalidOperationException(error.Message);
+if (search.IsFailure())
+    throw new InvalidOperationException(search.Message);
+var hits = search.Data
+    ?? throw new InvalidOperationException("A successful search must include its result collection.");
 foreach (var hit in hits)
     Console.WriteLine(hit);
 ```

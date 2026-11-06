@@ -272,7 +272,8 @@ public partial class EventBusWorkbench : IAsyncDisposable
         {
             var stop = await TestService.StopRuntimeListenerAsync(id);
             _token.ThrowIfCancellationRequested();
-            if (stop.IsFailed(out var error)) { Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error); return; }
+            var error = stop;
+            if (stop.IsFailure()) { Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error); return; }
         }
         var removal = await Monitor.UnsubscribeAsync(id);
         Report(removal, "Page:Messages:UnsubscribeSucceeded");
@@ -289,10 +290,11 @@ public partial class EventBusWorkbench : IAsyncDisposable
         });
     }
 
-    private void Report(Res result, string successKey)
+    private void Report(Result result, string successKey)
     {
         if (_retired) return;
-        if (result.IsFailed(out var error)) Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
+        var error = result;
+        if (result.IsFailure()) Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
         else Snackbar.Add(L[successKey].Value, Severity.Success);
     }
 

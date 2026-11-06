@@ -11,20 +11,20 @@ using Monica.Core.Mediator;
 using Monica.Core.Results;
 using Monica.Repository.Persistence.Abstractions;
 
-public sealed record SaveOrder(Order Order) : IRequest<Res>;
+public sealed record SaveOrder(Order Order) : IRequest<Result>;
 
 public sealed class SaveOrderHandler(IRepository<Order> orders)
-    : IRequestHandler<SaveOrder, Res>
+    : IRequestHandler<SaveOrder, Result>
 {
-    public Task<Res> Handle(SaveOrder request, CancellationToken cancellationToken)
+    public Task<Result> Handle(SaveOrder request, CancellationToken cancellationToken)
     {
         orders.Add(request.Order);
-        return Task.FromResult(Res.Ok());
+        return Task.FromResult(Result.Success());
     }
 }
 ```
 
-`Order` is the application's entity; register the handler through the host's normal DI/discovery path. The boundary begins a transaction, runs the handler, drains same-scope domain events, flushes participants, and commits. An exception, failed `Res`/`Res<T>`, or execution outcome marked for rollback rolls it back.
+`Order` is the application's entity; register the handler through the host's normal DI/discovery path. The boundary begins a transaction, runs the handler, drains same-scope domain events, flushes participants, and commits. An exception, failed `Result`/`Result<T>`, or execution outcome marked for rollback rolls it back.
 
 The execution adapters choose these defaults:
 
@@ -138,7 +138,7 @@ Use `ExecutionTransactionAttribute` from `Monica.Core.Execution` on the **concre
 using Monica.Core.Execution;
 
 [ExecutionTransaction(ExecutionTransactionMode.None)]
-public Task<Res> Handle(RefreshOrderCache request, CancellationToken cancellationToken)
+public Task<Result> Handle(RefreshOrderCache request, CancellationToken cancellationToken)
 {
     return cache.RefreshAsync(request.OrderId, cancellationToken);
 }
@@ -163,10 +163,10 @@ When one UnitOfWork context is registered, it is selected automatically. With mu
 [ExecutionTransaction(
     ExecutionTransactionMode.Automatic,
     DbContextTypes = new[] { typeof(OrdersDbContext), typeof(OrderProjectionDbContext) })]
-public Task<Res> Handle(ApproveOrder request, CancellationToken cancellationToken)
+public Task<Result> Handle(ApproveOrder request, CancellationToken cancellationToken)
 {
     // Stage the application's order and projection changes here.
-    return Task.FromResult(Res.Ok());
+    return Task.FromResult(Result.Success());
 }
 ```
 
@@ -217,7 +217,7 @@ A nested `RunAsync` joins the active transaction and can select additional compa
 
 UnitOfWork is the sole transaction owner for transactional Outbox capture. `RepositoryDbContext` does not start another transaction or create custom savepoints because Outbox is configured. During a save in a verified managed physical transaction, it temporarily disables EF automatic savepoints and restores the previous setting afterward, including on failure. The validation includes the selected logical participant, provider, connection and physical transaction; delegated sharding contexts must share that ownership. A failed save faults the context and makes the whole operation rollback-only. Commit checks that state again after final flushing and snapshot finalization, so a failure marked by a save callback cannot be committed even when the callback returns normally.
 
-Persistence policies, EF save callbacks and entity-event projections must throw when they cannot continue. Let that exception escape; `RepositoryDbContext` records the first failure and rethrows the original exception. If an EF callback only marks the operation rollback-only and returns normally, `SaveChanges`/`SaveChangesAsync` throws `TransactionRollbackOnlyException` as soon as that EF flush returns, including empty saves and the second Outbox flush. A rejection after the business flush prevents subsequent entity-event capture and Outbox flushing. Catching a save failure never restores transaction health; the owning boundary still rolls back and refuses commit. Return a failed `Res` at an operation's result boundary when that is its contract; a save callback has no such result boundary.
+Persistence policies, EF save callbacks and entity-event projections must throw when they cannot continue. Let that exception escape; `RepositoryDbContext` records the first failure and rethrows the original exception. If an EF callback only marks the operation rollback-only and returns normally, `SaveChanges`/`SaveChangesAsync` throws `TransactionRollbackOnlyException` as soon as that EF flush returns, including empty saves and the second Outbox flush. A rejection after the business flush prevents subsequent entity-event capture and Outbox flushing. Catching a save failure never restores transaction health; the owning boundary still rolls back and refuses commit. Return a failed `Result` at an operation's result boundary when that is its contract; a save callback has no such result boundary.
 
 An empty save still executes persistence policies and EF save callbacks, but does not issue transaction or write commands when those callbacks leave it empty. UnitOfWork still owns its surrounding begin/commit. Do not filter participants using only `ChangeTracker.HasChanges()`: prepared Outbox messages have their own queue, and a logical sharding context delegates saving to physical contexts. The primary context is flushed again when a later participant stages projection messages on it.
 

@@ -20,7 +20,7 @@ public partial class ProviderConfigurationDialog
     /// <summary>Persists the complete draft; return a safe diagnostic to keep the dialog open on failure.</summary>
     [Parameter, EditorRequired] public required Func<ProviderConfigurationEdit, CancellationToken, Task<string?>> OnSave { get; set; }
     /// <summary>Fetches endpoint model metadata without saving the supplied draft.</summary>
-    [Parameter, EditorRequired] public required Func<ProviderConfigurationEdit, CancellationToken, Task<Res<IReadOnlyList<AIModelConfiguration>>>> OnDiscover { get; set; }
+    [Parameter, EditorRequired] public required Func<ProviderConfigurationEdit, CancellationToken, Task<Result<IReadOnlyList<AIModelConfiguration>>>> OnDiscover { get; set; }
     private bool _saving, _editingModel, _restoreModelsFocus;
     private ElementReference _modelsHeading;
     private AIProviderConfiguration? _initialConfiguration;
@@ -103,7 +103,9 @@ public partial class ProviderConfigurationDialog
             if (_lifetime.IsRetired || cancellation.IsCancellationRequested) return;
             if (connection != CurrentConnection)
             { _discoveryError = L["Settings:DraftConnectionChanged"]; return; }
-            if (result.IsFailed(out var error, out var models)) { _discoveryError = error.Message; return; }
+            var error = result.WithoutData();
+            var models = result.Data;
+            if (result.IsFailure() || models is null) { _discoveryError = error.Message ?? L["Error:Generic"]; return; }
             _discovered = models; _hasDiscovered = true; _discoveryConnection = connection; _selectedModels.Clear();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
@@ -153,13 +155,13 @@ public partial class ProviderConfigurationDialog
                     [nameof(ModelConfigurationDialog.Model)] = model,
                     [nameof(ModelConfigurationDialog.ProviderType)] = _type,
                     [nameof(ModelConfigurationDialog.IsProviderDraft)] = true,
-                    [nameof(ModelConfigurationDialog.OnDiscover)] = (Func<CancellationToken, Task<Res<IReadOnlyList<AIModelConfiguration>>>>)(ct =>
-                        _lifetime.RunAsync<Res<IReadOnlyList<AIModelConfiguration>>>(async ownerToken =>
+                    [nameof(ModelConfigurationDialog.OnDiscover)] = (Func<CancellationToken, Task<Result<IReadOnlyList<AIModelConfiguration>>>>)(ct =>
+                        _lifetime.RunAsync<Result<IReadOnlyList<AIModelConfiguration>>>(async ownerToken =>
                         {
                             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ownerToken);
                             var result = await OnDiscover(draft, linked.Token);
                             linked.Token.ThrowIfCancellationRequested();
-                            if (connection != CurrentConnection) return Res.Fail(L["Settings:DraftConnectionChanged"].Value);
+                    if (connection != CurrentConnection) return Result.Failure<IReadOnlyList<AIModelConfiguration>>(L["Settings:DraftConnectionChanged"].Value);
                             return result;
                         })),
                     [nameof(ModelConfigurationDialog.OnSave)] = (Func<AIModelConfiguration, Task<string?>>)(saved =>

@@ -269,14 +269,20 @@
                     SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
                 }, token);
                 var activeResult = await Facade.QueryExecutionsAsync(new JobExecutionQuery { SchedulerScopeKey = string.Empty, States = [JobExecutionState.Queued, JobExecutionState.Running], CreatedBeforeUtc = at, PageSize = 200 }, token);
-                if (activeResult.IsFailed(out var activeError, out var active)) throw new InvalidOperationException(activeError.Message);
+                var activeError = activeResult.WithoutData();
+                var active = activeResult.Data;
+                if (activeResult.IsFailure() || active is null) throw new InvalidOperationException(activeError.Message ?? "The active executions were unavailable.");
                 var analyticsResult = await Facade.GetExecutionAnalyticsAsync(new JobExecutionAnalyticsQuery { StartTimeUtc = at.AddMinutes(-minutes), EndTimeUtc = at }, token);
-                if (analyticsResult.IsFailed(out var analyticsError, out var analytics)) throw new InvalidOperationException(analyticsError.Message);
+                var analyticsError = analyticsResult.WithoutData();
+                var analytics = analyticsResult.Data;
+                if (analyticsResult.IsFailure() || analytics is null) throw new InvalidOperationException(analyticsError.Message ?? "The execution analytics were unavailable.");
                 var cursors = new Dictionary<JobId, JobOperationalSummary>();
                 for (var page = 1; page <= Math.Ceiling(definitions.Length / 200d); page++)
                 {
                     var response = await Facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = page, PageSize = 200 }, token);
-                    if (response.IsFailed(out var cursorError, out var cursorPage)) throw new InvalidOperationException(cursorError.Message);
+                    var cursorError = response.WithoutData();
+                    var cursorPage = response.Data;
+                    if (response.IsFailure() || cursorPage is null) throw new InvalidOperationException(cursorError.Message ?? "The job catalog was unavailable.");
                     foreach (var summary in cursorPage.Items) cursors[summary.Definition.Id] = summary;
                     if (page * 200 >= cursorPage.TotalCount) break;
                 }

@@ -29,11 +29,11 @@ public sealed class EventBusStandaloneListenerLease : IAsyncDisposable
     /// <summary>Starts a standalone listener without replacing an existing handle recovered by this lease.</summary>
     /// <param name="topicName">The exact topic on the default distributed bus.</param>
     /// <returns>The owned handle or a failure; this operation has no cancellation argument and must be drained.</returns>
-    public Task<Res<IEventSubscription>> SubscribeAsync(string topicName) => _service.SubscribeForLeaseAsync(this, topicName);
+    public Task<Result<IEventSubscription>> SubscribeAsync(string topicName) => _service.SubscribeForLeaseAsync(this, topicName);
 
     /// <summary>Attempts removal of this lease's exact listener, retaining it on failure for a retry or later recovery.</summary>
     /// <returns>Success when removed or absent, or a failure. No later owner's listener can be removed by this lease.</returns>
-    public Task<Res> UnsubscribeAsync() => _service.UnsubscribeForLeaseAsync(this);
+    public Task<Result> UnsubscribeAsync() => _service.UnsubscribeForLeaseAsync(this);
 
     /// <summary>Retires admission and releases exclusive control after already admitted service operations finish.</summary>
     /// <returns>An idempotent release operation; retained listener resources remain owned by the scoped service.</returns>

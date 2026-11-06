@@ -377,7 +377,7 @@ public sealed class IncrementalGeneratorPipelineTests
 
             public sealed class QueryHandlerGetOrder : ApplicationService<QueryGetOrder, string>
             {
-                public override Task<Res<string>> Handle(
+                public override Task<Result<string>> Handle(
                     QueryGetOrder request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -428,7 +428,7 @@ public sealed class IncrementalGeneratorPipelineTests
             public sealed class QueryHandlerGetConfiguredOrder
                 : ApplicationService<QueryGetConfiguredOrder, string>
             {
-                public override Task<Res<string>> Handle(
+                public override Task<Result<string>> Handle(
                     QueryGetConfiguredOrder request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -465,7 +465,7 @@ public sealed class IncrementalGeneratorPipelineTests
         public sealed class QueryHandlerGetPublishedOrder
             : ApplicationService<QueryGetPublishedOrder, string>
         {
-            public override Task<Res<string>> Handle(
+            public override Task<Result<string>> Handle(
                 QueryGetPublishedOrder request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -507,10 +507,10 @@ public sealed class IncrementalGeneratorPipelineTests
             public sealed record PositionalEnvelope<T>(T Data) : IRemoteResultEnvelope<PositionalEnvelope<T>>
             {
                 public string? Message { get; set; }
-                public ResStatus Status { get; set; }
+                public ResultStatus Status { get; set; }
                 public ExpandoObject? Metadata { get; set; }
 
-                public static PositionalEnvelope<T> CreateRemoteFailure(ResStatus status, string message) => new(default(T)!)
+                public static PositionalEnvelope<T> CreateRemoteFailure(ResultStatus status, string message) => new(default(T)!)
                 {
                     Status = status,
                     Message = message
@@ -564,12 +564,12 @@ public sealed class IncrementalGeneratorPipelineTests
 
         public sealed class QueryHandlerGetOrder : ApplicationService<QueryGetOrder, string>
         {
-            public override Task<Res<string>> Handle(QueryGetOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryGetOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
         public sealed class QueryHandlerFindOrder : ApplicationService<QueryFindOrder, string>
         {
-            public override Task<Res<string>> Handle(QueryFindOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryFindOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 
@@ -607,27 +607,27 @@ public sealed class IncrementalGeneratorPipelineTests
 
         public sealed class QueryHandlerIntegerOrder : ApplicationService<QueryIntegerOrder, string>
         {
-            public override Task<Res<string>> Handle(QueryIntegerOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryIntegerOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
         public sealed class QueryHandlerGuidOrder : ApplicationService<QueryGuidOrder, string>
         {
-            public override Task<Res<string>> Handle(QueryGuidOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryGuidOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
         public sealed class QueryHandlerOptionalOrder : ApplicationService<QueryOptionalOrder, string>
         {
-            public override Task<Res<string>> Handle(QueryOptionalOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryOptionalOrder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
         public sealed class QueryHandlerOrderPath : ApplicationService<QueryOrderPath, string>
         {
-            public override Task<Res<string>> Handle(QueryOrderPath request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryOrderPath request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
 
         public sealed class QueryHandlerOrderRegion : ApplicationService<QueryOrderRegion, string>
         {
-            public override Task<Res<string>> Handle(QueryOrderRegion request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryOrderRegion request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 

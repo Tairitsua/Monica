@@ -42,7 +42,7 @@ public sealed class ModuleDiagnosticsSnapshotConcurrencyTests
                 TestContext.Current.CancellationToken);
             var results = new[] { firstResult, competingProjection, facade.GetSnapshot() };
 
-            results.Should().OnlyContain(result => result.Status == ResStatus.Ok && result.Data != null);
+            results.Should().OnlyContain(result => result.Status == ResultStatus.Ok && result.Data != null);
             var snapshots = results.Select(static result => result.Data!).ToArray();
             snapshots.Should().OnlyContain(static snapshot =>
                 snapshot.IsFinal && snapshot.Outcome == ModuleCompositionOutcome.Succeeded);

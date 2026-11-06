@@ -40,22 +40,22 @@ public abstract class CustomApplicationService<TRequest, TResponse> :
 }
 
 /// <summary>
-/// Base class for application services with a specific handler, request, and response wrapped in a <see cref="Res{T}"/>.
+/// Base class for application services with a specific handler, request, and response wrapped in a <see cref="Result{T}"/>.
 /// </summary>
 /// <typeparam name="TRequest">The type of the request.</typeparam>
 /// <typeparam name="TResponse">The type of the response.</typeparam>
 public abstract class ApplicationService<TRequest, TResponse> :
-    CustomApplicationService<TRequest, Res<TResponse>>
+    CustomApplicationService<TRequest, Result<TResponse>>
     where TRequest : IResultRequest<TResponse>
 {
 }
 
 /// <summary>
-/// Base class for application services with a specific handler, request, and response wrapped in a <see cref="Res"/>.
+/// Base class for application services with a specific handler, request, and response wrapped in a <see cref="Result"/>.
 /// </summary>
 /// <typeparam name="TRequest">The type of the request.</typeparam>
 public abstract class ApplicationService<TRequest> :
-    CustomApplicationService<TRequest, Res>
+    CustomApplicationService<TRequest, Result>
     where TRequest : IResultRequest
 {
 }

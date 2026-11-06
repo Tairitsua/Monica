@@ -59,24 +59,24 @@ internal sealed class RemoteResponseDecoder(
                 var messageName = fields.GetMessagePropertyName(_json);
                 var statusMembers = FindMembers(root, statusName);
                 var messageMembers = FindMembers(root, messageName);
-                // Successful Res<T> values can have a null Message omitted by the host's
+                // Successful Result<T> values can have a null Message omitted by the host's
                 // JSON ignore policy. Failure envelopes still require a message member.
                 var omitsSuccessMessage = messageMembers.Count == 0 && statusMembers.Count == 1 &&
                     statusMembers[0].ValueKind == JsonValueKind.Number &&
                     statusMembers[0].TryGetInt32(out var successStatus) &&
-                    successStatus is (int)ResStatus.Ok or (int)ResStatus.Created;
+                    successStatus is (int)ResultStatus.Ok or (int)ResultStatus.Created;
                 if (statusMembers.Count > 0 && (messageMembers.Count > 0 || omitsSuccessMessage))
                 {
                     if (statusMembers.Count != 1 || messageMembers.Count > 1 ||
                         statusMembers[0].ValueKind != JsonValueKind.Number ||
                         !statusMembers[0].TryGetInt32(out var numericStatus) ||
-                        !Enum.IsDefined(typeof(ResStatus), numericStatus) || numericStatus == 0 ||
+                        !Enum.IsDefined(typeof(ResultStatus), numericStatus) || numericStatus == 0 ||
                         messageMembers.Count == 1 &&
                         messageMembers[0].ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
                         throw Invalid(response, "envelope_shape");
 
-                    var status = (ResStatus)numericStatus;
-                    if (new Res("", status).ToHttpStatusCode() != response.StatusCode)
+                    var status = (ResultStatus)numericStatus;
+                    if (status.ToHttpStatusCode() != response.StatusCode)
                         throw Invalid(response, "status_mismatch");
 
                     try

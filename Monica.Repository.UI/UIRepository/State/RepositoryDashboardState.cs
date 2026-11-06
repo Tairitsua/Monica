@@ -98,9 +98,17 @@ public sealed class RepositoryDashboardState(
             {
                 var result = await facade.UpdateMigrationAsync(contextId, MigrationCommandTimeout, token);
                 token.ThrowIfCancellationRequested();
-                if (result.IsFailed(out var error, out var update))
+                var error = result.WithoutData();
+                var update = result.Data;
+                if (result.IsFailure())
                 {
                     ErrorMessage = MigrationCommandError = error.Message;
+                    UpdateResults = [];
+                    return;
+                }
+                if (update is null)
+                {
+                    ErrorMessage = MigrationCommandError = "The migration update returned no data.";
                     UpdateResults = [];
                     return;
                 }
@@ -130,9 +138,17 @@ public sealed class RepositoryDashboardState(
             {
                 var result = await facade.UpdateAllPendingMigrationsAsync(MigrationCommandTimeout, token);
                 token.ThrowIfCancellationRequested();
-                if (result.IsFailed(out var error, out var updates))
+                var error = result.WithoutData();
+                var updates = result.Data;
+                if (result.IsFailure())
                 {
                     ErrorMessage = MigrationCommandError = error.Message;
+                    UpdateResults = [];
+                    return;
+                }
+                if (updates is null)
+                {
+                    ErrorMessage = MigrationCommandError = "The migration updates returned no data.";
                     UpdateResults = [];
                     return;
                 }
@@ -161,7 +177,10 @@ public sealed class RepositoryDashboardState(
         {
             var result = await facade.GetRegisteredContextsAsync(RevealConnectionStrings, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var snapshots)) { ErrorMessage = error.Message; return; }
+            var error = result.WithoutData();
+            var snapshots = result.Data;
+            if (result.IsFailure()) { ErrorMessage = error.Message; return; }
+            if (snapshots is null) { ErrorMessage = "The repository context read returned no data."; return; }
             Contexts = snapshots.Select(snapshot => snapshot with { Options = snapshot.Options.ToArray() }).ToArray();
             ContextsCapturedAt = DateTime.UtcNow;
             SelectedContext = SelectSnapshot(selectedId) ?? Contexts.FirstOrDefault();
@@ -182,8 +201,10 @@ public sealed class RepositoryDashboardState(
         {
             var migrationResult = await facade.GetMigrationStatusAsync(selected.Registration.ContextId, token);
             token.ThrowIfCancellationRequested();
-            var migrations = migrationResult.IsFailed(out var migrationError, out var migrationStatus)
-                ? new RepositoryMigrationStatus { Registration = selected.Registration, ErrorMessage = migrationError.Message }
+            var migrationError = migrationResult.WithoutData();
+            var migrationStatus = migrationResult.Data;
+            var migrations = migrationResult.IsFailure() || migrationStatus is null
+                ? new RepositoryMigrationStatus { Registration = selected.Registration, ErrorMessage = migrationError.Message ?? "The migration status was unavailable." }
                 : migrationStatus with
                 {
                     AllMigrations = migrationStatus.AllMigrations.ToArray(),
@@ -192,8 +213,10 @@ public sealed class RepositoryDashboardState(
                 };
             var activityResult = await facade.GetActivityAsync(selected.Registration.ContextId, token);
             token.ThrowIfCancellationRequested();
-            Activity = activityResult.IsFailed(out var activityError, out var activity)
-                ? new RepositoryActivityResult { Registration = selected.Registration, Support = RepositoryActivitySupport.Failed, Message = activityError.Message }
+            var activityError = activityResult.WithoutData();
+            var activity = activityResult.Data;
+            Activity = activityResult.IsFailure() || activity is null
+                ? new RepositoryActivityResult { Registration = selected.Registration, Support = RepositoryActivitySupport.Failed, Message = activityError.Message ?? "The repository activity was unavailable." }
                 : activity with { Rows = activity.Rows.Select(row => row with { }).ToArray() };
             MigrationStatus = migrations;
             DetailsCapturedAt = DateTime.UtcNow;

@@ -2,7 +2,7 @@
 
 Configuration UI timestamps follow page time display in `$monica-infra-ui` (`references/time-display.md`). History date filters interpret complete calendar dates in the configured Clock zone, use per-boundary timezone rules and retain inclusive end-date semantics; invalid or ambiguous calendar boundaries produce a validation message. Saved-snapshot scopes show their count and a short preview; expand to search complete definition identities. Group and operator identifiers remain selectable in disclosures, and ledger search still matches the full identities. Storage roles sharing one StoreKey share one descriptor, capability list and latest-operation block.
 
-Register `AddConfiguration(plan)` using the [input plan and store](bootstrap-and-stores.md). `ConfigurationFacade` owns inspection, preview, mutation, history, rollback, and reload. Check each returned `Res<T>`; a failed apply can carry a structured rejection in its original `Data`, and a persisted operation can report `PostCommitIssues`.
+Register `AddConfiguration(plan)` using the [input plan and store](bootstrap-and-stores.md). `ConfigurationFacade` owns inspection, preview, mutation, history, rollback, and reload. Check each returned `Result<T>`; a failed apply can carry a structured rejection in its original `Data`, and a persisted operation can report `PostCommitIssues`.
 
 ## Startup configuration
 
@@ -47,7 +47,7 @@ using Monica.Configuration.Models;
 using Monica.Core.Results;
 
 var stateResult = await facade.GetDefinitionStateAsync("orders");
-if (!stateResult.IsOk(out var state) || state is null)
+if (!stateResult.IsSuccess() || stateResult.Data is not { } state)
     throw new InvalidOperationException(stateResult.Message);
 
 var request = new ConfigurationMutationGroupApplyRequest
@@ -56,14 +56,14 @@ var request = new ConfigurationMutationGroupApplyRequest
     Commands = [Set("minimum", "30"), Set("maximum", "40")]
 };
 var previewResult = await facade.PreviewMutationGroupAsync(request, cancellationToken);
-if (!previewResult.IsOk(out var preview) || preview is null || !preview.CanApply)
+if (!previewResult.IsSuccess() || previewResult.Data is not { } preview || !preview.CanApply)
     return; // Show the safe failure or all reports and problems; retain the draft.
 
 var applyResult = await facade.ApplyMutationGroupAsync(request with
 {
     ExpectedValidationFingerprint = preview.ValidationFingerprint
 });
-if (!applyResult.IsOk(out var applied) || applied is null)
+if (!applyResult.IsSuccess() || applyResult.Data is not { } applied)
 {
     var rejection = applyResult.Data?.ValidationPreview;
     return; // Display the original structured rejection when present and request a fresh review.

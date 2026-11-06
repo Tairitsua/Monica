@@ -14,12 +14,12 @@ The rules define the handler contract; snippets illustrate it. A DomainService i
 ## Use When
 
 - You need an application use case for a local UI, an internal consumer, or an explicitly published HTTP operation.
-- The entry point should return `Res` or `Res<T>`.
+- The entry point should return `Result` or `Result<T>`.
 - The use case orchestrates domain logic, repositories, and mapping, but does not own the business rules itself.
 
 ## Rules
 
-- Use `ApplicationService<TRequest, TResponse>` or `ApplicationService<TRequest>` for ordinary `Res` boundaries. Native `CustomApplicationService<TRequest, TResult>` is available when an adopted contract needs an explicit custom mediator result; it remains the same application role and execution boundary, not a new service family.
+- Use `ApplicationService<TRequest, TResponse>` or `ApplicationService<TRequest>` for ordinary `Result` boundaries. Native `CustomApplicationService<TRequest, TResult>` is available when an adopted contract needs an explicit custom mediator result; it remains the same application role and execution boundary, not a new service family.
 - Declare business collaborators in the constructor, preferably a primary constructor, and inject only dependencies the handler uses. Current-user access and ID generation are explicit application dependencies; do not add them to a shared service base or resolve them through `IServiceProvider` / `CachedServiceProvider`.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
@@ -72,17 +72,17 @@ public sealed record Query$FeatureName$(long Id) : IQuery<$ResponseName$>;
 public sealed class QueryHandler$FeatureName$($RepositoryName$ repository)
     : ApplicationService<Query$FeatureName$, $ResponseName$>
 {
-    public override async Task<Res<$ResponseName$>> Handle(
+    public override async Task<Result<$ResponseName$>> Handle(
         Query$FeatureName$ request,
         CancellationToken cancellationToken)
     {
         var entity = await repository.FindAsync(request.Id, cancellationToken: cancellationToken);
         if (entity is null)
         {
-            return Res.Fail("$FeatureName$ target was not found.");
+            return Result.Failure<$ResponseName$>("$FeatureName$ target was not found.", ResultStatus.NotFound);
         }
 
-        return Res.Ok(new $ResponseName$
+        return Result.Success(new $ResponseName$
         {
             Id = entity.Id
         });
@@ -119,19 +119,19 @@ public sealed record Command$FeatureName$(long Id) : ICommand;
 public sealed class CommandHandler$FeatureName$(IRepositoryOrder repository)
     : ApplicationService<Command$FeatureName$>
 {
-    public override async Task<Res> Handle(
+    public override async Task<Result> Handle(
         Command$FeatureName$ request,
         CancellationToken cancellationToken)
     {
         var order = await repository.GetAsync(request.Id, cancellationToken);
         order.Approve();
-        return Res.Ok();
+        return Result.Success();
     }
 }
 ```
 
 ## Notes
 
-- If the success payload type is `string`, use `Res.Ok<string>(value)`.
+- `Result.Success(value)` always carries data, including strings. Use `WithMessage` for a message and `Result.FromFailure<TResponse>` to forward an existing failure without losing metadata.
 - If a query becomes complex because of filtering, paging, or policy checks, extract that logic before the handler turns procedural.
 - API publication is namespace-driven, not handler-driven. Do not move a local request into `PublishedLanguages` merely to share a DTO.

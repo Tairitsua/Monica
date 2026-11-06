@@ -49,7 +49,7 @@ public class EventBusProviderDiscoveryService(
     /// <summary>
     /// Get all registered EventBus Providers
     /// </summary>
-    public Res<List<EventBusProviderInfo>> GetRegisteredProviders()
+    public Result<List<EventBusProviderInfo>> GetRegisteredProviders()
     {
         try
         {
@@ -79,19 +79,19 @@ public class EventBusProviderDiscoveryService(
             // 6. Populate subscription statistics
             PopulateSubscriptionCounts(providers);
 
-            return Res.Ok(providers);
+            return Result.Success(providers);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取已注册 EventBus Provider 失败");
-            return Res.Fail(localizer["Services:Providers:GetRegisteredFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<List<EventBusProviderInfo>>(localizer["Services:Providers:GetRegisteredFailed", ex.GetMessageRecursively()]);
         }
     }
 
     /// <summary>
     /// Get Local Provider based on service key
     /// </summary>
-    public Res<ILocalEventBus> GetLocalProvider(string? serviceKey)
+    public Result<ILocalEventBus> GetLocalProvider(string? serviceKey)
     {
         try
         {
@@ -101,24 +101,24 @@ public class EventBusProviderDiscoveryService(
 
             if (provider == null)
             {
-                return Res.Fail(localizer[
+                return Result.Failure<ILocalEventBus>(localizer[
                     "Services:Providers:LocalNotFound",
                     serviceKey ?? localizer["Services:Common:DefaultProviderKey"].Value]);
             }
 
-            return Res.Ok(provider);
+            return Result.Success(provider);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取 Local Provider 失败: {Key}", serviceKey);
-            return Res.Fail(localizer["Services:Providers:GetProviderFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<ILocalEventBus>(localizer["Services:Providers:GetProviderFailed", ex.GetMessageRecursively()]);
         }
     }
 
     /// <summary>
     /// Get Distributed Provider based on service key
     /// </summary>
-    public Res<IDistributedEventBus> GetDistributedProvider(string? serviceKey)
+    public Result<IDistributedEventBus> GetDistributedProvider(string? serviceKey)
     {
         try
         {
@@ -130,17 +130,17 @@ public class EventBusProviderDiscoveryService(
                     ? serviceProvider.GetService<IEventTransport>()
                     : serviceProvider.GetKeyedService<IEventTransport>(serviceKey)) is null)
             {
-                return Res.Fail(localizer[
+                return Result.Failure<IDistributedEventBus>(localizer[
                     "Services:Providers:DistributedNotFound",
                     serviceKey ?? localizer["Services:Common:DefaultProviderKey"].Value]);
             }
 
-            return Res.Ok(provider);
+            return Result.Success(provider);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取 Distributed Provider 失败: {Key}", serviceKey);
-            return Res.Fail(localizer["Services:Providers:GetProviderFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<IDistributedEventBus>(localizer["Services:Providers:GetProviderFailed", ex.GetMessageRecursively()]);
         }
     }
 

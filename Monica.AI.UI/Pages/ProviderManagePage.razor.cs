@@ -65,7 +65,7 @@ public partial class ProviderManagePage
                 if (!State.IsRetired) await InvokeAsync(StateHasChanged);
                 return error;
             }),
-            [nameof(ProviderConfigurationDialog.OnDiscover)] = (Func<ProviderConfigurationEdit, CancellationToken, Task<Monica.Core.Results.Res<IReadOnlyList<AIModelConfiguration>>>>)((draft, token) => Configuration.DiscoverDraftModelsAsync(draft.Configuration, draft.ApiKey, provider?.HasApiKey == true && !draft.ClearApiKey, token))
+            [nameof(ProviderConfigurationDialog.OnDiscover)] = (Func<ProviderConfigurationEdit, CancellationToken, Task<Monica.Core.Results.Result<IReadOnlyList<AIModelConfiguration>>>>)((draft, token) => Configuration.DiscoverDraftModelsAsync(draft.Configuration, draft.ApiKey, provider?.HasApiKey == true && !draft.ClearApiKey, token))
         });
     }
     private async Task EditModelAsync(AIModelConfiguration? model)
@@ -85,7 +85,7 @@ public partial class ProviderManagePage
             [nameof(ModelConfigurationDialog.ProviderType)] = provider.Configuration.ProviderType,
             [nameof(ModelConfigurationDialog.OnSave)] = (Func<AIModelConfiguration, Task<string?>>)(draft => Save(draft, CancellationToken.None)),
             [nameof(ModelConfigurationDialog.OnSaveWithCancellation)] = (Func<AIModelConfiguration, CancellationToken, Task<string?>>)Save,
-            [nameof(ModelConfigurationDialog.OnDiscover)] = (Func<CancellationToken, Task<Monica.Core.Results.Res<IReadOnlyList<AIModelConfiguration>>>>)(token => Configuration.DiscoverModelsAsync(provider.Configuration.ProviderId, token))
+            [nameof(ModelConfigurationDialog.OnDiscover)] = (Func<CancellationToken, Task<Monica.Core.Results.Result<IReadOnlyList<AIModelConfiguration>>>>)(token => Configuration.DiscoverModelsAsync(provider.Configuration.ProviderId, token))
         });
         if (!State.IsRetired && model is not null && result is { Canceled: false } && savedDraft is { } saved
             && !Same(model.ModelName, saved.ModelName))

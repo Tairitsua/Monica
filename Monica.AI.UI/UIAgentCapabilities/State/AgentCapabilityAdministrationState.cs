@@ -129,7 +129,9 @@ internal sealed class AgentCapabilityAdministrationState(
             token.ThrowIfCancellationRequested();
             if (IsRetired || _selectionVersion != selectionVersion || !SameKey(SelectedEntry?.Key, entry.Key)
                 || Management?.Revision != revision || !OwnsEntry(entry)) return null;
-            if (result.IsFailed(out var error, out var connectivity))
+            var error = result.WithoutData();
+            var connectivity = result.Data;
+            if (result.IsFailure() || connectivity is null)
             {
                 var diagnostic = Redact(error.Message ?? GenericError, entry.McpExternalProfile?.Headers);
                 _lifetime.TryApply(() => LastProbe = new(entry.Key, entry.Name, revision, null, diagnostic));
@@ -143,13 +145,15 @@ internal sealed class AgentCapabilityAdministrationState(
     }
 
     private Task<string?> ApplyManagementAsync(
-        Func<CancellationToken, Task<Res<AgentCapabilityManagementInfo>>> producer,
+        Func<CancellationToken, Task<Result<AgentCapabilityManagementInfo>>> producer,
         CancellationToken ct = default, IReadOnlyDictionary<string, string>? headers = null, string? selectName = null) =>
         RunOperationAsync(async token =>
         {
             var result = await producer(token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var management)) return Redact(error.Message ?? GenericError, headers);
+            var error = result.WithoutData();
+            var management = result.Data;
+            if (result.IsFailure()) return Redact(error.Message ?? GenericError, headers);
             _lifetime.TryApply(() =>
             {
                 Management = management;

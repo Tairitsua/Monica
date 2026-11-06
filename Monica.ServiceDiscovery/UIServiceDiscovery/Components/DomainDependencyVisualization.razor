@@ -316,14 +316,18 @@
 
             var domainResult = await ServiceDiscoveryFacade.CaptureDomainsAsync(_lifetimeCancellation.Token);
             if (_disposed) return;
-            if (domainResult.IsFailed(out var domainError, out var domains))
+            var domainError = domainResult.WithoutData();
+            var domains = domainResult.Data;
+            if (domainResult.IsFailure())
             {
                 _captureError = domainError.Message ?? L["Atlas:Shared:CaptureFailed"].Value;
                 return;
             }
             var serviceResult = await ServiceDiscoveryFacade.CaptureServicesAsync(_lifetimeCancellation.Token);
             if (_disposed) return;
-            if (serviceResult.IsFailed(out var serviceError, out var services))
+            var serviceError = serviceResult.WithoutData();
+            var services = serviceResult.Data;
+            if (serviceResult.IsFailure())
             {
                 _captureError = serviceError.Message ?? L["Atlas:Shared:CaptureFailed"].Value;
                 return;
@@ -331,7 +335,9 @@
 
             var topologyResult = await ServiceDiscoveryFacade.CaptureTopologyAsync(_lifetimeCancellation.Token);
             if (_disposed) return;
-            if (topologyResult.IsFailed(out var topologyError, out var topology))
+            var topologyError = topologyResult.WithoutData();
+            var topology = topologyResult.Data;
+            if (topologyResult.IsFailure() || topology is null)
             {
                 _captureError = topologyError.Message ?? L["Atlas:Shared:CaptureFailed"].Value;
                 return;
@@ -339,7 +345,7 @@
             _domains = (domains ?? []).GroupBy(d => d.Id, StringComparer.Ordinal).Select(g => g.First()).ToList();
             _unassignedServices = (services ?? []).Where(service => !service.GetDomainNames().Any()).ToList();
             BuildDomainServicesMap(services ?? []);
-            _topology = topology!;
+            _topology = topology;
             BuildDomainDependencies();
             AddUnlistedEndpoints();
             DomainColorResolver.AssignColors(_domains);

@@ -35,7 +35,7 @@ public sealed class JobSchedulerFacadeTests
             JobKey = "jobs.beta",
             JobArgs = "{\"v\":1}"
         }, TestContext.Current.CancellationToken);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data!.State.Should().Be(JobExecutionState.Queued);
         result.Data.Template.JobKey.Should().Be("jobs.beta");
         result.Data.Template.OwnerKey.Should().Be(StoreFixture.OWNER_A);
@@ -45,7 +45,7 @@ public sealed class JobSchedulerFacadeTests
             OwnerKey = StoreFixture.OWNER_A,
             JobKey = "jobs.missing"
         }, TestContext.Current.CancellationToken);
-        missing.Status.Should().NotBe(ResStatus.Ok);
+        missing.Status.Should().NotBe(ResultStatus.Ok);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides(),
                 ExpectedConcurrencyStamp = "00000000000000000000000000000000"
             }, TestContext.Current.CancellationToken);
-        conflict.Status.Should().Be(ResStatus.Conflict);
+        conflict.Status.Should().Be(ResultStatus.Conflict);
 
         var notFound = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -74,7 +74,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides(),
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        notFound.Status.Should().Be(ResStatus.NotFound);
+        notFound.Status.Should().Be(ResultStatus.NotFound);
 
         var invalid = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -84,7 +84,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides { MaxConcurrencyOverride = 0 },
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        invalid.Status.Should().Be(ResStatus.BadRequest);
+        invalid.Status.Should().Be(ResultStatus.BadRequest);
 
         var ok = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -94,7 +94,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides { MaxConcurrencyOverride = 3 },
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        ok.Status.Should().Be(ResStatus.Ok);
+        ok.Status.Should().Be(ResultStatus.Ok);
 
         var batch = await harness.Facade.UpdatePoliciesAsync(new JobPolicyBatchUpdateRequest
         {
@@ -118,8 +118,8 @@ public sealed class JobSchedulerFacadeTests
         }, TestContext.Current.CancellationToken);
         batch.Data!.SucceededCount.Should().Be(0);
         batch.Data.FailedCount.Should().Be(2);
-        batch.Data.Items[0].FailureStatus.Should().Be(ResStatus.Conflict);
-        batch.Data.Items[1].FailureStatus.Should().Be(ResStatus.NotFound);
+        batch.Data.Items[0].FailureStatus.Should().Be(ResultStatus.Conflict);
+        batch.Data.Items[1].FailureStatus.Should().Be(ResultStatus.NotFound);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class JobSchedulerFacadeTests
         }, TestContext.Current.CancellationToken);
 
         var overview = await harness.Facade.GetOverviewAsync(TestContext.Current.CancellationToken);
-        overview.Status.Should().Be(ResStatus.Ok);
+        overview.Status.Should().Be(ResultStatus.Ok);
         overview.Data!.Definitions.Should().HaveCount(2);
         overview.Data.ExecutionStateCounts[JobExecutionState.Queued].Should().Be(1);
         overview.Data.RecentExecutions.Should().ContainSingle();
@@ -193,7 +193,7 @@ public sealed class JobSchedulerFacadeTests
 
         var result = await harness.Facade.GetRuntimeOverviewAsync(TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         var overview = result.Data!;
         overview.Store.Kind.Should().Be("InMemory");
         overview.Store.Provider.Should().BeNull();

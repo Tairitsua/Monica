@@ -7,7 +7,7 @@ monica.AddExceptionHandling();
 monica.ConfigureApplication(options => options.DebugMode = true);
 ```
 
-`BusinessException` represents a business-rule rejection. The HTTP exception handler projects it as `Res.Fail(business.Message)`. Its type does not select EventBus retry behavior; distributed consumers apply the same [finite processing retry budget](../../monica-infra-messaging/references/event-bus.md#processing-retries-and-dead-letters) to all failures. Response diagnostic visibility does not change delivery or retry decisions.
+`BusinessException` represents a business-rule rejection. The HTTP exception handler projects it as `Result.Failure(business.Message)`. Its type does not select EventBus retry behavior; distributed consumers apply the same [finite processing retry budget](../../monica-infra-messaging/references/event-bus.md#processing-retries-and-dead-letters) to all failures. Response diagnostic visibility does not change delivery or retry decisions.
 
 With the switch enabled, an exception response contains `metadata.diagnostics`, an `ExceptionDiagnosticDocument` with `schemaVersion: 1`, a root `exceptionId`, optional request context, and an `exceptions` catalog. Each entry has an `id`, CLR `type`, its own `message`, its own `stackTrace` array, and optional `innerExceptionIds`. Runtime exceptions are captured once by object identity at response projection: the same propagated exception and shared causes use the same ID, while distinct exceptions with identical text remain distinct. Aggregate exceptions retain their direct causes. This avoids copying `Exception.ToString()` into each boundary or chain node; repeated frames within one actual stack remain meaningful evidence and are retained.
 

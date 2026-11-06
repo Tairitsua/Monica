@@ -39,7 +39,7 @@ public sealed class TransactionBoundaryTests
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var caller = app.CreateScope(token);
         var result = await caller.Resolve<ITestingCommandApi>().Coordinate(new(FailParent: failParent, FailChild: failChild), token);
-        Assert.Equal(rows == 0 ? ResStatus.InternalError : ResStatus.Ok, result.Status);
+        Assert.Equal(rows == 0 ? ResultStatus.InternalError : ResultStatus.Ok, result.Status);
         if (rows > 0)
         {
             Assert.Equal(result.Data!.ScopeId, result.Data.ChildScopeId);
@@ -55,7 +55,7 @@ public sealed class TransactionBoundaryTests
         await using var app = await new TransactionFactory(sharedConnection: false).CreateAsync(cancellationToken: token);
         await using var caller = app.CreateScope(token);
         var result = await caller.Resolve<ITestingCommandApi>().Coordinate(new(), token);
-        Assert.Equal(ResStatus.InternalError, result.Status);
+        Assert.Equal(ResultStatus.InternalError, result.Status);
         Assert.Equal(0, app.Services.GetRequiredService<TransactionLedger>().ChildCalls);
         await AssertRowsAsync(app, 0, 0);
     }
@@ -72,7 +72,7 @@ public sealed class TransactionBoundaryTests
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "original-caller")], "test")));
         var result = await caller.Resolve<ITestingCommandApi>()
             .Coordinate(new(Independent: true, FailParent: true, CallOriginalAfterView: callOriginalAfterView), token);
-        Assert.Equal(ResStatus.InternalError, result.Status);
+        Assert.Equal(ResultStatus.InternalError, result.Status);
         var ledger = app.Services.GetRequiredService<TransactionLedger>();
         Assert.Equal(1, ledger.ChildCalls);
         Assert.NotEqual(ledger.ParentScope, ledger.ChildScope);
@@ -91,7 +91,7 @@ public sealed class TransactionBoundaryTests
         await using var app = await new TransactionFactory(sharedConnection: false).CreateAsync(cancellationToken: token);
         await using var caller = app.CreateScope(token);
         var result = await caller.Resolve<ITestingCommandApi>().Coordinate(new(Independent: true, FailChild: true), token);
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.True(app.Services.GetRequiredService<TransactionLedger>().ParentRestored);
         await AssertRowsAsync(app, 1, 0);
     }
@@ -229,7 +229,7 @@ public sealed class CommandHandlerCoordinate(TransactionPrimaryContext db, Trans
     ITestingCommandApi commands, ITestingQueryApi queries) : ApplicationService<CommandCoordinate, TransactionReceipt>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionPrimaryContext)])]
-    public override async Task<Res<TransactionReceipt>> Handle(CommandCoordinate request, CancellationToken cancellationToken)
+    public override async Task<Result<TransactionReceipt>> Handle(CommandCoordinate request, CancellationToken cancellationToken)
     {
         ledger.ParentScope = scope.Id;
         db.Entries.Add(new OperationEntry { Name = "parent" });
@@ -243,7 +243,7 @@ public sealed class CommandHandlerCoordinate(TransactionPrimaryContext db, Trans
         }
         if (request.FailParent) throw new InvalidOperationException("Parent failed after its child.");
         // Deliberately handle a child's failed result to prove rollback-only versus independent behavior.
-        return Res.Ok(new TransactionReceipt(scope.Id, child.Data?.ScopeId ?? Guid.Empty,
+        return Result.Success(new TransactionReceipt(scope.Id, child.Data?.ScopeId ?? Guid.Empty,
             child.Data?.GrandchildScopeId ?? Guid.Empty, child.Data?.User));
     }
 }
@@ -253,7 +253,7 @@ public sealed class CommandHandlerTransactionChild(TransactionSecondaryContext d
     : ApplicationService<CommandTransactionChild, TransactionReceipt>
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionSecondaryContext)])]
-    public override async Task<Res<TransactionReceipt>> Handle(CommandTransactionChild request, CancellationToken cancellationToken)
+    public override async Task<Result<TransactionReceipt>> Handle(CommandTransactionChild request, CancellationToken cancellationToken)
     {
         ledger.ChildCalls++;
         ledger.ChildExecutions.Add((scope, cancellationToken));
@@ -262,21 +262,21 @@ public sealed class CommandHandlerTransactionChild(TransactionSecondaryContext d
         ledger.GrandchildScope = (await queries.TransactionScope(new(), cancellationToken)).Data;
         db.Entries.Add(new OperationEntry { Name = "child" });
         await db.SaveChangesAsync(cancellationToken);
-        if (request.Fail) return Res.Fail("Child failed after flushing.");
-        return Res.Ok(new TransactionReceipt(scope.Id, Guid.Empty, ledger.GrandchildScope, ledger.ChildUser));
+        if (request.Fail) return Result.Failure<TransactionReceipt>("Child failed after flushing.");
+        return Result.Success(new TransactionReceipt(scope.Id, Guid.Empty, ledger.GrandchildScope, ledger.ChildUser));
     }
 }
 
 public sealed class QueryHandlerTransactionScope(TransactionScope scope, TransactionLedger ledger) : ApplicationService<QueryTransactionScope, Guid>
 {
-    public override async Task<Res<Guid>> Handle(QueryTransactionScope request, CancellationToken cancellationToken)
+    public override async Task<Result<Guid>> Handle(QueryTransactionScope request, CancellationToken cancellationToken)
     {
         if (request.Cancel)
         {
             await ledger.ChildCancellation!.CancelAsync();
             cancellationToken.ThrowIfCancellationRequested();
         }
-        return Res.Ok(scope.Id);
+        return Result.Success(scope.Id);
     }
 }
 
@@ -295,7 +295,7 @@ public sealed class TransactionNoticeHandler(ITestingCommandApi commands, IDistr
     {
         ledger.EventScope = scope.Id;
         var child = await commands.TransactionChild(new(), cancellationToken);
-        if (child.Status != ResStatus.Ok) throw new InvalidOperationException("Child failed.");
+        if (child.Status != ResultStatus.Ok) throw new InvalidOperationException("Child failed.");
         await bus.PublishAsync(new TransactionCompleted(), cancellationToken: cancellationToken);
         if (ledger.FailEvent) throw new InvalidOperationException("Receive failed after staging effects.");
     }

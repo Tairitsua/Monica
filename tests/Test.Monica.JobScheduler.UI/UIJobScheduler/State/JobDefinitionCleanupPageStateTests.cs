@@ -117,7 +117,7 @@ public sealed class JobDefinitionCleanupPageStateTests
         Assert.False(state.CanWrite);
         Assert.Null(await state.PreviewAsync([new(OWNER, "first")], true));
         var result = await harness.Facade.QueryDefinitionCleanupAsync(new(), Token);
-        Assert.True(result.IsFailed(out _));
+        Assert.True(result.IsFailure());
         Assert.Empty(harness.Boundary.ReceivedCalls());
     }
 

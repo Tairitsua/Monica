@@ -10,9 +10,9 @@ namespace Roles.Ordering.Reporting.HandlersQuery;
 public sealed class QueryHandlerGetOrderSummary(IRepositoryOrder repository) : ApplicationService<QueryGetOrderSummary, OrderSummaryDto>
 {
     /// <inheritdoc />
-    public override async Task<Res<OrderSummaryDto>> Handle(QueryGetOrderSummary request, CancellationToken cancellationToken)
+    public override async Task<Result<OrderSummaryDto>> Handle(QueryGetOrderSummary request, CancellationToken cancellationToken)
     {
         var orders = await repository.ListAsync(cancellationToken);
-        return Res.Ok(new OrderSummaryDto(orders.Count, orders.Count(order => order.CaptureSnapshot().Status == OrderStatus.Draft)));
+        return Result.Success(new OrderSummaryDto(orders.Count, orders.Count(order => order.CaptureSnapshot().Status == OrderStatus.Draft)));
     }
 }

@@ -56,17 +56,20 @@ public sealed class TextTransformState(TextTransformFacade textTransformFacade)
     /// </summary>
     /// <param name="operation">Transformation operation to execute.</param>
     /// <returns>The result envelope returned by the facade.</returns>
-    public Res<TextTransformResult> Execute(TextTransformOperation operation)
+    public Result<TextTransformResult> Execute(TextTransformOperation operation)
     {
         ErrorMessage = null;
 
         var request = new TextTransformRequest(InputText, operation);
         LastAttemptedRequest = request;
         var result = textTransformFacade.Transform(request);
-        if (result.IsFailed(out var error, out var transformed))
+        var error = result.WithoutData();
+        var transformed = result.Data;
+        if (result.IsFailure() || transformed is null)
         {
-            ErrorMessage = error.Message;
+            ErrorMessage = error.Message ?? "The text transformation returned no data.";
             LatestAttemptSucceeded = false;
+            if (result.IsSuccess()) return Result.Failure<TextTransformResult>(ErrorMessage);
         }
         else
         {

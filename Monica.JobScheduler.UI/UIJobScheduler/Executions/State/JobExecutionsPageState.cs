@@ -285,8 +285,10 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
                 if (!authorization.IsAuthorized) return new(false, null, authorization.Error);
                 var result = await _facade.CancelExecutionAsync(instanceId, cancellationToken: token);
                 token.ThrowIfCancellationRequested();
-                return result.IsFailed(out var error, out var cancellation)
-                    ? new(true, null, error.Message) : new(true, cancellation.Status, null);
+                var error = result.WithoutData();
+                var cancellation = result.Data;
+                return result.IsFailure() || cancellation is null
+                    ? new(true, null, error.Message ?? "The cancellation request returned no data.") : new(true, cancellation.Status, null);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception exception) { return new(IsAuthorized, null, exception.Message); }
@@ -333,9 +335,11 @@ internal sealed class JobExecutionsPageState : IAsyncDisposable
             if (intent.HasInvalidRange) return EmptyPage();
             var result = await _facade.QueryExecutionsAsync(query, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var page))
+            var error = result.WithoutData();
+            var page = result.Data;
+            if (result.IsFailure() || page is null)
             {
-                FailQuery(version, authorization.Version, error.Message);
+                FailQuery(version, authorization.Version, error.Message ?? "The execution query returned no data.");
                 return RetainedPage(intent, authorization.Version);
             }
             var observedAtUtc = _timeProvider.GetUtcNow();

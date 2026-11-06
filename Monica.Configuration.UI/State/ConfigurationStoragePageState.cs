@@ -13,15 +13,15 @@ namespace Monica.Configuration.UI.State;
 internal sealed class ConfigurationStoragePageState : IAsyncDisposable
 {
     private readonly ConfigurationOperationLifetime _lifetime;
-    private readonly Func<Task<Res<ConfigurationStorageOverview>>> _overview;
-    private readonly Func<Task<Res<IReadOnlyList<ConfigurationStoreState>>>> _storeStates;
+    private readonly Func<Task<Result<ConfigurationStorageOverview>>> _overview;
+    private readonly Func<Task<Result<IReadOnlyList<ConfigurationStoreState>>>> _storeStates;
 
     internal ConfigurationStoragePageState(ConfigurationFacade facade, string unavailableText,
         ConfigurationOperationLifetime lifetime)
         : this(facade.GetStorageOverviewAsync, facade.GetStoreStatesAsync, unavailableText, lifetime: lifetime) { }
 
-    internal ConfigurationStoragePageState(Func<Task<Res<ConfigurationStorageOverview>>> overview,
-        Func<Task<Res<IReadOnlyList<ConfigurationStoreState>>>> storeStates,
+    internal ConfigurationStoragePageState(Func<Task<Result<ConfigurationStorageOverview>>> overview,
+        Func<Task<Result<IReadOnlyList<ConfigurationStoreState>>>> storeStates,
         string unavailableText,
         TimeProvider? timeProvider = null, ConfigurationOperationLifetime? lifetime = null)
     {

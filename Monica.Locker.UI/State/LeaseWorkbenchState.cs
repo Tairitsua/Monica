@@ -28,10 +28,10 @@ public sealed class LeaseWorkbenchState(LeaseDiagnosticsFacade facade, IOptions<
     {
         var result = await facade.GetInventoryAsync(token);
         token.ThrowIfCancellationRequested();
-        AccessDenied = result.Status == Core.Results.ResStatus.Forbidden;
-        Failed = !result.IsOk();
+        AccessDenied = result.Status == Core.Results.ResultStatus.Forbidden;
+        Failed = !result.IsSuccess();
         if (AccessDenied) { Authorities = []; Rows = []; Exact = null; HasLoaded = false; }
-        else if (result.IsOk() && result.Data is { } authorities)
+        else if (result.IsSuccess() && result.Data is { } authorities)
         {
             Authorities = authorities;
             Rows = authorities.SelectMany(source => source.Snapshot?.Leases
@@ -47,9 +47,9 @@ public sealed class LeaseWorkbenchState(LeaseDiagnosticsFacade facade, IOptions<
         Selection = (authorityId, resource);
         var result = await facade.GetResourceAsync(authorityId, resource, token);
         token.ThrowIfCancellationRequested();
-        ExactFailed = !result.IsOk();
-        if (result.Status == Core.Results.ResStatus.Forbidden) { AccessDenied = true; Authorities = []; Rows = []; Exact = null; HasLoaded = false; }
-        else if (result.IsOk()) Exact = result.Data;
+        ExactFailed = !result.IsSuccess();
+        if (result.Status == Core.Results.ResultStatus.Forbidden) { AccessDenied = true; Authorities = []; Rows = []; Exact = null; HasLoaded = false; }
+        else if (result.IsSuccess()) Exact = result.Data;
     }
 
     public void ClearSelection() { Selection = null; Exact = null; ExactFailed = false; }

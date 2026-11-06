@@ -98,7 +98,7 @@ Distinguish result states before reporting counts:
 | Nonempty snapshot with zero filtered rows | A search miss; clearing the native input restores the snapshot's rows. |
 | Refresh with an earlier capture | Retained evidence, explicitly presented as the previous snapshot until a new result is adopted. |
 
-The facade returns `Res<T>`, but a successful envelope can still contain `Support.Failed`, a migration status with `HasError`, or a failed per-context command outcome. Inspect the model's diagnostic status as well as the envelope.
+The facade returns `Result<T>`, but a successful envelope can still contain `Support.Failed`, a migration status with `HasError`, or a failed per-context command outcome. Inspect the model's diagnostic status as well as the envelope.
 
 The Options workspace also checks the selected registry snapshot's `HasError`. A failed context snapshot has no successfully captured options; surface its `ErrorMessage` rather than treating the default empty list as a successful empty configuration ledger.
 

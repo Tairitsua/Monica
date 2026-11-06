@@ -29,7 +29,7 @@ public sealed class OpenTelemetrySnapshotEndpointTests
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         scope.Resolve<IMeterFactory>().Create(factory.MeterName).CreateGauge<double>("retained-without-api").Record(4.5);
         var retained = await scope.Resolve<OpenTelemetryFacade>().GetSnapshotAsync();
-        retained.Status.Should().Be(ResStatus.Ok);
+        retained.Status.Should().Be(ResultStatus.Ok);
         retained.Message.Should().BeNullOrEmpty();
         retained.Data.Should().NotBeNull();
         retained.Data!.Instruments.Single().CurrentValue.Should().Be(4.5);
@@ -67,7 +67,7 @@ public sealed class OpenTelemetrySnapshotEndpointTests
         invalidOnly.Record(double.PositiveInfinity);
         invalidOnly.Record(double.NegativeInfinity);
         var before = await scope.Resolve<OpenTelemetryFacade>().GetSnapshotAsync();
-        before.Status.Should().Be(ResStatus.Ok);
+        before.Status.Should().Be(ResultStatus.Ok);
         before.Message.Should().BeNullOrEmpty();
         before.Data.Should().NotBeNull();
         using var client = CreateClient(application);
@@ -80,7 +80,7 @@ public sealed class OpenTelemetrySnapshotEndpointTests
         GetSnapshotEndpoints(application).Should().ContainSingle();
         using var json = JsonDocument.Parse(body);
         json.RootElement.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo("status", "message", "data");
-        json.RootElement.GetProperty("status").GetInt32().Should().Be((int)ResStatus.Ok);
+        json.RootElement.GetProperty("status").GetInt32().Should().Be((int)ResultStatus.Ok);
         json.RootElement.GetProperty("message").ValueKind.Should().Be(JsonValueKind.Null);
         var data = json.RootElement.GetProperty("data");
         data.GetProperty("resourceServiceName").GetString().Should().Be("OpenTelemetry behavior test host");
@@ -115,8 +115,8 @@ public sealed class OpenTelemetrySnapshotEndpointTests
         // Deserialization uses the exact host contract, including its existing long-as-string converter.
         var options = application.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
         options.DictionaryKeyPolicy!.ConvertName("A").Should().Be("a", "the tag converter must preserve keys locally without changing host-wide policy");
-        var envelope = JsonSerializer.Deserialize<Res<OpenTelemetrySnapshot>>(body, options)!;
-        envelope.Status.Should().Be(ResStatus.Ok);
+        var envelope = JsonSerializer.Deserialize<Result<OpenTelemetrySnapshot>>(body, options)!;
+        envelope.Status.Should().Be(ResultStatus.Ok);
         envelope.Message.Should().BeNullOrEmpty();
         envelope.Data.Should().NotBeNull();
         var transported = envelope.Data!;

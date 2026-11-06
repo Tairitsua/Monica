@@ -116,8 +116,8 @@ public sealed class ModuleDataChannelTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var options = application.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var envelope = JsonSerializer.Deserialize<Res<JsonElement>>(body, options)!;
-        envelope.Status.Should().Be(ResStatus.Ok);
+        var envelope = JsonSerializer.Deserialize<Result<JsonElement>>(body, options)!;
+        envelope.Status.Should().Be(ResultStatus.Ok);
         envelope.Message.Should().BeNullOrEmpty();
         envelope.Data.ValueKind.Should().Be(JsonValueKind.Array);
         envelope.Data.GetArrayLength().Should().Be(1);

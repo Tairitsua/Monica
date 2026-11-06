@@ -275,14 +275,14 @@ internal sealed class MarkdownDocumentSearchState(
                     return;
                 }
 
-                if (response.IsFailed(out var error, out var results))
+                if (response.IsFailure())
                 {
-                    ErrorMessage = error;
+                    ErrorMessage = response.Message ?? string.Empty;
                     Results = [];
                     return;
                 }
 
-                Results = results;
+                Results = response.Data ?? throw new InvalidOperationException("The document search returned no data.");
             }
         }
         catch (OperationCanceledException) when (searchCancellation.IsCancellationRequested)

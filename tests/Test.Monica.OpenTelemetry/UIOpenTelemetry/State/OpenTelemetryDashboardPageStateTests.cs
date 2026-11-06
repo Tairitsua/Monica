@@ -119,7 +119,7 @@ public sealed class OpenTelemetryDashboardPageStateTests
         var view = state.Snapshot; var instrument = state.SelectedInstrument; var series = state.SelectedSeries; var adopted = state.SnapshotCapturedAt;
         control.Fail(message); counter.Add(5); clock.Advance(TimeSpan.FromSeconds(2));
         var failure = await state.RefreshAsync();
-        failure.Status.Should().Be(ResStatus.ServiceUnavailable);
+        failure.Status.Should().Be(ResultStatus.ServiceUnavailable);
         failure.Message.Should().Be(message);
         state.Error.Should().Be(message);
         state.Snapshot.Should().BeSameAs(view);
@@ -148,7 +148,7 @@ public sealed class OpenTelemetryDashboardPageStateTests
         AssertOk(await state.RefreshAsync());
         var view = state.Snapshot; var instrument = state.SelectedInstrument; var series = state.SelectedSeries; var adopted = state.SnapshotCapturedAt;
         gauge.Record(3); clock.ThrowOnRead = true;
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.InternalError);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.InternalError);
         state.Error.Should().Be("Clock read unavailable.");
         state.Snapshot.Should().BeSameAs(view); state.SelectedInstrument.Should().BeSameAs(instrument); state.SelectedSeries.Should().BeSameAs(series);
         state.SnapshotCapturedAt.Should().Be(adopted); state.HasSnapshot.Should().BeTrue();
@@ -171,15 +171,15 @@ public sealed class OpenTelemetryDashboardPageStateTests
         var read = state.RefreshAsync(); await gate.Entered;
         try
         {
-            (await state.RefreshAsync()).Status.Should().Be(ResStatus.Conflict);
+            (await state.RefreshAsync()).Status.Should().Be(ResultStatus.Conflict);
             control.Reads.Should().Be(2);
             var disposal = state.DisposeAsync().AsTask();
             state.DisposeAsync().AsTask().Should().BeSameAs(disposal);
             disposal.IsCompleted.Should().BeFalse();
             state.IsLoading.Should().BeFalse();
-            (await state.RefreshAsync()).Status.Should().Be(ResStatus.Conflict);
+            (await state.RefreshAsync()).Status.Should().Be(ResultStatus.Conflict);
             gate.Release();
-            (await read).Status.Should().Be(ResStatus.Conflict);
+            (await read).Status.Should().Be(ResultStatus.Conflict);
             await disposal.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             state.Snapshot.Should().BeSameAs(view);
         }
@@ -240,11 +240,11 @@ public sealed class OpenTelemetryDashboardPageStateTests
         var laterNotifications = 0;
         state.StateChanged += () => _ = state.DisposeAsync();
         state.StateChanged += () => laterNotifications++;
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.Conflict);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.Conflict);
         await state.DisposeAsync(); laterNotifications.Should().Be(0);
         state.InstrumentNameFilter = "late";
         laterNotifications.Should().Be(0);
     }
 
-    private static void AssertOk(Res result) { result.Status.Should().Be(ResStatus.Ok); result.Message.Should().BeNullOrEmpty(); }
+    private static void AssertOk(Result result) { result.Status.Should().Be(ResultStatus.Ok); result.Message.Should().BeNullOrEmpty(); }
 }

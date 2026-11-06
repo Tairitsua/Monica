@@ -60,7 +60,7 @@ public sealed class DataChannelFacadeTests
 
         channel.Pipe.RecordState(PipelineState.Error, "Another ordinary record to clear.");
         var cleared = await facade.ClearChannelExceptionsAsync(channel.Id);
-        cleared.Status.Should().Be(ResStatus.Ok);
+        cleared.Status.Should().Be(ResultStatus.Ok);
         cleared.Message.Should().Contain("retained observable history");
         channel.Pipe.ObservableTracker.Count.Should().Be(0);
         var after = ResultAssertions.Success(await facade.GetManagementSnapshotAsync(scope.CancellationToken));
@@ -130,7 +130,7 @@ public sealed class DataChannelFacadeTests
         ResultAssertions.Success(await facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(scenario.Primary.Id, components[2].ComponentKey))
             .Should().BeSameAs(derived);
         var ambiguous = await facade.GetMiddlewareAsync<MessageDebuggerMiddleware>(scenario.Primary.Id, nameof(FirstNamespace.SameName));
-        ambiguous.Status.Should().Be(ResStatus.BadRequest);
+        ambiguous.Status.Should().Be(ResultStatus.BadRequest);
         ambiguous.Message.Should().Contain("ambiguous");
         ambiguous.Data.Should().BeNull();
     }
@@ -162,7 +162,7 @@ public sealed class DataChannelFacadeTests
         ResultAssertions.Success(await facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channel.Id, changed.Middlewares[1].ComponentKey))
             .Should().BeSameAs(appended);
         var retired = await facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channel.Id, before.Middlewares[0].ComponentKey);
-        retired.Status.Should().Be(ResStatus.BadRequest);
+        retired.Status.Should().Be(ResultStatus.BadRequest);
         retired.Message.Should().Contain("unavailable");
         retired.Data.Should().BeNull();
 
@@ -171,7 +171,7 @@ public sealed class DataChannelFacadeTests
         removed.Middlewares.Should().HaveCount(1);
         removed.Middlewares[0].ComponentKey.Should().Be(changed.Middlewares[0].ComponentKey);
         var removedResult = await facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channel.Id, changed.Middlewares[1].ComponentKey);
-        removedResult.Status.Should().Be(ResStatus.BadRequest);
+        removedResult.Status.Should().Be(ResultStatus.BadRequest);
         removedResult.Message.Should().Contain("unavailable");
         removedResult.Data.Should().BeNull();
     }
@@ -193,7 +193,7 @@ public sealed class DataChannelFacadeTests
         var read = () => facade.GetManagementSnapshotAsync(cancellation.Token);
         await read.Should().ThrowAsync<OperationCanceledException>();
         var missing = await facade.GetChannelExceptionsAsync("missing", cancellationToken: scope.CancellationToken);
-        missing.Status.Should().Be(ResStatus.BadRequest);
+        missing.Status.Should().Be(ResultStatus.BadRequest);
         missing.Message.Should().Contain("was not found");
         missing.Data.Should().BeNull();
     }

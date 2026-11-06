@@ -1,6 +1,6 @@
 # Operate scheduled work
 
-Register [JobScheduler](scheduler.md) with a store and scope before exposing operator actions. `JobSchedulerFacade` is the host-facing API for durable definitions, policy, queue, history, and diagnostics. It returns `Res<T>`; check status and data. The facade does not authorize callers: every exposing UI or API owns authorization before each read and mutation, including a policy-conflict reload. `monica.AddJobSchedulerUI()` adds the optional operational workspace and brings the scheduler, shell, and localization modules, but still needs an explicit scheduler store and scope; a Web host must complete `app.UseMonica()` and `app.MapMonica()`.
+Register [JobScheduler](scheduler.md) with a store and scope before exposing operator actions. `JobSchedulerFacade` is the host-facing API for durable definitions, policy, queue, history, and diagnostics. It returns `Result<T>`; check status and data. The facade does not authorize callers: every exposing UI or API owns authorization before each read and mutation, including a policy-conflict reload. `monica.AddJobSchedulerUI()` adds the optional operational workspace and brings the scheduler, shell, and localization modules, but still needs an explicit scheduler store and scope; a Web host must complete `app.UseMonica()` and `app.MapMonica()`.
 
 Trigger arguments and captured execution arguments use MoJson in `$monica-infra-ui` (`references/json.md`) for editing and viewing. Syntax feedback is independent of scheduler admission: optional blank arguments, payload rules and authorization remain owned by the scheduler UI.
 
@@ -107,7 +107,7 @@ All maintenance facade methods reject manual-mode hosts. The UI rechecks operati
 // The caller has already authorized maintenance and reviewed these exact identities.
 var preview = await facade.PreviewDefinitionCleanupAsync(
     [new JobId("retained-owner", "removed-job")], cancelQueued: false, cancellationToken);
-if (!preview.IsFailed(out _, out var plan) && plan.Eligible.Count > 0)
+if (preview.IsSuccess() && preview.Data is { } plan && plan.Eligible.Count > 0)
 {
     // Submit only after the operator acknowledges this preview. Rebuild on Changed or Blocked.
     var applied = await facade.RemoveDefinitionsAsync(plan.ToRequest(), cancellationToken);

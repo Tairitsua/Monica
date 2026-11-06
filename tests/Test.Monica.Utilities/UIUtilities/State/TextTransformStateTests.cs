@@ -17,7 +17,7 @@ public sealed class TextTransformStateTests
 
         var accepted = state.Execute(TextTransformOperation.FormatJson);
 
-        accepted.Status.Should().Be(ResStatus.Ok);
+        accepted.Status.Should().Be(ResultStatus.Ok);
         accepted.Message.Should().BeNull();
         accepted.Data.Should().NotBeNull();
         var acceptedOutput = accepted.Data!.Output;
@@ -30,7 +30,7 @@ public sealed class TextTransformStateTests
         state.OutputText.Should().Be(acceptedOutput);
         var malformed = state.Execute(TextTransformOperation.MinifyJson);
 
-        malformed.Status.Should().Be(ResStatus.BadRequest);
+        malformed.Status.Should().Be(ResultStatus.BadRequest);
         malformed.Message.Should().NotBeNullOrWhiteSpace();
         malformed.Data.Should().BeNull();
         state.ErrorMessage.Should().Be(malformed.Message);
@@ -43,7 +43,7 @@ public sealed class TextTransformStateTests
         state.InputText = " \r\n";
         var empty = state.Execute(TextTransformOperation.DecodeEscapedText);
 
-        empty.Status.Should().Be(ResStatus.BadRequest);
+        empty.Status.Should().Be(ResultStatus.BadRequest);
         empty.Message.Should().NotBeNullOrWhiteSpace();
         empty.Data.Should().BeNull();
         state.ErrorMessage.Should().Be(empty.Message);
@@ -62,7 +62,7 @@ public sealed class TextTransformStateTests
 
         var result = state.Execute(TextTransformOperation.MinifyJson);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         result.Data!.Output.Should().Be("{\"text\":\"中文\"}");
@@ -83,7 +83,7 @@ public sealed class TextTransformStateTests
 
         var result = state.Execute(TextTransformOperation.DecodeEscapedText);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         result.Data!.Output.Should().Be(source);

@@ -37,7 +37,9 @@
         {
             var result = await AttachmentFacade.ReadAsync(SessionId, Attachment.Id, _lifetime.Token);
             if (_disposed) return;
-            if (result.IsFailed(out var error, out var data)) _error = error.Message;
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure() || data is null) _error = error.Message ?? L["Error:Generic"];
             else if (Attachment.Kind == ChatAttachmentKind.Image) _imageSource = $"data:{Attachment.MediaType};base64,{Convert.ToBase64String(data.Data)}";
             else _text = data.ExtractedText;
         }

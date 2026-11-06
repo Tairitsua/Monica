@@ -121,7 +121,7 @@ public sealed partial class FileOpsWorkspaceControllerTests
         var attemptedEntry = Assert.IsType<FileOpsEntrySummary>(attempted.Entry);
         Assert.Equal(path, attemptedEntry.FullPath);
         Assert.Equal(path, state.InspectedEntry!.FullPath);
-        Assert.Equal(ResStatus.BadRequest, attempted.Outcome.Status);
+        Assert.Equal(ResultStatus.BadRequest, attempted.Outcome.Status);
         Assert.False(attempted.Outcome.Succeeded);
         Assert.Contains(binary ? "BinaryFilePreviewUnsupported" : "TextFileTooLarge", attempted.Outcome.Message);
         Assert.Null(state.InspectedFile);
@@ -199,7 +199,7 @@ public sealed partial class FileOpsWorkspaceControllerTests
         Assert.Null(state.InspectedEntry);
         Assert.Null(state.InspectedFile);
         Assert.False(attempted.Outcome.Succeeded);
-        Assert.Equal(ResStatus.BadRequest, attempted.Outcome.Status);
+        Assert.Equal(ResultStatus.BadRequest, attempted.Outcome.Status);
         Assert.Equal(path, Assert.Single(service.TextReads).Path);
     }
 }

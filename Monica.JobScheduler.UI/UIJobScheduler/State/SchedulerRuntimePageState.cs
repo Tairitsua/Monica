@@ -45,7 +45,7 @@ internal sealed class SchedulerRuntimePageStateFactory(
 /// </remarks>
 public sealed class SchedulerRuntimePageState : IAsyncDisposable
 {
-    private readonly Func<CancellationToken, Task<Res<JobSchedulerRuntimeOverview>>> _loadOverview;
+    private readonly Func<CancellationToken, Task<Result<JobSchedulerRuntimeOverview>>> _loadOverview;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly IJobSchedulerWorkerInsightProvider? _workerInsight;
     private readonly TimeProvider _timeProvider;
@@ -58,7 +58,7 @@ public sealed class SchedulerRuntimePageState : IAsyncDisposable
     private bool _isLoading;
 
     internal SchedulerRuntimePageState(
-        Func<CancellationToken, Task<Res<JobSchedulerRuntimeOverview>>> loadOverview,
+        Func<CancellationToken, Task<Result<JobSchedulerRuntimeOverview>>> loadOverview,
         Func<CancellationToken, Task<bool>> authorize,
         TimeProvider timeProvider,
         TimeSpan refreshInterval,
@@ -301,7 +301,8 @@ public sealed class SchedulerRuntimePageState : IAsyncDisposable
         {
             var result = await _loadOverview(token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out _, out var overview))
+            var overview = result.Data;
+            if (result.IsFailure())
             {
                 Apply(() => { IsQueryFailed = true; Error = result.Message; }, token);
                 return;

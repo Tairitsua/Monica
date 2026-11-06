@@ -83,16 +83,21 @@
                 _loading=true;
                 // Catalog identity and registration evidence have independent success/failure boundaries.
                 var topology = await Facade.CaptureTopologyAsync(_token);
-                _topology = topology.IsFailed(out _, out var snapshot) ? new(false, []) : snapshot!;
+                var snapshot = topology.Data;
+                _topology = topology.IsFailure() ? new(false, []) : snapshot ?? new(false, []);
                 var catalogTask=Facade.CaptureDomainsAsync(_token);
                 var servicesTask=Facade.CaptureServicesAsync(_token);
                 await Task.WhenAll(catalogTask,servicesTask);
                 _token.ThrowIfCancellationRequested();
                 var catalog=await catalogTask;
-                if(catalog.IsFailed(out var catalogError,out var domains)) _catalogError=catalogError.Message;
+                var catalogError = catalog;
+                var domains = catalog.Data;
+                if(catalog.IsFailure() || domains is null) _catalogError=catalogError.Message ?? "The domain catalog was unavailable.";
                 else { _domains=domains.OrderBy(d=>d.DisplayName ?? d.Id).ToList();_hasCatalog=true;_catalogCapturedAt=DateTime.UtcNow;_catalogError=null; }
                 var registry=await servicesTask;
-                if(registry.IsFailed(out var registryError,out var services)) _servicesError=registryError.Message;
+                var registryError = registry;
+                var services = registry.Data;
+                if(registry.IsFailure() || services is null) _servicesError=registryError.Message ?? "The service registry was unavailable.";
                 else { _services=services;_hasServices=true;_servicesCapturedAt=DateTime.UtcNow;_servicesError=null; }
             }
             finally { _loading=false;_gate.Release(); }

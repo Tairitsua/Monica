@@ -23,14 +23,14 @@ public sealed class CommandHandlerApproveOrder(
     /// <param name="request">The approval request.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The approved order, or a boundary failure when it is missing or already approved.</returns>
-    public override async Task<Res<OrderDto>> Handle(
+    public override async Task<Result<OrderDto>> Handle(
         CommandApproveOrder request,
         CancellationToken cancellationToken)
     {
         var order = await repository.FindAsync(request.OrderId, cancellationToken);
         if (order is null)
         {
-            return Res.Fail($"Order '{request.OrderId}' was not found.");
+            return Result.Failure<OrderDto>($"Order '{request.OrderId}' was not found.");
         }
 
         try
@@ -50,11 +50,11 @@ public sealed class CommandHandlerApproveOrder(
             // in the same relational context as the order instead of publishing directly.
             await localEventBus.PublishAsync(approvalEvent, cancellationToken: cancellationToken);
 
-            return Res.Ok(UtilsOrderMapping.ToDto(order));
+            return Result.Success(UtilsOrderMapping.ToDto(order));
         }
         catch (InvalidOperationException exception)
         {
-            return Res.Fail(exception.Message);
+            return Result.Failure<OrderDto>(exception.Message);
         }
     }
 }

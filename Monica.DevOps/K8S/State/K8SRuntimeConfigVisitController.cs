@@ -26,7 +26,9 @@ internal sealed class K8SRuntimeConfigVisitController(K8SFacade facade, Func<Tas
         ReloadFailed = false;
         var response = await facade.GetRuntimeConfigAsync(token);
         token.ThrowIfCancellationRequested();
-        if (response.IsFailed(out var error, out var config))
+        var error = response;
+        var config = response.Data;
+        if (response.IsFailure() || config is null)
         {
             Failure = error.Message ?? string.Empty;
             ReloadFailed = Draft is not null;
@@ -41,7 +43,8 @@ internal sealed class K8SRuntimeConfigVisitController(K8SFacade facade, Func<Tas
         var draft = BuildDraft();
         var response = await facade.SaveRuntimeConfigAsync(draft, token);
         token.ThrowIfCancellationRequested();
-        if (response.IsFailed(out var error)) { Failure = error.Message ?? string.Empty; Saved = false; return; }
+        var error = response;
+        if (response.IsFailure()) { Failure = error.Message ?? string.Empty; Saved = false; return; }
         Adopt(draft);
         Saved = true;
     });

@@ -78,7 +78,9 @@
             var completed=query.CompletedAfterUtc is not null || query.CompletedBeforeUtc is not null;
             var bounded=completed ? query with {CompletedBeforeUtc=query.CompletedBeforeUtc ?? captured} : query with {CreatedBeforeUtc=query.CreatedBeforeUtc ?? captured};
             var result=await Facade.GetExecutionDistributionAsync(bounded,48,token);
-            if(result.IsFailed(out var error,out var distribution)) throw new InvalidOperationException(error.Message);
+            var error = result;
+            var distribution = result.Data;
+            if(result.IsFailure() || distribution is null) throw new InvalidOperationException(error.Message ?? "The execution distribution was unavailable.");
             _lifetime.TryApply(() => { if(version==_version) { _distribution=distribution;if (_marks.Length != distribution.Buckets.Count * OutcomeStates.Length) _marks = new ElementReference[distribution.Buckets.Count * OutcomeStates.Length];_selected=distribution.Buckets.Count-1;_brush=null;_error=null; } });
         }); }
         catch(OperationCanceledException) when (_lifetime.IsRetired) { }

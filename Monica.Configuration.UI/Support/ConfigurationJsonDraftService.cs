@@ -460,7 +460,9 @@ internal sealed class ConfigurationJsonDraftService(
                 request.Definition,
                 request.ScopeNode.RelativePath,
                 candidateJson);
-            if (result.IsFailed(out var error, out var report))
+            var error = result;
+            var report = result.Data;
+            if (result.IsFailure() || report is null)
             {
                 AddDiagnostic(
                     ConfigurationImportDiagnosticSeverity.Error,

@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Monica.Core.Results;
+using Monica.UI.UISystemInfo.Models;
 using Monica.UI.UISystemInfo.State;
 using Xunit;
 
@@ -14,8 +15,8 @@ public sealed class SystemInfoPageSessionTests
         var callCount = 0;
         await using var session = new SystemInfoPageSession(
             SystemInfoTestData.Calls(() => ++callCount == 1
-                ? Res.Ok(first)
-                : Res.Fail("refresh failed")),
+                ? Result.Success(first)
+                : Result.Failure<SystemInfoSnapshot>("refresh failed")),
             clockInterval: TimeSpan.FromHours(1));
 
         await session.InitializeAsync();
@@ -38,7 +39,7 @@ public sealed class SystemInfoPageSessionTests
             SystemInfoTestData.Calls(() =>
             {
                 facadeCallCount++;
-                return Res.Ok(snapshot);
+                return Result.Success(snapshot);
             }),
             clockInterval: TimeSpan.FromHours(1));
         await session.InitializeAsync();
@@ -66,7 +67,7 @@ public sealed class SystemInfoPageSessionTests
     {
         var snapshot = SystemInfoTestData.Snapshot();
         await using var session = new SystemInfoPageSession(
-            SystemInfoTestData.Calls(() => Res.Ok(snapshot)),
+            SystemInfoTestData.Calls(() => Result.Success(snapshot)),
             clockInterval: TimeSpan.FromHours(1));
         var notificationCount = 0;
         session.Changed += () =>

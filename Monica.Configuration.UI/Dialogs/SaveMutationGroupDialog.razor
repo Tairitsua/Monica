@@ -188,9 +188,11 @@
                 return;
             }
 
-            if (applyResult.IsFailed(out var applyError, out var result))
+            var applyError = applyResult;
+            var result = applyResult.Data;
+            if (applyResult.IsFailure() || result is null)
             {
-                _error = applyError.Message;
+                _error = applyError.Message ?? L["Common:Errors:LoadFailed"].Value;
                 _validationPreview = applyResult.Data?.ValidationPreview;
                 _previewRequest = null;
                 return;
@@ -243,9 +245,11 @@
                 return;
             }
 
-            if (commandResult.IsFailed(out var commandError, out var commands))
+            var commandError = commandResult;
+            var commands = commandResult.Data;
+            if (commandResult.IsFailure() || commands is null)
             {
-                _error = commandError.Message;
+                _error = commandError.Message ?? L["Common:Errors:LoadFailed"].Value;
                 return;
             }
 
@@ -261,9 +265,11 @@
                 return;
             }
 
-            if (result.IsFailed(out var error, out var preview))
+            var error = result;
+            var preview = result.Data;
+            if (result.IsFailure() || preview is null)
             {
-                _error = error.Message;
+                _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                 _validationPreview = result.Data;
                 return;
             }
@@ -296,9 +302,11 @@
         ConfigurationDefinitionChangeImpact? impact = null;
         string? analysisError = null;
         var impactResult = await Facade.GetDefinitionChangeImpactAsync(targets);
-        if (impactResult.IsFailed(out var impactError, out impact))
+        var impactError = impactResult;
+        impact = impactResult.Data;
+        if (impactResult.IsFailure() || impact is null)
         {
-            analysisError = impactError.Message;
+            analysisError = impactError.Message ?? L["Common:Errors:LoadFailed"].Value;
         }
 
         if (_disposed)
@@ -317,7 +325,7 @@
         return result is { Canceled: false } && result.Data is true;
     }
 
-    private async Task<Res<IReadOnlyList<ConfigurationMutationCommand>>> BuildCommandsAsync(
+    private async Task<Result<IReadOnlyList<ConfigurationMutationCommand>>> BuildCommandsAsync(
         IReadOnlyList<PendingChange> changes)
     {
         var revisions = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -329,15 +337,16 @@
             {
                 if (string.IsNullOrWhiteSpace(change.SourceKey))
                 {
-                    return L["Dialogs:SaveGroup:MissingSourceTarget"].Value;
+                    return Result.Failure<IReadOnlyList<ConfigurationMutationCommand>>(L["Dialogs:SaveGroup:MissingSourceTarget"].Value);
                 }
 
                 if (!revisions.TryGetValue(change.SourceKey, out var revision))
                 {
                     var revisionResult = await Facade.GetSourceRevisionAsync(change.SourceKey);
-                    if (revisionResult.IsFailed(out var revisionError, out revision))
+                    revision = revisionResult.Data;
+                    if (revisionResult.IsFailure())
                     {
-                        return revisionError;
+                        return Result.FromFailure<IReadOnlyList<ConfigurationMutationCommand>>(revisionResult);
                     }
 
                     revisions[change.SourceKey] = revision;
@@ -369,7 +378,7 @@
             });
         }
 
-        return Res.Ok<IReadOnlyList<ConfigurationMutationCommand>>(commands);
+        return Result.Success<IReadOnlyList<ConfigurationMutationCommand>>(commands);
     }
 
     private void Cancel()

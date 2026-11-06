@@ -21,7 +21,7 @@ public sealed class ProjectUnitFilterPanelTests
         ];
         var selectedTypes = units.Select(static unit => unit.UnitType).ToHashSet();
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Fail("unused")));
+            new StubProjectUnitsUiDataSource(Result.Failure<ProjectUnitDashboardSnapshot>("unused")));
 
         var cut = context.Render<ProjectUnitFilterPanel>(parameters => parameters
             .Add(component => component.Units, units)

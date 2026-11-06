@@ -25,19 +25,20 @@ public sealed class ObjectMappingFacade
     /// Gets the mapping pairs and generated expressions registered in the current host.
     /// </summary>
     /// <returns>A result containing the current immutable mapping snapshot.</returns>
-    public Task<Res<ObjectMapperStatusResponse>> GetStatusAsync()
+    public Task<Result<ObjectMapperStatusResponse>> GetStatusAsync()
     {
         try
         {
             var status = _statusService.GetStatus();
             _logger.LogDebug("Retrieved object mapping status with {Count} mappings.", status.Count);
-            return Task.FromResult(Res.Ok(status));
+            return Task.FromResult(Result.Success(status));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to retrieve object mapping status.");
-            return Task.FromResult<Res<ObjectMapperStatusResponse>>(
-                $"Failed to retrieve object mapping status: {exception.Message}");
+            return Task.FromResult(Result.Failure<ObjectMapperStatusResponse>(
+                $"Failed to retrieve object mapping status: {exception.Message}"));
         }
     }
 }

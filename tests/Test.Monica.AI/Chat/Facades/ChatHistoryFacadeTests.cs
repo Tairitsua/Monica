@@ -26,7 +26,7 @@ public sealed class ChatHistoryFacadeTests
         provider.LoadSessionAsync(Arg.Any<ChatHistoryPartition>(), "session", Arg.Any<CancellationToken>()).Returns(CreateSnapshot());
         var facade = new ChatHistoryFacade(provider, resolver, CreateService());
         var loaded = await facade.LoadSessionAsync("session", TestContext.Current.CancellationToken);
-        loaded.Status.Should().Be(ResStatus.Ok);
+        loaded.Status.Should().Be(ResultStatus.Ok);
         loaded.Message.Should().BeNull();
         loaded.Data.Should().NotBeNull();
         await using var session = loaded.Data!;
@@ -36,7 +36,7 @@ public sealed class ChatHistoryFacadeTests
 
         var result = await facade.SaveSessionAsync(session, 0, TestContext.Current.CancellationToken);
 
-        result.IsFailed(out _).Should().BeTrue();
+        result.IsFailure().Should().BeTrue();
         result.Message.Should().Contain("different user or workspace");
         await provider.DidNotReceive().SaveSessionAsync(Arg.Any<ChatHistoryPartition>(), Arg.Any<ChatSessionSnapshot>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
     }
@@ -78,7 +78,7 @@ public sealed class ChatHistoryFacadeTests
             _ => await facade.DeleteArchivedSessionsAsync(["session"], 7, ct)
         };
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().BeSameAs(outcome);
         await resolver.Received(1).ResolveAsync(ct);

@@ -42,19 +42,23 @@ The provider-wide `SystemPrompt` is a host default. Editing instructions in an e
 
 Keep the Microsoft.Extensions.AI OpenAI adapter compatible with the OpenAI SDK: adapter 10.10.1 targets OpenAI 2.14.0. Adapter 10.10.0 references a Responses MCP approval type renamed in SDK 2.14.0 and can fail with `TypeLoadException`; upgrading only the SDK is insufficient. The production provider construction regression test covers both Chat and Responses API surfaces.
 
-Resolve scoped `ChatFacade` from the caller's DI scope. Create a session, then consume the ordered `Res<ChatStreamEvent>` stream. Text arrives as `ChatTextDeltaEvent`; tool, reasoning, context, and completion events have separate types. A `ChatCompletedEvent` with `AwaitingApproval` means the run has paused: present the request and call `ContinueApprovalAsync(...)` with the decision, or `CancelAsync(...)`. `EditMessageAsync`, `RetryMessageAsync`, `UpdateSettings`, and `UpdateRuntimeContext` apply to subsequent execution, not a turn already in flight. Dispose the session when its owner is done.
+Resolve scoped `ChatFacade` from the caller's DI scope. Create a session, then consume the ordered `Result<ChatStreamEvent>` stream. Text arrives as `ChatTextDeltaEvent`; tool, reasoning, context, and completion events have separate types. A `ChatCompletedEvent` with `AwaitingApproval` means the run has paused: present the request and call `ContinueApprovalAsync(...)` with the decision, or `CancelAsync(...)`. `EditMessageAsync`, `RetryMessageAsync`, `UpdateSettings`, and `UpdateRuntimeContext` apply to subsequent execution, not a turn already in flight. Dispose the session when its owner is done.
 
 ```csharp
 var created = await chat.CreateSessionAsync(ct: cancellationToken);
-if (created.IsFailed(out var createError, out var session))
-    throw new InvalidOperationException(createError.Message);
+if (created.IsFailure())
+    throw new InvalidOperationException(created.Message);
+var session = created.Data
+    ?? throw new InvalidOperationException("A successful session creation must return the session.");
 
 await using (session)
 {
     await foreach (var next in chat.SendMessageStreamingAsync(session, "Summarize the order", cancellationToken))
     {
-        if (next.IsFailed(out var streamError, out var update))
-            throw new InvalidOperationException(streamError.Message);
+        if (next.IsFailure())
+            throw new InvalidOperationException(next.Message);
+        var update = next.Data
+            ?? throw new InvalidOperationException("A successful stream item must include an event.");
         if (update is ChatTextDeltaEvent delta)
             Console.Write(delta.Text);
     }

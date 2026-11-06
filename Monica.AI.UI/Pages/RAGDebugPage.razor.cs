@@ -51,7 +51,9 @@ public partial class RAGDebugPage : IAsyncDisposable
         _loadError = _modelError = string.Empty;
         var kbResult = await KnowledgeBaseFacade.GetAllAsync();
         if (_lifetime.Retired) return;
-        if (kbResult.IsFailed(out var error, out var kbs)) _loadError = error.Message ?? L["KnowledgeWorkbench:Retrieval:LoadFailed"];
+        var error = kbResult.WithoutData();
+        var kbs = kbResult.Data;
+        if (kbResult.IsFailure() || kbs is null) _loadError = error.Message ?? L["KnowledgeWorkbench:Retrieval:LoadFailed"];
         else
         {
             _knowledgeBases = kbs;
@@ -59,7 +61,9 @@ public partial class RAGDebugPage : IAsyncDisposable
         }
         var modelsResult = await EmbeddingService.GetEmbeddingModelsAsync();
         if (_lifetime.Retired) return;
-        if (modelsResult.IsFailed(out error, out var models)) _modelError = error.Message ?? L["KnowledgeWorkbench:Retrieval:ModelsFailed"];
+        var modelError = modelsResult;
+        var models = modelsResult.Data;
+        if (modelsResult.IsFailure() || models is null) _modelError = modelError.Message ?? L["KnowledgeWorkbench:Retrieval:ModelsFailed"];
         else _embeddingModels = models;
         RefreshEmbeddingModelSelection();
         CheckEmbeddingModelMismatch();
@@ -124,7 +128,9 @@ public partial class RAGDebugPage : IAsyncDisposable
         {
             var result = await SearchFacade.SearchAsync(request.Query, request.Ids, request.TopK, embeddingOverride, _lifetime.Token);
             if (_lifetime.Retired || generation != _searchGeneration) return;
-            if (result.IsFailed(out var error, out var results))
+            var error = result.WithoutData();
+            var results = result.Data;
+            if (result.IsFailure() || results is null)
             {
                 _searchErrorMessage = error.Message ?? L["KnowledgeWorkbench:Retrieval:SearchFailed"];
                 Snackbar.Add(_searchErrorMessage, Severity.Error);
@@ -153,7 +159,9 @@ public partial class RAGDebugPage : IAsyncDisposable
         var statusText = L["RAG:ChunkViewer:SourceKnowledgeBase", GetResultBaseName(result)].Value;
         var chunksResult = await IndexingFacade.GetDocumentChunksAsync(baseId, documentId);
         if (_lifetime.Retired) return;
-        if (chunksResult.IsFailed(out var error, out var view)) { Snackbar.Add(error.Message!, Severity.Error); return; }
+        var error = chunksResult.WithoutData();
+        var view = chunksResult.Data;
+        if (chunksResult.IsFailure() || view is null) { Snackbar.Add(error.Message ?? L["Common:Error"], Severity.Error); return; }
         var parameters = new DialogParameters
         {
             { nameof(ChunkViewerDialog.DocumentName), sourceName },

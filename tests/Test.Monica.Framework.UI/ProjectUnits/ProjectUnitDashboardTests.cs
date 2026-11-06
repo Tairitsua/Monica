@@ -16,7 +16,7 @@ public sealed class ProjectUnitDashboardTests
         var summary = CreateSummary();
         var snapshot = CreateSnapshot(summary);
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Ok(snapshot)));
+            new StubProjectUnitsUiDataSource(Result.Success(snapshot)));
 
         var cut = context.Render<ProjectUnitDashboard>();
 
@@ -43,7 +43,7 @@ public sealed class ProjectUnitDashboardTests
             AppVersion = "1.0.3"
         });
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Ok(snapshot)));
+            new StubProjectUnitsUiDataSource(Result.Success(snapshot)));
 
         var cut = context.Render<ProjectUnitDashboard>();
 
@@ -73,7 +73,7 @@ public sealed class ProjectUnitDashboardTests
                 DomainName = "Ordering"
             });
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Ok(snapshot)));
+            new StubProjectUnitsUiDataSource(Result.Success(snapshot)));
 
         var cut = context.Render<ProjectUnitDashboard>();
 
@@ -103,7 +103,7 @@ public sealed class ProjectUnitDashboardTests
             CoverageGaps = []
         };
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Ok(snapshot)));
+            new StubProjectUnitsUiDataSource(Result.Success(snapshot)));
 
         var cut = context.Render<ProjectUnitDashboard>();
 
@@ -120,7 +120,7 @@ public sealed class ProjectUnitDashboardTests
     public async Task Failed_dashboard_renders_error_and_retry_action()
     {
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Fail("catalog unavailable")));
+            new StubProjectUnitsUiDataSource(Result.Failure<ProjectUnitDashboardSnapshot>("catalog unavailable")));
 
         var cut = context.Render<ProjectUnitDashboard>();
 
@@ -155,7 +155,7 @@ public sealed class ProjectUnitDashboardTests
             ]
         };
         await using var context = new ProjectUnitsUiTestContext(
-            new StubProjectUnitsUiDataSource(Res.Ok(CreateSnapshot(summary)), Res.Ok(detail)));
+            new StubProjectUnitsUiDataSource(Result.Success(CreateSnapshot(summary)), Result.Success(detail)));
 
         var cut = context.Render<ProjectUnitDetailDialog>(parameters => parameters
             .Add(component => component.Visible, true)

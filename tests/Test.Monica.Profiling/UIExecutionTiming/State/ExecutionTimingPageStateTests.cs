@@ -76,7 +76,7 @@ public sealed class ExecutionTimingPageStateTests
         state.Statistics.Single().ExecutionCount.Should().Be(1);
         state.SnapshotCapturedAt.Should().Be(capturedAt);
         var actual = facade.GetStatistics();
-        actual.Status.Should().Be(ResStatus.Ok);
+        actual.Status.Should().Be(ResultStatus.Ok);
         actual.Message.Should().BeNull();
         actual.Data.Should().ContainSingle().Which.ExecutionCount.Should().Be(2);
 
@@ -141,7 +141,7 @@ public sealed class ExecutionTimingPageStateTests
         clock.Advance(TimeSpan.FromMinutes(1));
         control.FailRunning("Controlled running read unavailable.");
         var originalFailure = scope.Resolve<ExecutionTimingFacade>().GetRunningOperations();
-        originalFailure.Status.Should().Be(ResStatus.BadRequest);
+        originalFailure.Status.Should().Be(ResultStatus.BadRequest);
         originalFailure.Message.Should().Contain("Controlled running read unavailable.");
         originalFailure.Data.Should().BeNull();
 
@@ -177,7 +177,7 @@ public sealed class ExecutionTimingPageStateTests
 
         var failure = await state.InitializeAsync();
         var originalFailure = scope.Resolve<ExecutionTimingFacade>().GetStatistics();
-        originalFailure.Status.Should().Be(ResStatus.BadRequest);
+        originalFailure.Status.Should().Be(ResultStatus.BadRequest);
         originalFailure.Message.Should().Contain("Initial read unavailable.");
         originalFailure.Data.Should().BeNull();
 
@@ -216,7 +216,7 @@ public sealed class ExecutionTimingPageStateTests
         Complete(recorder, "state.periodic");
         control.FailRunning("Periodic read unavailable.");
         var originalFailure = scope.Resolve<ExecutionTimingFacade>().GetRunningOperations();
-        originalFailure.Status.Should().Be(ResStatus.BadRequest);
+        originalFailure.Status.Should().Be(ResultStatus.BadRequest);
         originalFailure.Message.Should().Contain("Periodic read unavailable.");
         originalFailure.Data.Should().BeNull();
         var failed = NextSettledChange(state, () => state.LoadError is not null);
@@ -252,7 +252,7 @@ public sealed class ExecutionTimingPageStateTests
         await using var state = scope.Resolve<ExecutionTimingPageStateFactory>().Create();
         AssertSuccess(await state.InitializeAsync());
         control.FailRunning("Retained failure.");
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.BadRequest);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.BadRequest);
         var error = state.LoadError;
         var capturedAt = state.SnapshotCapturedAt;
         control.ClearFailures();
@@ -263,7 +263,7 @@ public sealed class ExecutionTimingPageStateTests
             await AwaitBounded(readGate.Entered);
             state.IsLoading.Should().BeTrue();
             var busy = await state.RefreshAsync();
-            busy.Status.Should().Be(ResStatus.Conflict);
+            busy.Status.Should().Be(ResultStatus.Conflict);
             busy.Message.Should().BeEmpty();
             state.LoadError.Should().Be(error);
             state.SnapshotCapturedAt.Should().Be(capturedAt);
@@ -373,7 +373,7 @@ public sealed class ExecutionTimingPageStateTests
         var notifications = 0;
         state.StateChanged += () => Interlocked.Increment(ref notifications);
         using var readGate = holdRunningRead ? control.HoldNextRunningRead() : control.HoldNextStatisticsRead();
-        Task<Res>? manualRead = null;
+        Task<Result>? manualRead = null;
         Task<int>? tick = null;
         if (periodicRead)
         {
@@ -394,7 +394,7 @@ public sealed class ExecutionTimingPageStateTests
             firstDispose.IsCompleted.Should().BeFalse();
             secondDispose.Should().BeSameAs(firstDispose);
             var lateRefresh = await state.RefreshAsync();
-            lateRefresh.Status.Should().Be(ResStatus.Conflict);
+            lateRefresh.Status.Should().Be(ResultStatus.Conflict);
             lateRefresh.Message.Should().BeEmpty();
             var lateInitialize = state.InitializeAsync();
             var lateEnable = state.SetAutoRefreshAsync(true);
@@ -408,7 +408,7 @@ public sealed class ExecutionTimingPageStateTests
             await AwaitBounded(firstDispose);
             await AwaitBounded(lateEnable);
             var initialized = await lateInitialize.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            initialized.Status.Should().Be(ResStatus.Conflict);
+            initialized.Status.Should().Be(ResultStatus.Conflict);
             initialized.Message.Should().BeEmpty();
         }
         finally
@@ -438,11 +438,11 @@ public sealed class ExecutionTimingPageStateTests
         }
         if (manualRead is not null)
         {
-            (await manualRead).Status.Should().Be(ResStatus.Conflict);
+            (await manualRead).Status.Should().Be(ResultStatus.Conflict);
         }
 
         var actual = scope.Resolve<ExecutionTimingFacade>().GetStatistics();
-        actual.Status.Should().Be(ResStatus.Ok);
+        actual.Status.Should().Be(ResultStatus.Ok);
         actual.Message.Should().BeNull();
         actual.Data.Should().ContainSingle().Which.ExecutionCount.Should().Be(2);
     }
@@ -466,7 +466,7 @@ public sealed class ExecutionTimingPageStateTests
 
         var result = await state.RefreshAsync();
 
-        result.Status.Should().Be(ResStatus.Conflict);
+        result.Status.Should().Be(ResultStatus.Conflict);
         result.Message.Should().BeEmpty();
         disposal.Should().NotBeNull();
         await AwaitBounded(disposal!);
@@ -529,9 +529,9 @@ public sealed class ExecutionTimingPageStateTests
         using var invocation = recorder.BeginScope(operationKey);
     }
 
-    private static void AssertSuccess(Res result)
+    private static void AssertSuccess(Result result)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
     }
 

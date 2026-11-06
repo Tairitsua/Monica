@@ -13,11 +13,11 @@ public sealed class ModuleResourceActivationSessionTests
     public async Task LiveReads_ShouldDistinguishFailureFromEmptyAndPreserveLastSuccessfulEvidence()
     {
         IReadOnlyList<ResourceActivationObservation> held = [Observation("held")];
-        var results = new Queue<Res<IReadOnlyList<ResourceActivationObservation>>>([
-            Res.Fail("Initial read failed."),
-            Res.Ok<IReadOnlyList<ResourceActivationObservation>>([]),
-            Res.Ok(held),
-            Res.Fail("Refresh failed.")
+        var results = new Queue<Result<IReadOnlyList<ResourceActivationObservation>>>([
+            Result.Failure<IReadOnlyList<ResourceActivationObservation>>("Initial read failed."),
+            Result.Success<IReadOnlyList<ResourceActivationObservation>>([]),
+            Result.Success(held),
+            Result.Failure<IReadOnlyList<ResourceActivationObservation>>("Refresh failed.")
         ]);
         await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls() with
         {
@@ -53,7 +53,7 @@ public sealed class ModuleResourceActivationSessionTests
             GetResourceActivations = () =>
             {
                 facadeCalls++;
-                return Res.Ok<IReadOnlyList<ResourceActivationObservation>>([Observation("resource")]);
+                return Result.Success<IReadOnlyList<ResourceActivationObservation>>([Observation("resource")]);
             }
         }, () =>
         {
@@ -88,7 +88,7 @@ public sealed class ModuleResourceActivationSessionTests
             GetResourceActivations = () =>
             {
                 facadeCalls++;
-                return Res.Ok<IReadOnlyList<ResourceActivationObservation>>([Observation("newer")]);
+                return Result.Success<IReadOnlyList<ResourceActivationObservation>>([Observation("newer")]);
             }
         }, () => ++authorizationChecks == 1 ? authorization.Task : Task.FromResult(true));
 

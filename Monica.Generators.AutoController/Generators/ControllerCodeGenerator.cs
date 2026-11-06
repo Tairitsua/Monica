@@ -120,7 +120,7 @@ internal static class ControllerCodeGenerator
 
         builder.Append("    [Http").Append(endpoint.HttpMethod).Append("(\"")
             .Append(EscapeString(endpoint.RelativeRoute)).AppendLine("\")]");
-        builder.Append("    [ProducesResponseType(typeof(").Append(endpoint.ResultTypeName)
+        builder.Append("    [ProducesResponseType(typeof(").Append(endpoint.ResultRuntimeTypeName)
             .AppendLine("), (int)HttpStatusCode.OK)]");
         builder.Append("    public async global::System.Threading.Tasks.Task<object> ")
             .Append(endpoint.OperationName).AppendLine("(");

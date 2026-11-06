@@ -79,7 +79,8 @@
     private void Load()
     {
         CancelReveal();
-        if (Service.GetRegisteredProviders().IsFailed(out var error, out var providers)) _error = error.Message;
+        var result = Service.GetRegisteredProviders();
+        if (result.IsFailure() || result.Data is not { } providers) _error = result.Message;
         else { _providers = providers; _error = null; Rebind(); }
     }
     private void Rebind() => _selected = _providers.FirstOrDefault(p => p.UniqueId == ProviderIdentity)

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Localization;
 using Monica.Core.Extensions;
 using Monica.Core.Results;
@@ -826,7 +827,7 @@ public sealed class EventBusKafkaPageState(
         var clusterId = SelectedClusterId;
         var result = await ObserveEvidenceAsync(facade.ListTopicsAsync(clusterId, cancellationToken), cancellationToken);
         if (!string.Equals(clusterId, SelectedClusterId, StringComparison.Ordinal)) return;
-        if (result.IsFailed(out var topicError)) TopicsError = topicError.Message;
+        if (result.IsFailure()) TopicsError = result.Message;
         if (suppressErrors
                 ? TryReadSilently(result, out var topics)
                 : TryRead(result, out topics))
@@ -863,7 +864,7 @@ public sealed class EventBusKafkaPageState(
         var clusterId = SelectedClusterId;
         var result = await ObserveEvidenceAsync(facade.ListConsumerGroupsAsync(clusterId, cancellationToken), cancellationToken);
         if (!string.Equals(clusterId, SelectedClusterId, StringComparison.Ordinal)) return;
-        if (result.IsFailed(out var groupsError)) ConsumerGroupsError = groupsError.Message;
+        if (result.IsFailure()) ConsumerGroupsError = result.Message;
         if (suppressErrors
                 ? TryReadSilently(result, out var groups)
                 : TryRead(result, out groups))
@@ -887,15 +888,17 @@ public sealed class EventBusKafkaPageState(
         var clusterId = SelectedClusterId;
         var result = await ObserveEvidenceAsync(facade.GetLatestPerformanceAsync(clusterId, cancellationToken), cancellationToken);
         if (!string.Equals(clusterId, SelectedClusterId, StringComparison.Ordinal)) return;
-        if (result.IsFailed(out var performanceError)) LatestPerformanceError = performanceError.Message;
-        if (suppressErrors
-                ? TryReadSilently(result, out var snapshot)
-                : TryRead(result, out snapshot))
+        if (result.IsFailure())
         {
-            performancePollingState.SetSnapshot(snapshot);
-            _performanceClusterId = clusterId;
-            Dashboard.LatestPerformance = snapshot;
+            LatestPerformanceError = result.Message;
+            if (!suppressErrors) ErrorMessage = result.Message;
+            return;
         }
+
+        var snapshot = result.Data;
+        performancePollingState.SetSnapshot(snapshot);
+        _performanceClusterId = clusterId;
+        Dashboard.LatestPerformance = snapshot;
     }
 
     private Task SynchronizePerformancePollingAsync(CancellationToken cancellationToken)
@@ -981,14 +984,14 @@ public sealed class EventBusKafkaPageState(
         }
     }
 
-    private bool TryRead(Res result)
+    private bool TryRead(Result result)
     {
-        if (!result.IsFailed(out var error))
+        if (result.IsSuccess())
         {
             return true;
         }
 
-        ErrorMessage = error.Message;
+        ErrorMessage = result.Message;
         return false;
     }
 
@@ -999,28 +1002,18 @@ public sealed class EventBusKafkaPageState(
         return result;
     }
 
-    private bool TryRead<T>(Res<T> result, out T data)
+    private bool TryRead<T>(Result<T> result, [NotNullWhen(true)] out T? data) where T : class
     {
-        if (!result.IsFailed(out var error))
-        {
-            data = result.Data!;
-            return true;
-        }
+        data = result.Data;
+        if (result.IsSuccess() && data is not null) return true;
 
-        data = default!;
-        ErrorMessage = error.Message;
+        ErrorMessage = result.Message;
         return false;
     }
 
-    private static bool TryReadSilently<T>(Res<T> result, out T data)
+    private static bool TryReadSilently<T>(Result<T> result, [NotNullWhen(true)] out T? data) where T : class
     {
-        if (!result.IsFailed(out _))
-        {
-            data = result.Data!;
-            return true;
-        }
-
-        data = default!;
-        return false;
+        data = result.Data;
+        return result.IsSuccess() && data is not null;
     }
 }

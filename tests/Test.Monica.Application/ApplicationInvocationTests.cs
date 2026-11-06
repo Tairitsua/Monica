@@ -44,8 +44,8 @@ public sealed class ApplicationInvocationTests
         circuit.Resolve<CircuitAuthentication>().User = Principal("second");
         var second = await client.Store(new CommandStore("two"), TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, first.Status);
-        Assert.Equal(ResStatus.Ok, second.Status);
+        Assert.Equal(ResultStatus.Ok, first.Status);
+        Assert.Equal(ResultStatus.Ok, second.Status);
         Assert.NotEqual(first.Data!.ScopeId, second.Data!.ScopeId);
         Assert.Equal(first.Data.ScopeId, first.Data.NestedScopeId);
         Assert.Equal(second.Data.ScopeId, second.Data.NestedScopeId);
@@ -68,7 +68,7 @@ public sealed class ApplicationInvocationTests
         var calls = await Task.WhenAll(
             firstCircuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(true), TestContext.Current.CancellationToken),
             secondCircuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(true), TestContext.Current.CancellationToken));
-        Assert.All(calls, result => Assert.Equal(ResStatus.Ok, result.Status));
+        Assert.All(calls, result => Assert.Equal(ResultStatus.Ok, result.Status));
         Assert.NotEqual(calls[0].Data!.ScopeId, calls[1].Data!.ScopeId);
         Assert.Equal("alice", calls[0].Data!.User);
         Assert.Equal("bob", calls[1].Data!.User);
@@ -82,9 +82,9 @@ public sealed class ApplicationInvocationTests
         await using var circuit = app.CreateScope(TestContext.Current.CancellationToken);
         var client = circuit.Resolve<ITestingCommandApi>();
         circuit.Resolve<CircuitAuthentication>().User = new ClaimsPrincipal(new ClaimsIdentity());
-        Assert.Equal(ResStatus.Unauthorized, (await circuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(), TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Unauthorized, (await circuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(), TestContext.Current.CancellationToken)).Status);
         circuit.Resolve<CircuitAuthentication>().User = Principal("denied", allowed: false);
-        Assert.Equal(ResStatus.Forbidden, (await circuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(), TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Forbidden, (await circuit.Resolve<ITestingQueryApi>().Identity(new QueryIdentity(), TestContext.Current.CancellationToken)).Status);
         Assert.Equal("system", app.Services.GetRequiredService<CurrentPrincipalContext>().Principal!.Identity!.Name);
     }
 
@@ -95,10 +95,10 @@ public sealed class ApplicationInvocationTests
         await using var circuit = app.CreateScope(TestContext.Current.CancellationToken);
         var client = circuit.Resolve<ITestingCommandApi>();
         var failed = await client.Store(new CommandStore("rollback", Fail: true), TestContext.Current.CancellationToken);
-        Assert.Equal(ResStatus.InternalError, failed.Status);
+        Assert.Equal(ResultStatus.InternalError, failed.Status);
         Assert.DoesNotContain("private database failure", failed.Message ?? string.Empty);
         Assert.False(((IDictionary<string, object?>?)failed.Metadata)?.ContainsKey("diagnostics") == true);
-        Assert.Equal(ResStatus.Ok, (await client.Store(new CommandStore("committed"), TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Ok, (await client.Store(new CommandStore("committed"), TestContext.Current.CancellationToken)).Status);
         await app.VerifyAsync<OperationDbContext>(async (db, ct) =>
             Assert.Equal(new[] { "committed" }, await db.Entries.Select(entry => entry.Name).ToArrayAsync(ct)), TestContext.Current.CancellationToken);
     }
@@ -109,7 +109,7 @@ public sealed class ApplicationInvocationTests
         await using var app = await new InvocationFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var circuit = app.CreateScope(TestContext.Current.CancellationToken);
         var local = await circuit.Resolve<ITestingCommandApi>().Store(new CommandStore(""), TestContext.Current.CancellationToken);
-        Assert.Equal(ResStatus.BadRequest, local.Status);
+        Assert.Equal(ResultStatus.BadRequest, local.Status);
         using var http = ((TestServer)app.Services.GetRequiredService<IServer>()).CreateClient();
         http.DefaultRequestHeaders.Add("X-Test-User", "test");
         using var invalid = await http.PostAsJsonAsync("/test/Testing/commands/Store", new CommandStore(""), TestContext.Current.CancellationToken);
@@ -128,12 +128,12 @@ public sealed class ApplicationInvocationTests
         http.DefaultRequestHeaders.Add("X-Test-User", "http-caller");
         using var response = await http.PostAsJsonAsync("/test/Testing/commands/Store", new CommandStore("http-owned"), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var receipt = await response.Content.ReadFromJsonAsync<Res<OperationReceipt>>(TestContext.Current.CancellationToken);
+        var receipt = await response.Content.ReadFromJsonAsync<Result<OperationReceipt>>(TestContext.Current.CancellationToken);
         Assert.Equal("http-caller", receipt!.Data!.User);
         Assert.Equal(receipt.Data.ScopeId, receipt.Data.NestedScopeId);
         using var query = await http.PostAsJsonAsync("/test/Testing/queries/Identity", new QueryIdentity(), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, query.StatusCode);
-        var identity = await query.Content.ReadFromJsonAsync<Res<OperationReceipt>>(TestContext.Current.CancellationToken);
+        var identity = await query.Content.ReadFromJsonAsync<Result<OperationReceipt>>(TestContext.Current.CancellationToken);
         Assert.Equal("http-caller", identity!.Data!.User);
         Assert.NotEqual(receipt.Data.ScopeId, identity.Data.ScopeId);
     }
@@ -158,7 +158,7 @@ public sealed class ApplicationInvocationTests
         await using var app = await new InvocationFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var circuit = app.CreateScope(TestContext.Current.CancellationToken);
         var result = await circuit.Resolve<ITestingCommandApi>().Store(new CommandStore("outer", fail) { CallNested = true }, TestContext.Current.CancellationToken);
-        Assert.Equal(fail ? ResStatus.InternalError : ResStatus.Ok, result.Status);
+        Assert.Equal(fail ? ResultStatus.InternalError : ResultStatus.Ok, result.Status);
         if (!fail) Assert.Equal(result.Data!.ScopeId, result.Data.NestedScopeId);
         await app.VerifyAsync<OperationDbContext>(async (db, ct) => Assert.Equal(fail ? 0 : 2, await db.Entries.CountAsync(ct)), TestContext.Current.CancellationToken);
     }
@@ -232,7 +232,7 @@ public sealed class OperationDbContext(DbContextOptions<OperationDbContext> opti
 public sealed class CommandHandlerStore(OperationDbContext db, OperationLease lease, ITestingQueryApi queries, ITestingCommandApi commands,
     ICurrentPrincipalAccessor principal) : ApplicationService<CommandStore, OperationReceipt>
 {
-    public override async Task<Res<OperationReceipt>> Handle(CommandStore request, CancellationToken cancellationToken)
+    public override async Task<Result<OperationReceipt>> Handle(CommandStore request, CancellationToken cancellationToken)
     {
         var nested = await queries.Identity(new QueryIdentity(), cancellationToken);
         db.Entries.Add(new OperationEntry { Name = request.Name });
@@ -240,10 +240,10 @@ public sealed class CommandHandlerStore(OperationDbContext db, OperationLease le
         if (request.CallNested)
         {
             var inner = await commands.Store(new CommandStore(request.Name + "-nested", request.Fail), cancellationToken);
-            return Res.Ok(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name, inner.Data!.ScopeId));
+            return Result.Success(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name, inner.Data!.ScopeId));
         }
         if (request.Fail) throw new InvalidOperationException("private database failure");
-        return Res.Ok(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name, nested.Data!.ScopeId));
+        return Result.Success(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name, nested.Data!.ScopeId));
     }
 }
 
@@ -251,10 +251,10 @@ public sealed class CommandHandlerStore(OperationDbContext db, OperationLease le
 public sealed class QueryHandlerIdentity(OperationLease lease, ICurrentPrincipalAccessor principal, ScopeLedger ledger)
     : ApplicationService<QueryIdentity, OperationReceipt>
 {
-    public override async Task<Res<OperationReceipt>> Handle(QueryIdentity request, CancellationToken cancellationToken)
+    public override async Task<Result<OperationReceipt>> Handle(QueryIdentity request, CancellationToken cancellationToken)
     {
         if (request.WaitForPeer) await ledger.WaitAsync(cancellationToken);
-        return Res.Ok(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name));
+        return Result.Success(new OperationReceipt(lease.Id, principal.Principal.Identity?.Name));
     }
 }
 

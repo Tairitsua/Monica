@@ -13,7 +13,7 @@ public sealed class SchedulerOverviewPageStateTests
     [Fact]
     public async Task RefreshAsync_WhenCallsOverlap_ShouldJoinOneAuthorizedLoad()
     {
-        var result = NewCompletion<Res<JobSchedulerOverview>>();
+        var result = NewCompletion<Result<JobSchedulerOverview>>();
         var snapshot = Snapshot();
         var clock = new ControlledTimeProvider();
         var authorizationCalls = 0;
@@ -38,7 +38,7 @@ public sealed class SchedulerOverviewPageStateTests
             Assert.True(state.IsLoading);
             Assert.Null(state.Overview);
 
-            result.TrySetResult(Res.Ok(snapshot));
+            result.TrySetResult(Result.Success(snapshot));
             await ObserveAsync(first);
             Assert.Same(snapshot, state.Overview);
             Assert.Equal(InitialTime, state.LastRefreshedUtc);
@@ -48,7 +48,7 @@ public sealed class SchedulerOverviewPageStateTests
         }
         finally
         {
-            result.TrySetResult(Res.Ok(snapshot));
+            result.TrySetResult(Result.Success(snapshot));
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
     }
@@ -57,7 +57,7 @@ public sealed class SchedulerOverviewPageStateTests
     public async Task RefreshAsync_WhenLaterQueryFails_ShouldRetainAcceptedSnapshotAndTimestamp()
     {
         var snapshot = Snapshot();
-        var next = Res.Ok(snapshot);
+        var next = Result.Success(snapshot);
         var clock = new ControlledTimeProvider();
         var state = new SchedulerOverviewPageState(_ => Task.FromResult(next),
             _ => Task.FromResult(true), clock, TimeSpan.Zero);
@@ -67,7 +67,7 @@ public sealed class SchedulerOverviewPageStateTests
             await ObserveAsync(state.RefreshAsync());
             var acceptedAt = state.LastRefreshedUtc;
             clock.UtcNow = InitialTime.AddMinutes(5);
-            next = new Res<JobSchedulerOverview>("The durable store query failed.", ResStatus.BadRequest);
+            next = Result.Failure<JobSchedulerOverview>("The durable store query failed.", ResultStatus.BadRequest);
 
             await ObserveAsync(state.RefreshAsync());
 
@@ -88,7 +88,7 @@ public sealed class SchedulerOverviewPageStateTests
         var state = new SchedulerOverviewPageState(_ =>
         {
             loadCalls++;
-            return Task.FromResult(Res.Ok(Snapshot()));
+            return Task.FromResult(Result.Success(Snapshot()));
         }, _ =>
         {
             authorizationCalls++;
@@ -123,7 +123,7 @@ public sealed class SchedulerOverviewPageStateTests
         var state = new SchedulerOverviewPageState(_ =>
         {
             loadCalls++;
-            return Task.FromResult(Res.Ok(Snapshot()));
+            return Task.FromResult(Result.Success(Snapshot()));
         }, token =>
         {
             authorizationToken = token;
@@ -165,7 +165,7 @@ public sealed class SchedulerOverviewPageStateTests
     {
         var accepted = Snapshot();
         var late = Snapshot(InitialTime.AddMinutes(5));
-        var pending = NewCompletion<Res<JobSchedulerOverview>>();
+        var pending = NewCompletion<Result<JobSchedulerOverview>>();
         var clock = new ControlledTimeProvider();
         var loadCalls = 0;
         var loadToken = CancellationToken.None;
@@ -175,7 +175,7 @@ public sealed class SchedulerOverviewPageStateTests
         {
             loadToken = token;
             loadCalls++;
-            return loadCalls == 1 ? Task.FromResult(Res.Ok(accepted)) : pending.Task;
+            return loadCalls == 1 ? Task.FromResult(Result.Success(accepted)) : pending.Task;
         }, _ => Task.FromResult(true), clock, TimeSpan.Zero);
         state.Changed += () =>
         {
@@ -194,7 +194,7 @@ public sealed class SchedulerOverviewPageStateTests
             Assert.False(retirement.IsCompleted);
 
             clock.UtcNow = InitialTime.AddMinutes(5);
-            pending.TrySetResult(Res.Ok(late));
+            pending.TrySetResult(Result.Success(late));
             await ObserveAsync(Task.WhenAll(refresh, retirement));
 
             Assert.Same(accepted, state.Overview);
@@ -206,7 +206,7 @@ public sealed class SchedulerOverviewPageStateTests
         }
         finally
         {
-            pending.TrySetResult(Res.Ok(late));
+            pending.TrySetResult(Result.Success(late));
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
     }
@@ -221,7 +221,7 @@ public sealed class SchedulerOverviewPageStateTests
         var state = new SchedulerOverviewPageState(_ =>
         {
             loadCalls++;
-            return Task.FromResult(Res.Ok(Snapshot()));
+            return Task.FromResult(Result.Success(Snapshot()));
         }, _ => Task.FromResult(true), clock, TimeSpan.FromSeconds(seconds));
 
         try
@@ -240,13 +240,13 @@ public sealed class SchedulerOverviewPageStateTests
     {
         var clock = new ControlledTimeProvider();
         var automaticLoadEntered = NewSignal();
-        var automaticResult = NewCompletion<Res<JobSchedulerOverview>>();
+        var automaticResult = NewCompletion<Result<JobSchedulerOverview>>();
         var nextSnapshot = Snapshot(InitialTime.AddMinutes(1));
         var loadCalls = 0;
         var state = new SchedulerOverviewPageState(_ =>
         {
             loadCalls++;
-            if (loadCalls == 1) return Task.FromResult(Res.Ok(Snapshot()));
+            if (loadCalls == 1) return Task.FromResult(Result.Success(Snapshot()));
             automaticLoadEntered.TrySetResult();
             return automaticResult.Task;
         }, _ => Task.FromResult(true), clock, TimeSpan.FromSeconds(5));
@@ -263,7 +263,7 @@ public sealed class SchedulerOverviewPageStateTests
             await ObserveAsync(automaticLoadEntered.Task);
             var joined = state.RefreshAsync();
             Assert.Equal(2, loadCalls);
-            automaticResult.TrySetResult(Res.Ok(nextSnapshot));
+            automaticResult.TrySetResult(Result.Success(nextSnapshot));
             await ObserveAsync(joined);
             Assert.Same(nextSnapshot, state.Overview);
 
@@ -276,7 +276,7 @@ public sealed class SchedulerOverviewPageStateTests
         }
         finally
         {
-            automaticResult.TrySetResult(Res.Ok(nextSnapshot));
+            automaticResult.TrySetResult(Result.Success(nextSnapshot));
             await ObserveAsync(state.DisposeAsync().AsTask());
             clock.DisposeTimers();
         }
@@ -297,7 +297,7 @@ public sealed class SchedulerOverviewPageStateTests
                     throw new TimeoutException("The controlled timer constructor was not released.");
             }
         };
-        var state = new SchedulerOverviewPageState(_ => Task.FromResult(Res.Ok(Snapshot())),
+        var state = new SchedulerOverviewPageState(_ => Task.FromResult(Result.Success(Snapshot())),
             _ => Task.FromResult(true), clock, TimeSpan.FromSeconds(5));
         var initializing = Task.Run(() => state.InitializeAsync(), TestContext.Current.CancellationToken);
         Task retiring = Task.CompletedTask;
@@ -359,7 +359,7 @@ public sealed class SchedulerOverviewPageStateTests
         {
             CoordinateWithAdmission();
             cancellationRegistration = token.Register(() => CoordinateWithAdmission(true));
-            return Task.FromResult(Res.Ok(Snapshot()));
+            return Task.FromResult(Result.Success(Snapshot()));
         }, _ =>
         {
             CoordinateWithAdmission();

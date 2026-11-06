@@ -298,7 +298,8 @@
             return;
         }
 
-        if (result.IsFailed(out _, out var export))
+        var export = result.Data;
+        if (result.IsFailure() || export is null)
         {
             Snackbar.Add(L["Export:Failed"], Severity.Error);
             return;

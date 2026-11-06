@@ -20,10 +20,10 @@ internal class ExceptionHandlerService(
     IExceptionResponseDiagnostics? diagnostics = null,
     IEnumerable<IRemoteExceptionDiagnosticsExtractor>? remoteExtractors = null) : IExceptionHandlerService
 {
-    public Task<Res> HandleCurrentHttpContextAsync(Exception exception, CancellationToken cancellationToken) =>
+    public Task<Result> HandleCurrentHttpContextAsync(Exception exception, CancellationToken cancellationToken) =>
         HandleAsync(accessor.HttpContext, exception, cancellationToken);
 
-    public void LogException(HttpContext? httpContext, Exception exception, Res response)
+    public void LogException(HttpContext? httpContext, Exception exception, Result response)
     {
         var status = (int)(response.ToHttpStatusCode() ?? System.Net.HttpStatusCode.InternalServerError);
         response.TryGetError(serializer.SerializerOptions, out var error);
@@ -34,7 +34,7 @@ internal class ExceptionHandlerService(
             error?.Code, status, exception.GetType().Name, error?.TraceId);
     }
 
-    public Task<Res> HandleAsync(HttpContext? httpContext, Exception exception, CancellationToken cancellationToken)
+    public Task<Result> HandleAsync(HttpContext? httpContext, Exception exception, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var exposeDiagnostics = applicationOptions.DebugMode;
@@ -46,17 +46,17 @@ internal class ExceptionHandlerService(
             exception = contextual.InnerException;
         }
 
-        Res? result = null;
+        Result? result = null;
         foreach (var mapper in mappers)
         {
             if (mapper.TryMap(httpContext, exception, cancellationToken, out result)) break;
         }
         result ??= exception switch
         {
-            BusinessException business => Res.Fail(business.Message),
-            DisplayMessageException display => new Res(display.DisplayMessage, display.ResultStatus)
+            BusinessException business => Result.Failure(business.Message),
+            DisplayMessageException display => Result.Failure(display.DisplayMessage, display.ResultStatus)
                 .WithDetail(display.TechnicalDetail),
-            _ => Res.Fail("", ResStatus.InternalError)
+            _ => Result.Failure("", ResultStatus.InternalError)
         };
         // All mappers pass through the same reserved-metadata policy. Outer context cannot replace an error.
         foreach (var entry in metadata.Where(entry => entry.Key != "error"))

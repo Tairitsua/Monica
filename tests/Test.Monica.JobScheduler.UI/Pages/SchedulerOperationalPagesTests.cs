@@ -48,7 +48,7 @@ public sealed class SchedulerOperationalPagesTests
         var recurring = state.Summaries.Single(summary =>
             summary.Definition.Declaration.JobType == JobType.Recurring);
 
-        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResultStatus.Ok);
         state.Summaries.Single(summary => summary.Definition.Declaration.JobKey ==
                                         recurring.Definition.Declaration.JobKey)
             .RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.Suspended);
@@ -75,12 +75,12 @@ public sealed class SchedulerOperationalPagesTests
             SortDirection = SortDirection.Ascending
         }, Xunit.TestContext.Current.CancellationToken);
         var recurring = state.Summaries.Single();
-        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResultStatus.Ok);
         recurring = state.Summaries.Single();
 
         var result = await state.RunRecurringNowAsync(recurring);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().NotBeNull();
         result.Data!.Origin.Should().Be(JobExecutionOrigin.RecurringRunNow);
         result.Data.State.Should().Be(JobExecutionState.Queued);
@@ -103,14 +103,14 @@ public sealed class SchedulerOperationalPagesTests
         recurring.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
 
         var pause = await state.SetDisabledAsync(recurring, true);
-        pause.IsFailed(out _).Should().BeTrue();
+        pause.IsFailure().Should().BeTrue();
 
         state.ToggleSelection(recurring);
         var batchPause = await state.SetSelectedDisabledAsync(true);
-        batchPause.IsFailed(out _).Should().BeTrue();
+        batchPause.IsFailure().Should().BeTrue();
 
         var runNow = await state.RunRecurringNowAsync(recurring);
-        runNow.Status.Should().Be(ResStatus.Ok);
+        runNow.Status.Should().Be(ResultStatus.Ok);
         var persisted = await context.Store.GetDefinitionAsync(
             JobSchedulerUiTestContext.SCOPE,
             JobSchedulerUiTestContext.OWNER,
@@ -151,7 +151,7 @@ public sealed class SchedulerOperationalPagesTests
             SortDirection = SortDirection.Ascending
         }, Xunit.TestContext.Current.CancellationToken);
         var recurring = state.Summaries.Single();
-        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(recurring, true)).Status.Should().Be(ResultStatus.Ok);
         await SetManualSuppressionAsync(context);
         await state.LoadTableAsync(new TableState
         {
@@ -163,7 +163,7 @@ public sealed class SchedulerOperationalPagesTests
         recurring.SuspensionReasons.Should().Be(
             JobRecurringScheduleSuspensionReason.OperatorPolicy | JobRecurringScheduleSuspensionReason.Manual);
 
-        (await state.SetDisabledAsync(recurring, false)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(recurring, false)).Status.Should().Be(ResultStatus.Ok);
 
         var optimistic = state.Summaries.Single();
         optimistic.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.Manual);
@@ -212,7 +212,7 @@ public sealed class SchedulerOperationalPagesTests
             .Create(new JobId(JobSchedulerUiTestContext.OWNER, context.TriggeredDefinition.Declaration.JobKey));
 
         await state.InitializeAsync();
-        (await state.SetDisabledAsync(true)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(true)).Status.Should().Be(ResultStatus.Ok);
 
         state.Summary.Should().NotBeNull();
         state.Summary!.Definition.IsDisabled.Should().BeTrue();
@@ -220,7 +220,7 @@ public sealed class SchedulerOperationalPagesTests
         state.Summary.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.None);
         state.Summary.NextOccurrenceUtc.Should().BeNull();
 
-        (await state.SetDisabledAsync(false)).Status.Should().Be(ResStatus.Ok);
+        (await state.SetDisabledAsync(false)).Status.Should().Be(ResultStatus.Ok);
         state.Summary.Definition.IsDisabled.Should().BeFalse();
         state.Summary.RecurringScheduleStatus.Should().Be(JobRecurringScheduleStatus.NotRecurring);
         state.Summary.SuspensionReasons.Should().Be(JobRecurringScheduleSuspensionReason.None);

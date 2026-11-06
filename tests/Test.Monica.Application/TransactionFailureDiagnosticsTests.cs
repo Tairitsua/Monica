@@ -38,7 +38,7 @@ public sealed class TransactionFailureDiagnosticsTests
             var invoke = () => scope.Resolve<ITestingQueryApi>().ReadTransaction(new(Fault: fault), token);
             Exception? original = null;
             if (fault == QueryFault.CaughtSql)
-                Assert.Equal(ResStatus.BadRequest, (await invoke()).Status);
+                Assert.Equal(ResultStatus.BadRequest, (await invoke()).Status);
             else if (fault == QueryFault.Cancellation)
                 original = await Assert.ThrowsAnyAsync<OperationCanceledException>(invoke);
             else
@@ -102,14 +102,14 @@ public sealed class TransactionFailureDiagnosticsTests
         var manager = scope.Resolve<IUnitOfWorkManager>();
         await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
         {
-            var result = await scope.Resolve<ITestingQueryApi>().ReadTransaction(new(ResStatus.ServiceUnavailable), token);
+            var result = await scope.Resolve<ITestingQueryApi>().ReadTransaction(new(ResultStatus.ServiceUnavailable), token);
             var first = Assert.IsType<ExecutionTransactionFailure>(manager.Current!.FirstFailure);
             result.Message = "changed after the failure";
-            result.Status = ResStatus.Ok;
+            result.Status = ResultStatus.Ok;
             var outbox = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => scope.Resolve<IDistributedEventBus>()
                 .PublishAsync(new TransactionCompleted(), cancellationToken: token));
             Assert.Same(first, outbox.FirstFailure);
-            Assert.Equal(ResStatus.ServiceUnavailable, first.ResultStatus);
+            Assert.Equal(ResultStatus.ServiceUnavailable, first.ResultStatus);
             Assert.Equal("Query rejected.", first.Reason);
             Assert.Null(outbox.InnerException);
             Assert.Contains("ServiceUnavailable", outbox.Message);
@@ -127,10 +127,10 @@ public sealed class TransactionFailureDiagnosticsTests
         await manager.RunAsync(async () =>
         {
             var api = scope.Resolve<ITestingQueryApi>();
-            Assert.Equal(ResStatus.NotFound, (await api.ReadTransaction(new(ResStatus.NotFound), token)).Status);
+            Assert.Equal(ResultStatus.NotFound, (await api.ReadTransaction(new(ResultStatus.NotFound), token)).Status);
             var independent = await api.WithTransaction(ApiTransaction.Independent)
                 .ReadTransaction(new(Fault: QueryFault.Exception), token);
-            Assert.Equal(ResStatus.InternalError, independent.Status);
+            Assert.Equal(ResultStatus.InternalError, independent.Status);
             Assert.Null(manager.Current!.FirstFailure);
             scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "healthy" });
             await scope.Resolve<IDistributedEventBus>().PublishAsync(new TransactionCompleted(), cancellationToken: token);

@@ -17,17 +17,23 @@ public sealed class UnitOfWorkRepositoryCommitTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(ResStatus.Created, true, false)]
-    [InlineData(ResStatus.Ok, true, true)]
-    [InlineData(ResStatus.Conflict, false, false)]
-    [InlineData(ResStatus.BadRequest, false, true)]
-    public async Task MvcOutcome_WhenReturned_ShouldHonorEnvelopeStatus(ResStatus status, bool committed, bool json)
+    [InlineData(ResultStatus.Created, true, false)]
+    [InlineData(ResultStatus.Ok, true, true)]
+    [InlineData(ResultStatus.Conflict, false, false)]
+    [InlineData(ResultStatus.BadRequest, false, true)]
+    public async Task MvcOutcome_WhenReturned_ShouldHonorEnvelopeStatus(ResultStatus status, bool committed, bool json)
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         await app.ExecuteAsync(scope =>
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "mvc" });
-            IActionResult result = json ? new JsonResult(new Res("outcome", status)) : new ObjectResult(new Res("outcome", status));
+            var envelope = (status switch
+            {
+                ResultStatus.Created => Result.Created(),
+                ResultStatus.Ok => Result.Success(),
+                _ => Result.Failure("outcome", status)
+            }).WithMessage("outcome");
+            IActionResult result = json ? new JsonResult(envelope) : new ObjectResult(envelope);
             return Task.FromResult(MvcActionExecutionResult.ShortCircuit(result));
         }, cancellationToken: Token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
@@ -67,9 +73,9 @@ public sealed class UnitOfWorkRepositoryCommitTests
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "failure result" });
             await scope.Resolve<IUnitOfWorkManager>().Current!.FlushAsync(Token);
-            return Res.Fail("declined");
+            return Result.Failure("declined");
         }, cancellationToken: Token);
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
             Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
     }

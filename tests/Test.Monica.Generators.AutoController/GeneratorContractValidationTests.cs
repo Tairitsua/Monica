@@ -6,6 +6,29 @@ namespace Test.Monica.Generators.AutoController;
 
 public sealed class GeneratorContractValidationTests
 {
+    [Fact]
+    public void Run_WhenPublishedEnvelopeIsNullable_ShouldReportInvalidEnvelopeInsteadOfGeneratingClient()
+    {
+        const string source = """
+            using Monica.Core.Mediator;
+            using Monica.Core.Results;
+            using Monica.Application.Annotations;
+
+            namespace Scenario.PublishedLanguages.DomainOrdering.Requests;
+
+            /// <summary>Uses a nullable envelope rather than a nullable payload.</summary>
+            [ApiEndpoint(ApiHttpMethod.Get, "orders")]
+            public sealed record QueryOrders : IRequest<Result<string>?>, IQueryRequest;
+            """;
+
+        var run = GeneratorTestHarness.Run(source, new ApiClientSourceGenerator());
+
+        var diagnostic = Assert.Single(run.RunResult.Diagnostics, item => item.Id == "AC1017");
+        diagnostic.GetMessage().Should().Contain("Result<").And.Contain(">?").And.Contain("non-nullable");
+        run.GeneratedSources.Should().NotContainKey("IOrderingQueryApi.g.cs");
+        run.OutputErrors.Should().BeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(InvalidContractScenarios))]
     public void Run_WhenContractBoundaryIsInvalid_ShouldReportSpecificDiagnostic(
@@ -62,7 +85,7 @@ public sealed class GeneratorContractValidationTests
             public sealed class QueryHandlerInternalOrders
                 : ApplicationService<QueryInternalOrders, string>
             {
-                public override Task<Res<string>> Handle(
+                public override Task<Result<string>> Handle(
                     QueryInternalOrders request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -88,7 +111,7 @@ public sealed class GeneratorContractValidationTests
         public sealed class QueryHandlerInvalidPrefix
             : ApplicationService<QueryInvalidPrefix, string>
         {
-            public override Task<Res<string>> Handle(
+            public override Task<Result<string>> Handle(
                 QueryInvalidPrefix request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -109,7 +132,7 @@ public sealed class GeneratorContractValidationTests
             public sealed record CustomEnvelope(string Data) : IResultEnvelope
             {
                 public string? Message { get; set; }
-                public ResStatus Status { get; set; }
+                public ResultStatus Status { get; set; }
                 public ExpandoObject? Metadata { get; set; }
             }
         }
@@ -149,7 +172,7 @@ public sealed class GeneratorContractValidationTests
         public sealed class QueryHandlerReadOnlyOrder
             : ApplicationService<QueryReadOnlyOrder, string>
         {
-            public override Task<Res<string>> Handle(
+            public override Task<Result<string>> Handle(
                 QueryReadOnlyOrder request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }

@@ -148,7 +148,7 @@
     private void Capture()
     {
         var result = Facade.Capture();
-        if (result.IsOk() && result.Data is { } snapshot) _snapshot = snapshot;
+        if (result.IsSuccess() && result.Data is { } snapshot) _snapshot = snapshot;
     }
 
     public async ValueTask DisposeAsync()

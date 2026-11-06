@@ -99,7 +99,7 @@ public sealed class SeederActivationTests
         try
         {
             var result = await application.Services.GetRequiredService<SeederFacade>().RunAsync(Identity("Independent"), Token);
-            Assert.False(result.IsOk());
+            Assert.False(result.IsSuccess());
             Assert.Contains("already running", result.Message);
             Assert.DoesNotContain("Independent", probe.Calls);
         }

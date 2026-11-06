@@ -45,16 +45,16 @@ public sealed class TypeAllocationFacade
     /// window or the window since its reset. Zero retained type rows can represent totals-only capture.
     /// </remarks>
     /// <returns>The live snapshot, or a failed envelope when the provider read fails.</returns>
-    public Res<TypeAllocationSnapshot> GetCurrentSnapshot()
+    public Result<TypeAllocationSnapshot> GetCurrentSnapshot()
     {
         try
         {
-            return Res.Ok(_typeAllocationTrackingService.GetCurrentSnapshot());
+            return Result.Success(_typeAllocationTrackingService.GetCurrentSnapshot());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load the current type allocation snapshot.");
-            return Res.Fail($"Failed to load type allocation snapshot: {ex.GetMessageRecursively()}");
+            return Result.Failure<TypeAllocationSnapshot>($"Failed to load type allocation snapshot: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -64,16 +64,16 @@ public sealed class TypeAllocationFacade
     /// Every read owns its snapshot/type-row copies; modifying them cannot alter retained history.
     /// </remarks>
     /// <returns>The retained live history, which may be empty, or a failed provider-read envelope.</returns>
-    public Res<IReadOnlyList<TypeAllocationSnapshot>> GetHistorySnapshots()
+    public Result<IReadOnlyList<TypeAllocationSnapshot>> GetHistorySnapshots()
     {
         try
         {
-            return Res.Ok(_typeAllocationTrackingService.GetHistorySnapshots());
+            return Result.Success(_typeAllocationTrackingService.GetHistorySnapshots());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load type allocation history.");
-            return Res.Fail($"Failed to load type allocation history: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<TypeAllocationSnapshot>>($"Failed to load type allocation history: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -87,17 +87,17 @@ public sealed class TypeAllocationFacade
     /// </remarks>
     /// <param name="mode">Low by default. Low and High use the same tick stream, without distinct sampling-rate guarantees.</param>
     /// <returns>The actual shared start outcome.</returns>
-    public Res StartCollection(AllocationSamplingMode mode = AllocationSamplingMode.Low)
+    public Result StartCollection(AllocationSamplingMode mode = AllocationSamplingMode.Low)
     {
         try
         {
             _typeAllocationTrackingService.StartCollection(mode);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to start type allocation collection.");
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure(ex.GetMessageRecursively());
         }
     }
 
@@ -109,17 +109,17 @@ public sealed class TypeAllocationFacade
     /// Page retirement alone must not invoke this host-wide action.
     /// </remarks>
     /// <returns>The actual shared stop outcome.</returns>
-    public Res StopCollection()
+    public Result StopCollection()
     {
         try
         {
             _typeAllocationTrackingService.StopCollection();
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to stop type allocation collection.");
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure(ex.GetMessageRecursively());
         }
     }
 
@@ -130,17 +130,17 @@ public sealed class TypeAllocationFacade
     /// re-entry from a notification returns failure. The UI can impose stricter inactive-only admission.
     /// </remarks>
     /// <returns>The actual shared reset outcome.</returns>
-    public Res ResetData()
+    public Result ResetData()
     {
         try
         {
             _typeAllocationTrackingService.ResetData();
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to reset type allocation data.");
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure(ex.GetMessageRecursively());
         }
     }
 
@@ -173,16 +173,16 @@ public sealed class TypeAllocationFacade
     /// A successful heap result is independent of live tracking and is retained by its caller.
     /// </remarks>
     /// <returns>The enumerated heap result, or a failed envelope preserving a native/platform/DAC failure.</returns>
-    public async Task<Res<TypeAllocationSnapshot>> TakeHeapSnapshotAsync()
+    public async Task<Result<TypeAllocationSnapshot>> TakeHeapSnapshotAsync()
     {
         try
         {
-            return Res.Ok(await _typeAllocationTrackingService.TakeHeapSnapshotAsync());
+            return Result.Success(await _typeAllocationTrackingService.TakeHeapSnapshotAsync());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to capture heap snapshot.");
-            return Res.Fail($"Failed to capture heap snapshot: {ex.GetMessageRecursively()}");
+            return Result.Failure<TypeAllocationSnapshot>($"Failed to capture heap snapshot: {ex.GetMessageRecursively()}");
         }
     }
 }

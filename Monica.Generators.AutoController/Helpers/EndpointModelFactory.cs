@@ -18,6 +18,10 @@ internal static class EndpointModelFactory
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAMESPACE = "Monica.Core.Results.Abstractions";
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAME = "IRemoteResultEnvelope`1";
 
+    private static readonly SymbolDisplayFormat NullableTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
+        .WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+                                  SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     private static readonly Regex SummaryPattern = new(
         "<summary>(?<content>.*?)</summary>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -184,7 +188,7 @@ internal static class EndpointModelFactory
                 DiagnosticDescriptors.InvalidPublishedResultEnvelope,
                 location,
                 requestDisplayName,
-                resultSymbol.ToDisplayString());
+                resultSymbol.ToDisplayString(NullableTypeFormat));
         }
 
         var validateSummary = SymbolEqualityComparer.Default.Equals(request.ContainingAssembly, currentAssembly);
@@ -201,6 +205,7 @@ internal static class EndpointModelFactory
         return new AnalysisSnapshot<EndpointModel>(new EndpointModel(
             requestDisplayName,
             request.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            resultSymbol.ToDisplayString(NullableTypeFormat),
             resultSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             domain!,
             namespaceInfo.ContractNamespaceRoot ?? request.ContainingNamespace.ToDisplayString(),
@@ -545,7 +550,8 @@ internal static class EndpointModelFactory
 
     private static bool IsConcreteRemoteResultEnvelope(ITypeSymbol result)
     {
-        return result is INamedTypeSymbol
+        return result.NullableAnnotation != NullableAnnotation.Annotated &&
+               result is INamedTypeSymbol
                {
                    TypeKind: TypeKind.Class,
                    IsAbstract: false,

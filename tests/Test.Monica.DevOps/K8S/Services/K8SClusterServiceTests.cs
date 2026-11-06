@@ -7,6 +7,18 @@ namespace Test.Monica.DevOps.K8S.Services;
 
 public sealed class K8SClusterServiceTests
 {
+    [Fact]
+    public async Task ListNamespaceInventory_WhenCallerCancels_ShouldPropagateCancellation()
+    {
+        var fixture = new K8SStateFixture();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        fixture.Provider.Handler = (_, _) => Task.FromCanceled<string>(cancellation.Token);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => fixture.Facade.ListNamespaceInventoryAsync("alpha", cancellation.Token));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -20,7 +32,7 @@ public sealed class K8SClusterServiceTests
 
         var response = await fixture.Facade.ListNamespaceInventoryAsync("alpha", TestContext.Current.CancellationToken);
 
-        Assert.Equal(failPodRead ? ResStatus.InternalError : ResStatus.Ok, response.Status);
+        Assert.Equal(failPodRead ? ResultStatus.InternalError : ResultStatus.Ok, response.Status);
         if (failPodRead)
         {
             Assert.Null(response.Data);

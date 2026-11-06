@@ -303,7 +303,7 @@ Knowledge/RAG management state has a visit lifetime, not a circuit lifetime. Inj
     </ChildContent>
     <ErrorContent Context="exception">
         <MudAlert Severity="Severity.Error">
-            Error: @exception.Message
+            The operation could not be completed.
         </MudAlert>
     </ErrorContent>
 </ErrorBoundary>
@@ -312,17 +312,21 @@ Knowledge/RAG management state has a visit lifetime, not a circuit lifetime. Inj
 ### 6.2 Service Layer Error Handling
 
 ```csharp
-public async Task<Res<TData>> GetDataAsync()
+public async Task<Result<TData>> GetDataAsync(CancellationToken cancellationToken)
 {
     try
     {
-        var data = await FetchDataAsync();
-        return Res.Ok(data);
+        var data = await FetchDataAsync(cancellationToken);
+        return Result.Success(data);
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+        throw;
     }
     catch (Exception ex)
     {
         Logger.LogError(ex, "Failed to get data");
-        return Res.Fail($"Failed to get data: {ex.Message}");
+        return Result.Failure<TData>("The data could not be loaded.", ResultStatus.InternalError);
     }
 }
 ```
@@ -610,9 +614,10 @@ Use module options by injecting `IOptions<TModuleOption>` or `IOptionsSnapshot<T
 
 private async Task HandleOperation()
 {
-    if ((await Service.ExecuteAsync()).IsFailed(out var error))
+    var result = await Service.ExecuteAsync();
+    if (result.IsFailure())
     {
-        Snackbar.Add(error.Message, Severity.Error);
+        Snackbar.Add(result.Message ?? "The operation failed.", Severity.Error);
         return;
     }
 
@@ -624,9 +629,10 @@ private async Task HandleOperation()
 
 ### 12.1 Return Value Standards
 
-- All service method return values must not be null, use `Res<T>` or `Res` types
-- Return `Res.Ok(data)` on success, `Res.Fail(errorMessage)` on failure
-- Exceptions must be caught and return `Res.Fail`
+- Deliberate host/UI boundaries use `Result<T>` or `Result`; internal services use direct returns and exceptions.
+- Use `Result.Success(data)` for data, `Result.Success().WithMessage(message)` for a no-data success message, and `Result.Failure<T>(message, status)` for a typed failure. Forward failures with `Result.FromFailure<T>(source)`.
+- Unexpected defects normally reach the host exception handler. A boundary that deliberately catches an exception logs diagnostics and returns a safe message; caller cancellation propagates. Do not expose exception text.
+- `IsSuccess()` and `IsFailure()` classify the status only. Check `Data` separately and preserve the API's allowed absence semantics. See the [result contract](../../monica-development/references/result-type-guide.md).
 
 ### 12.2 Service Call Pattern
 
@@ -637,15 +643,16 @@ private async Task HandleOperation()
 @code {
     private async Task LoadDataAsync()
     {
-        // Use IsFailed method to check result and get data or error
-        if ((await UserService.GetDataAsync(parameter)).IsFailed(out var error, out var data))
+        var result = await UserService.GetDataAsync(parameter);
+        if (result.IsFailure())
         {
             // Handle error case
-            Snackbar.Add($"Operation failed: {error.Message}", Severity.Error);
+            Snackbar.Add(result.Message ?? "The data could not be loaded.", Severity.Error);
             return;
         }
 
-        // Handle success case, data is not null
+        var data = result.Data
+            ?? throw new InvalidOperationException("A successful load must include data.");
         ProcessData(data);
     }
 }

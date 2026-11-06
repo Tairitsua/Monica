@@ -51,9 +51,9 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
         var result = await facade.RollbackUnifiedVersionAsync(CreateStaleRequest());
 
-        result.IsFailed(out var error, out _).Should().BeTrue();
-        error!.Status.Should().Be(ResStatus.Conflict);
-        error.Message.Should().Contain("reviewed configuration changed").And.Contain("new preview");
+        result.IsFailure().Should().BeTrue();
+        result.Status.Should().Be(ResultStatus.Conflict);
+        result.Message.Should().Contain("reviewed configuration changed").And.Contain("new preview");
         await applyService.DidNotReceive()
             .ApplyAsync(Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
     }

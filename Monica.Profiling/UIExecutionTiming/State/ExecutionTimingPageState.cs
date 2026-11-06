@@ -76,7 +76,7 @@ public sealed class ExecutionTimingPageState(
     /// Captures current evidence and starts configured polling. A busy or disposed page returns Conflict
     /// with an empty message; it does not change the retained snapshot or error.
     /// </summary>
-    public async Task<Res> InitializeAsync()
+    public async Task<Result> InitializeAsync()
     {
         var result = await RefreshAsync();
         await UpdateAutoRefreshAsync();
@@ -93,7 +93,7 @@ public sealed class ExecutionTimingPageState(
     /// Captures both timing lists without changing the polling preference. Concurrent or disposed calls
     /// return Conflict with an empty message. Actual query failures retain the previous successful snapshot.
     /// </summary>
-    public Task<Res> RefreshAsync() => Task.FromResult(Refresh());
+    public Task<Result> RefreshAsync() => Task.FromResult(Refresh());
 
     /// <summary>
     /// Stops and drains the page loop and any admitted read. Repeated calls share the same completion.
@@ -115,7 +115,7 @@ public sealed class ExecutionTimingPageState(
         }
     }
 
-    private Res Refresh(CancellationToken pollingCancellation = default)
+    private Result Refresh(CancellationToken pollingCancellation = default)
     {
         lock (_sync)
         {
@@ -147,7 +147,7 @@ public sealed class ExecutionTimingPageState(
         }
     }
 
-    private Res LoadData(CancellationToken pollingCancellation)
+    private Result LoadData(CancellationToken pollingCancellation)
     {
         lock (_sync)
         {
@@ -159,10 +159,14 @@ public sealed class ExecutionTimingPageState(
         }
 
         var statisticsResult = executionTimingFacade.GetStatistics();
-        if (statisticsResult.IsFailed(out var statisticsError, out var statistics))
+        var statisticsError = statisticsResult.WithoutData();
+        var statistics = statisticsResult.Data;
+        if (statisticsResult.IsFailure())
         {
             return RetainFailure(statisticsError, pollingCancellation);
         }
+        if (statistics is null)
+            return RetainFailure(Result.Failure("The execution timing statistics were unavailable."), pollingCancellation);
 
         lock (_sync)
         {
@@ -173,10 +177,14 @@ public sealed class ExecutionTimingPageState(
         }
 
         var runningResult = executionTimingFacade.GetRunningOperations();
-        if (runningResult.IsFailed(out var runningError, out var runningOperations))
+        var runningError = runningResult.WithoutData();
+        var runningOperations = runningResult.Data;
+        if (runningResult.IsFailure())
         {
             return RetainFailure(runningError, pollingCancellation);
         }
+        if (runningOperations is null)
+            return RetainFailure(Result.Failure("The running operations were unavailable."), pollingCancellation);
 
         lock (_sync)
         {
@@ -192,11 +200,11 @@ public sealed class ExecutionTimingPageState(
             SnapshotCapturedAt = capturedAt;
             HasSnapshot = true;
             LoadError = null;
-            return Res.Ok();
+            return Result.Success();
         }
     }
 
-    private Res RetainFailure(Res error, CancellationToken pollingCancellation)
+    private Result RetainFailure(Result error, CancellationToken pollingCancellation)
     {
         lock (_sync)
         {
@@ -321,5 +329,5 @@ public sealed class ExecutionTimingPageState(
         }
     }
 
-    private static Res InactiveResult() => Res.Fail(string.Empty, ResStatus.Conflict);
+    private static Result InactiveResult() => Result.Failure(string.Empty, ResultStatus.Conflict);
 }

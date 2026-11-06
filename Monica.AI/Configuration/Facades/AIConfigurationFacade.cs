@@ -27,14 +27,14 @@ public sealed class AIConfigurationFacade
     }
 
     /// <summary>Reloads host settings and returns their current revision and credential-free effective values.</summary>
-    public Task<Res<AIConfigurationSnapshot>> GetAsync(CancellationToken ct = default) =>
+    public Task<Result<AIConfigurationSnapshot>> GetAsync(CancellationToken ct = default) =>
         ExecuteAsync(() => _configuration.RefreshAsync(ct));
 
     /// <summary>
     /// Creates or replaces a persisted provider override at the supplied revision. A null or empty API key keeps
     /// the existing key; <paramref name="clearApiKey"/> explicitly removes it. New requests see saved changes.
     /// </summary>
-    public Task<Res<AIConfigurationSnapshot>> UpsertProviderAsync(
+    public Task<Result<AIConfigurationSnapshot>> UpsertProviderAsync(
         AIProviderConfiguration configuration,
         string? apiKey,
         bool clearApiKey,
@@ -43,18 +43,18 @@ public sealed class AIConfigurationFacade
         ExecuteAsync(() => _configuration.UpsertAsync(configuration, apiKey, clearApiKey, expectedRevision, ct));
 
     /// <summary>Deletes a runtime-created provider. Code-defined providers can be disabled but not deleted.</summary>
-    public Task<Res<AIConfigurationSnapshot>> RemoveProviderAsync(string providerId, long expectedRevision, CancellationToken ct = default) =>
+    public Task<Result<AIConfigurationSnapshot>> RemoveProviderAsync(string providerId, long expectedRevision, CancellationToken ct = default) =>
         ExecuteAsync(() => _configuration.RemoveAsync(providerId, expectedRevision, ct));
 
     /// <summary>Removes a persisted override and restores all code-defined values, including the code credential.</summary>
-    public Task<Res<AIConfigurationSnapshot>> ResetProviderAsync(string providerId, long expectedRevision, CancellationToken ct = default) =>
+    public Task<Result<AIConfigurationSnapshot>> ResetProviderAsync(string providerId, long expectedRevision, CancellationToken ct = default) =>
         ExecuteAsync(() => _configuration.ResetAsync(providerId, expectedRevision, ct));
 
     /// <summary>
     /// Lists remote models without saving them or probing inference capabilities. Explicitly configured metadata
     /// wins; catalog metadata applies only to official protocol endpoints. Custom aliases remain unknown.
     /// </summary>
-    public async Task<Res<IReadOnlyList<AIModelConfiguration>>> DiscoverModelsAsync(string providerId, CancellationToken ct = default)
+    public async Task<Result<IReadOnlyList<AIModelConfiguration>>> DiscoverModelsAsync(string providerId, CancellationToken ct = default)
     {
         IAIProviderLease? lease = null;
         try
@@ -65,10 +65,10 @@ public sealed class AIConfigurationFacade
                 string.Equals(entry.Configuration.ProviderId, providerId, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException("This custom provider does not support runtime configuration.");
             var remote = await lease.Provider.FetchRemoteModelsAsync(ct).ConfigureAwait(false);
-            return Res.Ok(MergeDiscoveredModels(setting.Configuration, remote));
+            return Result.Success(MergeDiscoveredModels(setting.Configuration, remote));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { return Res.Fail(Redact(ex, lease)); }
+        catch (Exception ex) { return Result.Failure<IReadOnlyList<AIModelConfiguration>>(Redact(ex, lease)); }
         finally { lease?.Dispose(); }
     }
 
@@ -78,7 +78,7 @@ public sealed class AIConfigurationFacade
     /// explicitly allows the matching saved provider's credential. The transient provider is always disposed.
     /// Cancellation propagates; other failures are returned with captured credentials redacted.
     /// </summary>
-    public async Task<Res<IReadOnlyList<AIModelConfiguration>>> DiscoverDraftModelsAsync(
+    public async Task<Result<IReadOnlyList<AIModelConfiguration>>> DiscoverDraftModelsAsync(
         AIProviderConfiguration configuration, string? apiKey = null, bool useSavedApiKey = false, CancellationToken ct = default)
     {
         var capturedKey = apiKey;
@@ -90,13 +90,13 @@ public sealed class AIConfigurationFacade
             using var provider = AIConfiguredProviderFactory.Create(
                 AIConfiguredProviderFactory.CreateOptions(draft.Configuration, draft.ApiKey), _catalog);
             var remote = await provider.FetchRemoteModelsAsync(ct).ConfigureAwait(false);
-            return Res.Ok(MergeDiscoveredModels(configuration, remote));
+            return Result.Success(MergeDiscoveredModels(configuration, remote));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             var message = _configuration.Redact(ex.GetMessageRecursively());
-            return Res.Fail(string.IsNullOrEmpty(capturedKey) ? message : message.Replace(capturedKey, "[redacted]", StringComparison.Ordinal));
+            return Result.Failure<IReadOnlyList<AIModelConfiguration>>(string.IsNullOrEmpty(capturedKey) ? message : message.Replace(capturedKey, "[redacted]", StringComparison.Ordinal));
         }
     }
 
@@ -124,7 +124,7 @@ public sealed class AIConfigurationFacade
     /// Tests authentication and connectivity using model discovery, without inference billing. Models unsupported
     /// by discovery can be tested explicitly with <see cref="TestModelAsync"/> after configuration.
     /// </summary>
-    public async Task<Res> TestProviderAsync(string providerId, CancellationToken ct = default)
+    public async Task<Result> TestProviderAsync(string providerId, CancellationToken ct = default)
     {
         IAIProviderLease? lease = null;
         try
@@ -132,15 +132,15 @@ public sealed class AIConfigurationFacade
             lease = _providers.AcquireProvider(providerId)
                 ?? throw new KeyNotFoundException($"Provider '{providerId}' was not found.");
             await lease.Provider.FetchRemoteModelsAsync(ct).ConfigureAwait(false);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { return Res.Fail(Redact(ex, lease)); }
+        catch (Exception ex) { return Result.Failure(Redact(ex, lease)); }
         finally { lease?.Dispose(); }
     }
 
     /// <summary>Sends a deliberately small text request to verify one configured model; this may incur usage charges.</summary>
-    public async Task<Res> TestModelAsync(string providerId, string modelName, CancellationToken ct = default)
+    public async Task<Result> TestModelAsync(string providerId, string modelName, CancellationToken ct = default)
     {
         IAIProviderLease? lease = null;
         try
@@ -151,10 +151,10 @@ public sealed class AIConfigurationFacade
             await client.GetResponseAsync(
                 [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "Reply with OK.")],
                 new Microsoft.Extensions.AI.ChatOptions { MaxOutputTokens = 16 }, ct).ConfigureAwait(false);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { return Res.Fail(Redact(ex, lease)); }
+        catch (Exception ex) { return Result.Failure(Redact(ex, lease)); }
         finally { lease?.Dispose(); }
     }
 
@@ -164,11 +164,11 @@ public sealed class AIConfigurationFacade
         return _configuration.Redact(lease?.RedactDiagnostic(diagnostic) ?? diagnostic);
     }
 
-    private async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> operation)
+    private async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> operation)
     {
-        try { return Res.Ok(await operation().ConfigureAwait(false)); }
+        try { return Result.Success(await operation().ConfigureAwait(false)); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { return Res.Fail(_configuration.Redact(ex.GetMessageRecursively())); }
+        catch (Exception ex) { return Result.Failure<T>(_configuration.Redact(ex.GetMessageRecursively())); }
     }
 
 }

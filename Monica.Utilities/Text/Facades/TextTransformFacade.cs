@@ -39,29 +39,29 @@ public sealed class TextTransformFacade
     /// </summary>
     /// <param name="request">Transformation request describing the input text and operation.</param>
     /// <returns>A result envelope containing the transformed output.</returns>
-    public Res<TextTransformResult> Transform(TextTransformRequest request)
+    public Result<TextTransformResult> Transform(TextTransformRequest request)
     {
         try
         {
-            return Res.Ok(_textTransformService.Transform(request));
+            return Result.Success(_textTransformService.Transform(request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute utilities text transform {Operation}.", request.Operation);
-            return Res.Fail(
+            return Result.Failure<TextTransformResult>(
                 _localizer["ServiceMessages:TextTransformFailed", ex.GetMessageRecursively()].Value,
                 GetStatus(ex));
         }
     }
 
-    private static ResStatus GetStatus(Exception exception)
+    private static ResultStatus GetStatus(Exception exception)
     {
         return exception switch
         {
-            ArgumentException => ResStatus.BadRequest,
-            JsonException => ResStatus.BadRequest,
-            FormatException => ResStatus.BadRequest,
-            _ => ResStatus.InternalError
+            ArgumentException => ResultStatus.BadRequest,
+            JsonException => ResultStatus.BadRequest,
+            FormatException => ResultStatus.BadRequest,
+            _ => ResultStatus.InternalError
         };
     }
 }

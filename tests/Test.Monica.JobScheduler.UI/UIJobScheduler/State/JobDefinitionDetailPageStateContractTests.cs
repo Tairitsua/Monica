@@ -107,7 +107,7 @@ public sealed class JobDefinitionDetailPageStateContractTests
             var accepted = state.Summary;
             authorize.TrySetResult(true);
             var result = await mutation.WaitAsync(ObservationTimeout, TestContext.Current.CancellationToken);
-            Assert.Equal(ResStatus.Conflict, result.Status);
+            Assert.Equal(ResultStatus.Conflict, result.Status);
             Assert.Same(accepted, state.Summary);
             Assert.False(state.Summary!.Definition.IsDisabled);
             Assert.Equal(0, state.Summary.Definition.Policy.Overrides.MaxRetainedHistoryRecords);
@@ -162,7 +162,7 @@ public sealed class JobDefinitionDetailPageStateContractTests
         Assert.NotNull(state.Analytics);
         boundary.Access.Authorized = false;
         var result = await state.RunRecurringNowAsync();
-        Assert.True(result.IsFailed(out _));
+        Assert.True(result.IsFailure());
         Assert.False(state.IsAuthorized);
         Assert.Null(state.Summary);
         Assert.Null(state.Analytics);
@@ -189,13 +189,15 @@ public sealed class JobDefinitionDetailPageStateContractTests
         if (runNow)
         {
             var result = await state.RunRecurringNowAsync();
-            Assert.True(result.IsFailed(out var error));
+            var error = result;
+            Assert.True(result.IsFailure());
             Assert.Equal("Definition access unavailable.", error.Message);
         }
         else
         {
             var result = await state.SetDisabledAsync(true);
-            Assert.True(result.IsFailed(out var error));
+            var error = result;
+            Assert.True(result.IsFailure());
             Assert.Equal("Definition access unavailable.", error.Message);
         }
         Assert.Equal("Definition access unavailable.", state.Error);

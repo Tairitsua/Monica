@@ -289,7 +289,8 @@
                 return;
             }
 
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
                 return;
@@ -344,7 +345,9 @@
             // Apply exactly the targets that were named in the native confirmation, not a later selection.
             var result = await state.SetSelectedDisabledAsync(request.Disabled, request.Summaries);
             if (_disposed || _state != state) return;
-            if (result.IsFailed(out var error, out var batch))
+            var error = result.WithoutData();
+            var batch = result.Data;
+            if (result.IsFailure() || batch is null)
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
                 return;
@@ -382,7 +385,9 @@
                 return;
             }
 
-            if (result.IsFailed(out var error, out var execution))
+            var error = result.WithoutData();
+            var execution = result.Data;
+            if (result.IsFailure() || execution is null)
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:RunFailed"], Severity.Error);
                 return;

@@ -22,29 +22,29 @@ public sealed class ExecutionTimingFacade
         _logger = logger;
     }
 
-    public Res<IReadOnlyList<ExecutionTimingStatistics>> GetStatistics()
+    public Result<IReadOnlyList<ExecutionTimingStatistics>> GetStatistics()
     {
         try
         {
-            return Res.Ok(_executionTimingService.GetStatistics());
+            return Result.Success(_executionTimingService.GetStatistics());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load execution timing statistics.");
-            return Res.Fail($"Failed to load execution timing statistics: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ExecutionTimingStatistics>>($"Failed to load execution timing statistics: {ex.GetMessageRecursively()}");
         }
     }
 
-    public Res<IReadOnlyList<RunningExecutionTimingInfo>> GetRunningOperations()
+    public Result<IReadOnlyList<RunningExecutionTimingInfo>> GetRunningOperations()
     {
         try
         {
-            return Res.Ok(_executionTimingService.GetRunningOperations());
+            return Result.Success(_executionTimingService.GetRunningOperations());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load running execution timing operations.");
-            return Res.Fail($"Failed to load running execution timing operations: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<RunningExecutionTimingInfo>>($"Failed to load running execution timing operations: {ex.GetMessageRecursively()}");
         }
     }
 }

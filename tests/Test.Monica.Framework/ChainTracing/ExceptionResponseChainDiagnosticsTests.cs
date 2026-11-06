@@ -33,14 +33,14 @@ public sealed class ExceptionResponseChainDiagnosticsTests
         var root = downstream.BeginTrace("Action", "Controller");
         var sql = downstream.BeginTrace("SELECT 1", null, type: EChainTracingType.Database);
         downstream.EndTrace(sql);
-        downstream.EndTrace(root, "Res(Ok)");
+        downstream.EndTrace(root, "Result(Ok)");
         var httpContext = new DefaultHttpContext();
         httpContext.Items[ChainTraceContext.HTTP_ITEM_KEY] = downstream.GetCurrentChain();
 
         // Fresh instance: no ambient chain, exactly like the unwound exception-handler flow.
         var diagnostics = new ExceptionResponseChainDiagnostics(
             CreateTracing(), CreateAttacher(exposeDiagnostics));
-        var response = Res.Fail("Safe failure", ResStatus.InternalError);
+        var response = Result.Failure("Safe failure", ResultStatus.InternalError);
 
         diagnostics.Attach(httpContext, response);
 
@@ -66,7 +66,7 @@ public sealed class ExceptionResponseChainDiagnosticsTests
     public void Attach_WhenNoChainWasPublished_ShouldAttachNothing()
     {
         var diagnostics = new ExceptionResponseChainDiagnostics(CreateTracing(), CreateAttacher(true));
-        var response = Res.Fail("Safe failure", ResStatus.InternalError);
+        var response = Result.Failure("Safe failure", ResultStatus.InternalError);
 
         diagnostics.Attach(new DefaultHttpContext(), response);
 

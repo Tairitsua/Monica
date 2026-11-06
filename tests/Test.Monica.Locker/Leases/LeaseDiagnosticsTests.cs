@@ -38,7 +38,7 @@ public sealed class LeaseDiagnosticsTests
             var reads = readers.Select(reader => reader.GetInventoryAsync(TestContext.Current.CancellationToken)).ToArray();
             await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
             var exact = await readers[0].GetResourceAsync("primary", Resource, TestContext.Current.CancellationToken);
-            Assert.True(exact.IsOk());
+            Assert.True(exact.IsSuccess());
             Assert.False(reads[0].IsCompleted);
             completion.SetResult(Snapshot);
             var inventories = await Task.WhenAll(reads);
@@ -92,12 +92,12 @@ public sealed class LeaseDiagnosticsTests
         await using var app = await Factory(store, access: access).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = app.Services.CreateAsyncScope();
         var facade = scope.ServiceProvider.GetRequiredService<LeaseDiagnosticsFacade>();
-        Assert.True((await facade.GetInventoryAsync(TestContext.Current.CancellationToken)).IsOk());
+        Assert.True((await facade.GetInventoryAsync(TestContext.Current.CancellationToken)).IsSuccess());
         store.ClearReceivedCalls();
         access.Allowed = false;
-        Assert.Equal(ResStatus.Forbidden, (await facade.GetInventoryAsync(TestContext.Current.CancellationToken)).Status);
-        Assert.Equal(ResStatus.Forbidden, (await facade.GetResourceAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
-        Assert.Equal(ResStatus.Forbidden, (await facade.RevokeAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Forbidden, (await facade.GetInventoryAsync(TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Forbidden, (await facade.GetResourceAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Forbidden, (await facade.RevokeAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
         Assert.Empty(store.ReceivedCalls());
     }
 
@@ -110,7 +110,7 @@ public sealed class LeaseDiagnosticsTests
         await using var app = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = app.Services.CreateAsyncScope();
         var result = await scope.ServiceProvider.GetRequiredService<LeaseDiagnosticsFacade>().GetInventoryAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(ResStatus.Forbidden, result.Status);
+        Assert.Equal(ResultStatus.Forbidden, result.Status);
         Assert.Empty(store.ReceivedCalls());
     }
 
@@ -122,12 +122,12 @@ public sealed class LeaseDiagnosticsTests
         await using var app = await Factory(store).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = app.Services.CreateAsyncScope();
         var facade = scope.ServiceProvider.GetRequiredService<LeaseDiagnosticsFacade>();
-        Assert.False((await facade.GetResourceAsync("primary", new("other", Resource.Name), TestContext.Current.CancellationToken)).IsOk());
-        Assert.False((await facade.RevokeAsync("primary", new("orders", "unrelated:role"), TestContext.Current.CancellationToken)).IsOk());
+        Assert.False((await facade.GetResourceAsync("primary", new("other", Resource.Name), TestContext.Current.CancellationToken)).IsSuccess());
+        Assert.False((await facade.RevokeAsync("primary", new("orders", "unrelated:role"), TestContext.Current.CancellationToken)).IsSuccess());
         Assert.Empty(store.ReceivedCalls());
         var exact = await facade.GetResourceAsync("primary", Resource, TestContext.Current.CancellationToken);
         Assert.False(exact.Data!.CanRevoke);
-        Assert.Equal(ResStatus.Forbidden, (await facade.RevokeAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(ResultStatus.Forbidden, (await facade.RevokeAsync("primary", Resource, TestContext.Current.CancellationToken)).Status);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class LeaseDiagnosticsTests
         await store.Received(1).GetSnapshotAsync("orders", "maintenance:", Arg.Any<CancellationToken>());
         completion.SetResult(Snapshot);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
-        Assert.True((await next).IsOk());
+        Assert.True((await next).IsSuccess());
         await store.Received(2).GetSnapshotAsync("orders", "maintenance:", Arg.Any<CancellationToken>());
     }
 

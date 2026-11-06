@@ -30,7 +30,7 @@ internal sealed class SchedulerOverviewPageStateFactory(
 /// </remarks>
 public sealed class SchedulerOverviewPageState : IAsyncDisposable
 {
-    private readonly Func<CancellationToken, Task<Res<JobSchedulerOverview>>> _loadOverview;
+    private readonly Func<CancellationToken, Task<Result<JobSchedulerOverview>>> _loadOverview;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _refreshInterval;
@@ -45,7 +45,7 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
     private bool _retired;
 
     internal SchedulerOverviewPageState(
-        Func<CancellationToken, Task<Res<JobSchedulerOverview>>> loadOverview,
+        Func<CancellationToken, Task<Result<JobSchedulerOverview>>> loadOverview,
         Func<CancellationToken, Task<bool>> authorize,
         TimeProvider timeProvider,
         TimeSpan refreshInterval)
@@ -217,7 +217,9 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
 
             var result = await _loadOverview(_lifetimeToken);
             _lifetimeToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var overview))
+            var error = result.WithoutData();
+            var overview = result.Data;
+            if (result.IsFailure())
             {
                 lock (_admissionGate)
                 {

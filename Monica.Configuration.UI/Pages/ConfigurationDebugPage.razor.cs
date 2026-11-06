@@ -43,7 +43,9 @@ public partial class ConfigurationDebugPage
         try
         {
             var policy = Facade.GetDebugModeState();
-            _debugModeError = policy.IsFailed(out var failure, out _debugModeState)
+            var failure = policy;
+            _debugModeState = policy.Data;
+            _debugModeError = policy.IsFailure() || _debugModeState is null
                 ? failure.Message ?? L["Common:Errors:LoadFailed"] : null;
             await _state.LoadAsync();
         }

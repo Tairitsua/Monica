@@ -15,7 +15,7 @@ public sealed class HealthCheckPageSessionTests
         await using var session = CreateSession((_, _) =>
         {
             facadeCalls++;
-            return Task.FromResult(Res.Ok(CreateSnapshot()));
+            return Task.FromResult(Result.Success(CreateSnapshot()));
         });
 
         await session.InitializeAsync();
@@ -39,7 +39,7 @@ public sealed class HealthCheckPageSessionTests
     public async Task RefreshAsync_WhenRequestIsActive_ShouldJoinTrackedRequestWithoutOverlap()
     {
         var facadeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseFacade = new TaskCompletionSource<Res<HealthCheckSnapshot>>(
+        var releaseFacade = new TaskCompletionSource<Result<HealthCheckSnapshot>>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var facadeCalls = 0;
         await using var session = CreateSession(async (_, _) =>
@@ -56,7 +56,7 @@ public sealed class HealthCheckPageSessionTests
         second.Should().BeSameAs(first);
         facadeCalls.Should().Be(1);
 
-        releaseFacade.SetResult(Res.Ok(CreateSnapshot()));
+        releaseFacade.SetResult(Result.Success(CreateSnapshot()));
         (await first).Should().BeTrue();
     }
 
@@ -68,7 +68,7 @@ public sealed class HealthCheckPageSessionTests
             (_, _) =>
             {
                 facadeCalls++;
-                return Task.FromResult(Res.Ok(CreateSnapshot()));
+                return Task.FromResult(Result.Success(CreateSnapshot()));
             },
             authorize: _ => Task.FromResult(false));
 
@@ -88,7 +88,7 @@ public sealed class HealthCheckPageSessionTests
             (_, _) =>
             {
                 facadeCalls++;
-                return Task.FromResult(Res.Ok(CreateSnapshot()));
+                return Task.FromResult(Result.Success(CreateSnapshot()));
             },
             authorize: _ => Task.FromResult(authorized));
 
@@ -114,7 +114,7 @@ public sealed class HealthCheckPageSessionTests
             try
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                return Res.Ok(CreateSnapshot());
+                return Result.Success(CreateSnapshot());
             }
             finally
             {
@@ -133,7 +133,7 @@ public sealed class HealthCheckPageSessionTests
     }
 
     private static HealthCheckPageSession CreateSession(
-        Func<HealthCheckScope, CancellationToken, Task<Res<HealthCheckSnapshot>>> getSnapshot,
+        Func<HealthCheckScope, CancellationToken, Task<Result<HealthCheckSnapshot>>> getSnapshot,
         Func<CancellationToken, Task<bool>>? authorize = null)
     {
         return new HealthCheckPageSession(

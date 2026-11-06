@@ -252,7 +252,9 @@
             if (!IsCurrent(request)) return;
             var result = await DataSource.GetDetailAsync(key, request.Token);
             if (!IsCurrent(request)) return;
-            if (result.IsFailed(out var error, out var detail))
+            var error = result.WithoutData();
+            var detail = result.Data;
+            if (result.IsFailure())
             {
                 _loadError = L["ProjectUnitDetailDialog:States:LoadFailed", error];
                 return;

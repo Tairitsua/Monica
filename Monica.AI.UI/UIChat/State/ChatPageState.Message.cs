@@ -31,8 +31,9 @@ public sealed partial class ChatPageState
                 SetError(localizer["Workbench:DocumentUnsupported"]);
                 return;
             }
-            if (chatFacade.UpdateRuntimeContext(session, BuildRuntimeContext(SelectedKnowledgeBaseIds)).IsFailed(out var runtimeError))
-            { SetError(runtimeError.Message); return; }
+            var runtimeResult = chatFacade.UpdateRuntimeContext(session, BuildRuntimeContext(SelectedKnowledgeBaseIds));
+            if (runtimeResult.IsFailure())
+            { SetError(runtimeResult.Message); return; }
             if (session.Messages.Count == 0)
                 _ = chatFacade.Rename(session, ChatProviderResolver.GenerateSessionTitle(
                     string.IsNullOrWhiteSpace(request.Message) ? _attachments[0].FileName : request.Message));
@@ -65,7 +66,9 @@ public sealed partial class ChatPageState
     {
         if (CurrentSession is not { } session) return;
         var result = await chatFacade.CompactAsync(session, ct);
-        if (result.IsFailed(out var error, out var compacted)) SetError(error.Message);
+        var error = result.WithoutData();
+        var compacted = result.Data;
+        if (result.IsFailure() || compacted is null) SetError(error.Message);
         else if (!_disposed) snackbar.Add(compacted.Applied
             ? localizer["Workbench:CompactionSummary", compacted.BeforeTokens, compacted.AfterTokens]
             : compacted.Reason ?? localizer["Workbench:NothingToCompact"], Severity.Info);
@@ -117,7 +120,7 @@ public sealed partial class ChatPageState
         }
     }
 
-    private async Task ConsumeStreamAsync(ChatSession session, IAsyncEnumerable<Res<ChatStreamEvent>> stream, CancellationToken ct)
+    private async Task ConsumeStreamAsync(ChatSession session, IAsyncEnumerable<Result<ChatStreamEvent>> stream, CancellationToken ct)
     {
         ChatApprovalRequestEvent? approval = null;
         var paintClock = Stopwatch.StartNew();
@@ -126,7 +129,9 @@ public sealed partial class ChatPageState
         var stepStatuses = new Dictionary<string, ChatExecutionStatus>(StringComparer.Ordinal);
         await foreach (var result in stream.WithCancellation(ct))
         {
-            if (result.IsFailed(out var error, out var update)) { SetError(error.Message); return; }
+            var error = result.WithoutData();
+            var update = result.Data;
+            if (result.IsFailure()) { SetError(error.Message); return; }
             approval = update as ChatApprovalRequestEvent ?? approval;
             var boundary = update is ChatApprovalRequestEvent;
             if (update is ChatStepChangedEvent changed)
@@ -188,7 +193,9 @@ public sealed partial class ChatPageState
             {
                 await using var data = file.OpenReadStream(aiOptions.Value.MaxChatAttachmentBytes, _lifetime.Token);
                 var result = await attachmentFacade.UploadAsync(session.SessionId, file.Name, file.ContentType, data, _lifetime.Token);
-                if (result.IsFailed(out var error, out var attachment)) { SetError(error.Message); continue; }
+                var error = result.WithoutData();
+                var attachment = result.Data;
+                if (result.IsFailure() || attachment is null) { SetError(error.Message); continue; }
                 if (_disposed) return;
                 _attachments.Add(attachment);
             }
@@ -205,7 +212,8 @@ public sealed partial class ChatPageState
     {
         if (_disposed || !_attachments.Contains(attachment) || CurrentSessionId is not { } id) return false;
         var result = await attachmentFacade.DeleteAsync(id, attachment.Id, _lifetime.Token);
-        if (result.IsFailed(out var error)) { SetError(error.Message); return false; }
+        var error = result;
+        if (result.IsFailure()) { SetError(error.Message); return false; }
         if (_disposed || CurrentSessionId != id) return false;
         _attachments.Remove(attachment);
         NotifyStateChanged();

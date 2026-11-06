@@ -121,7 +121,7 @@ public sealed class EventBusMonitorService(
     /// <summary>
     /// Get all subscriptions
     /// </summary>
-    public async Task<Res<List<SubscriptionViewModel>>> GetAllSubscriptionsAsync()
+    public async Task<Result<List<SubscriptionViewModel>>> GetAllSubscriptionsAsync()
     {
         try
         {
@@ -138,19 +138,19 @@ public sealed class EventBusMonitorService(
             logger.LogDebug("Retrieved {Count} subscriptions (Local: {LocalCount}, Distributed: {DistCount})",
                 allSubs.Count, localCount, distCount);
 
-            return Res.Ok(allSubs);
+            return Result.Success(allSubs);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get all subscriptions");
-            return Res.Fail(localizer["Services:Monitor:GetSubscriptionsFailed", ex.GetMessageRecursively()], ResStatus.InternalError);
+            return Result.Failure<List<SubscriptionViewModel>>(localizer["Services:Monitor:GetSubscriptionsFailed", ex.GetMessageRecursively()], ResultStatus.InternalError);
         }
     }
 
     /// <summary>
     /// Get subscription based on ID
     /// </summary>
-    public async Task<Res<SubscriptionViewModel?>> GetSubscriptionByIdAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result<SubscriptionViewModel?>> GetSubscriptionByIdAsync(EventSubscriptionId subscriptionId)
     {
         try
         {
@@ -158,16 +158,16 @@ public sealed class EventBusMonitorService(
 
             if (subscription == null)
             {
-                return Res.Ok<SubscriptionViewModel?>(null);
+                return Result.Success<SubscriptionViewModel?>(null);
             }
 
             var vm = MapToViewModel(subscription);
-            return Res.Ok<SubscriptionViewModel?>(vm);
+            return Result.Success<SubscriptionViewModel?>(vm);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get subscription by ID: {EventSubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Monitor:GetSubscriptionDetailFailed", ex.GetMessageRecursively()], ResStatus.InternalError);
+            return Result.Failure<SubscriptionViewModel?>(localizer["Services:Monitor:GetSubscriptionDetailFailed", ex.GetMessageRecursively()], ResultStatus.InternalError);
         }
     }
 
@@ -176,19 +176,19 @@ public sealed class EventBusMonitorService(
     /// </summary>
     /// <param name="filter">Conjunctive registration, runtime, scope, provider, discovery, and text filters.</param>
     /// <returns>Matching snapshots ordered by descending creation time, or a query failure.</returns>
-    public async Task<Res<List<SubscriptionViewModel>>> FilterSubscriptionsAsync(SubscriptionFilter filter)
+    public async Task<Result<List<SubscriptionViewModel>>> FilterSubscriptionsAsync(SubscriptionFilter filter)
     {
         try
         {
             var result = ApplyFilter(GetVisibleSubscriptions().Select(MapToViewModel), filter);
 
             logger.LogDebug("Filtered subscriptions: {Count} results", result.Count);
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to filter subscriptions");
-            return Res.Fail(localizer["Services:Monitor:FilterSubscriptionsFailed", ex.GetMessageRecursively()], ResStatus.InternalError);
+            return Result.Failure<List<SubscriptionViewModel>>(localizer["Services:Monitor:FilterSubscriptionsFailed", ex.GetMessageRecursively()], ResultStatus.InternalError);
         }
     }
 
@@ -261,7 +261,7 @@ public sealed class EventBusMonitorService(
     /// <summary>
     /// Get statistics
     /// </summary>
-    public async Task<Res<SubscriptionStatistics>> GetStatisticsAsync()
+    public async Task<Result<SubscriptionStatistics>> GetStatisticsAsync()
     {
         try
         {
@@ -313,12 +313,12 @@ public sealed class EventBusMonitorService(
             logger.LogDebug("Generated statistics: Total={Total}, Active={Active}, Unhealthy={Unhealthy}",
                 stats.TotalSubscriptions, stats.ActiveSubscriptions, stats.UnhealthySubscriptions);
 
-            return Res.Ok(stats);
+            return Result.Success(stats);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to calculate statistics");
-            return Res.Fail(localizer["Services:Monitor:StatisticsFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<SubscriptionStatistics>(localizer["Services:Monitor:StatisticsFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -329,7 +329,7 @@ public sealed class EventBusMonitorService(
     /// <summary>
     /// Activate subscription
     /// </summary>
-    public async Task<Res> ActivateSubscriptionAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result> ActivateSubscriptionAsync(EventSubscriptionId subscriptionId)
     {
         try
         {
@@ -337,21 +337,21 @@ public sealed class EventBusMonitorService(
 
             if (subscription == null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             if (subscription.State == EventSubscriptionState.Active)
             {
-                return Res.Fail(localizer["Services:Monitor:AlreadyActive"]);
+                return Result.Failure(localizer["Services:Monitor:AlreadyActive"]);
             }
 
             if (subscription.State == EventSubscriptionState.Disposed)
             {
-                return Res.Fail(localizer["Services:Monitor:CannotActivateDisposed"]);
+                return Result.Failure(localizer["Services:Monitor:CannotActivateDisposed"]);
             }
 
             if (subscription.Activation != Monica.Core.TypeDiscovery.Abstractions.ActivationMode.Automatic)
-                return Res.Fail(localizer["Services:Monitor:ActivationHeld"]);
+                return Result.Failure(localizer["Services:Monitor:ActivationHeld"]);
 
             if (subscription.State == EventSubscriptionState.Inactive)
             {
@@ -363,19 +363,19 @@ public sealed class EventBusMonitorService(
             }
 
             logger.LogInformation("Activated subscription: {EventSubscriptionId}", subscriptionId);
-            return Res.Ok(localizer["Services:Monitor:Activated"]);
+            return Result.Success().WithMessage(localizer["Services:Monitor:Activated"]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to activate subscription: {EventSubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Monitor:ActivateFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Monitor:ActivateFailed", ex.GetMessageRecursively()]);
         }
     }
 
     /// <summary>
     /// Deactivate subscription
     /// </summary>
-    public async Task<Res> DeactivateSubscriptionAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result> DeactivateSubscriptionAsync(EventSubscriptionId subscriptionId)
     {
         try
         {
@@ -383,30 +383,30 @@ public sealed class EventBusMonitorService(
 
             if (subscription == null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             if (subscription.State != EventSubscriptionState.Active)
             {
-                return Res.Fail(localizer["Services:Monitor:OnlyActiveCanDeactivate", subscription.State]);
+                return Result.Failure(localizer["Services:Monitor:OnlyActiveCanDeactivate", subscription.State]);
             }
 
             await _subscriptionManager.DeactivateAsync(subscriptionId);
 
             logger.LogInformation("Deactivated subscription: {EventSubscriptionId}", subscriptionId);
-            return Res.Ok(localizer["Services:Monitor:Deactivated"]);
+            return Result.Success().WithMessage(localizer["Services:Monitor:Deactivated"]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to deactivate subscription: {EventSubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Monitor:DeactivateFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Monitor:DeactivateFailed", ex.GetMessageRecursively()]);
         }
     }
 
     /// <summary>
     /// Remove subscription
     /// </summary>
-    public async Task<Res> UnsubscribeAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result> UnsubscribeAsync(EventSubscriptionId subscriptionId)
     {
         try
         {
@@ -414,23 +414,23 @@ public sealed class EventBusMonitorService(
 
             if (subscription == null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             if (subscription.State == EventSubscriptionState.Disposed)
             {
-                return Res.Fail(localizer["Services:Monitor:AlreadyRemoved"]);
+                return Result.Failure(localizer["Services:Monitor:AlreadyRemoved"]);
             }
 
             await _subscriptionManager.UnsubscribeAsync(subscriptionId);
 
             logger.LogInformation("Removed subscription: {EventSubscriptionId}", subscriptionId);
-            return Res.Ok(localizer["Services:Monitor:Removed"]);
+            return Result.Success().WithMessage(localizer["Services:Monitor:Removed"]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to unsubscribe: {EventSubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Monitor:RemoveFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Monitor:RemoveFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -495,16 +495,16 @@ public sealed class EventBusMonitorService(
     /// <summary>
     /// Get the runtime status snapshots of all known topic subscriptions.
     /// </summary>
-    public Res<List<TopicSubscriptionStatus>> GetAllTopicStatuses()
+    public Result<List<TopicSubscriptionStatus>> GetAllTopicStatuses()
     {
         try
         {
-            return Res.Ok(_topicStatusStore.GetAll().ToList());
+            return Result.Success(_topicStatusStore.GetAll().ToList());
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get topic statuses");
-            return Res.Fail(localizer["Services:Monitor:GetTopicStatusesFailed", ex.GetMessageRecursively()], ResStatus.InternalError);
+            return Result.Failure<List<TopicSubscriptionStatus>>(localizer["Services:Monitor:GetTopicStatusesFailed", ex.GetMessageRecursively()], ResultStatus.InternalError);
         }
     }
 

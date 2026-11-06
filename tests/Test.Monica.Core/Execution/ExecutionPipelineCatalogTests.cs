@@ -187,7 +187,7 @@ public sealed class ExecutionPipelineCatalogTests
 
         var result = await facade.GetSnapshotAsync();
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().NotBeNull();
         result.Data!.Plans.Should().BeEmpty();
     }

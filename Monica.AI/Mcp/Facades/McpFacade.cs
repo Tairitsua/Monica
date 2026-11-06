@@ -33,7 +33,7 @@ public sealed class McpFacade
     /// <summary>
     /// Tests connectivity or local readiness for an MCP catalog entry.
     /// </summary>
-    public async Task<Res<McpConnectivityTestResult>> TestConnectivityAsync(
+    public async Task<Result<McpConnectivityTestResult>> TestConnectivityAsync(
         string name,
         CancellationToken ct = default)
     {
@@ -45,7 +45,7 @@ public sealed class McpFacade
     /// <summary>
     /// Tests a draft external MCP client profile without saving it.
     /// </summary>
-    public Task<Res<McpConnectivityTestResult>> TestExternalProfileAsync(
+    public Task<Result<McpConnectivityTestResult>> TestExternalProfileAsync(
         ExternalMcpClientProfile profile,
         CancellationToken ct = default)
     {
@@ -61,7 +61,7 @@ public sealed class McpFacade
     /// <summary>
     /// Saves a user-managed external MCP client profile and invalidates cached clients and tools.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> SaveExternalProfileAsync(
+    public Task<Result<AgentCapabilityManagementInfo>> SaveExternalProfileAsync(
         ExternalMcpClientProfile profile,
         CancellationToken ct = default)
     {
@@ -88,7 +88,7 @@ public sealed class McpFacade
     /// <summary>
     /// Deletes a user-managed external MCP client profile and invalidates cached clients and tools.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> DeleteExternalProfileAsync(
+    public Task<Result<AgentCapabilityManagementInfo>> DeleteExternalProfileAsync(
         string name,
         CancellationToken ct = default)
     {
@@ -111,7 +111,7 @@ public sealed class McpFacade
     /// <param name="serverName">Logical name of a local HTTP MCP server in the catalog.</param>
     /// <param name="endpointUrl">Absolute HTTP endpoint the pack's helper scripts call by default.</param>
     /// <param name="targetRoot">Directory that receives <c>targetRoot/&lt;skill name&gt;</c>; must not already contain it.</param>
-    public Res<McpSkillPackExportResult> ExportSkillPack(string serverName, string endpointUrl, string targetRoot)
+    public Result<McpSkillPackExportResult> ExportSkillPack(string serverName, string endpointUrl, string targetRoot)
     {
         return Execute(() =>
         {
@@ -129,11 +129,11 @@ public sealed class McpFacade
         });
     }
 
-    private static async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> operation)
+    private static async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> operation)
     {
         try
         {
-            return await operation();
+            return Result.Success(await operation());
         }
         catch (OperationCanceledException)
         {
@@ -141,19 +141,19 @@ public sealed class McpFacade
         }
         catch (Exception ex)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<T>(ex.GetMessageRecursively());
         }
     }
 
-    private static Res<T> Execute<T>(Func<T> operation)
+    private static Result<T> Execute<T>(Func<T> operation)
     {
         try
         {
-            return Res.Ok<T>(operation());
+            return Result.Success<T>(operation());
         }
         catch (Exception ex)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<T>(ex.GetMessageRecursively());
         }
     }
 }

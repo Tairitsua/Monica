@@ -341,9 +341,9 @@ public sealed class ConfigurationDefinitionChangeImpactServiceTests
 
         var result = await facade.GetDefinitionChangeImpactAsync([Target("Test.Definition")]);
 
-        result.IsFailed(out var error, out _).Should().BeTrue();
-        error!.Message.Should().Contain("outer impact failure");
-        error.Message.Should().Contain("inner metadata failure");
+        result.IsFailure().Should().BeTrue();
+        result.Message.Should().Contain("outer impact failure");
+        result.Message.Should().Contain("inner metadata failure");
     }
 
     private static ConfigurationDefinitionChangeImpactService CreateService(

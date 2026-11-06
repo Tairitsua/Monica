@@ -44,7 +44,7 @@ public sealed class EventBusTestServiceTests
         var service = services.GetRequiredService<EventBusTestService>();
 
         var providers = services.GetRequiredService<EventBusProviderDiscoveryService>().GetRegisteredProviders();
-        providers.Status.Should().Be(ResStatus.Ok);
+        providers.Status.Should().Be(ResultStatus.Ok);
         providers.Data.Should().Contain(provider => provider.IsDistributed && provider.ServiceKey == null);
         var workbench = services.GetRequiredService<EventBusWorkbenchState>();
         await workbench.RefreshAsync(TestContext.Current.CancellationToken);
@@ -53,19 +53,19 @@ public sealed class EventBusTestServiceTests
         workbench.Subscriptions.Should().OnlyContain(row => !row.CanActivate && row.CanDeliverLocally);
 
         var prepared = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
-        prepared.Status.Should().Be(ResStatus.Ok);
+        prepared.Status.Should().Be(ResultStatus.Ok);
         prepared.Message.Should().BeNull();
         prepared.Data.Should().NotBeNull();
         var result = await service.DeliverLocalTestMessageAsync(target.Id, prepared.Data!, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
         factory.HandlerState.Deliveries.Should().ContainSingle();
         target.State.Should().Be(EventSubscriptionState.Held);
         other.State.Should().Be(EventSubscriptionState.Held);
         (await services.GetRequiredService<EventBusMonitorService>().ActivateSubscriptionAsync(target.Id))
-            .Status.Should().Be(ResStatus.BadRequest);
-        (await service.StartRuntimeListenerAsync(target.Id)).Status.Should().Be(ResStatus.BadRequest);
+            .Status.Should().Be(ResultStatus.BadRequest);
+        (await service.StartRuntimeListenerAsync(target.Id)).Status.Should().Be(ResultStatus.BadRequest);
         factory.DefaultTransport.Messages.Should().BeEmpty();
     }
 
@@ -79,23 +79,23 @@ public sealed class EventBusTestServiceTests
         var service = scope.ServiceProvider.GetRequiredService<EventBusTestService>();
         var first = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
         var second = service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD);
-        first.Status.Should().Be(ResStatus.Ok);
-        second.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
+        second.Status.Should().Be(ResultStatus.Ok);
         first.Data!.Metadata.MessageId.Should().NotBe(second.Data!.Metadata.MessageId);
         factory.HandlerState.Failure = new InvalidOperationException("local handler rejected");
         var failed = await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken);
-        failed.Status.Should().Be(ResStatus.BadRequest);
+        failed.Status.Should().Be(ResultStatus.BadRequest);
         failed.Message.Should().Contain("local handler rejected");
 
         factory.HandlerState.Failure = null;
         var replay = await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken);
-        replay.Status.Should().Be(ResStatus.Ok);
+        replay.Status.Should().Be(ResultStatus.Ok);
         factory.HandlerState.Deliveries.Should().ContainSingle().Which.Metadata.MessageId.Should().Be(first.Data.Metadata.MessageId);
         await scope.ServiceProvider.GetRequiredService<IEventSubscriptionRegistry>()
             .UnsubscribeAsync(target.Id, TestContext.Current.CancellationToken);
-        service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD).Status.Should().Be(ResStatus.BadRequest);
+        service.PrepareLocalTestMessage(target.Id, JSON_PAYLOAD).Status.Should().Be(ResultStatus.BadRequest);
         (await service.DeliverLocalTestMessageAsync(target.Id, first.Data, TestContext.Current.CancellationToken))
-            .Status.Should().Be(ResStatus.BadRequest);
+            .Status.Should().Be(ResultStatus.BadRequest);
     }
 
     [Theory]
@@ -122,7 +122,7 @@ public sealed class EventBusTestServiceTests
 
         var sample = service.CreateRuntimeJsonSample(subscription.Id);
 
-        sample.Status.Should().Be(ResStatus.Ok);
+        sample.Status.Should().Be(ResultStatus.Ok);
         sample.Message.Should().BeNull();
         sample.Data.Should().NotBeNullOrWhiteSpace();
         using var document = JsonDocument.Parse(sample.Data!);
@@ -134,13 +134,13 @@ public sealed class EventBusTestServiceTests
 
         var validation = service.ValidateRuntimePayload(subscription.Id, sample.Data!);
 
-        validation.Status.Should().Be(ResStatus.Ok);
+        validation.Status.Should().Be(ResultStatus.Ok);
         validation.Message.Should().BeEmpty();
 
         var publication = await service.PublishRuntimePayloadAsync(
             subscription.Id, sample.Data!, TestContext.Current.CancellationToken);
 
-        publication.Status.Should().Be(ResStatus.Ok);
+        publication.Status.Should().Be(ResultStatus.Ok);
         publication.Message.Should().BeEmpty();
         var message = factory.DefaultTransport.Messages.Should().ContainSingle().Which;
         var options = services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
@@ -173,7 +173,7 @@ public sealed class EventBusTestServiceTests
         var result = await services.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, JSON_PAYLOAD, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
         var transport = serviceKey is null ? factory.DefaultTransport : factory.KeyedTransport;
         var otherTransport = serviceKey is null ? factory.KeyedTransport : factory.DefaultTransport;
@@ -205,7 +205,7 @@ public sealed class EventBusTestServiceTests
         var result = await services.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, JSON_PAYLOAD, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
         var delivery = factory.HandlerState.Deliveries.Should().ContainSingle().Which;
         delivery.Payload.Should().Be(new RuntimePayload("diagnostic payload"));
@@ -235,7 +235,7 @@ public sealed class EventBusTestServiceTests
         var result = await scope.ServiceProvider.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, JSON_PAYLOAD, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().Contain(failure.Message);
         factory.HandlerState.Deliveries.Should().BeEmpty();
         factory.KeyedTransport.Messages.Should().BeEmpty();
@@ -257,7 +257,7 @@ public sealed class EventBusTestServiceTests
         var result = await scope.ServiceProvider.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, JSON_PAYLOAD, cancellation.Token);
 
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().NotBeNullOrWhiteSpace();
         factory.DefaultTransport.Messages.Should().BeEmpty();
         factory.KeyedTransport.Messages.Should().BeEmpty();
@@ -278,7 +278,7 @@ public sealed class EventBusTestServiceTests
         var result = await scope.ServiceProvider.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, json, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().NotBeNullOrWhiteSpace();
         factory.DefaultTransport.Messages.Should().BeEmpty();
         factory.KeyedTransport.Messages.Should().BeEmpty();
@@ -295,7 +295,7 @@ public sealed class EventBusTestServiceTests
         var result = await scope.ServiceProvider.GetRequiredService<EventBusTestService>().PublishRuntimePayloadAsync(
             subscription.Id, JSON_PAYLOAD, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().Contain(TEST_BUS);
         factory.DefaultTransport.Messages.Should().BeEmpty();
         factory.KeyedTransport.Messages.Should().BeEmpty();

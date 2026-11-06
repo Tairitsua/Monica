@@ -17,7 +17,7 @@ Monica.{Name}/{Feature}/
 │       ├── {VectorRecord}.cs
 │       └── {QueueItem}.cs
 ├── Facades/
-│   └── {Feature}Facade.cs            # ~150 lines, Res<T>
+│   └── {Feature}Facade.cs            # ~150 lines, Result<T>
 ├── Services/
 │   ├── {Capability}Service.cs         # One clear capability each
 │   └── Support/

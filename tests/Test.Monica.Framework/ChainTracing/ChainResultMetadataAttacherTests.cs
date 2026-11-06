@@ -35,7 +35,7 @@ public sealed class ChainResultMetadataAttacherTests
         tracing.EndTrace(database, "Error", false, cause);
         tracing.EndTrace(execution, "Exception", false, failure);
         tracing.EndTrace(root, "Exception", false, failure);
-        var response = Res.Fail("Safe message");
+        var response = Result.Failure("Safe message");
         var document = ExceptionDiagnosticProjection.GetOrCreate(response);
         document.ExceptionId = ExceptionDiagnosticProjection.Capture(document, failure);
 
@@ -66,7 +66,7 @@ public sealed class ChainResultMetadataAttacherTests
         var second = tracing.BeginTrace("Second", "Service");
         tracing.EndTrace(second, "Exception", false, new InvalidOperationException("same message"));
         tracing.EndTrace(root);
-        var response = Res.Fail("Safe message");
+        var response = Result.Failure("Safe message");
 
         CreateAttacher().Attach(tracing.GetCurrentChain(), new DefaultHttpContext(), response);
 
@@ -85,7 +85,7 @@ public sealed class ChainResultMetadataAttacherTests
         var failure = new InvalidOperationException("local failure while contacting actor-host");
         tracing.EndTrace(root, "Exception", false, new ContextualException(failure)
             .WithMetadata(ResultMetadataKeys.RemoteService, "actor-host"));
-        var response = Res.Fail("Safe message");
+        var response = Result.Failure("Safe message");
         response.SetMetadata(ResultMetadataKeys.RemoteService, "actor-host");
         var document = ExceptionDiagnosticProjection.GetOrCreate(response);
         document.ExceptionId = ExceptionDiagnosticProjection.Capture(document, failure);
@@ -113,7 +113,7 @@ public sealed class ChainResultMetadataAttacherTests
         tracing.EndTrace(outer);
         tracing.EndTrace(leaked, "Exception", false, new InvalidOperationException("isolated failure"));
         tracing.EndTrace(root);
-        var response = Res.Fail("Safe message");
+        var response = Result.Failure("Safe message");
 
         CreateAttacher().Attach(tracing.GetCurrentChain(), new DefaultHttpContext(), response);
 
@@ -135,7 +135,7 @@ public sealed class ChainResultMetadataAttacherTests
         var remoteNode = tracing.BeginTrace("Invoke", "Proxy", type: EChainTracingType.RemoteService);
         var response = RemoteResponse("actor-host", "remote-trace");
         tracing.MergeRemoteChain(remoteNode, response);
-        tracing.EndTrace(remoteNode, "Res(InternalError)", false);
+        tracing.EndTrace(remoteNode, "Result(InternalError)", false);
         tracing.EndTrace(root, "Exception", false, new InvalidOperationException("local failure"));
         var attacher = CreateAttacher();
 
@@ -169,10 +169,10 @@ public sealed class ChainResultMetadataAttacherTests
         {
             var invocation = tracing.BeginTrace("Invoke", "Proxy", type: EChainTracingType.RemoteService);
             tracing.MergeRemoteChain(invocation, RemoteResponse(service, $"{service}-trace"));
-            tracing.EndTrace(invocation, "Res(InternalError)", false);
+            tracing.EndTrace(invocation, "Result(InternalError)", false);
         }
-        tracing.EndTrace(root, "Res(InternalError)", false);
-        var response = Res.Fail("Dependencies failed");
+        tracing.EndTrace(root, "Result(InternalError)", false);
+        var response = Result.Failure("Dependencies failed");
 
         CreateAttacher().Attach(tracing.GetCurrentChain(), new DefaultHttpContext(), response);
 
@@ -193,13 +193,13 @@ public sealed class ChainResultMetadataAttacherTests
         var tracing = CreateTracing();
         var root = tracing.BeginTrace("Action", "Controller");
         var remoteNode = tracing.BeginTrace("Invoke", "Proxy", type: EChainTracingType.RemoteService);
-        var response = Res.Fail("Safe remote message");
+        var response = Result.Failure("Safe remote message");
         response.SetMetadata(ResultMetadataKeys.RemoteService, "actor-host");
         var remoteDocument = ExceptionDiagnosticProjection.GetOrCreate(response);
         remoteDocument.ExceptionId = ExceptionDiagnosticProjection.Capture(remoteDocument,
             new InvalidOperationException("remote typed failure"));
         tracing.MergeRemoteChain(remoteNode, response);
-        tracing.EndTrace(remoteNode, "Res(InternalError)", false);
+        tracing.EndTrace(remoteNode, "Result(InternalError)", false);
         tracing.EndTrace(root, "Exception", false, new InvalidOperationException("local failure"));
 
         CreateAttacher().Attach(tracing.GetCurrentChain(), new DefaultHttpContext(), response);
@@ -241,9 +241,9 @@ public sealed class ChainResultMetadataAttacherTests
         tracing.GetCurrentChain()!.Root!.Result.Should().Be("Exception: InvalidOperationException");
     }
 
-    private static Res RemoteResponse(string service, string traceId)
+    private static Result RemoteResponse(string service, string traceId)
     {
-        var response = Res.Fail("Safe remote message");
+        var response = Result.Failure("Safe remote message");
         response.SetMetadata(ResultMetadataKeys.RemoteService, service);
         response.SetMetadata(ResultMetadataKeys.TraceId, traceId);
         response.SetMetadata(ResultMetadataKeys.Diagnostics, JsonSerializer.SerializeToElement(new
@@ -261,7 +261,7 @@ public sealed class ChainResultMetadataAttacherTests
         return response;
     }
 
-    private static JsonElement Serialize(Res response) => JsonSerializer.SerializeToElement(response, JSON);
+    private static JsonElement Serialize(Result response) => JsonSerializer.SerializeToElement(response, JSON);
 
     private static ChainResultMetadataAttacher CreateAttacher() => new(
         new MonicaApplicationOptions { DebugMode = true },

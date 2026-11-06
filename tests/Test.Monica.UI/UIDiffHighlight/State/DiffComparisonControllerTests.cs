@@ -29,8 +29,8 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task RequestAsync_WhenDraftChangesDuringWork_ShouldSerializeAndCompareOnlyLatestPendingDraft()
     {
-        var firstResult = NewCompletion<Res<DiffHighlightResult>>();
-        var latestResult = NewCompletion<Res<DiffHighlightResult>>();
+        var firstResult = NewCompletion<Result<DiffHighlightResult>>();
+        var latestResult = NewCompletion<Result<DiffHighlightResult>>();
         var latestStarted = NewCompletion();
         var calls = new List<DiffComparisonInput>();
         await using var controller = new DiffComparisonController(input =>
@@ -50,7 +50,7 @@ public sealed class DiffComparisonControllerTests
         calls.Select(input => input.NewText).Should().Equal("first");
         controller.State.HasPendingRequest.Should().BeTrue();
 
-        firstResult.SetResult(Res.Ok(Result("first")));
+        firstResult.SetResult(Result.Success(ComparisonResult("first")));
         await latestStarted.Task;
         calls.Select(input => input.NewText).Should().Equal("first", "latest");
         controller.State.Accepted.Should().BeNull();
@@ -58,7 +58,7 @@ public sealed class DiffComparisonControllerTests
         skippedWait.IsCompleted.Should().BeFalse();
         latestWait.IsCompleted.Should().BeFalse();
 
-        latestResult.SetResult(Res.Ok(Result("latest")));
+        latestResult.SetResult(Result.Success(ComparisonResult("latest")));
         await Task.WhenAll(firstWait, skippedWait, latestWait);
         controller.State.IsBusy.Should().BeFalse();
         controller.State.IsAcceptedCurrent.Should().BeTrue();
@@ -68,10 +68,10 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task SetDraft_WhenAutomaticWorkIsNotRequested_ShouldRejectOldCompletionAndRetainPriorEvidence()
     {
-        var running = NewCompletion<Res<DiffHighlightResult>>();
+        var running = NewCompletion<Result<DiffHighlightResult>>();
         var calls = 0;
         await using var controller = new DiffComparisonController(_ => ++calls == 1
-            ? Task.FromResult(Res.Ok(Result("accepted"))) : running.Task);
+            ? Task.FromResult(Result.Success(ComparisonResult("accepted"))) : running.Task);
         controller.SetDraft(Input("accepted"));
         await controller.RequestAsync();
         var accepted = controller.State.Accepted;
@@ -79,7 +79,7 @@ public sealed class DiffComparisonControllerTests
         controller.SetDraft(Input("running"));
         var wait = controller.RequestAsync();
         controller.SetDraft(Input("manual draft"));
-        running.SetResult(Res.Ok(Result("running")));
+        running.SetResult(Result.Success(ComparisonResult("running")));
         await wait;
 
         controller.State.Accepted.Should().BeSameAs(accepted);
@@ -94,8 +94,8 @@ public sealed class DiffComparisonControllerTests
     public async Task RequestAsync_WhenCurrentComparisonFails_ShouldKeepWholePriorEvidenceAndIdentifyFailureScope()
     {
         var calls = 0;
-        await using var controller = new DiffComparisonController(_ => Task.FromResult<Res<DiffHighlightResult>>(
-            ++calls == 1 ? Res.Ok(Result("accepted")) : "comparison failed"));
+        await using var controller = new DiffComparisonController(_ => Task.FromResult<Result<DiffHighlightResult>>(
+            ++calls == 1 ? Result.Success(ComparisonResult("accepted")) : Result.Failure<DiffHighlightResult>("comparison failed")));
         controller.SetDraft(Input("accepted"));
         await controller.RequestAsync();
         var accepted = controller.State.Accepted;
@@ -116,7 +116,7 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task RequestAsync_WhenIdenticalRequestIsAlreadyActive_ShouldJoinActualWork()
     {
-        var completion = NewCompletion<Res<DiffHighlightResult>>();
+        var completion = NewCompletion<Result<DiffHighlightResult>>();
         var calls = 0;
         await using var controller = new DiffComparisonController(_ => { calls++; return completion.Task; });
         controller.SetDraft(Input("same"));
@@ -126,7 +126,7 @@ public sealed class DiffComparisonControllerTests
         first.Should().BeSameAs(second);
         calls.Should().Be(1);
 
-        completion.SetResult(Res.Ok(Result("same")));
+        completion.SetResult(Result.Success(ComparisonResult("same")));
         await Task.WhenAll(first, second);
         controller.State.IsAcceptedCurrent.Should().BeTrue();
     }
@@ -134,13 +134,13 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task ClearEvidence_WhenWorkIsActive_ShouldDrainWithoutRepopulatingTheSkippedEmptyView()
     {
-        var completion = NewCompletion<Res<DiffHighlightResult>>();
+        var completion = NewCompletion<Result<DiffHighlightResult>>();
         await using var controller = new DiffComparisonController(_ => completion.Task);
         controller.SetDraft(Input("active"));
         var wait = controller.RequestAsync();
         controller.SetDraft(DiffComparisonInput.Capture("", "", null));
         controller.ClearEvidence();
-        completion.SetResult(Res.Ok(Result("active")));
+        completion.SetResult(Result.Success(ComparisonResult("active")));
         await wait;
 
         controller.State.Accepted.Should().BeNull();
@@ -151,7 +151,7 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task DisposeAsync_WhenRealWorkIsActive_ShouldStopAdmissionAndAwaitRetirementWithoutAcceptance()
     {
-        var completion = NewCompletion<Res<DiffHighlightResult>>();
+        var completion = NewCompletion<Result<DiffHighlightResult>>();
         var calls = 0;
         var controller = new DiffComparisonController(_ => { calls++; return completion.Task; });
         controller.SetDraft(Input("active"));
@@ -165,7 +165,7 @@ public sealed class DiffComparisonControllerTests
         controller.SetDraft(Input("retired")).Should().BeFalse();
         await controller.RequestAsync();
 
-        completion.SetResult(Res.Ok(Result("active")));
+        completion.SetResult(Result.Success(ComparisonResult("active")));
         await Task.WhenAll(wait, queued, retirement);
         controller.State.Accepted.Should().BeNull();
         calls.Should().Be(1);
@@ -177,7 +177,7 @@ public sealed class DiffComparisonControllerTests
     {
         var calls = 0;
         await using var controller = new DiffComparisonController(_ => ++calls == 1
-            ? throw new InvalidOperationException("delegate failed") : Task.FromResult(Res.Ok(Result("retried"))));
+            ? throw new InvalidOperationException("delegate failed") : Task.FromResult(Result.Success(ComparisonResult("retried"))));
         controller.SetDraft(Input("retried"));
         await controller.RequestAsync();
         controller.State.Failure!.Message.Should().Be("delegate failed");
@@ -190,9 +190,9 @@ public sealed class DiffComparisonControllerTests
     [Fact]
     public async Task Accepted_WhenBackendAndRenderingObjectsMutate_ShouldKeepIndependentCompleteProjections()
     {
-        var backend = Result("source");
+        var backend = ComparisonResult("source");
         backend.Options.Style = new() { AddedLineStyle = "source style" };
-        await using var controller = new DiffComparisonController(_ => Task.FromResult(Res.Ok(backend)));
+        await using var controller = new DiffComparisonController(_ => Task.FromResult(Result.Success(backend)));
         controller.SetDraft(Input("source"));
         await controller.RequestAsync();
 
@@ -218,7 +218,7 @@ public sealed class DiffComparisonControllerTests
     private static DiffComparisonInput Input(string updated) => DiffComparisonInput.Capture("original", updated, new());
     private static TaskCompletionSource NewCompletion() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static TaskCompletionSource<T> NewCompletion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private static DiffHighlightResult Result(string updated) => new()
+    private static DiffHighlightResult ComparisonResult(string updated) => new()
     {
         HighlightedContent = updated,
         Statistics = new() { TotalChanges = 1, AddedLines = 1, TotalNewLines = 1 },

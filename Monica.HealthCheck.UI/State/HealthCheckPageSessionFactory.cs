@@ -10,7 +10,7 @@ namespace Monica.HealthCheck.UI.State;
 /// </summary>
 public sealed class HealthCheckPageSessionFactory
 {
-    private readonly Func<HealthCheckScope, CancellationToken, Task<Res<HealthCheckSnapshot>>> _getSnapshotAsync;
+    private readonly Func<HealthCheckScope, CancellationToken, Task<Result<HealthCheckSnapshot>>> _getSnapshotAsync;
     private readonly string _hostName;
 
     /// <summary>
@@ -26,7 +26,7 @@ public sealed class HealthCheckPageSessionFactory
     }
 
     internal HealthCheckPageSessionFactory(
-        Func<HealthCheckScope, CancellationToken, Task<Res<HealthCheckSnapshot>>> getSnapshotAsync,
+        Func<HealthCheckScope, CancellationToken, Task<Result<HealthCheckSnapshot>>> getSnapshotAsync,
         string hostName)
     {
         _getSnapshotAsync = getSnapshotAsync ?? throw new ArgumentNullException(nameof(getSnapshotAsync));

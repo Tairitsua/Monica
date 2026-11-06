@@ -250,7 +250,8 @@ public sealed class JobSchedulerNativeTableStateTests
         state.SelectedJobIds.Should().BeEquivalentTo([ownerA.Definition.Id, ownerB.Definition.Id]);
 
         var result = await state.SetDisabledAsync(ownerB, true);
-        result.IsFailed(out var error).Should().BeFalse(error?.Message);
+        var error = result;
+        result.IsFailure().Should().BeFalse(error?.Message);
         state.Summaries
             .Where(summary => summary.Definition.Declaration.JobKey == context.RecurringDefinition.Declaration.JobKey)
             .Single(summary => summary.Definition.OwnerKey == "worker-b")
@@ -309,7 +310,9 @@ public sealed class JobSchedulerNativeTableStateTests
             Xunit.TestContext.Current.CancellationToken);
 
         var result = await state.SetSelectedDisabledAsync(true);
-        result.IsFailed(out var error, out var batch).Should().BeFalse(error?.Message);
+        var error = result;
+        var batch = result.Data;
+        result.IsFailure().Should().BeFalse(error?.Message);
         batch.Should().NotBeNull();
         batch!.SucceededCount.Should().Be(1);
         batch.FailedCount.Should().Be(1);

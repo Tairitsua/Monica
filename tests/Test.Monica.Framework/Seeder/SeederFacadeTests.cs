@@ -31,7 +31,7 @@ public sealed class SeederFacadeTests
 
         var result = await facade.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         result.Data!.Configuration.MaxConcurrency.Should().Be(7);

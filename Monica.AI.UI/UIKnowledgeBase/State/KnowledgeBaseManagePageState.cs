@@ -184,7 +184,9 @@ public sealed partial class KnowledgeBaseManagePageState : IAsyncDisposable
         var catalogResult = await _knowledgeBaseFacade.GetAllAsync();
         _session.CheckCurrent();
         if (revision != _catalogReadRevision) return false;
-        if (catalogResult.IsFailed(out var error, out var knowledgeBases))
+        var error = catalogResult.WithoutData();
+        var knowledgeBases = catalogResult.Data;
+        if (catalogResult.IsFailure() || knowledgeBases is null)
         {
             CatalogErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             NotifyStateChanged();
@@ -217,7 +219,9 @@ public sealed partial class KnowledgeBaseManagePageState : IAsyncDisposable
         _session.CheckCurrent();
         var groupsResult = await _knowledgeDocumentFacade.GetMarkdownGroupsAsync();
         _session.CheckCurrent();
-        if (groupsResult.IsFailed(out var error, out var groups))
+        var error = groupsResult.WithoutData();
+        var groups = groupsResult.Data;
+        if (groupsResult.IsFailure() || groups is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return false;
@@ -249,7 +253,9 @@ public sealed partial class KnowledgeBaseManagePageState : IAsyncDisposable
         _session.CheckCurrent();
         if (revision != _inventoryReadRevision) return;
 
-        if (inventoryResult.IsFailed(out var error, out var documents))
+        var error = inventoryResult.WithoutData();
+        var documents = inventoryResult.Data;
+        if (inventoryResult.IsFailure() || documents is null)
         {
             InventoryErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
@@ -289,7 +295,9 @@ public sealed partial class KnowledgeBaseManagePageState : IAsyncDisposable
         _session.CheckCurrent();
         if (revision != _selectedMetadataRevision
             || !string.Equals(SelectedKnowledgeBase?.Id, knowledgeBaseId, StringComparison.OrdinalIgnoreCase)) return;
-        if (result.IsFailed(out var error, out var knowledgeBase))
+        var error = result.WithoutData();
+        var knowledgeBase = result.Data;
+        if (result.IsFailure() || knowledgeBase is null)
         {
             CatalogErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             return;

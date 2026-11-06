@@ -25,7 +25,7 @@ public sealed class BadHttpRequestExceptionMapperTests
 
         mapped.Should().BeTrue();
         response.Should().NotBeNull();
-        response!.Status.Should().Be(ResStatus.BadRequest);
+        response!.Status.Should().Be(ResultStatus.BadRequest);
         response.Message.Should().NotContain("expectedValueVersion");
     }
 
@@ -41,9 +41,9 @@ public sealed class BadHttpRequestExceptionMapperTests
     }
 
     [Theory]
-    [InlineData(StatusCodes.Status413PayloadTooLarge, ResStatus.PayloadTooLarge)]
-    [InlineData(StatusCodes.Status415UnsupportedMediaType, ResStatus.UnsupportedMediaType)]
-    public void TryMap_NonBadRequestStatus_PreservesHttpStatus(int statusCode, ResStatus expectedStatus)
+    [InlineData(StatusCodes.Status413PayloadTooLarge, ResultStatus.PayloadTooLarge)]
+    [InlineData(StatusCodes.Status415UnsupportedMediaType, ResultStatus.UnsupportedMediaType)]
+    public void TryMap_NonBadRequestStatus_PreservesHttpStatus(int statusCode, ResultStatus expectedStatus)
     {
         var mapper = CreateMapper();
         var exception = new BadHttpRequestException("The request cannot be processed.", statusCode);

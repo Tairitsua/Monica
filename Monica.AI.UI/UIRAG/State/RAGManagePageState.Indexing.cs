@@ -104,7 +104,8 @@ public sealed partial class RAGManagePageState
                     clearIndex: true);
             _session.CheckCurrent();
 
-            if (bindingResult.IsFailed(out var error))
+            var error = bindingResult;
+            if (bindingResult.IsFailure())
             {
                 CurrentEmbeddingModelKey = previousModelKey;
                 _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
@@ -169,9 +170,11 @@ public sealed partial class RAGManagePageState
         {
             var result = await _vectorStoreFacade.RemoveSupportAsync(selectedKnowledgeBaseId);
             _session.CheckCurrent();
-            if (result.IsFailed(out var error, out var removal))
+            var error = result.WithoutData();
+            var removal = result.Data;
+            if (result.IsFailure() || removal is null)
             {
-                if (CanForceRemoveRagSupport(error)
+                if (result.IsFailure() && CanForceRemoveRagSupport(error)
                     && await ConfirmForceRemoveRagSupportAsync())
                 {
                     await ForceRemoveRagSupportAsync(selectedKnowledgeBaseId);
@@ -286,7 +289,8 @@ public sealed partial class RAGManagePageState
                 ct: CancellationToken.None);
             _session.CheckCurrent();
 
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 if (IsCancellationMessage(error.Message))
                 {
@@ -370,7 +374,8 @@ public sealed partial class RAGManagePageState
                 progress,
                 ct: CancellationToken.None);
             _session.CheckCurrent();
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
                 return;
@@ -410,7 +415,8 @@ public sealed partial class RAGManagePageState
 
         var cancelResult = await _indexingFacade.CancelBatchAsync(originKnowledgeBase.Id);
         _session.CheckCurrent();
-        if (cancelResult.IsFailed(out var error))
+        var error = cancelResult;
+        if (cancelResult.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -455,7 +461,9 @@ public sealed partial class RAGManagePageState
 
         var result = await _indexingFacade.ClearPendingQueueAsync(originKnowledgeBase.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error, out var removedCount))
+        var error = result.WithoutData();
+        var removedCount = result.Data;
+        if (result.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -485,7 +493,9 @@ public sealed partial class RAGManagePageState
 
         var result = await _indexingFacade.QueueKnowledgeBaseForReindexAsync(originKnowledgeBase.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error, out var queuedCount))
+        var error = result.WithoutData();
+        var queuedCount = result.Data;
+        if (result.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -524,7 +534,9 @@ public sealed partial class RAGManagePageState
 
         var statusResult = await _vectorStoreFacade.GetCollectionStatusAsync(knowledgeBaseId);
         _session.CheckCurrent();
-        if (statusResult.IsFailed(out var statusError, out var status))
+        var statusError = statusResult.WithoutData();
+        var status = statusResult.Data;
+        if (statusResult.IsFailure() || status is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {statusError.Message}", Severity.Error);
             return false;
@@ -555,7 +567,9 @@ public sealed partial class RAGManagePageState
 
         var overwriteResult = await _vectorStoreFacade.OverwriteCollectionAsync(knowledgeBaseId);
         _session.CheckCurrent();
-        if (overwriteResult.IsFailed(out var overwriteError, out var overwrite))
+        var overwriteError = overwriteResult.WithoutData();
+        var overwrite = overwriteResult.Data;
+        if (overwriteResult.IsFailure() || overwrite is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {overwriteError.Message}", Severity.Error);
             return false;
@@ -596,7 +610,9 @@ public sealed partial class RAGManagePageState
             knowledgeBaseId,
             forceLocalMetadataRemoval: true);
         _session.CheckCurrent();
-        if (forcedResult.IsFailed(out var forceError, out var forcedRemoval))
+        var forceError = forcedResult.WithoutData();
+        var forcedRemoval = forcedResult.Data;
+        if (forcedResult.IsFailure() || forcedRemoval is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {forceError.Message}", Severity.Error);
             return;
@@ -626,7 +642,7 @@ public sealed partial class RAGManagePageState
         _session.CheckCurrent();
     }
 
-    private static bool CanForceRemoveRagSupport(Res error)
+    private static bool CanForceRemoveRagSupport(Result error)
     {
         if (error.Metadata is null)
         {

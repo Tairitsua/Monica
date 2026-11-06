@@ -89,7 +89,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidPublishedResultEnvelope = Create(
         "AC1017",
         "Published endpoint result envelope is invalid",
-        "Published API request '{0}' returns '{1}', which must be a concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
+        "Published API request '{0}' returns '{1}', which must be a non-nullable, concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
 
     public static readonly DiagnosticDescriptor UnbindableRouteProperty = Create(
         "AC1018",

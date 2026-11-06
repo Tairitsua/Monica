@@ -139,7 +139,8 @@
                 return;
             }
 
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 errorMessage = error.Message;
             }

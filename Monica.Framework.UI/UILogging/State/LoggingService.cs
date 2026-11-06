@@ -42,21 +42,21 @@ public sealed class LoggingService(
     public LogReadingSession CreateSession() => new(new ScreenLogBuffer(uiOptions), logTailService.CreateReader(), logFileQueryService, uiOptions, logger);
 
     /// <summary>Replaces the legacy host reader window; built-in pages instead borrow their scoped workspace reader.</summary>
-    public Task<Res<ScreenLogSnapshot>> InitializeAsync(int requestedLines, CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> InitializeAsync(int requestedLines, CancellationToken cancellationToken = default)
         => _legacy.InitializeAsync(requestedLines, cancellationToken);
     /// <summary>Starts legacy host following work, owned by the host container rather than a page.</summary>
-    public Task<Res> StartAsync(CancellationToken cancellationToken = default) => _legacy.StartAsync(cancellationToken);
+    public Task<Result> StartAsync(CancellationToken cancellationToken = default) => _legacy.StartAsync(cancellationToken);
     /// <summary>Stops and drains the legacy host reader only.</summary>
-    public Task<Res> PauseAsync() => _legacy.PauseAsync();
+    public Task<Result> PauseAsync() => _legacy.PauseAsync();
     /// <summary>Changes the legacy host reader filter only.</summary>
-    public Task<Res<ScreenLogSnapshot>> UpdateFilterAsync(string? keyword, bool onlyCapture) => _legacy.UpdateFilterAsync(keyword, onlyCapture);
+    public Task<Result<ScreenLogSnapshot>> UpdateFilterAsync(string? keyword, bool onlyCapture) => _legacy.UpdateFilterAsync(keyword, onlyCapture);
     /// <summary>Returns the legacy reader's immutable adopted snapshot.</summary>
     public ScreenLogSnapshot GetSnapshot() => _legacy.GetSnapshot();
     /// <summary>Loads earlier complete physical lines into the legacy host buffer.</summary>
-    public Task<Res<int>> LoadMoreLinesAsync(int lineCount = 50, CancellationToken cancellationToken = default)
+    public Task<Result<int>> LoadMoreLinesAsync(int lineCount = 50, CancellationToken cancellationToken = default)
         => _legacy.LoadMoreLinesAsync(lineCount, cancellationToken);
     /// <summary>Changes the source of the legacy host reader only.</summary>
-    public Task<Res<ScreenLogSnapshot>> SwitchToFileAsync(string relativePath, int initialLines, CancellationToken cancellationToken = default)
+    public Task<Result<ScreenLogSnapshot>> SwitchToFileAsync(string relativePath, int initialLines, CancellationToken cancellationToken = default)
         => _legacy.SwitchToFileAsync(relativePath, initialLines, cancellationToken);
     /// <summary>Subscribes to the legacy host reader; caller owns and disposes its subscription.</summary>
     public LoggingSubscription Subscribe() => _legacy.Subscribe();
@@ -65,18 +65,18 @@ public sealed class LoggingService(
     /// Exports the separate legacy host buffer with its existing timestamp/retention framing. This endpoint
     /// never exports any page-owned reader; reader pages use their own frozen session export.
     /// </summary>
-    public Task<Res<LogExportResult>> ExportBufferAsync(CancellationToken cancellationToken = default)
+    public Task<Result<LogExportResult>> ExportBufferAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var content = Encoding.UTF8.GetBytes(buffer.ExportCurrent());
-        return Task.FromResult((Res<LogExportResult>)new LogExportResult($"temp-logs-{DateTimeOffset.Now:yyyyMMddHHmmss}.log", "text/plain", content));
+        return Task.FromResult(Result.Success(new LogExportResult($"temp-logs-{DateTimeOffset.Now:yyyyMMddHHmmss}.log", "text/plain", content)));
     }
 
     /// <summary>Lists ordinary files beneath the inspection directory.</summary>
-    public Task<Res<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
+    public Task<Result<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
         => logFileQueryService.ListFilesAsync(cancellationToken);
     /// <summary>Opens an allowed live file; the caller owns and must dispose the stream.</summary>
-    public Task<Res<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
+    public Task<Result<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
         => logFileQueryService.OpenFileAsync(relativePath, cancellationToken);
     /// <summary>Retires the facade's legacy reader. Independently created sessions remain their caller's responsibility.</summary>
     public ValueTask DisposeAsync() => _legacy.DisposeAsync();

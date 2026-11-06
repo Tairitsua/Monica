@@ -22,15 +22,19 @@ internal sealed class ServiceDiscoveryWorkerInsightProvider(
         CancellationToken cancellationToken = default)
     {
         var servicesResult = await facade.GetServicesStatusAsync();
-        if (servicesResult.IsFailed(out var servicesError, out var services))
+        if (servicesResult.IsFailure())
         {
-            throw new InvalidOperationException(servicesError.Message);
+            throw new InvalidOperationException(servicesResult.Message);
         }
+
+        var services = servicesResult.Data
+            ?? throw new InvalidOperationException("Service discovery returned no service status data.");
 
         cancellationToken.ThrowIfCancellationRequested();
         // The election configuration only carries heartbeat cadence constants; an unavailable config falls back to
         // the module defaults instead of hiding every instance.
-        var electionConfig = facade.GetElectionConfig().IsFailed(out _, out var config) ? null : config;
+        var electionResult = facade.GetElectionConfig();
+        var electionConfig = electionResult.IsFailure() ? null : electionResult.Data;
         var healthyBoundary = (electionConfig?.HeartbeatPeriod ?? TimeSpan.FromSeconds(15))
             * HEALTHY_HEARTBEAT_PERIODS;
         var registrationTtl = electionConfig?.RegistrationTTL ?? TimeSpan.FromSeconds(46);

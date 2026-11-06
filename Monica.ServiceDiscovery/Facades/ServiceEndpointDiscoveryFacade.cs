@@ -28,15 +28,15 @@ public sealed class ServiceEndpointDiscoveryFacade
     }
 
     /// <summary>Returns detached retained evidence without triggering network activity.</summary>
-    public Res<ServiceEndpointDiagnosticsSnapshot> Capture() => Res.Ok(_diagnostics.Capture());
+    public Result<ServiceEndpointDiagnosticsSnapshot> Capture() => Result.Success(_diagnostics.Capture());
 
     /// <summary>
     /// Resolves declared targets with per-target deadlines and a 30-second overall budget. Cancellation propagates.
     /// A concurrent refresh is not duplicated. Failure retains prior candidates with their original timestamp.
     /// </summary>
-    public async Task<Res> RefreshAsync(CancellationToken cancellationToken = default)
+    public async Task<Result> RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (!await _refresh.WaitAsync(0, cancellationToken)) return Res.Ok();
+        if (!await _refresh.WaitAsync(0, cancellationToken)) return Result.Success();
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(30));
         try
@@ -66,6 +66,6 @@ public sealed class ServiceEndpointDiscoveryFacade
             }
         }
         finally { _refresh.Release(); }
-        return Res.Ok();
+        return Result.Success();
     }
 }

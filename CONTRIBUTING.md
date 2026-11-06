@@ -71,7 +71,7 @@ Release notes are generated from commit messages between release tags. Commits t
 
 ```text
 feat: add module-level metrics
-fix: preserve Res<string> facade data
+fix: preserve Result<string> facade data
 docs: update module registration guide
 refactor: simplify JobScheduler state model
 feat!: remove obsolete configuration API
@@ -97,7 +97,7 @@ BREAKING CHANGE: replace ambient Mo registration with builder.AddMonica(monica =
 
 - Follow the [Monica coding standards](skills/monica-coding-standards/SKILL.md) for responsibility ownership, simplification, validation, and failure behavior.
 - Follow their [C# contracts](skills/monica-coding-standards/references/csharp-contracts.md) for public XML documentation, options, registration methods, and language conventions.
-- Facades may return `Res` or `Res<T>`; internal services should use standard .NET return types and exceptions.
+- Facades may return `Result` or `Result<T>`; internal services should use standard .NET return types and exceptions.
 - Keep UI colors on MudBlazor palette variables or the approved Monica theme token contract.
 
 ## Release Process

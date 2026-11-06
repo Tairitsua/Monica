@@ -370,7 +370,7 @@ public sealed class ModuleObjectMappingTests
 
         var result = await facade.GetStatusAsync();
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().NotBeNull();
         result.Data!.Mappings.Should().ContainSingle(mapping =>
             mapping.SourceType.Contains(nameof(MappingSource), StringComparison.Ordinal) &&

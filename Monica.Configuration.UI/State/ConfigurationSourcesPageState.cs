@@ -13,13 +13,13 @@ namespace Monica.Configuration.UI.State;
 internal sealed class ConfigurationSourcesPageState : IAsyncDisposable
 {
     private readonly ConfigurationOperationLifetime _lifetime;
-    private readonly Func<Task<Res<IReadOnlyList<ConfigurationSourceInventory>>>> _inventories;
+    private readonly Func<Task<Result<IReadOnlyList<ConfigurationSourceInventory>>>> _inventories;
 
     internal ConfigurationSourcesPageState(ConfigurationFacade facade, string unavailableText,
         ConfigurationOperationLifetime lifetime, bool showSensitiveValues = false)
         : this(() => facade.GetConfigurationSourceInventoriesAsync(showSensitiveValues), unavailableText, lifetime: lifetime) { }
 
-    internal ConfigurationSourcesPageState(Func<Task<Res<IReadOnlyList<ConfigurationSourceInventory>>>> inventories,
+    internal ConfigurationSourcesPageState(Func<Task<Result<IReadOnlyList<ConfigurationSourceInventory>>>> inventories,
         string unavailableText, TimeProvider? timeProvider = null, ConfigurationOperationLifetime? lifetime = null)
     {
         _lifetime = lifetime ?? new();

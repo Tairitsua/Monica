@@ -35,11 +35,11 @@ namespace Domains.Ordering.Application.HandlersCommand
     public sealed class CommandHandlerApproveOrder(IRepositoryOrder repository)
         : ApplicationService<CommandApproveOrder>
     {
-        public override async Task<Res> Handle(CommandApproveOrder request, CancellationToken cancellationToken)
+        public override async Task<Result> Handle(CommandApproveOrder request, CancellationToken cancellationToken)
         {
             var order = await repository.GetAsync(request.Id, cancellationToken);
             order.Approve();
-            return Res.Ok();
+            return Result.Success();
         }
     }
 }
@@ -58,12 +58,12 @@ namespace Domains.Ordering.Application.HandlersQuery
     public sealed class QueryHandlerGetOrder(IRepositoryOrder repository)
         : ApplicationService<QueryGetOrder, OrderSummary>
     {
-        public override async Task<Res<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
+        public override async Task<Result<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
         {
             var summary = await repository.FindSummaryAsync(request.Id, cancellationToken);
             return summary is null
-                ? Res.Fail("Order was not found.", ResStatus.NotFound)
-                : Res.Ok<OrderSummary>(summary);
+                ? Result.Failure<OrderSummary>("Order was not found.", ResultStatus.NotFound)
+                : Result.Success<OrderSummary>(summary);
         }
     }
 }

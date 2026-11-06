@@ -71,8 +71,8 @@ internal sealed class JobDefinitionCleanupPageState(JobSchedulerFacade facade, I
             _lifetime.TryApply(() =>
             {
                 if (version != _queryVersion) return;
-                if (response.IsFailed(out var error, out var snapshot)) { Error = error; IsStale = true; }
-                else { Snapshot = snapshot; _acceptedQuery = query; Error = null; IsStale = false; }
+                if (response.IsFailure()) { Error = response.Message ?? string.Empty; IsStale = true; }
+                else { Snapshot = response.Data ?? throw new InvalidOperationException("The cleanup query returned no data."); _acceptedQuery = query; Error = null; IsStale = false; }
             });
             return true;
         });
@@ -86,8 +86,8 @@ internal sealed class JobDefinitionCleanupPageState(JobSchedulerFacade facade, I
         var response = await facade.PreviewDefinitionCleanupAsync([id], false, token);
         _lifetime.TryApply(() =>
         {
-            if (response.IsFailed(out var error, out var plan)) { Error = error; Inspection = null; }
-            else Inspection = plan.Items.Single();
+            if (response.IsFailure()) { Error = response.Message ?? string.Empty; Inspection = null; }
+            else Inspection = (response.Data ?? throw new InvalidOperationException("The cleanup preview returned no data.")).Items.Single();
         });
         return true;
     });
@@ -141,10 +141,11 @@ internal sealed class JobDefinitionCleanupPageState(JobSchedulerFacade facade, I
         IsStale = true;
     });
 
-    private T? Accept<T>(Res<T> response) where T : class
+    private T? Accept<T>(Result<T> response) where T : class
     {
-        if (!response.IsFailed(out var error, out var value)) return value;
-        _lifetime.TryApply(() => OperationError = error);
+        var value = response.Data;
+        if (!response.IsFailure()) return value;
+        _lifetime.TryApply(() => OperationError = response.Message ?? string.Empty);
         return null;
     }
 

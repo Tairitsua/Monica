@@ -118,7 +118,7 @@ public sealed class K8SScaleServiceTests
             : await operations.Facade.GetBatchScalePreviewAsync(
                 ControlledK8SOperations.NAMESPACE, K8SResourceType.Service, ControlledK8SOperations.SelectedServices,
                 K8SScaleOperation.ScaleDown, cancellationToken);
-        Assert.Equal(ResStatus.Ok, response.Status);
+        Assert.Equal(ResultStatus.Ok, response.Status);
         Assert.Null(response.Message);
         var preview = Assert.IsType<K8SScalePreview>(response.Data);
         Assert.True(preview.HasScalableTargets);
@@ -141,7 +141,7 @@ public sealed class K8SScaleServiceTests
                 ControlledK8SOperations.NAMESPACE, K8SResourceType.Service, ControlledK8SOperations.SelectedServices,
                 K8SScaleOperation.ScaleDown, cancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, execution.Status);
+        Assert.Equal(ResultStatus.BadRequest, execution.Status);
         Assert.Null(execution.Data);
         Assert.Contains(denyNamespace ? "GeneratedMessages:NamespaceOutsideScope" : "GeneratedMessages:NoScalableTargetsRemain",
             execution.Message, StringComparison.Ordinal);

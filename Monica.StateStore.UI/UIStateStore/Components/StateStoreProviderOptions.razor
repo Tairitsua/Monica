@@ -66,7 +66,8 @@
         var facade = Services.GetService<ModuleDiagnosticsFacade>();
         if (facade is null) { _failed = true; return; }
         var result = facade.GetModuleOptions(target.ModuleKey, target.ProfileSelector);
-        if (result.IsFailed(out _, out var diagnostics)) _failed = true;
+        var diagnostics = result.Data;
+        if (result.IsFailure()) _failed = true;
         else _diagnostics = diagnostics;
     }
 

@@ -7,7 +7,7 @@ Inject the generated domain interface, such as `IOrderingCommandApi`, and submit
 ```csharp
 var result = await commands.ApproveOrder(
     new CommandApproveOrder(orderId), cancellationToken);
-if (result.IsOk())
+if (result.IsSuccess())
 {
     selectedOrder = result.Data;
 }

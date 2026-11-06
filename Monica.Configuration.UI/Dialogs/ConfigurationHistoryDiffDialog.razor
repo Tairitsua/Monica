@@ -271,7 +271,9 @@
                     token.ThrowIfCancellationRequested();
                     _operations.TryApply(() =>
                     {
-                        if (result.IsFailed(out var error, out var page)) { _loadError = error.Message; return; }
+                        var error = result;
+                        var page = result.Data;
+                        if (result.IsFailure() || page is null) { _loadError = error.Message ?? L["Common:Errors:LoadFailed"].Value; return; }
                         var ids = _loadedRows.Select(row => row.HistoryId).ToHashSet(StringComparer.OrdinalIgnoreCase);
                         _loadedRows.AddRange(page.Items.Where(row => ids.Add(row.HistoryId)));
                         _nextCursor = page.NextCursor;

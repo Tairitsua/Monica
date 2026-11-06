@@ -87,14 +87,14 @@ internal static class ModuleSystemWorkbenchTestData
     }
 
     internal static ModuleDiagnosticsCalls Calls(
-        Func<Res<ModuleDiagnosticsSnapshot>>? snapshot = null,
-        Func<Res<TypeDiscoveryAssemblyInventory>>? inventory = null,
-        Func<ModuleKey, Res<ModuleOptionDiagnostics>>? options = null,
-        Func<Res<ModuleDiagnosticsExport>>? export = null) => new(
-        snapshot ?? (() => Res.Ok(Snapshot())),
-        inventory ?? (() => Res.Ok(Inventory())),
-        options ?? (key => Res.Ok(Options(key))),
-        export ?? (() => Res.Ok(Export())));
+        Func<Result<ModuleDiagnosticsSnapshot>>? snapshot = null,
+        Func<Result<TypeDiscoveryAssemblyInventory>>? inventory = null,
+        Func<ModuleKey, Result<ModuleOptionDiagnostics>>? options = null,
+        Func<Result<ModuleDiagnosticsExport>>? export = null) => new(
+        snapshot ?? (() => Result.Success(Snapshot())),
+        inventory ?? (() => Result.Success(Inventory())),
+        options ?? (key => Result.Success(Options(key))),
+        export ?? (() => Result.Success(Export())));
 
     internal static TypeDiscoveryAssemblyInventory Inventory() => new()
     {

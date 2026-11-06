@@ -139,7 +139,8 @@
         {
             var result = await TestService.PublishTestMessageAsync(message, topic, _lifetimeToken);
             if (_retired) return;
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 Snackbar.Add(L["TestPanel:Snackbars:PublishFailed", error.Message ?? string.Empty], Severity.Error);
                 return;
@@ -167,7 +168,8 @@
             var result = await lease.SubscribeAsync(topic);
             if (_retired) return;
             AdoptListenerSnapshot();
-            if (result.IsFailed(out var error, out _))
+            var error = result;
+            if (result.IsFailure())
             {
                 if (!_retired) Snackbar.Add(L["TestPanel:Snackbars:SubscribeFailed", error.Message ?? string.Empty], Severity.Error);
                 return;
@@ -187,7 +189,8 @@
             var result = await lease.UnsubscribeAsync();
             if (_retired) return;
             AdoptListenerSnapshot();
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 if (!_retired) Snackbar.Add(L["TestPanel:Snackbars:UnsubscribeFailed", error.Message ?? string.Empty], Severity.Warning);
                 return;
@@ -313,7 +316,8 @@
                 try
                 {
                     var result = await _listenerLease.UnsubscribeAsync();
-                    if (result.IsFailed(out var error))
+                    var error = result;
+                    if (result.IsFailure())
                         Logger.LogWarning("Retiring the standalone EventBus test listener failed; its exact subscription remains available for a later owner to retry: {Error}", error.Message);
                     else _ownsSubscription = false;
                 }

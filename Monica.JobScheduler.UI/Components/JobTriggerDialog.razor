@@ -197,7 +197,9 @@
             cancellationToken.ThrowIfCancellationRequested();
             if (IsDisposed) return;
 
-            if (result.IsFailed(out var error, out var execution))
+            var error = result.WithoutData();
+            var execution = result.Data;
+            if (result.IsFailure())
             {
                 _lifetime.TryApply(() => _error = error.Message);
                 return;

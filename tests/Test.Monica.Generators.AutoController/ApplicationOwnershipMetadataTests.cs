@@ -200,7 +200,7 @@ public sealed class ApplicationOwnershipMetadataTests
             public sealed record QueryProbe : Monica.Application.Abstractions.IQuery<int>;
             internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<QueryProbe, int>
             {
-                public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     QueryProbe request, System.Threading.CancellationToken cancellationToken) => throw new System.NotImplementedException();
             }
             """, [Emit(core, "Scenario.Core")], new ApplicationRoleMetadataSourceGenerator());

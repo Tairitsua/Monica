@@ -17,7 +17,7 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
     /// <param name="newText">The updated text.</param>
     /// <param name="options">The diff options to apply.</param>
     /// <returns>A response containing the highlighted result.</returns>
-    public async Task<Res<DiffHighlightResult>> HighlightAsync(string oldText, string newText, DiffHighlightOptions? options = null)
+    public async Task<Result<DiffHighlightResult>> HighlightAsync(string oldText, string newText, DiffHighlightOptions? options = null)
     {
         try
         {
@@ -29,17 +29,17 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
             logger.LogInformation("文本差异对比完成，处理时间: {ProcessingTime}ms, 变更数: {TotalChanges}",
                 result.ProcessingTimeMs, result.Statistics.TotalChanges);
             
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (ArgumentException ex)
         {
             logger.LogWarning(ex, "文本差异对比参数错误: {Message}", ex.Message);
-            return Res.Fail($"参数错误: {ex.Message}");
+            return Result.Failure<DiffHighlightResult>($"参数错误: {ex.Message}");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "文本差异对比过程中发生错误");
-            return Res.Fail($"文本差异对比失败: {ex.Message}");
+            return Result.Failure<DiffHighlightResult>($"文本差异对比失败: {ex.Message}");
         }
     }
     
@@ -50,7 +50,7 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
     /// <param name="newText">The updated text.</param>
     /// <param name="options">The diff options to apply.</param>
     /// <returns>A response containing the highlighted result.</returns>
-    public Res<DiffHighlightResult> Highlight(string oldText, string newText, DiffHighlightOptions? options = null)
+    public Result<DiffHighlightResult> Highlight(string oldText, string newText, DiffHighlightOptions? options = null)
     {
         try
         {
@@ -62,17 +62,17 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
             logger.LogInformation("文本差异对比完成，处理时间: {ProcessingTime}ms, 变更数: {TotalChanges}",
                 result.ProcessingTimeMs, result.Statistics.TotalChanges);
             
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (ArgumentException ex)
         {
             logger.LogWarning(ex, "文本差异对比参数错误: {Message}", ex.Message);
-            return Res.Fail($"参数错误: {ex.Message}");
+            return Result.Failure<DiffHighlightResult>($"参数错误: {ex.Message}");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "文本差异对比过程中发生错误");
-            return Res.Fail($"文本差异对比失败: {ex.Message}");
+            return Result.Failure<DiffHighlightResult>($"文本差异对比失败: {ex.Message}");
         }
     }
     
@@ -83,7 +83,7 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
     /// <param name="newText">The updated text.</param>
     /// <param name="options">The diff options to apply.</param>
     /// <returns>A response containing the diff statistics.</returns>
-    public async Task<Res<DiffStatistics>> GetStatisticsAsync(string oldText, string newText, DiffHighlightOptions? options = null)
+    public async Task<Result<DiffStatistics>> GetStatisticsAsync(string oldText, string newText, DiffHighlightOptions? options = null)
     {
         try
         {
@@ -92,12 +92,12 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
             var result = await diffHighlight.HighlightAsync(oldText, newText, options);
             
             logger.LogDebug("获取文本差异统计信息完成");
-            return Res.Ok(result.Statistics);
+            return Result.Success(result.Statistics);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取文本差异统计信息过程中发生错误");
-            return Res.Fail($"获取统计信息失败: {ex.Message}");
+            return Result.Failure<DiffStatistics>($"获取统计信息失败: {ex.Message}");
         }
     }
     
@@ -108,7 +108,7 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
     /// <param name="newText">The updated text.</param>
     /// <param name="options">The diff options to apply.</param>
     /// <returns>A response indicating whether the texts are identical.</returns>
-    public async Task<Res<bool>> IsIdenticalAsync(string oldText, string newText, DiffHighlightOptions? options = null)
+    public async Task<Result<bool>> IsIdenticalAsync(string oldText, string newText, DiffHighlightOptions? options = null)
     {
         try
         {
@@ -118,12 +118,12 @@ public class DiffHighlightFacade(IDiffHighlight diffHighlight, ILogger<DiffHighl
             var isIdentical = !result.HasChanges;
             
             logger.LogDebug("文本相同性检查完成，结果: {IsIdentical}", isIdentical);
-            return Res.Ok(isIdentical);
+            return Result.Success(isIdentical);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "检查文本相同性过程中发生错误");
-            return Res.Fail($"检查失败: {ex.Message}");
+            return Result.Failure<bool>($"检查失败: {ex.Message}");
         }
     }
 }

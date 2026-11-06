@@ -171,7 +171,9 @@ public partial class K8SResourceInspector : IAsyncDisposable
             {
                 var response = await K8SFacade.DescribePodAsync(namespaceName, pod.Name, _token);
                 if (_retired || _token.IsCancellationRequested) return;
-                if (response.IsFailed(out var error, out var details))
+                var error = response;
+                var details = response.Data;
+                if (response.IsFailure() || details is null)
                 {
                     Snackbar.Add(error?.Message ?? L["ServiceMessages:DescribePodFailed", pod.Name, namespaceName, string.Empty].Value, Severity.Error);
                     return;

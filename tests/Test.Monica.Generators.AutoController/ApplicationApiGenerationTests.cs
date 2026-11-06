@@ -113,9 +113,9 @@ public sealed class ApplicationApiGenerationTests
             namespace Scenario.Handlers;
             public sealed class TotalHandler : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryTotal, int>
             {
-                public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryTotal request, System.Threading.CancellationToken cancellationToken)
-                    => System.Threading.Tasks.Task.FromResult(Monica.Core.Results.Res.Ok(42));
+                    => System.Threading.Tasks.Task.FromResult(Monica.Core.Results.Result.Success(42));
             }
             """, [protocol], new HttpApiControllerSourceGenerator());
         handlers.GeneratedSources.Should().BeEmpty();

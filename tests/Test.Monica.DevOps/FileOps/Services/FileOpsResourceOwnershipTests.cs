@@ -19,7 +19,7 @@ public sealed class FileOpsResourceOwnershipTests
 
         var result = await fixture.Facade.OpenDownloadAsync(source, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.Null(result.Message);
         var descriptor = Assert.IsType<FileOpsDownloadDescriptor>(result.Data);
         try
@@ -56,7 +56,7 @@ public sealed class FileOpsResourceOwnershipTests
             Paths = [source], ArchiveName = "harmless-bundle"
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.Null(result.Message);
         var descriptor = Assert.IsType<FileOpsDownloadDescriptor>(result.Data);
         var ownedArchivePath = descriptor.FullPath;

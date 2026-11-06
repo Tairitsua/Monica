@@ -145,9 +145,11 @@ public partial class JobPolicyDialog : IAsyncDisposable
             request.Change, cancellationToken);
         if (IsDisposed || !ReferenceEquals(_state, request.State)) return;
 
-        if (result.IsFailed(out var error, out var policy))
+        var error = result.WithoutData();
+        var policy = result.Data;
+        if (result.IsFailure())
         {
-            if (result.Status == ResStatus.Conflict) await RebaseAfterConflictAsync(request, cancellationToken);
+            if (result.Status == ResultStatus.Conflict) await RebaseAfterConflictAsync(request, cancellationToken);
             else ApplyError(request, error.Message);
             return;
         }
@@ -166,7 +168,9 @@ public partial class JobPolicyDialog : IAsyncDisposable
         cancellationToken.ThrowIfCancellationRequested();
         var latestResult = await Facade.GetOperationalSummaryAsync(request.JobId, cancellationToken);
         if (IsDisposed || !ReferenceEquals(_state, request.State)) return;
-        if (latestResult.IsFailed(out var loadError, out var latest) || latest is null)
+        var loadError = latestResult.WithoutData();
+        var latest = latestResult.Data;
+        if (latestResult.IsFailure() || latest is null)
         {
             ApplyError(request, loadError?.Message ?? L["Policy:Conflict:ReloadFailed"]);
             return;

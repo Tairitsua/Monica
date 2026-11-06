@@ -57,7 +57,8 @@ public sealed partial class ChatPageState
     {
         if (_disposed || HasHistoryConflict || HasHistoryLoadFailure || CurrentSession != session) return false;
         var result = chatFacade.UpdateSettings(session, settings);
-        if (result.IsFailed(out var error)) { SetError(error.Message); return false; }
+        var error = result;
+        if (result.IsFailure()) { SetError(error.Message); return false; }
         var saved = await workspace.SaveSessionAsync(session, _lifetime.Token);
         NotifyStateChanged();
         return saved;

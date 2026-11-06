@@ -52,7 +52,8 @@ public sealed partial class KnowledgeBaseManagePageState
         var deleteResult = await _knowledgeBaseFacade.DeleteAsync(knowledgeBase.Id);
         _session.CheckCurrent();
 
-        if (deleteResult.IsFailed(out var error))
+        var error = deleteResult;
+        if (deleteResult.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -94,7 +95,8 @@ public sealed partial class KnowledgeBaseManagePageState
         var createResult = await _knowledgeBaseFacade.CreateAsync(data.Id, data.Name, data.Description);
         _session.CheckCurrent();
 
-        if (createResult.IsFailed(out var error))
+        var error = createResult;
+        if (createResult.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -146,7 +148,8 @@ public sealed partial class KnowledgeBaseManagePageState
                 data.Description);
         _session.CheckCurrent();
 
-        if (updateResult.IsFailed(out var error))
+        var error = updateResult;
+        if (updateResult.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -176,7 +179,9 @@ public sealed partial class KnowledgeBaseManagePageState
         var documentsResult = await _knowledgeDocumentFacade.GetMarkdownDocumentsAsync(originMarkdownGroup);
         _session.CheckCurrent();
 
-        if (documentsResult.IsFailed(out var error, out var documents))
+        var error = documentsResult.WithoutData();
+        var documents = documentsResult.Data;
+        if (documentsResult.IsFailure() || documents is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -209,7 +214,9 @@ public sealed partial class KnowledgeBaseManagePageState
                 selectedDocumentIds);
         _session.CheckCurrent();
 
-        if (importResultEnvelope.IsFailed(out var addError, out var importResult))
+        var addError = importResultEnvelope.WithoutData();
+        var importResult = importResultEnvelope.Data;
+        if (importResultEnvelope.IsFailure() || importResult is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {addError.Message}", Severity.Error);
             return;
@@ -257,7 +264,8 @@ public sealed partial class KnowledgeBaseManagePageState
                     content);
             _session.CheckCurrent();
 
-            if (uploadResult.IsFailed(out var error))
+            var error = uploadResult;
+            if (uploadResult.IsFailure())
             {
                 _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
                 return;
@@ -301,7 +309,8 @@ public sealed partial class KnowledgeBaseManagePageState
         var removeResult = await _knowledgeDocumentFacade.RemoveDocumentAsync(originKnowledgeBase.Id, document.Id);
         _session.CheckCurrent();
 
-        if (removeResult.IsFailed(out var error))
+        var error = removeResult;
+        if (removeResult.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -328,7 +337,9 @@ public sealed partial class KnowledgeBaseManagePageState
 
         var result = await _knowledgeDocumentFacade.GetDocumentPreviewAsync(originKnowledgeBase.Id, document.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error, out var preview))
+        var error = result.WithoutData();
+        var preview = result.Data;
+        if (result.IsFailure() || preview is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -379,7 +390,9 @@ public sealed partial class KnowledgeBaseManagePageState
 
         var result = await _knowledgeDocumentFacade.ClearDocumentsAsync(originKnowledgeBase.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error, out var removedCount))
+        var error = result.WithoutData();
+        var removedCount = result.Data;
+        if (result.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;

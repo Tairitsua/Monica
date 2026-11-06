@@ -123,7 +123,9 @@ public sealed class EventBusWorkbenchState(
 
             var subscriptionResult = await monitorService.GetAllSubscriptionsAsync();
             cancellationToken.ThrowIfCancellationRequested();
-            if (subscriptionResult.IsFailed(out var subscriptionError, out var subscriptions))
+            var subscriptionError = subscriptionResult.WithoutData();
+            var subscriptions = subscriptionResult.Data;
+            if (subscriptionResult.IsFailure())
             {
                 RecordRefreshFailure(subscriptionError, cancellationToken);
                 return;
@@ -131,7 +133,9 @@ public sealed class EventBusWorkbenchState(
 
             var providerResult = providerDiscoveryService.GetRegisteredProviders();
             cancellationToken.ThrowIfCancellationRequested();
-            if (providerResult.IsFailed(out var providerError, out var providers))
+            var providerError = providerResult.WithoutData();
+            var providers = providerResult.Data;
+            if (providerResult.IsFailure())
             {
                 RecordRefreshFailure(providerError, cancellationToken);
                 return;
@@ -139,7 +143,9 @@ public sealed class EventBusWorkbenchState(
 
             var topicResult = monitorService.GetAllTopicStatuses();
             cancellationToken.ThrowIfCancellationRequested();
-            if (topicResult.IsFailed(out var topicError, out var topicStatuses))
+            var topicError = topicResult.WithoutData();
+            var topicStatuses = topicResult.Data;
+            if (topicResult.IsFailure())
             {
                 RecordRefreshFailure(topicError, cancellationToken);
                 return;
@@ -316,7 +322,7 @@ public sealed class EventBusWorkbenchState(
     private static TopicSubscriptionStatus CloneTopicStatus(TopicSubscriptionStatus status) =>
         status with { RecentErrors = status.RecentErrors.ToImmutableArray() };
 
-    private void RecordRefreshFailure(Res error, CancellationToken cancellationToken)
+    private void RecordRefreshFailure(Result error, CancellationToken cancellationToken)
     {
         lock (_stateLock)
         {

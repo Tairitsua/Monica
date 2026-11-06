@@ -99,9 +99,9 @@ public sealed class ConfigurationFacadeSourceAuthorityTests
         var multiple = await facade.GetSourceChainsAsync(local.DefinitionKey, [path]);
         var contributions = await facade.GetDefinitionSourceContributionsAsync(local.DefinitionKey);
 
-        single.Status.Should().Be(ResStatus.Ok);
-        multiple.Status.Should().Be(ResStatus.Ok);
-        contributions.Status.Should().Be(ResStatus.Ok);
+        single.Status.Should().Be(ResultStatus.Ok);
+        multiple.Status.Should().Be(ResultStatus.Ok);
+        contributions.Status.Should().Be(ResultStatus.Ok);
         var projected = new[] { single.Data!.Values.Single().Source, multiple.Data!.Single().Values.Single().Source,
             contributions.Data!.Single().Source };
         foreach (var item in projected)

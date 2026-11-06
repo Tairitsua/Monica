@@ -128,7 +128,8 @@
         }
 
         var result = session.RequestSelfRestart();
-        if (result.IsFailed(out var error))
+        var error = result;
+        if (result.IsFailure())
         {
             Snackbar.Add(L["Page:Messages:RestartFailed", error.Message ?? string.Empty], Severity.Error);
             return;

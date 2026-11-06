@@ -39,14 +39,14 @@ public static class ResultPresentationExtensions
                 result.SetError(declaredError); // Project JSON into the public model; discard undeclared technical members.
         }
 
-        if (result.IsOk()) return result;
+        if (result.IsSuccess()) return result;
         if (!result.TryGetError(json, out var error))
         {
             error = new ResultError(result.Status switch
             {
-                ResStatus.InternalError => ResultErrorCodes.UnexpectedError,
-                ResStatus.Unauthorized => ResultErrorCodes.Unauthorized,
-                ResStatus.Forbidden => ResultErrorCodes.Forbidden,
+                ResultStatus.InternalError => ResultErrorCodes.UnexpectedError,
+                ResultStatus.Unauthorized => ResultErrorCodes.Unauthorized,
+                ResultStatus.Forbidden => ResultErrorCodes.Forbidden,
                 _ => ResultErrorCodes.OperationFailed
             }, traceId, service, operation);
             result.SetError(error);

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Monica.Experimental.Features.MoDecorator;
+using Monica.Experimental.Decorator;
 
 namespace Examples.Monica;
 
@@ -192,4 +192,4 @@ public static class MoDecoratorExample
             return result;
         }
     }
-} 
+}

@@ -36,10 +36,10 @@ internal sealed class ConfigurationReadState<T>(ConfigurationOperationLifetime l
     }
 
     /// <summary>Owns the actual read for a previously reserved generation.</summary>
-    internal Task ReadReservedAsync(long requestId, Func<Task<Res<T>>> producer, Func<T, T>? capture = null)
+    internal Task ReadReservedAsync(long requestId, Func<Task<Result<T>>> producer, Func<T, T>? capture = null)
         => lifetime.RunAsync(_ => ReadCoreAsync(requestId, producer, capture));
 
-    private async Task ReadCoreAsync(long requestId, Func<Task<Res<T>>> producer, Func<T, T>? capture)
+    private async Task ReadCoreAsync(long requestId, Func<Task<Result<T>>> producer, Func<T, T>? capture)
     {
         if (requestId == 0) return;
 
@@ -49,7 +49,9 @@ internal sealed class ConfigurationReadState<T>(ConfigurationOperationLifetime l
         try
         {
             var result = await producer();
-            if (result.IsFailed(out var failure, out var value))
+            var failure = result;
+            var value = result.Data;
+            if (result.IsFailure())
                 error = string.IsNullOrWhiteSpace(failure.Message) ? unavailableText : failure.Message;
             else if (value is null) error = unavailableText;
             else
@@ -58,6 +60,7 @@ internal sealed class ConfigurationReadState<T>(ConfigurationOperationLifetime l
                 observedAtUtc = _timeProvider.GetUtcNow();
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             error = string.IsNullOrWhiteSpace(exception.Message) ? unavailableText : exception.Message;

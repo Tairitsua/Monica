@@ -7,7 +7,7 @@ using Monica.Core.Results.Services;
 namespace Monica.WebApi.AutoControllers.Services.Support;
 
 /// <summary>
-/// Keeps the HTTP status code aligned with the <see cref="Res" /> status code.
+/// Keeps the HTTP status code aligned with the <see cref="Result" /> status code.
 /// </summary>
 public class ResultEnvelopeMvcFilter: IAlwaysRunResultFilter, IOrderedFilter
 {
@@ -18,10 +18,10 @@ public class ResultEnvelopeMvcFilter: IAlwaysRunResultFilter, IOrderedFilter
     {
         if (context.Result is StatusCodeResult { StatusCode: 413 or 415 } rejection)
         {
-            var status = (ResStatus)rejection.StatusCode;
-            var message = status == ResStatus.PayloadTooLarge
+            var status = (ResultStatus)rejection.StatusCode;
+            var message = status == ResultStatus.PayloadTooLarge
                 ? "The request payload is too large." : "The request content type is not supported.";
-            context.Result = ResultHttpProjection.ToMvcResult(Res.Fail(message, status)
+            context.Result = ResultHttpProjection.ToMvcResult(Result.Failure(message, status)
                 .SetError(new ResultError(ResultErrorCodes.InvalidRequest, ResultTraceId.Capture(context.HttpContext))));
         }
         if (context.Result is ObjectResult { Value: IResultEnvelope response } result)

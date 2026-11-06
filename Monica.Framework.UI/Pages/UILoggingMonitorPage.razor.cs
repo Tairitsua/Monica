@@ -89,9 +89,11 @@ public partial class UILoggingMonitorPage
         {
             var synchronized = await _session!.SynchronizeAsync(_retirement.Token);
             if (_disposed) return;
-            if (synchronized.IsFailed(out var synchronizationError, out var current))
+            var synchronizationError = synchronized.WithoutData();
+            var current = synchronized.Data;
+            if (synchronized.IsFailure() || current is null)
             {
-                _error = synchronizationError.Message;
+                _error = synchronizationError.Message ?? "The log reader snapshot was unavailable.";
                 return;
             }
             _snapshot = current;
@@ -162,17 +164,20 @@ public partial class UILoggingMonitorPage
         }
     }
 
-    private void Adopt(Res<ScreenLogSnapshot> result, bool sourceAdopted = false)
+    private void Adopt(Result<ScreenLogSnapshot> result, bool sourceAdopted = false)
     {
         if (_disposed) return;
-        if (result.IsFailed(out var error, out var snapshot)) _error = error.Message ?? L["Workbench:ReadFailed"].Value;
+        var error = result.WithoutData();
+        var snapshot = result.Data;
+        if (result.IsFailure()) _error = error.Message ?? L["Workbench:ReadFailed"].Value;
         else { _snapshot = snapshot; if (sourceAdopted) Workspace.MarkInitialized(_session!); }
     }
 
     private Task ToggleFollowingAsync() => RunCommandAsync(async () =>
     {
         var result = IsRunning ? await _session!.PauseAsync() : await _session!.StartAsync(_retirement.Token);
-        if (result.IsFailed(out var error)) _error = error.Message;
+        var error = result;
+        if (result.IsFailure()) _error = error.Message;
         if (!_disposed) _snapshot = _session!.GetSnapshot();
     });
 
@@ -203,7 +208,9 @@ public partial class UILoggingMonitorPage
         {
             if (_context is not null) return;
             var result = await _session!.LoadMoreLinesAsync(count, _retirement.Token);
-            if (result.IsFailed(out var error, out var value)) _error = error.Message;
+            var error = result.WithoutData();
+            var value = result.Data;
+            if (result.IsFailure()) _error = error.Message;
             else loaded = value;
             if (!_disposed) _snapshot = _session!.GetSnapshot();
         });
@@ -218,7 +225,9 @@ public partial class UILoggingMonitorPage
         return RunCommandAsync(async () =>
         {
             var result = await _session!.ReadContextAsync(request, 50, _retirement.Token);
-            if (result.IsFailed(out var error, out var context)) _error = error.Message;
+            var error = result.WithoutData();
+            var context = result.Data;
+            if (result.IsFailure()) _error = error.Message;
             else if (!_disposed)
             {
                 if (_context is null) _livePosition = _position;
@@ -249,7 +258,9 @@ public partial class UILoggingMonitorPage
     private Task ExportRetainedAsync() => RunCommandAsync(async () =>
     {
         var result = await _session!.ExportBufferAsync();
-        if (result.IsFailed(out var error, out var export)) _error = error.Message;
+        var error = result.WithoutData();
+        var export = result.Data;
+        if (result.IsFailure()) _error = error.Message;
         else await _transfer!.ExportAsync(export);
     });
 

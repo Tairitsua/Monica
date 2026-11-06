@@ -97,8 +97,8 @@ Mirror source folders such as `Modules/`, `Facades/`, `Services/`, `Providers/`,
 ## Monica-Specific Assertions
 
 - Prefer public-surface behavior.
-- Assert facade `Res` or `Res<T>` status, message, and data explicitly.
-- Always assert successful `Res<string>.Data` to catch the `Res.Ok(string)` overload trap.
+- Assert facade `Result` or `Result<T>` status, message, and data explicitly.
+- Always assert successful `Result<string>.Data` to catch the `Result.Success(string)` overload trap.
 - Test module registration extensions through dependencies, options, DI-visible registrations, or runtime snapshots rather than static tables alone.
 - Avoid real network, uncontrolled persistence, sleeps, random/manual output, and hidden developer-machine state.
 

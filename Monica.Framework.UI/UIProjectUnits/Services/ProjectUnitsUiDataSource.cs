@@ -6,21 +6,21 @@ namespace Monica.Framework.UI.UIProjectUnits.Services;
 
 internal interface IProjectUnitsUiDataSource
 {
-    Task<Res<ProjectUnitDashboardSnapshot>> GetDashboardAsync();
+    Task<Result<ProjectUnitDashboardSnapshot>> GetDashboardAsync();
 
-    Task<Res<ProjectUnitDetail>> GetDetailAsync(
+    Task<Result<ProjectUnitDetail>> GetDetailAsync(
         string key,
         CancellationToken cancellationToken = default);
 }
 
 internal sealed class ProjectUnitsUiDataSource(ProjectUnitsFacade facade) : IProjectUnitsUiDataSource
 {
-    public Task<Res<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
+    public Task<Result<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
     {
         return facade.GetDashboardAsync();
     }
 
-    public Task<Res<ProjectUnitDetail>> GetDetailAsync(
+    public Task<Result<ProjectUnitDetail>> GetDetailAsync(
         string key,
         CancellationToken cancellationToken = default)
     {

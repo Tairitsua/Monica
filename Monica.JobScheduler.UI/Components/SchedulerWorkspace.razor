@@ -111,7 +111,7 @@
                 _lifetime.TryApply(() =>
                 {
                     if (version == _readinessVersion)
-                        _ready = result.IsFailed(out _, out var overview) ? null
+                        _ready = result.IsFailure() || result.Data is not { } overview ? null
                             : overview.LocalPlane.SchedulingReady && overview.LocalPlane.WorkerReady;
                 });
             });

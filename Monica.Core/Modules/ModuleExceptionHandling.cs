@@ -58,12 +58,12 @@ public class ModuleExceptionHandling : MonicaModule<ModuleExceptionHandlingOptio
             var response = statusCodeContext.HttpContext.Response;
             var rejection = response.StatusCode switch
             {
-                StatusCodes.Status413PayloadTooLarge => Res.Fail(
+                StatusCodes.Status413PayloadTooLarge => Result.Failure(
                     "The request payload is too large.",
-                    ResStatus.PayloadTooLarge),
-                StatusCodes.Status415UnsupportedMediaType => Res.Fail(
+                    ResultStatus.PayloadTooLarge),
+                StatusCodes.Status415UnsupportedMediaType => Result.Failure(
                     "The request content type is not supported.",
-                    ResStatus.UnsupportedMediaType),
+                    ResultStatus.UnsupportedMediaType),
                 _ => null
             };
 

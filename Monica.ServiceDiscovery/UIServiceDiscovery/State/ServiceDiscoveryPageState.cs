@@ -27,7 +27,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public bool ShowOnlyWithInstances { get; set; }
 
     /// <summary>Captures one complete registry, retaining prior evidence on failure and rejecting canceled work.</summary>
-    public async Task<Res<List<RegisteredServiceStatus>>> RefreshServicesAsync(bool showLoading = true, CancellationToken cancellationToken = default)
+    public async Task<Result<List<RegisteredServiceStatus>>> RefreshServicesAsync(bool showLoading = true, CancellationToken cancellationToken = default)
     {
         await _captureGate.WaitAsync(cancellationToken);
         try
@@ -35,7 +35,9 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
             IsLoading = showLoading;
             var result = await facade.CaptureServicesAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var services))
+            var error = result.WithoutData();
+            var services = result.Data;
+            if (result.IsFailure())
             {
                 ErrorMessage = error.Message;
                 return result;

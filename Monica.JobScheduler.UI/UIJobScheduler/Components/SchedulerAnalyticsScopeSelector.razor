@@ -72,7 +72,9 @@
                 }
                 var result = await Facade.QueryDefinitionsAsync(new JobDefinitionQuery { PageSize = 200, SortField = JobDefinitionSortField.OwnerKey }, token);
                 token.ThrowIfCancellationRequested();
-                if (result.IsFailed(out var error, out var page)) throw new InvalidOperationException(error.Message);
+                var error = result.WithoutData();
+                var page = result.Data;
+                if (result.IsFailure() || page is null) throw new InvalidOperationException(error.Message ?? "The job definition query returned no data.");
                 _lifetime.TryApply(() => { if (version == _version) { _definitions = page.Items; _total = page.TotalCount; _hasLoadedChoices = true; _error = null; } });
             });
         }

@@ -23,33 +23,33 @@ public sealed class LeaseDiagnosticsFacade
     }
 
     /// <summary>Reads cached inventories; each authority preserves its own clock, failure and last successful evidence.</summary>
-    public Task<Res<IReadOnlyList<LeaseAuthorityEvidence>>> GetInventoryAsync(CancellationToken cancellationToken = default) =>
+    public Task<Result<IReadOnlyList<LeaseAuthorityEvidence>>> GetInventoryAsync(CancellationToken cancellationToken = default) =>
         RunAsync(token => _reader.ReadAsync(token), cancellationToken);
 
     /// <summary>Reads one exact permitted resource without enumerating other roles.</summary>
-    public Task<Res<LeaseResourceEvidence>> GetResourceAsync(string authorityId, LeaseResource resource,
+    public Task<Result<LeaseResourceEvidence>> GetResourceAsync(string authorityId, LeaseResource resource,
         CancellationToken cancellationToken = default) => RunAsync(token => _reader.ReadResourceAsync(authorityId, resource, token), cancellationToken);
 
     /// <summary>Revokes whichever grant exists at execution, not necessarily the displayed holder.</summary>
     /// <remarks>Requires current access, an opted-in binding and ILeaseAdministration. Does not stop existing work.</remarks>
-    public Task<Res<bool>> RevokeAsync(string authorityId, LeaseResource resource,
+    public Task<Result<bool>> RevokeAsync(string authorityId, LeaseResource resource,
         CancellationToken cancellationToken = default) => RunAsync(token => _reader.RevokeAsync(authorityId, resource, token), cancellationToken);
 
-    private async Task<Res<T>> RunAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken token)
+    private async Task<Result<T>> RunAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken token)
     {
         try
         {
-            if (!await _access.IsAuthorizedAsync(token)) return Res.Fail("Lease diagnostics access denied.", ResStatus.Forbidden);
+            if (!await _access.IsAuthorizedAsync(token)) return Result.Failure<T>("Lease diagnostics access denied.", ResultStatus.Forbidden);
             token.ThrowIfCancellationRequested();
-            return Res.Ok(await operation(token));
+            return Result.Success(await operation(token));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch (UnauthorizedAccessException) { return Res.Fail("Lease administration is not permitted.", ResStatus.Forbidden); }
-        catch (ArgumentException) { return Res.Fail("Unknown authority or resource outside its configured scope."); }
+        catch (UnauthorizedAccessException) { return Result.Failure<T>("Lease administration is not permitted.", ResultStatus.Forbidden); }
+        catch (ArgumentException) { return Result.Failure<T>("Unknown authority or resource outside its configured scope."); }
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Lease observation or administration could not be confirmed");
-            return Res.Fail("Lease observation or administration could not be confirmed.", ResStatus.InternalError);
+            return Result.Failure<T>("Lease observation or administration could not be confirmed.", ResultStatus.InternalError);
         }
     }
 }

@@ -21,32 +21,32 @@ public sealed class ServiceDiscoveryFacade(
     /// Captures detached current registrations and predefined services. Failed reads return an error,
     /// rather than a successful empty registry. Cancellation prevents the UI from adopting retired work.
     /// </summary>
-    public Task<Res<List<RegisteredServiceStatus>>> CaptureServicesAsync(CancellationToken cancellationToken = default)
+    public Task<Result<List<RegisteredServiceStatus>>> CaptureServicesAsync(CancellationToken cancellationToken = default)
         => CaptureAsync(async () => (await queryService.GetMergedServicesStatusAsync(cancellationToken))
             .Select(ServiceDiscoverySnapshot.Copy).ToList(), cancellationToken);
 
     /// <summary>Captures detached catalog entries. A successful empty catalog remains distinct from a failed read.</summary>
-    public Task<Res<List<DomainInfo>>> CaptureDomainsAsync(CancellationToken cancellationToken = default)
+    public Task<Result<List<DomainInfo>>> CaptureDomainsAsync(CancellationToken cancellationToken = default)
         => CaptureAsync(async () => (await queryService.GetDomainsAsync(cancellationToken)).Select(domain => new DomainInfo
         {
             Id = domain.Id, DisplayName = domain.DisplayName, Description = domain.Description
         }).ToList(), cancellationToken);
 
     /// <summary>Captures querying-host identity and local election evidence alongside the independently read application lease.</summary>
-    public Task<Res<CurrentInstanceSnapshot>> CaptureCurrentInstanceAsync(CancellationToken cancellationToken = default)
+    public Task<Result<CurrentInstanceSnapshot>> CaptureCurrentInstanceAsync(CancellationToken cancellationToken = default)
         => CaptureAsync(() => queryService.GetCurrentInstanceSnapshotAsync(cancellationToken), cancellationToken);
 
     /// <summary>Captures compiled API usage separately from live registration and transport evidence.</summary>
-    public Task<Res<ApplicationTopologySnapshot>> CaptureTopologyAsync(CancellationToken cancellationToken = default)
+    public Task<Result<ApplicationTopologySnapshot>> CaptureTopologyAsync(CancellationToken cancellationToken = default)
         => CaptureAsync(() => Task.FromResult(queryService.GetApplicationTopology()), cancellationToken);
 
-    private async Task<Res<T>> CaptureAsync<T>(Func<Task<T>> read, CancellationToken cancellationToken)
+    private async Task<Result<T>> CaptureAsync<T>(Func<Task<T>> read, CancellationToken cancellationToken)
     {
         try
         {
             var captured = await read();
             cancellationToken.ThrowIfCancellationRequested();
-            return Res.Ok(captured);
+            return Result.Success(captured);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -56,193 +56,193 @@ public sealed class ServiceDiscoveryFacade(
         {
             cancellationToken.ThrowIfCancellationRequested();
             logger.LogError(exception, "Failed to capture discovery evidence.");
-            return Res.Fail(localizer["Workbench:ReadFailed"].Value);
+            return Result.Failure<T>(localizer["Workbench:ReadFailed"].Value);
         }
     }
 
-    public async Task<Res<List<RegisteredServiceStatus>>> GetServicesStatusAsync()
+    public async Task<Result<List<RegisteredServiceStatus>>> GetServicesStatusAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetServicesStatusAsync());
+            return Result.Success(await queryService.GetServicesStatusAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure<List<RegisteredServiceStatus>>(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get service status.");
-            return Res.Fail(localizer["Service:Errors:GetServicesStatusFailed", ex.Message].Value);
+            return Result.Failure<List<RegisteredServiceStatus>>(localizer["Service:Errors:GetServicesStatusFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res<LeaderStatusResponse>> GetRegistryLeaderStatusAsync()
+    public async Task<Result<LeaderStatusResponse>> GetRegistryLeaderStatusAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetRegistryLeaderStatusAsync());
+            return Result.Success(await queryService.GetRegistryLeaderStatusAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure<LeaderStatusResponse>(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get registry leader status.");
-            return Res.Fail($"获取 Leader 状态失败: {ex.Message}");
+            return Result.Failure<LeaderStatusResponse>($"获取 Leader 状态失败: {ex.Message}");
         }
     }
 
-    public async Task<Res<RegistryServiceStatusResponse>> GetRegistryServiceStatusAsync()
+    public async Task<Result<RegistryServiceStatusResponse>> GetRegistryServiceStatusAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetRegistryServiceStatusAsync());
+            return Result.Success(await queryService.GetRegistryServiceStatusAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure<RegistryServiceStatusResponse>(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get registry service status.");
-            return Res.Fail($"获取服务状态失败: {ex.Message}");
+            return Result.Failure<RegistryServiceStatusResponse>($"获取服务状态失败: {ex.Message}");
         }
     }
 
-    public async Task<Res> ReleaseLeaderAsync()
+    public async Task<Result> ReleaseLeaderAsync()
     {
         try
         {
             if (!await queryService.ReleaseLeaderAsync())
             {
-                return Res.Fail("当前实例不是 Leader");
+                return Result.Failure("当前实例不是 Leader");
             }
 
-            return Res.Ok("已释放 Leader 状态");
+            return Result.Success().WithMessage("已释放 Leader 状态");
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to release leader status.");
-            return Res.Fail($"释放 Leader 状态失败: {ex.Message}");
+            return Result.Failure($"释放 Leader 状态失败: {ex.Message}");
         }
     }
 
-    public Res<ElectionConfig> GetElectionConfig()
+    public Result<ElectionConfig> GetElectionConfig()
     {
-        return Res.Ok(_option.Election);
+        return Result.Success(_option.Election);
     }
 
-    public async Task<Res<List<RegisteredServiceStatus>>> GetMergedServicesStatusAsync()
+    public async Task<Result<List<RegisteredServiceStatus>>> GetMergedServicesStatusAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetMergedServicesStatusAsync());
+            return Result.Success(await queryService.GetMergedServicesStatusAsync());
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get merged service status.");
-            return Res.Fail(localizer["Service:Errors:GetMergedServicesStatusFailed", ex.Message].Value);
+            return Result.Failure<List<RegisteredServiceStatus>>(localizer["Service:Errors:GetMergedServicesStatusFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res<List<DomainInfo>>> GetDomainsAsync()
+    public async Task<Result<List<DomainInfo>>> GetDomainsAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetDomainsAsync());
+            return Result.Success(await queryService.GetDomainsAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:InfoProviderNotConfigured"].Value);
+            return Result.Failure<List<DomainInfo>>(localizer["Service:Errors:InfoProviderNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get service discovery domains.");
-            return Res.Fail(localizer["Service:Errors:GetDomainsFailed", ex.Message].Value);
+            return Result.Failure<List<DomainInfo>>(localizer["Service:Errors:GetDomainsFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res<DomainDetailInfo>> GetDomainDetailAsync(string domainName)
+    public async Task<Result<DomainDetailInfo>> GetDomainDetailAsync(string domainName)
     {
         if (string.IsNullOrWhiteSpace(domainName))
         {
-            return Res.Fail(localizer["Service:Errors:DomainNameRequired"].Value);
+            return Result.Failure<DomainDetailInfo>(localizer["Service:Errors:DomainNameRequired"].Value);
         }
 
         try
         {
-            return Res.Ok(await queryService.GetDomainDetailAsync(domainName));
+            return Result.Success(await queryService.GetDomainDetailAsync(domainName));
         }
         catch (KeyNotFoundException)
         {
-            return Res.Fail(localizer["Service:Errors:DomainNotFound", domainName].Value);
+            return Result.Failure<DomainDetailInfo>(localizer["Service:Errors:DomainNotFound", domainName].Value);
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:InfoProviderNotConfigured"].Value);
+            return Result.Failure<DomainDetailInfo>(localizer["Service:Errors:InfoProviderNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get domain detail for {DomainName}.", domainName);
-            return Res.Fail(localizer["Service:Errors:GetDomainDetailFailed", ex.Message].Value);
+            return Result.Failure<DomainDetailInfo>(localizer["Service:Errors:GetDomainDetailFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res<LeaderState?>> GetLeaderStateAsync()
+    public async Task<Result<LeaderState?>> GetLeaderStateAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetLeaderStateAsync());
+            return Result.Success(await queryService.GetLeaderStateAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure<LeaderState?>(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get leader state.");
-            return Res.Fail(localizer["Service:Errors:GetLeaderStateFailed", ex.Message].Value);
+            return Result.Failure<LeaderState?>(localizer["Service:Errors:GetLeaderStateFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res<CurrentInstanceSnapshot>> GetCurrentInstanceSnapshotAsync()
+    public async Task<Result<CurrentInstanceSnapshot>> GetCurrentInstanceSnapshotAsync()
     {
         try
         {
-            return Res.Ok(await queryService.GetCurrentInstanceSnapshotAsync());
+            return Result.Success(await queryService.GetCurrentInstanceSnapshotAsync());
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["CurrentInstance:Errors:ClientInfoNotConfigured"].Value);
+            return Result.Failure<CurrentInstanceSnapshot>(localizer["CurrentInstance:Errors:ClientInfoNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get current instance snapshot.");
-            return Res.Fail(localizer["CurrentInstance:Errors:LoadFailed", ex.Message].Value);
+            return Result.Failure<CurrentInstanceSnapshot>(localizer["CurrentInstance:Errors:LoadFailed", ex.Message].Value);
         }
     }
 
-    public async Task<Res> ForceDeleteLeaderAsync(string appId)
+    public async Task<Result> ForceDeleteLeaderAsync(string appId)
     {
         try
         {
             await queryService.ForceDeleteLeaderAsync(appId);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (InvalidOperationException)
         {
-            return Res.Fail(localizer["Service:Errors:StateManagerNotConfigured"].Value);
+            return Result.Failure(localizer["Service:Errors:StateManagerNotConfigured"].Value);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to force delete leader for application {AppId}.", appId);
-            return Res.Fail(localizer["Service:Errors:ForceDeleteLeaderFailed", ex.Message].Value);
+            return Result.Failure(localizer["Service:Errors:ForceDeleteLeaderFailed", ex.Message].Value);
         }
     }
 }

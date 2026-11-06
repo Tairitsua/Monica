@@ -66,7 +66,7 @@ public sealed class McpFacadeTests
 
         var deleted = await scope.Resolve<McpFacade>().DeleteExternalProfileAsync(profile.Name, ct);
 
-        deleted.Status.Should().Be(ResStatus.Ok);
+        deleted.Status.Should().Be(ResultStatus.Ok);
         deleted.Message.Should().BeNull();
         deleted.Data.Should().NotBeNull();
         deleted.Data!.McpEntries.Should().NotContain(entry => entry.Name == profile.Name);
@@ -78,7 +78,7 @@ public sealed class McpFacadeTests
         // A fresh scope still uses the host-owned catalog; no explicit refresh repairs the cache.
         await using var subsequentScope = application.CreateScope(ct);
         var subsequent = await subsequentScope.Resolve<AgentCapabilityFacade>().GetManagementInfoAsync(ct);
-        subsequent.Status.Should().Be(ResStatus.Ok);
+        subsequent.Status.Should().Be(ResultStatus.Ok);
         subsequent.Message.Should().BeNull();
         subsequent.Data.Should().NotBeNull();
         subsequent.Data!.McpEntries.Should().NotContain(entry => entry.Name == profile.Name);

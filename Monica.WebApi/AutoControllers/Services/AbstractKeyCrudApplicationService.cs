@@ -178,17 +178,20 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <param name="input">The input parameters for the list operation</param>
     /// <returns>A paged response containing the mapped entity DTOs</returns>
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public virtual async Task<ResPaged<dynamic>> GetListAsync(TGetListInput input)
+    public virtual async Task<Monica.Core.Results.PagedResult<dynamic>> GetListAsync(TGetListInput input)
     {
         var result = await InnerGetListAsync(input);
-        if (result.TotalCounts == 0) return new ResPaged<dynamic>(0, []);
+        if (result.TotalCounts == 0) return Monica.Core.Results.PagedResult.Success<dynamic>(0, []);
 
         if (result.Results is not List<TGetListOutputDto> dtos)
-            return new ResPaged<dynamic>(result.TotalCounts, result.Results, result.CurrentPage,
+            return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, result.Results, result.CurrentPage,
                 result.PageSize, result.Cursor);
         
-        if ((await ApplyCustomActionToResponseListAsync(input, dtos)).IsFailed(out var error, out var data)) return error;
-        return new ResPaged<dynamic>(result.TotalCounts, (IReadOnlyList<dynamic>) data, result.CurrentPage,
+        var customResult = await ApplyCustomActionToResponseListAsync(input, dtos);
+        if (customResult.IsFailure()) return Monica.Core.Results.PagedResult.FromFailure<dynamic>(customResult);
+        var data = customResult.Data
+            ?? throw new InvalidOperationException("The custom response list action returned no data.");
+        return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, (IReadOnlyList<dynamic>) data, result.CurrentPage,
             result.PageSize, result.Cursor);
     }
 
@@ -587,11 +590,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// </summary>
     /// <param name="input">The input used for the list query.</param>
     /// <param name="dtos">The entity DTOs to process.</param>
-    /// <returns>The processed DTO list wrapped in a <see cref="Res{T}"/> result.</returns>
-    protected virtual async Task<Res<List<TGetListOutputDto>>> ApplyCustomActionToResponseListAsync(TGetListInput input,
+    /// <returns>The processed DTO list wrapped in a <see cref="Result{T}"/> result.</returns>
+    protected virtual async Task<Result<List<TGetListOutputDto>>> ApplyCustomActionToResponseListAsync(TGetListInput input,
         List<TGetListOutputDto> dtos)
     {
-        return dtos;
+        return Result.Success(dtos);
     }
     /// <summary>
     /// Applies custom filter conditions.

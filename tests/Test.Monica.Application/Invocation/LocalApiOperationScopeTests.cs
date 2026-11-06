@@ -40,7 +40,7 @@ public sealed class LocalApiOperationScopeTests
             var context = app.Services.GetRequiredService<ExecutionScopeContext>();
             var parent = context.Services;
             var first = await commands.TransactionChild(new(), ct);
-            Assert.Equal(ResStatus.Ok, first.Status);
+            Assert.Equal(ResultStatus.Ok, first.Status);
             Assert.Equal("job-caller", first.Data!.User);
             Assert.Equal(first.Data.ScopeId, first.Data.GrandchildScopeId);
             Assert.NotEqual(callerScope.Id, first.Data.ScopeId);
@@ -49,7 +49,7 @@ public sealed class LocalApiOperationScopeTests
             Assert.Null(manager.Current);
 
             var second = await commands.TransactionChild(new(Fail: failSecond), ct);
-            Assert.Equal(failSecond ? ResStatus.BadRequest : ResStatus.Ok, second.Status);
+            Assert.Equal(failSecond ? ResultStatus.BadRequest : ResultStatus.Ok, second.Status);
             Assert.Equal(2, ledger.ChildExecutions.Count);
             Assert.NotEqual(ledger.ChildExecutions[0].Scope.Id, ledger.ChildExecutions[1].Scope.Id);
             Assert.All(ledger.ChildExecutions, execution =>
@@ -79,12 +79,12 @@ public sealed class LocalApiOperationScopeTests
         {
             var first = await queries.TransactionScope(new(), ct);
             var second = await queries.TransactionScope(new(), ct);
-            Assert.Equal(ResStatus.Ok, first.Status);
-            Assert.Equal(ResStatus.Ok, second.Status);
+            Assert.Equal(ResultStatus.Ok, first.Status);
+            Assert.Equal(ResultStatus.Ok, second.Status);
             Assert.NotEqual(first.Data, second.Data);
             Assert.NotEqual(caller.Resolve<TransactionScope>().Id, first.Data);
             var read = await queries.ReadTransaction(new(), ct);
-            Assert.Equal(ResStatus.Ok, read.Status);
+            Assert.Equal(ResultStatus.Ok, read.Status);
             Assert.False(read.Data!.HasTransaction);
             Assert.Null(caller.Resolve<IUnitOfWorkManager>().Current);
         });
@@ -107,7 +107,7 @@ public sealed class LocalApiOperationScopeTests
             Assert.Equal("Query execution failed.", exception.Message);
             Assert.Same(parent, context.Services);
             var next = await caller.Resolve<ITestingCommandApi>().TransactionChild(new(), ct);
-            Assert.Equal(ResStatus.Ok, next.Status);
+            Assert.Equal(ResultStatus.Ok, next.Status);
         });
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Single(await db.Entries.ToListAsync(ct)), token);
     }
@@ -131,7 +131,7 @@ public sealed class LocalApiOperationScopeTests
             Assert.Same(parent, context.Services);
             Assert.Null(caller.Resolve<IExecutionTransaction>().FirstFailure);
             var next = await caller.Resolve<ITestingCommandApi>().TransactionChild(new(), ct);
-            Assert.Equal(ResStatus.Ok, next.Status);
+            Assert.Equal(ResultStatus.Ok, next.Status);
         });
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Single(await db.Entries.ToListAsync(ct)), token);
     }
@@ -152,14 +152,14 @@ public sealed class LocalApiOperationScopeTests
             Assert.True(boundary.IsOperationActive);
             Assert.False(boundary.IsActive);
             var child = await caller.Resolve<ITestingCommandApi>().TransactionChild(new(), token);
-            Assert.Equal(ResStatus.Ok, child.Status);
+            Assert.Equal(ResultStatus.Ok, child.Status);
             Assert.Equal(caller.Resolve<TransactionScope>().Id, child.Data!.ScopeId);
             Assert.Equal(child.Data.ScopeId, child.Data.GrandchildScopeId);
             Assert.True(boundary.IsActive);
             Assert.False(Assert.Single(app.Services.GetRequiredService<TransactionLedger>().ChildExecutions).Scope.IsDisposed);
-            return failParent ? Res.Fail("Parent rejected after enlistment.") : Res.Ok();
+            return failParent ? Result.Failure("Parent rejected after enlistment.") : Result.Success();
         }, new UnitOfWorkScopeOptions([]), token);
-        Assert.Equal(failParent ? ResStatus.BadRequest : ResStatus.Ok, result.Status);
+        Assert.Equal(failParent ? ResultStatus.BadRequest : ResultStatus.Ok, result.Status);
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) =>
             Assert.Equal(failParent ? 0 : 1, await db.Entries.CountAsync(ct)), token);
     }

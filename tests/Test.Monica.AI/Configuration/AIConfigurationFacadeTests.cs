@@ -26,7 +26,7 @@ public sealed class AIConfigurationFacadeTests
         var result = await facade.UpsertProviderAsync(Provider("one") with { OpenAIProtocolProfile = OpenAIProtocolProfile.DeepSeek },
             "test-super-secret", false, 0, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         result.Data!.Revision.Should().Be(1);
@@ -52,7 +52,7 @@ public sealed class AIConfigurationFacadeTests
 
         var result = await facade.UpsertProviderAsync(Provider("stale"), "key", false, 0, TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().Contain("Reload settings");
         result.Data.Should().BeNull();
         workspace.Store.Read().Providers.Single().Configuration.ProviderId.Should().Be("winner");
@@ -74,7 +74,7 @@ public sealed class AIConfigurationFacadeTests
 
         var result = await facade.ResetProviderAsync("code", 1, TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         var provider = result.Data!.Providers.Single();
         provider.IsCodeDefined.Should().BeTrue();
@@ -152,7 +152,7 @@ public sealed class AIConfigurationFacadeTests
             BaseUrl = "https://user:embedded-secret@example.test/v1"
         }, "key", false, 0, TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().NotContain("embedded-secret");
         workspace.Store.Read().Revision.Should().Be(0);
     }
@@ -194,7 +194,7 @@ public sealed class AIConfigurationFacadeTests
 
         var result = await facade.DiscoverModelsAsync("provider", TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         var configured = result.Data!.Single(static model => model.ModelName == "custom-model");
         configured.SupportsImage.Should().BeFalse();
@@ -225,7 +225,7 @@ public sealed class AIConfigurationFacadeTests
 
         var result = await facade.UpsertProviderAsync(provider, "key", false, 0, TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().Contain("no standard thinking-token budget");
         result.Data.Should().BeNull();
         workspace.Store.Read().Revision.Should().Be(0);

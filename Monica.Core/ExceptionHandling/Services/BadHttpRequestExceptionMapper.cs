@@ -14,7 +14,7 @@ internal sealed class BadHttpRequestExceptionMapper(IRequestRejectionFactory rej
         HttpContext? httpContext,
         Exception exception,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out Res? response)
+        [NotNullWhen(true)] out Result? response)
     {
         if (exception is not BadHttpRequestException badRequestException)
         {

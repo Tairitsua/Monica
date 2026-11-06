@@ -6,7 +6,7 @@ Use `AddDiffHighlight()` when only the facade/service or module-governed endpoin
 
 ## Compare through the real service contract
 
-`DiffHighlightFacade.HighlightAsync(original, updated, options)` returns a `Res<DiffHighlightResult>`. Check failure before reading its data. A successful result contains the full line models, side-specific numbers and character ranges, logical statistics, serialized output, options and processing duration. Statistics describe the complete comparison, including when a reader shows only one side.
+`DiffHighlightFacade.HighlightAsync(original, updated, options)` returns a `Result<DiffHighlightResult>`. Check failure before reading its data. A successful result contains the full line models, side-specific numbers and character ranges, logical statistics, serialized output, options and processing duration. Statistics describe the complete comparison, including when a reader shows only one side.
 
 | Setting | Built-in behavior |
 | --- | --- |

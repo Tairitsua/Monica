@@ -119,7 +119,8 @@
                 token.ThrowIfCancellationRequested();
                 var deletion = await Facade.DeleteUnifiedVersionAsync(accepted);
                 if (_lifetime.IsRetired) return;
-                if (deletion.IsFailed(out var error))
+                var error = deletion;
+                if (deletion.IsFailure())
                 {
                     Snackbar.Add(L["Versions:Delete:Messages:Failed", label, error.Message ?? string.Empty], Severity.Error);
                     return;

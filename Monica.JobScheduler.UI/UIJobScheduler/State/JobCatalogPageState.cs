@@ -343,10 +343,10 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         Definitions = Definitions.Select(definition => definition.Id == jobId ? definition with { Policy = policy } : definition).ToArray();
     }
 
-    internal Task<Res<JobPolicy>> SetDisabledAsync(JobOperationalSummary summary, bool disabled) =>
+    internal Task<Result<JobPolicy>> SetDisabledAsync(JobOperationalSummary summary, bool disabled) =>
         _lifetime.RunAsync(token => SetDisabledCoreAsync(summary, disabled, token));
 
-    private async Task<Res<JobPolicy>> SetDisabledCoreAsync(
+    private async Task<Result<JobPolicy>> SetDisabledCoreAsync(
         JobOperationalSummary summary, bool disabled, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -357,9 +357,9 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+                return Result.Failure<JobPolicy>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
             if (disabled && JobSchedulerUiPresentation.IsManualOnlySuppressed(summary))
-                return Res.Fail(_localizer["Catalog:Messages:PauseUnavailableManual"]);
+                return Result.Failure<JobPolicy>(_localizer["Catalog:Messages:PauseUnavailableManual"]);
 
             var definition = summary.Definition;
             var result = await _facade.UpdatePolicyAsync(
@@ -371,8 +371,11 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                     ExpectedConcurrencyStamp = definition.Policy.ConcurrencyStamp
                 }, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var policy))
+            if (result.IsSuccess())
+            {
+                var policy = result.Data ?? throw new InvalidOperationException("The policy update returned no data.");
                 _lifetime.TryApply(() => ApplyPolicy(definition.Id, policy));
+            }
             return result;
         }
         finally
@@ -385,10 +388,10 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
     }
 
-    internal Task<Res<JobExecutionInstance>> RunRecurringNowAsync(JobOperationalSummary summary) =>
+    internal Task<Result<JobExecutionInstance>> RunRecurringNowAsync(JobOperationalSummary summary) =>
         _lifetime.RunAsync(token => RunRecurringNowCoreAsync(summary, token));
 
-    private async Task<Res<JobExecutionInstance>> RunRecurringNowCoreAsync(
+    private async Task<Result<JobExecutionInstance>> RunRecurringNowCoreAsync(
         JobOperationalSummary summary, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -399,7 +402,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+                return Result.Failure<JobExecutionInstance>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
             var definition = summary.Definition;
             var result = await _facade.RunRecurringNowAsync(new JobRecurringRunNowRequest
             {
@@ -419,12 +422,12 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
     }
 
-    internal Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(bool disabled) =>
+    internal Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(bool disabled) =>
         SetSelectedDisabledAsync(disabled, SelectedRecurringSummaries);
 
     /// <summary>Mutates only the exact identities and policy revisions accepted by the confirmation dialog.</summary>
     /// <remarks>Selection changes after confirmation or during authorization cannot retarget the admitted batch.</remarks>
-    internal Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(
+    internal Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(
         bool disabled, IReadOnlyList<JobOperationalSummary> confirmedSelection)
     {
         ArgumentNullException.ThrowIfNull(confirmedSelection);
@@ -432,7 +435,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         return _lifetime.RunAsync(token => SetSelectedDisabledCoreAsync(disabled, selected, token));
     }
 
-    private async Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledCoreAsync(
+    private async Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledCoreAsync(
         bool disabled, IReadOnlyList<JobOperationalSummary> selected, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -443,12 +446,12 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
-            if (selected.Count == 0) return _localizer["Catalog:Batch:Empty"].Value;
+                return Result.Failure<JobPolicyBatchUpdateResult>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+            if (selected.Count == 0) return Result.Failure<JobPolicyBatchUpdateResult>(_localizer["Catalog:Batch:Empty"].Value);
             if (selected.Any(static summary => summary.Definition.Declaration.JobType != JobType.Recurring))
                 throw new ArgumentException("A catalog policy batch accepts only confirmed recurring definitions.", nameof(selected));
             if (disabled && selected.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed))
-                return _localizer["Catalog:Batch:PauseUnavailableManual"].Value;
+                return Result.Failure<JobPolicyBatchUpdateResult>(_localizer["Catalog:Batch:PauseUnavailableManual"].Value);
 
             var result = await _facade.UpdatePoliciesAsync(new JobPolicyBatchUpdateRequest
             {
@@ -461,8 +464,9 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                 }).ToArray()
             }, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var batch))
+            if (result.IsSuccess())
             {
+                var batch = result.Data ?? throw new InvalidOperationException("The policy batch update returned no data.");
                 _lifetime.TryApply(() =>
                 {
                     foreach (var item in batch.Items.Where(static item => item.IsSucceeded))
@@ -561,9 +565,11 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     {
         var result = await _facade.GetOverviewAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error, out var overview))
+        var error = result.WithoutData();
+        var overview = result.Data;
+        if (result.IsFailure() || overview is null)
         {
-            _lifetime.TryApply(() => FacetsError = error.Message);
+            _lifetime.TryApply(() => FacetsError = error.Message ?? "The scheduler overview was unavailable.");
             return;
         }
 
@@ -572,7 +578,9 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         for (var pageNumber = 1; pageNumber <= 10; pageNumber++)
         {
             var response = await _facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = pageNumber, PageSize = 200 }, cancellationToken);
-            if (response.IsFailed(out var catalogError, out var page)) { _lifetime.TryApply(() => FacetsError = catalogError.Message); return; }
+            var catalogError = response.WithoutData();
+            var page = response.Data;
+            if (response.IsFailure() || page is null) { _lifetime.TryApply(() => FacetsError = catalogError.Message ?? "The job catalog was unavailable."); return; }
             catalog.AddRange(page.Items); total = page.TotalCount;
             if (catalog.Count >= total || page.Items.Count == 0) break;
         }

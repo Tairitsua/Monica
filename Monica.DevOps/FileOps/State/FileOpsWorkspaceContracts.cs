@@ -17,10 +17,10 @@ public enum FileOpsSortField { Name, Type, Size, Modified }
 public enum FileOpsDiscardReason { Navigate, OpenFile, Reload, CloseInspector, UploadReplacement, PolicyReplacement, Leave }
 
 /// <summary>Detached outcome of an actual facade operation; a refresh cannot replace a command outcome.</summary>
-public sealed record FileOpsOutcome(FileOpsOperationKind Kind, bool Succeeded, ResStatus Status, string? Message)
+public sealed record FileOpsOutcome(FileOpsOperationKind Kind, bool Succeeded, ResultStatus Status, string? Message)
 {
     internal static FileOpsOutcome From(FileOpsOperationKind kind, IResultEnvelope result, bool hasData = true) =>
-        new(kind, result.IsOk() && hasData, result.Status, result.Message);
+        new(kind, result.IsSuccess() && hasData, result.Status, result.Message);
 }
 
 /// <summary>Immutable identity of the dirty draft presented to a native discard confirmation.</summary>

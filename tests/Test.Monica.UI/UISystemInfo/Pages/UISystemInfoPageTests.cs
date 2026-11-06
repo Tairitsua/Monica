@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.Results;
 using Monica.Modules;
 using Monica.UI.Pages;
+using Monica.UI.UISystemInfo.Models;
 using Monica.UI.UISystemInfo.State;
 using MudBlazor;
 using Xunit;
@@ -20,7 +21,7 @@ public sealed class UISystemInfoPageTests
     {
         var snapshot = SystemInfoTestData.Snapshot();
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
-            () => Res.Ok(snapshot)));
+            () => Result.Success(snapshot)));
         var options = Options.Create(new ModuleSystemInfoUIOption
         {
             CustomLinks =
@@ -50,8 +51,8 @@ public sealed class UISystemInfoPageTests
         var callCount = 0;
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
             () => ++callCount == 1
-                ? Res.Fail("initial capture failed")
-                : Res.Ok(SystemInfoTestData.Snapshot())));
+                ? Result.Failure<SystemInfoSnapshot>("initial capture failed")
+                : Result.Success(SystemInfoTestData.Snapshot())));
         await using var context = CreateContext(factory, new ModuleSystemInfoUIOption());
 
         var cut = context.Render<UISystemInfoPage>();
@@ -75,7 +76,7 @@ public sealed class UISystemInfoPageTests
         var snapshot = SystemInfoTestData.Snapshot();
         var callCount = 0;
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
-            () => ++callCount == 1 ? Res.Ok(snapshot) : Res.Fail("refresh failed")));
+            () => ++callCount == 1 ? Result.Success(snapshot) : Result.Failure<SystemInfoSnapshot>("refresh failed")));
         await using var context = CreateContext(factory, new ModuleSystemInfoUIOption());
 
         var cut = context.Render<UISystemInfoPage>();
@@ -94,7 +95,7 @@ public sealed class UISystemInfoPageTests
     public async Task Render_WhenEveryConfiguredLinkIsDisabled_ShouldOmitTheLinkPanel()
     {
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
-            () => Res.Ok(SystemInfoTestData.Snapshot())));
+            () => Result.Success(SystemInfoTestData.Snapshot())));
         var options = new ModuleSystemInfoUIOption
         {
             CustomLinks =
@@ -119,7 +120,7 @@ public sealed class UISystemInfoPageTests
             SystemInfoTestData.Calls(() =>
             {
                 captureCount++;
-                return Res.Ok(snapshot);
+                return Result.Success(snapshot);
             }),
             clockInterval: TimeSpan.FromDays(1));
         await using var context = CreateContext(factory, new ModuleSystemInfoUIOption());
@@ -166,11 +167,11 @@ public sealed class UISystemInfoPageTests
     {
         var restartCount = 0;
         var factory = new SystemInfoPageSessionFactory(SystemInfoTestData.Calls(
-            () => Res.Ok(SystemInfoTestData.Snapshot()),
+            () => Result.Success(SystemInfoTestData.Snapshot()),
             () =>
             {
                 restartCount++;
-                return Res.Ok();
+                return Result.Success();
             }));
         await using var context = CreateContext(factory, new ModuleSystemInfoUIOption
         {

@@ -158,10 +158,10 @@ public sealed class EventBusTestService(
         }
     }
 
-    internal Task<Res<IEventSubscription>> SubscribeForLeaseAsync(EventBusStandaloneListenerLease lease, string topicName) =>
+    internal Task<Result<IEventSubscription>> SubscribeForLeaseAsync(EventBusStandaloneListenerLease lease, string topicName) =>
         SubscribeToTestTopicCoreAsync(topicName, lease);
 
-    internal Task<Res> UnsubscribeForLeaseAsync(EventBusStandaloneListenerLease lease) =>
+    internal Task<Result> UnsubscribeForLeaseAsync(EventBusStandaloneListenerLease lease) =>
         UnsubscribeFromTestTopicCoreAsync(lease);
 
     /// <summary>
@@ -169,14 +169,14 @@ public sealed class EventBusTestService(
     /// </summary>
     /// <param name="subscriptionId">Selected subscription id.</param>
     /// <returns>A formatted JSON sample or an error result.</returns>
-    public Res<string> CreateRuntimeJsonSample(EventSubscriptionId subscriptionId)
+    public Result<string> CreateRuntimeJsonSample(EventSubscriptionId subscriptionId)
     {
         try
         {
             var subscription = GetSourceSubscription(subscriptionId);
             if (subscription is null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure<string>(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             var sample = CreateSampleValue(subscription.EventType, [], depth: 0);
@@ -184,12 +184,12 @@ public sealed class EventBusTestService(
                 sample,
                 jsonSerializerOptionsProvider.SerializerOptions.Copy(o => o.WriteIndented = true));
 
-            return Res.Ok<string>(json ?? "{}");
+            return Result.Success<string>(json ?? "{}");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create EventBus test JSON sample for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:CreateJsonSampleFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<string>(localizer["Services:Test:CreateJsonSampleFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -199,28 +199,28 @@ public sealed class EventBusTestService(
     /// <param name="subscriptionId">Selected subscription id.</param>
     /// <param name="json">JSON payload to validate.</param>
     /// <returns>A success result when deserialization succeeds.</returns>
-    public Res ValidateRuntimePayload(EventSubscriptionId subscriptionId, string json)
+    public Result ValidateRuntimePayload(EventSubscriptionId subscriptionId, string json)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(json))
             {
-                return Res.Fail(localizer["Services:Common:JsonContentRequired"]);
+                return Result.Failure(localizer["Services:Common:JsonContentRequired"]);
             }
 
             var subscription = GetSourceSubscription(subscriptionId);
             if (subscription is null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             _ = DeserializePayload(subscription.EventType, json);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "EventBus test JSON validation failed for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:JsonValidationFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:JsonValidationFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -236,7 +236,7 @@ public sealed class EventBusTestService(
     /// Success after local handlers complete or the distributed transport accepts the message; distributed
     /// success does not acknowledge consumer completion. Preparation and delivery failures return an error result.
     /// </returns>
-    public async Task<Res> PublishRuntimePayloadAsync(
+    public async Task<Result> PublishRuntimePayloadAsync(
         EventSubscriptionId subscriptionId,
         string json,
         CancellationToken cancellationToken = default)
@@ -245,19 +245,19 @@ public sealed class EventBusTestService(
         {
             if (string.IsNullOrWhiteSpace(json))
             {
-                return Res.Fail(localizer["Services:Common:JsonContentRequired"]);
+                return Result.Failure(localizer["Services:Common:JsonContentRequired"]);
             }
 
             var subscription = GetSourceSubscription(subscriptionId);
             if (subscription is null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             var eventBusResult = GetEventBus(subscription);
-            if (eventBusResult.IsFailed(out var providerError, out _))
+            if (eventBusResult.IsFailure())
             {
-                return providerError;
+                return Result.FromFailure(eventBusResult);
             }
 
             var payload = DeserializePayload(subscription.EventType, json);
@@ -286,12 +286,12 @@ public sealed class EventBusTestService(
                 subscription.Scope,
                 subscription.ServiceKey ?? "default");
 
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to publish EventBus UI runtime test payload for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:PublishRuntimePayloadFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:PublishRuntimePayloadFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -300,24 +300,24 @@ public sealed class EventBusTestService(
     /// <param name="json">Payload deserialized using the target's event contract and host serializer.</param>
     /// <returns>The prepared message, or a validation failure. No transport or handler is invoked.</returns>
     /// <remarks>Retain this exact message, including its body, only when an intentional replay is requested.</remarks>
-    public Res<EventMessage> PrepareLocalTestMessage(EventSubscriptionId subscriptionId, string json)
+    public Result<EventMessage> PrepareLocalTestMessage(EventSubscriptionId subscriptionId, string json)
     {
         try
         {
             var subscription = GetSourceSubscription(subscriptionId);
             if (!CanDeliverLocally(subscription))
-                return Res.Fail(localizer["Services:Test:LocalTargetUnavailable"]);
+                return Result.Failure<EventMessage>(localizer["Services:Test:LocalTargetUnavailable"]);
             if (string.IsNullOrWhiteSpace(json))
-                return Res.Fail(localizer["Services:Common:JsonContentRequired"]);
+                return Result.Failure<EventMessage>(localizer["Services:Common:JsonContentRequired"]);
 
             var payload = DeserializePayload(subscription!.EventType, json);
-            return Res.Ok(serviceProvider.GetRequiredService<IEventMessageFactory>().Prepare(
+            return Result.Success(serviceProvider.GetRequiredService<IEventMessageFactory>().Prepare(
                 subscription.EventType, payload, subscription.Scope, subscription.TopicName, subscription.ServiceKey));
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to prepare local EventBus test message for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:JsonValidationFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<EventMessage>(localizer["Services:Test:JsonValidationFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -327,24 +327,24 @@ public sealed class EventBusTestService(
     /// <param name="cancellationToken">Cancels this delivery; it does not activate or stop a subscription.</param>
     /// <returns>Success after the handler pipeline completes, or a preparation/delivery failure.</returns>
     /// <remarks>Invokes real handlers, transactions and Inbox behavior. Never publishes to a broker or enables automatic receipt.</remarks>
-    public async Task<Res> DeliverLocalTestMessageAsync(
+    public async Task<Result> DeliverLocalTestMessageAsync(
         EventSubscriptionId subscriptionId, EventMessage message, CancellationToken cancellationToken = default)
     {
         try
         {
             ArgumentNullException.ThrowIfNull(message);
             if (!CanDeliverLocally(GetSourceSubscription(subscriptionId)))
-                return Res.Fail(localizer["Services:Test:LocalTargetUnavailable"]);
+                return Result.Failure(localizer["Services:Test:LocalTargetUnavailable"]);
 
             await using var scope = serviceScopeFactory.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<IEventReceiveDispatcher>()
                 .DispatchTestAsync(message, [subscriptionId], cancellationToken);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to deliver local EventBus test message for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:LocalDeliveryFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:LocalDeliveryFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -362,7 +362,7 @@ public sealed class EventBusTestService(
     /// and bus scope. Closing a dialog does not stop it. Starts serialize with stops and scope cleanup, preventing
     /// duplicate registry handles. This operation has no cancellation argument; components must drain admitted work.
     /// </remarks>
-    public async Task<Res<RuntimeTestListenerSnapshot>> StartRuntimeListenerAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result<RuntimeTestListenerSnapshot>> StartRuntimeListenerAsync(EventSubscriptionId subscriptionId)
     {
         await _runtimeListenerGate.WaitAsync();
         try
@@ -371,16 +371,16 @@ public sealed class EventBusTestService(
             var subscription = GetSourceSubscription(subscriptionId);
             if (subscription is null)
             {
-                return Res.Fail(localizer["Services:Common:SubscriptionNotFound"]);
+                return Result.Failure<RuntimeTestListenerSnapshot>(localizer["Services:Common:SubscriptionNotFound"]);
             }
 
             if (_runtimeListeners.TryGetValue(subscriptionId, out var existingState))
             {
-                return existingState.CreateSnapshot();
+                return Result.Success(existingState.CreateSnapshot());
             }
 
             if (subscription.Activation != ActivationMode.Automatic)
-                return Res.Fail(localizer["Services:Monitor:ActivationHeld"]);
+                return Result.Failure<RuntimeTestListenerSnapshot>(localizer["Services:Monitor:ActivationHeld"]);
 
             var state = new RuntimeListenerState(
                 subscriptionId,
@@ -415,12 +415,12 @@ public sealed class EventBusTestService(
                 listenerSubscription.Id,
                 subscriptionId);
 
-            return state.CreateSnapshot();
+            return Result.Success(state.CreateSnapshot());
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to start EventBus UI runtime listener for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:StartRuntimeListenerFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<RuntimeTestListenerSnapshot>(localizer["Services:Test:StartRuntimeListenerFailed", ex.GetMessageRecursively()]);
         }
         finally
         {
@@ -438,7 +438,7 @@ public sealed class EventBusTestService(
     /// messages, and a later stop or repeated scope disposal may retry it. This operation remains available after
     /// scope retirement for exact-handle cleanup and has no cancellation argument; callers must drain admitted work.
     /// </remarks>
-    public async Task<Res> StopRuntimeListenerAsync(EventSubscriptionId subscriptionId)
+    public async Task<Result> StopRuntimeListenerAsync(EventSubscriptionId subscriptionId)
     {
         await _runtimeListenerGate.WaitAsync();
         try
@@ -451,13 +451,13 @@ public sealed class EventBusTestService(
         }
     }
 
-    private async Task<Res> StopRuntimeListenerCoreAsync(EventSubscriptionId subscriptionId)
+    private async Task<Result> StopRuntimeListenerCoreAsync(EventSubscriptionId subscriptionId)
     {
         try
         {
             if (!_runtimeListeners.TryGetValue(subscriptionId, out var state))
             {
-                return Res.Ok();
+                return Result.Success();
             }
 
             if (state.ListenerSubscription is not null)
@@ -469,12 +469,12 @@ public sealed class EventBusTestService(
             state.Clear();
 
             logger.LogInformation("Stopped EventBus UI runtime listener for source subscription {SubscriptionId}", subscriptionId);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to stop EventBus UI runtime listener for {SubscriptionId}", subscriptionId);
-            return Res.Fail(localizer["Services:Test:StopRuntimeListenerFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:StopRuntimeListenerFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -516,18 +516,18 @@ public sealed class EventBusTestService(
     /// <summary>
     /// Publish standalone test-panel message.
     /// </summary>
-    public async Task<Res> PublishTestMessageAsync(string message, string? topicName, CancellationToken cancellationToken = default)
+    public async Task<Result> PublishTestMessageAsync(string message, string? topicName, CancellationToken cancellationToken = default)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(message))
             {
-                return Res.Fail(localizer["Services:Common:MessageContentRequired"]);
+                return Result.Failure(localizer["Services:Common:MessageContentRequired"]);
             }
 
             if (string.IsNullOrWhiteSpace(topicName))
             {
-                return Res.Fail(localizer["Services:Common:TopicNameRequired"]);
+                return Result.Failure(localizer["Services:Common:TopicNameRequired"]);
             }
 
             var testMessage = new TestEventMessage
@@ -541,12 +541,12 @@ public sealed class EventBusTestService(
 
             logger.LogInformation("已发布测试消息到主题 {TopicName}: {MessageId}", topicName, testMessage.MessageId);
 
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "发布测试消息失败");
-            return Res.Fail(localizer["Services:Test:PublishMessageFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:PublishMessageFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -559,10 +559,10 @@ public sealed class EventBusTestService(
     /// Standalone start and stop operations serialize. The scoped service owns the resulting handle until successful
     /// registry removal. This API does not accept cancellation; a retiring component must await its admitted operation.
     /// </remarks>
-    public Task<Res<IEventSubscription>> SubscribeToTestTopicAsync(string topicName) =>
+    public Task<Result<IEventSubscription>> SubscribeToTestTopicAsync(string topicName) =>
         SubscribeToTestTopicCoreAsync(topicName, null);
 
-    private async Task<Res<IEventSubscription>> SubscribeToTestTopicCoreAsync(
+    private async Task<Result<IEventSubscription>> SubscribeToTestTopicCoreAsync(
         string topicName, EventBusStandaloneListenerLease? lease)
     {
         await _legacySubscriptionGate.WaitAsync();
@@ -570,7 +570,7 @@ public sealed class EventBusTestService(
         {
             if (string.IsNullOrWhiteSpace(topicName))
             {
-                return Res.Fail(localizer["Services:Common:TopicNameRequired"]);
+                return Result.Failure<IEventSubscription>(localizer["Services:Common:TopicNameRequired"]);
             }
 
             lock (_legacySubscriptionLock)
@@ -579,7 +579,7 @@ public sealed class EventBusTestService(
                 EnsureStandaloneOwner(lease);
                 if (_activeSubscription != null)
                 {
-                    return Res.Fail(localizer["Services:Test:ActiveSubscriptionExists"]);
+                    return Result.Failure<IEventSubscription>(localizer["Services:Test:ActiveSubscriptionExists"]);
                 }
             }
 
@@ -613,12 +613,12 @@ public sealed class EventBusTestService(
             }
 
             logger.LogInformation("已订阅测试主题: {TopicName}", topicName);
-            return Res.Ok(subscription);
+            return Result.Success(subscription);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "订阅测试主题失败");
-            return Res.Fail(localizer["Services:Test:SubscribeFailed", ex.GetMessageRecursively()]);
+            return Result.Failure<IEventSubscription>(localizer["Services:Test:SubscribeFailed", ex.GetMessageRecursively()]);
         }
         finally
         {
@@ -634,9 +634,9 @@ public sealed class EventBusTestService(
     /// Start and stop operations serialize. A failed removal retains the handle and topic, preventing a replacement
     /// start from silently abandoning it. Call this method again to retry. The operation has no cancellation parameter.
     /// </remarks>
-    public Task<Res> UnsubscribeFromTestTopicAsync() => UnsubscribeFromTestTopicCoreAsync(null);
+    public Task<Result> UnsubscribeFromTestTopicAsync() => UnsubscribeFromTestTopicCoreAsync(null);
 
-    private async Task<Res> UnsubscribeFromTestTopicCoreAsync(
+    private async Task<Result> UnsubscribeFromTestTopicCoreAsync(
         EventBusStandaloneListenerLease? lease, bool forceScopeCleanup = false)
     {
         await _legacySubscriptionGate.WaitAsync();
@@ -662,12 +662,12 @@ public sealed class EventBusTestService(
                 logger.LogInformation("已取消订阅测试主题");
             }
 
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "取消订阅失败");
-            return Res.Fail(localizer["Services:Test:UnsubscribeFailed", ex.GetMessageRecursively()]);
+            return Result.Failure(localizer["Services:Test:UnsubscribeFailed", ex.GetMessageRecursively()]);
         }
         finally
         {
@@ -752,24 +752,28 @@ public sealed class EventBusTestService(
             : null;
     }
 
-    private Res<IEventBus> GetEventBus(IEventSubscription subscription)
+    private Result<IEventBus> GetEventBus(IEventSubscription subscription)
     {
         if (subscription.Scope == EventSubscriptionScope.Local)
         {
-            if (providerDiscoveryService.GetLocalProvider(subscription.ServiceKey).IsFailed(out var error, out var localProvider))
+            var localResult = providerDiscoveryService.GetLocalProvider(subscription.ServiceKey);
+            if (localResult.IsFailure())
             {
-                return error;
+                return Result.FromFailure<IEventBus>(localResult);
             }
 
-            return Res.Ok<IEventBus>(localProvider);
+            return Result.Success<IEventBus>(localResult.Data
+                ?? throw new InvalidOperationException("The local event bus provider was missing from a successful result."));
         }
 
-        if (providerDiscoveryService.GetDistributedProvider(subscription.ServiceKey).IsFailed(out var distributedError, out var distributedProvider))
+        var distributedResult = providerDiscoveryService.GetDistributedProvider(subscription.ServiceKey);
+        if (distributedResult.IsFailure())
         {
-            return distributedError;
+            return Result.FromFailure<IEventBus>(distributedResult);
         }
 
-        return Res.Ok<IEventBus>(distributedProvider);
+        return Result.Success<IEventBus>(distributedResult.Data
+            ?? throw new InvalidOperationException("The distributed event bus provider was missing from a successful result."));
     }
 
     private object DeserializePayload(Type eventType, string json)

@@ -96,13 +96,15 @@ Add the companion UI with `monica.AddDataChannelUI()` alongside the configured `
 
 ```csharp
 var result = await facade.GetManagementSnapshotAsync(cancellationToken);
-if (result.IsFailed(out var error, out var capture))
+if (result.IsFailure())
 {
     // Preserve the previous capture and present the refresh failure.
     return;
 }
 
-var channelEvidence = capture!.Channels.Single(channel => channel.Id == "orders");
+var capture = result.Data
+    ?? throw new InvalidOperationException("A successful management read must include a capture.");
+var channelEvidence = capture.Channels.Single(channel => channel.Id == "orders");
 var exceptionEvidence = capture.ExceptionSummary.ChannelSummaries.Single(channel => channel.ChannelId == "orders");
 ```
 

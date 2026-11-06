@@ -211,7 +211,8 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
         var disabled = !operatorPaused;
         var result = await state.SetDisabledAsync(disabled);
         if (_disposed || !ReferenceEquals(PageState, state)) return;
-        if (result.IsFailed(out var error))
+        var error = result;
+        if (result.IsFailure())
         {
             Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
             return;
@@ -226,7 +227,9 @@ public partial class JobDefinitionDetailPage : IAsyncDisposable
         if (state.Summary is not { Definition.IsPresent: true }) return;
         var result = await state.RunRecurringNowAsync();
         if (_disposed || !ReferenceEquals(PageState, state)) return;
-        if (result.IsFailed(out var error, out var execution))
+        var error = result.WithoutData();
+        var execution = result.Data;
+        if (result.IsFailure() || execution is null)
         {
             Snackbar.Add(error.Message ?? L["Catalog:Messages:RunFailed"], Severity.Error);
             return;

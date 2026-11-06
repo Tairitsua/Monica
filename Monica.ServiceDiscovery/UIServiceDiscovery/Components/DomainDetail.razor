@@ -190,13 +190,16 @@
         try
         {
             var domainsResult = await ServiceDiscoveryFacade.GetDomainsAsync();
-            if (!domainsResult.IsFailed(out _, out var domains))
+            var domains = domainsResult.Data;
+            if (!domainsResult.IsFailure())
             {
                 DomainColorResolver.AssignColors(domains ?? []);
             }
 
             var result = await ServiceDiscoveryFacade.GetDomainDetailAsync(DomainName);
-            if (result.IsFailed(out var error, out var domainDetail))
+            var error = result.WithoutData();
+            var domainDetail = result.Data;
+            if (result.IsFailure())
             {
                 Snackbar.Add(L["DomainDetail:Messages:LoadFailed", error.Message ?? L["Shared:Values:Unknown"].Value].Value, Severity.Error);
                 _domainDetail = null;

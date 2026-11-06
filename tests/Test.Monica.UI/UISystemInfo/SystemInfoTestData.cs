@@ -94,8 +94,8 @@ internal static class SystemInfoTestData
     };
 
     internal static SystemInfoFacadeCalls Calls(
-        Func<Res<SystemInfoSnapshot>>? getSnapshot = null,
-        Func<Res>? requestSelfRestart = null) => new(
-        getSnapshot ?? (() => Res.Ok(Snapshot())),
-        requestSelfRestart ?? (() => Res.Ok()));
+        Func<Result<SystemInfoSnapshot>>? getSnapshot = null,
+        Func<Result>? requestSelfRestart = null) => new(
+        getSnapshot ?? (() => Result.Success(Snapshot())),
+        requestSelfRestart ?? (() => Result.Success()));
 }

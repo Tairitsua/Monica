@@ -23,7 +23,9 @@ internal sealed record SchedulerExecutionSample(IReadOnlyList<JobExecutionInstan
                 SortField = JobExecutionSortField.CreatedAtUtc, SortDescending = true
             }, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var page)) throw new InvalidOperationException(error.Message);
+            var error = result.WithoutData();
+            var page = result.Data;
+            if (result.IsFailure() || page is null) throw new InvalidOperationException(error.Message ?? "The execution query returned no data.");
             total = page.TotalCount;
             records.AddRange(page.Items);
             if (page.Items.Count < pageSize || records.Count >= total) break;

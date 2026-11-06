@@ -120,7 +120,7 @@ public partial class LeaseWorkbench
             var resource = target.Snapshot.Leases.Single().Resource;
             var outcome = await Facade.RevokeAsync(target.Authority.Id, resource, token);
             // A successful mutation remains successful even if reconciliation is canceled by navigation.
-            succeeded = outcome.IsOk();
+            succeeded = outcome.IsSuccess();
             token.ThrowIfCancellationRequested();
             if (succeeded) await State.RefreshAsync(token);
         });

@@ -446,9 +446,9 @@ public sealed class ProjectUnitCatalogTests
             typeof(CompleteDomainService).FullName!,
             TestContext.Current.CancellationToken);
 
-        listResult.Status.Should().Be(ResStatus.Ok);
-        dashboardResult.Status.Should().Be(ResStatus.Ok);
-        detailResult.Status.Should().Be(ResStatus.Ok);
+        listResult.Status.Should().Be(ResultStatus.Ok);
+        dashboardResult.Status.Should().Be(ResultStatus.Ok);
+        detailResult.Status.Should().Be(ResultStatus.Ok);
         detailResult.Data!.Summary.Dependencies.Should().ContainSingle(dependency =>
             dependency.Key == typeof(DependencyDomainService).FullName);
 

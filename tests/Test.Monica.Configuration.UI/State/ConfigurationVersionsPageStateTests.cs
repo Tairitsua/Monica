@@ -12,12 +12,12 @@ public sealed class ConfigurationVersionsPageStateTests
     [Fact]
     public async Task Selection_WhenCachedPairSupersedesPendingRead_ShouldKeepCachedPair()
     {
-        var pending = NewCompletion<Res<ConfigurationUnifiedVersionComparison>>();
+        var pending = NewCompletion<Result<ConfigurationUnifiedVersionComparison>>();
         var calls = new List<(long, long)>();
         await using var state = State((origin, target) =>
         {
             calls.Add((origin, target));
-            return origin == 1 ? pending.Task : Task.FromResult(Res.Ok(Comparison(origin, target)));
+            return origin == 1 ? pending.Task : Task.FromResult(Result.Success(Comparison(origin, target)));
         });
         await ObserveAsync(state.LoadAsync());
         var cached = Assert.IsType<ConfigurationUnifiedVersionComparison>(state.SelectedComparison);
@@ -27,7 +27,7 @@ public sealed class ConfigurationVersionsPageStateTests
         await ObserveAsync(state.SelectComparisonAsync(2, 3));
         Assert.Same(cached, state.SelectedComparison);
         Assert.False(state.ComparisonLoading);
-        pending.SetResult(Res.Ok(Comparison(1, 3)));
+        pending.SetResult(Result.Success(Comparison(1, 3)));
         await ObserveAsync(older);
         Assert.Same(cached, state.SelectedComparison);
         Assert.Equal(2, state.OriginVersion);
@@ -40,14 +40,14 @@ public sealed class ConfigurationVersionsPageStateTests
     [InlineData(true)]
     public async Task Selection_WhenClearedOrRejected_ShouldRetirePendingComparison(bool invalidPair)
     {
-        var pending = NewCompletion<Res<ConfigurationUnifiedVersionComparison>>();
+        var pending = NewCompletion<Result<ConfigurationUnifiedVersionComparison>>();
         await using var state = State((origin, target) => origin == 1
-            ? pending.Task : Task.FromResult(Res.Ok(Comparison(origin, target))));
+            ? pending.Task : Task.FromResult(Result.Success(Comparison(origin, target))));
         await ObserveAsync(state.LoadAsync());
         var older = state.SelectComparisonAsync(1, 3);
         await ObserveAsync(invalidPair ? state.SelectComparisonAsync(99, 3)
             : state.CompareWithPreviousAsync(new() { Version = 1 }));
-        pending.SetResult(Res.Ok(Comparison(1, 3)));
+        pending.SetResult(Result.Success(Comparison(1, 3)));
         await ObserveAsync(older);
         Assert.Null(state.SelectedComparison);
         Assert.False(state.ComparisonLoading);
@@ -84,7 +84,7 @@ public sealed class ConfigurationVersionsPageStateTests
     [Fact]
     public async Task Reload_WhenNewerEmptyLoadCompletesFirst_ShouldRejectOlderList()
     {
-        var oldList = NewCompletion<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
+        var oldList = NewCompletion<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
         var calls = 0;
         await using var state = State(load: () => ++calls == 1 ? oldList.Task : Task.FromResult(Versions([])));
         var older = state.LoadAsync();
@@ -104,7 +104,7 @@ public sealed class ConfigurationVersionsPageStateTests
     [InlineData("failure")]
     public async Task Reload_WhenAcceptedListExists_ShouldRetainItUntilNewestOutcomeIsAccepted(string outcome)
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
         var calls = 0;
         await using var state = State(load: () => ++calls == 1
             ? Task.FromResult(Versions([new() { Version = 3 }, new() { Version = 2 }])) : pending.Task);
@@ -119,7 +119,7 @@ public sealed class ConfigurationVersionsPageStateTests
         Assert.Equal(new long[] { 3, 2 }, state.Versions.Select(version => version.Version));
         pending.SetResult(outcome switch
         {
-            "failure" => Res.Fail("refresh unavailable"),
+            "failure" => Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("refresh unavailable"),
             "empty" => Versions([]),
             _ => Versions([new() { Version = 4 }])
         });
@@ -148,19 +148,19 @@ public sealed class ConfigurationVersionsPageStateTests
     [InlineData(true)]
     public async Task Reload_WhenNewestRefreshFails_ShouldNotRestoreEvidenceFromLateOlderOutcome(bool olderFails)
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
         var calls = 0;
         var reports = new List<string>();
         await using var state = State(load: () => ++calls switch
         {
             1 => Task.FromResult(Versions([new() { Version = 3 }])),
             2 => pending.Task,
-            _ => Task.FromResult<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>(Res.Fail("newest unavailable"))
+            _ => Task.FromResult<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>(Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("newest unavailable"))
         }, reports: reports);
         await ObserveAsync(state.LoadAsync());
         var older = state.LoadAsync();
         await ObserveAsync(state.LoadAsync());
-        pending.SetResult(olderFails ? Res.Fail("older unavailable") : Versions([new() { Version = 99 }]));
+        pending.SetResult(olderFails ? Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("older unavailable") : Versions([new() { Version = 99 }]));
         await ObserveAsync(older);
 
         Assert.False(state.Loading);
@@ -174,7 +174,7 @@ public sealed class ConfigurationVersionsPageStateTests
     [Fact]
     public async Task Reload_WhenNewestRefreshSucceeds_ShouldRejectLateOlderEmptyList()
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
         var calls = 0;
         await using var state = State(load: () => ++calls switch
         {
@@ -202,7 +202,7 @@ public sealed class ConfigurationVersionsPageStateTests
     {
         var calls = 0;
         await using var state = State(load: () => Task.FromResult(++calls == 1
-            ? (Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>)Res.Fail("version store unavailable") : Versions([])));
+            ? Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("version store unavailable") : Versions([])));
         await ObserveAsync(state.LoadAsync());
         Assert.False(state.HasLoadedVersions);
         Assert.True(state.HasLoadFailure);
@@ -218,7 +218,7 @@ public sealed class ConfigurationVersionsPageStateTests
     [Fact]
     public async Task Comparison_WhenUnavailable_ShouldNotBeAnEmptySuccessfulComparison()
     {
-        await using var state = State((_, _) => Task.FromResult<Res<ConfigurationUnifiedVersionComparison>>(Res.Fail("snapshot deleted")));
+        await using var state = State((_, _) => Task.FromResult<Result<ConfigurationUnifiedVersionComparison>>(Result.Failure<ConfigurationUnifiedVersionComparison>("snapshot deleted")));
         await ObserveAsync(state.LoadAsync());
         Assert.True(state.HasLoadedVersions);
         Assert.Null(state.SelectedComparison);
@@ -227,9 +227,37 @@ public sealed class ConfigurationVersionsPageStateTests
     }
 
     [Fact]
+    public async Task Load_WhenSuccessfulResponseHasNoList_ShouldRemainUnavailable()
+    {
+        var missing = new Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>> { Status = ResultStatus.Ok };
+        await using var state = State(load: () => Task.FromResult(missing));
+
+        await ObserveAsync(state.LoadAsync());
+
+        Assert.False(state.HasLoadedVersions);
+        Assert.True(state.HasLoadFailure);
+        Assert.Equal("Common:Errors:LoadFailed", state.ErrorText);
+        Assert.Empty(state.Versions);
+    }
+
+    [Fact]
+    public async Task Comparison_WhenSuccessfulResponseHasNoData_ShouldRemainUnavailable()
+    {
+        var missing = new Result<ConfigurationUnifiedVersionComparison> { Status = ResultStatus.Ok };
+        await using var state = State((_, _) => Task.FromResult(missing));
+
+        await ObserveAsync(state.LoadAsync());
+
+        Assert.True(state.HasLoadedVersions);
+        Assert.Null(state.SelectedComparison);
+        Assert.Equal("Common:Errors:LoadFailed", state.ComparisonError);
+        Assert.False(state.ComparisonLoading);
+    }
+
+    [Fact]
     public async Task Retirement_ShouldJoinActualTokenlessReadAndRejectLateAdoption()
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>();
         var reports = new List<string>();
         var calls = 0;
         var state = State(load: () => { calls++; return pending.Task; }, reports: reports);
@@ -237,7 +265,7 @@ public sealed class ConfigurationVersionsPageStateTests
         var retirement = state.DisposeAsync().AsTask();
         Assert.Same(retirement, state.DisposeAsync().AsTask());
         Assert.False(retirement.IsCompleted);
-        pending.SetResult(Res.Fail("late failure"));
+        pending.SetResult(Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("late failure"));
         await ObserveAsync(load);
         await ObserveAsync(retirement);
         Assert.Empty(reports);
@@ -252,7 +280,7 @@ public sealed class ConfigurationVersionsPageStateTests
     {
         ConfigurationVersionsPageState? state = null;
         Task? retirement = null;
-        state = State(load: () => Task.FromResult<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>(Res.Fail("failed")),
+        state = State(load: () => Task.FromResult<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>(Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>("failed")),
             report: _ => retirement = state!.DisposeAsync().AsTask());
         await ObserveAsync(state.LoadAsync());
         Assert.NotNull(retirement);
@@ -261,19 +289,19 @@ public sealed class ConfigurationVersionsPageStateTests
     }
 
     private static ConfigurationVersionsPageState State(
-        Func<long, long, Task<Res<ConfigurationUnifiedVersionComparison>>>? compare = null,
-        Func<Task<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>>? load = null,
+        Func<long, long, Task<Result<ConfigurationUnifiedVersionComparison>>>? compare = null,
+        Func<Task<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>>? load = null,
         List<string>? reports = null, Action<string>? report = null)
     {
         var localizer = Substitute.For<IStringLocalizer<ConfigurationUIResource>>();
         localizer[Arg.Any<string>()].Returns(call => new LocalizedString(call.Arg<string>(), call.Arg<string>()));
         localizer[Arg.Any<string>(), Arg.Any<object[]>()].Returns(call => new LocalizedString(call.Arg<string>(), call.Arg<string>()));
         return new(load ?? (() => Task.FromResult(Versions([new() { Version = 1 }, new() { Version = 3 }, new() { Version = 2 }]))),
-            compare ?? ((origin, target) => Task.FromResult(Res.Ok(Comparison(origin, target)))),
+            compare ?? ((origin, target) => Task.FromResult(Result.Success(Comparison(origin, target)))),
             report ?? (message => reports?.Add(message)), localizer);
     }
 
-    private static Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>> Versions(IReadOnlyList<ConfigurationUnifiedVersionSummary> versions) => Res.Ok(versions);
+    private static Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>> Versions(IReadOnlyList<ConfigurationUnifiedVersionSummary> versions) => Result.Success(versions);
     private static ConfigurationUnifiedVersionComparison Comparison(long origin, long target) => new()
     {
         Origin = new() { Summary = new() { Version = origin } },

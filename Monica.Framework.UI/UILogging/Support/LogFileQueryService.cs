@@ -23,13 +23,13 @@ public sealed class LogFileQueryService(
     /// Lists ordinary files recursively. A missing or unavailable configured directory returns a failed
     /// result, distinct from an existing empty directory. Symbolic-link descendants are excluded.
     /// </summary>
-    public Task<Res<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
+    public Task<Result<IReadOnlyList<LogFileDescriptor>>> ListFilesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
             if (!Directory.Exists(_logDirectory))
-                return Task.FromResult((Res<IReadOnlyList<LogFileDescriptor>>)$"The configured log directory does not exist or cannot be accessed: {_logDirectory}");
+                return Task.FromResult(Result.Failure<IReadOnlyList<LogFileDescriptor>>($"The configured log directory does not exist or cannot be accessed: {_logDirectory}"));
             var files = new List<LogFileDescriptor>();
             foreach (var file in new DirectoryInfo(_logDirectory).EnumerateFiles("*", new EnumerationOptions
                 { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false }))
@@ -39,14 +39,14 @@ public sealed class LogFileQueryService(
                     Path.GetRelativePath(_logDirectory, file.FullName).Replace(Path.DirectorySeparatorChar, '/')));
             }
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult((Res<IReadOnlyList<LogFileDescriptor>>)Array.AsReadOnly(files.OrderByDescending(file => file.LastModified)
-                .ThenBy(file => file.RelativePath, StringComparer.Ordinal).ToArray()));
+            return Task.FromResult(Result.Success<IReadOnlyList<LogFileDescriptor>>(Array.AsReadOnly(files.OrderByDescending(file => file.LastModified)
+                .ThenBy(file => file.RelativePath, StringComparer.Ordinal).ToArray())));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to list log directory {LogDirectory}.", _logDirectory);
-            return Task.FromResult((Res<IReadOnlyList<LogFileDescriptor>>)$"Failed to list log directory: {ex.Message}");
+            return Task.FromResult(Result.Failure<IReadOnlyList<LogFileDescriptor>>($"Failed to list log directory: {ex.Message}"));
         }
     }
 
@@ -55,28 +55,28 @@ public sealed class LogFileQueryService(
     /// The caller owns the returned stream; this is a live handle, not an immutable archive snapshot.
     /// Cancellation throws before a handle is returned. Paths outside the inspection directory are rejected.
     /// </summary>
-    public Task<Res<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
+    public Task<Result<FileStream>> OpenFileAsync(string relativePath, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         FileStream? stream = null;
         try
         {
             var fullPath = ResolveFilePath(relativePath);
-            if (!File.Exists(fullPath)) return Task.FromResult((Res<FileStream>)$"The requested log file does not exist: {relativePath}");
+            if (!File.Exists(fullPath)) return Task.FromResult(Result.Failure<FileStream>($"The requested log file does not exist: {relativePath}"));
             stream = new FileStream(fullPath, new FileStreamOptions
             {
                 Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.ReadWrite | FileShare.Delete,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             });
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult((Res<FileStream>)stream);
+            return Task.FromResult(Result.Success(stream));
         }
         catch (OperationCanceledException) { stream?.Dispose(); throw; }
         catch (Exception ex)
         {
             stream?.Dispose();
             logger.LogWarning(ex, "Failed to open log file {RelativePath}.", relativePath);
-            return Task.FromResult((Res<FileStream>)$"Failed to open log file: {ex.Message}");
+            return Task.FromResult(Result.Failure<FileStream>($"Failed to open log file: {ex.Message}"));
         }
     }
 
@@ -84,29 +84,29 @@ public sealed class LogFileQueryService(
     /// Compatibility context read beneath this service's directory. This overload has no source-generation
     /// proof; reader pages should use LogReadingSession.ReadContextAsync with their frozen line request.
     /// </summary>
-    public async Task<Res<ContextLogResult>> ReadContextAsync(string filePath, long targetLineNumber,
+    public async Task<Result<ContextLogResult>> ReadContextAsync(string filePath, long targetLineNumber,
         int contextLines = 50, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var fullPath = ResolveFilePath(Path.GetRelativePath(_logDirectory, Path.GetFullPath(filePath)));
-            if (!File.Exists(fullPath)) return $"The log file does not exist: {filePath}";
-            if (targetLineNumber < 1 || contextLines < 0) return "Log context requires a positive target line and nonnegative context count.";
+            if (!File.Exists(fullPath)) return Result.Failure<ContextLogResult>($"The log file does not exist: {filePath}");
+            if (targetLineNumber < 1 || contextLines < 0) return Result.Failure<ContextLogResult>("Log context requires a positive target line and nonnegative context count.");
             var start = Math.Max(1, targetLineNumber - contextLines);
             var end = targetLineNumber > long.MaxValue - contextLines ? long.MaxValue : targetLineNumber + contextLines;
             var raw = await LogTailService.ReadRangeAsync(fullPath, start, end, cancellationToken).ConfigureAwait(false);
             var lines = raw.Select((line, index) => LogLineViewModel.FromRaw(line).WithPosition(start + index, null)
                 .WithContextTarget(start + index == targetLineNumber)).ToArray();
-            if (!lines.Any(line => line.IsContextTarget)) return "The requested physical line is no longer available.";
+            if (!lines.Any(line => line.IsContextTarget)) return Result.Failure<ContextLogResult>("The requested physical line is no longer available.");
             cancellationToken.ThrowIfCancellationRequested();
-            return new ContextLogResult(Array.AsReadOnly(lines), targetLineNumber, start, start + lines.Length - 1) { ReadAt = DateTimeOffset.UtcNow };
+            return Result.Success(new ContextLogResult(Array.AsReadOnly(lines), targetLineNumber, start, start + lines.Length - 1) { ReadAt = DateTimeOffset.UtcNow });
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to read log context at physical line {LineNumber}.", targetLineNumber);
-            return $"Failed to read log context: {ex.Message}";
+            return Result.Failure<ContextLogResult>($"Failed to read log context: {ex.Message}");
         }
     }
 

@@ -14,7 +14,7 @@ public interface IResultRequestBase
 /// Request interface that returns a typed result.
 /// </summary>
 /// <typeparam name="TRequest">The response type for the request.</typeparam>
-public interface IResultRequest<TRequest> : IRequest<Res<TRequest>>, IResultRequestBase
+public interface IResultRequest<TRequest> : IRequest<Result<TRequest>>, IResultRequestBase
 {
     
 }
@@ -22,7 +22,7 @@ public interface IResultRequest<TRequest> : IRequest<Res<TRequest>>, IResultRequ
 /// <summary>
 /// Simple request interface.
 /// </summary>
-public interface IResultRequest : IRequest<Res>, IResultRequestBase
+public interface IResultRequest : IRequest<Result>, IResultRequestBase
 {
 
 }

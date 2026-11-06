@@ -52,7 +52,7 @@ Clear removes retained output, latest result and failed-attempt evidence while p
 
 ## Admission, cancellation and lifetime
 
-`TerminalFacade.StartCommandAsync(owner, sessionId, request)` returns `Res<TerminalCommandAcceptance>`. Its command ID and detached session capture prove admission only. A fast command may already have completed in that capture; a later process-start failure is visible in `LastExecutionFailure`. The page observes immutable snapshots through a single serial loop, including while idle so another same-owner tab's active command can become visible.
+`TerminalFacade.StartCommandAsync(owner, sessionId, request)` returns `Result<TerminalCommandAcceptance>`. Its command ID and detached session capture prove admission only. A fast command may already have completed in that capture; a later process-start failure is visible in `LastExecutionFailure`. The page observes immutable snapshots through a single serial loop, including while idle so another same-owner tab's active command can become visible.
 
 Leaving the route retires the visit without canceling the host-owned command or waiting for its duration. Returning reads actual running state and can request cancellation. A visit requests command-field focus only for a command it admitted, with the matching session and eligible draft generation; reentry or another visit's completion does not take focus.
 
@@ -66,7 +66,7 @@ The singleton service retains active producers after a direct caller closes a ru
 
 Read/list/create APIs now return detached `TerminalSessionSnapshot` evidence instead of the former mutable live `TerminalSession`. Environment reads return `TerminalEnvironmentSnapshot`. Collections and output-line records are immutable; retaining or copying a snapshot cannot mutate server identity, working directory, transcript or results. Use service operations for changes.
 
-The cancel API now requires `expectedCommandId` and returns `Res<TerminalSessionSnapshot>` at the facade. Capture `session.ActiveCommand.CommandId` before awaiting any confirmation or rendering work. Service callers replace synchronous close with `CloseSessionAsync` and await its removal/request receipt.
+The cancel API now requires `expectedCommandId` and returns `Result<TerminalSessionSnapshot>` at the facade. Capture `session.ActiveCommand.CommandId` before awaiting any confirmation or rendering work. Service callers replace synchronous close with `CloseSessionAsync` and await its removal/request receipt.
 
 `ExecuteCommandAsync` retains its direct await-to-completion API over the same producer as Start. Its caller token explicitly cancels execution; do not pass a route-lifetime token when continued execution is intended. Its optional output observer is invoked serially and awaited. Synchronous and late observer faults remain observable after process/output cleanup; callbacks must not await their own command completion. The service stores immutable results separately from the returned mutable direct-completion DTO, so subsequent caller mutation cannot change retained evidence.
 

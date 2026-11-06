@@ -38,7 +38,7 @@ public sealed class FileOpsWorkspaceServiceTests
             Paths = [first, second, third], Recursive = true
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         Assert.Contains(readOnlySecond ? "GeneratedMessages:PathReadOnly" : "GeneratedMessages:EntryNotFound", result.Message);
         Assert.Contains(second, result.Message);
         Assert.Null(result.Data);
@@ -64,7 +64,7 @@ public sealed class FileOpsWorkspaceServiceTests
             Paths = [parent, child, later], Recursive = true
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         Assert.Contains("GeneratedMessages:EntryNotFound", result.Message);
         Assert.Contains(child, result.Message);
         Assert.Null(result.Data);
@@ -85,7 +85,7 @@ public sealed class FileOpsWorkspaceServiceTests
             Paths = [target, string.Empty, "  ", $"  {target}  ", target], Recursive = true
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.Null(result.Message);
         var data = Assert.IsType<FileOpsBatchDeleteResult>(result.Data);
         Assert.Equal(target, Assert.Single(data.DeletedEntries).Path);

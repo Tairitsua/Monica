@@ -19,9 +19,11 @@ public static class ExecutionOutcomePolicy
     public static bool RequiresRollback(object? result, bool isReadOnly = false)
     {
         if (result is IExecutionOutcome { ShouldRollback: true }) return true;
-        if (result is not IResultEnvelope envelope || envelope.IsOk()) return false;
-        return !isReadOnly || envelope.Status is not (ResStatus.BadRequest or ResStatus.Unauthorized
-            or ResStatus.Forbidden or ResStatus.NotFound or ResStatus.Conflict
-            or ResStatus.PayloadTooLarge or ResStatus.UnsupportedMediaType);
+        if (result is not IResultEnvelope envelope) return false;
+        // Invalid envelopes remain rollback outcomes even though public status predicates reject them.
+        if (envelope.Status is ResultStatus.Ok or ResultStatus.Created) return false;
+        return !isReadOnly || envelope.Status is not (ResultStatus.BadRequest or ResultStatus.Unauthorized
+            or ResultStatus.Forbidden or ResultStatus.NotFound or ResultStatus.Conflict
+            or ResultStatus.PayloadTooLarge or ResultStatus.UnsupportedMediaType);
     }
 }

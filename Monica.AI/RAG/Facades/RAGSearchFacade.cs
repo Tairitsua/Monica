@@ -19,7 +19,7 @@ public sealed class RAGSearchFacade
     }
 
     /// <summary>Searches selected knowledge bases.</summary>
-    public async Task<Res<IReadOnlyList<TextSearchResult>>> SearchAsync(
+    public async Task<Result<IReadOnlyList<TextSearchResult>>> SearchAsync(
         string query,
         IEnumerable<string> knowledgeBaseIds,
         int topK = 5,
@@ -28,12 +28,12 @@ public sealed class RAGSearchFacade
     {
         try
         {
-            return Res.Ok(await service.SearchAsync(query, knowledgeBaseIds, topK, embeddingOverride, ct));
+            return Result.Success(await service.SearchAsync(query, knowledgeBaseIds, topK, embeddingOverride, ct));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Semantic search failed for '{Query}'.", query);
-            return Res.Fail($"Search failed: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<TextSearchResult>>($"Search failed: {ex.GetMessageRecursively()}");
         }
     }
 }

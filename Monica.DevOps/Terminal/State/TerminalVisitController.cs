@@ -101,9 +101,11 @@ internal sealed class TerminalVisitController : IAsyncDisposable
                 _owner = owner;
                 var environment = await _facade.GetEnvironmentAsync();
                 if (_retired) return;
-                if (environment.IsFailed(out var environmentError, out var environmentValue))
+                var environmentError = environment;
+                var environmentValue = environment.Data;
+                if (environment.IsFailure() || environmentValue is null)
                 {
-                    InitializationFailure = environmentError.Message;
+                    InitializationFailure = environmentError.Message ?? string.Empty;
                     return;
                 }
                 Environment = environmentValue;
@@ -112,9 +114,11 @@ internal sealed class TerminalVisitController : IAsyncDisposable
                 {
                     var created = await _facade.CreateSessionAsync(owner);
                     if (_retired) return;
-                    if (created.IsFailed(out var createError, out var session))
+                    var createError = created;
+                    var session = created.Data;
+                    if (created.IsFailure() || session is null)
                     {
-                        InitializationFailure = createError.Message;
+                        InitializationFailure = createError.Message ?? string.Empty;
                         return;
                     }
                     Sessions = [session];
@@ -127,7 +131,7 @@ internal sealed class TerminalVisitController : IAsyncDisposable
             catch (Exception error)
             {
                 if (_retired) throw;
-                InitializationFailure = error.Message;
+                InitializationFailure = error.Message ?? string.Empty;
             }
             finally
             {
@@ -159,7 +163,9 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var result = await _facade.CreateSessionAsync(owner, new() { WorkingDirectory = directory });
             if (_retired) return;
-            if (result.IsFailed(out var error, out var session)) { OperationFailure = error.Message; return; }
+            var error = result;
+            var session = result.Data;
+            if (result.IsFailure() || session is null) { OperationFailure = error.Message ?? string.Empty; return; }
             Sessions = new[] { session }.Concat(Sessions.Where(x => x.Id != session.Id)).ToArray();
             SelectedSessionId = session.Id;
             RequestFocus();
@@ -175,13 +181,16 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var result = await _facade.CloseSessionAsync(owner, id);
             if (_retired) return;
-            if (result.IsFailed(out var error)) { OperationFailure = error.Message; return; }
+            var error = result;
+            if (result.IsFailure()) { OperationFailure = error.Message ?? string.Empty; return; }
             if (!await ReadCoreAsync() || _retired) return;
             if (Sessions.Count == 0)
             {
                 var replacement = await _facade.CreateSessionAsync(owner);
                 if (_retired) return;
-                if (replacement.IsFailed(out var createError, out var session)) { OperationFailure = createError.Message; return; }
+                var createError = replacement;
+                var session = replacement.Data;
+                if (replacement.IsFailure() || session is null) { OperationFailure = createError.Message ?? string.Empty; return; }
                 Sessions = [session];
                 SelectedSessionId = session.Id;
             }
@@ -198,7 +207,8 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var result = await _facade.ClearOutputAsync(owner, id);
             if (_retired) return;
-            if (result.IsFailed(out var error)) { OperationFailure = error.Message; return; }
+            var error = result;
+            if (result.IsFailure()) { OperationFailure = error.Message ?? string.Empty; return; }
             await ReadCoreAsync();
             if (!_retired) RequestFocus();
         });
@@ -215,7 +225,9 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var result = await _facade.StartCommandAsync(owner, id, new() { Command = command });
             if (_retired) return;
-            if (result.IsFailed(out var error, out var acceptance)) { OperationFailure = error.Message; return; }
+            var error = result;
+            var acceptance = result.Data;
+            if (result.IsFailure() || acceptance is null) { OperationFailure = error.Message ?? string.Empty; return; }
             long? focusGeneration = null;
             if (_draftGeneration == generation)
             {
@@ -239,7 +251,9 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var result = await _facade.CancelCommandAsync(owner, id, commandId);
             if (_retired) return;
-            if (result.IsFailed(out var error, out var session)) { OperationFailure = error.Message; return; }
+            var error = result;
+            var session = result.Data;
+            if (result.IsFailure() || session is null) { OperationFailure = error.Message ?? string.Empty; return; }
             AdoptSession(session);
             ObserveOwnedCompletion();
         });
@@ -301,7 +315,7 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         catch (Exception error)
         {
             if (_retired) throw;
-            OperationFailure = error.Message;
+            OperationFailure = error.Message ?? string.Empty;
         }
         finally
         {
@@ -323,10 +337,12 @@ internal sealed class TerminalVisitController : IAsyncDisposable
         {
             var response = await _facade.GetSessionsAsync(owner);
             if (_retired || generation != _evidenceGeneration) return false;
-            if (response.IsFailed(out var error, out var sessions))
+            var error = response;
+            var sessions = response.Data;
+            if (response.IsFailure() || sessions is null)
             {
-                if (initializing) InitializationFailure = error.Message;
-                else ReadFailure = error.Message;
+                if (initializing) InitializationFailure = error.Message ?? string.Empty;
+                else ReadFailure = error.Message ?? string.Empty;
                 return false;
             }
             Sessions = sessions.ToArray();
@@ -341,8 +357,8 @@ internal sealed class TerminalVisitController : IAsyncDisposable
             if (_retired) throw;
             if (generation == _evidenceGeneration)
             {
-                if (initializing) InitializationFailure = error.Message;
-                else ReadFailure = error.Message;
+                if (initializing) InitializationFailure = error.Message ?? string.Empty;
+                else ReadFailure = error.Message ?? string.Empty;
             }
             return false;
         }
@@ -396,7 +412,7 @@ internal sealed class TerminalVisitController : IAsyncDisposable
             catch (Exception error)
             {
                 NotificationError = error;
-                if (!_retired) ReadFailure = error.Message;
+                if (!_retired) ReadFailure = error.Message ?? string.Empty;
             }
         });
     }

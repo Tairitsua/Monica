@@ -52,11 +52,11 @@ public sealed class SystemInfoFacade(
     /// Captures one immutable system-information snapshot for the current host.
     /// </summary>
     /// <returns>A successful result containing the snapshot, or a localized failure result.</returns>
-    public Res<SystemInfoSnapshot> GetSnapshot()
+    public Result<SystemInfoSnapshot> GetSnapshot()
     {
         try
         {
-            return Res.Ok(_snapshotProvider.Capture());
+            return Result.Success(_snapshotProvider.Capture());
         }
         catch (SystemInfoUnavailableException ex)
         {
@@ -68,12 +68,12 @@ public sealed class SystemInfoFacade(
                 _ => throw new ArgumentOutOfRangeException(nameof(ex.Reason), ex.Reason, null)
             };
 
-            return Res.Fail(localizer[key].Value);
+            return Result.Failure<SystemInfoSnapshot>(localizer[key].Value);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to capture system information.");
-            return Res.Fail(localizer["Service:Errors:GetSystemInfoFailed"].Value);
+            return Result.Failure<SystemInfoSnapshot>(localizer["Service:Errors:GetSystemInfoFailed"].Value);
         }
     }
 
@@ -81,19 +81,19 @@ public sealed class SystemInfoFacade(
     /// Requests graceful host shutdown so an external supervisor can restart the process.
     /// </summary>
     /// <returns>A localized result describing whether shutdown was scheduled.</returns>
-    public Res RequestSelfRestart()
+    public Result RequestSelfRestart()
     {
         try
         {
             var request = _restartCoordinator.Request();
             return request.Status switch
             {
-                SystemInfoRestartStatus.Scheduled => Res.Ok(localizer[
+                SystemInfoRestartStatus.Scheduled => Result.Success().WithMessage(localizer[
                     "Service:Messages:RestartRequested",
                     request.Delay.TotalSeconds].Value),
-                SystemInfoRestartStatus.Disabled => Res.Fail(localizer[
+                SystemInfoRestartStatus.Disabled => Result.Failure(localizer[
                     "Service:Errors:SelfRestartDisabled"].Value),
-                SystemInfoRestartStatus.AlreadyPending => Res.Fail(localizer[
+                SystemInfoRestartStatus.AlreadyPending => Result.Failure(localizer[
                     "Service:Errors:RestartAlreadyRequested"].Value),
                 _ => throw new ArgumentOutOfRangeException(nameof(request.Status), request.Status, null)
             };
@@ -101,7 +101,7 @@ public sealed class SystemInfoFacade(
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to schedule graceful shutdown for a self restart request.");
-            return Res.Fail(localizer["Service:Errors:RestartSchedulingFailed"].Value);
+            return Result.Failure(localizer["Service:Errors:RestartSchedulingFailed"].Value);
         }
     }
 }

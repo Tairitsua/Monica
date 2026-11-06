@@ -41,7 +41,7 @@ public sealed record QueryTransactionScope(bool Cancel = false) : IQuery<Guid>;
 
 /// <summary>Reads transactional state or returns a deliberately selected query outcome.</summary>
 [ApiEndpoint(ApiHttpMethod.Post, "transactions/Read")]
-public sealed record QueryReadTransaction(global::Monica.Core.Results.ResStatus? Rejection = null,
+public sealed record QueryReadTransaction(global::Monica.Core.Results.ResultStatus? Rejection = null,
     QueryFault Fault = QueryFault.None) : IQuery<QueryTransactionReceipt>;
 
 /// <summary>Reads through an explicitly selected consistency transaction.</summary>

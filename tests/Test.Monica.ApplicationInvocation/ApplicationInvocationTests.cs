@@ -53,7 +53,7 @@ public sealed class ApplicationInvocationTests
         {
             var result = await scope.Resolve<IApplicationApiInvoker>().InvokeAsync(new QueryOrdinary("query"), OrdinaryEndpoint, token,
                 independent ? ApiTransaction.Independent : ApiTransaction.Shared);
-            Assert.Equal(ResStatus.Ok, result.Status);
+            Assert.Equal(ResultStatus.Ok, result.Status);
         }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token);
         if (independent) await operation();
         else Assert.Contains("Independent", (await Assert.ThrowsAsync<InvalidOperationException>(operation)).Message);
@@ -104,7 +104,7 @@ public sealed class ApplicationInvocationTests
         {
             var result = await scope.Resolve<IApplicationApiInvoker>().InvokeAsync(new CommandConstrained(9), RequiredEndpoint, token,
                 independent ? ApiTransaction.Independent : ApiTransaction.Shared);
-            Assert.Equal(ResStatus.Ok, result.Status);
+            Assert.Equal(ResultStatus.Ok, result.Status);
             Assert.Equal(independent ? 501 : 42, result.Data);
         }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token);
         Assert.Equal(independent ? 1 : 0, host.Services.GetRequiredService<RecordingTransport>().Calls.Count);
@@ -126,7 +126,7 @@ public sealed class ApplicationInvocationTests
         var result = await scope.Resolve<IApplicationApiInvoker>()
             .InvokeAsync(new CommandConstrained(88), RequiredEndpoint, scope.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.Equal(501, result.Data);
         var transport = host.Services.GetRequiredService<RecordingTransport>();
         Assert.Equal(["first:request", "second:request", "second:response", "first:response"], transport.HandlerSteps.ToArray());
@@ -166,7 +166,7 @@ public sealed class ApplicationInvocationTests
 
         var result = await scope.Resolve<IApplicationApiInvoker>().InvokeAsync(new QueryRemoteOnly(17), OrdinaryEndpoint, scope.CancellationToken);
 
-        Assert.Equal(ResStatus.ServiceUnavailable, result.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, result.Status);
         Assert.Single(host.Services.GetRequiredService<RecordingTransport>().Calls);
         Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().OrdinaryCalls);
     }
@@ -226,7 +226,7 @@ public sealed class ApplicationInvocationTests
         var result = await scope.Resolve<IApplicationApiInvoker>()
             .InvokeAsync(new CommandConstrained(9), RequiredEndpoint, scope.CancellationToken);
 
-        Assert.Equal(ResStatus.ServiceUnavailable, result.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, result.Status);
         Assert.Single(host.Services.GetRequiredService<RecordingTransport>().Calls);
         Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().ConstrainedCalls);
     }
@@ -513,10 +513,10 @@ public sealed class ApplicationApiReceiverController(IMediator mediator) : Contr
     public Task<string> Worker(CancellationToken cancellationToken) => mediator.Send(new OrdinaryQuery(), cancellationToken);
 
     [HttpGet("ordinary"), ApplicationApiReceiver(typeof(QueryOrdinary))]
-    public Task<Res<int>> Ordinary(CancellationToken cancellationToken) => mediator.Send(new QueryOrdinary("http"), cancellationToken);
+    public Task<Result<int>> Ordinary(CancellationToken cancellationToken) => mediator.Send(new QueryOrdinary("http"), cancellationToken);
 
     [HttpGet("constrained"), ApplicationApiReceiver(typeof(CommandConstrained))]
-    public Task<Res<int>> Constrained(CancellationToken cancellationToken) => mediator.Send(new CommandConstrained(1), cancellationToken);
+    public Task<Result<int>> Constrained(CancellationToken cancellationToken) => mediator.Send(new CommandConstrained(1), cancellationToken);
 
     [HttpGet("unrelated")]
     public string Unrelated() => "available";

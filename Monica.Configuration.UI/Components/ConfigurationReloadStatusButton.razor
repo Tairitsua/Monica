@@ -240,7 +240,9 @@
         try
         {
             var result = await Facade.GetRuntimeReloadStatusAsync();
-            if (result.IsFailed(out var error, out var report))
+            var error = result;
+            var report = result.Data;
+            if (result.IsFailure() || report is null)
             {
                 Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
                 _report = null;
@@ -269,7 +271,9 @@
         try
         {
             var result = await Facade.ReloadRuntimeConfigurationAsync();
-            if (result.IsFailed(out var error, out var report))
+            var error = result;
+            var report = result.Data;
+            if (result.IsFailure() || report is null)
             {
                 Snackbar.Add($"{L["State:ReloadStatus:ReloadFailed"]}: {error.Message}", Severity.Error);
                 return;
@@ -292,7 +296,9 @@
         try
         {
             var result = await Facade.BroadcastReloadAllAsync();
-            if (result.IsFailed(out var error, out var broadcast))
+            var error = result;
+            var broadcast = result.Data;
+            if (result.IsFailure() || broadcast is null)
             {
                 Snackbar.Add($"{L["State:ReloadStatus:BroadcastFailed"]}: {error.Message}", Severity.Error);
                 return;

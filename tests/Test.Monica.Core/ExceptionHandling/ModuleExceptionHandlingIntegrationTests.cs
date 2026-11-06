@@ -34,12 +34,12 @@ public sealed class ModuleExceptionHandlingIntegrationTests
             "/required-json",
             new StringContent("{}", Encoding.UTF8, "application/json"),
             TestContext.Current.CancellationToken);
-        var result = await response.Content.ReadFromJsonAsync<Res>(TestContext.Current.CancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<Result>(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
         result.Should().NotBeNull();
-        result!.Status.Should().Be(ResStatus.BadRequest);
+        result!.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().NotBeNull();
         Assert.DoesNotContain("Required properties", result.Message!, StringComparison.OrdinalIgnoreCase);
         endpointInvoked.Should().BeFalse();
@@ -55,29 +55,29 @@ public sealed class ModuleExceptionHandlingIntegrationTests
             "/required-json",
             new StringContent("{}", Encoding.UTF8, "text/plain"),
             TestContext.Current.CancellationToken);
-        var result = await response.Content.ReadFromJsonAsync<Res>(TestContext.Current.CancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<Result>(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
         result.Should().NotBeNull();
-        result!.Status.Should().Be(ResStatus.UnsupportedMediaType);
+        result!.Status.Should().Be(ResultStatus.UnsupportedMediaType);
         result.Message.Should().NotBeNullOrWhiteSpace();
         endpointInvoked.Should().BeFalse();
     }
 
     [Theory]
-    [InlineData(StatusCodes.Status413PayloadTooLarge, ResStatus.PayloadTooLarge)]
-    [InlineData(StatusCodes.Status415UnsupportedMediaType, ResStatus.UnsupportedMediaType)]
+    [InlineData(StatusCodes.Status413PayloadTooLarge, ResultStatus.PayloadTooLarge)]
+    [InlineData(StatusCodes.Status415UnsupportedMediaType, ResultStatus.UnsupportedMediaType)]
     public async Task EmptyFrameworkRejection_InProduction_ReturnsStructuredResponse(
         int statusCode,
-        ResStatus expectedStatus)
+        ResultStatus expectedStatus)
     {
         await using var application = await StartApplicationAsync(static () => { });
 
         using var response = await application.GetTestClient().GetAsync(
             $"/empty-rejection/{statusCode}",
             TestContext.Current.CancellationToken);
-        var result = await response.Content.ReadFromJsonAsync<Res>(TestContext.Current.CancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<Result>(TestContext.Current.CancellationToken);
 
         ((int)response.StatusCode).Should().Be(statusCode);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
@@ -204,7 +204,7 @@ public sealed class ModuleExceptionHandlingIntegrationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         diagnostics.Calls.Should().HaveCount(1);
-        diagnostics.Calls[0].Response.Status.Should().Be(ResStatus.InternalError);
+        diagnostics.Calls[0].Response.Status.Should().Be(ResultStatus.InternalError);
         diagnostics.Calls[0].HttpContext.Should().NotBeNull();
     }
 
@@ -249,11 +249,11 @@ public sealed class ModuleExceptionHandlingIntegrationTests
 
     private sealed class RecordingDiagnostics : IExceptionResponseDiagnostics
     {
-        public List<(HttpContext? HttpContext, Res Response)> Calls { get; } = [];
+        public List<(HttpContext? HttpContext, Result Response)> Calls { get; } = [];
 
         public void Attach(HttpContext? httpContext, IResultEnvelope response)
         {
-            Calls.Add((httpContext, (Res)response));
+            Calls.Add((httpContext, (Result)response));
         }
     }
 

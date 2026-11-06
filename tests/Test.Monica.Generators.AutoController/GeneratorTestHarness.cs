@@ -210,7 +210,7 @@ internal static class GeneratorTestHarness
             }
         }
 
-        AddAssemblyClosure(typeof(Res).Assembly, assemblyPaths);
+        AddAssemblyClosure(typeof(Result).Assembly, assemblyPaths);
         AddAssemblyClosure(typeof(ICachedServiceProvider).Assembly, assemblyPaths);
         AddAssemblyClosure(typeof(ApplicationService).Assembly, assemblyPaths);
         AddAssemblyClosure(typeof(ApiEndpointAttribute).Assembly, assemblyPaths);

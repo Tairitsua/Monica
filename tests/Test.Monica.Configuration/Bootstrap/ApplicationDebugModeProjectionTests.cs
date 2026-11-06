@@ -23,12 +23,12 @@ public sealed class ApplicationDebugModeProjectionTests
         await using var application = await factory.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var facade = application.Services.GetRequiredService<ConfigurationFacade>();
         var actual = facade.GetDebugModeState();
-        Assert.True(actual.IsOk());
+        Assert.True(actual.IsSuccess());
         Assert.True(actual.Data!.ActualValue);
         Assert.Equal(application.Services.GetRequiredService<IMonicaApplicationOptions>().DebugMode, actual.Data.ActualValue);
         factory.Configuration!["Application:DebugMode"] = "false";
         var candidate = facade.GetDebugModeState();
-        Assert.True(candidate.IsOk());
+        Assert.True(candidate.IsSuccess());
         Assert.True(candidate.Data!.ActualValue);
         Assert.False(candidate.Data.CandidateValue);
         Assert.True(candidate.Data.RequiresRestart);

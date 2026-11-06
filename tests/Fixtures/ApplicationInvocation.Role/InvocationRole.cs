@@ -33,7 +33,7 @@ public sealed class InvocationLedger : ISingletonDependency
 
 public sealed class LedgerCrudService : ICrudApplicationService
 {
-    public Res<int> Get() => Res.Ok(43);
+    public Result<int> Get() => Result.Success(43);
 }
 
 public sealed class InheritedLedgerCrudService : SharedCrudServiceBase, ICrudApplicationService;
@@ -47,20 +47,20 @@ public sealed class RoleOwnedController : ControllerBase
 
 public sealed class OrdinaryApiHandler(InvocationLedger calls) : ApplicationService<QueryOrdinary, int>
 {
-    public override Task<Res<int>> Handle(QueryOrdinary request, CancellationToken cancellationToken)
+    public override Task<Result<int>> Handle(QueryOrdinary request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         calls.RecordOrdinary();
-        return Task.FromResult(Res.Ok(41));
+        return Task.FromResult(Result.Success(41));
     }
 }
 
 public sealed class ConstrainedApiHandler(InvocationLedger calls) : ApplicationService<CommandConstrained, int>
 {
-    public override Task<Res<int>> Handle(CommandConstrained request, CancellationToken cancellationToken)
+    public override Task<Result<int>> Handle(CommandConstrained request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         calls.RecordConstrained();
-        return Task.FromResult(Res.Ok(42));
+        return Task.FromResult(Result.Success(42));
     }
 }

@@ -20,8 +20,8 @@ public sealed class ModuleSystemWorkbenchSessionTests
         var calls = 0;
         await using var session = new ModuleSystemWorkbenchSession(
             ModuleSystemWorkbenchTestData.Calls(snapshot: () => ++calls == 1
-                ? Res.Ok(first)
-                : Res.Fail("refresh failed")));
+                ? Result.Success(first)
+                : Result.Failure<ModuleDiagnosticsSnapshot>("refresh failed")));
 
         await session.InitializeAsync();
         await session.RefreshAsync();
@@ -38,9 +38,9 @@ public sealed class ModuleSystemWorkbenchSessionTests
         var older = session.BeginSnapshotRequest(isInitial: true);
         var newer = session.BeginSnapshotRequest(isInitial: true);
 
-        session.CompleteSnapshotRequest(older, Res.Ok(ModuleSystemWorkbenchTestData.Snapshot(1)))
+        session.CompleteSnapshotRequest(older, Result.Success(ModuleSystemWorkbenchTestData.Snapshot(1)))
             .Should().BeFalse();
-        session.CompleteSnapshotRequest(newer, Res.Ok(ModuleSystemWorkbenchTestData.Snapshot(2)))
+        session.CompleteSnapshotRequest(newer, Result.Success(ModuleSystemWorkbenchTestData.Snapshot(2)))
             .Should().BeTrue();
 
         session.Snapshot!.Revision.Should().Be(2);
@@ -200,7 +200,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
             }
         };
         await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls(
-            snapshot: () => Res.Ok(snapshot)));
+            snapshot: () => Result.Success(snapshot)));
 
         await session.InitializeAsync();
 
@@ -244,12 +244,12 @@ public sealed class ModuleSystemWorkbenchSessionTests
                 snapshot: () =>
                 {
                     snapshotCalls++;
-                    return Res.Ok(ModuleSystemWorkbenchTestData.Snapshot());
+                    return Result.Success(ModuleSystemWorkbenchTestData.Snapshot());
                 },
                 inventory: () =>
                 {
                     inventoryCalls++;
-                    return Res.Ok(ModuleSystemWorkbenchTestData.Inventory());
+                    return Result.Success(ModuleSystemWorkbenchTestData.Inventory());
                 }),
             authorize: () => Task.FromResult(authorized));
 
@@ -273,7 +273,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
             ModuleSystemWorkbenchTestData.Calls(options: key =>
             {
                 optionCalls++;
-                return Res.Ok(ModuleSystemWorkbenchTestData.Options(
+                return Result.Success(ModuleSystemWorkbenchTestData.Options(
                     key,
                     ModuleOptionDiagnosticsExposureMode.RevealSensitive));
             }),
@@ -308,7 +308,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
             ModuleSystemWorkbenchTestData.Calls(options: key =>
             {
                 optionCalls++;
-                return Res.Ok(ModuleSystemWorkbenchTestData.Options(
+                return Result.Success(ModuleSystemWorkbenchTestData.Options(
                     key,
                     ModuleOptionDiagnosticsExposureMode.RevealSensitive));
             }),
@@ -344,7 +344,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
             ModuleSystemWorkbenchTestData.Calls(options: key =>
             {
                 optionCalls++;
-                return Res.Ok(ModuleSystemWorkbenchTestData.Options(key));
+                return Result.Success(ModuleSystemWorkbenchTestData.Options(key));
             }),
             authorize: () =>
             {
@@ -408,7 +408,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
             ModuleSystemWorkbenchTestData.Calls(options: key =>
             {
                 Interlocked.Increment(ref optionCalls);
-                return Res.Ok(ModuleSystemWorkbenchTestData.Options(
+                return Result.Success(ModuleSystemWorkbenchTestData.Options(
                     key,
                     ModuleOptionDiagnosticsExposureMode.RevealSensitive));
             }),
@@ -448,7 +448,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
                 var requestVersion = session.BeginSnapshotRequest(isInitial: false);
                 session.CompleteSnapshotRequest(
                         requestVersion,
-                        Res.Ok(ModuleSystemWorkbenchTestData.Snapshot(revision: 2)))
+                        Result.Success(ModuleSystemWorkbenchTestData.Snapshot(revision: 2)))
                     .Should().BeTrue();
                 break;
             case OptionRequestInvalidation.Dispose:
@@ -477,7 +477,7 @@ public sealed class ModuleSystemWorkbenchSessionTests
     {
         var calls = 0;
         await using var session = new ModuleSystemWorkbenchSession(
-            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Res.Ok(
+            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Result.Success(
                 ModuleSystemWorkbenchTestData.Snapshot(++calls, isFinal: calls >= 2))),
             pollingInterval: TimeSpan.FromMilliseconds(5));
 

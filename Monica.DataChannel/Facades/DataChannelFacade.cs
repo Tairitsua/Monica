@@ -22,7 +22,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// </summary>
     /// <param name="cancellationToken">Cancels before and between channel reads.</param>
     /// <returns>Complete detached evidence, or a failed result without partial data.</returns>
-    public Task<Res<DataChannelManagementSnapshot>> GetManagementSnapshotAsync(CancellationToken cancellationToken = default) =>
+    public Task<Result<DataChannelManagementSnapshot>> GetManagementSnapshotAsync(CancellationToken cancellationToken = default) =>
         Capture(() =>
         {
             var capturedAt = DateTime.UtcNow;
@@ -46,7 +46,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <summary>Captures registered channel identity, component values, initialization state and exception counts.</summary>
     /// <param name="cancellationToken">Cancels before and between channel reads.</param>
     /// <returns>Detached channel captures in manager order.</returns>
-    public Task<Res<List<DataChannelStatusInfo>>> GetChannelsStatusAsync(CancellationToken cancellationToken = default) =>
+    public Task<Result<List<DataChannelStatusInfo>>> GetChannelsStatusAsync(CancellationToken cancellationToken = default) =>
         Capture(() => manager.FetchAll().Select(channel =>
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -57,23 +57,23 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <param name="id">Exact channel identifier.</param>
     /// <param name="cancellationToken">Cancels the admitted endpoint operation.</param>
     /// <returns>The completed operation result, never early success for another active attempt.</returns>
-    public async Task<Res> ReInitializeChannelAsync(string id, CancellationToken cancellationToken = default)
+    public async Task<Result> ReInitializeChannelAsync(string id, CancellationToken cancellationToken = default)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (application?.Application.AutonomousWork == false)
-                return Res.Fail("Data channels are held while Application:AutonomousWork is false.");
+                return Result.Failure("Data channels are held while Application:AutonomousWork is false.");
             var channel = manager.Fetch(id);
-            if (channel is null) return Res.Fail($"DataChannel '{id}' was not found.");
+            if (channel is null) return Result.Failure($"DataChannel '{id}' was not found.");
             await channel.ReInitialize(cancellationToken);
-            return Res.Ok("DataChannel reinitialized successfully.");
+            return Result.Success().WithMessage("DataChannel reinitialized successfully.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to reinitialize DataChannel {DataChannelId}.", id);
-            return Res.Fail($"Failed to reinitialize DataChannel '{id}': {exception.GetMessageRecursively()}");
+            return Result.Failure($"Failed to reinitialize DataChannel '{id}': {exception.GetMessageRecursively()}");
         }
     }
 
@@ -82,7 +82,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <param name="count">Maximum details to return; nonpositive values return an empty subset.</param>
     /// <param name="cancellationToken">Cancels the tracker capture.</param>
     /// <returns>Detached exception evidence; source provenance is empty because the tracker does not record it.</returns>
-    public Task<Res<DataChannelExceptionInfo>> GetChannelExceptionsAsync(string id, int count = 10,
+    public Task<Result<DataChannelExceptionInfo>> GetChannelExceptionsAsync(string id, int count = 10,
         CancellationToken cancellationToken = default) => Capture(() =>
         {
             var channel = RequireChannel(id);
@@ -117,7 +117,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <summary>Builds exception aggregates from each channel's internally consistent tracker capture.</summary>
     /// <param name="cancellationToken">Cancels before and between channel reads.</param>
     /// <returns>Retained and lifetime exception statistics, including channel capture times.</returns>
-    public Task<Res<DataChannelExceptionSummaryInfo>> GetExceptionSummaryAsync(CancellationToken cancellationToken = default) =>
+    public Task<Result<DataChannelExceptionSummaryInfo>> GetExceptionSummaryAsync(CancellationToken cancellationToken = default) =>
         Capture(() =>
         {
             var capturedAt = DateTime.UtcNow;
@@ -135,17 +135,17 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// </summary>
     /// <param name="id">Exact channel identifier.</param>
     /// <returns>The history-clear operation result.</returns>
-    public Task<Res> ClearChannelExceptionsAsync(string id)
+    public Task<Result> ClearChannelExceptionsAsync(string id)
     {
         try
         {
             RequireChannel(id).Pipe.ObservableTracker.ClearHistory();
-            return Task.FromResult(Res.Ok("DataChannel retained observable history cleared successfully."));
+            return Task.FromResult(Result.Success().WithMessage("DataChannel retained observable history cleared successfully."));
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to clear retained history for DataChannel {DataChannelId}.", id);
-            return Task.FromResult(Res.Fail($"Failed to clear retained history for DataChannel '{id}': {exception.GetMessageRecursively()}"));
+            return Task.FromResult(Result.Failure($"Failed to clear retained history for DataChannel '{id}': {exception.GetMessageRecursively()}"));
         }
     }
 
@@ -154,7 +154,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <param name="channelId">Exact channel identifier.</param>
     /// <param name="componentKey">Owner-issued key from a component capture.</param>
     /// <returns>The original live middleware, or failure for missing, removed, replaced or transient registrations.</returns>
-    public Task<Res<T?>> GetMiddlewareByKeyAsync<T>(string channelId, string componentKey) where T : class =>
+    public Task<Result<T?>> GetMiddlewareByKeyAsync<T>(string channelId, string componentKey) where T : class =>
         Capture<T?>(() =>
         {
             var middleware = RequireChannel(channelId).Pipe.ResolveMiddleware(componentKey);
@@ -167,7 +167,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
     /// <param name="channelId">Exact channel identifier.</param>
     /// <param name="middlewareName">Declared CLR short name; use a component key for repeated names.</param>
     /// <returns>The unique live middleware, or a failed result when missing, ambiguous or transient.</returns>
-    public Task<Res<T?>> GetMiddlewareAsync<T>(string channelId, string middlewareName) where T : class =>
+    public Task<Result<T?>> GetMiddlewareAsync<T>(string channelId, string middlewareName) where T : class =>
         Capture<T?>(() =>
         {
             var matches = RequireChannel(channelId).Pipe.GetMiddlewares().Where(component =>
@@ -231,20 +231,20 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
         ChannelSummaries = items
     };
 
-    private Task<Res<T>> Capture<T>(Func<T> capture, string operation, CancellationToken cancellationToken = default)
+    private Task<Result<T>> Capture<T>(Func<T> capture, string operation, CancellationToken cancellationToken = default)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var result = capture();
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(Res.Ok(result));
+            return Task.FromResult(Result.Success(result));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to {Operation}.", operation);
-            return Task.FromResult<Res<T>>(Res.Fail($"Failed to {operation}: {exception.GetMessageRecursively()}"));
+            return Task.FromResult<Result<T>>(Result.Failure<T>($"Failed to {operation}: {exception.GetMessageRecursively()}"));
         }
     }
 }

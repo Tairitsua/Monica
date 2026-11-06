@@ -116,7 +116,9 @@ public partial class ObservableWorkspace
     {
         var result = await MonitorService.CaptureAsync(_retirement.Token);
         if (_disposed) return;
-        if (result.IsFailed(out var error, out var capture)) _error = error.Message;
+        var error = result.WithoutData();
+        var capture = result.Data;
+        if (result.IsFailure()) _error = error.Message;
         else Workspace.Capture = capture;
     }
     private Task InspectAsync(ObservableInstanceSnapshot instance) => ShowInspector(instance, "Current", null);
@@ -151,7 +153,8 @@ public partial class ObservableWorkspace
         if (_disposed || confirmation is null || confirmation.Canceled) return;
         var result = await MonitorService.ClearHistoryAsync(instance.Identity, _retirement.Token);
         if (_disposed) return;
-        if (result.IsFailed(out var error)) _error = error.Message;
+        var error = result;
+        if (result.IsFailure()) _error = error.Message;
         else await ReadAsync();
     });
     public ValueTask DisposeAsync()

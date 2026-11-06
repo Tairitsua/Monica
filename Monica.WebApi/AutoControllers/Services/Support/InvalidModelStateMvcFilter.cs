@@ -20,7 +20,7 @@ public sealed class InvalidModelStateMvcFilter(IRequestRejectionFactory rejectio
             context.ActionDescriptor.EndpointMetadata.OfType<IApiBehaviorMetadata>().Any()) return;
 
         context.Result = ResultHttpProjection.ToMvcResult(
-            rejections.FromModelState(context, ResStatus.BadRequest).ToResult());
+            rejections.FromModelState(context, ResultStatus.BadRequest).ToResult());
     }
 
     /// <inheritdoc />

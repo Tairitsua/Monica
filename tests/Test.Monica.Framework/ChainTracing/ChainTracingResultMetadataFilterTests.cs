@@ -47,7 +47,7 @@ public sealed class ChainTracingResultMetadataFilterTests
         descriptors[0].Order.Should().BeLessThan(descriptors[1].Order);
         var filters = descriptors.Select(descriptor => (IActionFilter)
             ((IFilterFactory)descriptor.Filter).CreateInstance(scope.ServiceProvider)).ToArray();
-        var context = ExecutedContext(Res.Fail("Safe failure"));
+        var context = ExecutedContext(Result.Failure("Safe failure"));
         context.ActionDescriptor.DisplayName = "Action";
         var executing = new ActionExecutingContext(context, [], new Dictionary<string, object?>(), context.Controller);
         foreach (var filter in filters) filter.OnActionExecuting(executing);
@@ -74,7 +74,7 @@ public sealed class ChainTracingResultMetadataFilterTests
         var tracing = CreateTracingWithDatabaseNode();
         var filter = new ChainTracingResultMetadataActionFilter(tracing,
             new ChainResultMetadataAttacher(new MonicaApplicationOptions { DebugMode = exposeDiagnostics }));
-        var response = Res.Fail("Safe failure");
+        var response = Result.Failure("Safe failure");
         var context = ExecutedContext(response);
 
         filter.OnActionExecuted(context);
@@ -103,7 +103,7 @@ public sealed class ChainTracingResultMetadataFilterTests
         return tracing;
     }
 
-    private static ActionExecutedContext ExecutedContext(Res response)
+    private static ActionExecutedContext ExecutedContext(Result response)
     {
         var httpContext = new DefaultHttpContext();
         var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());

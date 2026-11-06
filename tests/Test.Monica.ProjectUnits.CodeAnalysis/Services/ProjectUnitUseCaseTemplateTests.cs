@@ -98,8 +98,8 @@ public sealed class ProjectUnitUseCaseTemplateTests
         var commandHandler = Activator.CreateInstance(commandHandlerType, repository)!;
         var command = Activator.CreateInstance(commandType, 41L)!;
 
-        var approval = (Res)await InvokeHandlerAsync(commandHandler, command, cancellationToken);
-        approval.IsFailed(out _).Should().BeFalse();
+        var approval = (Result)await InvokeHandlerAsync(commandHandler, command, cancellationToken);
+        approval.IsSuccess().Should().BeTrue();
         entityUnit.Type.GetProperty("IsApproved")!.GetValue(order).Should().Be(true);
         probeType.GetProperty("LastToken")!.GetValue(repository).Should().Be(cancellationToken);
 
@@ -125,14 +125,14 @@ public sealed class ProjectUnitUseCaseTemplateTests
         var customHandlerType = assembly.GetType(
             "Domains.Ordering.Application.HandlersQuery.CustomQueryHandlerGetOrder", throwOnError: true)!;
         catalog.GetUnits<UnitApplicationService>().Single(unit => unit.Type == customHandlerType)
-            .ResponseType.Should().Be(typeof(Res<>).MakeGenericType(summaryType));
+            .ResponseType.Should().Be(typeof(Result<>).MakeGenericType(summaryType));
         var customHandler = Activator.CreateInstance(customHandlerType, repository)!;
         var customResult = await InvokeHandlerAsync(
             customHandler, Activator.CreateInstance(queryType, 41L)!, cancellationToken);
-        ((IResultEnvelope)customResult).Status.Should().Be(ResStatus.Ok);
+        ((IResultEnvelope)customResult).Status.Should().Be(ResultStatus.Ok);
 
         var queryResult = await InvokeHandlerAsync(queryHandler, Activator.CreateInstance(queryType, 41L)!, cancellationToken);
-        ((IResultEnvelope)queryResult).Status.Should().Be(ResStatus.Ok);
+        ((IResultEnvelope)queryResult).Status.Should().Be(ResultStatus.Ok);
         var summary = queryResult.GetType().GetProperty("Data")!.GetValue(queryResult)!;
         summary.GetType().Should().Be(summaryType);
         summaryType.GetProperty("Number")!.GetValue(summary).Should().Be("ORD-41");
@@ -140,7 +140,7 @@ public sealed class ProjectUnitUseCaseTemplateTests
 
         var missingResult = await InvokeHandlerAsync(
             queryHandler, Activator.CreateInstance(queryType, 99L)!, cancellationToken);
-        ((IResultEnvelope)missingResult).Status.Should().Be(ResStatus.NotFound);
+        ((IResultEnvelope)missingResult).Status.Should().Be(ResultStatus.NotFound);
     }
 
     private static async Task<object> InvokeHandlerAsync(object handler, object request, CancellationToken cancellationToken)
@@ -171,7 +171,7 @@ public sealed class ProjectUnitUseCaseTemplateTests
             typeof(ApplicationService<>).Assembly.Location,
             typeof(IRepository<>).Assembly.Location,
             typeof(DbContext).Assembly.Location,
-            typeof(Res).Assembly.Location,
+            typeof(Result).Assembly.Location,
             typeof(ProjectUnitMetadataAttribute).Assembly.Location,
             typeof(ICachedServiceProvider).Assembly.Location
         };
@@ -216,14 +216,14 @@ public sealed class ProjectUnitUseCaseTemplateTests
             Tags = ["ordering", "approval"])]
         [ProjectUnitRequirement("template-test.order-approval")]
         public sealed class CustomQueryHandlerGetOrder(IRepositoryOrder repository)
-            : CustomApplicationService<QueryGetOrder, Res<OrderSummary>>
+            : CustomApplicationService<QueryGetOrder, Result<OrderSummary>>
         {
-            public override async Task<Res<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
+            public override async Task<Result<OrderSummary>> Handle(QueryGetOrder request, CancellationToken cancellationToken)
             {
                 var summary = await repository.FindSummaryAsync(request.Id, cancellationToken);
                 return summary is null
-                    ? Res.Fail("Order was not found.", ResStatus.NotFound)
-                    : Res.Ok<OrderSummary>(summary);
+                    ? Result.Failure<OrderSummary>("Order was not found.", ResultStatus.NotFound)
+                    : Result.Success<OrderSummary>(summary);
             }
         }
         """;

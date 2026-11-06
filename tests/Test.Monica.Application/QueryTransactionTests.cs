@@ -29,7 +29,7 @@ public sealed class QueryTransactionTests
         var api = scope.Resolve<ITestingQueryApi>();
         if (independent) api = api.WithTransaction(ApiTransaction.Independent);
         var result = await api.ReadTransaction(new(), token);
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.False(result.Data!.HasTransaction);
     }
 
@@ -51,14 +51,14 @@ public sealed class QueryTransactionTests
     }
 
     [Theory]
-    [InlineData(ResStatus.BadRequest)]
-    [InlineData(ResStatus.Unauthorized)]
-    [InlineData(ResStatus.Forbidden)]
-    [InlineData(ResStatus.NotFound)]
-    [InlineData(ResStatus.Conflict)]
-    [InlineData(ResStatus.PayloadTooLarge)]
-    [InlineData(ResStatus.UnsupportedMediaType)]
-    public async Task SharedQuery_WhenBusinessRejectionIsHandled_ShouldCommitParentAndOutbox(ResStatus rejection)
+    [InlineData(ResultStatus.BadRequest)]
+    [InlineData(ResultStatus.Unauthorized)]
+    [InlineData(ResultStatus.Forbidden)]
+    [InlineData(ResultStatus.NotFound)]
+    [InlineData(ResultStatus.Conflict)]
+    [InlineData(ResultStatus.PayloadTooLarge)]
+    [InlineData(ResultStatus.UnsupportedMediaType)]
+    public async Task SharedQuery_WhenBusinessRejectionIsHandled_ShouldCommitParentAndOutbox(ResultStatus rejection)
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
@@ -78,13 +78,13 @@ public sealed class QueryTransactionTests
     }
 
     [Theory]
-    [InlineData(ResStatus.TooManyRequests)]
-    [InlineData(ResStatus.InternalError)]
-    [InlineData(ResStatus.BadGateway)]
-    [InlineData(ResStatus.ServiceUnavailable)]
-    [InlineData(ResStatus.GatewayTimeout)]
-    [InlineData(ResStatus.Unknown)]
-    public async Task SharedQuery_WhenExecutionFailureIsHandled_ShouldStillRollbackParent(ResStatus rejection)
+    [InlineData(ResultStatus.TooManyRequests)]
+    [InlineData(ResultStatus.InternalError)]
+    [InlineData(ResultStatus.BadGateway)]
+    [InlineData(ResultStatus.ServiceUnavailable)]
+    [InlineData(ResultStatus.GatewayTimeout)]
+    [InlineData(ResultStatus.Unknown)]
+    public async Task SharedQuery_WhenExecutionFailureIsHandled_ShouldStillRollbackParent(ResultStatus rejection)
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
@@ -116,7 +116,7 @@ public sealed class QueryTransactionTests
             await manager.Current!.FlushAsync(token);
             var invoke = () => scope.Resolve<ITestingQueryApi>().ReadTransaction(new(Fault: fault), token);
             if (fault == QueryFault.CaughtSql)
-                Assert.Equal(ResStatus.BadRequest, (await invoke()).Status);
+                Assert.Equal(ResultStatus.BadRequest, (await invoke()).Status);
             else if (fault == QueryFault.Cancellation)
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(invoke);
             else
@@ -142,17 +142,20 @@ public sealed class QueryTransactionTests
 public sealed class QueryHandlerReadTransaction(TransactionPrimaryContext db)
     : ApplicationService<QueryReadTransaction, QueryTransactionReceipt>
 {
-    public override async Task<Res<QueryTransactionReceipt>> Handle(QueryReadTransaction request, CancellationToken cancellationToken)
+    public override async Task<Result<QueryTransactionReceipt>> Handle(QueryReadTransaction request, CancellationToken cancellationToken)
     {
         if (request.Fault == QueryFault.Exception) throw new InvalidOperationException("Query execution failed.");
         if (request.Fault == QueryFault.Cancellation) throw new OperationCanceledException("Query execution was cancelled.");
         if (request.Fault == QueryFault.CaughtSql)
         {
             try { await db.Database.SqlQueryRaw<int>("SELECT Value FROM MissingQueryTable").ToListAsync(cancellationToken); }
-            catch (DbException) { return Res.Fail("A provider error must not become a recoverable business rejection."); }
+            catch (DbException) { return Result.Failure<QueryTransactionReceipt>("A provider error must not become a recoverable business rejection."); }
         }
-        if (request.Rejection is { } rejection) return Res.Fail(rejection, "Query rejected.");
-        return new QueryTransactionReceipt(db.Database.CurrentTransaction is not null, await db.Entries.CountAsync(cancellationToken));
+        if (request.Rejection is { } rejection)
+            return rejection == ResultStatus.Unknown
+                ? new Result<QueryTransactionReceipt> { Status = rejection, Message = "Query rejected." }
+                : Result.Failure<QueryTransactionReceipt>("Query rejected.", rejection);
+        return Result.Success(new QueryTransactionReceipt(db.Database.CurrentTransaction is not null, await db.Entries.CountAsync(cancellationToken)));
     }
 }
 
@@ -161,6 +164,6 @@ public sealed class QueryHandlerConsistentRead(TransactionPrimaryContext db)
 {
     [ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = [typeof(TransactionPrimaryContext)],
         IsolationLevel = IsolationLevel.Serializable)]
-    public override async Task<Res<QueryTransactionReceipt>> Handle(QueryConsistentRead request, CancellationToken cancellationToken)
-        => new QueryTransactionReceipt(db.Database.CurrentTransaction is not null, await db.Entries.CountAsync(cancellationToken));
+    public override async Task<Result<QueryTransactionReceipt>> Handle(QueryConsistentRead request, CancellationToken cancellationToken)
+        => Result.Success(new QueryTransactionReceipt(db.Database.CurrentTransaction is not null, await db.Entries.CountAsync(cancellationToken)));
 }

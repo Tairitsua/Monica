@@ -10,6 +10,125 @@ namespace Test.Monica.Generators.AutoController;
 public sealed class ApplicationHostSourceGeneratorTests
 {
     [Fact]
+    public void Run_WhenResponseContainsNullableTypes_ShouldPreserveThemAcrossCatalogAndClients()
+    {
+        var contracts = Contracts.Replace(
+            "public sealed record QueryGetTotal : Monica.Application.Abstractions.IQuery<int>;",
+            "public sealed record QueryGetTotal : Monica.Application.Abstractions.IQuery<Scenario.Payload<string?>?>;") + """
+
+            namespace Scenario { public sealed class Payload<T> { } }
+            namespace Scenario.PublishedLanguages.DomainOrdering.Requests
+            {
+                /// <summary>Reads an optional count.</summary>
+                [Monica.Application.Annotations.ApiEndpoint(Monica.Application.Annotations.ApiHttpMethod.Get, "queries/OptionalCount")]
+                public sealed record QueryGetOptionalCount : Monica.Application.Abstractions.IQuery<int?>;
+            }
+            """;
+        var ordinary = RoleDeclaration + """
+
+            namespace Scenario.Ordering;
+            internal sealed class TotalHandler
+                : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Scenario.Payload<string?>?>
+            {
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<Scenario.Payload<string?>?>> Handle(
+                    Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal request, System.Threading.CancellationToken token)
+                    => throw new System.NotImplementedException();
+            }
+            internal sealed class OptionalCountHandler
+                : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetOptionalCount, int?>
+            {
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int?>> Handle(
+                    Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetOptionalCount request, System.Threading.CancellationToken token)
+                    => throw new System.NotImplementedException();
+            }
+            internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<Scenario.Internal.QueryProbe, int>
+            {
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
+                    Scenario.Internal.QueryProbe request, System.Threading.CancellationToken token)
+                    => throw new System.NotImplementedException();
+            }
+            """;
+
+        var protocol = GeneratorTestHarness.Run(contracts, new ApiClientSourceGenerator());
+        protocol.OutputErrors.Should().BeEmpty();
+        AssertNullablePayload(protocol.OutputCompilation,
+            "Scenario.PublishedLanguages.DomainOrdering.Contracts.IOrderingQueryApi");
+        AssertNullableValuePayload(protocol.OutputCompilation,
+            "Scenario.PublishedLanguages.DomainOrdering.Contracts.IOrderingQueryApi");
+
+        var application = CompileCatalogApplication(contracts, ordinary);
+        var roleMetadata = application.Exports.Single(export => export.Contains("Scenario.Ordering.TotalHandler", StringComparison.Ordinal));
+        var catalogAttribute = application.Generation.OutputCompilation.Assembly.GetAttributes().Single(attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "System.Reflection.AssemblyMetadataAttribute" &&
+            (string?)attribute.ConstructorArguments[0].Value == "Monica.ApplicationModel.Catalog.v1");
+        var catalogMetadata = Assert.IsType<string>(catalogAttribute.ConstructorArguments[1].Value);
+        foreach (var metadata in new[] { roleMetadata, catalogMetadata })
+        {
+            var operation = Assert.Single(System.Xml.Linq.XDocument.Parse(metadata).Descendants("Operation"), element =>
+                ((string?)element.Attribute("Request"))?.EndsWith(".QueryGetTotal", StringComparison.Ordinal) == true);
+            var resultType = Assert.IsType<string>((string?)operation.Attribute("Result"));
+            resultType.Count(character => character == '?').Should().Be(2);
+        }
+
+        var local = RunHost([.. application.References, application.Catalog]);
+        var remote = RunHost([application.References[0], application.Catalog]);
+        foreach (var run in new[] { local, remote })
+        {
+            run.OutputErrors.Should().BeEmpty();
+            run.RunResult.Diagnostics.Should().BeEmpty();
+            run.OutputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning &&
+                    diagnostic.Id.StartsWith("CS86", StringComparison.Ordinal) &&
+                    diagnostic.Location.SourceTree?.FilePath.Contains("ApplicationOrderingQueryApiClient.g.cs", StringComparison.Ordinal) == true)
+                .Should().BeEmpty();
+            AssertNullablePayload(run.OutputCompilation,
+                "Scenario.PublishedLanguages.DomainOrdering.Implementations.Application.ApplicationOrderingQueryApiClient");
+            AssertNullableValuePayload(run.OutputCompilation,
+                "Scenario.PublishedLanguages.DomainOrdering.Implementations.Application.ApplicationOrderingQueryApiClient");
+            run.RunAgain().GeneratedSources.Should().BeEquivalentTo(run.GeneratedSources);
+        }
+
+        var receiver = local.GeneratedSources["HttpEndpointQueryOrdering.g.cs"];
+        var responseAttribute = receiver.Split('\n').Single(line => line.Contains("ProducesResponseType(typeof(", StringComparison.Ordinal) &&
+            line.Contains("Scenario.Payload", StringComparison.Ordinal));
+        responseAttribute.Should().NotContain("?");
+
+        var receiverTree = Assert.Single(local.OutputCompilation.SyntaxTrees,
+            tree => tree.FilePath.EndsWith("HttpEndpointQueryOrdering.g.cs", StringComparison.Ordinal));
+        var semanticModel = local.OutputCompilation.GetSemanticModel(receiverTree);
+        var runtimeTypes = receiverTree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeOfExpressionSyntax>()
+            .Select(expression => semanticModel.GetTypeInfo(expression.Type, TestContext.Current.CancellationToken).Type)
+            .OfType<INamedTypeSymbol>();
+        Assert.Contains(runtimeTypes, type => type.Name == "Result" && type.TypeArguments.Length == 1 &&
+            type.TypeArguments[0] is INamedTypeSymbol payload &&
+            payload.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T);
+    }
+
+    private static void AssertNullablePayload(CSharpCompilation compilation, string typeName)
+    {
+        var type = compilation.GetTypeByMetadataName(typeName);
+        Assert.NotNull(type);
+        var method = Assert.Single(type.GetMembers("GetTotal").OfType<IMethodSymbol>());
+        var task = Assert.IsAssignableFrom<INamedTypeSymbol>(method.ReturnType);
+        var result = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(task.TypeArguments));
+        var payload = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(result.TypeArguments));
+        payload.NullableAnnotation.Should().Be(NullableAnnotation.Annotated);
+        Assert.Single(payload.TypeArguments).NullableAnnotation.Should().Be(NullableAnnotation.Annotated);
+    }
+
+    private static void AssertNullableValuePayload(CSharpCompilation compilation, string typeName)
+    {
+        var type = compilation.GetTypeByMetadataName(typeName);
+        Assert.NotNull(type);
+        var method = Assert.Single(type.GetMembers("GetOptionalCount").OfType<IMethodSymbol>());
+        var task = Assert.IsAssignableFrom<INamedTypeSymbol>(method.ReturnType);
+        var result = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(task.TypeArguments));
+        var payload = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(result.TypeArguments));
+        payload.OriginalDefinition.SpecialType.Should().Be(SpecialType.System_Nullable_T);
+    }
+
+    [Fact]
     public void Catalog_PreservesActualCrossDomainApiUsageWithoutRequiringSourceImplementationsInHost()
     {
         var application = CompileCatalogApplication();
@@ -173,9 +292,9 @@ public sealed class ApplicationHostSourceGeneratorTests
         const string plainHandler = """
 
             internal sealed class AlternateTotalHandler
-                : Monica.Core.Mediator.IRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Monica.Core.Results.Res<int>>
+                : Monica.Core.Mediator.IRequestHandler<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, Monica.Core.Results.Result<int>>
             {
-                public System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+                public System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal request, System.Threading.CancellationToken token)
                     => throw new System.NotImplementedException();
             }
@@ -236,7 +355,7 @@ public sealed class ApplicationHostSourceGeneratorTests
                 {{accessibility}} sealed record QueryHidden : Monica.Application.Abstractions.IQuery<int>;
                 private sealed class HiddenHandler : Monica.Application.Abstractions.ApplicationService<QueryHidden, int>
                 {
-                    public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+                    public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                         QueryHidden request, System.Threading.CancellationToken token)
                         => throw new System.NotImplementedException();
                 }
@@ -365,14 +484,14 @@ public sealed class ApplicationHostSourceGeneratorTests
     }
 
     private static (MetadataReference[] References, PortableExecutableReference Catalog, string[] Exports,
-        GeneratorTestHarness.GeneratorTestRun Generation) CompileCatalogApplication()
+        GeneratorTestHarness.GeneratorTestRun Generation) CompileCatalogApplication(string contracts = Contracts, string ordinarySource = OrdinaryRole)
     {
-        var protocol = Emit(GeneratorTestHarness.Run(Contracts, new ApiClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
+        var protocol = Emit(GeneratorTestHarness.Run(contracts, new ApiClientSourceGenerator()).OutputCompilation, "Scenario.Protocol");
         var core = GeneratorTestHarness.RunNamedWithReferences("Scenario.DomainCore",
             "[assembly: Monica.ApplicationModel.Annotations.ApplicationDomain(Scenario.ProductDomain.Ordering)]", [protocol],
             new ApplicationRoleMetadataSourceGenerator());
         var coreReference = Emit(core.OutputCompilation, "Scenario.DomainCore");
-        var ordinary = GeneratorTestHarness.RunNamedWithReferences("Scenario.OrderingRole", OrdinaryRole, [protocol, coreReference],
+        var ordinary = GeneratorTestHarness.RunNamedWithReferences("Scenario.OrderingRole", ordinarySource, [protocol, coreReference],
             new ApplicationRoleMetadataSourceGenerator());
         var chat = GeneratorTestHarness.RunNamedWithReferences("Scenario.ChatRole", ChatRole, [protocol, coreReference],
             new ApplicationRoleMetadataSourceGenerator());
@@ -433,13 +552,13 @@ public sealed class ApplicationHostSourceGeneratorTests
         internal sealed class TotalHandler
             : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal, int>
         {
-            public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+            public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                 Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetTotal request, System.Threading.CancellationToken token)
                 => throw new System.NotImplementedException();
         }
         internal sealed class ProbeHandler : Monica.Application.Abstractions.ApplicationService<Scenario.Internal.QueryProbe, int>
         {
-            public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+            public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                 Scenario.Internal.QueryProbe request, System.Threading.CancellationToken token)
                 => throw new System.NotImplementedException();
         }
@@ -453,7 +572,7 @@ public sealed class ApplicationHostSourceGeneratorTests
             internal sealed class TotalHandler
                 : Monica.Application.Abstractions.ApplicationService<Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal, int>
             {
-                public override System.Threading.Tasks.Task<Monica.Core.Results.Res<int>> Handle(
+                public override System.Threading.Tasks.Task<Monica.Core.Results.Result<int>> Handle(
                     Scenario.PublishedLanguages.DomainOrdering.Requests.QueryGetChatTotal request, System.Threading.CancellationToken token)
                     => throw new System.NotImplementedException();
             }

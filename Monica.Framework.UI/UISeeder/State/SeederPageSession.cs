@@ -26,8 +26,8 @@ public sealed class SeederPageSession : IAsyncDisposable
 {
     private static readonly TimeSpan DEFAULT_REFRESH_INTERVAL = TimeSpan.FromSeconds(1);
 
-    private readonly Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
-    private readonly Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? _runAsync;
+    private readonly Func<CancellationToken, Task<Result<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
+    private readonly Func<string, CancellationToken, Task<Result<SeederStateSnapshot>>>? _runAsync;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _refreshInterval;
@@ -41,12 +41,12 @@ public sealed class SeederPageSession : IAsyncDisposable
     private bool _disposed;
 
     internal SeederPageSession(
-        Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> getSnapshotAsync,
+        Func<CancellationToken, Task<Result<SeederDiagnosticsSnapshot>>> getSnapshotAsync,
         Func<CancellationToken, Task<bool>> authorize,
         string hostName,
         TimeProvider? timeProvider = null,
         TimeSpan? refreshInterval = null,
-        Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? runAsync = null)
+        Func<string, CancellationToken, Task<Result<SeederStateSnapshot>>>? runAsync = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);
         _getSnapshotAsync = getSnapshotAsync ?? throw new ArgumentNullException(nameof(getSnapshotAsync));
@@ -125,7 +125,8 @@ public sealed class SeederPageSession : IAsyncDisposable
             EnsureRefreshLoop();
             var result = await _runAsync!(typeName, cancellationToken);
             if (IsDisposed()) return false;
-            if (result.IsFailed(out var error, out _))
+            var error = result;
+            if (result.IsFailure())
             {
                 lock (_stateGate) _state = _state with { ExecutionError = error.Message };
                 return false;
@@ -460,7 +461,7 @@ public sealed class SeederPageSession : IAsyncDisposable
         }
     }
 
-    private bool CompleteRefresh(Res<SeederDiagnosticsSnapshot> result, out SeederRunStatus runStatus)
+    private bool CompleteRefresh(Result<SeederDiagnosticsSnapshot> result, out SeederRunStatus runStatus)
     {
         lock (_stateGate)
         {
@@ -470,9 +471,11 @@ public sealed class SeederPageSession : IAsyncDisposable
                 return false;
             }
 
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure() || snapshot is null)
             {
-                CompleteFailureCore(error.Message ?? string.Empty);
+                CompleteFailureCore(error.Message ?? "The seeder snapshot was unavailable.");
                 return false;
             }
 

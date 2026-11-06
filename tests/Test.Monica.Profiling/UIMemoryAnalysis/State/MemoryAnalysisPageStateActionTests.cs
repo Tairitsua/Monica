@@ -23,13 +23,13 @@ public sealed partial class MemoryAnalysisPageStateTests
         if (!allowGc)
         {
             var result = await state.ForceGarbageCollectionAsync(2);
-            result.Status.Should().Be(ResStatus.Forbidden);
+            result.Status.Should().Be(ResultStatus.Forbidden);
             result.Message.Should().BeEmpty();
         }
         if (!allowDump)
         {
             var result = await state.CreateGcDumpAsync();
-            result.Status.Should().Be(ResStatus.Forbidden);
+            result.Status.Should().Be(ResultStatus.Forbidden);
             result.Message.Should().BeEmpty();
         }
         control.GcActions.Should().Be(0);
@@ -81,7 +81,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         }
         var result = await action;
         result.Should().BeSameAs(dump ? (object)control.DumpResult : control.GcResult);
-        if (dump) ((Res<string>)result).Data.Should().Be(control.DumpResult.Data);
+        if (dump) ((Result<string>)result).Data.Should().Be(control.DumpResult.Data);
         state.LastAction!.Action.Should().Be(kind);
         state.LastAction.StartedAt.Should().Be(startedAt);
         state.LastAction.CompletedAt.Should().Be(clock.GetUtcNow());
@@ -116,12 +116,12 @@ public sealed partial class MemoryAnalysisPageStateTests
         await using var state = Decorated(scope, clock, control);
         AssertSuccess(await state.RefreshAsync());
         control.Fail(MemoryReadStage.Snapshot, "Prior read error.");
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.ServiceUnavailable);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.ServiceUnavailable);
         var reads = control.ReadOrder.Count;
         var snapshot = state.CurrentSnapshot;
         var capturedAt = state.SnapshotCapturedAt;
-        control.GcResult = Res.Fail(string.Empty, ResStatus.BadGateway);
-        control.DumpResult = new Res<string> { Message = null, Status = ResStatus.GatewayTimeout };
+        control.GcResult = Result.Failure(string.Empty, ResultStatus.BadGateway);
+        control.DumpResult = new Result<string> { Message = null, Status = ResultStatus.GatewayTimeout };
 
         IResultEnvelope result = dump ? await RunDump(state) : await state.ForceGarbageCollectionAsync(1);
 
@@ -223,7 +223,7 @@ public sealed partial class MemoryAnalysisPageStateTests
             gate.Release();
             await AwaitBounded(action);
         }
-        (await action).IsOk().Should().BeTrue();
+        (await action).IsSuccess().Should().BeTrue();
         state.LastAction!.IsSuccessful.Should().BeTrue();
         state.CurrentSnapshot.Should().NotBeSameAs(snapshot);
         state.SnapshotCapturedAt.Should().Be(clock.GetUtcNow());

@@ -238,7 +238,9 @@ public sealed class SchedulerStatisticsPageState : IAsyncDisposable
 
             var result = await _facade.GetExecutionAnalyticsAsync(query, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
             {
                 FailQuery(version, authorization.Version, error.Message);
                 return;

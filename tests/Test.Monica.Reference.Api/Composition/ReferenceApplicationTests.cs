@@ -66,16 +66,16 @@ public sealed class ReferenceApplicationTests
         var commands = scope.Resolve<IOrderingCommandApi>();
         var queries = scope.Resolve<IOrderingQueryApi>();
         var created = await commands.CreateOrder(new CommandCreateOrder("MANUAL-1003", "Manual customer", 125m), token);
-        Assert.Equal(ResStatus.Ok, created.Status);
+        Assert.Equal(ResultStatus.Ok, created.Status);
         Assert.NotNull(created.Data);
         var approved = await commands.ApproveOrder(new CommandApproveOrder(created.Data.Id), token);
-        Assert.Equal(ResStatus.Ok, approved.Status);
+        Assert.Equal(ResultStatus.Ok, approved.Status);
         Assert.Equal(OrderStatus.Approved, approved.Data!.Status);
         var listed = await queries.GetOrders(new QueryGetOrders(), token);
-        Assert.Equal(ResStatus.Ok, listed.Status);
+        Assert.Equal(ResultStatus.Ok, listed.Status);
         Assert.Contains(listed.Data!, order => order.Id == created.Data.Id && order.Status == OrderStatus.Approved);
         var summary = await queries.GetOrderSummary(new QueryGetOrderSummary(), token);
-        Assert.Equal(ResStatus.Ok, summary.Status);
+        Assert.Equal(ResultStatus.Ok, summary.Status);
         Assert.Equal(3, summary.Data!.TotalOrders);
         Assert.Equal(2, summary.Data.DraftOrders);
         Assert.Contains(factory.Logs.Entries, entry => entry.Category == typeof(LocalEventHandlerOrderApproved).FullName
@@ -111,7 +111,7 @@ public sealed class ReferenceApplicationTests
             JobKey = typeof(WorkerOrderBacklogReport).FullName!,
             InstanceId = "reference-explicit-report"
         }, token);
-        Assert.Equal(ResStatus.Ok, admitted.Status);
+        Assert.Equal(ResultStatus.Ok, admitted.Status);
         Assert.NotNull(admitted.Data);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -140,13 +140,13 @@ public sealed class ReferenceApplicationTests
         await using var scope = app.CreateScope(TestContext.Current.CancellationToken);
         var facade = scope.Resolve<ConfigurationFacade>();
         var catalog = await facade.GetDefinitionCatalogAsync();
-        Assert.Equal(ResStatus.Ok, catalog.Status);
+        Assert.Equal(ResultStatus.Ok, catalog.Status);
         var managed = Assert.Single(catalog.Data!.Definitions, definition => definition.DefinitionKey == "reference.ordering");
         Assert.Equal("Ordering", managed.SectionPath);
         Assert.Equal(ConfigurationKind.Managed, managed.Kind);
         Assert.Equal(100, scope.Resolve<IOptions<OptionsOrdering>>().Value.MaximumOrdersReturned);
         var state = await facade.GetDefinitionStateAsync(managed.DefinitionKey);
-        Assert.Equal(ResStatus.Ok, state.Status);
+        Assert.Equal(ResultStatus.Ok, state.Status);
         Assert.True(state.Data!.IsUnpersisted);
         Assert.Null(state.Data.EffectiveValueVersion);
         var startup = Assert.Single(catalog.Data.Definitions, definition => definition.SectionPath == "ReferenceUI");

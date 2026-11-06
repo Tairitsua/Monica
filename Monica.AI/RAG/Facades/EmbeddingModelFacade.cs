@@ -19,7 +19,7 @@ public class EmbeddingModelFacade(
     IKnowledgeBaseStore knowledgeBaseStore,
     ILogger<EmbeddingModelFacade> logger)
 {
-    public Task<Res<IReadOnlyList<EmbeddingModelOption>>> GetEmbeddingModelsAsync()
+    public Task<Result<IReadOnlyList<EmbeddingModelOption>>> GetEmbeddingModelsAsync()
     {
         try
         {
@@ -44,20 +44,20 @@ public class EmbeddingModelFacade(
                 .ToList()
                 .AsReadOnly();
 
-            return Task.FromResult(Res.Ok<IReadOnlyList<EmbeddingModelOption>>(options));
+            return Task.FromResult(Result.Success<IReadOnlyList<EmbeddingModelOption>>(options));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get embedding model options.");
-            return Task.FromResult<Res<IReadOnlyList<EmbeddingModelOption>>>(
-                Res.Fail($"Failed to load embedding models: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<IReadOnlyList<EmbeddingModelOption>>>(
+                Result.Failure<IReadOnlyList<EmbeddingModelOption>>($"Failed to load embedding models: {ex.GetMessageRecursively()}"));
         }
     }
 
     /// <summary>
     /// Gets diagnostic metadata for every configured embedding model, including invalid providers.
     /// </summary>
-    public Task<Res<IReadOnlyList<EmbeddingModelDiagnosticInfo>>> GetEmbeddingModelDiagnosticsAsync()
+    public Task<Result<IReadOnlyList<EmbeddingModelDiagnosticInfo>>> GetEmbeddingModelDiagnosticsAsync()
     {
         try
         {
@@ -84,13 +84,13 @@ public class EmbeddingModelFacade(
                 .ToList()
                 .AsReadOnly();
 
-            return Task.FromResult(Res.Ok<IReadOnlyList<EmbeddingModelDiagnosticInfo>>(diagnostics));
+            return Task.FromResult(Result.Success<IReadOnlyList<EmbeddingModelDiagnosticInfo>>(diagnostics));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get embedding model diagnostics.");
-            return Task.FromResult<Res<IReadOnlyList<EmbeddingModelDiagnosticInfo>>>(
-                Res.Fail($"Failed to load embedding diagnostics: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<IReadOnlyList<EmbeddingModelDiagnosticInfo>>>(
+                Result.Failure<IReadOnlyList<EmbeddingModelDiagnosticInfo>>($"Failed to load embedding diagnostics: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -100,7 +100,7 @@ public class EmbeddingModelFacade(
     /// <param name="providerId">Provider identifier that owns the embedding model.</param>
     /// <param name="modelName">Embedding model name to test.</param>
     /// <param name="ct">Cancellation token used for the live embedding request.</param>
-    public async Task<Res<EmbeddingModelConnectionTestResult>> TestEmbeddingModelConnectionAsync(
+    public async Task<Result<EmbeddingModelConnectionTestResult>> TestEmbeddingModelConnectionAsync(
         string providerId,
         string modelName,
         CancellationToken ct = default)
@@ -109,19 +109,19 @@ public class EmbeddingModelFacade(
         {
             if (string.IsNullOrWhiteSpace(providerId))
             {
-                return Res.Fail("Embedding provider ID cannot be empty.");
+                return Result.Failure<EmbeddingModelConnectionTestResult>("Embedding provider ID cannot be empty.");
             }
 
             if (string.IsNullOrWhiteSpace(modelName))
             {
-                return Res.Fail("Embedding model name cannot be empty.");
+                return Result.Failure<EmbeddingModelConnectionTestResult>("Embedding model name cannot be empty.");
             }
 
             using var lease = providerFactory.AcquireProvider(providerId);
             var provider = lease?.Provider;
             if (provider is null)
             {
-                return Res.Fail($"Embedding provider '{providerId}' was not found.");
+                return Result.Failure<EmbeddingModelConnectionTestResult>($"Embedding provider '{providerId}' was not found.");
             }
 
             var embeddingModel = provider.Info.SupportedModels?
@@ -130,7 +130,7 @@ public class EmbeddingModelFacade(
 
             if (embeddingModel is null)
             {
-                return Res.Fail($"Embedding model '{modelName}' is not configured on provider '{provider.ProviderId}'.");
+                return Result.Failure<EmbeddingModelConnectionTestResult>($"Embedding model '{modelName}' is not configured on provider '{provider.ProviderId}'.");
             }
 
             var generator = provider.GetEmbeddingGenerator(embeddingModel.ModelName);
@@ -138,13 +138,13 @@ public class EmbeddingModelFacade(
             var embedding = generated.FirstOrDefault();
             if (embedding is null)
             {
-                return Res.Fail("Embedding generator returned no vectors.");
+                return Result.Failure<EmbeddingModelConnectionTestResult>("Embedding generator returned no vectors.");
             }
 
             var dimensions = embedding.Vector.Length;
             embeddingModel.Dimensions = dimensions;
 
-            return Res.Ok(new EmbeddingModelConnectionTestResult
+            return Result.Success(new EmbeddingModelConnectionTestResult
             {
                 ProviderId = provider.ProviderId,
                 ModelName = embeddingModel.ModelName,
@@ -160,7 +160,7 @@ public class EmbeddingModelFacade(
                 "Failed to test embedding model '{ModelName}' on provider '{ProviderId}'.",
                 modelName,
                 providerId);
-            return Res.Ok(new EmbeddingModelConnectionTestResult
+            return Result.Success(new EmbeddingModelConnectionTestResult
             {
                 ProviderId = providerId,
                 ModelName = modelName,
@@ -170,27 +170,30 @@ public class EmbeddingModelFacade(
         }
     }
 
-    public async Task<Res<EmbeddingModelOption?>> GetKnowledgeBaseEmbeddingModelAsync(string kbId)
+    public async Task<Result<EmbeddingModelOption?>> GetKnowledgeBaseEmbeddingModelAsync(string kbId)
     {
         try
         {
             var kb = await knowledgeBaseStore.GetKnowledgeBaseAsync(kbId);
             if (kb is null)
             {
-                return Res.Fail("Knowledge base not found.");
+                return Result.Failure<EmbeddingModelOption?>("Knowledge base not found.");
             }
 
             if (string.IsNullOrWhiteSpace(kb.EmbeddingProviderId)
                 || string.IsNullOrWhiteSpace(kb.EmbeddingModelName))
             {
-                return Res.Ok<EmbeddingModelOption?>(null);
+                return Result.Success<EmbeddingModelOption?>(null);
             }
 
             var modelsResult = await GetEmbeddingModelsAsync();
-            if (modelsResult.IsFailed(out var error, out var models))
+            if (modelsResult.IsFailure())
             {
-                return Res.Fail(error.Message!);
+                return Result.FromFailure<EmbeddingModelOption?>(modelsResult);
             }
+
+            var models = modelsResult.Data
+                ?? throw new InvalidOperationException("Embedding model discovery returned no data.");
 
             var model = models.FirstOrDefault(m =>
                 string.Equals(m.ProviderId, kb.EmbeddingProviderId, StringComparison.OrdinalIgnoreCase)
@@ -198,13 +201,13 @@ public class EmbeddingModelFacade(
 
             if (model is not null)
             {
-                return Res.Ok<EmbeddingModelOption?>(model);
+                return Result.Success<EmbeddingModelOption?>(model);
             }
 
             var provider = providerFactory.GetProviderInfo(kb.EmbeddingProviderId);
             var fallbackProviderId = kb.EmbeddingProviderId.Trim();
 
-            return Res.Ok<EmbeddingModelOption?>(new EmbeddingModelOption
+            return Result.Success<EmbeddingModelOption?>(new EmbeddingModelOption
             {
                 ProviderId = kb.EmbeddingProviderId,
                 ProviderDisplayName = provider?.DisplayName ?? fallbackProviderId,
@@ -215,11 +218,11 @@ public class EmbeddingModelFacade(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get embedding model for KB '{KbId}'", kbId);
-            return Res.Fail($"Failed to get embedding model: {ex.GetMessageRecursively()}");
+            return Result.Failure<EmbeddingModelOption?>($"Failed to get embedding model: {ex.GetMessageRecursively()}");
         }
     }
 
-    public async Task<Res> SetKnowledgeBaseEmbeddingModelAsync(
+    public async Task<Result> SetKnowledgeBaseEmbeddingModelAsync(
         string kbId,
         string providerId,
         string modelName,
@@ -229,19 +232,22 @@ public class EmbeddingModelFacade(
         {
             if (string.IsNullOrWhiteSpace(providerId))
             {
-                return Res.Fail("Embedding provider ID cannot be empty.");
+                return Result.Failure("Embedding provider ID cannot be empty.");
             }
 
             if (string.IsNullOrWhiteSpace(modelName))
             {
-                return Res.Fail("Embedding model name cannot be empty.");
+                return Result.Failure("Embedding model name cannot be empty.");
             }
 
             var modelsResult = await GetEmbeddingModelsAsync();
-            if (modelsResult.IsFailed(out var error, out var models))
+            if (modelsResult.IsFailure())
             {
-                return Res.Fail(error.Message!);
+                return Result.FromFailure(modelsResult);
             }
+
+            var models = modelsResult.Data
+                ?? throw new InvalidOperationException("Embedding model discovery returned no data.");
 
             var exists = models.Any(option =>
                 string.Equals(option.ProviderId, providerId, StringComparison.OrdinalIgnoreCase)
@@ -249,7 +255,7 @@ public class EmbeddingModelFacade(
 
             if (!exists)
             {
-                return Res.Fail(
+                return Result.Failure(
                     $"Embedding model '{modelName}' is not available on provider '{providerId}'.");
             }
 
@@ -259,7 +265,7 @@ public class EmbeddingModelFacade(
                 modelName,
                 clearIndex);
 
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
@@ -268,8 +274,8 @@ public class EmbeddingModelFacade(
                 "Failed to set embedding binding for KB '{KbId}' to provider '{ProviderId}' model '{ModelName}'",
                 kbId, providerId, modelName);
             return ex is InvalidOperationException or KeyNotFoundException
-                ? Res.Fail(ex.GetMessageRecursively())
-                : Res.Fail($"Failed to set embedding model: {ex.GetMessageRecursively()}");
+                ? Result.Failure(ex.GetMessageRecursively())
+                : Result.Failure($"Failed to set embedding model: {ex.GetMessageRecursively()}");
         }
     }
 

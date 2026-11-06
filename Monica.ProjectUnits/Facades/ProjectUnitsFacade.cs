@@ -22,17 +22,17 @@ public sealed class ProjectUnitsFacade(
     /// Gets every discovered project unit.
     /// </summary>
     /// <returns>A result envelope containing the project-unit projections for the current host.</returns>
-    public Task<Res<List<ProjectUnitSummary>>> GetAllProjectUnitsAsync()
+    public Task<Result<List<ProjectUnitSummary>>> GetAllProjectUnitsAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok<List<ProjectUnitSummary>>(CatalogService.GetAllProjectUnits()));
+            return Task.FromResult(Result.Success<List<ProjectUnitSummary>>(CatalogService.GetAllProjectUnits()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load project units.");
-            return Task.FromResult<Res<List<ProjectUnitSummary>>>(
-                Res.Fail($"Failed to load project units: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<List<ProjectUnitSummary>>>(
+                Result.Failure<List<ProjectUnitSummary>>($"Failed to load project units: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -40,17 +40,17 @@ public sealed class ProjectUnitsFacade(
     /// Gets the current host's project-unit status dashboard.
     /// </summary>
     /// <returns>A result envelope containing independent coverage, topology, and catalog-health metrics.</returns>
-    public Task<Res<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
+    public Task<Result<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(CatalogService.GetDashboard()));
+            return Task.FromResult(Result.Success(CatalogService.GetDashboard()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load the project-unit dashboard.");
-            return Task.FromResult<Res<ProjectUnitDashboardSnapshot>>(
-                Res.Fail($"Failed to load the project-unit dashboard: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<ProjectUnitDashboardSnapshot>>(
+                Result.Failure<ProjectUnitDashboardSnapshot>($"Failed to load the project-unit dashboard: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -60,18 +60,18 @@ public sealed class ProjectUnitsFacade(
     /// <param name="key">The represented CLR type's full name.</param>
     /// <param name="cancellationToken">Signals that the detail request has been cancelled.</param>
     /// <returns>A result envelope containing the detail projection.</returns>
-    public async Task<Res<ProjectUnitDetail>> GetProjectUnitDetailAsync(
+    public async Task<Result<ProjectUnitDetail>> GetProjectUnitDetailAsync(
         string key,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await CatalogService.GetProjectUnitDetailAsync(key, cancellationToken));
+            return Result.Success(await CatalogService.GetProjectUnitDetailAsync(key, cancellationToken));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to resolve project unit {ProjectUnitKey}.", key);
-            return Res.Fail($"Failed to resolve project unit: {ex.GetMessageRecursively()}");
+            return Result.Failure<ProjectUnitDetail>($"Failed to resolve project unit: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -79,17 +79,17 @@ public sealed class ProjectUnitsFacade(
     /// Gets discovered domain-event metadata.
     /// </summary>
     /// <returns>A result envelope containing domain-event metadata and representative payload structures.</returns>
-    public Task<Res<List<ProjectUnitDomainEventInfo>>> GetDomainEventsAsync()
+    public Task<Result<List<ProjectUnitDomainEventInfo>>> GetDomainEventsAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok<List<ProjectUnitDomainEventInfo>>(CatalogService.GetDomainEvents()));
+            return Task.FromResult(Result.Success<List<ProjectUnitDomainEventInfo>>(CatalogService.GetDomainEvents()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load domain events.");
-            return Task.FromResult<Res<List<ProjectUnitDomainEventInfo>>>(
-                Res.Fail($"Failed to load domain events: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<List<ProjectUnitDomainEventInfo>>>(
+                Result.Failure<List<ProjectUnitDomainEventInfo>>($"Failed to load domain events: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -102,17 +102,17 @@ public sealed class ProjectUnitsFacade(
     /// </param>
     /// <param name="eventContent">The JSON payload to deserialize as the selected event type.</param>
     /// <returns>A result envelope describing whether the event was published.</returns>
-    public async Task<Res> PublishDomainEventAsync(string eventKey, JsonNode eventContent)
+    public async Task<Result> PublishDomainEventAsync(string eventKey, JsonNode eventContent)
     {
         try
         {
-            var eventToPublish = await CatalogService.PublishDomainEventAsync(eventKey, eventContent);
-            return Res.Ok(eventToPublish).AppendMessage($"Published domain event '{eventKey}'.");
+            await CatalogService.PublishDomainEventAsync(eventKey, eventContent);
+            return Result.Success().WithMessage($"Published domain event '{eventKey}'.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to publish domain event {EventKey}.", eventKey);
-            return Res.Fail($"Failed to publish domain event: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to publish domain event: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -123,17 +123,17 @@ public sealed class ProjectUnitsFacade(
     /// A result envelope that distinguishes an unavailable service from an available service with no disabled paths.
     /// Reading this snapshot does not attach middleware, change paths, or grant mutation access.
     /// </returns>
-    public Task<Res<ProjectUnitRequestFilterState>> GetRequestFilterStateAsync()
+    public Task<Result<ProjectUnitRequestFilterState>> GetRequestFilterStateAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(CatalogService.GetRequestFilterState()));
+            return Task.FromResult(Result.Success(CatalogService.GetRequestFilterState()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to read request-filter state.");
-            return Task.FromResult<Res<ProjectUnitRequestFilterState>>(
-                Res.Fail($"Failed to read request-filter state: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<ProjectUnitRequestFilterState>>(
+                Result.Failure<ProjectUnitRequestFilterState>($"Failed to read request-filter state: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -146,16 +146,16 @@ public sealed class ProjectUnitsFacade(
     /// A result envelope containing the currently disabled request paths, or an empty list if no service is registered.
     /// Use <see cref="GetRequestFilterStateAsync"/> when availability must be distinguished from an empty set.
     /// </returns>
-    public Task<Res<List<string>>> ManageRequestFilterAsync(List<string>? urls, bool? disable)
+    public Task<Result<List<string>>> ManageRequestFilterAsync(List<string>? urls, bool? disable)
     {
         try
         {
-            return Task.FromResult(Res.Ok<List<string>>(CatalogService.ManageRequestFilter(urls, disable)));
+            return Task.FromResult(Result.Success<List<string>>(CatalogService.ManageRequestFilter(urls, disable)));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to manage request filters.");
-            return Task.FromResult<Res<List<string>>>($"Failed to manage request filters: {ex.GetMessageRecursively()}");
+            return Task.FromResult(Result.Failure<List<string>>($"Failed to manage request filters: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -164,16 +164,16 @@ public sealed class ProjectUnitsFacade(
     /// </summary>
     /// <param name="name">An optional short enum type name used to filter the result.</param>
     /// <returns>A result envelope containing discovered enum metadata.</returns>
-    public Task<Res<List<DtoAssemblyEnumInfo>>> GetEnumInfoAsync(string? name = null)
+    public Task<Result<List<DtoAssemblyEnumInfo>>> GetEnumInfoAsync(string? name = null)
     {
         try
         {
-            return Task.FromResult(Res.Ok<List<DtoAssemblyEnumInfo>>(CatalogService.GetEnumInfo(name)));
+            return Task.FromResult(Result.Success<List<DtoAssemblyEnumInfo>>(CatalogService.GetEnumInfo(name)));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load enum metadata.");
-            return Task.FromResult<Res<List<DtoAssemblyEnumInfo>>>($"Failed to load enum metadata: {ex.GetMessageRecursively()}");
+            return Task.FromResult(Result.Failure<List<DtoAssemblyEnumInfo>>($"Failed to load enum metadata: {ex.GetMessageRecursively()}"));
         }
     }
 

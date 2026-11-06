@@ -17,57 +17,57 @@ public sealed class SignalRFacade(
     /// <summary>
     /// Gets metadata for all registered SignalR hubs.
     /// </summary>
-    public Task<Res<List<SignalRHubInfo>>> GetHubInfosAsync()
+    public Task<Result<List<SignalRHubInfo>>> GetHubInfosAsync()
     {
         try
         {
             var inspectionService = serviceProvider.GetRequiredService<SignalRInspectionService>();
-            return Task.FromResult(Res.Ok(inspectionService.GetHubInfos().ToList()));
+            return Task.FromResult(Result.Success(inspectionService.GetHubInfos().ToList()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get SignalR hub metadata.");
-            return Task.FromResult<Res<List<SignalRHubInfo>>>(Res.Fail(
+            return Task.FromResult<Result<List<SignalRHubInfo>>>(Result.Failure<List<SignalRHubInfo>>(
                 $"Failed to get SignalR hub metadata: {ex.GetMessageRecursively()}",
-                ResStatus.InternalError));
+                ResultStatus.InternalError));
         }
     }
 
     /// <summary>
     /// Gets the currently connected SignalR users.
     /// </summary>
-    public Task<Res<List<SignalRConnectedUserInfo>>> GetConnectedUsersAsync()
+    public Task<Result<List<SignalRConnectedUserInfo>>> GetConnectedUsersAsync()
     {
         try
         {
             var inspectionService = serviceProvider.GetRequiredService<SignalRInspectionService>();
-            return Task.FromResult(Res.Ok(inspectionService.GetConnectedUsers().ToList()));
+            return Task.FromResult(Result.Success(inspectionService.GetConnectedUsers().ToList()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get connected SignalR users.");
-            return Task.FromResult<Res<List<SignalRConnectedUserInfo>>>(Res.Fail(
+            return Task.FromResult<Result<List<SignalRConnectedUserInfo>>>(Result.Failure<List<SignalRConnectedUserInfo>>(
                 $"Failed to get connected SignalR users: {ex.GetMessageRecursively()}",
-                ResStatus.InternalError));
+                ResultStatus.InternalError));
         }
     }
 
     /// <summary>
     /// Gets Monica-observed SignalR server-to-client send diagnostics.
     /// </summary>
-    public Task<Res<SignalRSendDiagnosticsSnapshot>> GetSendDiagnosticsAsync()
+    public Task<Result<SignalRSendDiagnosticsSnapshot>> GetSendDiagnosticsAsync()
     {
         try
         {
             var inspectionService = serviceProvider.GetRequiredService<SignalRInspectionService>();
-            return Task.FromResult(Res.Ok(inspectionService.GetSendDiagnostics()));
+            return Task.FromResult(Result.Success(inspectionService.GetSendDiagnostics()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get SignalR send diagnostics.");
-            return Task.FromResult<Res<SignalRSendDiagnosticsSnapshot>>(Res.Fail(
+            return Task.FromResult<Result<SignalRSendDiagnosticsSnapshot>>(Result.Failure<SignalRSendDiagnosticsSnapshot>(
                 $"Failed to get SignalR send diagnostics: {ex.GetMessageRecursively()}",
-                ResStatus.InternalError));
+                ResultStatus.InternalError));
         }
     }
 }

@@ -170,7 +170,9 @@
                 _operations.TryApply(() =>
                 {
                     if (generation != _loadGeneration) return;
-                    if (result.IsFailed(out var error, out var chain)) _error = error.Message;
+                    var error = result;
+                    var chain = result.Data;
+                    if (result.IsFailure() || chain is null) _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                     else { _chain = chain; _error = null; }
                     _loading = false;
                 });

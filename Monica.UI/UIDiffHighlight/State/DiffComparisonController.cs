@@ -8,9 +8,9 @@ namespace Monica.UI.UIDiffHighlight.State;
 /// Serializes real Diff work for one component visit. Callers own automatic/manual admission,
 /// rendering, and empty-input policy. Retirement drains computation without claiming cancellation.
 /// </summary>
-internal sealed class DiffComparisonController(Func<DiffComparisonInput, Task<Res<DiffHighlightResult>>> compare) : IAsyncDisposable
+internal sealed class DiffComparisonController(Func<DiffComparisonInput, Task<Result<DiffHighlightResult>>> compare) : IAsyncDisposable
 {
-    private readonly Func<DiffComparisonInput, Task<Res<DiffHighlightResult>>> _compare = compare
+    private readonly Func<DiffComparisonInput, Task<Result<DiffHighlightResult>>> _compare = compare
         ?? throw new ArgumentNullException(nameof(compare));
     private readonly object _sync = new();
     private DiffComparisonInput? _draft;
@@ -120,8 +120,10 @@ internal sealed class DiffComparisonController(Func<DiffComparisonInput, Task<Re
                 try
                 {
                     var result = await _compare(request.Input);
-                    if (result.IsFailed(out var error, out var data))
-                        failure = new(request.Revision, request.Input, error.Message ?? string.Empty);
+                    var error = result.WithoutData();
+                    var data = result.Data;
+                    if (result.IsFailure() || data is null)
+                        failure = new(request.Revision, request.Input, error.Message ?? "The comparison returned no data.");
                     else
                         accepted = new(request.Revision, request.Input, data);
                 }

@@ -38,11 +38,11 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var json = $$"""{"code":{{status}},"message":"Application message","data":null}""";
         using var client = Client((_, _) => Task.FromResult(Response(http, json)));
-        var result = await Invoke<Res<string?>>(host, client);
-        Assert.Equal((ResStatus)status, result.Status);
+        var result = await Invoke<Result<string?>>(host, client);
+        Assert.Equal((ResultStatus)status, result.Status);
         Assert.Equal("Application message", result.Message);
         Assert.Null(result.Data);
-        Assert.Equal(status is 200 or 201, result.IsOk());
+        Assert.Equal(status is 200 or 201, result.IsSuccess());
     }
 
     [Theory]
@@ -57,7 +57,7 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory(ignoreCondition: ignoreCondition)
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var options = host.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var downstream = Res.Create("payload", (ResStatus)status);
+        var downstream = status == 201 ? Result.Created("payload") : Result.Success("payload");
         Assert.Null(downstream.Message);
         var json = JsonSerializer.Serialize(downstream, options);
         using var document = JsonDocument.Parse(json);
@@ -65,11 +65,11 @@ public sealed class RemoteCallClientTests
             document.RootElement.TryGetProperty("message", out _));
         using var client = Client((_, _) => Task.FromResult(Response(status, json)));
 
-        var result = await Invoke<Res<string>>(host, client);
+        var result = await Invoke<Result<string>>(host, client);
 
-        Assert.Equal((ResStatus)status, result.Status);
+        Assert.Equal((ResultStatus)status, result.Status);
         Assert.Equal("payload", result.Data);
-        Assert.True(result.IsOk());
+        Assert.True(result.IsSuccess());
         Assert.False(result.TryGetError(options, out _));
     }
 
@@ -89,9 +89,9 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromResult(Response(http, json)));
 
-        var result = await Invoke<Res<string>>(host, client);
+        var result = await Invoke<Result<string>>(host, client);
 
-        Assert.Equal(ResStatus.BadGateway, result.Status);
+        Assert.Equal(ResultStatus.BadGateway, result.Status);
         Assert.Equal(ResultErrorCodes.DependencyInvalidResponse, Error(host, result).Code);
         Assert.DoesNotContain("secret", JsonSerializer.Serialize(result));
     }
@@ -104,9 +104,9 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromResult(Response(http, $$"""{"code":{{http}}}""")));
 
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
 
-        Assert.Equal(ResStatus.BadGateway, result.Status);
+        Assert.Equal(ResultStatus.BadGateway, result.Status);
         Assert.Equal(code, Error(host, result).Code);
     }
 
@@ -130,8 +130,8 @@ public sealed class RemoteCallClientTests
     {
         await using var host = await new RpcFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromResult(Response(http, json)));
-        var result = await Invoke<Res<string>>(host, client);
-        Assert.Equal((ResStatus)status, result.Status);
+        var result = await Invoke<Result<string>>(host, client);
+        Assert.Equal((ResultStatus)status, result.Status);
         Assert.Equal(code, Error(host, result).Code);
         Assert.DoesNotContain("secret", JsonSerializer.Serialize(result));
     }
@@ -148,7 +148,7 @@ public sealed class RemoteCallClientTests
             return Task.FromResult(response);
         });
         Activity.Current = null;
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
         var error = Error(host, result);
         Assert.Equal(32, error.TraceId.Length);
         var entry = Assert.Single(logs.Entries);
@@ -167,14 +167,14 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory(exposeDiagnostics: expose)
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var jsonOptions = host.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var downstream = Res.Fail("Safe downstream failure", ResStatus.InternalError)
+        var downstream = Result.Failure("Safe downstream failure", ResultStatus.InternalError)
             .SetError(new ResultError("domain.failed", "origin-trace"))
             .SetMetadata("exception", new { stackTrace = "downstream-secret" });
         using var client = Client((_, _) => Task.FromResult(Response(500, JsonSerializer.Serialize(downstream, jsonOptions))));
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
         var output = JsonSerializer.Serialize(result);
 
-        Assert.Equal(ResStatus.InternalError, result.Status);
+        Assert.Equal(ResultStatus.InternalError, result.Status);
         if (expose) Assert.Contains("downstream-secret", output);
         else Assert.DoesNotContain("downstream-secret", output);
         // A forwarded error that does not identify its origin gains the immediate dependency's identity.
@@ -192,7 +192,7 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory(exposeDiagnostics: expose)
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromResult(Response(200, """{"code":200,"message":"","data":"ok"}""")));
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
 
         var output = JsonSerializer.Serialize(result);
         if (expose) Assert.Contains("\"remoteService\":\"Orders\"", output);
@@ -205,9 +205,9 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("unreachable")));
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
 
-        Assert.Equal(ResStatus.ServiceUnavailable, result.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, result.Status);
         // The local envelope bypasses remote presentation, so the stamp stays for in-process chain consumers.
         Assert.Contains("\"remoteService\":\"Orders\"", JsonSerializer.Serialize(result));
         Assert.Equal("Orders", Error(host, result).Service);
@@ -218,14 +218,14 @@ public sealed class RemoteCallClientTests
     {
         await using var host = await new RpcFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var jsonOptions = host.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var downstream = Res.Fail("Safe downstream failure", ResStatus.InternalError)
+        var downstream = Result.Failure("Safe downstream failure", ResultStatus.InternalError)
             .SetError(new ResultError("domain.failed", "origin-trace", "Inventory", "Reserve"))
             .SetMetadata("request", "secret").SetMetadata("chain", "secret")
             .SetMetadata("actions", new[] { "inspect" });
         using var client = Client((_, _) => Task.FromResult(Response(500, JsonSerializer.Serialize(downstream, jsonOptions))));
-        var result = await Invoke<Res>(host, client);
+        var result = await Invoke<Result>(host, client);
         Assert.Equal("origin-trace", Error(host, result).TraceId);
-        Assert.Equal(ResStatus.InternalError, result.Status);
+        Assert.Equal(ResultStatus.InternalError, result.Status);
         var output = JsonSerializer.Serialize(result);
         Assert.DoesNotContain("secret", output);
         Assert.Contains("actions", output);
@@ -251,7 +251,7 @@ public sealed class RemoteCallClientTests
             if (compressed) response.Content.Headers.ContentEncoding.Add("gzip");
             return Task.FromResult(response);
         });
-        var result = await Invoke<Res<string>>(host, client);
+        var result = await Invoke<Result<string>>(host, client);
         Assert.Equal("dependency.invalid_response", Error(host, result).Code);
     }
 
@@ -271,12 +271,12 @@ public sealed class RemoteCallClientTests
             return Task.FromResult(response);
         });
         var originalTimeout = client.Timeout;
-        var call = Invoke<Res>(host, client, cancellation.Token);
+        var call = Invoke<Result>(host, client, cancellation.Token);
         await body.Entered.Task.WaitAsync(TestContext.Current.CancellationToken);
         if (callerCancels) await cancellation.CancelAsync();
         clock.Fire();
         if (callerCancels) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call);
-        else Assert.Equal(ResStatus.GatewayTimeout, (await call).Status);
+        else Assert.Equal(ResultStatus.GatewayTimeout, (await call).Status);
         Assert.True(body.Disposed);
         Assert.Equal(originalTimeout, client.Timeout);
     }
@@ -286,7 +286,7 @@ public sealed class RemoteCallClientTests
     {
         await using var host = await new RpcFactory(maxBytes: long.MaxValue).CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromResult(Response(200, """{"code":200,"message":""}""")));
-        Assert.True((await Invoke<Res>(host, client)).IsOk());
+        Assert.True((await Invoke<Result>(host, client)).IsSuccess());
     }
 
     [Fact]
@@ -311,7 +311,7 @@ public sealed class RemoteCallClientTests
             ? """{"code":500,"message":"Domain failed","metadata":{"error":{"code":"domain.failed","traceId":"origin"}}}"""
             : """{"providerError":"unavailable"}""";
         using var client = Client((_, _) => Task.FromResult(Response(500, body)));
-        var result = await host.Services.GetRequiredService<IRemoteCallClient>().InvokeAsync<Res>(client,
+        var result = await host.Services.GetRequiredService<IRemoteCallClient>().InvokeAsync<Result>(client,
             _ => ValueTask.FromResult(new HttpRequestMessage(HttpMethod.Get, "http://target/")),
             Call with { Transport = transport }, TestContext.Current.CancellationToken);
         Assert.Equal(expectedCode, Error(host, result).Code);
@@ -324,7 +324,7 @@ public sealed class RemoteCallClientTests
         var requestBody = new MemoryStream([1, 2, 3]);
         using var client = Client((_, _) => throw new TaskCanceledException("send timeout", new TimeoutException()));
         var configuredTimeout = client.Timeout;
-        var result = await host.Services.GetRequiredService<IRemoteCallClient>().InvokeAsync<Res>(client,
+        var result = await host.Services.GetRequiredService<IRemoteCallClient>().InvokeAsync<Result>(client,
             _ => ValueTask.FromResult(new HttpRequestMessage(HttpMethod.Post, "http://target/") { Content = new StreamContent(requestBody) }),
             Call, TestContext.Current.CancellationToken);
         Assert.Equal("dependency.timeout", Error(host, result).Code);
@@ -339,7 +339,7 @@ public sealed class RemoteCallClientTests
         var sends = 0;
         using var client = Client((_, _) => { sends++; throw new Exception("must not send"); });
         await Assert.ThrowsAsync<InvalidOperationException>(() => host.Services.GetRequiredService<IRemoteCallClient>()
-            .InvokeAsync<Res>(client, _ => throw new InvalidOperationException("local"), Call, TestContext.Current.CancellationToken));
+            .InvokeAsync<Result>(client, _ => throw new InvalidOperationException("local"), Call, TestContext.Current.CancellationToken));
         Assert.Equal(0, sends);
     }
 
@@ -353,7 +353,7 @@ public sealed class RemoteCallClientTests
         using var bad = Client((_, _) => Task.FromResult(Response(502, "bad")));
         var failure = await Invoke<CustomEnvelope>(host, bad);
         Assert.Equal("failure-data", failure.Data);
-        Assert.Equal(ResStatus.BadGateway, failure.Status);
+        Assert.Equal(ResultStatus.BadGateway, failure.Status);
     }
 
     private static Task<T> Invoke<T>(MonicaTestApplication host, HttpClient client, CancellationToken? token = null)
@@ -382,9 +382,9 @@ public sealed class RemoteCallClientTests
     private sealed record CustomEnvelope(string Data) : IRemoteResultEnvelope<CustomEnvelope>
     {
         public string? Message { get; set; }
-        public ResStatus Status { get; set; }
+        public ResultStatus Status { get; set; }
         public ExpandoObject? Metadata { get; set; }
-        public static CustomEnvelope CreateRemoteFailure(ResStatus status, string message) =>
+        public static CustomEnvelope CreateRemoteFailure(ResultStatus status, string message) =>
             new("failure-data") { Status = status, Message = message };
     }
 
@@ -431,7 +431,7 @@ public sealed class RemoteCallClientTests
         public bool TryClassify(RemoteResponseContext response,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out RemoteCallFailure? failure)
         {
-            failure = new RemoteCallFailure(ResStatus.ServiceUnavailable, ResultErrorCodes.DependencyUnavailable, "provider");
+            failure = new RemoteCallFailure(ResultStatus.ServiceUnavailable, ResultErrorCodes.DependencyUnavailable, "provider");
             return true;
         }
     }

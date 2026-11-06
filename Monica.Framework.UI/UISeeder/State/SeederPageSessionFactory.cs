@@ -10,8 +10,8 @@ namespace Monica.Framework.UI.UISeeder.State;
 /// </summary>
 public sealed class SeederPageSessionFactory
 {
-    private readonly Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
-    private readonly Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? _runAsync;
+    private readonly Func<CancellationToken, Task<Result<SeederDiagnosticsSnapshot>>> _getSnapshotAsync;
+    private readonly Func<string, CancellationToken, Task<Result<SeederStateSnapshot>>>? _runAsync;
     private readonly string _hostName;
 
     /// <summary>Creates a factory backed by the host-local Seeder diagnostics facade.</summary>
@@ -25,9 +25,9 @@ public sealed class SeederPageSessionFactory
     }
 
     internal SeederPageSessionFactory(
-        Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> getSnapshotAsync,
+        Func<CancellationToken, Task<Result<SeederDiagnosticsSnapshot>>> getSnapshotAsync,
         string hostName,
-        Func<string, CancellationToken, Task<Res<SeederStateSnapshot>>>? runAsync = null)
+        Func<string, CancellationToken, Task<Result<SeederStateSnapshot>>>? runAsync = null)
     {
         _getSnapshotAsync = getSnapshotAsync ?? throw new ArgumentNullException(nameof(getSnapshotAsync));
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);

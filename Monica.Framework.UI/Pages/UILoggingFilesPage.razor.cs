@@ -85,7 +85,9 @@ public partial class UILoggingFilesPage
     {
         var result = await FileQuery.ListFilesAsync(_retirement.Token);
         if (_disposed) return;
-        if (result.IsFailed(out var error, out var files)) _error = error.Message;
+        var error = result.WithoutData();
+        var files = result.Data;
+        if (result.IsFailure() || files is null) _error = error.Message ?? "The log file catalog was unavailable.";
         else { _files = files; _readAt = DateTimeOffset.UtcNow; _page = Math.Min(_page, PageCount - 1); }
     });
 

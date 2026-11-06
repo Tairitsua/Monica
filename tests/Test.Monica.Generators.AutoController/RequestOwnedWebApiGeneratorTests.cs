@@ -126,8 +126,8 @@ public sealed class RequestOwnedWebApiGeneratorTests
         run.OutputErrors.Should().BeEmpty();
         var apiContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
 
-        apiContract.Should().Contain("global::Monica.Core.Results.Res");
-        apiContract.Should().Contain("global::Monica.Core.Results.ResPaged");
+        apiContract.Should().Contain("global::Monica.Core.Results.Result");
+        apiContract.Should().Contain("global::Monica.Core.Results.PagedResult");
         apiContract.Should().Contain("global::Scenario.Results.CustomEnvelope");
         apiContract.Should().Contain("global::Scenario.Alpha.SharedDto");
         apiContract.Should().Contain("global::Scenario.Beta.SharedDto");
@@ -317,7 +317,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed class QueryHandlerGetOrders
                 : ApplicationService<QueryGetOrders, IReadOnlyList<OrderDto>>
             {
-                public override Task<Res<IReadOnlyList<OrderDto>>> Handle(
+                public override Task<Result<IReadOnlyList<OrderDto>>> Handle(
                     QueryGetOrders request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -325,7 +325,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed class CommandHandlerCreateOrder
                 : ApplicationService<CommandCreateOrder, OrderDto>
             {
-                public override Task<Res<OrderDto>> Handle(
+                public override Task<Result<OrderDto>> Handle(
                     CommandCreateOrder request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -378,7 +378,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed class QueryHandlerPublishedOrders
                 : ApplicationService<QueryGetPublishedOrders, IReadOnlyList<string>>
             {
-                public override Task<Res<IReadOnlyList<string>>> Handle(
+                public override Task<Result<IReadOnlyList<string>>> Handle(
                     QueryGetPublishedOrders request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -386,7 +386,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed class QueryHandlerLocalHealth
                 : ApplicationService<QueryGetLocalHealth, string>
             {
-                public override Task<Res<string>> Handle(
+                public override Task<Result<string>> Handle(
                     QueryGetLocalHealth request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -429,7 +429,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class QueryHandlerOrderById : ApplicationService<QueryOrderById, OrderDto>
             {
-                public override Task<Res<OrderDto>> Handle(
+                public override Task<Result<OrderDto>> Handle(
                     QueryOrderById request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -477,27 +477,27 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class QueryHandlerGetItem : ApplicationService<QueryGetItem, string>
             {
-                public override Task<Res<string>> Handle(QueryGetItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result<string>> Handle(QueryGetItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class CommandHandlerCreateItem : ApplicationService<CommandCreateItem>
             {
-                public override Task<Res> Handle(CommandCreateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandCreateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class CommandHandlerReplaceItem : ApplicationService<CommandReplaceItem>
             {
-                public override Task<Res> Handle(CommandReplaceItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandReplaceItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class CommandHandlerUpdateItem : ApplicationService<CommandUpdateItem>
             {
-                public override Task<Res> Handle(CommandUpdateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandUpdateItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class CommandHandlerDeleteItem : ApplicationService<CommandDeleteItem>
             {
-                public override Task<Res> Handle(CommandDeleteItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandDeleteItem request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
         """;
@@ -533,10 +533,10 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed record CustomEnvelope<T>(T Value) : IRemoteResultEnvelope<CustomEnvelope<T>>
             {
                 public string? Message { get; set; }
-                public ResStatus Status { get; set; }
+                public ResultStatus Status { get; set; }
                 public ExpandoObject? Metadata { get; set; }
 
-                public static CustomEnvelope<T> CreateRemoteFailure(ResStatus status, string message) => new(default(T)!)
+                public static CustomEnvelope<T> CreateRemoteFailure(ResultStatus status, string message) => new(default(T)!)
                 {
                     Status = status,
                     Message = message
@@ -556,7 +556,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             /// <summary>Returns a paged result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "paged")]
-            public sealed record QueryPaged : IRequest<ResPaged<global::Scenario.Alpha.SharedDto>>, global::Monica.Core.Mediator.IQueryRequest;
+            public sealed record QueryPaged : IRequest<PagedResult<global::Scenario.Alpha.SharedDto>>, global::Monica.Core.Mediator.IQueryRequest;
 
             /// <summary>Returns a custom result envelope.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "custom")]
@@ -574,19 +574,19 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class QueryHandlerNoContent : ApplicationService<QueryNoContent>
             {
-                public override Task<Res> Handle(QueryNoContent request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(QueryNoContent request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerTyped
                 : ApplicationService<QueryTyped, global::Scenario.Alpha.SharedDto>
             {
-                public override Task<Res<global::Scenario.Alpha.SharedDto>> Handle(QueryTyped request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result<global::Scenario.Alpha.SharedDto>> Handle(QueryTyped request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerPaged
-                : CustomApplicationService<QueryPaged, ResPaged<global::Scenario.Alpha.SharedDto>>
+                : CustomApplicationService<QueryPaged, PagedResult<global::Scenario.Alpha.SharedDto>>
             {
-                public override Task<ResPaged<global::Scenario.Alpha.SharedDto>> Handle(QueryPaged request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<PagedResult<global::Scenario.Alpha.SharedDto>> Handle(QueryPaged request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerCustom
@@ -598,7 +598,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
             public sealed class QueryHandlerNested
                 : ApplicationService<QueryNested, Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>
             {
-                public override Task<Res<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>> Handle(QueryNested request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result<Dictionary<string, IReadOnlyList<global::Scenario.Alpha.SharedDto>>>> Handle(QueryNested request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
         """;
@@ -628,7 +628,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class CommandHandlerUpload : ApplicationService<CommandUpload>
             {
-                public override Task<Res> Handle(CommandUpload request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandUpload request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
         """;
@@ -659,7 +659,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class CommandHandlerDeleteItems : ApplicationService<CommandDeleteItems>
             {
-                public override Task<Res> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
         """;
@@ -690,7 +690,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             public sealed class CommandHandlerDeleteItems : ApplicationService<CommandDeleteItems>
             {
-                public override Task<Res> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result> Handle(CommandDeleteItems request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
         }
         """;
@@ -747,7 +747,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         public sealed class QueryHandlerMissingEndpoint : ApplicationService<QueryMissingEndpoint, string>
         {
-            public override Task<Res<string>> Handle(QueryMissingEndpoint request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryMissingEndpoint request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 
@@ -771,7 +771,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
         public sealed class QueryHandlerLegacyHandler : ApplicationService<QueryLegacyHandler, string>
         {
             [HttpGet("legacy")]
-            public override Task<Res<string>> Handle(QueryLegacyHandler request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryLegacyHandler request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 
@@ -793,7 +793,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         public sealed class QueryHandlerMissingConfiguration : ApplicationService<QueryMissingConfiguration, string>
         {
-            public override Task<Res<string>> Handle(QueryMissingConfiguration request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryMissingConfiguration request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 
@@ -815,7 +815,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         public sealed class QueryHandlerMissingPlaceholder : ApplicationService<QueryMissingPlaceholder, string>
         {
-            public override Task<Res<string>> Handle(QueryMissingPlaceholder request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryMissingPlaceholder request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 
@@ -837,7 +837,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
         public sealed class QueryHandlerInvalidRoute : ApplicationService<QueryInvalidRoute, string>
         {
-            public override Task<Res<string>> Handle(QueryInvalidRoute request, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public override Task<Result<string>> Handle(QueryInvalidRoute request, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
         """;
 

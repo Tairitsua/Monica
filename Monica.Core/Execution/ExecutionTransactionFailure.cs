@@ -17,7 +17,7 @@ public sealed record ExecutionTransactionFailure(string Source, string Reason)
     public Exception? Exception { get; init; }
 
     /// <summary>Gets the failed result's status, when failure was reported as a result.</summary>
-    public ResStatus? ResultStatus { get; init; }
+    public ResultStatus? ResultStatus { get; init; }
 
     /// <summary>Gets the failed operation's display name, or null outside a known execution.</summary>
     public string? Operation { get; init; }

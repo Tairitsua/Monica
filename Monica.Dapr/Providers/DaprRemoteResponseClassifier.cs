@@ -17,7 +17,7 @@ internal sealed class DaprRemoteResponseClassifier : IRemoteResponseClassifier
             !response.Body.TryGetProperty("errorCode", out var code) ||
             code.ValueKind != JsonValueKind.String || code.GetString() != "ERR_DIRECT_INVOKE") return false;
 
-        failure = new RemoteCallFailure(ResStatus.ServiceUnavailable, ResultErrorCodes.DependencyUnavailable,
+        failure = new RemoteCallFailure(ResultStatus.ServiceUnavailable, ResultErrorCodes.DependencyUnavailable,
             "dapr_invocation", response.StatusCode);
         return true;
     }

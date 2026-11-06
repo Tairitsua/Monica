@@ -286,7 +286,7 @@ public sealed class ProjectUnitSymbolClassifierParityTests
         public sealed class CommandCustom(SampleDomainService service)
             : OurApplicationService<SampleTypedRequest, string>
         {
-            public override Task<Monica.Core.Results.Res<string>> Handle(
+            public override Task<Monica.Core.Results.Result<string>> Handle(
                 SampleTypedRequest request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }

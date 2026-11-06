@@ -153,7 +153,9 @@
                     var revisionResult = await Facade.GetSourceRevisionAsync(source.SourceKey);
                     cancellation.Token.ThrowIfCancellationRequested();
                     if (generation != _previewGeneration) return;
-                    if (revisionResult.IsFailed(out var revisionError, out var revision))
+                    var revisionError = revisionResult;
+                    var revision = revisionResult.Data;
+                    if (revisionResult.IsFailure())
                     {
                         _operations.TryApply(() => _error = revisionError.Message);
                         return;
@@ -182,9 +184,11 @@
                     if (generation != _previewGeneration) return;
                     _operations.TryApply(() =>
                     {
-                        if (result.IsFailed(out var error, out var preview))
+                        var error = result;
+                        var preview = result.Data;
+                        if (result.IsFailure() || preview is null)
                         {
-                            _error = error.Message;
+                            _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                             _validationPreview = result.Data;
                         }
                         else
@@ -237,11 +241,13 @@
                     // Apply is deliberately tokenless: retirement drains its actual durable outcome.
                     var result = await Facade.ApplyMutationGroupAsync(request);
                     if (_operations.IsRetired) return;
-                    if (result.IsFailed(out var error, out var applied))
+                    var error = result;
+                    var applied = result.Data;
+                    if (result.IsFailure() || applied is null)
                     {
                         _operations.TryApply(() =>
                         {
-                            _error = error.Message;
+                            _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                             _validationPreview = result.Data?.ValidationPreview;
                             _previewRequest = null;
                         });

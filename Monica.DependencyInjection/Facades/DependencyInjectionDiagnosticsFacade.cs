@@ -17,17 +17,17 @@ public sealed class DependencyInjectionDiagnosticsFacade(
     /// <summary>
     /// Gets the finalized dependency-injection diagnostics snapshot.
     /// </summary>
-    public Task<Res<DependencyInjectionDiagnosticsSnapshot>> GetSnapshotAsync()
+    public Task<Result<DependencyInjectionDiagnosticsSnapshot>> GetSnapshotAsync()
     {
         try
         {
             var diagnosticsService = serviceProvider.GetRequiredService<DependencyInjectionDiagnosticsService>();
-            return Task.FromResult<Res<DependencyInjectionDiagnosticsSnapshot>>(Res.Ok(diagnosticsService.GetSnapshot()));
+            return Task.FromResult<Result<DependencyInjectionDiagnosticsSnapshot>>(Result.Success(diagnosticsService.GetSnapshot()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to build the dependency-injection diagnostics snapshot.");
-            return Task.FromResult<Res<DependencyInjectionDiagnosticsSnapshot>>(Res.Fail(
+            return Task.FromResult<Result<DependencyInjectionDiagnosticsSnapshot>>(Result.Failure<DependencyInjectionDiagnosticsSnapshot>(
                 $"Failed to build the dependency-injection diagnostics snapshot: {ex.GetMessageRecursively()}"));
         }
     }

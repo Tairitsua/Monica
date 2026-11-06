@@ -25,6 +25,33 @@ public sealed class RAGSourceProvenanceTests
     private const string FIRST_CONTENT = "# First group\n\nThis is the unrelated same-path document.";
     private const string SECOND_CONTENT = "# Second group\n\nThis content belongs to the recorded group.";
 
+    [Fact]
+    public async Task IndexDocumentAsync_WhenCallerCancels_ShouldPropagateCancellation()
+    {
+        using var files = new FileChatStorageFixture();
+        await using var application = await CreateApplicationAsync(files, CreateCatalog());
+        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            scope.Resolve<RAGIndexingFacade>().IndexDocumentAsync("source", DOCUMENT_ID, ct: cancellation.Token));
+    }
+
+    [Fact]
+    public async Task CancelBatchAsync_WhenNoBatchIsActive_ShouldReturnTheOperationMessage()
+    {
+        using var files = new FileChatStorageFixture();
+        await using var application = await CreateApplicationAsync(files, CreateCatalog());
+        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
+        await CreateKnowledgeBaseAsync(scope);
+
+        var result = await scope.Resolve<RAGIndexingFacade>().CancelBatchAsync("source", scope.CancellationToken);
+
+        result.IsSuccess().Should().BeTrue();
+        result.Message.Should().Be("No active indexing task found. Cancellation treated as no-op.");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -36,7 +63,7 @@ public sealed class RAGSourceProvenanceTests
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         await CreateKnowledgeBaseAsync(scope);
         var uploaded = await scope.Resolve<KnowledgeDocumentFacade>().UploadDocumentAsync("source", DOCUMENT_ID, UPLOADED_CONTENT);
-        uploaded.Status.Should().Be(ResStatus.Ok);
+        uploaded.Status.Should().Be(ResultStatus.Ok);
         await AssertSourcePreviewAsync(scope, UPLOADED_CONTENT, KnowledgeDocumentSourceKinds.Uploaded, null);
 
         await IndexAsync(scope, batch);
@@ -64,7 +91,7 @@ public sealed class RAGSourceProvenanceTests
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         await CreateKnowledgeBaseAsync(scope);
         var imported = await scope.Resolve<KnowledgeDocumentFacade>().ImportMarkdownDocumentsAsync("source", "second", [DOCUMENT_ID]);
-        imported.Status.Should().Be(ResStatus.Ok);
+        imported.Status.Should().Be(ResultStatus.Ok);
         imported.Message.Should().BeNull();
         imported.Data.Should().NotBeNull();
         var importDetails = imported.Data!;
@@ -104,11 +131,11 @@ public sealed class RAGSourceProvenanceTests
         await AssertSourcePreviewMissingAsync(scope);
 
         var preview = await scope.Resolve<RAGIndexingFacade>().GetDocumentChunksAsync("source", DOCUMENT_ID);
-        preview.Status.Should().NotBe(ResStatus.Ok);
+        preview.Status.Should().NotBe(ResultStatus.Ok);
         preview.Message.Should().NotBeNullOrWhiteSpace();
         preview.Data.Should().BeNull();
         var indexed = await scope.Resolve<RAGIndexingFacade>().StartBatchAsync("source", [DOCUMENT_ID], ct: scope.CancellationToken);
-        indexed.Status.Should().NotBe(ResStatus.Ok);
+        indexed.Status.Should().NotBe(ResultStatus.Ok);
         indexed.Message.Should().Contain("completed with errors");
 
         var state = await scope.Resolve<IDocumentIndexStateStore>().GetDocumentStateAsync("source", DOCUMENT_ID, scope.CancellationToken);
@@ -136,11 +163,11 @@ public sealed class RAGSourceProvenanceTests
         await AssertSourcePreviewMissingAsync(scope);
 
         var preview = await scope.Resolve<RAGIndexingFacade>().GetDocumentChunksAsync("source", DOCUMENT_ID);
-        preview.Status.Should().NotBe(ResStatus.Ok);
+        preview.Status.Should().NotBe(ResultStatus.Ok);
         preview.Message.Should().Contain("no available source content");
         preview.Data.Should().BeNull();
         var indexed = await scope.Resolve<RAGIndexingFacade>().StartBatchAsync("source", [DOCUMENT_ID], ct: scope.CancellationToken);
-        indexed.Status.Should().NotBe(ResStatus.Ok);
+        indexed.Status.Should().NotBe(ResultStatus.Ok);
         indexed.Message.Should().Contain("completed with errors");
 
         var state = await scope.Resolve<IDocumentIndexStateStore>().GetDocumentStateAsync("source", DOCUMENT_ID, scope.CancellationToken);
@@ -180,7 +207,7 @@ public sealed class RAGSourceProvenanceTests
         await AssertSourcePreviewMissingAsync(scope);
         var result = await scope.Resolve<RAGIndexingFacade>().GetDocumentChunksAsync("source", DOCUMENT_ID);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().Contain("not found in knowledge base");
         result.Data.Should().BeNull();
     }
@@ -215,14 +242,14 @@ public sealed class RAGSourceProvenanceTests
             var content = string.Join("\n\n", Enumerable.Range(0, sections[index])
                 .Select(section => $"# Section {section}\n\nRecorded content for {names[index]} section {section}."));
             var uploaded = await scope.Resolve<KnowledgeDocumentFacade>().UploadDocumentAsync("source", names[index], content);
-            uploaded.Status.Should().Be(ResStatus.Ok);
+            uploaded.Status.Should().Be(ResultStatus.Ok);
         }
 
         var indexed = await scope.Resolve<RAGIndexingFacade>().StartBatchAsync("source", names, maxConcurrency: 3, ct: scope.CancellationToken);
-        indexed.Status.Should().Be(ResStatus.Ok);
+        indexed.Status.Should().Be(ResultStatus.Ok);
         indexed.Message.Should().NotBeNullOrWhiteSpace();
         var inventory = await scope.Resolve<KnowledgeDocumentFacade>().GetDocumentInventoryAsync("source");
-        inventory.Status.Should().Be(ResStatus.Ok);
+        inventory.Status.Should().Be(ResultStatus.Ok);
         inventory.Message.Should().BeNull();
         inventory.Data.Should().NotBeNull();
         var documents = inventory.Data!;
@@ -230,7 +257,7 @@ public sealed class RAGSourceProvenanceTests
         var totalChunks = documents.Sum(row => row.ChunkCount);
         totalChunks.Should().BeGreaterThan(names.Length);
         var knowledgeBase = await scope.Resolve<KnowledgeBaseFacade>().GetByIdAsync("source");
-        knowledgeBase.Status.Should().Be(ResStatus.Ok);
+        knowledgeBase.Status.Should().Be(ResultStatus.Ok);
         knowledgeBase.Message.Should().BeNull();
         knowledgeBase.Data.Should().NotBeNull();
         var aggregate = knowledgeBase.Data!;
@@ -239,7 +266,7 @@ public sealed class RAGSourceProvenanceTests
 
         // Fake embeddings have arbitrary rank; request all records and assert identity and persisted content.
         var search = await scope.Resolve<RAGSearchFacade>().SearchAsync("Recorded content", ["source"], topK: totalChunks, ct: scope.CancellationToken);
-        search.Status.Should().Be(ResStatus.Ok);
+        search.Status.Should().Be(ResultStatus.Ok);
         search.Message.Should().BeNull();
         search.Data.Should().NotBeNull();
         var results = search.Data!;
@@ -260,12 +287,12 @@ public sealed class RAGSourceProvenanceTests
     private static async Task CreateKnowledgeBaseAsync(MonicaTestScope scope)
     {
         var created = await scope.Resolve<KnowledgeBaseFacade>().CreateAsync("source", "Source provenance");
-        created.Status.Should().Be(ResStatus.Ok);
+        created.Status.Should().Be(ResultStatus.Ok);
         created.Message.Should().BeNull();
         created.Data.Should().NotBeNull();
         created.Data!.Id.Should().Be("source");
         var bound = await scope.Resolve<EmbeddingModelFacade>().SetKnowledgeBaseEmbeddingModelAsync("source", "Fake", "Fake-Embeddings-384d");
-        bound.Status.Should().Be(ResStatus.Ok);
+        bound.Status.Should().Be(ResultStatus.Ok);
     }
 
     private static Task SeedDocumentAsync(MonicaTestScope scope, string sourceKind, string? group)
@@ -281,14 +308,14 @@ public sealed class RAGSourceProvenanceTests
         var result = batch
             ? await facade.StartBatchAsync("source", [DOCUMENT_ID], ct: scope.CancellationToken)
             : await facade.IndexDocumentAsync("source", DOCUMENT_ID, ct: scope.CancellationToken);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().NotBeNullOrWhiteSpace();
     }
 
     private static async Task AssertChunkViewAsync(MonicaTestScope scope, string content, string kind, string? group, bool isPreview)
     {
         var result = await scope.Resolve<RAGIndexingFacade>().GetDocumentChunksAsync("source", DOCUMENT_ID);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         var view = result.Data!;
@@ -303,7 +330,7 @@ public sealed class RAGSourceProvenanceTests
     private static async Task AssertSourcePreviewAsync(MonicaTestScope scope, string content, string kind, string? group)
     {
         var result = await scope.Resolve<KnowledgeDocumentFacade>().GetDocumentPreviewAsync("source", DOCUMENT_ID);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         var preview = result.Data!;
@@ -317,7 +344,7 @@ public sealed class RAGSourceProvenanceTests
     private static async Task AssertSourcePreviewMissingAsync(MonicaTestScope scope)
     {
         var result = await scope.Resolve<KnowledgeDocumentFacade>().GetDocumentPreviewAsync("source", DOCUMENT_ID);
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().NotBeNullOrWhiteSpace();
         result.Data.Should().BeNull();
     }
@@ -325,7 +352,7 @@ public sealed class RAGSourceProvenanceTests
     private static async Task AssertSearchAsync(MonicaTestScope scope, string content)
     {
         var result = await scope.Resolve<RAGSearchFacade>().SearchAsync("source content", ["source"], topK: 1, ct: scope.CancellationToken);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         var hit = result.Data!.Should().ContainSingle().Which;

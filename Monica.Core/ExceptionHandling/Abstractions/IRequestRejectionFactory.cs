@@ -10,7 +10,7 @@ namespace Monica.Core.ExceptionHandling.Abstractions;
 public interface IRequestRejectionFactory
 {
     /// <summary>Creates bounded field errors with the standard 400 rejection status.</summary>
-    RequestRejection FromModelState(ActionContext context, ResStatus status = ResStatus.BadRequest);
+    RequestRejection FromModelState(ActionContext context, ResultStatus status = ResultStatus.BadRequest);
     /// <summary>Preserves HTTP 413/415 and extracts safe JSON-path information.</summary>
     RequestRejection FromBadRequest(HttpContext? context, BadHttpRequestException exception);
     /// <summary>Normalizes declared validation errors into the standard 400 validation rejection.</summary>

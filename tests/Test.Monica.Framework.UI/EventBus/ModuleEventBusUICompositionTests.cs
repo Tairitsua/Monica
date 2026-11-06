@@ -31,7 +31,7 @@ public sealed class ModuleEventBusUICompositionTests
         await using var scope = app.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<EventBusTestService>().Should().NotBeNull();
         var providers = scope.ServiceProvider.GetRequiredService<EventBusProviderDiscoveryService>().GetRegisteredProviders();
-        providers.Status.Should().Be(ResStatus.Ok);
+        providers.Status.Should().Be(ResultStatus.Ok);
         providers.Message.Should().BeNull();
         providers.Data.Should().ContainSingle(provider => !provider.IsDistributed);
         providers.Data.Should().NotContain(provider => provider.IsDistributed);

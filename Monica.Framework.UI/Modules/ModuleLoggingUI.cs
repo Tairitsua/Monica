@@ -115,9 +115,15 @@ public class ModuleLoggingUI : MonicaModule<ModuleLoggingUIOption>, IWebHostRequ
                   HttpContext httpContext) =>
             {
                 var result = await loggingService.OpenFileAsync(filePath, httpContext.RequestAborted);
-                if (result.IsFailed(out var error, out var stream))
+                var error = result.WithoutData();
+                var stream = result.Data;
+                if (result.IsFailure())
                 {
                     return error.GetResponse();
+                }
+                if (stream is null)
+                {
+                    return Result.Failure("The log file could not be opened.", ResultStatus.InternalError).GetResponse();
                 }
 
                 httpContext.Response.RegisterForDisposeAsync(stream);
@@ -139,7 +145,9 @@ public class ModuleLoggingUI : MonicaModule<ModuleLoggingUIOption>, IWebHostRequ
             async ([FromServices] LoggingService loggingService, HttpContext httpContext) =>
             {
                 var result = await loggingService.ExportBufferAsync(httpContext.RequestAborted);
-                if (result.IsFailed(out var error, out var export))
+                var error = result.WithoutData();
+                var export = result.Data;
+                if (result.IsFailure())
                 {
                     return error.GetResponse();
                 }

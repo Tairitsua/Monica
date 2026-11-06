@@ -21,7 +21,7 @@ public sealed class CommandHandlerCreateOrder(
     /// <param name="request">The order creation request.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The created order, or a boundary failure when input or uniqueness rules are violated.</returns>
-    public override async Task<Res<OrderDto>> Handle(
+    public override async Task<Result<OrderDto>> Handle(
         CommandCreateOrder request,
         CancellationToken cancellationToken)
     {
@@ -29,11 +29,11 @@ public sealed class CommandHandlerCreateOrder(
         {
             var order = Order.Create(request.OrderNumber, request.CustomerName, request.Total);
             await repository.AddAsync(order, cancellationToken);
-            return Res.Ok(UtilsOrderMapping.ToDto(order));
+            return Result.Success(UtilsOrderMapping.ToDto(order));
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
-            return Res.Fail(exception.Message);
+            return Result.Failure<OrderDto>(exception.Message);
         }
     }
 }

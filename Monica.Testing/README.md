@@ -84,7 +84,7 @@ There is no separate application-service fixture. Application services use `Proj
 - `ProjectUnits/` — raw ProjectUnit fixture and execution helpers
 - `Repository/` — direct DbContext and repository helpers
 - `Doubles/` — deterministic state, user, and event boundaries
-- `Results/` — explicit assertions for `Res`, `Res<T>`, and `ResPaged<T>`
+- `Results/` — explicit assertions for `Result`, `Result<T>`, and `PagedResult<T>`
 - `Localization/` and `ObjectMapping/` — focused shared test support
 
 UI-specific support lives in `Monica.Testing.UI` so non-UI tests do not acquire Monica UI or bUnit dependencies through the core toolkit.

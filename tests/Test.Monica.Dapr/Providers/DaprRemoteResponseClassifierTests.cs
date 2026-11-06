@@ -16,7 +16,7 @@ public sealed class DaprRemoteResponseClassifierTests
         var classifier = new DaprRemoteResponseClassifier();
         Assert.Equal("dapr", classifier.Transport);
         Assert.True(classifier.TryClassify(new RemoteResponseContext(HttpStatusCode.InternalServerError, json.RootElement), out var failure));
-        Assert.Equal(ResStatus.ServiceUnavailable, failure!.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, failure!.Status);
         Assert.Equal("dependency.unavailable", failure.Code);
         Assert.DoesNotContain("secret", JsonSerializer.Serialize(failure));
     }

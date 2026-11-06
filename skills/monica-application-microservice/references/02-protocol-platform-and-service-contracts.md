@@ -13,4 +13,3 @@ An independently hosted server UI can use the build-generated catalog without ba
 - A `required` member is wire-mandatory: the canonical JSON contract always emits it, even when the host selects a null-omitting `DefaultIgnoreCondition`, and a nullable `required` member is transmitted as an explicit `null` so strict consumers can always bind it.
 - A member without `required` follows the host's ignore condition. When the host omits nulls, consumers must treat an absent optional member and an explicit `null` as equivalent.
 - Choose semantics deliberately: `required` marks "always present on the wire" and never needs to be removed to avoid serialization errors; a member that may legitimately be absent is optional and must not carry business meaning through omission alone.
-

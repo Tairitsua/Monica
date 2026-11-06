@@ -47,7 +47,9 @@ public partial class ConfigurationDefinitionSourcesDialog
                 var result = await Facade.GetDefinitionSourceContributionsAsync(_definitionKey);
                 _operations.TryApply(() =>
                 {
-                    if (result.IsFailed(out var error, out var contributions)) _error = error.Message;
+                    var error = result;
+                    var contributions = result.Data;
+                    if (result.IsFailure() || contributions is null) _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                     else _contributions.AddRange(contributions);
                     _loading = false;
                 });

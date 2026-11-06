@@ -23,7 +23,7 @@ public sealed class QueryHandlerGetOrders(
     /// <param name="request">The list request.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The immutable order view.</returns>
-    public override async Task<Res<IReadOnlyList<OrderDto>>> Handle(
+    public override async Task<Result<IReadOnlyList<OrderDto>>> Handle(
         QueryGetOrders request,
         CancellationToken cancellationToken)
     {
@@ -32,6 +32,6 @@ public sealed class QueryHandlerGetOrders(
             .Take(options.Value.MaximumOrdersReturned)
             .Select(UtilsOrderMapping.ToDto)
             .ToArray();
-        return Res.Ok<IReadOnlyList<OrderDto>>(response);
+        return Result.Success<IReadOnlyList<OrderDto>>(response);
     }
 }

@@ -58,7 +58,7 @@ public sealed class ChainTracingExecutionBehavior<TInput, TResult>(IChainTracing
                 scope.MergeRemoteChain(response);
             }
 
-            if (response.IsOk())
+            if (response.IsSuccess())
             {
                 scope.EndWithSuccess(description);
             }

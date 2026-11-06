@@ -35,7 +35,7 @@ public sealed class ChannelPipelineTests
 
         scenario.Primary.Outer.Initialization = _ => Task.CompletedTask;
         var recovered = await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken);
-        recovered.Status.Should().Be(ResStatus.Ok);
+        recovered.Status.Should().Be(ResultStatus.Ok);
         recovered.Message.Should().Contain("reinitialized successfully");
         var ready = ResultAssertions.Success(await facade.GetChannelsStatusAsync(scope.CancellationToken)).Single();
         ready.IsInitialized.Should().BeTrue();
@@ -45,7 +45,7 @@ public sealed class ChannelPipelineTests
 
         scenario.Primary.Outer.Initialization = _ => throw new InvalidOperationException("Later endpoint failure.");
         var failedRetry = await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken);
-        failedRetry.Status.Should().Be(ResStatus.BadRequest);
+        failedRetry.Status.Should().Be(ResultStatus.BadRequest);
         failedRetry.Message.Should().Contain("Later endpoint failure");
         var after = ResultAssertions.Success(await facade.GetChannelsStatusAsync(scope.CancellationToken)).Single();
         after.IsInitialized.Should().BeFalse();
@@ -78,7 +78,7 @@ public sealed class ChannelPipelineTests
             initializing.IsInitializing.Should().BeTrue();
             initializing.IsInitialized.Should().BeFalse();
             var rejected = await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken);
-            rejected.Status.Should().Be(ResStatus.BadRequest);
+            rejected.Status.Should().Be(ResultStatus.BadRequest);
             rejected.Message.Should().Contain("already initializing");
             pending.IsCompleted.Should().BeFalse();
             scenario.Primary.Outer.InitializationCalls.Should().Be(2, "a rejected attempt never calls an endpoint");
@@ -91,7 +91,7 @@ public sealed class ChannelPipelineTests
             retired.IsInitialized.Should().BeFalse();
             retired.IsNotAvailable.Should().BeTrue();
             scenario.Primary.Outer.Initialization = _ => Task.CompletedTask;
-            (await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken)).Status.Should().Be(ResStatus.Ok);
+            (await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken)).Status.Should().Be(ResultStatus.Ok);
         }
         finally
         {
@@ -125,13 +125,13 @@ public sealed class ChannelPipelineTests
         debugger.CanDebugMessages.Should().BeFalse();
         debugger.Type.Should().Be(global::Monica.DataChannel.UIDataChannel.Models.PipelineComponentKind.InfoDisplayMiddleware);
         var transientAction = await facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channel.Id, debugger.ComponentKey);
-        transientAction.Status.Should().Be(ResStatus.BadRequest);
+        transientAction.Status.Should().Be(ResultStatus.BadRequest);
         transientAction.Message.Should().Contain("unavailable");
         transientAction.Data.Should().BeNull();
 
         channel.Outer.Initialization = _ => Task.CompletedTask;
         var retry = await facade.ReInitializeChannelAsync(channel.Id, scope.CancellationToken);
-        retry.Status.Should().Be(ResStatus.Ok);
+        retry.Status.Should().Be(ResultStatus.Ok);
         retry.Message.Should().Contain("reinitialized successfully");
         channel.Outer.InitializationCalls.Should().Be(2, "a failed transient initialization must not latch success");
         var after = ResultAssertions.Success(await facade.GetChannelsStatusAsync(scope.CancellationToken)).Single();

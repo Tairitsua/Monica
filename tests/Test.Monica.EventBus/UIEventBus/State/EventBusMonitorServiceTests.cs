@@ -172,10 +172,10 @@ public sealed class EventBusMonitorServiceTests
         var subscriptions = await fixture.Monitor.GetAllSubscriptionsAsync();
         var statistics = await fixture.Monitor.GetStatisticsAsync();
 
-        subscriptions.Status.Should().Be(ResStatus.Ok);
+        subscriptions.Status.Should().Be(ResultStatus.Ok);
         subscriptions.Message.Should().BeNullOrEmpty();
         subscriptions.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(visible.Id.ToString());
-        statistics.Status.Should().Be(ResStatus.Ok);
+        statistics.Status.Should().Be(ResultStatus.Ok);
         statistics.Data!.TotalSubscriptions.Should().Be(1);
         statistics.Data.ActiveSubscriptions.Should().Be(1);
         Drain(feed).Should().BeEmpty();
@@ -192,7 +192,7 @@ public sealed class EventBusMonitorServiceTests
         fixture.Store.ReportMessageProcessed(null, "orders");
         var statuses = fixture.Monitor.GetAllTopicStatuses();
 
-        statuses.Status.Should().Be(ResStatus.Ok);
+        statuses.Status.Should().Be(ResultStatus.Ok);
         statuses.Data.Should().ContainSingle().Which.ProcessedMessages.Should().Be(1);
         Drain(feed).Should().BeEmpty();
     }
@@ -218,7 +218,7 @@ public sealed class EventBusMonitorServiceTests
 
         var result = await fixture.Monitor.FilterSubscriptionsAsync(filter);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNullOrEmpty();
         result.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(matching.Id.ToString());
         result.Data![0].State.Should().Be(EventSubscriptionState.Active);
@@ -226,7 +226,7 @@ public sealed class EventBusMonitorServiceTests
 
         filter.ServiceKey = "another-key";
         var contradictory = await fixture.Monitor.FilterSubscriptionsAsync(filter);
-        contradictory.Status.Should().Be(ResStatus.Ok);
+        contradictory.Status.Should().Be(ResultStatus.Ok);
         contradictory.Data.Should().BeEmpty();
     }
 
@@ -246,9 +246,9 @@ public sealed class EventBusMonitorServiceTests
             SelectedProvider = new EventBusProviderInfo { ServiceKey = "default", IsDistributed = false }
         });
 
-        defaultResult.Status.Should().Be(ResStatus.Ok);
+        defaultResult.Status.Should().Be(ResultStatus.Ok);
         defaultResult.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(defaultSubscription.Id.ToString());
-        namedResult.Status.Should().Be(ResStatus.Ok);
+        namedResult.Status.Should().Be(ResultStatus.Ok);
         namedResult.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(namedSubscription.Id.ToString());
     }
 
@@ -264,7 +264,7 @@ public sealed class EventBusMonitorServiceTests
             TopicRuntimeState = TopicSubscriptionRuntimeState.Healthy
         });
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().BeEmpty();
     }
 
@@ -279,7 +279,7 @@ public sealed class EventBusMonitorServiceTests
 
         var result = await fixture.Monitor.FilterSubscriptionsAsync(new SubscriptionFilter { SearchText = search });
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(subscription.Id.ToString());
     }
 
@@ -294,7 +294,7 @@ public sealed class EventBusMonitorServiceTests
             SearchText = subscription.Id.Value.ToString("D")
         });
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().ContainSingle().Which.SubscriptionId.Should().Be(subscription.Id.ToString());
     }
 

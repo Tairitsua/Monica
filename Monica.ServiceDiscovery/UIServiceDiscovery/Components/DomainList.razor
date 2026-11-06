@@ -123,7 +123,9 @@
         try
         {
             var domainsResult = await ServiceDiscoveryFacade.GetDomainsAsync();
-            if (domainsResult.IsFailed(out var error, out var domains))
+            var error = domainsResult.WithoutData();
+            var domains = domainsResult.Data;
+            if (domainsResult.IsFailure())
             {
                 Snackbar.Add(L["DomainList:Messages:LoadFailed", error.Message ?? L["Shared:Values:Unknown"].Value].Value, Severity.Error);
                 _domains = [];
@@ -135,9 +137,11 @@
             }
 
             var topologyResult = await ServiceDiscoveryFacade.CaptureTopologyAsync();
-            _topology = topologyResult.IsFailed(out _, out var topology) ? new(false, []) : topology!;
+            var topology = topologyResult.Data;
+            _topology = topologyResult.IsFailure() ? new(false, []) : topology ?? new(false, []);
             var servicesResult = await ServiceDiscoveryFacade.GetMergedServicesStatusAsync();
-            if (!servicesResult.IsFailed(out _, out var services))
+            var services = servicesResult.Data;
+            if (!servicesResult.IsFailure())
             {
                 _allServices = services ?? [];
             }

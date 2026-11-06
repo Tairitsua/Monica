@@ -56,7 +56,7 @@ public sealed class KafkaPollingSessionTests
     public async Task Capture_WhenInitialMetadataFails_ShouldKeepDefaultCountsUnavailable()
     {
         var failed = new KafkaPerformanceSnapshot { ClusterId = "primary", Message = "Broker metadata failed." };
-        await using var session = Create((_, _) => Task.FromResult(Res.Ok(failed)));
+        await using var session = Create((_, _) => Task.FromResult(Result.Success(failed)));
         await session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
 
         (await session.CaptureAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
@@ -77,7 +77,7 @@ public sealed class KafkaPollingSessionTests
             Message = "Topic metadata failed after querying the broker.", BrokerCount = 1
         };
         var next = valid;
-        await using var session = Create((_, _) => Task.FromResult(Res.Ok(next)));
+        await using var session = Create((_, _) => Task.FromResult(Result.Success(next)));
         await session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
         (await session.CaptureAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
         next = failed;
@@ -97,7 +97,7 @@ public sealed class KafkaPollingSessionTests
         partial.Message = "One committed-offset batch was incomplete.";
         partial.TotalLag = null;
         partial.MessageConsumeRatePerSecond = null;
-        await using var session = Create((_, _) => Task.FromResult(Res.Ok(partial)));
+        await using var session = Create((_, _) => Task.FromResult(Result.Success(partial)));
         await session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
 
         (await session.CaptureAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
@@ -121,7 +121,7 @@ public sealed class KafkaPollingSessionTests
                 admitted.TrySetResult();
                 await release.Task;
             }
-            return Res.Ok(Snapshot(target.ClusterId));
+            return Result.Success(Snapshot(target.ClusterId));
         });
         await session.ActivateAsync(new KafkaSamplingTarget("old"), TestContext.Current.CancellationToken);
         var oldCapture = session.CaptureAsync(TestContext.Current.CancellationToken);
@@ -148,7 +148,7 @@ public sealed class KafkaPollingSessionTests
         {
             admitted.TrySetResult();
             await release.Task;
-            return Res.Ok(Snapshot(target.ClusterId));
+            return Result.Success(Snapshot(target.ClusterId));
         });
         session.StateChanged += () => notifications++;
         await session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
@@ -177,7 +177,7 @@ public sealed class KafkaPollingSessionTests
         {
             admitted.TrySetResult();
             await release.Task;
-            return Res.Ok(Snapshot(target.ClusterId));
+            return Result.Success(Snapshot(target.ClusterId));
         }, enabled: true);
         var activation = session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
         await admitted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -197,7 +197,7 @@ public sealed class KafkaPollingSessionTests
     public async Task Activate_WhenMatchingRepositoryEvidenceWasLoaded_ShouldRetainItWithAutomaticSamplingDisabled()
     {
         var valid = Snapshot("primary");
-        await using var session = Create((target, _) => Task.FromResult(Res.Ok(Snapshot(target.ClusterId))));
+        await using var session = Create((target, _) => Task.FromResult(Result.Success(Snapshot(target.ClusterId))));
         session.SetSnapshot(valid, new KafkaSamplingTarget("primary"));
 
         await session.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
@@ -214,12 +214,12 @@ public sealed class KafkaPollingSessionTests
         await using var first = Create((target, _) =>
         {
             firstCount++;
-            return Task.FromResult(Res.Ok(Snapshot(target.ClusterId)));
+            return Task.FromResult(Result.Success(Snapshot(target.ClusterId)));
         });
         await using var second = Create((target, _) =>
         {
             secondCount++;
-            return Task.FromResult(Res.Ok(Snapshot(target.ClusterId)));
+            return Task.FromResult(Result.Success(Snapshot(target.ClusterId)));
         });
         await first.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
         await second.ActivateAsync(new KafkaSamplingTarget("primary"), TestContext.Current.CancellationToken);
@@ -242,7 +242,7 @@ public sealed class KafkaPollingSessionTests
         await using var session = Create((target, _) =>
         {
             actual = target;
-            return Task.FromResult(Res.Ok(Snapshot(target.ClusterId)));
+            return Task.FromResult(Result.Success(Snapshot(target.ClusterId)));
         });
         await session.ActivateAsync(expected, TestContext.Current.CancellationToken);
 
@@ -252,7 +252,7 @@ public sealed class KafkaPollingSessionTests
     }
 
     private static KafkaPollingSession<KafkaPerformanceSnapshot> Create(
-        Func<KafkaSamplingTarget, CancellationToken, Task<Res<KafkaPerformanceSnapshot>>> capture,
+        Func<KafkaSamplingTarget, CancellationToken, Task<Result<KafkaPerformanceSnapshot>>> capture,
         bool enabled = false) => new(capture, snapshot => snapshot.HasMetadataSnapshot,
         snapshot => snapshot.Message, snapshot => snapshot.CapturedAt, enabled, TimeSpan.FromSeconds(60));
 

@@ -289,9 +289,9 @@ public sealed class StartupOptionsTests
         restored.StartupCandidate.ValidationReport.IsValid.Should().BeTrue();
     }
 
-    private static T RequireSuccess<T>(Res<T> result) where T : class
+    private static T RequireSuccess<T>(Result<T> result) where T : class
     {
-        result.Status.Should().Be(ResStatus.Ok, "{0}", result.Message);
+        result.Status.Should().Be(ResultStatus.Ok, "{0}", result.Message);
         result.Message.Should().BeNullOrEmpty();
         result.Data.Should().NotBeNull();
         return result.Data!;

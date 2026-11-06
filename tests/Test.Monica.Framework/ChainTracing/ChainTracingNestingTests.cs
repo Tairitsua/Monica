@@ -36,8 +36,8 @@ public sealed class ChainTracingNestingTests
         var sql2 = tracing.BeginTrace("SELECT 2", null, type: EChainTracingType.Database);
         tracing.EndTrace(sql2);
 
-        tracing.EndTrace(exec, "Res(Ok)");
-        tracing.EndTrace(action, "Res(Ok)");
+        tracing.EndTrace(exec, "Result(Ok)");
+        tracing.EndTrace(action, "Result(Ok)");
 
         var chain = tracing.GetCurrentChain()!;
         chain.IsolatedNodes.Should().BeNullOrEmpty("nothing closed out of order");
@@ -153,13 +153,13 @@ public sealed class ChainTracingNestingTests
     public void MergedRemoteCorrelation_ShouldSurviveScopeCompletion_AndAppearOnNodeFields()
     {
         var tracing = CreateTracing();
-        var remote = Res.Fail("downstream rejected", ResStatus.InternalError);
+        var remote = Result.Failure("downstream rejected", ResultStatus.InternalError);
         remote.SetError(new ResultError("dependency.failed", "trace-remote-1", "RemoteService", "Query"));
         remote.SetMetadata(ResultMetadataKeys.RemoteService, "flight-route-api");
 
         var node = tracing.BeginTrace("Invoke remote", "Proxy");
         tracing.MergeRemoteChain(node, remote);
-        tracing.EndTrace(node, "Res(InternalError)", success: false);
+        tracing.EndTrace(node, "Result(InternalError)", success: false);
 
         var completed = tracing.GetCurrentChain()!.Root!;
         completed.RemoteTraceId.Should().Be("trace-remote-1");
@@ -172,7 +172,7 @@ public sealed class ChainTracingNestingTests
     public void SuccessfulRemoteCall_ShouldCorrelateTargetAndDownstreamTrace()
     {
         var tracing = CreateTracing();
-        var remote = Res.Ok<string>("payload");
+        var remote = Result.Success<string>("payload");
         // Metadata values cross process boundaries as JSON elements; correlation must read either form.
         remote.SetMetadata(ResultMetadataKeys.TraceId, JsonSerializer.SerializeToElement("trace-remote-2"));
         remote.SetMetadata(ResultMetadataKeys.RemoteService,

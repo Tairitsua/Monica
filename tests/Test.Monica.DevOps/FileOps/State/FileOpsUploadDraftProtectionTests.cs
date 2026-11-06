@@ -92,7 +92,7 @@ public sealed class FileOpsUploadDraftProtectionTests
         Assert.False(state.MetadataStale);
         Assert.True(state.LastCommand!.Succeeded);
         Assert.Equal(FileOpsOperationKind.Upload, state.LastCommand.Kind);
-        Assert.Equal(ResStatus.Ok, state.LastCommand.Status);
+        Assert.Equal(ResultStatus.Ok, state.LastCommand.Status);
         Assert.True(state.LastRead!.Succeeded);
     }
 

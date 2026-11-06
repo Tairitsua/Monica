@@ -29,7 +29,7 @@ public sealed class RAGIndexingFacade
     }
 
     /// <summary>Adds markdown documents to the indexing queue.</summary>
-    public async Task<Res<int>> AddDocumentsAsync(
+    public async Task<Result<int>> AddDocumentsAsync(
         string knowledgeBaseId,
         IEnumerable<string> documentIds,
         string? sourceGroupKey = null)
@@ -42,34 +42,34 @@ public sealed class RAGIndexingFacade
             $"add documents to '{knowledgeBaseId}'");
 
     /// <summary>Clears pending and failed queue entries.</summary>
-    public async Task<Res<int>> ClearPendingQueueAsync(string knowledgeBaseId)
+    public async Task<Result<int>> ClearPendingQueueAsync(string knowledgeBaseId)
         => await ExecuteAsync(
             () => documentService.ClearPendingQueueAsync(knowledgeBaseId),
             $"clear pending queue for '{knowledgeBaseId}'");
 
     /// <summary>Returns one document to pending state after removing current vectors.</summary>
-    public async Task<Res> QueueDocumentForReindexAsync(string knowledgeBaseId, string documentId)
+    public async Task<Result> QueueDocumentForReindexAsync(string knowledgeBaseId, string documentId)
     {
         try
         {
             await documentService.QueueForReindexAsync(knowledgeBaseId, documentId);
-            return Res.Ok("Document queued for reindexing.");
+            return Result.Success().WithMessage("Document queued for reindexing.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to queue '{DocumentId}' for reindexing.", documentId);
-            return Res.Fail($"Failed to queue document: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to queue document: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>Returns every document in a knowledge base to pending state.</summary>
-    public async Task<Res<int>> QueueKnowledgeBaseForReindexAsync(string knowledgeBaseId)
+    public async Task<Result<int>> QueueKnowledgeBaseForReindexAsync(string knowledgeBaseId)
         => await ExecuteAsync(
             () => documentService.QueueKnowledgeBaseForReindexAsync(knowledgeBaseId),
             $"queue '{knowledgeBaseId}' for reindexing");
 
     /// <summary>Indexes one queued document.</summary>
-    public async Task<Res> IndexDocumentAsync(
+    public async Task<Result> IndexDocumentAsync(
         string knowledgeBaseId,
         string documentId,
         IProgress<IndexingProgress>? progress = null,
@@ -77,22 +77,23 @@ public sealed class RAGIndexingFacade
     {
         try
         {
+            ct.ThrowIfCancellationRequested();
             await batchCoordinator.StartDocumentIndexingAsync(knowledgeBaseId, documentId, progress, ct);
-            return Res.Ok("Document indexed successfully.");
+            return Result.Success().WithMessage("Document indexed successfully.");
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            return Res.Fail("Request was cancelled.");
+            throw;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to index '{DocumentId}'.", documentId);
-            return Res.Fail($"Failed to index document: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to index document: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>Starts a tracked batch indexing operation.</summary>
-    public async Task<Res> StartBatchAsync(
+    public async Task<Result> StartBatchAsync(
         string knowledgeBaseId,
         IEnumerable<string>? documentIds = null,
         int maxConcurrency = 5,
@@ -105,20 +106,20 @@ public sealed class RAGIndexingFacade
             progress,
             ct,
             documentIds);
-        return outcome.Succeeded ? Res.Ok(outcome.Message) : Res.Fail(outcome.Message);
+        return outcome.Succeeded ? Result.Success().WithMessage(outcome.Message) : Result.Failure(outcome.Message);
     }
 
     /// <summary>Requests cancellation of an active batch operation.</summary>
-    public async Task<Res> CancelBatchAsync(string knowledgeBaseId, CancellationToken ct = default)
+    public async Task<Result> CancelBatchAsync(string knowledgeBaseId, CancellationToken ct = default)
     {
         try
         {
-            return Res.Ok(await batchCoordinator.CancelBatchIndexingAsync(knowledgeBaseId, ct));
+            return Result.Success().WithMessage(await batchCoordinator.CancelBatchIndexingAsync(knowledgeBaseId, ct));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to cancel batch indexing for '{KnowledgeBaseId}'.", knowledgeBaseId);
-            return Res.Fail($"Failed to cancel indexing: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to cancel indexing: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -126,23 +127,23 @@ public sealed class RAGIndexingFacade
     public bool IsBatchActive(string knowledgeBaseId) => batchCoordinator.IsBatchIndexingActive(knowledgeBaseId);
 
     /// <summary>Returns original source text and chunk highlights.</summary>
-    public async Task<Res<DocumentChunkView>> GetDocumentChunksAsync(
+    public async Task<Result<DocumentChunkView>> GetDocumentChunksAsync(
         string knowledgeBaseId,
         string documentId)
         => await ExecuteAsync(
             () => chunkViewCoordinator.GetDocumentChunksAsync(knowledgeBaseId, documentId),
             $"load chunks for '{documentId}'");
 
-    private async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
+    private async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to {Operation}.", operation);
-            return Res.Fail($"Failed to {operation}: {ex.GetMessageRecursively()}");
+            return Result.Failure<T>($"Failed to {operation}: {ex.GetMessageRecursively()}");
         }
     }
 }

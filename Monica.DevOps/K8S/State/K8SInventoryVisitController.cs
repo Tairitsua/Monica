@@ -128,7 +128,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         await SetActivityAsync(K8SInventoryActivity.Inspecting, identity.Namespace, identity.ResourceType, token, [identity.Name]);
         var response = await facade.DescribeResourceAsync(identity.Namespace, identity.ResourceType, identity.Name, token);
         token.ThrowIfCancellationRequested();
-        if (response.IsFailed(out var error, out var details))
+        var error = response;
+        var details = response.Data;
+        if (response.IsFailure() || details is null)
             ReadFailure = new(identity.Namespace, identity.ResourceType, error.Message ?? string.Empty);
         else await show(details, token);
         token.ThrowIfCancellationRequested();
@@ -145,7 +147,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
                 ? await facade.GetNamespaceRestartPreviewAsync(request.Namespace, token)
                 : await facade.GetBatchRestartPreviewAsync(request.Namespace, request.ResourceType, request.Names, token);
             token.ThrowIfCancellationRequested();
-            if (previewResponse.IsFailed(out var error, out var preview))
+            var error = previewResponse;
+            var preview = previewResponse.Data;
+            if (previewResponse.IsFailure() || preview is null)
             {
                 ReadFailure = new(request.Namespace, request.ResourceType, error.Message ?? string.Empty);
                 return;
@@ -159,7 +163,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
                 ? await facade.RestartNamespaceAsync(request.Namespace, token)
                 : await facade.RestartResourcesAsync(request.Namespace, request.ResourceType, request.Names, token);
             token.ThrowIfCancellationRequested();
-            LatestOperation = response.IsFailed(out var commandError, out var result)
+            var commandError = response;
+            var result = response.Data;
+            LatestOperation = response.IsFailure() || result is null
                 ? new(request, DateTimeOffset.UtcNow, null, null, commandError.Message ?? string.Empty)
                 : new(request, result.CompletedAtUtc, result, null, null);
         }
@@ -170,7 +176,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
                 ? await facade.GetNamespaceScalePreviewAsync(request.Namespace, operation, token)
                 : await facade.GetBatchScalePreviewAsync(request.Namespace, request.ResourceType, request.Names, operation, token);
             token.ThrowIfCancellationRequested();
-            if (previewResponse.IsFailed(out var error, out var preview))
+            var error = previewResponse;
+            var preview = previewResponse.Data;
+            if (previewResponse.IsFailure() || preview is null)
             {
                 ReadFailure = new(request.Namespace, request.ResourceType, error.Message ?? string.Empty);
                 return;
@@ -184,7 +192,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
                 ? await facade.ScaleNamespaceAsync(request.Namespace, operation, token)
                 : await facade.ScaleResourcesAsync(request.Namespace, request.ResourceType, request.Names, operation, token);
             token.ThrowIfCancellationRequested();
-            LatestOperation = response.IsFailed(out var commandError, out var result)
+            var commandError = response;
+            var result = response.Data;
+            LatestOperation = response.IsFailure() || result is null
                 ? new(request, DateTimeOffset.UtcNow, null, null, commandError.Message ?? string.Empty)
                 : new(request, result.CompletedAtUtc, null, result, null);
         }
@@ -198,11 +208,15 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         await SetActivityAsync(K8SInventoryActivity.Reading, Namespace, ResourceType, token);
         var configResponse = await facade.GetRuntimeConfigAsync(token);
         token.ThrowIfCancellationRequested();
-        if (configResponse.IsFailed(out var configError, out var config)) ContextFailure = configError.Message ?? string.Empty;
+        var configError = configResponse;
+        var config = configResponse.Data;
+        if (configResponse.IsFailure() || config is null) ContextFailure = configError.Message ?? string.Empty;
         else { ExecutionNode = config.ExecutionNode; ContextFailure = null; }
         var namespaceResponse = await facade.ListNamespacesAsync(token);
         token.ThrowIfCancellationRequested();
-        if (namespaceResponse.IsFailed(out var error, out var namespaces))
+        var error = namespaceResponse;
+        var namespaces = namespaceResponse.Data;
+        if (namespaceResponse.IsFailure() || namespaces is null)
         {
             ContextFailure = error.Message ?? string.Empty;
             return;
@@ -223,7 +237,9 @@ internal sealed class K8SInventoryVisitController(K8SFacade facade, K8SNavigatio
         await SetActivityAsync(K8SInventoryActivity.Reading, namespaceName, type, token);
         var response = await facade.ListNamespaceInventoryAsync(namespaceName, token);
         token.ThrowIfCancellationRequested();
-        if (response.IsFailed(out var error, out var list)) ReadFailure = new(namespaceName, type, error.Message ?? string.Empty);
+        var error = response;
+        var list = response.Data;
+        if (response.IsFailure() || list is null) ReadFailure = new(namespaceName, type, error.Message ?? string.Empty);
         else
         {
             NamespaceCapture = list;

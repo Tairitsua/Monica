@@ -44,10 +44,10 @@ public sealed class RAGManagePageStateLifecycleTests
             await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
             var bases = scope.Resolve<KnowledgeBaseFacade>();
             var documents = scope.Resolve<KnowledgeDocumentFacade>();
-            (await bases.CreateAsync("owned", "Process-owned indexing")).Status.Should().Be(ResStatus.Ok);
-            (await documents.UploadDocumentAsync("owned", "owned.md", "# Owned source\n\nA route visit must not cancel durable indexing.")).Status.Should().Be(ResStatus.Ok);
+            (await bases.CreateAsync("owned", "Process-owned indexing")).Status.Should().Be(ResultStatus.Ok);
+            (await documents.UploadDocumentAsync("owned", "owned.md", "# Owned source\n\nA route visit must not cancel durable indexing.")).Status.Should().Be(ResultStatus.Ok);
             (await scope.Resolve<EmbeddingModelFacade>()
-                .SetKnowledgeBaseEmbeddingModelAsync("owned", "controlled", "controlled-4d")).Status.Should().Be(ResStatus.Ok);
+                .SetKnowledgeBaseEmbeddingModelAsync("owned", "controlled", "controlled-4d")).Status.Should().Be(ResultStatus.Ok);
             var state = scope.Resolve<RAGManagePageStateFactory>().Create(action => { action(); return Task.CompletedTask; });
             try
             {
@@ -69,7 +69,7 @@ public sealed class RAGManagePageStateLifecycleTests
                 await Task.WhenAll(operation, retirement);
 
                 var inventory = await documents.GetDocumentInventoryAsync("owned");
-                inventory.Status.Should().Be(ResStatus.Ok);
+                inventory.Status.Should().Be(ResultStatus.Ok);
                 inventory.Data.Should().NotBeNull();
                 var row = inventory.Data!.Should().ContainSingle().Which;
                 row.Status.Should().Be(DocumentStatus.Done);
@@ -77,7 +77,7 @@ public sealed class RAGManagePageStateLifecycleTests
                 row.SourceKind.Should().Be(KnowledgeDocumentSourceKinds.Uploaded);
                 row.SourceGroupKey.Should().BeNull();
                 var current = await bases.GetByIdAsync("owned");
-                current.Status.Should().Be(ResStatus.Ok);
+                current.Status.Should().Be(ResultStatus.Ok);
                 current.Data!.ChunkCount.Should().Be(row.ChunkCount);
                 lateNotifications.Should().Be(0);
                 snackbar.ReceivedCalls().Count().Should().Be(notificationsAtRetirement);
@@ -111,18 +111,18 @@ public sealed class RAGManagePageStateLifecycleTests
             var bases = scope.Resolve<KnowledgeBaseFacade>();
             var documents = scope.Resolve<KnowledgeDocumentFacade>();
             var indexing = scope.Resolve<RAGIndexingFacade>();
-            (await bases.CreateAsync("owned", "Reopened batch")).Status.Should().Be(ResStatus.Ok);
-            (await documents.UploadDocumentAsync("owned", "first.md", "# First source\n\nAlready indexed content.")).Status.Should().Be(ResStatus.Ok);
+            (await bases.CreateAsync("owned", "Reopened batch")).Status.Should().Be(ResultStatus.Ok);
+            (await documents.UploadDocumentAsync("owned", "first.md", "# First source\n\nAlready indexed content.")).Status.Should().Be(ResultStatus.Ok);
             (await scope.Resolve<EmbeddingModelFacade>()
-                .SetKnowledgeBaseEmbeddingModelAsync("owned", "controlled", "controlled-4d")).Status.Should().Be(ResStatus.Ok);
-            (await indexing.IndexDocumentAsync("owned", "first.md", ct: TestContext.Current.CancellationToken)).Status.Should().Be(ResStatus.Ok);
+                .SetKnowledgeBaseEmbeddingModelAsync("owned", "controlled", "controlled-4d")).Status.Should().Be(ResultStatus.Ok);
+            (await indexing.IndexDocumentAsync("owned", "first.md", ct: TestContext.Current.CancellationToken)).Status.Should().Be(ResultStatus.Ok);
             var initial = await documents.GetDocumentInventoryAsync("owned");
-            initial.Status.Should().Be(ResStatus.Ok);
+            initial.Status.Should().Be(ResultStatus.Ok);
             var first = initial.Data!.Should().ContainSingle().Which;
             first.Status.Should().Be(DocumentStatus.Done);
             var firstChunks = first.ChunkCount;
             firstChunks.Should().BeGreaterThan(0);
-            (await documents.UploadDocumentAsync("owned", "second.md", "# Second source\n\nContent completed after the visit opens.")).Status.Should().Be(ResStatus.Ok);
+            (await documents.UploadDocumentAsync("owned", "second.md", "# Second source\n\nContent completed after the visit opens.")).Status.Should().Be(ResultStatus.Ok);
 
             boundary.HoldRequests = true;
             var batch = indexing.StartBatchAsync("owned", ["second.md"], ct: TestContext.Current.CancellationToken);
@@ -147,7 +147,7 @@ public sealed class RAGManagePageStateLifecycleTests
                 state.SelectedKnowledgeBaseVectorValidation!.IndexedChunkCount.Should().Be(firstChunks);
 
                 boundary.Release.SetResult();
-                (await batch).Status.Should().Be(ResStatus.Ok);
+                (await batch).Status.Should().Be(ResultStatus.Ok);
                 await completedValidation.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
 
                 state.DocumentQueue.Should().HaveCount(2).And.OnlyContain(row => row.Status == DocumentStatus.Done);

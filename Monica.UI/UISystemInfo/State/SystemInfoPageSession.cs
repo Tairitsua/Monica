@@ -4,8 +4,8 @@ using Monica.UI.UISystemInfo.Models;
 namespace Monica.UI.UISystemInfo.State;
 
 internal sealed record SystemInfoFacadeCalls(
-    Func<Res<SystemInfoSnapshot>> GetSnapshot,
-    Func<Res> RequestSelfRestart);
+    Func<Result<SystemInfoSnapshot>> GetSnapshot,
+    Func<Result> RequestSelfRestart);
 
 /// <summary>
 /// Describes the availability of the first immutable System Info snapshot.
@@ -106,11 +106,11 @@ public sealed class SystemInfoPageSession : IAsyncDisposable
     /// Requests the host-owned restart workflow and records acceptance for this page instance.
     /// </summary>
     /// <returns>The facade result describing whether the request was accepted.</returns>
-    public Res RequestSelfRestart()
+    public Result RequestSelfRestart()
     {
         ThrowIfDisposed();
         var result = _calls.RequestSelfRestart();
-        if (!result.IsFailed(out _))
+        if (!result.IsFailure())
         {
             lock (_stateGate)
             {
@@ -205,7 +205,7 @@ public sealed class SystemInfoPageSession : IAsyncDisposable
         }
     }
 
-    private bool CompleteSnapshotRequest(Res<SystemInfoSnapshot> result)
+    private bool CompleteSnapshotRequest(Result<SystemInfoSnapshot> result)
     {
         lock (_stateGate)
         {
@@ -214,7 +214,9 @@ public sealed class SystemInfoPageSession : IAsyncDisposable
                 return false;
             }
 
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
             {
                 var hasSnapshot = _state.Snapshot is not null;
                 _state = _state with

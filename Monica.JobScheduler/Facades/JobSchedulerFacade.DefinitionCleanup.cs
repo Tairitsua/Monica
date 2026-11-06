@@ -9,7 +9,7 @@ public sealed partial class JobSchedulerFacade
 {
     /// <summary>Queries obsolete definitions and stale owner observations in this host's configured shared scope.</summary>
     /// <remarks>The caller owns authorization. Manual-mode hosts cannot maintain the shared store.</remarks>
-    public Task<Res<JobDefinitionCleanupSnapshot>> QueryDefinitionCleanupAsync(JobDefinitionCleanupQuery query,
+    public Task<Result<JobDefinitionCleanupSnapshot>> QueryDefinitionCleanupAsync(JobDefinitionCleanupQuery query,
         CancellationToken cancellationToken = default) => ExecuteAsync(() =>
         {
             EnsureDefinitionMaintenanceEnabled();
@@ -18,7 +18,7 @@ public sealed partial class JobSchedulerFacade
         }, "assess definition cleanup", cancellationToken);
 
     /// <summary>Freezes the exact removal selection and explicit queue-cancellation choice for review.</summary>
-    public Task<Res<JobDefinitionCleanupPlan>> PreviewDefinitionCleanupAsync(IReadOnlyList<JobId> ids,
+    public Task<Result<JobDefinitionCleanupPlan>> PreviewDefinitionCleanupAsync(IReadOnlyList<JobId> ids,
         bool cancelQueued, CancellationToken cancellationToken = default)
     {
         var frozen = ids.ToArray();
@@ -31,7 +31,7 @@ public sealed partial class JobSchedulerFacade
 
     /// <summary>Revalidates and atomically applies a reviewed removal request, retaining execution evidence.</summary>
     /// <remarks>Authorize this destructive operation separately from viewing. Changed and blocked outcomes perform no removal.</remarks>
-    public Task<Res<JobDefinitionMaintenanceResult>> RemoveDefinitionsAsync(JobDefinitionCleanupRequest request,
+    public Task<Result<JobDefinitionMaintenanceResult>> RemoveDefinitionsAsync(JobDefinitionCleanupRequest request,
         CancellationToken cancellationToken = default)
     {
         var frozen = request with { Targets = request.Targets.ToArray() };
@@ -46,7 +46,7 @@ public sealed partial class JobSchedulerFacade
     }
 
     /// <summary>Reviews publication and execution prerequisites before deliberately retiring one exact owner.</summary>
-    public Task<Res<JobOwnerRetirementPreview>> PreviewOwnerRetirementAsync(string ownerKey,
+    public Task<Result<JobOwnerRetirementPreview>> PreviewOwnerRetirementAsync(string ownerKey,
         CancellationToken cancellationToken = default) => ExecuteAsync(() =>
         {
             EnsureDefinitionMaintenanceEnabled();
@@ -55,7 +55,7 @@ public sealed partial class JobSchedulerFacade
 
     /// <summary>After confirmed publisher shutdown, permanently fences an exact owner and marks its definitions absent.</summary>
     /// <remarks>The caller owns authorization and shutdown confirmation. Queued work and history remain; no automatic reactivation exists.</remarks>
-    public Task<Res<JobDefinitionMaintenanceResult>> RetireOwnerAsync(string ownerKey, string expectedStamp,
+    public Task<Result<JobDefinitionMaintenanceResult>> RetireOwnerAsync(string ownerKey, string expectedStamp,
         CancellationToken cancellationToken = default) => ExecuteAsync(async () =>
         {
             EnsureDefinitionMaintenanceEnabled();

@@ -83,7 +83,7 @@ public sealed class ObservableSnapshotTests
         var replacement = registry.Register("one");
         replacement.RecordState("replacement", "ready");
         var rejected = await facade.ClearInstanceHistoryAsync(identity, TestContext.Current.CancellationToken);
-        rejected.IsFailed(out _).Should().BeTrue();
+        rejected.IsFailure().Should().BeTrue();
         replacement.Count.Should().Be(1);
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
@@ -140,13 +140,14 @@ public sealed class ObservableSnapshotTests
         first.Register("same").RecordState("host one", "first");
         second.Register("same").RecordState("host two", "second");
         var result = await CreateFacade(first).CaptureAsync(TestContext.Current.CancellationToken);
-        result.IsOk(out var snapshots).Should().BeTrue();
+        result.IsSuccess().Should().BeTrue();
+        var snapshots = result.Data;
         snapshots!.Single().CurrentState.Text.Should().Be("first");
         ((IObservableInstanceRegistryWriter)first).Unregister("same");
         snapshots!.Single().CurrentState.Text.Should().Be("first");
         var empty = await CreateFacade(first).CaptureAsync(TestContext.Current.CancellationToken);
-        empty.IsOk(out var noInstances).Should().BeTrue();
-        noInstances.Should().BeEmpty();
+        empty.IsSuccess().Should().BeTrue();
+        empty.Data.Should().BeEmpty();
         second.GetById("same")!.CaptureSnapshot(TestContext.Current.CancellationToken).CurrentState.Text.Should().Be("second");
     }
 
@@ -188,8 +189,10 @@ public sealed class ObservableSnapshotTests
         for (var i = 0; i < 4; i++) { one.RecordState("first host", i); two.RecordState("second host", i); }
         var firstRead = await first.Services.GetRequiredService<ObservableInstanceFacade>().CaptureAsync(TestContext.Current.CancellationToken);
         var secondRead = await second.Services.GetRequiredService<ObservableInstanceFacade>().CaptureAsync(TestContext.Current.CancellationToken);
-        firstRead.IsOk(out var firstInstances).Should().BeTrue();
-        secondRead.IsOk(out var secondInstances).Should().BeTrue();
+        firstRead.IsSuccess().Should().BeTrue();
+        secondRead.IsSuccess().Should().BeTrue();
+        var firstInstances = firstRead.Data;
+        var secondInstances = secondRead.Data;
         firstInstances!.Single().History.Should().HaveCount(2);
         secondInstances!.Single().History.Should().HaveCount(4);
         firstInstances!.Single().Identity.Should().NotBe(secondInstances!.Single().Identity);

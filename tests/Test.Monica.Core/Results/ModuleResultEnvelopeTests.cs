@@ -23,7 +23,13 @@ public sealed class ModuleResultEnvelopeTests
         builder.AddMonica(monica =>
         {
             monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
-            monica.AddResultEnvelope().UseResultFieldNames(static names => names.Status = "code");
+            monica.AddResultEnvelope().UseResultFieldNames(static names =>
+            {
+                names.Message = "text";
+                names.Status = "code";
+                names.Data = "payload";
+                names.Metadata = "context";
+            });
         });
 
         using var host = builder.Build();
@@ -40,18 +46,25 @@ public sealed class ModuleResultEnvelopeTests
         foreach (var serializerOptions in new[] { canonicalOptions, httpOptions, mvcOptions })
         {
             serializerOptions.IsReadOnly.Should().BeTrue();
-            var json = JsonSerializer.Serialize(Res.Ok("ready"), serializerOptions);
+            var original = Result.Success("ready").WithMessage("loaded").SetMetadata("tenant", "north");
+            var json = JsonSerializer.Serialize(original, serializerOptions);
             using var document = JsonDocument.Parse(json);
 
-            document.RootElement.GetProperty("code").GetInt32().Should().Be((int)ResStatus.Ok);
+            document.RootElement.GetProperty("code").GetInt32().Should().Be((int)ResultStatus.Ok);
+            document.RootElement.GetProperty("text").GetString().Should().Be("loaded");
+            document.RootElement.GetProperty("payload").GetString().Should().Be("ready");
+            document.RootElement.GetProperty("context").GetProperty("tenant").GetString().Should().Be("north");
             document.RootElement.TryGetProperty("status", out _).Should().BeFalse();
+            document.RootElement.TryGetProperty("message", out _).Should().BeFalse();
+            document.RootElement.TryGetProperty("data", out _).Should().BeFalse();
+            document.RootElement.TryGetProperty("metadata", out _).Should().BeFalse();
 
-            var deserialized = JsonSerializer.Deserialize<Res<string>>(
-                """{"message":"","code":200,"data":"hello"}""",
-                serializerOptions);
+            var deserialized = JsonSerializer.Deserialize<Result<string>>(json, serializerOptions);
             deserialized.Should().NotBeNull();
-            deserialized!.Status.Should().Be(ResStatus.Ok);
-            deserialized.Data.Should().Be("hello");
+            deserialized!.Status.Should().Be(ResultStatus.Ok);
+            deserialized.Message.Should().Be("loaded");
+            deserialized.Data.Should().Be("ready");
+            deserialized.Metadata.Should().NotBeNull();
         }
 
     }

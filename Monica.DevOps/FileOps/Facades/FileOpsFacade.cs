@@ -11,8 +11,8 @@ namespace Monica.DevOps.FileOps.Facades;
 
 /// <summary>Projects the scoped FileOps filesystem and transfer boundaries into result envelopes.</summary>
 /// <remarks>Injected services are borrowed. Callers own upload input streams and successful download streams.
-/// Service exceptions, including cancellation, are returned as failed envelopes; a failed mutation can already
-/// have applied filesystem changes. Native UI retirement must therefore observe actual producer completion.</remarks>
+/// Service failures are returned as failed envelopes; cancellation propagates. A failed or canceled mutation can
+/// already have applied filesystem changes. Native UI retirement must therefore observe actual producer completion.</remarks>
 public class FileOpsFacade(
     IFileOpsWorkspaceService workspaceService,
     IFileOpsTransferService transferService,
@@ -20,7 +20,7 @@ public class FileOpsFacade(
     IStringLocalizer<FileOpsResource> localizer,
     ILogger<FileOpsFacade> logger)
 {
-    public Task<Res<FileOpsRuntimeConfig>> GetRuntimeConfigAsync(CancellationToken cancellationToken = default)
+    public Task<Result<FileOpsRuntimeConfig>> GetRuntimeConfigAsync(CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             () => workspaceService.GetRuntimeConfigAsync(cancellationToken),
@@ -28,7 +28,7 @@ public class FileOpsFacade(
             "Failed to load FileOps runtime configuration.");
     }
 
-    public Task<Res> SaveRuntimeConfigAsync(FileOpsRuntimeConfig runtimeConfig, CancellationToken cancellationToken = default)
+    public Task<Result> SaveRuntimeConfigAsync(FileOpsRuntimeConfig runtimeConfig, CancellationToken cancellationToken = default)
     {
         var normalizedConfig = runtimeConfig.Clone().Normalize();
         return ExecuteAsync(
@@ -38,7 +38,7 @@ public class FileOpsFacade(
             "Failed to save FileOps runtime configuration.");
     }
 
-    public Task<Res<FileOpsBrowseResult>> BrowseAsync(string? path, CancellationToken cancellationToken = default)
+    public Task<Result<FileOpsBrowseResult>> BrowseAsync(string? path, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             () => workspaceService.BrowseAsync(path, cancellationToken),
@@ -46,7 +46,7 @@ public class FileOpsFacade(
             $"Failed to browse FileOps path {path ?? "(default)"}.");
     }
 
-    public Task<Res<FileOpsFileTextContent>> ReadTextFileAsync(string path, CancellationToken cancellationToken = default)
+    public Task<Result<FileOpsFileTextContent>> ReadTextFileAsync(string path, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             () => workspaceService.ReadTextFileAsync(path, cancellationToken),
@@ -54,7 +54,7 @@ public class FileOpsFacade(
             $"Failed to read FileOps text file {path}.");
     }
 
-    public Task<Res> SaveTextFileAsync(FileOpsTextUpdateRequest request, CancellationToken cancellationToken = default)
+    public Task<Result> SaveTextFileAsync(FileOpsTextUpdateRequest request, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             () => workspaceService.SaveTextFileAsync(request, cancellationToken),
@@ -63,7 +63,7 @@ public class FileOpsFacade(
             $"Failed to save FileOps text file {request.Path}.");
     }
 
-    public Task<Res> CreateDirectoryAsync(FileOpsCreateDirectoryRequest request, CancellationToken cancellationToken = default)
+    public Task<Result> CreateDirectoryAsync(FileOpsCreateDirectoryRequest request, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             async () =>
@@ -75,7 +75,7 @@ public class FileOpsFacade(
             $"Failed to create FileOps directory in {request.ParentPath}.");
     }
 
-    public Task<Res> DeleteEntryAsync(FileOpsDeleteRequest request, CancellationToken cancellationToken = default)
+    public Task<Result> DeleteEntryAsync(FileOpsDeleteRequest request, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             async () =>
@@ -87,7 +87,7 @@ public class FileOpsFacade(
             $"Failed to delete FileOps entry {request.Path}.");
     }
 
-    public Task<Res<FileOpsDownloadDescriptor>> OpenDownloadAsync(string path, CancellationToken cancellationToken = default)
+    public Task<Result<FileOpsDownloadDescriptor>> OpenDownloadAsync(string path, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(
             () => transferService.OpenDownloadAsync(path, cancellationToken),
@@ -95,7 +95,7 @@ public class FileOpsFacade(
             $"Failed to open FileOps download stream for {path}.");
     }
 
-    public Task<Res<FileOpsDownloadDescriptor>> OpenArchiveDownloadAsync(
+    public Task<Result<FileOpsDownloadDescriptor>> OpenArchiveDownloadAsync(
         FileOpsArchiveDownloadRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -105,7 +105,7 @@ public class FileOpsFacade(
             $"Failed to open FileOps archive download stream for {request.Paths?.Count ?? 0} entries.");
     }
 
-    public Task<Res<FileOpsBatchDeleteResult>> DeleteEntriesAsync(
+    public Task<Result<FileOpsBatchDeleteResult>> DeleteEntriesAsync(
         FileOpsBatchDeleteRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -115,7 +115,7 @@ public class FileOpsFacade(
             $"Failed to batch delete {request.Paths.Count} FileOps entries.");
     }
 
-    public Task<Res<FileOpsUploadResult>> UploadAsync(
+    public Task<Result<FileOpsUploadResult>> UploadAsync(
         string directoryPath,
         IReadOnlyCollection<FileOpsUploadPayload> files,
         bool overwrite = true,
@@ -152,23 +152,24 @@ public class FileOpsFacade(
             $"Failed to upload FileOps files into {directoryPath}.");
     }
 
-    private async Task<Res<T>> ExecuteAsync<T>(
+    private async Task<Result<T>> ExecuteAsync<T>(
         Func<Task<T>> action,
         Func<Exception, string> failureMessageFactory,
         string logMessage)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "{LogMessage}", logMessage);
-            return Res.Fail(failureMessageFactory(ex), GetResultStatus(ex));
+            return Result.Failure<T>(failureMessageFactory(ex), GetResultStatus(ex));
         }
     }
 
-    private async Task<Res> ExecuteAsync(
+    private async Task<Result> ExecuteAsync(
         Func<Task> action,
         Func<string> successMessageFactory,
         Func<Exception, string> failureMessageFactory,
@@ -177,44 +178,46 @@ public class FileOpsFacade(
         try
         {
             await action();
-            return Res.Ok(successMessageFactory());
+            return Result.Success().WithMessage(successMessageFactory());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "{LogMessage}", logMessage);
-            return Res.Fail(failureMessageFactory(ex), GetResultStatus(ex));
+            return Result.Failure(failureMessageFactory(ex), GetResultStatus(ex));
         }
     }
 
-    private async Task<Res> ExecuteAsync(
+    private async Task<Result> ExecuteAsync(
         Func<Task<string>> action,
         Func<Exception, string> failureMessageFactory,
         string logMessage)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success().WithMessage(await action());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "{LogMessage}", logMessage);
-            return Res.Fail(failureMessageFactory(ex), GetResultStatus(ex));
+            return Result.Failure(failureMessageFactory(ex), GetResultStatus(ex));
         }
     }
 
-    private static ResStatus GetResultStatus(Exception exception)
+    private static ResultStatus GetResultStatus(Exception exception)
     {
         return exception switch
         {
-            ArgumentException => ResStatus.BadRequest,
-            InvalidOperationException => ResStatus.BadRequest,
-            KeyNotFoundException => ResStatus.BadRequest,
-            DirectoryNotFoundException => ResStatus.BadRequest,
-            FileNotFoundException => ResStatus.BadRequest,
-            IOException => ResStatus.BadRequest,
-            UnauthorizedAccessException => ResStatus.Forbidden,
-            FileOpsOperationException => ResStatus.BadRequest,
-            _ => ResStatus.InternalError
+            ArgumentException => ResultStatus.BadRequest,
+            InvalidOperationException => ResultStatus.BadRequest,
+            KeyNotFoundException => ResultStatus.BadRequest,
+            DirectoryNotFoundException => ResultStatus.BadRequest,
+            FileNotFoundException => ResultStatus.BadRequest,
+            IOException => ResultStatus.BadRequest,
+            UnauthorizedAccessException => ResultStatus.Forbidden,
+            FileOpsOperationException => ResultStatus.BadRequest,
+            _ => ResultStatus.InternalError
         };
     }
 }

@@ -95,7 +95,7 @@ public sealed class K8SRestartServiceTests
             ? await operations.Facade.GetNamespaceRestartPreviewAsync(ControlledK8SOperations.NAMESPACE, cancellationToken)
             : await operations.Facade.GetBatchRestartPreviewAsync(
                 ControlledK8SOperations.NAMESPACE, K8SResourceType.Service, ControlledK8SOperations.SelectedServices, cancellationToken);
-        Assert.Equal(ResStatus.Ok, response.Status);
+        Assert.Equal(ResultStatus.Ok, response.Status);
         Assert.Null(response.Message);
         var preview = Assert.IsType<K8SRestartPreview>(response.Data);
         Assert.True(preview.HasRestartableTargets);
@@ -117,7 +117,7 @@ public sealed class K8SRestartServiceTests
             : await operations.Facade.RestartResourcesAsync(
                 ControlledK8SOperations.NAMESPACE, K8SResourceType.Service, ControlledK8SOperations.SelectedServices, cancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, execution.Status);
+        Assert.Equal(ResultStatus.BadRequest, execution.Status);
         Assert.Null(execution.Data);
         Assert.Contains(denyNamespace ? "GeneratedMessages:NamespaceOutsideScope" : "GeneratedMessages:NoRestartableTargetsRemain",
             execution.Message, StringComparison.Ordinal);

@@ -231,17 +231,17 @@ public sealed class ServiceDiscoveryCaptureContractTests
             TestContext.Current.CancellationToken);
     }
 
-    private static void AssertSuccess<T>(Res<T> result) where T : class
+    private static void AssertSuccess<T>(Result<T> result) where T : class
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNullOrEmpty();
         result.Data.Should().NotBeNull();
     }
 
-    private static void AssertSafeFailure<T>(Res<T> result, string providerMessage,
+    private static void AssertSafeFailure<T>(Result<T> result, string providerMessage,
         IStringLocalizer<ServiceDiscoveryResource> localizer) where T : class
     {
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().Be(localizer["Workbench:ReadFailed"].Value);
         result.Message.Should().NotContain(providerMessage);
         result.Data.Should().BeNull();

@@ -17,17 +17,17 @@ public sealed class RepositoryDiagnosticsFacade(
     /// <param name="revealConnectionStrings">Whether to include full connection strings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Registered DbContext snapshots.</returns>
-    public async Task<Res<IReadOnlyList<RepositoryDbContextSnapshot>>> GetRegisteredContextsAsync(
+    public async Task<Result<IReadOnlyList<RepositoryDbContextSnapshot>>> GetRegisteredContextsAsync(
         bool revealConnectionStrings = false,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await diagnosticsService.GetRegisteredContextsAsync(revealConnectionStrings, cancellationToken));
+            return Result.Success(await diagnosticsService.GetRegisteredContextsAsync(revealConnectionStrings, cancellationToken));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to load Repository DbContext diagnostics: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<RepositoryDbContextSnapshot>>($"Failed to load Repository DbContext diagnostics: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -37,17 +37,17 @@ public sealed class RepositoryDiagnosticsFacade(
     /// <param name="contextId">Selected DbContext identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Activity result.</returns>
-    public async Task<Res<RepositoryActivityResult>> GetActivityAsync(
+    public async Task<Result<RepositoryActivityResult>> GetActivityAsync(
         string contextId,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await diagnosticsService.GetActivityAsync(contextId, cancellationToken));
+            return Result.Success(await diagnosticsService.GetActivityAsync(contextId, cancellationToken));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to load Repository activity diagnostics: {ex.GetMessageRecursively()}");
+            return Result.Failure<RepositoryActivityResult>($"Failed to load Repository activity diagnostics: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -57,17 +57,17 @@ public sealed class RepositoryDiagnosticsFacade(
     /// <param name="contextId">Selected DbContext identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Migration status.</returns>
-    public async Task<Res<RepositoryMigrationStatus>> GetMigrationStatusAsync(
+    public async Task<Result<RepositoryMigrationStatus>> GetMigrationStatusAsync(
         string contextId,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await diagnosticsService.GetMigrationStatusAsync(contextId, cancellationToken));
+            return Result.Success(await diagnosticsService.GetMigrationStatusAsync(contextId, cancellationToken));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to load Repository migration status: {ex.GetMessageRecursively()}");
+            return Result.Failure<RepositoryMigrationStatus>($"Failed to load Repository migration status: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -78,18 +78,18 @@ public sealed class RepositoryDiagnosticsFacade(
     /// <param name="commandTimeout">Migration command timeout.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Migration update result.</returns>
-    public async Task<Res<RepositoryMigrationUpdateResult>> UpdateMigrationAsync(
+    public async Task<Result<RepositoryMigrationUpdateResult>> UpdateMigrationAsync(
         string contextId,
         TimeSpan commandTimeout,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await diagnosticsService.UpdateMigrationAsync(contextId, commandTimeout, cancellationToken));
+            return Result.Success(await diagnosticsService.UpdateMigrationAsync(contextId, commandTimeout, cancellationToken));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to update Repository migrations: {ex.GetMessageRecursively()}");
+            return Result.Failure<RepositoryMigrationUpdateResult>($"Failed to update Repository migrations: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -99,17 +99,17 @@ public sealed class RepositoryDiagnosticsFacade(
     /// <param name="commandTimeout">Migration command timeout.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Per-context update results.</returns>
-    public async Task<Res<IReadOnlyList<RepositoryMigrationUpdateResult>>> UpdateAllPendingMigrationsAsync(
+    public async Task<Result<IReadOnlyList<RepositoryMigrationUpdateResult>>> UpdateAllPendingMigrationsAsync(
         TimeSpan commandTimeout,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await diagnosticsService.UpdateAllPendingMigrationsAsync(commandTimeout, cancellationToken));
+            return Result.Success(await diagnosticsService.UpdateAllPendingMigrationsAsync(commandTimeout, cancellationToken));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to update Repository migrations: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<RepositoryMigrationUpdateResult>>($"Failed to update Repository migrations: {ex.GetMessageRecursively()}");
         }
     }
 }

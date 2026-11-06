@@ -27,7 +27,7 @@ public sealed class ModuleDiagnosticsFacade
     }
 
     /// <summary>Gets one immutable, revisioned diagnostics snapshot.</summary>
-    public Res<ModuleDiagnosticsSnapshot> GetSnapshot()
+    public Result<ModuleDiagnosticsSnapshot> GetSnapshot()
     {
         return Execute(
             () =>
@@ -40,7 +40,7 @@ public sealed class ModuleDiagnosticsFacade
     }
 
     /// <summary>Gets the lazily cached assembly-resolution and type-scan inventory.</summary>
-    public Res<TypeDiscoveryAssemblyInventory> GetAssemblyInventory()
+    public Result<TypeDiscoveryAssemblyInventory> GetAssemblyInventory()
     {
         return Execute(
             _diagnostics.GetAssemblyInventory,
@@ -49,14 +49,14 @@ public sealed class ModuleDiagnosticsFacade
 
     /// <summary>Gets current per-resource activation observations independently of the immutable startup snapshot.</summary>
     /// <remarks>Held factories remain opaque. Native prerequisite updates can change later observations; reading never starts work.</remarks>
-    public Res<IReadOnlyList<ResourceActivationObservation>> GetResourceActivations() => Execute(
+    public Result<IReadOnlyList<ResourceActivationObservation>> GetResourceActivations() => Execute(
         _diagnostics.GetResourceActivations, "Failed to load resource activation observations.");
 
     /// <summary>
     /// Gets a complete public-property catalog with bounded values for one module's finalized default options.
     /// </summary>
     /// <param name="moduleKey">The host-local module diagnostic key.</param>
-    public Res<ModuleOptionDiagnostics> GetModuleOptions(ModuleKey moduleKey)
+    public Result<ModuleOptionDiagnostics> GetModuleOptions(ModuleKey moduleKey)
     {
         return Execute(
             () => _diagnostics.GetModuleOptions(moduleKey),
@@ -69,7 +69,7 @@ public sealed class ModuleDiagnosticsFacade
     /// </summary>
     /// <param name="moduleKey">The host-local module diagnostic key.</param>
     /// <param name="selector">The exact profile-selection and fallback behavior.</param>
-    public Res<ModuleOptionDiagnostics> GetModuleOptions(
+    public Result<ModuleOptionDiagnostics> GetModuleOptions(
         ModuleKey moduleKey,
         ModuleOptionProfileSelector selector)
     {
@@ -85,23 +85,24 @@ public sealed class ModuleDiagnosticsFacade
     /// <summary>
     /// Creates a portable baseline without option values, assembly paths, stack traces, or raw exception details.
     /// </summary>
-    public Res<ModuleDiagnosticsExport> CreateExport()
+    public Result<ModuleDiagnosticsExport> CreateExport()
     {
         return Execute(
             _diagnostics.CreateExport,
             "Failed to create the module diagnostics export.");
     }
 
-    private Res<T> Execute<T>(Func<T> action, string publicFailureMessage)
+    private Result<T> Execute<T>(Func<T> action, string publicFailureMessage)
     {
         try
         {
-            return Res.Ok(action());
+            return Result.Success(action());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             _logger.LogError(exception, "{FailureMessage}", publicFailureMessage);
-            return Res.Fail(publicFailureMessage);
+            return Result.Failure<T>(publicFailureMessage);
         }
     }
 }

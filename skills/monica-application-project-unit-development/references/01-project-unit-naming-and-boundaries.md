@@ -121,7 +121,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 
 ## Boundary Rules
 
-- Keep `Res` and `Res<T>` at public application/Facade boundaries. Internal domain services and repositories use normal return types and exceptions.
+- Keep `Result` and `Result<T>` at public application/Facade boundaries. Internal domain services and repositories use normal return types and exceptions.
 - Keep orchestration in handlers and business rules at their state/domain owner. Handler length alone does not justify a DomainService; select one only for a meaningful domain responsibility.
 - Keep entity invariants on the entity. Do not let handlers or repositories directly toggle domain state through scattered property assignments.
 - Keep repository interfaces on the domain side of the boundary and repository implementations on the infrastructure side.
@@ -142,6 +142,6 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 
 ## Result Handling
 
-- For typed success results, prefer `return data;` or `return Res.Ok<TResponse>(data);`.
-- For failure results, prefer `return Res.Fail("message");`.
-- If `TResponse` is `string`, use `Res.Ok<string>(value)` instead of `Res.Ok(value)`.
+- For typed success results, use `return Result.Success(data);`, including string data. Use an explicit type argument when inference cannot express the declared payload type.
+- For typed failure results, use `return Result.Failure<TResponse>("message", status);`; no-data failures use `Result.Failure`. Forward an existing failure with `Result.FromFailure<TResponse>(source)` to preserve its status and metadata.
+- Messages use `WithMessage`. Do not return bare data or strings, erase payloads implicitly, or infer non-null data from success. Follow the [result contract](../../monica-development/references/result-type-guide.md).

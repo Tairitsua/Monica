@@ -38,7 +38,7 @@ public sealed class ManualJobSchedulerTests
         {
             OwnerKey = OWNER, JobKey = typeof(Recurring).FullName!, InstanceId = "explicit-recurring"
         }, TestContext.Current.CancellationToken);
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         await probe.RecurringCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(1, probe.RecurringRuns);
         Assert.Equal(0, probe.SharedOpens);

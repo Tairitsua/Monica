@@ -193,7 +193,8 @@
             if (_retired || confirmation is null || confirmation.Canceled || confirmation.Data is not true) return;
             var result = await ServiceDiscoveryFacade.ForceDeleteLeaderAsync(_service.AppId);
             if (_retired) return;
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
                 Snackbar.Add(L["ServiceDetail:Messages:DeleteLeaderFailed", error.Message ?? L["Shared:Values:Unknown"].Value].Value, Severity.Error);
             else
             {

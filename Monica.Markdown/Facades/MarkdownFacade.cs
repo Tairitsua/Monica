@@ -9,7 +9,7 @@ namespace Monica.Markdown.Facades;
 
 /// <summary>
 /// Host-facing markdown entry point for UI components and other presentation adapters.
-/// Converts internal exceptions into the unified <see cref="Res"/> result model.
+/// Converts internal exceptions into the unified <see cref="Result"/> result model.
 /// </summary>
 public class MarkdownFacade(
     IMarkdownDocumentCatalog markdownCatalog,
@@ -19,34 +19,34 @@ public class MarkdownFacade(
     /// <summary>
     /// Gets all registered document groups.
     /// </summary>
-    public async Task<Res<List<MarkdownDocumentGroup>>> GetAllDocumentGroupsAsync()
+    public async Task<Result<List<MarkdownDocumentGroup>>> GetAllDocumentGroupsAsync()
     {
         try
         {
             var groups = await markdownCatalog.GetAllDocumentGroupsAsync();
-            return Res.Ok(groups);
+            return Result.Success(groups);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load document groups.");
-            return Res.Fail($"Failed to load document groups: {ex.Message}");
+            return Result.Failure<List<MarkdownDocumentGroup>>($"Failed to load document groups: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Gets a single document group by key.
     /// </summary>
-    public async Task<Res<MarkdownDocumentGroup>> GetDocumentGroupAsync(string groupKey)
+    public async Task<Result<MarkdownDocumentGroup>> GetDocumentGroupAsync(string groupKey)
     {
         try
         {
             var group = await markdownCatalog.GetDocumentGroupAsync(groupKey);
-            return Res.Ok(group);
+            return Result.Success(group);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load document group '{GroupKey}'.", groupKey);
-            return Res.Fail($"Failed to load document group: {ex.Message}");
+            return Result.Failure<MarkdownDocumentGroup>($"Failed to load document group: {ex.Message}");
         }
     }
 
@@ -55,50 +55,50 @@ public class MarkdownFacade(
     /// For multilingual groups, providing a culture returns the visible tree
     /// rooted at that language folder.
     /// </summary>
-    public async Task<Res<TreeNode<MarkdownDocumentNodeData>>> GetDocumentTreeAsync(
+    public async Task<Result<TreeNode<MarkdownDocumentNodeData>>> GetDocumentTreeAsync(
         string groupKey,
         string? culture = null)
     {
         try
         {
             var tree = await markdownCatalog.GetDocumentTreeAsync(groupKey, culture);
-            return Res.Ok(tree);
+            return Result.Success(tree);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load document tree for group '{GroupKey}'.", groupKey);
-            return Res.Fail($"Failed to load document tree: {ex.Message}");
+            return Result.Failure<TreeNode<MarkdownDocumentNodeData>>($"Failed to load document tree: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Reads the raw markdown content of a document.
     /// </summary>
-    public async Task<Res<string>> GetDocumentContentAsync(MarkdownDocument document)
+    public async Task<Result<string>> GetDocumentContentAsync(MarkdownDocument document)
     {
         try
         {
             var content = await markdownCatalog.GetDocumentContentAsync(document);
-            return Res.Ok<string>(content);
+            return Result.Success<string>(content);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load markdown document content from '{Path}'.", document.FilePath);
-            return Res.Fail($"Failed to load document content: {ex.Message}");
+            return Result.Failure<string>($"Failed to load document content: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Searches markdown documents and returns UI-friendly result descriptors.
     /// </summary>
-    public async Task<Res<IReadOnlyList<MarkdownDocumentSearchResult>>> SearchDocumentsAsync(
+    public async Task<Result<IReadOnlyList<MarkdownDocumentSearchResult>>> SearchDocumentsAsync(
         MarkdownDocumentSearchRequest request,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var results = await markdownSearcher.SearchAsync(request, cancellationToken);
-            return Res.Ok<IReadOnlyList<MarkdownDocumentSearchResult>>(results);
+            return Result.Success<IReadOnlyList<MarkdownDocumentSearchResult>>(results);
         }
         catch (OperationCanceledException)
         {
@@ -107,41 +107,41 @@ public class MarkdownFacade(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to search markdown documents for query '{Query}'.", request.Query);
-            return Res.Fail($"Failed to search markdown documents: {ex.Message}");
+            return Result.Failure<IReadOnlyList<MarkdownDocumentSearchResult>>($"Failed to search markdown documents: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Rescans a specific document group.
     /// </summary>
-    public async Task<Res> RefreshGroupAsync(string groupKey)
+    public async Task<Result> RefreshGroupAsync(string groupKey)
     {
         try
         {
             await markdownCatalog.RefreshAsync(groupKey);
-            return Res.Ok("Group refreshed successfully");
+            return Result.Success().WithMessage("Group refreshed successfully");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to refresh markdown group '{GroupKey}'.", groupKey);
-            return Res.Fail($"Failed to refresh group: {ex.Message}");
+            return Result.Failure($"Failed to refresh group: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Rescans all registered document groups.
     /// </summary>
-    public async Task<Res> RefreshAllAsync()
+    public async Task<Result> RefreshAllAsync()
     {
         try
         {
             await markdownCatalog.RefreshAllAsync();
-            return Res.Ok("All groups refreshed successfully");
+            return Result.Success().WithMessage("All groups refreshed successfully");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to refresh all markdown groups.");
-            return Res.Fail($"Failed to refresh all groups: {ex.Message}");
+            return Result.Failure($"Failed to refresh all groups: {ex.Message}");
         }
     }
 }

@@ -18,41 +18,41 @@ public sealed class ProviderFacade(IAIProviderFactory providerFactory)
     }
 
     /// <summary>Runs the provider's small inference connectivity check under a captured configuration lease.</summary>
-    public async Task<Res> TestProviderAsync(string providerId, CancellationToken ct = default)
+    public async Task<Result> TestProviderAsync(string providerId, CancellationToken ct = default)
     {
         using var lease = providerFactory.AcquireProvider(providerId);
         var provider = lease?.Provider;
         if (provider == null)
         {
-            return Res.Fail($"Provider '{providerId}' not found");
+            return Result.Failure($"Provider '{providerId}' not found");
         }
 
         try
         {
             await provider.TestConnectionAsync(ct);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
-            return Res.Fail(lease!.RedactDiagnostic(ex.GetMessageRecursively()));
+            return Result.Failure(lease!.RedactDiagnostic(ex.GetMessageRecursively()));
         }
     }
 
     /// <summary>Sends a small inference request to one configured chat model.</summary>
-    public async Task<Res> TestModelAsync(string providerId, string modelName, CancellationToken ct = default)
+    public async Task<Result> TestModelAsync(string providerId, string modelName, CancellationToken ct = default)
     {
         using var lease = providerFactory.AcquireProvider(providerId);
         var provider = lease?.Provider;
         if (provider == null)
         {
-            return Res.Fail($"Provider '{providerId}' not found");
+            return Result.Failure($"Provider '{providerId}' not found");
         }
 
         var model = provider.Info.SupportedModels?.FirstOrDefault(m =>
             string.Equals(m.ModelName, modelName, StringComparison.OrdinalIgnoreCase));
         if (model is not LLMModelInfo)
         {
-            return Res.Fail("Only LLM models are supported for testing");
+            return Result.Failure("Only LLM models are supported for testing");
         }
 
         try
@@ -62,38 +62,38 @@ public sealed class ProviderFacade(IAIProviderFactory providerFactory)
                 [new ChatMessage(ChatRole.User, "Hello")],
                 new ChatOptions { MaxOutputTokens = 8 },
                 ct);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Model test failed: {lease!.RedactDiagnostic(ex.GetMessageRecursively())}");
+            return Result.Failure($"Model test failed: {lease!.RedactDiagnostic(ex.GetMessageRecursively())}");
         }
     }
 
     /// <summary>Lists remote models without inference or automatic configuration changes.</summary>
-    public async Task<Res<IReadOnlyList<AIRemoteModelInfo>>> FetchRemoteModelsAsync(
+    public async Task<Result<IReadOnlyList<AIRemoteModelInfo>>> FetchRemoteModelsAsync(
         string providerId, CancellationToken ct = default)
     {
         using var lease = providerFactory.AcquireProvider(providerId);
         var provider = lease?.Provider;
         if (provider == null)
         {
-            return Res.Fail($"Provider '{providerId}' not found");
+            return Result.Failure<IReadOnlyList<AIRemoteModelInfo>>($"Provider '{providerId}' not found");
         }
 
         if (!provider.SupportsRemoteModelListing)
         {
-            return Res.Fail("Provider does not support remote model listing");
+            return Result.Failure<IReadOnlyList<AIRemoteModelInfo>>("Provider does not support remote model listing");
         }
 
         try
         {
             var models = await provider.FetchRemoteModelsAsync(ct);
-            return Res.Ok(models);
+            return Result.Success(models);
         }
         catch (Exception ex)
         {
-            return Res.Fail(lease!.RedactDiagnostic(ex.GetMessageRecursively()));
+            return Result.Failure<IReadOnlyList<AIRemoteModelInfo>>(lease!.RedactDiagnostic(ex.GetMessageRecursively()));
         }
     }
 
@@ -108,18 +108,18 @@ public sealed class ProviderFacade(IAIProviderFactory providerFactory)
     /// Probes the actual vector dimensions of an embedding model by sending a short text
     /// and measuring the returned embedding length. Updates the model's Dimensions if successful.
     /// </summary>
-    public async Task<Res<int>> ProbeEmbeddingDimensionsAsync(
+    public async Task<Result<int>> ProbeEmbeddingDimensionsAsync(
         string providerId, string modelName, CancellationToken ct = default)
     {
         using var lease = providerFactory.AcquireProvider(providerId);
         var provider = lease?.Provider;
         if (provider == null)
-            return Res.Fail($"Provider '{providerId}' not found");
+            return Result.Failure<int>($"Provider '{providerId}' not found");
 
         var model = provider.Info.SupportedModels?.FirstOrDefault(m =>
             string.Equals(m.ModelName, modelName, StringComparison.OrdinalIgnoreCase));
         if (model is not EmbeddingModelInfo embeddingModel)
-            return Res.Fail("Only embedding models can be probed for dimensions");
+            return Result.Failure<int>("Only embedding models can be probed for dimensions");
 
         try
         {
@@ -130,11 +130,11 @@ public sealed class ProviderFacade(IAIProviderFactory providerFactory)
             // Update the model's dimensions in place
             embeddingModel.Dimensions = dimensions;
 
-            return Res.Ok(dimensions);
+            return Result.Success(dimensions);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Embedding probe failed: {lease!.RedactDiagnostic(ex.GetMessageRecursively())}");
+            return Result.Failure<int>($"Embedding probe failed: {lease!.RedactDiagnostic(ex.GetMessageRecursively())}");
         }
     }
 }

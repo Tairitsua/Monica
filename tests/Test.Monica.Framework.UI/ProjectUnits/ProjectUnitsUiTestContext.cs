@@ -30,22 +30,22 @@ internal sealed class ProjectUnitsUiTestContext : BunitContext
 }
 
 internal sealed class StubProjectUnitsUiDataSource(
-    Res<ProjectUnitDashboardSnapshot> dashboardResult,
-    Res<ProjectUnitDetail>? detailResult = null)
+    Result<ProjectUnitDashboardSnapshot> dashboardResult,
+    Result<ProjectUnitDetail>? detailResult = null)
     : IProjectUnitsUiDataSource
 {
-    public Task<Res<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
+    public Task<Result<ProjectUnitDashboardSnapshot>> GetDashboardAsync()
     {
         return Task.FromResult(dashboardResult);
     }
 
-    public Task<Res<ProjectUnitDetail>> GetDetailAsync(
+    public Task<Result<ProjectUnitDetail>> GetDetailAsync(
         string key,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return detailResult is not null
             ? Task.FromResult(detailResult)
-            : Task.FromResult<Res<ProjectUnitDetail>>(Res.Fail("No detail configured."));
+            : Task.FromResult(Result.Failure<ProjectUnitDetail>("No detail configured."));
     }
 }

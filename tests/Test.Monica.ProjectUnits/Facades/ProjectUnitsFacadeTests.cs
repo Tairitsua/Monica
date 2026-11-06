@@ -30,7 +30,7 @@ public sealed class ProjectUnitsFacadeTests
 
         var result = await scope.Resolve<ProjectUnitsFacade>().GetRequestFilterStateAsync();
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNullOrEmpty();
         result.Data.Should().NotBeNull();
         result.Data!.IsAvailable.Should().Be(enabled);
@@ -49,18 +49,18 @@ public sealed class ProjectUnitsFacadeTests
         var facade = firstScope.Resolve<ProjectUnitsFacade>();
 
         var disabled = await facade.ManageRequestFilterAsync(["/probe", "/Probe", "/probe"], true);
-        disabled.Status.Should().Be(ResStatus.Ok);
+        disabled.Status.Should().Be(ResultStatus.Ok);
         disabled.Data.Should().BeEquivalentTo("/probe", "/Probe");
         var captured = await facade.GetRequestFilterStateAsync();
-        captured.Status.Should().Be(ResStatus.Ok);
+        captured.Status.Should().Be(ResultStatus.Ok);
         captured.Data!.DisabledPaths.Should().BeEquivalentTo("/probe", "/Probe");
 
         var enabled = await facade.ManageRequestFilterAsync(["/probe"], false);
-        enabled.Status.Should().Be(ResStatus.Ok);
+        enabled.Status.Should().Be(ResultStatus.Ok);
         enabled.Data.Should().Equal("/Probe");
         captured.Data.DisabledPaths.Should().BeEquivalentTo("/probe", "/Probe");
         var other = await secondScope.Resolve<ProjectUnitsFacade>().GetRequestFilterStateAsync();
-        other.Status.Should().Be(ResStatus.Ok);
+        other.Status.Should().Be(ResultStatus.Ok);
         other.Data!.IsAvailable.Should().BeTrue();
         other.Data.DisabledPaths.Should().BeEmpty();
     }
@@ -73,14 +73,14 @@ public sealed class ProjectUnitsFacadeTests
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var facade = scope.Resolve<ProjectUnitsFacade>();
         var descriptors = await facade.GetDomainEventsAsync();
-        descriptors.Status.Should().Be(ResStatus.Ok);
+        descriptors.Status.Should().Be(ResultStatus.Ok);
         var descriptor = descriptors.Data!.Single(item => item.Info.Key == typeof(EventFriendlyDispatch).FullName);
         descriptor.Info.Title.Should().Be("Friendly dispatch label");
         descriptor.EventKey.Should().Be(typeof(EventFriendlyDispatch).FullName);
 
         var result = await facade.PublishDomainEventAsync(descriptor.EventKey, JsonNode.Parse("{\"Value\":\"exact\"}")!);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().Contain(descriptor.EventKey);
         var delivery = application.Services.GetRequiredService<RecordingDistributedProvider>().Deliveries.Single();
         delivery.Type.Should().Be(typeof(EventFriendlyDispatch));
@@ -98,7 +98,7 @@ public sealed class ProjectUnitsFacadeTests
         foreach (var eventType in new[] { typeof(FirstContext.EventCollision), typeof(SecondContext.EventCollision) })
         {
             var result = await facade.PublishDomainEventAsync(eventType.FullName!, JsonNode.Parse("{}")!);
-            result.Status.Should().Be(ResStatus.Ok);
+            result.Status.Should().Be(ResultStatus.Ok);
         }
 
         application.Services.GetRequiredService<RecordingDistributedProvider>().Deliveries
@@ -115,7 +115,7 @@ public sealed class ProjectUnitsFacadeTests
         var result = await scope.Resolve<ProjectUnitsFacade>()
             .PublishDomainEventAsync(nameof(EventFriendlyDispatch), JsonNode.Parse("{}")!);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         application.Services.GetRequiredService<RecordingDistributedProvider>().Deliveries
             .Should().ContainSingle(item => item.Type == typeof(EventFriendlyDispatch));
     }
@@ -130,7 +130,7 @@ public sealed class ProjectUnitsFacadeTests
         var result = await scope.Resolve<ProjectUnitsFacade>()
             .PublishDomainEventAsync(nameof(FirstContext.EventCollision), JsonNode.Parse("{}")!);
 
-        result.IsOk().Should().BeFalse();
+        result.IsSuccess().Should().BeFalse();
         result.Message.Should().Contain("short name is ambiguous").And.Contain("full CLR event key");
         application.Services.GetRequiredService<RecordingDistributedProvider>().Deliveries.Should().BeEmpty();
     }
@@ -144,7 +144,7 @@ public sealed class ProjectUnitsFacadeTests
 
         var result = await scope.Resolve<ProjectUnitsFacade>().GetDomainEventsAsync();
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data!.Single(item => item.EventKey == typeof(EventParameterized).FullName).Structure.Should().BeNull();
         result.Data!.Single(item => item.EventKey == typeof(EventFriendlyDispatch).FullName).Structure.Should().NotBeNull();
     }

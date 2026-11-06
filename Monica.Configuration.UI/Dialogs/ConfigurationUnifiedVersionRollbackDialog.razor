@@ -118,9 +118,12 @@
             token.ThrowIfCancellationRequested();
             _operations.TryApply(() =>
             {
-                if (result.IsFailed(out var error, out var preview))
+                var error = result;
+                var preview = result.Data;
+                if (result.IsFailure() || preview is null)
                 {
-                    _error = preserveError && !string.IsNullOrWhiteSpace(_error) ? $"{_error}{Environment.NewLine}{error.Message}" : error.Message;
+                    var message = error.Message ?? L["Common:Errors:LoadFailed"].Value;
+                    _error = preserveError && !string.IsNullOrWhiteSpace(_error) ? $"{_error}{Environment.NewLine}{message}" : message;
                     _preview = result.Data;
                 }
                 else _preview = preview;
@@ -149,9 +152,11 @@
                 // Apply is tokenless: retirement joins its actual outcome and cannot reverse persistence.
                 var result = await Facade.RollbackUnifiedVersionAsync(request);
                 if (_operations.IsRetired) return;
-                if (result.IsFailed(out var error, out var rollback))
+                var error = result;
+                var rollback = result.Data;
+                if (result.IsFailure() || rollback is null)
                 {
-                    _error = error.Message;
+                    _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                     await LoadPreviewCoreAsync(token, preserveError: true);
                     return;
                 }
@@ -183,7 +188,8 @@
                 token.ThrowIfCancellationRequested();
                 var result = await Facade.ReloadRuntimeConfigurationAsync();
                 if (_operations.IsRetired) return;
-                if (result.IsFailed(out var error, out _)) { _error = error.Message; return; }
+                var error = result;
+                if (result.IsFailure()) { _error = error.Message; return; }
                 await LoadPreviewCoreAsync(token);
             }
             finally

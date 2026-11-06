@@ -86,7 +86,9 @@ internal sealed class ProviderAdministrationState(
     {
         var result = await configuration.GetAsync(token);
         token.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error, out var snapshot)) return error.Message ?? GenericError;
+        var error = result.WithoutData();
+        var snapshot = result.Data;
+        if (result.IsFailure() || snapshot is null) return error.Message ?? GenericError;
         _lifetime.TryApply(() => Adopt(snapshot));
         return null;
     }) is null;
@@ -101,7 +103,9 @@ internal sealed class ProviderAdministrationState(
         {
             var result = await configuration.UpsertProviderAsync(edit.Configuration, edit.ApiKey, edit.ClearApiKey, capture.Revision, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var snapshot)) return error.Message ?? GenericError;
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure() || snapshot is null) return error.Message ?? GenericError;
             _lifetime.TryApply(() =>
             {
                 Adopt(snapshot);
@@ -170,7 +174,9 @@ internal sealed class ProviderAdministrationState(
                 ? await configuration.ResetProviderAsync(provider.Configuration.ProviderId, capture.Revision, token)
                 : await configuration.RemoveProviderAsync(provider.Configuration.ProviderId, capture.Revision, token);
             token.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var snapshot)) return error.Message ?? GenericError;
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure() || snapshot is null) return error.Message ?? GenericError;
             _lifetime.TryApply(() => Adopt(snapshot));
             return null;
         });
@@ -187,7 +193,9 @@ internal sealed class ProviderAdministrationState(
             var result = await configuration.DiscoverModelsAsync(provider.Configuration.ProviderId, token);
             token.ThrowIfCancellationRequested();
             if (!MatchesSelection(capture, selectionVersion)) return null;
-            if (result.IsFailed(out var error, out var models))
+            var error = result.WithoutData();
+            var models = result.Data;
+            if (result.IsFailure() || models is null)
             {
                 var diagnostic = error.Message ?? GenericError;
                 _lifetime.TryApply(() => DiscoveryError = diagnostic);
@@ -217,12 +225,13 @@ internal sealed class ProviderAdministrationState(
         return RunOperationAsync(async token =>
         {
             _lifetime.TryApply(() => LastProbe = null);
-            Res result = model is null
+            Result result = model is null
                 ? await configuration.TestProviderAsync(provider.Configuration.ProviderId, token)
                 : await configuration.TestModelAsync(provider.Configuration.ProviderId, model, token);
             token.ThrowIfCancellationRequested();
             if (!MatchesSelection(capture, selectionVersion)) return null;
-            var diagnostic = result.IsFailed(out var error) ? error.Message ?? GenericError : null;
+            var error = result;
+            var diagnostic = result.IsFailure() ? error.Message ?? GenericError : null;
             _lifetime.TryApply(() => LastProbe = new(provider.Configuration.ProviderId, model, capture.Revision,
                 model is not null, diagnostic is null, diagnostic));
             return diagnostic;

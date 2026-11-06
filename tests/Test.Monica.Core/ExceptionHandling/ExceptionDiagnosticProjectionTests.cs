@@ -17,7 +17,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void Capture_WhenTheSameExceptionIsObservedTwice_ShouldReuseItsEntryAndStack()
     {
-        var result = Res.Fail("Safe failure", ResStatus.InternalError);
+        var result = Result.Failure("Safe failure", ResultStatus.InternalError);
         var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(result);
         var exception = ThrowAndCatch(new InvalidOperationException("Database unavailable"));
 
@@ -36,7 +36,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void Capture_WhenDistinctExceptionsHaveTheSameDetails_ShouldPreserveTheirIdentityAndRecursiveFrames()
     {
-        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Safe failure"));
+        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Safe failure"));
         var first = new RecursiveStackException();
         var second = new RecursiveStackException();
 
@@ -59,7 +59,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     {
         var inner = ThrowAndCatch(new ArgumentException("Invalid timestamp kind"));
         var outer = ThrowAndCatch(new InvalidOperationException("Saving changes failed", inner));
-        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Safe failure"));
+        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Safe failure"));
 
         var id = ExceptionDiagnosticProjection.Capture(diagnostics, outer);
 
@@ -88,7 +88,7 @@ public sealed class ExceptionDiagnosticProjectionTests
         var firstBranch = new InvalidOperationException("First operation failed", shared);
         var secondBranch = new IOException("Second operation failed", shared);
         var aggregate = new AggregateException("Parallel operations failed", firstBranch, secondBranch);
-        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Safe failure"));
+        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Safe failure"));
 
         var id = ExceptionDiagnosticProjection.Capture(diagnostics, aggregate);
 
@@ -108,7 +108,7 @@ public sealed class ExceptionDiagnosticProjectionTests
         var remoteResponse = CreateLegacyResponse();
         var exception = new ExtractedTransportException(
             "Actor invocation failed: " + remoteResponse.GetRawText(), remoteResponse);
-        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Safe failure"));
+        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Safe failure"));
 
         var id = ExceptionDiagnosticProjection.Capture(diagnostics, exception, [new FixtureExtractor()]);
 
@@ -250,7 +250,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void CaptureRemote_WhenResponseAlreadyUsesDiagnostics_ShouldRetainItsGraphAndCorrelation()
     {
-        var result = Res.Fail("Remote operation failed", ResStatus.InternalError)
+        var result = Result.Failure("Remote operation failed", ResultStatus.InternalError)
             .SetError(new ResultError("remote.failed", "remote-trace", "remote-service"));
         var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(result);
         var rootId = ExceptionDiagnosticProjection.Capture(diagnostics,
@@ -325,11 +325,11 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void CaptureRemote_WhenCurrentDiagnosticsContainNestedRemote_ShouldRetainItsBoundaryAndAdditionalChains()
     {
-        var result = Res.Fail("Forwarding failed", ResStatus.InternalError);
+        var result = Result.Failure("Forwarding failed", ResultStatus.InternalError);
         var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(result);
         diagnostics.ExceptionId = ExceptionDiagnosticProjection.Capture(diagnostics,
             new InvalidOperationException("Invocation failed"));
-        var nestedDiagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Remote failed"));
+        var nestedDiagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Remote failed"));
         nestedDiagnostics.ExceptionId = ExceptionDiagnosticProjection.Capture(nestedDiagnostics,
             new IOException("Remote storage unavailable"));
         var nestedId = nestedDiagnostics.ExceptionId;
@@ -383,7 +383,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void CaptureRemote_WhenNestedRemoteHasOnlyASummary_ShouldNotInventAnException()
     {
-        var result = Res.Fail("Invocation failed", ResStatus.BadGateway);
+        var result = Result.Failure("Invocation failed", ResultStatus.BadGateway);
         var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(result);
         diagnostics.ExceptionId = ExceptionDiagnosticProjection.Capture(diagnostics,
             new InvalidOperationException("Remote request rejected"));
@@ -501,7 +501,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void CaptureRemote_WhenAnEnvelopeExceedsThePayloadLimit_ShouldRetainItsKnownStatus()
     {
-        var result = Res.Fail("Upstream unavailable", ResStatus.ServiceUnavailable)
+        var result = Result.Failure("Upstream unavailable", ResultStatus.ServiceUnavailable)
             .SetMetadata("chain", new { operation = new string('x', 2_000_000) });
 
         var remote = ExceptionDiagnosticProjection.CaptureRemote(result, Json, "fixture-rpc");
@@ -573,7 +573,7 @@ public sealed class ExceptionDiagnosticProjectionTests
         Exception exception = new InvalidOperationException("Original cause");
         for (var index = 0; index < 512; index++)
             exception = new InvalidOperationException($"Wrapper {index}", exception);
-        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Res.Fail("Safe failure"));
+        var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(Result.Failure("Safe failure"));
 
         ExceptionDiagnosticProjection.Capture(diagnostics, exception);
 
@@ -588,7 +588,7 @@ public sealed class ExceptionDiagnosticProjectionTests
     [Fact]
     public void PrepareForPresentation_WhenDiagnosticsArePrivate_ShouldRemoveModernAndLegacyMembers()
     {
-        var result = Res.Fail("Safe failure", ResStatus.InternalError)
+        var result = Result.Failure("Safe failure", ResultStatus.InternalError)
             .SetMetadata("exception", "secret-exception")
             .SetMetadata("chain", "secret-chain")
             .SetMetadata("chain_1", "secret-remote-chain")
@@ -607,14 +607,14 @@ public sealed class ExceptionDiagnosticProjectionTests
         Assert.Contains("chainOfCustody", serialized, StringComparison.Ordinal);
         Assert.True(result.TryGetError(Json, out var error));
         Assert.Equal("public-trace", error.TraceId);
-        Assert.Equal(ResStatus.InternalError, result.Status);
+        Assert.Equal(ResultStatus.InternalError, result.Status);
         Assert.Equal("Safe failure", result.Message);
     }
 
     [Fact]
     public void PrepareForPresentation_WhenDetailsAreEnabled_ShouldRetainTheDiagnosticGraph()
     {
-        var result = Res.Fail("Safe failure", ResStatus.InternalError);
+        var result = Result.Failure("Safe failure", ResultStatus.InternalError);
         var diagnostics = ExceptionDiagnosticProjection.GetOrCreate(result);
         var id = ExceptionDiagnosticProjection.Capture(diagnostics, new InvalidOperationException("Diagnostic detail"));
 

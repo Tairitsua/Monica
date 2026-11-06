@@ -28,7 +28,7 @@ internal sealed class ResultEnvelopeSchemaFilter(
         foreach (var property in serializer.SerializerOptions.GetTypeInfo(context.Type).Properties)
         {
             if (property.AttributeProvider is not MemberInfo member ||
-                member.Name is not (nameof(Res.Status) or nameof(Res.Message) or nameof(Res.Metadata) or "Data")) continue;
+                member.Name is not (nameof(Result.Status) or nameof(Result.Message) or nameof(Result.Metadata) or "Data")) continue;
             var originalName = member.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ??
                 serializer.SerializerOptions.PropertyNamingPolicy?.ConvertName(member.Name) ?? member.Name;
             if (originalName == property.Name || !result.Properties.Remove(originalName, out var propertySchema)) continue;

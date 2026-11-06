@@ -7,7 +7,7 @@ namespace Monica.Core.Results;
 /// contract defects at API boundaries, and business semantics belong to the <c>metadata.error</c> reason codes
 /// (<see cref="ResultErrorCodes"/>) rather than to these numbers.
 /// </summary>
-public enum ResStatus
+public enum ResultStatus
 {
     /// <summary>
     /// No result status has been assigned.

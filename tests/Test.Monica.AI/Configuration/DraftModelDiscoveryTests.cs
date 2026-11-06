@@ -23,7 +23,7 @@ public sealed class DraftModelDiscoveryTests
         var result = await facade.DiscoverDraftModelsAsync(new AIProviderConfiguration { ProviderId = "", BaseUrl = endpoint.BaseUrl },
             "draft-key", ct: TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         (await endpoint.Credential.Task).Should().Be("Bearer draft-key");
         result.Data.Should().ContainSingle();
         result.Data![0].ContextWindow.Should().Be(131072);
@@ -49,12 +49,12 @@ public sealed class DraftModelDiscoveryTests
             Models = [new AIModelConfiguration { ModelName = "custom-alias", ContextWindow = 65536, SupportsImage = false }]
         };
         var missing = await facade.DiscoverDraftModelsAsync(draft, ct: TestContext.Current.CancellationToken);
-        missing.Status.Should().NotBe(ResStatus.Ok);
+        missing.Status.Should().NotBe(ResultStatus.Ok);
         endpoint.Credential.Task.IsCompleted.Should().BeFalse();
 
         var result = await facade.DiscoverDraftModelsAsync(draft, useSavedApiKey: true, ct: TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         (await endpoint.Credential.Task).Should().Be("Bearer code-key");
         result.Data!.Single().ContextWindow.Should().Be(65536);
         result.Data!.Single().SupportsImage.Should().BeFalse();
@@ -76,7 +76,7 @@ public sealed class DraftModelDiscoveryTests
         var result = await facade.DiscoverDraftModelsAsync(new AIProviderConfiguration { ProviderId = "draft", BaseUrl = endpoint.BaseUrl },
             "draft-secret", ct: TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().NotContain("draft-secret").And.Contain("[redacted]");
         workspace.Store.Read().Revision.Should().Be(0);
     }
@@ -95,7 +95,7 @@ public sealed class DraftModelDiscoveryTests
             new AIProviderConfiguration { ProviderId = "saved", BaseUrl = endpoint.BaseUrl },
             "replacement-key", useSavedApiKey: true, ct: TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().ContainSingle();
         (await endpoint.Credential.Task).Should().Be("Bearer replacement-key");

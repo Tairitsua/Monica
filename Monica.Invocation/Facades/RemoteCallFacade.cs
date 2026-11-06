@@ -63,8 +63,8 @@ internal sealed class RemoteCallFacade(
             // flowing; every other host still strips them at this boundary.
             result.PrepareForPresentation(serializer.SerializerOptions, messages, traceId, context.Service.Name,
                 context.Operation, exposeReservedDiagnostics: applicationOptions.DebugMode);
-            activity.SetStatus(result.IsOk() ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
-            outcome = result.IsOk() ? "success" : "business_failure";
+            activity.SetStatus(result.IsSuccess() ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
+            outcome = result.IsSuccess() ? "success" : "business_failure";
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -75,7 +75,7 @@ internal sealed class RemoteCallFacade(
         catch (OperationCanceledException exception) when (deadline.IsCancellationRequested ||
             stage == "send" && exception.InnerException is TimeoutException)
         {
-            return Failure<TResponse>(new RemoteCallFailure(ResStatus.GatewayTimeout,
+            return Failure<TResponse>(new RemoteCallFailure(ResultStatus.GatewayTimeout,
                 ResultErrorCodes.DependencyTimeout, stage), exception);
         }
         catch (RemoteCallException exception) when (stage == "response")
@@ -84,7 +84,7 @@ internal sealed class RemoteCallFacade(
         }
         catch (HttpRequestException exception) when (stage == "send" && !HasSerializationFailure(exception))
         {
-            return Failure<TResponse>(new RemoteCallFailure(ResStatus.ServiceUnavailable,
+            return Failure<TResponse>(new RemoteCallFailure(ResultStatus.ServiceUnavailable,
                 ResultErrorCodes.DependencyUnavailable, stage, exception.StatusCode), exception);
         }
         finally
@@ -118,7 +118,7 @@ internal sealed class RemoteCallFacade(
     {
         // A forwarded application failure keeps the origin's own error untouched; only an error that does not
         // identify its origin gains the immediate dependency so clients can show where the failure came from.
-        if (result.IsOk() || !result.TryGetError(serializer.SerializerOptions, out var forwarded) ||
+        if (result.IsSuccess() || !result.TryGetError(serializer.SerializerOptions, out var forwarded) ||
             forwarded.Service is not null || forwarded.Operation is not null) return;
         result.SetError(new ResultError(forwarded.Code, forwarded.TraceId,
             context.Service.Name, context.Operation, forwarded.Fields));

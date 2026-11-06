@@ -328,7 +328,9 @@
                 return;
             }
 
-            if (result.IsFailed(out var error, out var data))
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure() || data is null)
             {
                 _loadError = L["Shared:Messages:LoadFailed", error].Value;
                 Snackbar.Add(_loadError, Severity.Error);

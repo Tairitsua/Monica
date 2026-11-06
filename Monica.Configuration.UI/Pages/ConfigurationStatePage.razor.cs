@@ -363,7 +363,9 @@ public partial class ConfigurationStatePage
             return;
         }
 
-        if (result.IsFailed(out var error, out var catalog))
+        var error = result;
+        var catalog = result.Data;
+        if (result.IsFailure() || catalog is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             _definitions.Clear();
@@ -488,7 +490,9 @@ public partial class ConfigurationStatePage
             }
 
             var sourceResult = await sourceTask;
-            if (sourceResult.IsFailed(out var sourceError, out var report))
+            var sourceError = sourceResult;
+            var report = sourceResult.Data;
+            if (sourceResult.IsFailure() || report is null)
             {
                 _runtimeValidationError = sourceError.Message ?? L["Validation:Unavailable"].Value;
                 _runtimeValidationReport = null;
@@ -499,7 +503,9 @@ public partial class ConfigurationStatePage
             }
 
             var optionsResult = await optionsTask;
-            if (optionsResult.IsFailed(out var optionsError, out var attempts))
+            var optionsError = optionsResult;
+            var attempts = optionsResult.Data;
+            if (optionsResult.IsFailure() || attempts is null)
             {
                 _optionsValidationError = optionsError.Message ?? L["Validation:Unavailable"].Value;
                 _optionsValidationReports = [];
@@ -625,7 +631,9 @@ public partial class ConfigurationStatePage
         {
             var result = await Facade.GetDefinitionStateAsync(summary.DefinitionKey, Visibility.ShowSensitiveValues);
             if (route.IsRetired || generation != _selectionGeneration || valueGeneration != _valueReadGeneration) return;
-            if (result.IsFailed(out var error, out var definitionState))
+            var error = result;
+            var definitionState = result.Data;
+            if (result.IsFailure() || definitionState is null)
             {
                 Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
                 ClearSelectedDefinition();
@@ -663,7 +671,9 @@ public partial class ConfigurationStatePage
         var result = await Facade.GetDefinitionStateAsync(definition.DefinitionKey, Visibility.ShowSensitiveValues);
         if (route.IsRetired || generation != _valueReadGeneration
             || !string.Equals(_selectedSummary?.DefinitionKey, definition.DefinitionKey, StringComparison.Ordinal)) return;
-        if (result.IsFailed(out var error, out var definitionState))
+        var error = result;
+        var definitionState = result.Data;
+        if (result.IsFailure() || definitionState is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             return;
@@ -713,7 +723,8 @@ public partial class ConfigurationStatePage
             definition.DefinitionKey,
             nodes.Select(static node => node.RelativePath).ToArray(), Visibility.ShowSensitiveValues);
         if (route.IsRetired || generation != _valueReadGeneration || !ReferenceEquals(definition, _selectedDefinition)) return;
-        if (result.IsFailed(out _, out var sourceChains))
+        var sourceChains = result.Data;
+        if (result.IsFailure() || sourceChains is null)
         {
             return;
         }
@@ -790,14 +801,14 @@ public partial class ConfigurationStatePage
         return _externalEffectiveSources.GetValueOrDefault(node.RelativePath);
     }
 
-    private Task<Res<ConfigurationDefinitionDetail>> LoadDefinitionDetailAsync(string definitionKey) =>
+    private Task<Result<ConfigurationDefinitionDetail>> LoadDefinitionDetailAsync(string definitionKey) =>
         RunOwnedAsync((route, token) => LoadDefinitionDetailAsyncCore(definitionKey, route, token));
 
-    private async Task<Res<ConfigurationDefinitionDetail>> LoadDefinitionDetailAsyncCore(string definitionKey, ConfigurationOperationLifetime route, CancellationToken token)
+    private async Task<Result<ConfigurationDefinitionDetail>> LoadDefinitionDetailAsyncCore(string definitionKey, ConfigurationOperationLifetime route, CancellationToken token)
     {
         if (_definitionDetails.TryGetValue(definitionKey, out var cachedDefinition))
         {
-            return Res.Ok(new ConfigurationDefinitionDetail
+            return Result.Success(new ConfigurationDefinitionDetail
             {
                 Definition = cachedDefinition
             });
@@ -805,7 +816,8 @@ public partial class ConfigurationStatePage
 
         var result = await Facade.GetDefinitionAsync(definitionKey);
         token.ThrowIfCancellationRequested();
-        if (!result.IsFailed(out _, out var detail))
+        var detail = result.Data;
+        if (!result.IsFailure() && detail is not null)
         {
             _definitionDetails[definitionKey] = detail.Definition;
         }
@@ -993,7 +1005,8 @@ public partial class ConfigurationStatePage
 
             var result = await Facade.GetDefinitionAsync(summary.DefinitionKey);
             if (route.IsRetired || generation != _catalogGeneration || filter != _lifecycleFilter) return;
-            if (!result.IsFailed(out _, out var detail))
+            var detail = result.Data;
+            if (!result.IsFailure() && detail is not null)
             {
                 _definitionDetails[summary.DefinitionKey] = detail.Definition;
             }
@@ -1266,7 +1279,9 @@ public partial class ConfigurationStatePage
         };
         var result = await Facade.QueryHistoryPageAsync(request);
         if (route.IsRetired || !ReferenceEquals(definition, _selectedDefinition)) return;
-        if (result.IsFailed(out var error, out var page))
+        var error = result;
+        var page = result.Data;
+        if (result.IsFailure() || page is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             return;
@@ -1313,7 +1328,9 @@ public partial class ConfigurationStatePage
 
         var result = await Facade.GetDefinitionPublicationOverviewAsync(definition.DefinitionKey, 50);
         if (route.IsRetired || !ReferenceEquals(definition, _selectedDefinition)) return;
-        if (result.IsFailed(out var error, out var overview))
+        var error = result;
+        var overview = result.Data;
+        if (result.IsFailure() || overview is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             return;
@@ -1358,7 +1375,9 @@ public partial class ConfigurationStatePage
 
         var previewResult = await Facade.PreviewDefinitionPurgeAsync(summary.DefinitionKey);
         if (route.IsRetired) return;
-        if (previewResult.IsFailed(out var previewError, out var preview))
+        var previewError = previewResult;
+        var preview = previewResult.Data;
+        if (previewResult.IsFailure() || preview is null)
         {
             Snackbar.Add(
                 L["DefinitionPurge:Messages:PreviewFailed", previewError.Message ?? string.Empty],
@@ -1384,9 +1403,10 @@ public partial class ConfigurationStatePage
         }
 
         var purgeResult = await Facade.PurgeDefinitionAsync(request);
-        if (!purgeResult.IsFailed(out _)) StateStore.UndoScope(request.DefinitionKey, LogicalPath.Root);
+        if (!purgeResult.IsFailure()) StateStore.UndoScope(request.DefinitionKey, LogicalPath.Root);
         if (route.IsRetired) return;
-        if (purgeResult.IsFailed(out var purgeError))
+        var purgeError = purgeResult;
+        if (purgeResult.IsFailure())
         {
             Snackbar.Add(
                 L["DefinitionPurge:Messages:PurgeFailed", purgeError.Message ?? string.Empty],
@@ -1428,7 +1448,9 @@ public partial class ConfigurationStatePage
         CloseRuntimeValidationPopover();
         var result = await LoadDefinitionDetailAsyncCore(issue.DefinitionKey, route, token);
         if (route.IsRetired) return;
-        if (result.IsFailed(out var error, out var detail))
+        var error = result;
+        var detail = result.Data;
+        if (result.IsFailure() || detail is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             return;
@@ -1479,7 +1501,8 @@ public partial class ConfigurationStatePage
         {
             var result = await LoadDefinitionDetailAsyncCore(definitionChanges.Key, route, token);
             if (route.IsRetired) return;
-            if (result.IsFailed(out _, out var detail))
+            var detail = result.Data;
+            if (result.IsFailure() || detail is null)
             {
                 refreshedChanges.AddRange(definitionChanges);
                 continue;
@@ -1487,7 +1510,8 @@ public partial class ConfigurationStatePage
 
             var rootValueResult = await Facade.GetEffectiveValueAsync(definitionChanges.Key, LogicalPath.Root, Visibility.ShowSensitiveValues);
             if (route.IsRetired) return;
-            if (rootValueResult.IsFailed(out _, out var rootValue))
+            var rootValue = rootValueResult.Data;
+            if (rootValueResult.IsFailure() || rootValue is null)
             {
                 refreshedChanges.AddRange(definitionChanges);
                 continue;
@@ -1505,7 +1529,8 @@ public partial class ConfigurationStatePage
 
                 var effectiveValueResult = await Facade.GetEffectiveValueAsync(change.DefinitionKey, change.LogicalPath, Visibility.ShowSensitiveValues);
                 if (route.IsRetired) return;
-                if (effectiveValueResult.IsFailed(out _, out var effectiveValue))
+                var effectiveValue = effectiveValueResult.Data;
+                if (effectiveValueResult.IsFailure() || effectiveValue is null)
                 {
                     refreshedChanges.Add(change);
                     continue;
@@ -1544,7 +1569,9 @@ public partial class ConfigurationStatePage
 
         var statusResult = await Facade.GetRuntimeReloadStatusAsync();
         if (route.IsRetired) return true;
-        if (statusResult.IsFailed(out var error, out var report))
+        var error = statusResult;
+        var report = statusResult.Data;
+        if (statusResult.IsFailure() || report is null)
         {
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
             return true;

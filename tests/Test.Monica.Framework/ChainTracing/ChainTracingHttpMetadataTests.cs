@@ -81,7 +81,7 @@ public sealed class ChainTracingHttpMetadataTests
                 options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
                 options.EnableGlobalEnumToString = true;
                 options.EnableEnumFormatValue = true;
-                options.EnumTypeToIgnore = [typeof(ResStatus)];
+                options.EnumTypeToIgnore = [typeof(ResultStatus)];
             });
             builder.ConfigureApplication(options => options.DebugMode = exposeDiagnostics);
             builder.AddResultEnvelope()
@@ -120,7 +120,7 @@ public sealed class ChainTracingHttpProbeController(ChainTracingHttpProbeDbConte
     {
         await Task.Yield();
         var value = await database.Database.SqlQueryRaw<int>("SELECT 42 AS Value").SingleAsync(cancellationToken);
-        return Res.Ok<int>(value).GetResponse(this);
+        return Result.Success<int>(value).GetResponse(this);
     }
 }
 

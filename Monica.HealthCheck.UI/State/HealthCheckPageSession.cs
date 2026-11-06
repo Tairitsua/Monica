@@ -26,7 +26,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
 {
     private static readonly TimeSpan DEFAULT_REFRESH_INTERVAL = TimeSpan.FromSeconds(10);
 
-    private readonly Func<HealthCheckScope, CancellationToken, Task<Res<HealthCheckSnapshot>>> _getSnapshotAsync;
+    private readonly Func<HealthCheckScope, CancellationToken, Task<Result<HealthCheckSnapshot>>> _getSnapshotAsync;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _refreshInterval;
@@ -39,7 +39,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
     private bool _disposed;
 
     internal HealthCheckPageSession(
-        Func<HealthCheckScope, CancellationToken, Task<Res<HealthCheckSnapshot>>> getSnapshotAsync,
+        Func<HealthCheckScope, CancellationToken, Task<Result<HealthCheckSnapshot>>> getSnapshotAsync,
         Func<CancellationToken, Task<bool>> authorize,
         string hostName,
         TimeProvider? timeProvider = null,
@@ -321,7 +321,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         }
     }
 
-    private bool CompleteRefresh(Res<HealthCheckSnapshot> result)
+    private bool CompleteRefresh(Result<HealthCheckSnapshot> result)
     {
         lock (_stateGate)
         {
@@ -330,14 +330,16 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
                 return false;
             }
 
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure() || snapshot is null)
             {
                 var hasSnapshot = _state.Snapshot is not null;
                 _state = _state with
                 {
                     LoadState = hasSnapshot ? HealthCheckPageLoadState.Ready : HealthCheckPageLoadState.Failed,
-                    LoadError = hasSnapshot ? null : error.Message,
-                    RefreshError = hasSnapshot ? error.Message : null,
+                    LoadError = hasSnapshot ? null : error.Message ?? "The health check snapshot was unavailable.",
+                    RefreshError = hasSnapshot ? error.Message ?? "The health check snapshot was unavailable." : null,
                     IsRefreshing = false
                 };
                 return false;

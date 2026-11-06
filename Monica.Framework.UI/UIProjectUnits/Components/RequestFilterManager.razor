@@ -153,7 +153,9 @@
         {
             var result = await ProjectUnitsFacade.GetRequestFilterStateAsync();
             if (_disposed) return;
-            if (result.IsFailed(out var error, out var data))
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure() || data is null)
             {
                 _loadError = L["Shared:Messages:LoadFailed", error];
                 Snackbar.Add(_loadError, Severity.Error);
@@ -241,7 +243,9 @@
         {
             var result = await ProjectUnitsFacade.ManageRequestFilterAsync(paths, disable);
             if (_disposed) return;
-            if (result.IsFailed(out var error, out var data))
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure() || data is null)
             {
                 Snackbar.Add(failureMessage(error), Severity.Error);
                 return;

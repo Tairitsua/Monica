@@ -149,7 +149,7 @@ public sealed partial class FileOpsWorkspaceController
     });
 
     private async Task<FileOpsOperationDisposition> TransferAsync(
-        Func<Task<Res<FileOpsDownloadDescriptor>>> open, FileOpsOperationKind kind, FileOpsDownloadCallback transfer)
+        Func<Task<Result<FileOpsDownloadDescriptor>>> open, FileOpsOperationKind kind, FileOpsDownloadCallback transfer)
     {
         if (IsRetired) return FileOpsOperationDisposition.Retired;
         var result = await open();

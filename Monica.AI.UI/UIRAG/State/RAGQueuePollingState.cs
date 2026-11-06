@@ -107,7 +107,9 @@ public sealed class RAGQueuePollingState(KnowledgeDocumentFacade knowledgeDocume
         // The facade has no token overload. Retirement retains and drains the actual read.
         var result = await knowledgeDocumentFacade.GetDocumentInventoryAsync(id);
         if (token.IsCancellationRequested || _lifetime.IsRetired || generation != _generation) return false;
-        if (result.IsFailed(out var error, out var queue))
+        var error = result.WithoutData();
+        var queue = result.Data;
+        if (result.IsFailure() || queue is null)
         {
             if (QueueRefreshFailed is { } failed)
                 foreach (Func<string, long, string, Task> callback in failed.GetInvocationList())

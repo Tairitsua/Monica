@@ -269,7 +269,9 @@
 
             var result = await ServiceDiscoveryFacade.CaptureServicesAsync(_lifetimeCancellation.Token);
             if (_disposed) return;
-            if (result.IsFailed(out var error, out var services))
+            var error = result.WithoutData();
+            var services = result.Data;
+            if (result.IsFailure())
             {
                 _captureError = error.Message ?? L["Atlas:Shared:CaptureFailed"].Value;
                 return;
