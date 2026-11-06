@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.DynamicLinq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Monica.AutoModel.Abstractions;
+using Monica.ModelQuery.Abstractions;
 using Monica.Core.ObjectMapping.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Execution;
@@ -41,9 +41,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     where TEntity : class, IEntity<TKey>
 {
     /// <summary>
-    /// Gets the auto model database operator for entity operations.
+    /// Gets the model query operator for entity operations.
     /// </summary>
-    protected IAutoModelDbOperator<TEntity> AutoModel => CachedServiceProvider.GetRequiredService<IAutoModelDbOperator<TEntity>>();
+    protected IQueryableModelQuery<TEntity> ModelQuery => CachedServiceProvider.GetRequiredService<IQueryableModelQuery<TEntity>>();
 
     /// <summary>
     /// Gets the unit of work manager.
@@ -108,11 +108,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         {
             if (!select.SelectColumns.IsNullOrWhiteSpace())
             {
-                dynamicQuery = AutoModel.DynamicSelect(query, select.SelectColumns);
+                dynamicQuery = ModelQuery.SelectFields(query, select.SelectColumns);
             }
             else if (!select.SelectExceptColumns.IsNullOrWhiteSpace())
             {
-                dynamicQuery = AutoModel.DynamicSelectExcept(query, select.SelectExceptColumns);
+                dynamicQuery = ModelQuery.SelectFieldsExcept(query, select.SelectExceptColumns);
             }
 
             if (featureSetting?.FeatureFlags?.HasFlag(ERequestFeature.Distinct) is true)
@@ -240,8 +240,8 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         if (input is IHasRequestSelect select && select.HasUsingSelected())
         {
             var dynamicQuery = !select.SelectColumns.IsNullOrWhiteSpace()
-                ? AutoModel.DynamicSelect(query, select.SelectColumns)
-                : AutoModel.DynamicSelectExcept(query, select.SelectExceptColumns!);
+                ? ModelQuery.SelectFields(query, select.SelectColumns)
+                : ModelQuery.SelectFieldsExcept(query, select.SelectExceptColumns!);
 
             await foreach (var item in (dynamicQuery as IAsyncEnumerable<dynamic>)!.WithCancellation(cancellationToken))
             {
@@ -629,18 +629,18 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         {
             if (!string.IsNullOrEmpty(filterRequest.Filter))
             {
-                var result = AutoModel.GetNormalizedResult(filterRequest.Filter);
+                var result = ModelQuery.NormalizeFilter(filterRequest.Filter);
                 if (result.Context.Tokens.Any(p => p.FieldInfo?.ReflectionName == nameof(IHasSoftDelete.IsDeleted)))
                 {
                     query = query.IncludeSoftDeleted(); // Important: this was observed to stop working with sharded tables.
                 }
 
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
-                queryable = AutoModel.ApplyFilter(queryable, result);
+                queryable = ModelQuery.ApplyFilter(queryable, result);
 
                 if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
                 {
-                    queryable = AutoModel.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                    queryable = ModelQuery.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
                 }
 
                 return await ApplyClientSideFilterAsync(input, queryable);
@@ -649,7 +649,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
             if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
             {
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
-                queryable = AutoModel.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                queryable = ModelQuery.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
                 return await ApplyClientSideFilterAsync(input, queryable);
             }
         }

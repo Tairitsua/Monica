@@ -46,7 +46,7 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAutoModel, ModuleAutoModelOption>();
+        module.Require<ModuleModelQuery, ModuleModelQueryOption>();
         module.Require<ModuleControllers, ModuleControllersOption>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
     }

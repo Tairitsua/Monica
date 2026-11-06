@@ -1,4 +1,4 @@
-using Monica.AutoModel.Abstractions;
+using Monica.ModelQuery.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 
 namespace Monica.WebApi.AutoControllers.Models;

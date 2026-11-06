@@ -31,7 +31,7 @@ Only already registered capabilities participate:
 | Result envelope and exception handling | Bounded `metadata.diagnostics` exception catalogs and reserved response diagnostics; readable UTF-8 diagnostic JSON. |
 | Invocation | Preserve reserved diagnostics actually supplied by downstream hosts. An upstream with debug disabled strips them; enabling an upstream does not enable a downstream. |
 | Chain tracing | Attach existing call-chain and database-command evidence when the host has selected the response-attachment integration. |
-| AutoModel | Existing expression-debug output through the configured logger, including original filters, generated expressions, and captured parameters. |
+| ModelQuery | Existing expression-debug output through the configured logger, including original filters, generated expressions, and captured parameters. |
 
 Details may contain stack traces, paths, exception messages, SQL and parameter values. Every client of the affected endpoints can receive them; this is not a per-user administrator preference. Existing bounds and redaction still apply. Diagnostic JSON is consumed as JSON, not inserted as raw HTML or script.
 
@@ -49,7 +49,7 @@ Debug mode does not register modules, tracing interceptors, exporters, endpoints
 | Logging levels, body capture, profiling | Their own owners control volume and additional data collection. |
 | `Application:AutonomousWork` | Automatic environmental work, independent of diagnostic disclosure. |
 
-Do not use the word debug to describe an authorization bypass or sensitive-value reveal. The old `ModuleUIHostOption.EnableDebug`, `ModuleResultEnvelopeOption.ExposeDiagnosticDetails`, and `ModuleAutoModelOption.EnableDebugging` setters have been removed. Migrate those callers to `ConfigureApplication` or the canonical deployment input. Rename former `OperationalPageAccess.DebugMode` calls to `BypassAuthorization` only when preserving that explicit access decision.
+Do not use the word debug to describe an authorization bypass or sensitive-value reveal. Configure shared diagnostics through `ConfigureApplication` or the canonical deployment input instead of module-specific debug setters. The independent access decision uses `OperationalPageAccess.BypassAuthorization`; changing the application debug mode must not enable it.
 
 ## Inspect actual and candidate state
 

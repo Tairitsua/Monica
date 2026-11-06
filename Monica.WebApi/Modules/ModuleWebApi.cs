@@ -14,7 +14,7 @@ public class ModuleWebApi : MonicaModule<ModuleWebApiOption>
     {
         module.Require<ModuleApplication, ModuleApplicationOption>();
         module.Require<ModuleAutoControllers, ModuleAutoControllersOption>();
-        module.Require<ModuleAutoModel, ModuleAutoModelOption>();
+        module.Require<ModuleModelQuery, ModuleModelQueryOption>();
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
         module.Require<ModuleSwagger, ModuleSwaggerOption>();
         module.Require<ModuleAuthentication, ModuleAuthenticationOption>();

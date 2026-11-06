@@ -14,7 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="../Monica.Application/Monica.Application.csproj" />
     <ProjectReference Include="..\Monica.Authority\Monica.Authority.csproj" />
-    <ProjectReference Include="..\Monica.AutoModel\Monica.AutoModel.csproj" />
+    <ProjectReference Include="..\Monica.ModelQuery\Monica.ModelQuery.csproj" />
     <ProjectReference Include="..\Monica.Core\Monica.Core.csproj" />
     <ProjectReference Include="..\Monica.DependencyInjection\Monica.DependencyInjection.csproj" />
     <ProjectReference Include="..\Monica.Repository\Monica.Repository.csproj" />

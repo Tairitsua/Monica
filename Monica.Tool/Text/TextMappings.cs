@@ -60,9 +60,9 @@ public static class TextMappings
     };
 
     /// <summary>
-    /// Keywords that indicate create actions in AutoModel flows.
+    /// Keywords that indicate create actions in CRUD flows.
     /// </summary>
-    public static readonly HashSet<string> AutoModelAddAction = new()
+    public static readonly HashSet<string> CrudAddAction = new()
     {
         "add",
         "create",
@@ -80,9 +80,9 @@ public static class TextMappings
         "post"
     };
     /// <summary>
-    /// Keywords that indicate delete actions in AutoModel flows.
+    /// Keywords that indicate delete actions in CRUD flows.
     /// </summary>
-    public static readonly HashSet<string> AutoModelDeleteAction = new()
+    public static readonly HashSet<string> CrudDeleteAction = new()
     {
         "delete",
         "d",
@@ -95,9 +95,9 @@ public static class TextMappings
         "forget",
     };
     /// <summary>
-    /// Keywords that indicate update actions in AutoModel flows.
+    /// Keywords that indicate update actions in CRUD flows.
     /// </summary>
-    public static readonly HashSet<string> AutoModelModifyAction = new()
+    public static readonly HashSet<string> CrudModifyAction = new()
     {
         "modify",
         "update",
@@ -111,9 +111,9 @@ public static class TextMappings
         "patch"
     };
     /// <summary>
-    /// Keywords that indicate query actions in AutoModel flows.
+    /// Keywords that indicate query actions in CRUD flows.
     /// </summary>
-    public static readonly HashSet<string> AutoModelSearchAction = new()
+    public static readonly HashSet<string> CrudSearchAction = new()
     {
         "search",
         "retrieve",

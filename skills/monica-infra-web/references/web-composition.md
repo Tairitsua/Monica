@@ -1,6 +1,6 @@
 # Compose a Monica Web API
 
-The Web layer turns a composed module graph into middleware and endpoints. `AddWebApi()` is the standard bundle for MVC/AutoControllers, AutoModel, conventional DI, Swagger, JWT authentication, mediator, object mapping, repository, and exception handling. It does not itself add ProjectUnits, an EventBus transport, permission-bit authorization, or CORS. Choose individual modules when the bundle brings infrastructure the host does not need.
+The Web layer turns a composed module graph into middleware and endpoints. `AddWebApi()` is the standard bundle for MVC/AutoControllers, ModelQuery, conventional DI, Swagger, JWT authentication, mediator, object mapping, repository, and exception handling. It does not itself add ProjectUnits, an EventBus transport, permission-bit authorization, or CORS. Choose individual modules when the bundle brings infrastructure the host does not need. [ModelQuery](model-query.md) can also be registered independently for model metadata, filtering, fuzzy matching and field projection.
 
 ## Compose one Web host
 

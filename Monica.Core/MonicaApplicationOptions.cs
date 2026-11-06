@@ -158,7 +158,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     /// <remarks>
     /// Application:DebugMode supplies the canonical startup input; contradictory code configuration fails composition.
     /// Enabled capabilities expose detailed Blazor and SignalR errors, bounded result and downstream diagnostics,
-    /// existing call-chain evidence, and AutoModel expression logs. Details may contain SQL, parameter values, paths,
+    /// existing call-chain evidence, and ModelQuery expression logs. Details may contain SQL, parameter values, paths,
     /// and stack traces. Only already registered capabilities participate. Authorization, sensitive configuration
     /// reveal, EF sensitive-data logging, log levels, and autonomous work retain their independent policies.
     /// Changes require a host restart. Server exception logging and public trace identifiers remain available when false.

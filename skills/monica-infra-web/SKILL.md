@@ -1,6 +1,6 @@
 ---
 name: monica-infra-web
-description: Compose Monica Web API, generated controllers, AutoModel, Swagger, authentication, authorization, CORS, and ProjectUnit HTTP integration. Use for host-facing API setup and route or execution-pipeline diagnosis.
+description: Compose Monica Web API, generated controllers, ModelQuery, Swagger, authentication, authorization, CORS, and ProjectUnit HTTP integration. Use for model filtering/projection, host-facing API setup, and route or execution-pipeline diagnosis.
 ---
 
 # Monica Web integration
@@ -10,7 +10,8 @@ Choose host composition for the Web bundle or individual modules; choose endpoin
 | Task | Read |
 | --- | --- |
 | Compose an HTTP host and choose the Web bundle or individual capabilities | [Web composition](references/web-composition.md) |
-| Expose request-owned endpoints, configure AutoModel, or inspect and extend execution behaviors | [Endpoints and execution](references/endpoints-and-execution.md) |
+| Expose request-owned endpoints or inspect and extend execution behaviors | [Endpoints and execution](references/endpoints-and-execution.md) |
+| Configure model fields, resolve query names, filter data, or project selected fields | [Model queries](references/model-query.md) |
 | Configure JWT authentication, permission checks, or CORS | [Access control](references/access-control.md) |
 | Configure Swagger documents or control the visibility of module routes | [API documentation and visibility](references/api-documentation-and-visibility.md) |
 

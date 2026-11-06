@@ -743,13 +743,14 @@
           "authority",
           "auto-controllers",
           "auto-model",
+          "model-query",
           "web-api",
           "project-units",
           "execution-pipeline"
         ],
         "sourcePaths": [
           "Monica.WebApi",
-          "Monica.AutoModel",
+          "Monica.ModelQuery",
           "Monica.Authority",
           "Monica.ProjectUnits",
           "Monica.Core/Execution",

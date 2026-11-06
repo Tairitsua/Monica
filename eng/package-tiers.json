@@ -16,7 +16,7 @@
         "Monica.Application.UI",
         "Monica.ApplicationModel",
         "Monica.Authority",
-        "Monica.AutoModel",
+        "Monica.ModelQuery",
         "Monica.Configuration",
         "Monica.Configuration.UI",
         "Monica.Core",
