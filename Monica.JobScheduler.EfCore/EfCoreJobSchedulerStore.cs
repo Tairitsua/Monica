@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.EfCore.Entities;
 using Monica.JobScheduler.EfCore.Metrics;
@@ -29,7 +30,8 @@ public sealed partial class EfCoreJobSchedulerStore(
     IDbContextFactory<JobSchedulerDbContext> dbContextFactory,
     TimeProvider? timeProvider = null,
     IOptions<ModuleJobSchedulerOption>? options = null,
-    IMeterFactory? meterFactory = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor, IExclusiveLeaseStore, IDisposable
+    IMeterFactory? meterFactory = null,
+    ILogger<EfCoreJobSchedulerStore>? logger = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor, IExclusiveLeaseStore, IDisposable
 {
     private const int MAX_TRANSACTION_ATTEMPTS = 5;
     private static readonly JsonSerializerOptions JSON_OPTIONS = new(JsonSerializerDefaults.Web);
@@ -97,11 +99,17 @@ public sealed partial class EfCoreJobSchedulerStore(
         Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken,
         [CallerMemberName] string operationName = "") =>
-        RunStoreOperationAsync(operationName, false, async token =>
+        RunStoreOperationAsync(operationName, false, async (trace, token) =>
         {
+            trace.Enter("context");
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(token);
             if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(_operationTimeout);
-            return await operation(dbContext, token);
+            try
+            {
+                trace.Enter("query");
+                return await operation(dbContext, token);
+            }
+            finally { trace.Enter("dispose"); }
         }, cancellationToken);
 
     private Task<TResult> WriteAsync<TResult>(
@@ -109,8 +117,8 @@ public sealed partial class EfCoreJobSchedulerStore(
         CancellationToken cancellationToken, JobCoordinatorLeaseKey? coordinatorLease = null,
         [CallerMemberName] string operationName = "") =>
         RunStoreOperationAsync(operationName, operationName is nameof(RenewLeaseAsync) or nameof(CompleteAttemptAsync)
-            or nameof(ReleaseLeaseAsync), token => WriteCoreAsync(operation, token,
-                GetOperationTimeout(operationName), coordinatorLease), cancellationToken);
+            or nameof(ReleaseLeaseAsync), (trace, token) => WriteCoreAsync(operation, token,
+                GetOperationTimeout(operationName), trace, coordinatorLease), cancellationToken);
 
     private TimeSpan GetOperationTimeout(string operationName) =>
         operationName is nameof(CompleteAttemptAsync) or nameof(ReleaseLeaseAsync)
@@ -118,11 +126,13 @@ public sealed partial class EfCoreJobSchedulerStore(
             : _operationTimeout;
 
     private async Task<TResult> RunStoreOperationAsync<TResult>(string operationName, bool critical,
-        Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
+        Func<JobSchedulerStoreOperationTrace, CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
         var started = Stopwatch.GetTimestamp();
         var outcome = "failed";
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var trace = new JobSchedulerStoreOperationTrace();
+        using var cancellationRegistration = deadline.Token.Register(trace.Cancel);
         deadline.CancelAfter(GetOperationTimeout(operationName));
         var ordinaryEntered = false;
         var allEntered = false;
@@ -135,7 +145,8 @@ public sealed partial class EfCoreJobSchedulerStore(
             }
             await _allOperations.WaitAsync(deadline.Token);
             allEntered = true;
-            var result = await operation(deadline.Token);
+            trace.Enter("operation");
+            var result = await operation(trace, deadline.Token);
             outcome = "succeeded";
             return result;
         }
@@ -149,6 +160,16 @@ public sealed partial class EfCoreJobSchedulerStore(
             if (allEntered) _allOperations.Release();
             if (ordinaryEntered) _ordinaryOperations.Release();
             _metrics?.Record(operationName, outcome, Stopwatch.GetElapsedTime(started));
+            if (trace.GetCancellation() is { } cancellation)
+            {
+                _metrics?.Cancelled(operationName, cancellation.Phase, cancellation.Elapsed);
+                var elapsed = Stopwatch.GetElapsedTime(started);
+                logger?.Log(elapsed >= GetOperationTimeout(operationName) ? LogLevel.Warning : LogLevel.Debug,
+                    "Scheduler store {Operation} exited after cancellation. ReasonCode={ReasonCode}, Phase={Phase}, " +
+                    "CancellationElapsed={CancellationElapsed}, Elapsed={Elapsed}, Outcome={Outcome}",
+                    operationName, "StoreCancellationExited", cancellation.Phase, cancellation.Elapsed,
+                    elapsed, outcome);
+            }
         }
     }
 
@@ -156,41 +177,54 @@ public sealed partial class EfCoreJobSchedulerStore(
         Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken,
         TimeSpan operationTimeout,
+        JobSchedulerStoreOperationTrace trace,
         JobCoordinatorLeaseKey? coordinatorLease = null)
     {
         for (var attempt = 1; ; attempt++)
         {
+            trace.Enter("context");
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(operationTimeout);
-            await using var transaction = dbContext.Database.IsRelational()
-                ? await dbContext.Database.BeginTransactionAsync(
-                    UsesNativeRowLocks(dbContext) ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,
-                    cancellationToken)
-                : null;
             try
             {
-                await ValidateCoordinatorLeaseAsync(dbContext, coordinatorLease, cancellationToken);
-                var result = await operation(dbContext, cancellationToken);
-                await TrimExecutionHistoryAsync(dbContext, cancellationToken);
-                SetMutationVersions(dbContext);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                if (transaction is not null)
+                trace.Enter("open-transaction");
+                await using var transaction = dbContext.Database.IsRelational()
+                    ? await dbContext.Database.BeginTransactionAsync(
+                        UsesNativeRowLocks(dbContext) ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,
+                        cancellationToken)
+                    : null;
+                try
                 {
-                    await transaction.CommitAsync(cancellationToken);
-                }
+                    trace.Enter("query");
+                    await ValidateCoordinatorLeaseAsync(dbContext, coordinatorLease, cancellationToken);
+                    var result = await operation(dbContext, cancellationToken);
+                    await TrimExecutionHistoryAsync(dbContext, cancellationToken);
+                    SetMutationVersions(dbContext);
+                    trace.Enter("save");
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        trace.Enter("commit");
+                        await transaction.CommitAsync(cancellationToken);
+                    }
 
-                return result;
-            }
-            catch (Exception exception) when (attempt < MAX_TRANSACTION_ATTEMPTS && IsRetryable(exception))
-            {
-                _metrics?.Retry();
-                if (transaction is not null)
+                    return result;
+                }
+                catch (Exception exception) when (attempt < MAX_TRANSACTION_ATTEMPTS && IsRetryable(exception))
                 {
-                    await transaction.RollbackAsync(cancellationToken);
-                }
+                    _metrics?.Retry();
+                    if (transaction is not null)
+                    {
+                        trace.Enter("rollback");
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 25) * attempt), cancellationToken);
+                    trace.Enter("retry-delay");
+                    await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 25) * attempt), cancellationToken);
+                }
+                finally { trace.Enter("dispose"); }
             }
+            finally { trace.Enter("dispose"); }
         }
     }
 

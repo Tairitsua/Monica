@@ -76,6 +76,8 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         ValidatePositive(options.ExecutionLeaseSafetyMargin, nameof(options.ExecutionLeaseSafetyMargin));
         ValidatePositive(options.ExecutionLeaseRenewalTimeout, nameof(options.ExecutionLeaseRenewalTimeout));
         ValidatePositive(options.ExecutionFinalizationTimeout, nameof(options.ExecutionFinalizationTimeout));
+        ValidatePositive(options.ExecutionStoreDrainTimeout, nameof(options.ExecutionStoreDrainTimeout));
+        ValidatePositive(options.ExecutionStoreRecoveryDelay, nameof(options.ExecutionStoreRecoveryDelay));
         ValidatePositive(options.ExecutionRetryDelay, nameof(options.ExecutionRetryDelay));
         ValidatePositive(options.ExecutionCancellationGracePeriod, nameof(options.ExecutionCancellationGracePeriod));
         ValidatePositive(options.WorkerShutdownGracePeriod, nameof(options.WorkerShutdownGracePeriod));
@@ -549,9 +551,22 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     /// <summary>
     /// Gets or sets the maximum wait for recording completion or releasing a stopped attempt, including relational
     /// store admission, commands and retries. This budget does not extend the execution lease. Expired finalization
-    /// is observed in the background and durable recovery remains authoritative. The default is 30 seconds.
+    /// enters a bounded cancellation drain and durable recovery remains authoritative. The default is 30 seconds.
     /// </summary>
     public TimeSpan ExecutionFinalizationTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the maximum time from the first cancellation of a store call until both I/O and cancellation
+    /// callbacks exit. New claims pause during cleanup; exceeding this budget requests host termination. This
+    /// budget never extends the execution lease or the host shutdown deadline. The default is 30 seconds.
+    /// </summary>
+    public TimeSpan ExecutionStoreDrainTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the backoff after timed-out store calls exit. Ordinary cancellation during job completion
+    /// does not add this delay. Recovery probes with at most one claim before normal batches. The default is five seconds.
+    /// </summary>
+    public TimeSpan ExecutionStoreRecoveryDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Gets or sets the delay applied by the durable store before a failed attempt becomes retryable. The default is

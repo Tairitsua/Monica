@@ -8,6 +8,28 @@ namespace Test.Monica.JobScheduler.Services;
 public sealed class JobSchedulerHealthCheckTests
 {
     [Fact]
+    public async Task CheckHealthAsync_WhenWorkerTemporarilyPauses_ShouldDegradeUntilRecoveryWithoutMaskingPermanentFailures()
+    {
+        var state = new JobSchedulerRuntimeState();
+        state.SetScheduling(true, "ready");
+        state.SetWorker(false, "store cleanup");
+        state.SetWorkerAdmissionPaused(true);
+        var check = new JobSchedulerHealthCheck(state);
+        var token = TestContext.Current.CancellationToken;
+
+        (await check.CheckHealthAsync(new HealthCheckContext(), token)).Status.Should().Be(HealthStatus.Degraded);
+        state.SetScheduling(false, "coordinator failure");
+        (await check.CheckHealthAsync(new HealthCheckContext(), token)).Status.Should().Be(HealthStatus.Unhealthy);
+        state.SetScheduling(true, "ready");
+        state.SetWorkerAdmissionPaused(false);
+        (await check.CheckHealthAsync(new HealthCheckContext(), token)).Status.Should().Be(HealthStatus.Unhealthy);
+        state.SetWorkerAdmissionPaused(true);
+        state.SetWorker(true, "recovered");
+        state.WorkerAdmissionPaused.Should().BeFalse();
+        (await check.CheckHealthAsync(new HealthCheckContext(), token)).Status.Should().Be(HealthStatus.Healthy);
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_WhenAPlaneHasNotInitialized_ShouldBeUnhealthy()
     {
         var runtimeState = new JobSchedulerRuntimeState();

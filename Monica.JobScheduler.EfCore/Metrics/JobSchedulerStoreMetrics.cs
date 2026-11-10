@@ -7,6 +7,7 @@ internal sealed class JobSchedulerStoreMetrics
     private readonly Histogram<double> _duration;
     private readonly Counter<long> _operations;
     private readonly Counter<long> _retries;
+    private readonly Histogram<double> _cancellationDuration;
 
     public JobSchedulerStoreMetrics(IMeterFactory factory)
     {
@@ -14,6 +15,7 @@ internal sealed class JobSchedulerStoreMetrics
         _duration = meter.CreateHistogram<double>(JobSchedulerStoreMetricNames.OperationDuration, "s");
         _operations = meter.CreateCounter<long>(JobSchedulerStoreMetricNames.Operations, "operations");
         _retries = meter.CreateCounter<long>(JobSchedulerStoreMetricNames.TransactionRetries, "retries");
+        _cancellationDuration = meter.CreateHistogram<double>(JobSchedulerStoreMetricNames.CancellationDuration, "s");
     }
 
     public void Record(string operation, string outcome, TimeSpan elapsed)
@@ -25,4 +27,8 @@ internal sealed class JobSchedulerStoreMetrics
     }
 
     public void Retry() => _retries.Add(1);
+
+    public void Cancelled(string operation, string phase, TimeSpan elapsed) => _cancellationDuration.Record(
+        elapsed.TotalSeconds, new KeyValuePair<string, object?>("operation", operation),
+        new KeyValuePair<string, object?>("phase", phase));
 }

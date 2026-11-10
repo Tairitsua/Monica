@@ -151,6 +151,32 @@ public sealed class JobExecutionDistributionStoreTests
         await invalid.Should().ThrowAsync<ArgumentOutOfRangeException>();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetExecutionDistributionAsync_WhenAdjacentTicksStraddleWideBuckets_ShouldPreserveExactBoundaries(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        var width = TimeSpan.TicksPerDay * 366L * 40;
+        long[] offsets = [0, width - 1, width, 2 * width - 1, 2 * width, 3 * width - 1];
+        var previous = 0L;
+        foreach (var offset in offsets)
+        {
+            fixture.Time.Advance(TimeSpan.FromTicks(offset - previous));
+            await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: $"at-{offset}");
+            previous = offset;
+        }
+
+        var result = await fixture.Store.GetExecutionDistributionAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope, CreatedAfterUtc = START,
+            CreatedBeforeUtc = START.AddTicks(3 * width - 1)
+        }, 3, TestContext.Current.CancellationToken);
+        result.Buckets.Select(bucket => bucket.Counts[JobExecutionState.Queued]).Should().Equal(2, 2, 2);
+        result.StateTotals[JobExecutionState.Queued].Should().Be(6);
+    }
+
     private static async Task CompleteAsync(StoreFixture fixture, string owner, string id, JobAttemptOutcome outcome, TimeSpan duration)
     {
         await fixture.EnqueueTriggeredAsync(owner, "jobs.match", instanceId: id);

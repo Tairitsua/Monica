@@ -1,10 +1,12 @@
 using System.Net;
+using System.Data.Common;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
@@ -23,6 +25,65 @@ namespace Test.Monica.WebApi.AutoControllers;
 
 public sealed class ModelQueryCrudIntegrationTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("?DisablePage=true")]
+    [InlineData("?DisablePage=true&IncludeFields=code")]
+    public async Task GetList_WhenHttpRequestIsAborted_ShouldCancelThePendingDatabaseRead(string query)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var observer = new BlockReadUntilCancelled();
+        await using var host = await new ModelQueryCrudFactory(observer).CreateAsync(cancellationToken: token);
+        using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        observer.Enabled = true;
+        var response = client.GetAsync("/model-query-crud/records" + query, cancellation.Token);
+        try
+        {
+            var first = await Task.WhenAny(observer.Entered.Task, response).WaitAsync(TimeSpan.FromSeconds(5), token);
+            if (first == response)
+            {
+                using var unexpected = await response;
+                Assert.Fail($"The request returned before reaching the database: {unexpected.StatusCode}, {await unexpected.Content.ReadAsStringAsync(token)}");
+            }
+            var databaseToken = await observer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.True(databaseToken.CanBeCanceled);
+            await cancellation.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => response);
+            await observer.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.True(databaseToken.IsCancellationRequested);
+        }
+        finally
+        {
+            observer.Release.TrySetResult();
+            await cancellation.CancelAsync();
+        }
+    }
+
+    private sealed class BlockReadUntilCancelled : DbCommandInterceptor
+    {
+        public bool Enabled { get; set; }
+        public TaskCompletionSource<CancellationToken> Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Exited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (!Enabled) return result;
+            Entered.TrySetResult(cancellationToken);
+            try
+            {
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                Exited.TrySetResult();
+            }
+            return result;
+        }
+    }
+
     [Fact]
     public async Task GetList_WhenFilteringSearchingAndSelectingFields_ShouldUseThePublishedRequestContract()
     {
@@ -129,7 +190,7 @@ public sealed class ModelQueryCrudIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, conflicting.StatusCode);
     }
 
-    private sealed class ModelQueryCrudFactory : MonicaTestApplicationFactory<ModelQueryCrudIntegrationTests>
+    private sealed class ModelQueryCrudFactory(DbCommandInterceptor? interceptor = null) : MonicaTestApplicationFactory<ModelQueryCrudIntegrationTests>
     {
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
@@ -143,7 +204,10 @@ public sealed class ModelQueryCrudIntegrationTests
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
-            services.UseTestDatabase<ModelQueryCrudContext>();
+            services.UseTestDatabase<ModelQueryCrudContext>((_, options) =>
+            {
+                if (interceptor is not null) options.AddInterceptors(interceptor);
+            });
             services.AddScoped<ModelQueryCrudRepository>();
         }
     }

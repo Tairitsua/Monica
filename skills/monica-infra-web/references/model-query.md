@@ -99,6 +99,12 @@ Use `MatchFields(names)` only when the caller deliberately owns another field vo
 
 ## HTTP request contract
 
+CRUD list execution passes the active HTTP request's `RequestAborted` token to counts, selected-field reads and
+DTO/entity materialization, including split queries. Derived CRUD adapters use the protected
+`QueryCancellationToken` for their additional repository or API reads and propagate cancellation. Outside HTTP
+the default token is uncancellable; an adapter with another execution owner can override the property. Query
+composition and authorization remain unchanged, and cancellation does not introduce cross-caller result reuse.
+
 | Interface | Property | Type and meaning |
 | --- | --- | --- |
 | `IModelFilterRequest` | `Filter` | Optional filter expression. |
