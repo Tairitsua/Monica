@@ -179,6 +179,9 @@ public sealed record JobSchedulerLocalPlaneSnapshot
     /// <summary>Gets whether the worker plane's last cycle succeeded.</summary>
     public required bool WorkerReady { get; init; }
 
+    /// <summary>Gets whether the worker is recovering store I/O without terminating the host.</summary>
+    public bool WorkerAdmissionPaused { get; init; }
+
     /// <summary>Gets the worker plane's latest readiness message, when one was recorded.</summary>
     public required string? WorkerMessage { get; init; }
 

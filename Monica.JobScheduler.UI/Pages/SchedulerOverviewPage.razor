@@ -49,7 +49,7 @@
                         </MudAlert>
                     }
 
-                    <SchedulerPulse Definitions="@overview.Definitions" CapturedAtUtc="@overview.CapturedAtUtc" StateCounts="@overview.ExecutionStateCounts"
+                    <SchedulerPulse Definitions="@overview.Definitions" CapturedAtUtc="@overview.CapturedAtUtc" StateCounts="@overview.ExecutionStateCounts" RefreshVersion="@_manualRefreshVersion"
                                     WindowMinutes="@WindowMinutes" WindowChanged="SetWindow" Search="@Search" SearchChanged="SetSearch" />
 
 
@@ -64,6 +64,7 @@
 
     private SchedulerOverviewPageState? _state;
     private volatile bool _disposed;
+    private int _manualRefreshVersion;
     private readonly object _lifetimeGate = new();
     private TaskCompletionSource? _retirement;
 
@@ -88,15 +89,16 @@
         if (!_disposed) StateHasChanged();
     });
 
-    private Task RefreshAsync()
+    private async Task RefreshAsync()
     {
         SchedulerOverviewPageState? state;
         lock (_lifetimeGate)
         {
-            if (_disposed) return Task.CompletedTask;
+            if (_disposed) return;
             state = _state;
         }
-        return state?.RefreshAsync() ?? Task.CompletedTask;
+        if (state is not null) await state.RefreshAsync();
+        if (!_disposed) _manualRefreshVersion++;
     }
 
     public ValueTask DisposeAsync()

@@ -2,6 +2,7 @@ using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.DynamicLinq;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +57,13 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     protected virtual IEfEntityStore<TEntity, TKey> Repository { get; } = repository;
 
     #region Query
+    /// <summary>
+    /// Gets cancellation for database reads and response enrichment. HTTP calls use RequestAborted; direct calls
+    /// outside HTTP have no implicit cancellation. Adapters with another execution owner may override this token.
+    /// </summary>
+    protected virtual CancellationToken QueryCancellationToken => CachedServiceProvider
+        .GetService<IHttpContextAccessor>()?.HttpContext?.RequestAborted ?? CancellationToken.None;
+
     protected virtual bool DisableProjectToType => false;
     /// <summary>
     /// Retrieves an entity by its ID and maps it to a DTO.
@@ -79,6 +87,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <returns>A paged response containing the mapped entity DTOs</returns>
     protected virtual async Task<ListResult> InnerGetListAsync<TCustomDto>(TGetListInput input, IQueryable<TEntity> query)
     {
+        QueryCancellationToken.ThrowIfCancellationRequested();
         ApplyHostPagingDefaults(input);
 
         var selection = (input as IFieldSelectionRequest)?.GetFieldSelection();
@@ -97,7 +106,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         {
             if (featureSetting?.ShouldJumpCount() is not true)
             {
-                totalCount = await query.CountAsync();
+                totalCount = await query.CountAsync(QueryCancellationToken);
                 if (totalCount == 0) return new ListResult([]);
             }
         }
@@ -114,7 +123,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
             if (featureSetting?.FeatureFlags?.HasFlag(ERequestFeature.Distinct) is true)
             {
                 dynamicQuery = dynamicQuery.Distinct();
-                totalCount = await dynamicQuery.CountAsync();
+                totalCount = await dynamicQuery.CountAsync(QueryCancellationToken);
             }
         }
 
@@ -124,7 +133,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         // If dynamic projection has already been applied.
         if (dynamicQuery is not IQueryable<TEntity> finalEntityQuery)
         {
-            var selectedList = await dynamicQuery.ToDynamicListAsync();
+            var selectedList = await dynamicQuery.ToDynamicListAsync(QueryCancellationToken);
             return new ListResult(selectedList)
             {
                 TotalCounts = totalCount ?? selectedList.Count
@@ -656,7 +665,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         var clientSideMethod = ApplyCustomFilterQueryClientSideAsync(input);
         if (clientSideMethod != null)
         {
-            return (await queryable.AsAsyncEnumerable().Where(clientSideMethod).ToListAsync()).AsQueryable();
+            return (await queryable.AsAsyncEnumerable().Where(clientSideMethod).ToListAsync(QueryCancellationToken)).AsQueryable();
         }
 
         return queryable;
@@ -776,11 +785,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
 
         if (!DisableProjectToType)
         {
-            return await Mapper.ProjectToType<TCustomDto>(query).ToListAsync();
+            return await Mapper.ProjectToType<TCustomDto>(query).ToListAsync(QueryCancellationToken);
         }
         else
         {
-            return Mapper.Map<List<TEntity>, List<TCustomDto>>(await query.ToListAsync());
+            return Mapper.Map<List<TEntity>, List<TCustomDto>>(await query.ToListAsync(QueryCancellationToken));
         }
     }
 

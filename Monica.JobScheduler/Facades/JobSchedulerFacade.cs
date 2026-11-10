@@ -97,6 +97,7 @@ public sealed partial class JobSchedulerFacade(
                     SchedulingReady = runtimeState.SchedulingReady,
                     SchedulingMessage = runtimeState.SchedulingMessage,
                     WorkerReady = runtimeState.WorkerReady,
+                    WorkerAdmissionPaused = runtimeState.WorkerAdmissionPaused,
                     WorkerMessage = runtimeState.WorkerMessage,
                     InFlightExecutions = runtimeState.InFlightExecutions,
                     LastOwnerSchedulingWorkAtUtc = runtimeState.LastOwnerSchedulingWorkAtUtc,

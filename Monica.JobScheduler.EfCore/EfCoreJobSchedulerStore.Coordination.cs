@@ -19,23 +19,23 @@ public sealed partial class EfCoreJobSchedulerStore
 
     Task<LeaseGrant?> IExclusiveLeaseStore.TryAcquireAsync(LeaseResource resource, string holderId, TimeSpan duration,
         CancellationToken cancellationToken) => RunStoreOperationAsync("CoordinatorAcquire", false,
-        token => RelationalLeases.TryAcquireAsync(resource, holderId, duration, token), cancellationToken);
+        (_, token) => RelationalLeases.TryAcquireAsync(resource, holderId, duration, token), cancellationToken);
 
     Task<LeaseGrant?> IExclusiveLeaseStore.TryRenewAsync(LeaseIdentity identity, TimeSpan duration,
         CancellationToken cancellationToken) => RunStoreOperationAsync("CoordinatorRenew", true,
-        token => RelationalLeases.TryRenewAsync(identity, duration, token), cancellationToken);
+        (_, token) => RelationalLeases.TryRenewAsync(identity, duration, token), cancellationToken);
 
     Task<bool> IExclusiveLeaseStore.TryReleaseAsync(LeaseIdentity identity, CancellationToken cancellationToken) =>
         RunStoreOperationAsync("CoordinatorRelease", true,
-            token => RelationalLeases.TryReleaseAsync(identity, token), cancellationToken);
+            (_, token) => RelationalLeases.TryReleaseAsync(identity, token), cancellationToken);
 
     Task<LeaseSnapshot> IExclusiveLeaseStore.GetSnapshotAsync(LeaseResource resource, CancellationToken cancellationToken) =>
         RunStoreOperationAsync("CoordinatorSnapshot", false,
-            token => RelationalLeases.GetSnapshotAsync(resource, token), cancellationToken);
+            (_, token) => RelationalLeases.GetSnapshotAsync(resource, token), cancellationToken);
 
     Task<LeaseSnapshot> IExclusiveLeaseStore.GetSnapshotAsync(string scope, string namePrefix, CancellationToken cancellationToken) =>
         RunStoreOperationAsync("CoordinatorSnapshot", false,
-            token => RelationalLeases.GetSnapshotAsync(scope, namePrefix, token), cancellationToken);
+            (_, token) => RelationalLeases.GetSnapshotAsync(scope, namePrefix, token), cancellationToken);
 
     /// <inheritdoc />
     public Task<JobCoordinatorSnapshot> GetCoordinatorSnapshotAsync(string schedulerScopeKey,

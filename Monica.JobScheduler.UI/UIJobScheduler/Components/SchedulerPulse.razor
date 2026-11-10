@@ -10,6 +10,8 @@
 @inject SchedulerTimePresentation TimePresentation
 @inject Monica.UI.Shared.Services.MoTimeFormatter ClockFormatter
 @inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
+@inject IOptions<ModuleJobSchedulerUIOption> UiOptions
+@inject TimeProvider TimeProvider
 @implements IAsyncDisposable
 
 <SchedulerHistoryCoverage />
@@ -213,6 +215,8 @@
     [Parameter] public string? Search { get; set; }
     /// <summary>Gets the callback persisting the search without adding a history entry for every keystroke.</summary>
     [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    /// <summary>Gets the explicit refresh generation, independently of automatic overview captures.</summary>
+    [Parameter] public int RefreshVersion { get; set; }
     private readonly SchedulerOperationLifetime _lifetime = new();
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private CancellationTokenSource? _loadCancellation;
@@ -228,6 +232,8 @@
     private string _filter = string.Empty;
     private string? _error;
     private DateTimeOffset _requestedAt, _acceptedAt;
+    private long? _lastLoadTimestamp;
+    private int _requestedRefreshVersion;
     private DateTimeOffset Start => _acceptedAt.AddMinutes(-_acceptedMinutes);
     private DateTimeOffset End => _acceptedAt.AddMinutes(_acceptedMinutes switch { 15 => 5, 360 => 60, 1440 => 240, _ => 15 });
     private IEnumerable<SchedulerJobEvidence> FilteredJobs => _jobs.Where(job => string.IsNullOrEmpty(_filter)
@@ -240,9 +246,15 @@
     {
         _filter = Search ?? string.Empty;
         var minutes = WindowMinutes is 15 or 60 or 360 or 1440 ? WindowMinutes : 60;
-        if (_requestedAt == CapturedAtUtc && _minutes == minutes) return Task.CompletedTask;
+        var explicitRefresh = _requestedRefreshVersion != RefreshVersion;
+        var rangeChanged = _minutes != minutes;
+        if (_requestedAt == CapturedAtUtc && !rangeChanged && !explicitRefresh) return Task.CompletedTask;
         _minutes = minutes;
         _requestedAt = CapturedAtUtc;
+        _requestedRefreshVersion = RefreshVersion;
+        if (!rangeChanged && !explicitRefresh && _lastLoadTimestamp is { } started
+            && (UiOptions.Value.PulseRefreshInterval <= TimeSpan.Zero
+                || TimeProvider.GetElapsedTime(started) < UiOptions.Value.PulseRefreshInterval)) return Task.CompletedTask;
         return LoadAsync();
     }
     private Task ChangeRangeAsync(int minutes) => WindowChanged.HasDelegate ? WindowChanged.InvokeAsync(minutes) : ChangeLocalRangeAsync(minutes);
@@ -251,6 +263,7 @@
     private async Task LoadAsync()
     {
         if (_lifetime.IsRetired) return;
+        _lastLoadTimestamp = TimeProvider.GetTimestamp();
         // Renderer-owned requests replace pending work, but wait for the old read to actually exit.
         using var cancellation = new CancellationTokenSource();
         var previous = _loadCancellation;
@@ -259,8 +272,10 @@
         var at = CapturedAtUtc;
         var minutes = _minutes;
         var definitions = Definitions.ToArray();
-        if (_sample is null) _acceptedAt = at;
+        if (_acceptedMinutes != minutes) ClearSnapshot();
+        if (_sample is null) { _acceptedAt = at; _acceptedMinutes = minutes; }
         _loading = true;
+        var authorized = false;
         try
         {
             await _lifetime.RunAsync(async lifetimeToken =>
@@ -274,9 +289,10 @@
                     token.ThrowIfCancellationRequested();
                     if (!await Access.IsAuthorizedAsync(token))
                     {
-                        _lifetime.TryApply(() => { if (version == _version) { _jobs = []; _sample = null; _error = L["Access:DeniedDescription"]; } });
+                        _lifetime.TryApply(() => { if (version == _version) { ClearSnapshot(); _error = L["Access:DeniedDescription"]; } });
                         return;
                     }
+                    authorized = true;
                     var sample = await SchedulerExecutionSample.LoadAsync(Facade, new JobExecutionQuery
                     {
                         SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
@@ -309,12 +325,20 @@
             });
         }
         catch (OperationCanceledException) when (_lifetime.IsRetired || cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) _error = exception.Message; }); }
+        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) { if (!authorized) ClearSnapshot(); _error = exception.Message; } }); }
         finally
         {
             if (ReferenceEquals(_loadCancellation, cancellation)) _loadCancellation = null;
             _lifetime.TryApply(() => { if (version == _version) _loading = false; });
         }
+    }
+    private void ClearSnapshot()
+    {
+        _sample = null;
+        _analytics = null;
+        _jobs = [];
+        _cursors = new Dictionary<JobId, JobOperationalSummary>();
+        _hovered = null;
     }
     private async Task InspectAsync(string id)
     {

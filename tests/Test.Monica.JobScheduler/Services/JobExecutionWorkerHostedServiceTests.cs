@@ -21,7 +21,7 @@ using Xunit;
 
 namespace Test.Monica.JobScheduler.Services;
 
-public sealed class JobExecutionWorkerHostedServiceTests
+public sealed partial class JobExecutionWorkerHostedServiceTests
 {
     private const string OWNER = StoreFixture.OWNER_A;
     private const string WORKER_INSTANCE = "worker-instance-1";
@@ -477,12 +477,15 @@ public sealed class JobExecutionWorkerHostedServiceTests
             await time.WaitForTimerAsync(TimeSpan.FromSeconds(33), TestContext.Current.CancellationToken);
             time.Advance(TimeSpan.FromSeconds(23));
 
-            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(40), TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromSeconds(7));
 
             renewalToken.CanBeCanceled.Should().BeTrue();
             renewalToken.IsCancellationRequested.Should().BeTrue();
             probe.Exited.Task.IsCompletedSuccessfully.Should().BeTrue();
             await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            attempt.IsCompleted.Should().BeFalse("pending I/O retains its execution slot even after termination is requested");
             await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
             _ = store.Received(1).RenewLeaseAsync(
                 Arg.Any<JobLeaseKey>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
@@ -497,6 +500,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
             renewal.TrySetException(new InvalidOperationException("The stalled renewal failed after retirement."));
             await workerStop.CancelAsync();
             await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
 
@@ -724,10 +728,13 @@ public sealed class JobExecutionWorkerHostedServiceTests
             attempt.IsCompleted.Should().BeFalse();
             completionToken.IsCancellationRequested.Should().BeFalse();
             time.Advance(TimeSpan.FromSeconds(1));
-            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(34), TestContext.Current.CancellationToken);
+            applicationLifetime.DidNotReceive().StopApplication();
+            time.Advance(TimeSpan.FromSeconds(30));
 
             completionToken.IsCancellationRequested.Should().BeTrue();
             await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            attempt.IsCompleted.Should().BeFalse();
             await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
             await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
             _ = store.Received(1).CompleteAttemptAsync(
@@ -739,6 +746,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
         finally
         {
             completion.TrySetException(new InvalidOperationException("Completion failed after its local deadline."));
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
 
@@ -783,11 +791,14 @@ public sealed class JobExecutionWorkerHostedServiceTests
             releaseToken.CanBeCanceled.Should().BeTrue();
             releaseToken.IsCancellationRequested.Should().BeFalse();
             time.Advance(TimeSpan.FromSeconds(4));
-            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(34), TestContext.Current.CancellationToken);
+            applicationLifetime.DidNotReceive().StopApplication();
+            time.Advance(TimeSpan.FromSeconds(30));
 
             releaseToken.IsCancellationRequested.Should().BeTrue();
             probe.Exited.Task.IsCompletedSuccessfully.Should().BeTrue();
             await restartRequested.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            attempt.IsCompleted.Should().BeFalse();
             await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
             await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
             _ = store.Received(1).ReleaseLeaseAsync(Arg.Any<JobLeaseKey>(), Arg.Any<CancellationToken>());
@@ -799,6 +810,7 @@ public sealed class JobExecutionWorkerHostedServiceTests
             release.TrySetException(new InvalidOperationException("Release failed after its local deadline."));
             await workerStop.CancelAsync();
             await probe.Exited.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
 

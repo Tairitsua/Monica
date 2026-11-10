@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,6 +12,7 @@ using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.JobScheduler.Metrics;
 using Monica.Modules;
 
 namespace Monica.JobScheduler.Services.Support;
@@ -31,7 +33,8 @@ internal sealed class JobExecutionWorkerHostedService(
     IObservableInstanceRegistry observableRegistry,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     IServiceScopeFactory serviceScopeFactory,
-    ILogger<JobExecutionWorkerHostedService> logger)
+    ILogger<JobExecutionWorkerHostedService> logger,
+    IMeterFactory? meterFactory = null)
     : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
 {
     private readonly ConcurrentDictionary<string, Task> _executions = new(StringComparer.Ordinal);
@@ -42,6 +45,7 @@ internal sealed class JobExecutionWorkerHostedService(
         FullMode = BoundedChannelFullMode.DropWrite
     });
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
+    private readonly JobExecutionWorkerMetrics? _metrics = meterFactory is null ? null : new(meterFactory);
     private readonly LocalOwner[] _localOwners = localDefinitions
         .GroupBy(definition => definition.OwnerKey ?? schedulerOptions.Value.GetProjectName(), StringComparer.Ordinal)
         .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
@@ -56,6 +60,8 @@ internal sealed class JobExecutionWorkerHostedService(
     private readonly CancellationTokenSource _workerStop = new();
     private readonly object _workerStateGate = new();
     private int _admissionsStopped;
+    private int _pendingStoreDrains;
+    private long? _storeRecoveryStarted;
     private int _nextClaimOwnerIndex;
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
@@ -88,7 +94,7 @@ internal sealed class JobExecutionWorkerHostedService(
                         break;
                     }
 
-                    if (runtimeState.SetWorker(
+                    if (CanAdmitWork() && _storeRecoveryStarted is null && runtimeState.SetWorker(
                             true,
                             $"Worker is active for {_localOwners.Length} logical owner(s) with {localDefinitions.Count} local job(s)."))
                     {
@@ -160,6 +166,7 @@ internal sealed class JobExecutionWorkerHostedService(
         _workerStop.Cancel();
         lock (_workerStateGate)
         {
+            runtimeState.SetWorkerAdmissionPaused(false);
             _ = runtimeState.SetWorker(false, "Worker is stopping.");
         }
         return Task.CompletedTask;
@@ -230,7 +237,7 @@ internal sealed class JobExecutionWorkerHostedService(
     {
         var availableSlots = _options.MaxWorkerExecutionThreads - _executions.Count;
         if (availableSlots <= 0 || localDefinitions.Count == 0
-            || Volatile.Read(ref _admissionsStopped) != 0 || workerToken.IsCancellationRequested)
+            || !CanAdmitWork() || workerToken.IsCancellationRequested)
         {
             return;
         }
@@ -238,7 +245,7 @@ internal sealed class JobExecutionWorkerHostedService(
         var remainingBudget = Math.Min(availableSlots, _options.MaxClaimBatchSize);
         for (var visited = 0; visited < _localOwners.Length && remainingBudget > 0; visited++)
         {
-            if (Volatile.Read(ref _admissionsStopped) != 0 || workerToken.IsCancellationRequested)
+            if (!CanAdmitWork() || workerToken.IsCancellationRequested)
             {
                 return;
             }
@@ -246,6 +253,11 @@ internal sealed class JobExecutionWorkerHostedService(
             var owner = _localOwners[_nextClaimOwnerIndex];
             _nextClaimOwnerIndex = (_nextClaimOwnerIndex + 1) % _localOwners.Length;
             var requestStarted = timeProvider.GetTimestamp();
+            long? recoveryStarted;
+            lock (_workerStateGate)
+            {
+                recoveryStarted = _storeRecoveryStarted;
+            }
             var leases = await store.ClaimAsync(new JobClaimRequest
             {
                 SchedulerScopeKey = _options.SchedulerScopeKey,
@@ -254,11 +266,22 @@ internal sealed class JobExecutionWorkerHostedService(
                 WorkerInstanceId = _options.WorkerInstanceId,
                 JobKeys = owner.JobKeys,
                 LeaseDuration = _options.ExecutionLeaseDuration,
-                MaxCount = remainingBudget
+                MaxCount = recoveryStarted.HasValue ? 1 : remainingBudget
             }, workerToken);
+            lock (_workerStateGate)
+            {
+                if (recoveryStarted.HasValue && _storeRecoveryStarted == recoveryStarted && _pendingStoreDrains == 0
+                    && Volatile.Read(ref _admissionsStopped) == 0)
+                {
+                    _storeRecoveryStarted = null;
+                    _metrics?.Record("StoreAdmissionResumed");
+                    logger.LogInformation("Scheduler worker admission resumed after store recovery. ReasonCode={ReasonCode}",
+                        "StoreAdmissionResumed");
+                }
+            }
             foreach (var lease in leases)
             {
-                var task = Volatile.Read(ref _admissionsStopped) != 0 || workerToken.IsCancellationRequested
+                var task = !CanAdmitWork() || workerToken.IsCancellationRequested
                     ? FinalizeAsync(lease, null)
                     : ExecuteLeaseAsync(lease, workerToken, requestStarted);
                 if (!_executions.TryAdd(lease.Execution.InstanceId, NotifyExecutionCompletedAsync(task)))
@@ -268,6 +291,11 @@ internal sealed class JobExecutionWorkerHostedService(
                 }
 
                 remainingBudget--;
+            }
+
+            if (recoveryStarted.HasValue)
+            {
+                return;
             }
         }
     }
@@ -284,7 +312,7 @@ internal sealed class JobExecutionWorkerHostedService(
         var stopAfter = GetStopAfter(lease.GrantedAtUtc, lease.Execution.LeaseExpiresAtUtc);
         var remaining = stopAfter - timeProvider.GetElapsedTime(grantStarted);
         if (remaining <= TimeSpan.Zero || workerStop.IsCancellationRequested
-                                      || Volatile.Read(ref _admissionsStopped) != 0)
+                                      || !CanAdmitWork())
         {
             await FinalizeAsync(lease, null);
             return;
@@ -301,6 +329,7 @@ internal sealed class JobExecutionWorkerHostedService(
             () => orchestrator.ExecuteAsync(lease, executionCancellation.Token),
             executionCancellation.Token);
         StoreOperation<JobLeaseRenewalResult>? renewal = null;
+        Task? renewalDrain = null;
         var renewalDeadline = never;
         var renewalStarted = 0L;
         var cancellationRequested = false;
@@ -310,7 +339,10 @@ internal sealed class JobExecutionWorkerHostedService(
         async Task CancelExecutionAsync(string reason)
         {
             // Store callbacks and their timeout stay independent from the job's cancellation callbacks.
-            _ = renewal?.CancelAsync();
+            if (renewal is not null)
+            {
+                renewalDrain ??= DrainStoreOperationAsync(renewal, lease, "renewal", cancel: true);
+            }
             await CancelAndAwaitExecutionAsync(
                 executionCancellation,
                 executionTask,
@@ -325,7 +357,7 @@ internal sealed class JobExecutionWorkerHostedService(
             {
                 var completed = await Task.WhenAny(
                     executionTask, watchdog, timeoutSignal, workerStopSignal,
-                    renewal?.Operation ?? renewalDelay, renewalDeadline);
+                    renewalDrain ?? renewal?.Completion ?? renewalDelay, renewalDeadline);
                 if (executionTask.IsCompleted)
                 {
                     break;
@@ -345,8 +377,11 @@ internal sealed class JobExecutionWorkerHostedService(
                 {
                     renewalDeadline = never;
                     logger.LogWarning(
-                        "Execution {InstanceId} renewal exceeded its I/O deadline; lease supervision remains active",
-                        lease.Execution.InstanceId);
+                        "Execution {InstanceId} renewal exceeded its I/O deadline; lease supervision remains active. " +
+                        "ReasonCode={ReasonCode}, RemainingLeaseRunway={RemainingLeaseRunway}",
+                        lease.Execution.InstanceId, "StoreIoTimedOut",
+                        stopAfter + _options.ExecutionCancellationGracePeriod - timeProvider.GetElapsedTime(grantStarted));
+                    renewalDrain ??= DrainStoreOperationAsync(renewal!, lease, "renewal", cancel: true);
                     continue;
                 }
 
@@ -378,8 +413,9 @@ internal sealed class JobExecutionWorkerHostedService(
                 }
                 finally
                 {
-                    await DrainRenewalAsync(finishedRenewal, lease.Execution.InstanceId, cancel: false);
+                    await (renewalDrain ?? DrainStoreOperationAsync(finishedRenewal, lease, "renewal", cancel: false));
                     renewal = null;
+                    renewalDrain = null;
                     renewalDeadline = never;
                     renewalDelay = Task.Delay(_options.ExecutionLeaseRenewInterval, timeProvider, timers.Token);
                 }
@@ -387,6 +423,13 @@ internal sealed class JobExecutionWorkerHostedService(
                 if (finishedRenewal.HasTimedOut || renewalResult is null)
                 {
                     continue;
+                }
+
+                if (watchdog.IsCompleted)
+                {
+                    leaseRetired = true;
+                    await CancelExecutionAsync("the conservative lease deadline");
+                    break;
                 }
 
                 if (renewalResult.Status == JobLeaseRenewalStatus.Lost)
@@ -439,13 +482,14 @@ internal sealed class JobExecutionWorkerHostedService(
             await timers.CancelAsync();
             if (renewal is not null)
             {
-                await DrainRenewalAsync(renewal, lease.Execution.InstanceId, cancel: true);
+                await (renewalDrain ?? DrainStoreOperationAsync(renewal, lease, "renewal", cancel: true));
             }
         }
 
         var result = await ObserveExecutionTaskAsync(
             executionTask, lease.Execution.InstanceId, timedOut, cancellationRequested, workerToken);
-        if (leaseRetired || Volatile.Read(ref _admissionsStopped) != 0)
+        if (leaseRetired || Volatile.Read(ref _admissionsStopped) != 0
+                         || timeProvider.GetElapsedTime(grantStarted) >= stopAfter + _options.ExecutionCancellationGracePeriod)
         {
             return;
         }
@@ -493,42 +537,90 @@ internal sealed class JobExecutionWorkerHostedService(
         timeProvider,
         callbacks => _ = ObserveDetachedAsync(callbacks, instanceId, $"{operationName} cancellation"));
 
-    private async Task DrainRenewalAsync(
-        StoreOperation<JobLeaseRenewalResult> renewal,
-        string instanceId,
+    private async Task DrainStoreOperationAsync<T>(
+        StoreOperation<T> operation,
+        JobExecutionLease lease,
+        string operationName,
         bool cancel)
     {
-        renewal.StopDeadline();
+        operation.StopDeadline();
         if (cancel)
         {
-            _ = renewal.CancelAsync();
+            _ = operation.CancelAsync();
         }
 
-        var completion = renewal.Completion;
-        if (!completion.IsCompleted && !renewal.HasTimedOut)
+        var completion = operation.Completion;
+        if (completion.IsCompleted && !operation.HasTimedOut)
         {
-            try
-            {
-                await completion.WaitAsync(_options.ExecutionLeaseRenewalTimeout, timeProvider);
-            }
-            catch (TimeoutException)
-            {
-                // The operation and its callbacks stay observed, but no replacement work may consume more I/O.
-            }
-            catch (Exception)
-            {
-                // The observer below records the operation's complete fault, including callback failures.
-            }
-        }
-
-        if (!completion.IsCompleted)
-        {
-            RequestWorkerRestart(instanceId, "The store did not stop an outstanding lease renewal.");
-            _ = ObserveDetachedAsync(completion, instanceId, "retired renewal", renewal);
+            await ObserveDetachedAsync(completion, lease.Execution.InstanceId, operationName, operation);
             return;
         }
 
-        await ObserveDetachedAsync(completion, instanceId, "finished renewal", renewal);
+        lock (_workerStateGate)
+        {
+            _pendingStoreDrains++;
+            _storeRecoveryStarted = null;
+            if (Volatile.Read(ref _admissionsStopped) == 0)
+            {
+                runtimeState.SetWorkerAdmissionPaused(true);
+                _ = runtimeState.SetWorker(false, "Worker admission is paused while cancelled store I/O drains.");
+                RecordState("Worker admission paused for store cleanup", HostedServiceState.Degraded,
+                    logLevel: LogLevel.Warning);
+            }
+        }
+
+        logger.LogWarning(
+            "Execution {InstanceId} is draining {Operation}; new claims are paused. " +
+            "ReasonCode={ReasonCode}, JobKey={JobKey}, ExecutionAttempt={ExecutionAttempt}, DrainTimeout={DrainTimeout}",
+            lease.Execution.InstanceId, operationName, "StoreIoDrainStarted", lease.Execution.Template.JobKey,
+            lease.Execution.ExecutionAttempt, _options.ExecutionStoreDrainTimeout);
+        _metrics?.Record("StoreIoDrainStarted");
+        try
+        {
+            // The clock starts at the first cancellation, even when user-code shutdown delays this observer.
+            var remaining = _options.ExecutionStoreDrainTimeout - operation.CancellationElapsed;
+            if (!completion.IsCompleted)
+            {
+                try
+                {
+                    await completion.WaitAsync(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, timeProvider);
+                }
+                catch (TimeoutException)
+                {
+                    // Check completion again: the store itself may have thrown TimeoutException.
+                }
+                catch (Exception)
+                {
+                    // The observer below records the full I/O and callback failure.
+                }
+            }
+
+            if (!completion.IsCompleted)
+            {
+                RequestWorkerRestart(lease.Execution.InstanceId,
+                    $"Store {operationName} I/O or its cancellation callbacks exceeded the cancellation drain budget.",
+                    "StoreIoDrainExpired");
+            }
+
+            // Keep the slot and operation resources owned until actual exit, including after a termination request.
+            await ObserveDetachedAsync(completion, lease.Execution.InstanceId, operationName);
+            _metrics?.Drained(operationName, operation.CancellationElapsed);
+            logger.LogInformation(
+                "Execution {InstanceId} {Operation} exited after cancellation. ReasonCode={ReasonCode}, CancellationElapsed={CancellationElapsed}",
+                lease.Execution.InstanceId, operationName, "StoreIoDrained", operation.CancellationElapsed);
+        }
+        finally
+        {
+            operation.Dispose();
+            lock (_workerStateGate)
+            {
+                if (--_pendingStoreDrains == 0)
+                {
+                    _storeRecoveryStarted = timeProvider.GetTimestamp();
+                }
+            }
+            _ = _completionWake.Writer.TryWrite(true);
+        }
     }
 
     private async Task FinalizeAsync(JobExecutionLease lease, JobAttemptCompletion? completion)
@@ -542,10 +634,12 @@ internal sealed class JobExecutionWorkerHostedService(
             "finalization");
         try
         {
-            await Task.WhenAny(operation.Operation, operation.Deadline);
+            await Task.WhenAny(operation.Completion, operation.Deadline);
             if (operation.HasTimedOut)
             {
-                RequestWorkerRestart(lease.Execution.InstanceId, "The store did not finish finalizing a stopped attempt.");
+                logger.LogWarning(
+                    "Execution {InstanceId} finalization exceeded its I/O deadline; the commit outcome is not replayed. ReasonCode={ReasonCode}",
+                    lease.Execution.InstanceId, "FinalizationOutcomeUnknown");
                 return;
             }
 
@@ -555,16 +649,17 @@ internal sealed class JobExecutionWorkerHostedService(
         }
         finally
         {
-            operation.StopDeadline();
-            if (operation.Completion.IsCompleted)
-            {
-                await ObserveDetachedAsync(operation.Completion, lease.Execution.InstanceId, "finalization", operation);
-            }
-            else
-            {
-                RequestWorkerRestart(lease.Execution.InstanceId, "Finalization I/O or its cancellation callbacks did not exit.");
-                _ = ObserveDetachedAsync(operation.Completion, lease.Execution.InstanceId, "late finalization", operation);
-            }
+            await DrainStoreOperationAsync(operation, lease, "finalization", cancel: operation.HasTimedOut);
+        }
+    }
+
+    private bool CanAdmitWork()
+    {
+        lock (_workerStateGate)
+        {
+            return Volatile.Read(ref _admissionsStopped) == 0 && _pendingStoreDrains == 0
+                && (_storeRecoveryStarted is not { } started
+                    || timeProvider.GetElapsedTime(started) >= _options.ExecutionStoreRecoveryDelay);
         }
     }
 
@@ -662,7 +757,7 @@ internal sealed class JobExecutionWorkerHostedService(
         }
     }
 
-    private void RequestWorkerRestart(string instanceId, string reason)
+    private void RequestWorkerRestart(string instanceId, string reason, string reasonCode = "UnsafeExecution")
     {
         lock (_workerStateGate)
         {
@@ -672,8 +767,12 @@ internal sealed class JobExecutionWorkerHostedService(
             }
 
             var message = $"Worker restart requested because execution '{instanceId}' did not stop safely. {reason}";
+            runtimeState.SetWorkerAdmissionPaused(false);
             _ = runtimeState.SetWorker(false, message);
             RecordState(message, HostedServiceState.Faulted, logLevel: LogLevel.Critical);
+            logger.LogCritical("Execution {InstanceId} requested worker termination. ReasonCode={ReasonCode}",
+                instanceId, reasonCode);
+            _metrics?.Record(reasonCode);
         }
 
         _ = ObserveDetachedAsync(_workerStop.CancelAsync(), instanceId, "worker shutdown cancellation");
@@ -719,7 +818,9 @@ internal sealed class JobExecutionWorkerHostedService(
         private readonly TaskCompletionSource _deadline = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ITimer _deadlineTimer;
         private readonly Action<Task> _observeCancellation;
+        private readonly TimeProvider _clock;
         private Task _callbacks = Task.CompletedTask;
+        private long? _cancellationStartedAt;
         private bool _cancellationStarted;
         private bool _timerStopped;
         private bool _timedOut;
@@ -733,6 +834,7 @@ internal sealed class JobExecutionWorkerHostedService(
             Action<Task> observeCancellation)
         {
             _observeCancellation = observeCancellation;
+            _clock = clock;
             _deadlineTimer = clock.CreateTimer(OnDeadline, null, timeout, Timeout.InfiniteTimeSpan);
             var token = _cancellation.Token;
             Operation = Task.Run(async () =>
@@ -746,6 +848,7 @@ internal sealed class JobExecutionWorkerHostedService(
                     Volatile.Write(ref _operationCompleted, 1);
                 }
             }, token);
+            Completion = CompleteAsync();
         }
 
         public Task<T> Operation { get; }
@@ -763,15 +866,38 @@ internal sealed class JobExecutionWorkerHostedService(
             }
         }
 
-        public Task Completion
+        public Task Completion { get; }
+
+        public TimeSpan CancellationElapsed
         {
             get
             {
                 lock (_gate)
                 {
-                    return Task.WhenAll(Operation, _callbacks);
+                    return _cancellationStartedAt is { } started ? _clock.GetElapsedTime(started) : TimeSpan.Zero;
                 }
             }
+        }
+
+        private async Task CompleteAsync()
+        {
+            try
+            {
+                await Operation;
+            }
+            catch (Exception)
+            {
+                // Join both outcomes below so completion includes cancellation callbacks and the I/O failure.
+            }
+
+            Task callbacks;
+            lock (_gate)
+            {
+                _timerStopped = true;
+                _deadlineTimer.Dispose();
+                callbacks = _callbacks;
+            }
+            await Task.WhenAll(Operation, callbacks);
         }
 
         public Task CancelAsync()
@@ -840,10 +966,11 @@ internal sealed class JobExecutionWorkerHostedService(
 
         private Task CancelLocked(out bool started)
         {
-            started = !_cancellationStarted && !_disposed;
+            started = !_cancellationStarted && !_disposed && Volatile.Read(ref _operationCompleted) == 0;
             if (started)
             {
                 _cancellationStarted = true;
+                _cancellationStartedAt = _clock.GetTimestamp();
                 _callbacks = _cancellation.CancelAsync();
             }
 

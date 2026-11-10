@@ -11,4 +11,6 @@ public static class JobSchedulerStoreMetricNames
     public const string Operations = "monica.job_scheduler.store.operations";
     /// <summary>Gets the transaction retry counter name.</summary>
     public const string TransactionRetries = "monica.job_scheduler.store.transaction.retries";
+    /// <summary>Gets cancellation-to-exit duration tagged by operation and the phase where cancellation began.</summary>
+    public const string CancellationDuration = "monica.job_scheduler.store.cancellation.duration";
 }

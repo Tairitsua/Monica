@@ -142,6 +142,13 @@ public sealed class ModuleJobSchedulerUIOption : ModuleOptions<ModuleJobSchedule
     public TimeSpan AutoRefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets the minimum automatic refresh interval for the overview's execution timeline and analytics.
+    /// The default is 30 seconds; non-positive values allow only initial, range-change and manual reads. The
+    /// accepted snapshot retains its own timestamp while lightweight runtime facts refresh independently.
+    /// </summary>
+    public TimeSpan PulseRefreshInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Gets or sets the default catalog and execution page size. The default is 20.
     /// </summary>
     public int DefaultPageSize { get; set; } = 20;
