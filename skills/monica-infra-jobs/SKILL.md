@@ -10,7 +10,7 @@ Choose JobScheduler for recurring or on-demand work with managed execution histo
 | Task | Read |
 | --- | --- |
 | Register recurring or typed triggered jobs, select storage and scope, or enqueue application work | [Scheduler](references/scheduler.md) |
-| Inspect execution history, trigger or cancel work, change policy, or expose the operator UI | [Scheduler operations](references/scheduler-operations.md) |
+| Inspect execution history, diagnose distribution or analytics failures, trigger or cancel work, change policy, or expose the operator UI | [Scheduler operations](references/scheduler-operations.md) |
 | Declare startup seeders, order dependencies, or diagnose readiness | [Startup seeding](references/startup-seeding.md) |
 
 For application job placement, use Building Block development in `$monica-application-building-block-development`. For framework module or worker implementation, use `$monica-framework`, then `$monica-development`.

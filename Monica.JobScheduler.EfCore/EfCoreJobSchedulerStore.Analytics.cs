@@ -255,15 +255,13 @@ public sealed partial class EfCoreJobSchedulerStore
         var rows = await completions
             .Select(item => new
             {
-                // Divide in double and cast back: GaussDB evaluates bigint division in double precision, which
-                // the Int64-shaped bucket-key reader cannot materialize; the explicit cast keeps the grouped
-                // key an integer on every provider. Inputs are non-negative and far below double precision's
-                // exact-integer range, so truncation matches integer division exactly.
-                BucketIndex = (long)((item.CompletedAtUtcTicks!.Value - startTicks) / (double)bucketTicks),
+                Offset = item.CompletedAtUtcTicks!.Value - startTicks,
                 item.State,
                 WasExecuted = item.StartedAtUtcTicks != null
             })
-            .GroupBy(static item => item.BucketIndex)
+            // Remove the remainder before decimal division so GaussDB returns an exact integer bucket key.
+            // Casting a fractional quotient directly to bigint rounds on PostgreSQL-family servers.
+            .GroupBy(item => (long)((decimal)(item.Offset - item.Offset % bucketTicks) / bucketTicks))
             .Select(static group => new AnalyticsTrendRow(
                 group.Key,
                 group.LongCount(item => item.State == JobExecutionState.Succeeded),

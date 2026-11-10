@@ -10,6 +10,55 @@ public sealed class JobExecutionDistributionStoreTests
     private static readonly DateTimeOffset START = new(2026, 10, 27, 0, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData(false, false, 101L)]
+    [InlineData(false, true, 101L)]
+    [InlineData(true, false, 101L)]
+    [InlineData(true, true, 101L)]
+    [InlineData(false, false, 9_007_199_254_740_993L)]
+    [InlineData(false, true, 9_007_199_254_740_993L)]
+    [InlineData(true, false, 9_007_199_254_740_993L)]
+    [InlineData(true, true, 9_007_199_254_740_993L)]
+    public async Task GetExecutionDistributionAsync_WhenRecordsBorderBuckets_ShouldPreserveExactTickBoundaries(
+        bool useEfCore, bool completed, long bucketTicks)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        long[] offsets = [0, bucketTicks / 2 + 1, bucketTicks - 1, bucketTicks,
+            bucketTicks + bucketTicks / 2 + 1, 2 * bucketTicks - 1, 2 * bucketTicks, 3 * bucketTicks - 1];
+        foreach (var offset in offsets)
+        {
+            fixture.Time.Advance(START.AddTicks(offset) - fixture.Time.GetUtcNow());
+            if (completed)
+            {
+                await CompleteAsync(fixture, StoreFixture.OWNER_A, $"at-{offset}",
+                    JobAttemptOutcome.Succeeded, TimeSpan.Zero);
+            }
+            else
+            {
+                await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: $"at-{offset}");
+            }
+        }
+
+        var end = START.AddTicks(3 * bucketTicks);
+        var query = new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope,
+            CreatedAfterUtc = completed ? null : START,
+            CreatedBeforeUtc = completed ? null : end.AddTicks(-1),
+            CompletedAfterUtc = completed ? START : null,
+            CompletedBeforeUtc = completed ? end.AddTicks(-1) : null
+        };
+        var snapshot = await fixture.Store.GetExecutionDistributionAsync(query, 3, TestContext.Current.CancellationToken);
+        var state = completed ? JobExecutionState.Succeeded : JobExecutionState.Queued;
+
+        snapshot.Buckets.Select(bucket => bucket.Counts[state]).Should().Equal(3, 3, 2);
+        snapshot.StateTotals[state].Should().Be(offsets.Length);
+        snapshot.Buckets.Select(bucket => bucket.StartTimeUtc).Should()
+            .Equal(START, START.AddTicks(bucketTicks), START.AddTicks(2 * bucketTicks));
+        snapshot.EndTimeUtc.Should().Be(end);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task QueryExecutionsAsync_WhenCompletionBoundsCrossCreationWindow_ShouldFilterBeforeCountingAndPaging(bool useEfCore)

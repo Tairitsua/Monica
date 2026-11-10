@@ -17,6 +17,7 @@ Identify the running Monica and .NET versions, actual host/environment, failed U
 | API call, event delivery, DataChannel, or SignalR fails | `$monica-infra-messaging` reference for that transport |
 | Managed values are missing, rejected, or stale | `$monica-infra-configuration` bootstrap, validation, or runtime-change reference |
 | Job does not run or startup readiness never completes | `$monica-infra-jobs` scheduler operations or startup-seeding reference |
+| Distribution/analytics type-conversion errors | `$monica-infra-jobs` → `references/scheduler-operations.md` |
 | HTTP endpoint is absent or access is denied | `$monica-infra-web` endpoints, visibility, or access-control reference |
 | Logs, traces, metrics, or health evidence are missing | `$monica-infra-observability` reference for that signal |
 | AI provider, retrieval, runtime skill, or MCP fails | `$monica-infra-ai` reference for that capability |
