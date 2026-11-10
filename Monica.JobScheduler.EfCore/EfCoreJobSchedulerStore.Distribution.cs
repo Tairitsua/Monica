@@ -21,8 +21,17 @@ public sealed partial class EfCoreJobSchedulerStore
             var bounds = await rows.GroupBy(row => 1).Select(group => new { First = group.Min(row => row.At), Last = group.Max(row => row.At) }).SingleOrDefaultAsync(token);
             var layout = JobExecutionDistributionLayout.Create(query, bucketCount, bounds?.First, bounds?.Last, await GetUtcNowAsync(dbContext, token));
             var start = layout.StartTicks; var width = layout.BucketTicks;
-            var groups = await rows.GroupBy(row => new { Bucket = (row.At!.Value - start) / width, row.State }).Select(group => new { group.Key.Bucket, group.Key.State, Count = group.LongCount() }).ToArrayAsync(token);
-            var result = layout.Build(groups.Select(group => (group.Bucket, group.State, group.Count)));
+            // Vastbase returns double precision for bigint division. Group by exact tick offsets instead,
+            // then divide only the bounded aggregate keys in memory to preserve half-open bucket boundaries.
+            var groups = await rows
+                .GroupBy(row => new
+                {
+                    Offset = row.At!.Value - start - (row.At.Value - start) % width,
+                    row.State
+                })
+                .Select(group => new { group.Key.Offset, group.Key.State, Count = group.LongCount() })
+                .ToArrayAsync(token);
+            var result = layout.Build(groups.Select(group => (group.Offset / width, group.State, group.Count)));
             if (transaction is not null) await transaction.CommitAsync(token);
             return result;
         }, cancellationToken);
