@@ -32,6 +32,7 @@ public sealed partial class JobSchedulerFacade(
     ITypeActivationPolicy? activation = null)
 {
     private const int MAX_PAGE_SIZE = 200;
+    private const int EXECUTION_SAMPLE_LIMIT = 2000;
     private const int RECENT_EXECUTION_COUNT = 12;
     private const int OVERVIEW_DEFINITION_LIMIT = 500;
     private const int THROUGHPUT_WINDOW_HOURS = 24;
@@ -155,18 +156,10 @@ public sealed partial class JobSchedulerFacade(
                     SortDescending = true
                 },
                 cancellationToken);
-            // Page size one is sufficient: only TotalCount feeds the per-hour rate.
-            var throughputTask = store.QueryExecutionsAsync(
-                new JobExecutionQuery
-                {
-                    SchedulerScopeKey = _schedulerScopeKey,
-                    CreatedAfterUtc = timeProvider.GetUtcNow().AddHours(-THROUGHPUT_WINDOW_HOURS),
-                    PageNumber = 1,
-                    PageSize = 1,
-                    SortField = JobExecutionSortField.CreatedAtUtc,
-                    SortDescending = true
-                },
-                cancellationToken);
+            var throughputTask = store.GetExecutionStateStatisticsAsync(
+                _schedulerScopeKey,
+                startTimeUtc: timeProvider.GetUtcNow().AddHours(-THROUGHPUT_WINDOW_HOURS),
+                cancellationToken: cancellationToken);
 
             await Task.WhenAll(definitionsTask, statisticsTask, recentTask, throughputTask);
             return new JobSchedulerOverview
@@ -174,7 +167,7 @@ public sealed partial class JobSchedulerFacade(
                 Definitions = (await definitionsTask).Items,
                 ExecutionStateCounts = await statisticsTask,
                 RecentExecutions = (await recentTask).Items,
-                ExecutionsPerHourLast24h = (await throughputTask).TotalCount / (double)THROUGHPUT_WINDOW_HOURS,
+                ExecutionsPerHourLast24h = (await throughputTask).Values.Sum(count => (long)count) / (double)THROUGHPUT_WINDOW_HOURS,
                 CapturedAtUtc = timeProvider.GetUtcNow()
             };
         }, "load the scheduler overview", cancellationToken);
@@ -333,6 +326,33 @@ public sealed partial class JobSchedulerFacade(
         return ExecuteAsync(
             () => store.QueryExecutionsAsync(bounded, cancellationToken),
             "query job executions",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the newest 2,000 matching executions and their total count for a diagnostic timeline.
+    /// </summary>
+    /// <remarks>
+    /// Preserves identity, state, search and time filters, but replaces scope, ordering and pagination.
+    /// One bounded store query avoids repeated counts and shifting offsets across sample pages.
+    /// Returned records omit audit history; fewer records than TotalCount means the sample is truncated.
+    /// </remarks>
+    public Task<Result<QueryResult<JobExecutionInstance>>> GetExecutionSampleAsync(
+        JobExecutionQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var bounded = query with
+        {
+            SchedulerScopeKey = _schedulerScopeKey,
+            PageNumber = 1,
+            PageSize = EXECUTION_SAMPLE_LIMIT,
+            SortField = JobExecutionSortField.CreatedAtUtc,
+            SortDescending = true
+        };
+        return ExecuteAsync(
+            () => store.QueryExecutionsAsync(bounded, cancellationToken),
+            "load the job execution sample",
             cancellationToken);
     }
 

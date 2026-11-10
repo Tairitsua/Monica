@@ -214,6 +214,8 @@
     /// <summary>Gets the callback persisting the search without adding a history entry for every keystroke.</summary>
     [Parameter] public EventCallback<string> SearchChanged { get; set; }
     private readonly SchedulerOperationLifetime _lifetime = new();
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private CancellationTokenSource? _loadCancellation;
     private ExecutionDialogSession? _inspectors;
     private SchedulerExecutionSample? _sample;
     private IReadOnlyList<SchedulerJobEvidence> _jobs = [];
@@ -249,6 +251,10 @@
     private async Task LoadAsync()
     {
         if (_lifetime.IsRetired) return;
+        // Renderer-owned requests replace pending work, but wait for the old read to actually exit.
+        using var cancellation = new CancellationTokenSource();
+        var previous = _loadCancellation;
+        _loadCancellation = cancellation;
         var version = ++_version;
         var at = CapturedAtUtc;
         var minutes = _minutes;
@@ -257,45 +263,58 @@
         _loading = true;
         try
         {
-            await _lifetime.RunAsync(async token =>
+            await _lifetime.RunAsync(async lifetimeToken =>
             {
-                if (!await Access.IsAuthorizedAsync(token))
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken, cancellation.Token);
+                var token = linked.Token;
+                if (previous is not null) await previous.CancelAsync();
+                await _loadGate.WaitAsync(token);
+                try
                 {
-                    _lifetime.TryApply(() => { if (version == _version) { _jobs = []; _sample = null; _error = L["Access:DeniedDescription"]; } });
-                    return;
+                    token.ThrowIfCancellationRequested();
+                    if (!await Access.IsAuthorizedAsync(token))
+                    {
+                        _lifetime.TryApply(() => { if (version == _version) { _jobs = []; _sample = null; _error = L["Access:DeniedDescription"]; } });
+                        return;
+                    }
+                    var sample = await SchedulerExecutionSample.LoadAsync(Facade, new JobExecutionQuery
+                    {
+                        SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
+                    }, token);
+                    var activeResult = await Facade.QueryExecutionsAsync(new JobExecutionQuery { SchedulerScopeKey = string.Empty, States = [JobExecutionState.Queued, JobExecutionState.Running], CreatedBeforeUtc = at, PageSize = 200 }, token);
+                    var activeError = activeResult.WithoutData();
+                    var active = activeResult.Data;
+                    if (activeResult.IsFailure() || active is null) throw new InvalidOperationException(activeError.Message ?? "The active executions were unavailable.");
+                    var analyticsResult = await Facade.GetExecutionAnalyticsAsync(new JobExecutionAnalyticsQuery { StartTimeUtc = at.AddMinutes(-minutes), EndTimeUtc = at }, token);
+                    var analyticsError = analyticsResult.WithoutData();
+                    var analytics = analyticsResult.Data;
+                    if (analyticsResult.IsFailure() || analytics is null) throw new InvalidOperationException(analyticsError.Message ?? "The execution analytics were unavailable.");
+                    var cursors = new Dictionary<JobId, JobOperationalSummary>();
+                    for (var page = 1; page <= Math.Ceiling(definitions.Length / 200d); page++)
+                    {
+                        var response = await Facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = page, PageSize = 200 }, token);
+                        var cursorError = response.WithoutData();
+                        var cursorPage = response.Data;
+                        if (response.IsFailure() || cursorPage is null) throw new InvalidOperationException(cursorError.Message ?? "The job catalog was unavailable.");
+                        foreach (var summary in cursorPage.Items) cursors[summary.Definition.Id] = summary;
+                        if (page * 200 >= cursorPage.TotalCount) break;
+                    }
+                    token.ThrowIfCancellationRequested();
+                    var records = sample.Records.Concat(active.Items).DistinctBy(record => record.InstanceId, StringComparer.Ordinal).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+                    var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at, !sample.IsTruncated))
+                        .OrderByDescending(job => job.NeedsAttention).ThenByDescending(job => job.FailureStreak).ThenBy(job => job.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture).ToArray();
+                    _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _analytics = analytics; _jobs = jobs; _cursors = cursors; _hovered = null; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
                 }
-                var sample = await SchedulerExecutionSample.LoadAsync(Facade, new JobExecutionQuery
-                {
-                    SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
-                }, token);
-                var activeResult = await Facade.QueryExecutionsAsync(new JobExecutionQuery { SchedulerScopeKey = string.Empty, States = [JobExecutionState.Queued, JobExecutionState.Running], CreatedBeforeUtc = at, PageSize = 200 }, token);
-                var activeError = activeResult.WithoutData();
-                var active = activeResult.Data;
-                if (activeResult.IsFailure() || active is null) throw new InvalidOperationException(activeError.Message ?? "The active executions were unavailable.");
-                var analyticsResult = await Facade.GetExecutionAnalyticsAsync(new JobExecutionAnalyticsQuery { StartTimeUtc = at.AddMinutes(-minutes), EndTimeUtc = at }, token);
-                var analyticsError = analyticsResult.WithoutData();
-                var analytics = analyticsResult.Data;
-                if (analyticsResult.IsFailure() || analytics is null) throw new InvalidOperationException(analyticsError.Message ?? "The execution analytics were unavailable.");
-                var cursors = new Dictionary<JobId, JobOperationalSummary>();
-                for (var page = 1; page <= Math.Ceiling(definitions.Length / 200d); page++)
-                {
-                    var response = await Facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = page, PageSize = 200 }, token);
-                    var cursorError = response.WithoutData();
-                    var cursorPage = response.Data;
-                    if (response.IsFailure() || cursorPage is null) throw new InvalidOperationException(cursorError.Message ?? "The job catalog was unavailable.");
-                    foreach (var summary in cursorPage.Items) cursors[summary.Definition.Id] = summary;
-                    if (page * 200 >= cursorPage.TotalCount) break;
-                }
-                token.ThrowIfCancellationRequested();
-                var records = sample.Records.Concat(active.Items).DistinctBy(record => record.InstanceId, StringComparer.Ordinal).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
-                var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at, !sample.IsTruncated))
-                    .OrderByDescending(job => job.NeedsAttention).ThenByDescending(job => job.FailureStreak).ThenBy(job => job.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture).ToArray();
-                _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _analytics = analytics; _jobs = jobs; _cursors = cursors; _hovered = null; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
+                finally { _loadGate.Release(); }
             });
         }
-        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (OperationCanceledException) when (_lifetime.IsRetired || cancellation.IsCancellationRequested) { }
         catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) _error = exception.Message; }); }
-        finally { _lifetime.TryApply(() => { if (version == _version) _loading = false; }); }
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, cancellation)) _loadCancellation = null;
+            _lifetime.TryApply(() => { if (version == _version) _loading = false; });
+        }
     }
     private async Task InspectAsync(string id)
     {
@@ -396,7 +415,7 @@
     public async ValueTask DisposeAsync()
     {
         var inspectors = _inspectors?.DisposeAsync() ?? ValueTask.CompletedTask;
-        var operations = _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+        var operations = _lifetime.RetireAsync(_loadGate.Dispose);
         var failures = new List<Exception>();
         foreach (var retirement in new[] { inspectors, operations })
         {

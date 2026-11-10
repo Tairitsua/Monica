@@ -122,6 +122,7 @@ public sealed class JobSchedulerDbContext(
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.State,
                 item.AvailableAtUtcTicks, item.CreatedAtUtcTicks, item.InstanceId });
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.CreatedAtUtcTicks });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.CreatedAtUtcTicks, item.InstanceId });
             entity.HasMany(item => item.History)
                 .WithOne(item => item.Execution)
                 .HasForeignKey(item => new { item.SchedulerScopeKey, item.InstanceId })
