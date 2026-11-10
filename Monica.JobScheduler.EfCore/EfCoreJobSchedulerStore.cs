@@ -163,11 +163,12 @@ public sealed partial class EfCoreJobSchedulerStore(
             if (trace.GetCancellation() is { } cancellation)
             {
                 _metrics?.Cancelled(operationName, cancellation.Phase, cancellation.Elapsed);
-                logger?.LogWarning(
+                var elapsed = Stopwatch.GetElapsedTime(started);
+                logger?.Log(elapsed >= GetOperationTimeout(operationName) ? LogLevel.Warning : LogLevel.Debug,
                     "Scheduler store {Operation} exited after cancellation. ReasonCode={ReasonCode}, Phase={Phase}, " +
                     "CancellationElapsed={CancellationElapsed}, Elapsed={Elapsed}, Outcome={Outcome}",
                     operationName, "StoreCancellationExited", cancellation.Phase, cancellation.Elapsed,
-                    Stopwatch.GetElapsedTime(started), outcome);
+                    elapsed, outcome);
             }
         }
     }

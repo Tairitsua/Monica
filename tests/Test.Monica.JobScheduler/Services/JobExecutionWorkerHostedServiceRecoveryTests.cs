@@ -95,8 +95,10 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
         }
     }
 
-    [Fact]
-    public async Task ExecuteLeaseAsync_WhenTimedOutRenewalDrainsAfterJobExit_ShouldRecoverAdmissionWithoutRestart()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteLeaseAsync_WhenCancelledRenewalDrainsAfterJobExit_ShouldBackOffOnlyAfterTimeout(bool timedOut)
     {
         var time = new ControllableTimeProvider(NOW);
         var probe = new CompletionProbe();
@@ -127,10 +129,10 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
             await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             time.Advance(TimeSpan.FromSeconds(7));
             await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            time.Advance(TimeSpan.FromSeconds(3));
-            await time.WaitForTimerAsync(TimeSpan.FromSeconds(40), TestContext.Current.CancellationToken);
-            renewalToken.IsCancellationRequested.Should().BeTrue();
+            if (timedOut) time.Advance(TimeSpan.FromSeconds(3));
             probe.Completion.TrySetResult();
+            await time.WaitForTimerAsync(TimeSpan.FromSeconds(timedOut ? 40 : 37), TestContext.Current.CancellationToken);
+            renewalToken.IsCancellationRequested.Should().BeTrue();
             await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
             await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
             attempt.IsCompleted.Should().BeFalse();
@@ -140,10 +142,12 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
             renewal.TrySetException(new OperationCanceledException(renewalToken));
             await attempt.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             await store.Received(1).CompleteAttemptAsync(Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
-            await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
-            await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
-
-            time.Advance(options.Value.ExecutionStoreRecoveryDelay);
+            if (timedOut)
+            {
+                await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
+                await store.DidNotReceive().ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+                time.Advance(options.Value.ExecutionStoreRecoveryDelay);
+            }
             await worker.ClaimAvailableWorkAsync(TestContext.Current.CancellationToken);
             await store.Received(1).ClaimAsync(Arg.Is<JobClaimRequest>(request => request.MaxCount == 1),
                 Arg.Any<CancellationToken>());

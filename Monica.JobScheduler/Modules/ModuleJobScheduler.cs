@@ -563,8 +563,8 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public TimeSpan ExecutionStoreDrainTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Gets or sets the backoff after all cancelled store calls exit. Recovery admits at most one execution until
-    /// a claim succeeds, then resumes normal batches. The default is five seconds.
+    /// Gets or sets the backoff after timed-out store calls exit. Ordinary cancellation during job completion
+    /// does not add this delay. Recovery probes with at most one claim before normal batches. The default is five seconds.
     /// </summary>
     public TimeSpan ExecutionStoreRecoveryDelay { get; set; } = TimeSpan.FromSeconds(5);
 

@@ -62,6 +62,7 @@ internal sealed class JobExecutionWorkerHostedService(
     private int _admissionsStopped;
     private int _pendingStoreDrains;
     private long? _storeRecoveryStarted;
+    private bool _storeRecoveryRequiresBackoff;
     private int _nextClaimOwnerIndex;
 
     public override string? ServiceGroupId => nameof(ModuleJobScheduler);
@@ -274,6 +275,7 @@ internal sealed class JobExecutionWorkerHostedService(
                     && Volatile.Read(ref _admissionsStopped) == 0)
                 {
                     _storeRecoveryStarted = null;
+                    _storeRecoveryRequiresBackoff = false;
                     _metrics?.Record("StoreAdmissionResumed");
                     logger.LogInformation("Scheduler worker admission resumed after store recovery. ReasonCode={ReasonCode}",
                         "StoreAdmissionResumed");
@@ -556,24 +558,26 @@ internal sealed class JobExecutionWorkerHostedService(
             return;
         }
 
+        var timedOut = operation.HasTimedOut;
         lock (_workerStateGate)
         {
             _pendingStoreDrains++;
             _storeRecoveryStarted = null;
+            _storeRecoveryRequiresBackoff |= timedOut;
             if (Volatile.Read(ref _admissionsStopped) == 0)
             {
                 runtimeState.SetWorkerAdmissionPaused(true);
                 _ = runtimeState.SetWorker(false, "Worker admission is paused while cancelled store I/O drains.");
                 RecordState("Worker admission paused for store cleanup", HostedServiceState.Degraded,
-                    logLevel: LogLevel.Warning);
+                    logLevel: timedOut ? LogLevel.Warning : LogLevel.Debug);
             }
         }
 
-        logger.LogWarning(
+        logger.Log(timedOut ? LogLevel.Warning : LogLevel.Debug,
             "Execution {InstanceId} is draining {Operation}; new claims are paused. " +
-            "ReasonCode={ReasonCode}, JobKey={JobKey}, ExecutionAttempt={ExecutionAttempt}, DrainTimeout={DrainTimeout}",
+            "ReasonCode={ReasonCode}, JobKey={JobKey}, ExecutionAttempt={ExecutionAttempt}, DrainTimeout={DrainTimeout}, TimedOut={TimedOut}",
             lease.Execution.InstanceId, operationName, "StoreIoDrainStarted", lease.Execution.Template.JobKey,
-            lease.Execution.ExecutionAttempt, _options.ExecutionStoreDrainTimeout);
+            lease.Execution.ExecutionAttempt, _options.ExecutionStoreDrainTimeout, timedOut);
         _metrics?.Record("StoreIoDrainStarted");
         try
         {
@@ -605,7 +609,7 @@ internal sealed class JobExecutionWorkerHostedService(
             // Keep the slot and operation resources owned until actual exit, including after a termination request.
             await ObserveDetachedAsync(completion, lease.Execution.InstanceId, operationName);
             _metrics?.Drained(operationName, operation.CancellationElapsed);
-            logger.LogInformation(
+            logger.Log(timedOut ? LogLevel.Information : LogLevel.Debug,
                 "Execution {InstanceId} {Operation} exited after cancellation. ReasonCode={ReasonCode}, CancellationElapsed={CancellationElapsed}",
                 lease.Execution.InstanceId, operationName, "StoreIoDrained", operation.CancellationElapsed);
         }
@@ -659,6 +663,7 @@ internal sealed class JobExecutionWorkerHostedService(
         {
             return Volatile.Read(ref _admissionsStopped) == 0 && _pendingStoreDrains == 0
                 && (_storeRecoveryStarted is not { } started
+                    || !_storeRecoveryRequiresBackoff
                     || timeProvider.GetElapsedTime(started) >= _options.ExecutionStoreRecoveryDelay);
         }
     }
