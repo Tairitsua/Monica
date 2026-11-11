@@ -74,6 +74,18 @@ public sealed class DataChannelWorkbenchState(DataChannelFacade facade, ILogger<
     public Task<Result> ReinitializeAsync(string channelId, CancellationToken cancellationToken) =>
         ExecuteAsync(() => facade.ReInitializeChannelAsync(channelId, cancellationToken), cancellationToken);
 
+    /// <summary>Starts a selected setup through its host-owned lifecycle.</summary>
+    public Task<Result> StartSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.StartSetupAsync(setupId, cancellationToken), cancellationToken);
+
+    /// <summary>Stops a selected setup and drains endpoint cleanup.</summary>
+    public Task<Result> StopSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.StopSetupAsync(setupId, cancellationToken), cancellationToken);
+
+    /// <summary>Restarts a selected setup without changing global autonomous participation.</summary>
+    public Task<Result> RestartSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.RestartSetupAsync(setupId, cancellationToken), cancellationToken);
+
     /// <summary>Clears all retained observable history for one channel while preserving lifetime counters.</summary>
     /// <param name="channelId">The exact identifier frozen before confirmation.</param>
     /// <param name="cancellationToken">Cancels admission and suppresses adoption after retirement.</param>

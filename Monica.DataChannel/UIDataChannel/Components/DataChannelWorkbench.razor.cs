@@ -96,6 +96,18 @@ public partial class DataChannelWorkbench : IAsyncDisposable
 
     private Task ReinitializeAsync(string channelId) => ReinitializeAsync(channelId, default);
 
+    private Task StartSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StartSetupAsync, "Setup:Started");
+    private Task StopSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StopSetupAsync, "Setup:Stopped");
+    private Task RestartSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.RestartSetupAsync, "Setup:Restarted");
+
+    private Task ExecuteSetupAsync(string setupId, Func<string, CancellationToken, Task<Result>> command, string successKey) =>
+        ExecuteChannelAsync("setup:" + setupId, async token =>
+        {
+            var outcome = await command(setupId, token);
+            Report(outcome, successKey, setupId, token);
+            await State.RefreshAsync(token);
+        });
+
     private Task ReinitializeAsync(string channelId, CancellationToken ownerToken) => ExecuteChannelAsync(channelId, async token =>
     {
         var outcome = await State.ReinitializeAsync(channelId, token);

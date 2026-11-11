@@ -48,30 +48,27 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
         services.TryAddSingleton<DataChannelRuntime>();
         services.TryAddSingleton<IDataChannelRegistrar>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<IDataChannelManager>(provider => provider.GetRequiredService<DataChannelRuntime>());
+        services.TryAddSingleton<IDataChannelLifecycle>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<TcpConnectionRuntime>();
         services.TryAddSingleton<IKafkaDataChannelClientFactory, KafkaDataChannelClientFactory>();
         services.TryAddSingleton<MessageMetrics>();
         services.AddScoped<DataChannelFacade>();
-        services.AddHostedService<DataChannelInitializerService>();
+        services.AddHostedService(provider => new DataChannelInitializerService(
+            provider.GetRequiredService<DataChannelRuntime>(),
+            provider.GetRequiredService<Monica.Core.ObservableInstance.Abstractions.IObservableInstanceRegistry>(),
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ModuleHostedServiceOption>>(),
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DataChannelInitializerService>>()));
         // Every setup is admitted independently before construction. This coordinator only sees admitted channels.
         context.Composition.AdmitHostedLifecycle(
-            services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(DataChannelInitializerService)), typeof(DataChannelInitializerService));
+            services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)), typeof(DataChannelInitializerService));
     }
 
     public override void ConfigureApplicationBuilder(WebModuleContext<ModuleDataChannelOption> context)
     {
         var app = context.ApplicationBuilder;
-        var setups = app.ApplicationServices.GetServices<DataChannelSetupRegistration>();
-        var registrar = app.ApplicationServices.GetRequiredService<IDataChannelRegistrar>();
         var runtime = app.ApplicationServices.GetRequiredService<DataChannelRuntime>();
-
-        foreach (var setup in setups.Where(setup => setup.Mode == ActivationMode.Automatic))
-        {
-            runtime.ApplySetup((IDataChannelSetup)app.ApplicationServices.GetRequiredService(setup.ImplementationType),
-                setup.RegistrationOwner, registrar);
-        }
-
-        runtime.Materialize(app);
+        runtime.ConfigureApplication(app);
     }
 
     public override void ConfigureEndpoints(WebModuleContext<ModuleDataChannelOption> context)
@@ -82,6 +79,29 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
         UseEndpoints(context, endpoints =>
         {
             var tagName = Option.GetApiGroupName();
+
+            endpoints.MapGet("/channel-setups", ([FromServices] DataChannelFacade service) =>
+                    service.GetSetups().GetResponse())
+                .WithName("DataChannel.ListSetups").WithTags(tagName)
+                .WithSummary("List data-channel setup lifecycle evidence");
+
+            endpoints.MapPost("/channel-setups/{id}/start", async (string id,
+                    [FromServices] DataChannelFacade service, CancellationToken cancellationToken) =>
+                    (await service.StartSetupAsync(id, cancellationToken)).GetResponse())
+                .WithName("DataChannel.StartSetup").WithTags(tagName)
+                .WithSummary("Start one eligible data-channel setup");
+
+            endpoints.MapPost("/channel-setups/{id}/stop", async (string id,
+                    [FromServices] DataChannelFacade service, CancellationToken cancellationToken) =>
+                    (await service.StopSetupAsync(id, cancellationToken)).GetResponse())
+                .WithName("DataChannel.StopSetup").WithTags(tagName)
+                .WithSummary("Stop one data-channel setup and release its endpoints");
+
+            endpoints.MapPost("/channel-setups/{id}/restart", async (string id,
+                    [FromServices] DataChannelFacade service, CancellationToken cancellationToken) =>
+                    (await service.RestartSetupAsync(id, cancellationToken)).GetResponse())
+                .WithName("DataChannel.RestartSetup").WithTags(tagName)
+                .WithSummary("Restart one data-channel setup using frozen configuration");
 
             endpoints.MapPost("/channel/{id}/reinitialize",
                 async ([FromRoute] string id,
@@ -171,7 +191,9 @@ public static class ModuleDataChannelBuilderExtensions
         /// <typeparam name="TSetup">The host-owned pipeline setup.</typeparam>
         /// <returns>The same host-bound registration.</returns>
         /// <remarks>
-        /// Setups run once per implementation type in registration order before any pipeline is materialized.
+        /// Automatic setups declare during host composition, before their pipelines are materialized.
+        /// Manual setups remain unconstructed until explicitly started through IDataChannelLifecycle.
+        /// A successful declaration is retained for subsequent starts and restarts.
         /// Repeated calls for the same setup type have no additional effect. Channel identifiers must be unique
         /// across every setup contributed to the host.
         /// </remarks>
@@ -203,10 +225,11 @@ public static class ModuleDataChannelBuilderExtensions
                         Reason = mode == ActivationMode.Automatic ? "Setup may declare and materialize channels."
                             : "Setup is held before construction; its channel factories and endpoints are not materialized."
                     });
-                    if (mode == ActivationMode.Automatic)
+                    if (mode != ActivationMode.Disabled)
                     {
                         context.Services.TryAddSingleton<TSetup>();
-                        context.Services.AddSingleton<IDataChannelSetup>(provider => provider.GetRequiredService<TSetup>());
+                        if (mode == ActivationMode.Automatic)
+                            context.Services.AddSingleton<IDataChannelSetup>(provider => provider.GetRequiredService<TSetup>());
                     }
                 })
                 .SatisfyFeature(ModuleDataChannel.CHANNEL_SETUP_FEATURE);

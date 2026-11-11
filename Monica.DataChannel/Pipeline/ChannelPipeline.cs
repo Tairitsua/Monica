@@ -308,6 +308,12 @@ public class ChannelPipeline : IObservableInstance
     {
         var cancellationToken = data.CancellationToken;
         cancellationToken.ThrowIfCancellationRequested();
+        lock (_initializationGate)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            if (!_isInitialized && !_isInitializing)
+                throw new InvalidOperationException($"Data channel '{Id}' is not running. Start its setup explicitly before sending.");
+        }
         // Run transform middleware.
         await TransformMiddlewares.DoAsync(async p =>
         {
@@ -428,6 +434,33 @@ public class ChannelPipeline : IObservableInstance
     {
         lock (_initializationGate)
             return _disposalTask ??= DisposeCoreAsync();
+    }
+
+    /// <summary>Stops endpoints without retiring definitions or observable history. Cleanup cannot be abandoned.</summary>
+    internal async Task StopAsync()
+    {
+        await _lifecycleLock.WaitAsync();
+        try
+        {
+            lock (_initializationGate)
+            {
+                ObjectDisposedException.ThrowIf(_isDisposed, this);
+                _isInitialized = false;
+                _isNotAvailable = true;
+            }
+            List<Exception>? failures = null;
+            foreach (var endpoint in GetEndpoints().Reverse().OfType<ICommunicationEndpoint>())
+            {
+                try { await endpoint.DisposeAsync(); }
+                catch (Exception exception)
+                {
+                    CollectException(exception, endpoint);
+                    (failures ??= []).Add(exception);
+                }
+            }
+            if (failures is not null) throw new AggregateException(failures);
+        }
+        finally { _lifecycleLock.Release(); }
     }
 
     private async Task DisposeCoreAsync()

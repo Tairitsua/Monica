@@ -79,7 +79,7 @@ public sealed class ChannelPipelineTests
             initializing.IsInitialized.Should().BeFalse();
             var rejected = await facade.ReInitializeChannelAsync(scenario.Primary.Id, scope.CancellationToken);
             rejected.Status.Should().Be(ResultStatus.BadRequest);
-            rejected.Message.Should().Contain("already initializing");
+            rejected.Message.Should().Contain("lifecycle operation is already in progress");
             pending.IsCompleted.Should().BeFalse();
             scenario.Primary.Outer.InitializationCalls.Should().Be(2, "a rejected attempt never calls an endpoint");
 
@@ -161,7 +161,7 @@ public sealed class ChannelPipelineTests
     }
 
     [Fact]
-    public async Task Shutdown_WhenInitializationIsAdmitted_ShouldWaitThenRetireThePipelinePermanently()
+    public async Task Shutdown_WhenInitializationIsAdmitted_ShouldCancelThenDrainCleanupAndRetireThePipeline()
     {
         var behavior = new LifecycleBehavior();
         await using var application = await new LifecycleApplicationFactory(behavior)
@@ -169,13 +169,18 @@ public sealed class ChannelPipelineTests
         var channel = application.Services.GetRequiredService<IDataChannelManager>().Fetch("lifecycle")!;
         var initializer = application.Services.GetServices<IHostedService>().OfType<DataChannelInitializerService>().Single();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanupEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         behavior.InitializeOuter = async token =>
         {
             behavior.Events.Enqueue("initialization-entered");
             entered.TrySetResult();
-            await release.Task.WaitAsync(token);
-            behavior.Events.Enqueue("initialization-completed");
+            await Task.Delay(Timeout.Infinite, token);
+        };
+        behavior.DisposeOuter = async _ =>
+        {
+            cleanupEntered.TrySetResult();
+            await releaseCleanup.Task;
         };
 
         var initialization = channel.ReInitialize(TestContext.Current.CancellationToken);
@@ -184,26 +189,29 @@ public sealed class ChannelPipelineTests
         {
             await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
             shutdown = initializer.StopAsync(TestContext.Current.CancellationToken);
+            await cleanupEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
             shutdown.IsCompleted.Should().BeFalse();
             channel.Pipe.IsInitializing.Should().BeTrue();
-            behavior.Events.Should().Equal("initialization-entered");
-
-            release.TrySetResult();
-            await initialization.WaitAsync(TestContext.Current.CancellationToken);
+            releaseCleanup.TrySetResult();
+            var cancelled = () => initialization;
+            await cancelled.Should().ThrowAsync<OperationCanceledException>();
             await shutdown.WaitAsync(TestContext.Current.CancellationToken);
 
-            behavior.Events.Should().Equal("initialization-entered", "initialization-completed", "dispose-outer", "dispose-inner");
+            behavior.Events.Should().NotContain("initialization-completed");
+            behavior.Events.TakeLast(2).Should().Equal("dispose-outer", "dispose-inner");
+            var eventCount = behavior.Events.Count;
             channel.Pipe.IsInitializing.Should().BeFalse();
             channel.Pipe.IsInitialized.Should().BeFalse();
             channel.Pipe.IsNotAvailable.Should().BeTrue();
             var rejected = () => channel.ReInitialize(TestContext.Current.CancellationToken);
             await rejected.Should().ThrowAsync<ObjectDisposedException>();
-            behavior.Events.Should().HaveCount(4, "terminal host disposal cannot reopen endpoints");
+            behavior.Events.Should().HaveCount(eventCount, "terminal host disposal cannot reopen endpoints");
         }
         finally
         {
-            release.TrySetResult();
-            await initialization;
+            releaseCleanup.TrySetResult();
+            try { await initialization; }
+            catch (OperationCanceledException) { }
             if (shutdown is not null) await shutdown;
         }
     }
@@ -263,6 +271,9 @@ public sealed class ChannelPipelineTests
         await initializer.StopAsync(TestContext.Current.CancellationToken);
         await initializer.StopAsync(TestContext.Current.CancellationToken);
 
+        var setup = application.Services.GetRequiredService<IDataChannelLifecycle>().GetSetups().Single();
+        setup.State.Should().Be(DataChannelSetupState.Failed);
+        setup.Error.Should().Contain(endpointFailure.Message);
         behavior.Events.Should().Equal("dispose-outer", "dispose-inner");
         channel.Pipe.IsInitialized.Should().BeFalse();
         channel.Pipe.IsNotAvailable.Should().BeTrue();
