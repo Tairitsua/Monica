@@ -16,11 +16,13 @@
         "Monica.Application.UI",
         "Monica.ApplicationModel",
         "Monica.Authority",
-        "Monica.ModelQuery",
+        "Monica.BlobStorage",
+        "Monica.BuildingBlocks",
         "Monica.Configuration",
         "Monica.Configuration.UI",
         "Monica.Core",
         "Monica.DependencyInjection",
+        "Monica.EntityFrameworkCore",
         "Monica.EventBus",
         "Monica.Framework",
         "Monica.Framework.Generators",
@@ -32,11 +34,13 @@
         "Monica.JobScheduler",
         "Monica.JobScheduler.UI",
         "Monica.Locker",
+        "Monica.Locker.EfCore",
+        "Monica.Locker.UI",
         "Monica.Logging",
         "Monica.Markdown",
+        "Monica.ModelQuery",
         "Monica.OpenTelemetry",
         "Monica.OpenTelemetry.UI",
-        "Monica.BuildingBlocks",
         "Monica.Repository",
         "Monica.Repository.UI",
         "Monica.ServiceDiscovery",
@@ -56,12 +60,14 @@
       "name": "Integrations",
       "promise": "Versioned adapters around external systems and provider boundaries.",
       "packages": [
+        "Monica.BlobStorage.Minio",
         "Monica.Configuration.EfCore",
         "Monica.Configuration.EventBus",
         "Monica.Dapr",
         "Monica.EventBus.Kafka",
         "Monica.JobScheduler.EfCore",
         "Monica.JobScheduler.ServiceDiscovery",
+        "Monica.Locker.Redis",
         "Monica.SignalR",
         "Monica.StateStore.StackExchange"
       ]
@@ -86,16 +92,6 @@
       "project": "Monica.Experimental",
       "tier": "labs",
       "reason": "Experimental source is intentionally not published as a package."
-    },
-    {
-      "project": "Monica.Guide.App",
-      "tier": "labs",
-      "reason": "The unified guide executable is published per platform as Monica.Guide, not as a NuGet package."
-    },
-    {
-      "project": "Monica.Guide.Engine",
-      "tier": "labs",
-      "reason": "The preview-first guide engine ships inside platform executables and consuming products, not as a NuGet package."
     },
     {
       "project": "Monica.BuildingBlocks.CodeAnalysis",
