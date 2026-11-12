@@ -119,9 +119,9 @@ public sealed class ModuleEventBusUITests
             using var response = await client.SendAsync(request, cancellationToken);
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
-            var result = await response.Content.ReadFromJsonAsync<Res>(serializerOptions, cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<Result>(serializerOptions, cancellationToken);
             result.Should().NotBeNull();
-            result!.Status.Should().Be(ResStatus.BadRequest);
+            result!.Status.Should().Be(ResultStatus.BadRequest);
             result.Message.Should().Be(expectedMessage);
             result.TryGetError(serializerOptions, out var error).Should().BeTrue();
             error!.Code.Should().Be(ResultErrorCodes.OperationFailed);
@@ -136,15 +136,15 @@ public sealed class ModuleEventBusUITests
     private static HttpClient CreateClient(MonicaTestApplication application) =>
         ((TestServer)application.Services.GetRequiredService<IServer>()).CreateClient();
 
-    private static async Task<Res<T>> GetResultAsync<T>(
+    private static async Task<Result<T>> GetResultAsync<T>(
         HttpClient client, string path, JsonSerializerOptions serializerOptions, CancellationToken cancellationToken)
     {
         using var response = await client.GetAsync(path, cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
-        var result = await response.Content.ReadFromJsonAsync<Res<T>>(serializerOptions, cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<Result<T>>(serializerOptions, cancellationToken);
         result.Should().NotBeNull();
-        result!.Status.Should().Be(ResStatus.Ok);
+        result!.Status.Should().Be(ResultStatus.Ok);
         result.TryGetError(serializerOptions, out _).Should().BeFalse();
         return result;
     }
@@ -154,9 +154,9 @@ public sealed class ModuleEventBusUITests
     {
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
-        var result = await response.Content.ReadFromJsonAsync<Res>(serializerOptions, cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<Result>(serializerOptions, cancellationToken);
         result.Should().NotBeNull();
-        result!.Status.Should().Be(ResStatus.Ok);
+        result!.Status.Should().Be(ResultStatus.Ok);
         result.TryGetError(serializerOptions, out _).Should().BeFalse();
     }
 

@@ -10,5 +10,5 @@ public interface IExceptionResponseMapper
         HttpContext? httpContext,
         Exception exception,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out Res? response);
+        [NotNullWhen(true)] out Result? response);
 }

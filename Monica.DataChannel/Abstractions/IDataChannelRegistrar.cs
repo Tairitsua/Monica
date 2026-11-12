@@ -7,7 +7,8 @@ namespace Monica.DataChannel.Abstractions;
 /// </summary>
 /// <remarks>
 /// The registrar belongs to one application host. Registrations are accepted only while
-/// <see cref="IDataChannelSetup.Setup"/> is running and are materialized before endpoint mapping.
+/// <see cref="IDataChannelSetup.Setup"/> is running. Automatic setups materialize before endpoint mapping;
+/// manual setups materialize on explicit startup and cannot add startup-time HTTP mappings.
 /// </remarks>
 public interface IDataChannelRegistrar
 {
@@ -21,7 +22,7 @@ public interface IDataChannelRegistrar
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the identifier is already registered, the outer endpoint is missing,
-    /// or registration has already completed for the host.
+    /// or the selected setup callback has completed.
     /// </exception>
     void Add(string id, Action<ChannelPipelineBuilder> configure, string? groupId = null);
 }

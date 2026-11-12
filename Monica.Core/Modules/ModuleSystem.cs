@@ -45,6 +45,7 @@ public class ModuleSystem : MonicaModule<ModuleSystemOption>
             provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ModuleDiagnosticsFacade>>()));
         services.TryAddSingleton<ModuleInitMetrics>();
         services.AddHostedService<ModuleInitMetricsActivationService>();
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(ModuleInitMetricsActivationService)), typeof(ModuleInitMetricsActivationService));
     }
 }
 

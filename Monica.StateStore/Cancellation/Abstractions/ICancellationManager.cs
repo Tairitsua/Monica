@@ -32,7 +32,9 @@ public interface ICancellationManager
 
     /// <summary>
     /// Resets the cancellation token status of the specified key
-    /// Resets canceled tokens to non-cancelled state, allowing reuse
+    /// Establishes an active token when the key is missing, or resets its cancelled state for reuse.
+    /// A distributed implementation persists that active state before starting observation.
+    /// Obtain the new token with <see cref="GetOrCreateTokenAsync"/>; previously returned tokens are not reactivated.
     /// </summary>
     /// <param name="key">Unique identification key for cancellation token</param>
     /// <param name="cancellationToken">Cancellation token for the operation</param>

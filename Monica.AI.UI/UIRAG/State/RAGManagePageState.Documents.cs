@@ -25,7 +25,9 @@ public sealed partial class RAGManagePageState
 
         var result = await _indexingFacade.GetDocumentChunksAsync(originKnowledgeBase.Id, document.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error, out var view))
+        var error = result.WithoutData();
+        var view = result.Data;
+        if (result.IsFailure() || view is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;
@@ -76,7 +78,8 @@ public sealed partial class RAGManagePageState
             originKnowledgeBase.Id,
             document.Id);
         _session.CheckCurrent();
-        if (result.IsFailed(out var error))
+        var error = result;
+        if (result.IsFailure())
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return;

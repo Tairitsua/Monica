@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure UI"
-  short_description: "Blazor shell, pages, and Markdown"
-  default_prompt: "Use $monica-infra-ui to register Monica UI modules and configure their host integration."

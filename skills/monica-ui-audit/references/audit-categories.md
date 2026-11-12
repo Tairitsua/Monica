@@ -32,10 +32,13 @@ Indicators:
 - Custom dropdown/flyout/overlay markup with manual `@onmouseenter` / `@onmouseleave` / `@onclick` state machines
 - Manual `_isOpen`, `_isHovered`, delayed-close `CancellationTokenSource` patterns
 - Custom `<div class="dropdown-menu">` / `<div class="flyout-menu">` / `<div class="popover-panel">` instead of `MudMenu`, `MudPopover`, `MudDialog`, `MudDrawer`
+- A prototype's plain `select` or browser date/time input is copied into the product even though a themed Monica or MudBlazor control already owns the interaction; the closed field matches but the opened control uses unrelated browser/operating-system chrome
 - A temporary details overlay has no accessible identity, leaks keyboard focus, cannot close with Escape, or fails to restore focus; choosing `MudDrawer` alone does not establish dialog behavior
 - Clicking a disabled native menu leaf moves focus to the document and strands Escape, or a custom label overrides its disabled appearance; verify inert activation and dismissal after the actual pointer click
 
 Fix: use MudBlazor overlay primitives and inspect their exact source and runtime keyboard behavior. Add the missing focus/dismissal contract at the owning component where required, with trapping mounted only while open. Simple native buttons, links, and status-filter controls are valid; this category concerns overlay behavior, not all native interactive markup. Reference implementation: `NavBarDropdown.razor`, `NavBarMore.razor` in `Monica.UI/Shell/Components/Layout/`. See the shared [interaction guidance](../../monica-ui-development/references/monica-workbench-design-language.md#preserve-interaction-and-runtime-state).
+
+For prototype-derived form controls, follow [placeholder interpretation and verification](../../monica-ui-development/references/prototype-replication.md). Inspect the open picker/menu as well as its activator, and preserve localization, value/null semantics, timezone, required precision and validation when selecting the native component.
 
 For a controlled native input with a separate reset action, verify both displayed text and the filtered model. Clear must empty the actual input, restore the results, and allow that same query to be entered again. Check pending debounce as well as settled input; row counts alone do not prove correct native control ownership. See [component communication](../../monica-ui-development/references/blazor-best-practices.md#13-component-communication) for the native reset path.
 
@@ -73,6 +76,8 @@ Indicators:
 - Selection or row-action glyphs and focus bounds touch the surface edge despite a declared column width; native checkbox negative margins or compressed inner padding undo the intended inset, or selection replaces the focused input
 - A full-width table's header, last row, hover/selected paint or pager covers its owner's rounded corners; only the outer border is rounded while descendant backgrounds remain square
 - A flush table has competing outer/inner radii, does not declare whether its owner clips painted corners or the table is inset, or broad overflow clipping hides focus indicators, required local scrolling or overlay content
+- A rounded notice, callout or inner card meets an enclosing surface edge while retaining its own radius or border, creating competing corners; a selected segment's border or shadow makes its apparent top/bottom inset unequal
+- An obvious prototype defect, such as clipped controls, mismatched baselines or unequal content insets, is reproduced as a fidelity requirement instead of correcting the intended layout at its owner
 - Distinct tools with independent tasks and lifetimes remain hidden in one local tab route, preventing direct links, browser history and meaningful shell search entries without a deliberate navigation reason
 - A master/detail inventory grows the shell page through many entries while its selected dossier remains offscreen; selecting the last item requires manually returning to the details
 - A sticky catalog and its search/filter controls cannot fit a short scrollport, or a compact picker remains expanded after selection instead of revealing the selected dossier
@@ -109,6 +114,7 @@ Indicators:
 - The page has no signature region, uses a single accent where its data has several categories, or applies category colors inconsistently between its signature, ledger, and inspector; see the [visual language](../../monica-ui-development/references/monica-visual-language.md)
 - Unrelated effects compete as the page's signature treatment, or a glow/pattern has no clear role in the page's intentional visual plan
 - Color, depth, or illustration obscures evidence, lowers contrast, or makes semantic states hard to distinguish; a decorative chart or graphic implies unsupported data, history, or coverage
+- A rate, score, trend, or percentile has no domain definition, population, or window, or a judgment such as "overrunning" has no written rule; see the [design method](../../monica-ui-design/references/design-method.md#3-define-every-judgment)
 - A uniformly neutral composition erases useful identity and hierarchy even though its geometry and token usage are correct
 - Actionable controls, rows, or cards lack visible hover, focus, pressed, or selected feedback
 - Informational surfaces translate, scale, change the cursor, or use strong lift on hover, falsely implying an unavailable action; subtle border, tonal, or low-shadow spatial-focus feedback is valid
@@ -117,6 +123,7 @@ Indicators:
 - The same accent rail is repeated across unrelated card groups, replaces a clearer page-specific outline/icon/badge treatment, or appears where it encodes no additional status or category meaning
 - Border radii drift from the theme baseline without an intentional component contract, grow across nested surfaces, or global theme selectors override component-owned geometry
 - The implementation loses the prototype's typography, density, spacing rhythm, composition, surface roles, width utilization, or responsive reflow
+- Prototype acceptance checks only wide and phone layouts or lack matched owner widths; intermediate native breakpoints silently change the layout, or small repeated markers, icon tiles, badges and selected segments differ without rendered measurements
 - Interface, hierarchy, and diagnostic text have no deliberate font-role separation, or monospace is used broadly as decoration
 - A font declared by the prototype/source is missing from local WOFF2 assets, lacks `@font-face`, fails offline, has no explicit fallback stack/CJK coverage, or is silently replaced by a fallback
 - Component CSS repainting global MudBlazor behavior that should be consistent across modules
@@ -134,8 +141,10 @@ Indicators:
 - Custom CSS classes on menu surfaces, row items, or overlay panels (e.g. `.my-dropdown`, `.custom-flyout-item`) that are also targeted in theme files
 - Theme files containing selectors for these private component classes
 - Grep theme files for the private class name to confirm coupling
+- Pages reproduce a shared value mark, filter, or other visual primitive with local CSS, or consume the shared component and override its internal geometry or paint through broad descendant selectors
+- An extraction adds a shared wrapper while leaving duplicate render helpers and retired styles in callers
 
-Fix: remove theme coupling. If the class is only used by the owning component, keep it in the component's `.razor.css`. Promote a hook to shared CSS only when multiple components intentionally share the same layout contract.
+Fix: remove theme coupling. If the class is only used by the owning component, keep it in the component's `.razor.css`. Promote a hook to shared CSS only when multiple components intentionally share the same layout contract. Consult the [shared component selection guide](../../monica-infra-ui/references/visual-components.md) and verify that equivalent callers use the owner without restyling its internals. Complete extraction by removing replaced implementations; follow the [consolidation workflow](../../monica-ui-development/references/prototype-replication.md) and verify representative callers when a shared default changes.
 
 ### P5 — Duplicate utility or raw CLR type-display logic
 

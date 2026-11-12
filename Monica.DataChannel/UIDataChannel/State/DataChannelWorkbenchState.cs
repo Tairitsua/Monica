@@ -42,13 +42,14 @@ public sealed class DataChannelWorkbenchState(DataChannelFacade facade, ILogger<
             {
                 var result = await facade.GetManagementSnapshotAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (result.IsFailed(out var error, out var capture))
+                if (result.IsFailure())
                 {
-                    RefreshError = error.Message ?? error.ToString();
+                    RefreshError = result.Message ?? result.ToString();
                     return;
                 }
 
-                Snapshot = capture;
+                Snapshot = result.Data
+                    ?? throw new InvalidOperationException("The DataChannel management capture returned no data.");
                 RefreshError = null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -70,18 +71,30 @@ public sealed class DataChannelWorkbenchState(DataChannelFacade facade, ILogger<
     /// <param name="channelId">The exact registered channel identifier.</param>
     /// <param name="cancellationToken">Cancels admission or the actual endpoint initialization attempt.</param>
     /// <returns>The initialization outcome, independently of a later evidence refresh.</returns>
-    public Task<Res> ReinitializeAsync(string channelId, CancellationToken cancellationToken) =>
+    public Task<Result> ReinitializeAsync(string channelId, CancellationToken cancellationToken) =>
         ExecuteAsync(() => facade.ReInitializeChannelAsync(channelId, cancellationToken), cancellationToken);
+
+    /// <summary>Starts a selected setup through its host-owned lifecycle.</summary>
+    public Task<Result> StartSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.StartSetupAsync(setupId, cancellationToken), cancellationToken);
+
+    /// <summary>Stops a selected setup and drains endpoint cleanup.</summary>
+    public Task<Result> StopSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.StopSetupAsync(setupId, cancellationToken), cancellationToken);
+
+    /// <summary>Restarts a selected setup without changing global autonomous participation.</summary>
+    public Task<Result> RestartSetupAsync(string setupId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => facade.RestartSetupAsync(setupId, cancellationToken), cancellationToken);
 
     /// <summary>Clears all retained observable history for one channel while preserving lifetime counters.</summary>
     /// <param name="channelId">The exact identifier frozen before confirmation.</param>
     /// <param name="cancellationToken">Cancels admission and suppresses adoption after retirement.</param>
     /// <returns>The actual clear outcome; clearing does not recover a pipeline or acknowledge a fault.</returns>
     /// <remarks>The underlying synchronous tracker clear cannot be interrupted once admitted.</remarks>
-    public Task<Res> ClearHistoryAsync(string channelId, CancellationToken cancellationToken) =>
+    public Task<Result> ClearHistoryAsync(string channelId, CancellationToken cancellationToken) =>
         ExecuteAsync(() => facade.ClearChannelExceptionsAsync(channelId), cancellationToken);
 
-    private async Task<Res> ExecuteAsync(Func<Task<Res>> command, CancellationToken cancellationToken)
+    private async Task<Result> ExecuteAsync(Func<Task<Result>> command, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try

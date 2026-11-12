@@ -30,11 +30,14 @@ public interface IModuleOptionReader
 /// Exposes the finalized option object and host-bound module graph to a composition callback.
 /// </summary>
 /// <typeparam name="TOptions">The current module's option type.</typeparam>
-public abstract class ModuleCompositionContext<TOptions>
+public abstract class ModuleCompositionContext<TOptions> : IMonicaCompositionContext
     where TOptions : class, IModuleOptions, new()
 {
     internal ModuleCompositionContext(ModuleConfigurationContext context)
     {
+        Application = context.Registration.Application;
+        Composition = Application.Composition;
+        RegistrationOwner = context.RegistrationOwner;
         Options = (TOptions)context.Registration.ModuleOption;
         Modules = new ModuleOptionReader(
             context.Registration.Application,
@@ -45,6 +48,17 @@ public abstract class ModuleCompositionContext<TOptions>
     /// Gets the current module's finalized option object.
     /// </summary>
     public TOptions Options { get; }
+
+    /// <inheritdoc />
+    public MonicaCompositionState Composition { get; }
+
+    /// <summary>Gets this host's frozen application policy and native resource diagnostics without resolving services.</summary>
+    /// <remarks>Resource extensions evaluate their actual implementation and captured RegistrationOwner independently; a shared module does not have one business owner.</remarks>
+    public MonicaApplication Application { get; }
+
+    /// <summary>Gets the declaring application type captured by this contribution, or null for module-wide lifecycle callbacks.</summary>
+    /// <remarks>Resource registrations retain their own owner; a framework module may contain contributions from several owners.</remarks>
+    public Type? RegistrationOwner { get; }
 
     /// <summary>
     /// Gets the relationship-checked option reader for the current module.

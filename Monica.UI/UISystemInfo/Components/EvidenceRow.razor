@@ -1,9 +1,17 @@
-<div class="system-info-evidence-row">
+<div class="system-info-evidence-row @(Wide ? "is-wide" : null)">
     <dt>@Label</dt>
-    <dd>@Value</dd>
+    <dd class="@(Monospace ? "is-mono" : null)">
+        @if (ChildContent is not null) { @ChildContent } else { @Value }
+    </dd>
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+    /// <summary>Optional composed evidence, such as an exact-value copy action.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Spans both columns of the dossier for paths and other long evidence.</summary>
+    [Parameter] public bool Wide { get; set; }
+    /// <summary>Uses the selected theme's diagnostic typeface. Defaults to true.</summary>
+    [Parameter] public bool Monospace { get; set; } = true;
 }

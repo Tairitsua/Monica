@@ -80,7 +80,7 @@ public sealed class LogFileQueryServiceTests
 
         var result = await service.OpenFileAsync(relativePath, TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().NotBeNullOrEmpty();
         result.Data.Should().BeNull();
     }
@@ -113,7 +113,7 @@ public sealed class LogFileQueryServiceTests
 
         var result = await service.ReadContextAsync(outsidePath, 1, 1, TestContext.Current.CancellationToken);
 
-        result.Status.Should().NotBe(ResStatus.Ok);
+        result.Status.Should().NotBe(ResultStatus.Ok);
         result.Message.Should().NotBeNullOrEmpty();
         result.Data.Lines.Should().BeNullOrEmpty();
     }
@@ -126,7 +126,7 @@ public sealed class LogFileQueryServiceTests
         var service = CreateService(directory);
 
         var missing = await service.ListFilesAsync(TestContext.Current.CancellationToken);
-        missing.Status.Should().NotBe(ResStatus.Ok);
+        missing.Status.Should().NotBe(ResultStatus.Ok);
         missing.Message.Should().NotBeNullOrEmpty();
         missing.Data.Should().BeNull();
 
@@ -150,7 +150,7 @@ public sealed class LogFileQueryServiceTests
 
         var current = await service.ListFilesAsync(TestContext.Current.CancellationToken);
 
-        current.Status.Should().NotBe(ResStatus.Ok);
+        current.Status.Should().NotBe(ResultStatus.Ok);
         current.Message.Should().NotBeNullOrEmpty();
         current.Data.Should().BeNull();
         previous.Should().ContainSingle().Which.RelativePath.Should().Be("previous.log");

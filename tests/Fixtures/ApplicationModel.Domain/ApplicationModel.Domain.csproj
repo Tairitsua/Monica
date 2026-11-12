@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../Monica.ApplicationModel/Monica.ApplicationModel.csproj" />
+    <ProjectReference Include="../../../Monica.Repository/Monica.Repository.csproj" />
+  </ItemGroup>
+</Project>

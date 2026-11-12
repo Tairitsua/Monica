@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("guide_bundle_profiles", ROOT / "scripts" / "build_monica_guide_bundle.py")
+SPEC = importlib.util.spec_from_file_location("guide_bundle_profiles", ROOT / "scripts" / "build_framework_bundle.py")
 assert SPEC is not None and SPEC.loader is not None
 BUNDLE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BUNDLE)
@@ -27,6 +27,10 @@ class GuideBundleProfileSelectionTests(unittest.TestCase):
         conditions = projected["profileSelections"]["application"]["conditional"]
         microservice = next(condition for condition in conditions if condition["capability"] == "microservice")
         self.assertIn("monica-application-microservice", microservice["skills"])
+        application = projected["profileSelections"]["application"]
+        self.assertNotIn("monica-infra-ui", application["required"])
+        ui = next(condition for condition in conditions if condition["capability"] == "ui")
+        self.assertEqual(ui["skills"], ["monica-application-ui", "monica-application-ui-development"])
 
     def test_projection_keeps_required_dependencies_separate_from_recommendations(self) -> None:
         catalog = {

@@ -12,6 +12,13 @@ namespace Monica.JobScheduler.Models;
 public sealed record LocalJobDefinition
 {
     /// <summary>
+    /// Gets the logical owner whose durable definition and executions this process can publish and execute.
+    /// Module discovery freezes the application activation policy's owner, or the configured project owner.
+    /// A manually constructed definition may leave this null to use the scheduler's project-owner fallback.
+    /// </summary>
+    public string? OwnerKey { get; init; }
+
+    /// <summary>
     /// Gets the immutable declaration discovered from the worker assembly.
     /// </summary>
     public required JobDeclaration Declaration { get; init; }

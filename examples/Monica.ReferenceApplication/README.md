@@ -1,169 +1,92 @@
-# Monica Ordering Reference
+# Monica reference application
 
-A runnable ordering backend that demonstrates Monica's Stable application path while preserving normal ASP.NET Core hosting and domain-first ownership.
+This example contains one Ordering domain, two domain-owned roles, the product UI and one native executable. It uses the same compiled artifact for combined and split placement. Its repository is an in-memory dictionary; it does not demonstrate shared persistence or transactional rollback.
 
-The sample is intentionally more realistic than a hello-world endpoint:
-
-- one composition-only AppHost and one ordering bounded context
-- stable request, response, endpoint, and event contracts in `Platform.Protocol`
-- rich order invariants owned by the entity
-- a replaceable in-memory repository for zero-infrastructure startup
-- request-owned API contracts exposed by command and query `ApplicationService` units
-- a schema-first `[Configuration]` ProjectUnit consumed through `IOptions<OrderingOptions>`
-- a unit-of-work boundary around controller requests
-- an `EventOrderApproved` local event published after the demo's dictionary update
-- an auto-discovered `LocalEventHandlerOrderApproved` reaction
-- an auto-discovered recurring backlog report backed by the in-memory job scheduler
-- Swagger, ProjectUnit inspection, Prometheus metrics, and a health response
-
-No database, broker, cache, or other external service is required. Runtime configuration documents are stored under the application output directory, while the repository and scheduler metadata reset with the process or rebuild output.
-
-## Run
-
-From the Monica repository root:
+Run from the repository root:
 
 ```bash
-dotnet run --project examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api/Monica.Reference.Api.csproj
+dotnet run --project examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api --launch-profile Manual
 ```
 
-The launch profile listens on <http://localhost:5275>. The repository starts with two draft orders, so the first request already returns useful data:
+`Manual` is the first and default local profile. It sets `Application__AutonomousWork=false` and enables the existing Startup diagnostics option. Open [Ordering](http://localhost:5275/orders) or [Swagger](http://localhost:5275/swagger). Both role APIs remain available, and the reporting job waits for an explicit native run. The `Automatic` profile uses the same application and permits its once-per-minute report:
 
 ```bash
-curl http://localhost:5275/api/v1/Ordering/orders
+dotnet run --project examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api --launch-profile Automatic
 ```
 
-Create an order:
+The UI uses generated `IOrderingCommandApi` and `IOrderingQueryApi` contracts, operation scopes, its Ordering layout, Monica themes and localization. The overview is at `/overview`. This demo has public use cases without authorization attributes; production hosts configure identity and policies.
 
-```bash
-curl --request POST http://localhost:5275/api/v1/Ordering/orders \
-  --header 'Content-Type: application/json' \
-  --data '{"orderNumber":"MON-1003","customerName":"Adventure Works","total":1299.90}'
-```
-
-Approve it using the identifier returned by the create request:
-
-```bash
-curl --request POST http://localhost:5275/api/v1/Ordering/orders/approve \
-  --header 'Content-Type: application/json' \
-  --data '{"orderId":"REPLACE_WITH_ORDER_ID"}'
-```
-
-Explore the running architecture:
-
-- Swagger UI: <http://localhost:5275/swagger>
-- Monica ProjectUnit catalog: <http://localhost:5275/framework/units>
-- Prometheus metrics: <http://localhost:5275/metrics>
-- Readiness response: <http://localhost:5275/health>
-- Liveness response: <http://localhost:5275/alive>
-
-`OrderingOptions.MaximumOrdersReturned` limits the collection response. The values in `appsettings.json` seed Monica's local effective-value store on first startup, and the query consumes the resulting configuration through `IOptions<OrderingOptions>`.
-
-The backlog worker runs once per minute. Its execution history and normal application log report the draft count, escalating to a warning when `OrderingOptions.BacklogWarningThreshold` is reached.
-
-## Request-owned API contracts
-
-Published endpoints are declared beside their request contracts in `Platform.Protocol`, not on the handlers that execute them:
-
-```csharp
-[ApiEndpoint(
-    ApiHttpMethod.Post,
-    "orders",
-    Binding = ApiRequestBinding.Body)]
-public sealed record CommandCreateOrder(
-    string OrderNumber,
-    string CustomerName,
-    decimal Total) : IResultRequest<OrderDto>;
-```
-
-`WebApiGenerationConfig` supplies the shared `api/v1/Ordering` prefix and asks the generator for the published HTTP RPC client. The `Command` prefix classifies the operation and produces the default `CreateOrder` method name. The corresponding `CommandHandlerCreateOrder` contains only execution logic; it does not repeat the route, verb, or binding attributes. Requests under `PublishedLanguages.DomainOrdering.Requests` are eligible for RPC clients. An attributed request outside that published-language namespace can still expose a local HTTP endpoint, but it remains intentionally absent from the generated RPC contract.
-
-## Host-bound module graph
-
-The AppHost declares its Configuration inputs once, then records its runtime capabilities in one `AddMonica` callback. The immutable plan keeps the selected store, source order, and section-path convention consistent wherever startup configuration and runtime composition need them:
-
-```csharp
-var configurationInputPlan = MonicaConfigurationInputPlan.Create(inputs => inputs
-    .UseFileConfigurationStore());
-
-builder.AddMonica(monica =>
-{
-    monica.ConfigureApplication(options =>
-    {
-        options.ProjectName = "Monica.Reference.Api";
-        options.AppName = "Monica Ordering Reference";
-        options.AppId = "monica-ordering-reference";
-        options.DomainName = "Ordering";
-    });
-    monica.ConfigureModuleSystem(options =>
-    {
-        options.DefaultApiGroupName = "Ordering";
-        options.EnableMinimalApiByDefault = true;
-    });
-    monica.ConfigureTypeDiscovery(options =>
-        options.Add("Domains.Ordering", "Platform.Protocol"));
-
-    monica.AddHealthCheck();
-    monica.AddConfiguration(configurationInputPlan);
-    monica.AddEventBus()
-        .UseNoOpDistributedEventBus();
-    monica.AddResultEnvelope();
-    monica.AddWebApi();
-    monica.AddSwagger(options =>
-    {
-        options.AppName = "Monica Ordering Reference";
-        options.ApiVersion = "v1";
-    });
-    monica.AddUnitOfWork();
-    monica.AddProjectUnits(options =>
-    {
-        options.ConventionOptions.EnableNameConvention = true;
-        options.ConventionOptions.NameConventionMode = ENameConventionMode.Strict;
-    });
-    monica.AddJobScheduler(options =>
-        {
-            options.MaxWorkerExecutionThreads = 1;
-        })
-        .UseSchedulerScope("monica-reference-ordering")
-        .UseInMemoryStore();
-    monica.AddOpenTelemetry()
-        .UsePrometheusEndpoint();
-});
-```
-
-The no-op distributed provider makes the external integration boundary explicit without introducing a broker. `EventOrderApproved` is dispatched through the real in-process local bus. The sample publishes after its process-local dictionary update. Durable applications use the transactional outbox; the sample does not provide durable publication or rollback.
-
-JobScheduler UI is deliberately not composed: adding its Blazor shell to an API-only host would blur the host boundary. The host synchronizes its local owner snapshot and schedules and executes the recurring job; its activity remains observable through scheduler execution history and logs.
-
-Production stores recover abandoned leases with at-least-once execution and fence stale scheduler mutations. A job must still make its own external side effects idempotent or transactional because lease fencing cannot provide exactly-once business effects.
-
-## Architecture
+## Ownership and composition
 
 ```text
 src/
-├── AppHost/Monica.Reference.Api/       # composition only
-├── Domains/Ordering/                   # use cases, events, job, entity, repository
-└── Shared/
-    ├── Platform.Infrastructure/        # solution-owned infrastructure boundary
-    ├── Platform.Protocol/              # stable business language
-    └── Platform.BuildingBlocks/        # project-common Monica capabilities
+  Domains/Ordering/
+    Domains.Ordering/                 # Entities, repository, OptionsOrdering
+    Roles.Ordering/                   # Commands, collection query, local event handler
+    Roles.Ordering.Reporting/         # Summary query, native role registration, backlog job
+  Shared/Platform.Protocol/           # Requests, DTOs, events and stable identifiers
+  Presentation/Monica.Reference.UI/   # Product layout, pages, forms and localization
+  AppHost/Monica.Reference.Api/
+    Composition/                     # Host modules, providers and overview endpoint
+    Configurations/                  # OptionsReferenceUI
+    Program.cs                       # Native host lifecycle
 ```
 
-The project-reference direction is deliberately one-way:
+Create shared projects only when they contain real shared code. Protocol directly references Monica's application and event contract types and the API generator. The core, roles and host directly reference the capabilities they use. This example has no reusable product infrastructure, independent foundation library, shared testing library or migration project to extract. Four allowed Platform responsibilities do not require four empty projects.
 
-```text
-AppHost -> Ordering -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks
+Each core/role assembly declares `ApplicationDomain` or `ApplicationRole`. The host's `[assembly: ApplicationHost]` generates its manifest and operation callers/receivers from the referenced implementations. Protocol independently generates the stable Ordering API interfaces. The host includes both roles; each role references only its own core and published contracts. The UI references Protocol and Monica.Application.UI.
+
+`Program.cs` keeps `AddMonica`, `Build`, `UseMonica`, `MapMonica` and `Run`. Its `Composition/ReferenceApplicationComposition.cs` owns the executable's module/provider choices and is reused by the host tests. Monica selects `Application:AppId`, validates the complete `Deployment:Applications` map and projects the selected `AppName`. The reporting assembly's `RoleRegistration.ConfigureActive` contributes JobScheduler before the module graph closes. No host role-registration table is maintained. Scheduler scope defaults to `Deployment:Scope`; the issued workload owner remains `ordering.reporting` when placement changes.
+
+## Startup and Managed configuration
+
+`OptionsReferenceUI` is Startup configuration under `ReferenceUI`. `EnableDiagnostics` selects Swagger, module diagnostics and configuration diagnostics before service registration. Changing it requires restart; its value never enters the managed store. The Manual and Automatic launch profiles enable it equally in Debug and Release. Without a launch profile, use `--ReferenceUI:EnableDiagnostics=true` when diagnostics are wanted.
+
+`OptionsOrdering` is Managed configuration. Its section remains `Ordering` and its definition key remains `reference.ordering`, preserving the stored identity despite the CLR naming change. `MaximumOrdersReturned` limits collection queries and `BacklogWarningThreshold` controls reporting severity. An Automatic host publishes and seeds missing definitions into the local file store. A Manual host reads existing documents or uses validated, unpersisted appsettings defaults when they are absent; it does not create or publish a store just by starting. Configuration diagnostics explain read-only authority when an Automatic owner has not established the managed publication.
+
+For a private environment input, select `Application:EnvironmentFiles` before `AddMonica`. One file may supply Startup sections, the complete `Deployment:Applications` map and connection data. It must not contain the Managed `Ordering` section. A higher-priority topology replaces the whole map, including names and roles. A listed file must exist; missing roles, unknown roles and an absent current AppId stop startup. The reference needs no external resources, so its ordinary local profile uses the complete topology already in appsettings.
+
+## Combined and split placement
+
+The default topology assigns `ordering` and `ordering.reporting` to `monica-ordering-reference`. To inspect split activation, replace `Deployment:Applications` in appsettings with:
+
+```json
+{
+  "monica-ordering-reference": { "AppName": "Ordering API", "Roles": ["ordering"] },
+  "monica-ordering-reports": { "AppName": "Ordering reports", "Roles": ["ordering.reporting"] }
+}
 ```
 
-That shape gives humans and coding agents a predictable answer to “where does this change belong?” without splitting a small deployment into premature microservices.
+Run the ordinary host, then run the same project on another port:
 
-## Package maturity
+```bash
+dotnet run --project examples/Monica.ReferenceApplication/src/AppHost/Monica.Reference.Api --launch-profile Manual -- --Application:AppId=monica-ordering-reports --urls http://localhost:5276
+```
 
-This reference stays entirely on Monica's Stable path:
+Both processes contain the implementations. Placement controls HTTP ingress and autonomous ownership; the ordinary host still serves the UI's `GetOrderSummary` call locally while its reporting role is remote. Only the reporting owner composes that role's scheduler and exposes its summary receiver. In Manual mode its job stays available for explicit execution; Automatic mode permits scheduling. These demo processes have independent dictionaries. A real split requires shared domain stores appropriate for ordinary local calls.
 
-| Tier | Used here | Guidance |
-| --- | --- | --- |
-| Stable | Core composition, Configuration, EventBus, Web API, UnitOfWork, ProjectUnits, JobScheduler, repository abstractions, OpenTelemetry | Appropriate defaults for an application foundation |
-| Integrations | None | Add a database, broker, cache, or service provider only when the deployment has chosen it |
-| Labs | None | Evaluate runtime AI, RAG, MCP, DataChannel, DevOps, Office, and profiling packages explicitly |
+No demo operation depends on a process-owned resource, so none uses `RunOnRole` or needs a remote provider. A constrained operation declares `RunOnRole` on its published request and uses the native invocation provider. This example does not demonstrate selective host artifacts or an ownership catalog.
 
-`RepositoryOrder` is the intentional persistence seam. A production application can replace it with an Integration-tier provider without moving order rules out of the domain entity or changing the public requests. Because this sample repository is process-local rather than transactional, UnitOfWork demonstrates scoped request coordination only; it cannot roll back in-memory mutations. See the repository migration guide for a relational context and outbox integration.
+## APIs and explicit work
+
+Swagger derives role documents from the actual mapped endpoints: `role.ordering` contains the ordinary API and `role.ordering.reporting` the summary query. The native framework document remains separate. The diagnostic switch does not change receiver placement, authorization or execution policy.
+
+```bash
+curl --request POST http://localhost:5275/api/v1/Ordering/queries/GetOrders --header 'Content-Type: application/json' --data '{}'
+curl --request POST http://localhost:5275/api/v1/Ordering/commands/CreateOrder --header 'Content-Type: application/json' --data '{"orderNumber":"MON-1003","customerName":"Adventure Works","total":1299.90}'
+curl --request POST http://localhost:5275/api/v1/Ordering/commands/ApproveOrder --header 'Content-Type: application/json' --data '{"orderId":"REPLACE_WITH_ORDER_ID"}'
+```
+
+Generated Local callers use the real operation pipeline. `EventOrderApproved` invokes the real local handler after the dictionary mutation; durable applications use a transactional outbox. The no-op distributed provider keeps this example free of broker prerequisites. Manual mode does not turn explicit API writes into dry runs.
+
+The reporting job uses the native `JobSchedulerFacade.RunRecurringNowAsync` operation, with owner `ordering.reporting` and job key `typeof(WorkerOrderBacklogReport).FullName`. Its execution history records the real backlog result. This example does not add JobScheduler UI; the framework's native UI can expose the same operation when selected by a host. No replacement manual job engine or application debug switch is introduced.
+
+## Verification
+
+`tests/Test.Monica.Reference.Api` uses `MonicaTestApplicationFactory`, the production composition and the host's generated manifest. It verifies the Manual API create/list/approve flow and local event, configuration identity and read-only Startup behavior, and explicit execution of the real backlog job through the native local scheduler. The File provider receives an isolated test directory; business services and the job are not replaced. These tests belong to the root standard runner:
+
+```bash
+dotnet test tests/Test.Monica.Reference.Api -c Release
+```
+
+Diagnostics include [Swagger](http://localhost:5275/swagger), [Building Blocks](http://localhost:5275/framework/building-blocks), [metrics](http://localhost:5275/metrics), [readiness](http://localhost:5275/health) and [liveness](http://localhost:5275/alive). See the [unified application specification](../../skills/monica-application/references/03-unified-architecture.md) for project boundaries and the shared local-development contract.

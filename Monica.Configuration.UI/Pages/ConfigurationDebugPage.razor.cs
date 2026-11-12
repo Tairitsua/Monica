@@ -1,5 +1,7 @@
 using Monica.Configuration.UI.State;
 using Monica.Configuration.UI.Support;
+using Monica.Core.Configuration;
+using Monica.Core.Results;
 
 namespace Monica.Configuration.UI.Pages;
 
@@ -16,6 +18,8 @@ public partial class ConfigurationDebugPage
     private static readonly IReadOnlySet<int> EmptyRevealedLines = new HashSet<int>();
     private ConfigurationDebugPageState? _state;
     private string _searchText = string.Empty;
+    private ApplicationDebugModeState? _debugModeState;
+    private string? _debugModeError;
 
     private IReadOnlyList<ConfigurationDebugLine> _lines => _state?.Read.Value ?? [];
     private IReadOnlySet<int> _revealedLines => _state?.RevealedLines ?? EmptyRevealedLines;
@@ -36,9 +40,32 @@ public partial class ConfigurationDebugPage
     private async Task LoadAsync()
     {
         if (_operations.IsRetired || _state is null) return;
-        try { await _state.LoadAsync(); }
+        try
+        {
+            var policy = Facade.GetDebugModeState();
+            var failure = policy;
+            _debugModeState = policy.Data;
+            _debugModeError = policy.IsFailure() || _debugModeState is null
+                ? failure.Message ?? L["Common:Errors:LoadFailed"] : null;
+            await _state.LoadAsync();
+        }
         catch (OperationCanceledException) when (_operations.IsRetired) { }
     }
+
+    private string FormatDebugMode(bool? enabled) => enabled switch
+    {
+        true => L["Debug:Policy:Enabled"],
+        false => L["Debug:Policy:Disabled"],
+        null => L["Debug:Policy:Unavailable"]
+    };
+
+    private string FormatPolicySource(string? source) => source switch
+    {
+        "Code" => L["Debug:Policy:SourceCode"],
+        "Default" => L["Debug:Policy:SourceDefault"],
+        null => L["Debug:Policy:Unavailable"],
+        _ => source
+    };
 
     private bool IsMatch(ConfigurationDebugLine line) => string.IsNullOrWhiteSpace(_searchText)
         || (Visibility.ShowSensitiveValues ? line.RawText : line.SearchText).Contains(_searchText, StringComparison.OrdinalIgnoreCase);

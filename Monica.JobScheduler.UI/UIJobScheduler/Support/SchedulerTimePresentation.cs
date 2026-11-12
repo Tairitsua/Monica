@@ -70,6 +70,51 @@ internal sealed class SchedulerTimePresentation(
     /// </summary>
     internal string FormatTimestamp(DateTimeOffset? value) => timeFormatter.Format(value);
 
+    /// <summary>Formats execution-detail evidence with three millisecond digits in the deployment Clock zone.</summary>
+    internal string FormatExecutionTimestamp(DateTimeOffset? value) => timeFormatter.Format(value, "yyyy-MM-dd HH:mm:ss.fff");
+
+    /// <summary>Formats the compact execution-history clock with three millisecond digits.</summary>
+    internal string FormatExecutionClock(DateTimeOffset? value) => timeFormatter.Format(value, "HH:mm:ss.fff");
+
+    /// <summary>Formats a compact ordinary observation time through the host-owned display policy.</summary>
+    internal string FormatClock(DateTimeOffset? value) => timeFormatter.FormatTime(value);
+
+    /// <summary>Formats a compact chart boundary in the host display timezone, without milliseconds.</summary>
+    internal string FormatChartTimestamp(DateTimeOffset value) => timeFormatter.Format(value, "MM-dd HH:mm");
+
+    /// <summary>Preserves the complete date and time in operational lists, including records from today.</summary>
+    internal string FormatListTimestamp(DateTimeOffset value, DateTimeOffset observedAtUtc) =>
+        timeFormatter.Format(value, "yyyy-MM-dd HH:mm:ss");
+
+    /// <summary>Formats an explicitly projected schedule-calendar instant without applying the deployment Clock zone again.</summary>
+    internal string FormatScheduleTimestamp(DateTimeOffset value) => timeFormatter.FormatWallTime(TimeZoneInfo.ConvertTime(value, _timeZone));
+
+    /// <summary>Formats exact elapsed execution evidence; ordinary list durations retain their compact scale.</summary>
+    internal string FormatPreciseDuration(TimeSpan? duration)
+    {
+        return string.Join(" ", PreciseDurationParts(duration)
+            .Select(part => string.IsNullOrEmpty(part.Unit) ? part.Value : $"{part.Value} {part.Unit}"));
+    }
+
+    /// <summary>Separates exact elapsed evidence from its localized unit for the drawer's display-scale reading.</summary>
+    internal IReadOnlyList<(string Value, string Unit)> PreciseDurationParts(TimeSpan? duration)
+    {
+        if (duration is null) return [("—", string.Empty)];
+        var value = TimeSpan.FromMilliseconds(Math.Max(0, Math.Round(duration.Value.TotalMilliseconds)));
+        var parts = new List<(string, string)>();
+        void Add(double number, string unit, string format = "0") =>
+            parts.Add((number.ToString(format, CultureInfo.CurrentCulture), localizer[$"Runtime:Format:{unit}", ""].Value.Trim()));
+        if (value.Days > 0) Add(value.Days, "Days");
+        if (value.Hours > 0) Add(value.Hours, "Hours");
+        if (value.Minutes > 0) Add(value.Minutes, "Minutes");
+        Add(value.Seconds + value.Milliseconds / 1000d, "Seconds", "F3");
+        return parts;
+    }
+
+    /// <summary>Formats the recorded duration of the selected execution at the accepted observation instant.</summary>
+    internal string FormatPreciseExecutionDuration(JobExecutionInstance execution, DateTimeOffset observedAtUtc) =>
+        FormatPreciseDuration(GetExecutionDuration(execution, observedAtUtc));
+
     /// <summary>Formats an interval without repeating its date when both endpoints share a display-calendar day.</summary>
     internal string FormatRange(DateTimeOffset start, DateTimeOffset end) => timeFormatter.FormatRange(start, end);
 
@@ -122,7 +167,7 @@ internal sealed class SchedulerTimePresentation(
     }
 
     /// <summary>
-    /// Formats elapsed time as milliseconds below one second and decimal seconds otherwise.
+    /// Formats compact elapsed evidence with explicit day, hour, minute and second units.
     /// </summary>
     internal string FormatDuration(TimeSpan? duration)
     {
@@ -132,9 +177,18 @@ internal sealed class SchedulerTimePresentation(
         }
 
         var value = duration.Value < TimeSpan.Zero ? TimeSpan.Zero : duration.Value;
+        if (value.TotalMinutes >= 1)
+        {
+            var parts = new List<string>();
+            if (value.Days > 0) parts.Add(localizer["Runtime:Format:Days", value.Days]);
+            if (value.Hours > 0) parts.Add(localizer["Runtime:Format:Hours", value.Hours]);
+            if (value.Minutes > 0) parts.Add(localizer["Runtime:Format:Minutes", value.Minutes]);
+            parts.Add(localizer["Runtime:Format:Seconds", value.Seconds]);
+            return string.Join(" ", parts);
+        }
         if (value.TotalSeconds >= 1)
         {
-            return FormatDurationUnit("Common:Duration:Seconds", value.TotalSeconds, "F2");
+            return FormatDurationUnit("Common:Duration:Seconds", value.TotalSeconds, value.TotalSeconds < 10 ? "F2" : "F1");
         }
 
         return FormatDurationUnit(

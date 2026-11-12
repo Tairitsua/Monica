@@ -38,7 +38,7 @@ public sealed class ChainTraceMetadataTests
         var childId = tracing.BeginTrace("Handle", "Handler");
         tracing.EndTrace(childId, success: success);
         tracing.EndTrace(rootId, success: success);
-        var response = success ? Res.Ok() : Res.Fail("Safe failure");
+        var response = success ? Result.Success() : Result.Failure("Safe failure");
 
         var httpContext = new DefaultHttpContext();
         attacher.Attach(tracing.GetCurrentChain(), httpContext, response);
@@ -79,7 +79,7 @@ public sealed class ChainTraceMetadataTests
         var tracing = application.Services.GetRequiredService<IChainTracing>();
         var rootId = tracing.BeginTrace("Action", "Controller");
         tracing.EndTrace(rootId);
-        var response = Res.Ok();
+        var response = Result.Success();
 
         application.Services.GetRequiredService<ChainResultMetadataAttacher>()
             .Attach(tracing.GetCurrentChain(), new DefaultHttpContext(), response);
@@ -99,7 +99,7 @@ public sealed class ChainTraceMetadataTests
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
             builder.AddJsonSerialization(options => options.DateTimeFormat = DateTimeWireFormat.SpaceSeparatedWallClock);
-            builder.AddResultEnvelope(options => options.ExposeDiagnosticDetails = exposeDiagnostics);
+            builder.ConfigureApplication(options => options.DebugMode = exposeDiagnostics);
             builder.AddChainTracing(options =>
                 {
                     options.ServiceName = serviceName;

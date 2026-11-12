@@ -26,7 +26,7 @@
     }
     else if (_session is { } session)
     {
-        <MudDrawerContainer Class="seeder-drawer-container">
+        <div class="seeder-workspace">
             <header class="seeder-page-header">
                 <div class="seeder-page-heading">
                     <span class="seeder-page-eyebrow">@L["Page:Eyebrow"]</span>
@@ -96,7 +96,7 @@
             }
 
             <SeederDetailsDrawer Session="@session" />
-        </MudDrawerContainer>
+        </div>
     }
 </div>
 

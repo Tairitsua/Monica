@@ -7,10 +7,12 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\Monica.Testing\Monica.Testing.csproj" />
 		<ProjectReference Include="..\..\Monica.ServiceDiscovery\Monica.ServiceDiscovery.csproj" />
+		<ProjectReference Include="..\..\Monica.Locker.Redis\Monica.Locker.Redis.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="AwesomeAssertions" />
+		<PackageReference Include="NSubstitute" />
 		<PackageReference Include="coverlet.collector">
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>

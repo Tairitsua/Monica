@@ -21,6 +21,12 @@ public class MoMudMarkdown : MudMarkdown
     [Parameter]
     public bool EnableMermaid { get; set; } = true;
 
+    /// <summary>Host-owned flowchart aliases and accessible labels.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? MermaidNodes { get; set; }
+
+    /// <summary>Activates a host-owned diagram node without evaluating authored JavaScript.</summary>
+    [Parameter] public EventCallback<string> MermaidNodeActivated { get; set; }
+
     /// <summary>
     /// Enables click-to-copy for recognizable file paths in prose or inline code. Defaults to true.
     /// Other inline code, including identifiers and commands, keeps standard Markdown rendering.
@@ -162,6 +168,8 @@ public class MoMudMarkdown : MudMarkdown
         {
             builder.OpenComponent<MoMarkdownMermaidBlock>(0);
             builder.AddComponentParameter(1, nameof(MoMarkdownMermaidBlock.Definition), CreateCodeBlockText(code));
+            builder.AddComponentParameter(2, nameof(MoMarkdownMermaidBlock.Nodes), MermaidNodes);
+            builder.AddComponentParameter(3, nameof(MoMarkdownMermaidBlock.NodeActivated), MermaidNodeActivated);
             builder.CloseComponent();
             elementIndex += 2;
             return;

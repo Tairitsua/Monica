@@ -122,7 +122,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         var gc = state.CurrentGcDetails;
         var trend = state.TrendData;
         var capturedAt = state.SnapshotCapturedAt;
-        var failure = control.Fail((MemoryReadStage)stageIndex, message, ResStatus.GatewayTimeout);
+        var failure = control.Fail((MemoryReadStage)stageIndex, message, ResultStatus.GatewayTimeout);
         failure.SetMetadata("source", "page-boundary");
         var readsBefore = control.ReadOrder.Count;
         clock.Advance(TimeSpan.FromSeconds(2));
@@ -131,7 +131,7 @@ public sealed partial class MemoryAnalysisPageStateTests
 
         result.Status.Should().Be(failure.Status);
         result.Message.Should().Be(failure.Message);
-        result.Metadata.Should().BeSameAs(failure.Metadata);
+        result.Metadata.Should().NotBeSameAs(failure.Metadata).And.BeEquivalentTo(failure.Metadata);
         state.LoadError.Should().Be(message ?? string.Empty);
         state.CurrentSnapshot.Should().BeSameAs(snapshot);
         state.CurrentGcDetails.Should().BeSameAs(gc);
@@ -162,7 +162,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         control.Fail((MemoryReadStage)stageIndex, string.Empty);
         await using var state = Decorated(scope, clock, control);
 
-        (await state.InitializeAsync()).Status.Should().Be(ResStatus.ServiceUnavailable);
+        (await state.InitializeAsync()).Status.Should().Be(ResultStatus.ServiceUnavailable);
 
         state.HasSnapshot.Should().BeFalse();
         state.CurrentSnapshot.Should().BeNull();
@@ -247,7 +247,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         try
         {
             var actual = facade.GetTrend();
-            actual.IsOk().Should().BeTrue();
+            actual.IsSuccess().Should().BeTrue();
             var latest = actual.Data!.DataPoints.LastOrDefault();
             if (latest is not null && !ReferenceEquals(latest, differentFrom)) return latest;
             return await captured.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -262,21 +262,21 @@ public sealed partial class MemoryAnalysisPageStateTests
         try
         {
             var actual = facade.GetLatestPoint();
-            if (actual.IsOk() && actual.Data is not null) return actual.Data;
+            if (actual.IsSuccess() && actual.Data is not null) return actual.Data;
             return await captured.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
         finally { unsubscribe(); }
     }
 
-    private static void AssertSuccess(Res result)
+    private static void AssertSuccess(Result result)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
     }
 
     private static void AssertInactive(IResultEnvelope result)
     {
-        result.Status.Should().Be(ResStatus.Conflict);
+        result.Status.Should().Be(ResultStatus.Conflict);
         result.Message.Should().BeEmpty();
     }
 

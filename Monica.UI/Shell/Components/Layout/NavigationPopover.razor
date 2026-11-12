@@ -30,6 +30,14 @@
         {
             <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild" Disabled="@OpenOnHover">
                 <div id="@_popupId" class="@SurfaceClass" @onkeydown="HandlePopoverKeyDown">
+                    @if (ShowOverview && Group is { } overviewGroup)
+                    {
+                        <CascadingValue Value="@((INavigationEventReceiver)this)" IsFixed="true">
+                            <NavigationMegaMenu Group="@overviewGroup" ActiveItem="@ActiveItem" />
+                        </CascadingValue>
+                    }
+                    else
+                    {
                     @if (!string.IsNullOrWhiteSpace(Header))
                     {
                         @if (ShowOverview)
@@ -65,6 +73,7 @@
                             }
                         </MudNavMenu>
                     </CascadingValue>
+                    }
                 </div>
             </MudFocusTrap>
         }

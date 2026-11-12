@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.Diagnostics;
+using System.Globalization;
 using Monica.Core.ExceptionHandling.Models;
 using Monica.Core.Results.Abstractions;
 
@@ -17,6 +19,37 @@ public class ChainTraceNode
     private string? _duration;
     private EChainTracingType _type;
     private int _repeatCount;
+    private long? _startedTimestamp;
+    private long? _endedTimestamp;
+    private DateTime? _endTime;
+    private double? _durationMs;
+
+    /// <summary>Start offset in milliseconds from this process's chain root; remote roots have their own origin.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? StartOffsetMs { get; set; }
+
+    /// <summary>Elapsed wall time in milliseconds. Aggregated database nodes span the first start to last completion.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? DurationMs
+    {
+        get => _durationMs ?? (_startedTimestamp is { } start && _endedTimestamp is { } end
+            ? Stopwatch.GetElapsedTime(start, end).TotalMilliseconds
+            : _duration is { } text && text.EndsWith("ms", StringComparison.Ordinal)
+                && double.TryParse(text.AsSpan(0, text.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed : EndTime?.Subtract(StartTime).TotalMilliseconds);
+        set => _durationMs = value;
+    }
+
+    /// <summary>Database phase, correlation, and completed-execution statistics; absent for other nodes.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DatabaseTraceDetails? Database { get; set; }
+
+    internal void InitializeTiming(ChainTraceNode? root)
+    {
+        _startedTimestamp = Stopwatch.GetTimestamp();
+        StartOffsetMs = root?._startedTimestamp is { } origin
+            ? Stopwatch.GetElapsedTime(origin, _startedTimestamp.Value).TotalMilliseconds : 0;
+    }
 
     /// <summary>
     /// Number of identical database commands aggregated onto this node beyond the first execution.
@@ -117,14 +150,22 @@ public class ChainTraceNode
     /// Time when the node completed.
     /// </summary>
     [JsonIgnore]
-    public DateTime? EndTime { get; set; }
+    public DateTime? EndTime
+    {
+        get => _endTime;
+        set
+        {
+            _endTime = value;
+            _endedTimestamp = value.HasValue && _startedTimestamp.HasValue ? Stopwatch.GetTimestamp() : null;
+        }
+    }
 
     /// <summary>
     /// Duration of the node formatted in milliseconds.
     /// </summary>
     public string? Duration
     {
-        get => _duration ?? (EndTime?.Subtract(StartTime).TotalMilliseconds is { } milliseconds ? $"{milliseconds}ms" : null);
+        get => _duration ?? (DurationMs is { } milliseconds ? milliseconds.ToString("0.####", CultureInfo.InvariantCulture) + "ms" : null);
         set => _duration = value;
     }
 

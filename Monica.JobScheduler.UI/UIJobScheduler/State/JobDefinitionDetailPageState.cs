@@ -132,6 +132,12 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
     /// </summary>
     public JobExecutionActivitySlice RecentFailureActivity { get; private set; } = JobExecutionActivitySlice.Empty;
 
+    /// <summary>Gets the latest forty retained executions for the job trajectory, with its exact retained total.</summary>
+    public JobExecutionActivitySlice RecentActivity { get; private set; } = new() { ItemLimit = 40 };
+
+    /// <summary>Gets the newest retained error message from the latest failed execution, when available.</summary>
+    public string? LatestFailureMessage { get; private set; }
+
     /// <summary>
     /// Gets whether the first access check completed.
     /// </summary>
@@ -220,10 +226,13 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 analyticsQuery.EndTimeUtc.AddTicks(-1),
                 RecentFailureActivity.ItemLimit,
                 cancellationToken);
-            await Task.WhenAll(summaryTask, analyticsTask, runningTask, failuresTask);
+            var recentTask = QueryExecutionsAsync(null, JobExecutionSortField.CreatedAtUtc, null, now, 40, cancellationToken);
+            await Task.WhenAll(summaryTask, analyticsTask, runningTask, failuresTask, recentTask);
             cancellationToken.ThrowIfCancellationRequested();
             var summaryResult = await summaryTask;
-            if (summaryResult.IsFailed(out var error, out var summary))
+            var error = summaryResult.WithoutData();
+            var summary = summaryResult.Data;
+            if (summaryResult.IsFailure())
             {
                 _lifetime.TryApply(() => Error = error.Message);
                 return;
@@ -232,13 +241,25 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             var analyticsResult = await analyticsTask;
             var runningResult = await runningTask;
             var failureResult = await failuresTask;
+            var recentResult = await recentTask;
+            string? failureMessage = null;
+            var failedPage = failureResult.Data;
+            if (failureResult.IsSuccess() && failedPage is not null && failedPage.Items.FirstOrDefault() is { } latestFailure)
+            {
+                var detailResult = await _facade.GetExecutionAsync(latestFailure.InstanceId, cancellationToken);
+                var failureDetail = detailResult.Data;
+                if (!detailResult.IsFailure())
+                    failureMessage = failureDetail?.History.LastOrDefault(entry => entry.LogLevel >= Microsoft.Extensions.Logging.LogLevel.Error)?.Message;
+            }
             _lifetime.TryApply(() =>
             {
                 Summary = summary;
                 IsNotFound = summary is null;
                 Error = null;
-                if (analyticsResult.IsFailed(out var analyticsError, out var analytics))
-                    AnalyticsError = analyticsError.Message;
+                var analyticsError = analyticsResult.WithoutData();
+                var analytics = analyticsResult.Data;
+                if (analyticsResult.IsFailure() || analytics is null)
+                    AnalyticsError = analyticsError.Message ?? "The execution analytics were unavailable.";
                 else
                 {
                     Analytics = analytics;
@@ -246,6 +267,8 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 }
                 RunningActivity = AcceptExecutionEvidence(runningResult, RunningActivity);
                 RecentFailureActivity = AcceptExecutionEvidence(failureResult, RecentFailureActivity);
+                RecentActivity = AcceptExecutionEvidence(recentResult, RecentActivity);
+                LatestFailureMessage = failureMessage;
                 ObservedAtUtc = now;
             });
         }
@@ -283,13 +306,13 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
     /// The clicked definition and policy revision are captured before asynchronous authorization.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The session has retired or the admitted operation is canceled.</exception>
-    public Task<Res<JobPolicy>> SetDisabledAsync(bool disabled)
+    public Task<Result<JobPolicy>> SetDisabledAsync(bool disabled)
     {
         var summary = Summary;
         return _lifetime.RunAsync(token => SetDisabledCoreAsync(summary, disabled, token));
     }
 
-    private async Task<Res<JobPolicy>> SetDisabledCoreAsync(
+    private async Task<Result<JobPolicy>> SetDisabledCoreAsync(
         JobOperationalSummary? summary, bool disabled, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -303,17 +326,17 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
             {
-                return access.Error ?? _localizer["Access:DeniedDescription"].Value;
+                return Result.Failure<JobPolicy>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
             }
 
             if (summary is null)
             {
-                return _localizer["JobDetail:NotFound", JobKey].Value;
+                return Result.Failure<JobPolicy>(_localizer["JobDetail:NotFound", JobKey].Value);
             }
 
-            if (disabled && JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary))
+            if (disabled && JobSchedulerUiPresentation.IsManualOnlySuppressed(summary))
             {
-                return _localizer["Catalog:Messages:PauseUnavailableDebug"].Value;
+                return Result.Failure<JobPolicy>(_localizer["Catalog:Messages:PauseUnavailableManual"].Value);
             }
 
             var definition = summary.Definition;
@@ -327,8 +350,9 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 },
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var policy))
+            if (result.IsSuccess())
             {
+                var policy = result.Data ?? throw new InvalidOperationException("The policy update returned no data.");
                 var isRecurring = definition.Declaration.JobType == JobType.Recurring;
                 var suspensionReasons = isRecurring
                     ? JobSchedulerUiPresentation.SetOperatorPolicySuspension(
@@ -369,13 +393,13 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
     /// Reauthorizes the circuit and admits an immediate occurrence for a present recurring definition without advancing its cursor.
     /// </summary>
     /// <exception cref="OperationCanceledException">The session has retired or the admitted operation is canceled.</exception>
-    public Task<Res<JobExecutionInstance>> RunRecurringNowAsync()
+    public Task<Result<JobExecutionInstance>> RunRecurringNowAsync()
     {
         var summary = Summary;
         return _lifetime.RunAsync(token => RunRecurringNowCoreAsync(summary, token));
     }
 
-    private async Task<Res<JobExecutionInstance>> RunRecurringNowCoreAsync(
+    private async Task<Result<JobExecutionInstance>> RunRecurringNowCoreAsync(
         JobOperationalSummary? summary, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -389,12 +413,12 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
             {
-                return access.Error ?? _localizer["Access:DeniedDescription"].Value;
+                return Result.Failure<JobExecutionInstance>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
             }
 
             if (summary is null)
             {
-                return _localizer["JobDetail:NotFound", JobKey].Value;
+                return Result.Failure<JobExecutionInstance>(_localizer["JobDetail:NotFound", JobKey].Value);
             }
 
             var definition = summary.Definition;
@@ -406,8 +430,9 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
                 },
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var execution))
+            if (result.IsSuccess())
             {
+                var execution = result.Data ?? throw new InvalidOperationException("The run-now request returned no data.");
                 var observedAtUtc = _timeProvider.GetUtcNow();
                 _lifetime.TryApply(() =>
                 {
@@ -488,14 +513,16 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
         Analytics = null;
         RunningActivity = JobExecutionActivitySlice.Empty;
         RecentFailureActivity = JobExecutionActivitySlice.Empty;
+        RecentActivity = new() { ItemLimit = 40 };
+        LatestFailureMessage = null;
         IsNotFound = false;
         Error = null;
         AnalyticsError = null;
         ObservedAtUtc = null;
     }
 
-    private Task<Res<QueryResult<JobExecutionInstance>>> QueryExecutionsAsync(
-        JobExecutionState state,
+    private Task<Result<QueryResult<JobExecutionInstance>>> QueryExecutionsAsync(
+        JobExecutionState? state,
         JobExecutionSortField sortField,
         DateTimeOffset? createdAfterUtc,
         DateTimeOffset? createdBeforeUtc,
@@ -506,9 +533,11 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
             SchedulerScopeKey = string.Empty,
             OwnerKey = JobId.OwnerKey,
             JobKey = JobKey,
-            States = [state],
-            CreatedAfterUtc = createdAfterUtc,
-            CreatedBeforeUtc = createdBeforeUtc,
+            States = state is JobExecutionState.Running ? [JobExecutionState.Running, JobExecutionState.Queued] : state is { } value ? [value] : null,
+            CreatedAfterUtc = sortField == JobExecutionSortField.CompletedAtUtc ? null : createdAfterUtc,
+            CreatedBeforeUtc = sortField == JobExecutionSortField.CompletedAtUtc ? null : createdBeforeUtc,
+            CompletedAfterUtc = sortField == JobExecutionSortField.CompletedAtUtc ? createdAfterUtc : null,
+            CompletedBeforeUtc = sortField == JobExecutionSortField.CompletedAtUtc ? createdBeforeUtc : null,
             SortField = sortField,
             SortDescending = true,
             PageNumber = 1,
@@ -516,12 +545,14 @@ public sealed class JobDefinitionDetailPageState : IAsyncDisposable
         }, cancellationToken);
 
     private static JobExecutionActivitySlice AcceptExecutionEvidence(
-        Res<QueryResult<JobExecutionInstance>> result,
+        Result<QueryResult<JobExecutionInstance>> result,
         JobExecutionActivitySlice current)
     {
-        if (result.IsFailed(out var error, out var page))
+        var error = result.WithoutData();
+        var page = result.Data;
+        if (result.IsFailure() || page is null)
         {
-            return current with { Error = error.Message };
+            return current with { Error = error.Message ?? "The execution query returned no data." };
         }
 
         return new JobExecutionActivitySlice

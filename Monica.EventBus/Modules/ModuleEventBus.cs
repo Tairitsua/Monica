@@ -51,10 +51,21 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
             sp.GetRequiredService<LocalEventBus>(), sp.GetRequiredService<IEventMessageFactory>(), sp));
         services.AddScoped<EventDeliveryContext>();
         services.AddScoped<IEventDeliveryContext>(sp => sp.GetRequiredService<EventDeliveryContext>());
+        services.AddScoped<EventBatchDeliveryContext>();
+        services.AddScoped<IEventBatchDeliveryContext>(sp => sp.GetRequiredService<EventBatchDeliveryContext>());
         services.AddSingleton<IEventMessageFactory, EventMessageFactory>();
         services.AddSingleton<IEventReceiveDispatcher, EventReceiveDispatcher>();
+        services.AddSingleton<EventMessageRetryPolicy>();
         services.AddSingleton(_autoDiscovery);
         services.AddHostedService<EventBusAutoDiscoveryLifecycle>();
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(EventBusAutoDiscoveryLifecycle)),
+            typeof(EventBusAutoDiscoveryLifecycle));
+        context.Composition.OnServicesFinalized(static _ => { }, descriptors =>
+        {
+            if (!Option.DisableAutoDiscovery) _autoDiscovery.CollectRegisteredHandlers(descriptors);
+            _autoDiscovery.CaptureRegistrationOwners(descriptors, context.Composition.GetServiceRegistrationOwner);
+        });
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -195,6 +206,17 @@ public static class ModuleEventBusRegistrationExtensions
 public class ModuleEventBusOption : ModuleOptions<ModuleEventBus>
 {
     /// <summary>
+    /// Gets or sets the number of retries after the first failed distributed receive attempt.
+    /// Defaults to one (two attempts in total); zero disables retries. Must be nonnegative.
+    /// Dapr and native Kafka apply this budget to all processing failures, including business exceptions,
+    /// timeouts, deserialization failures and handler cancellation. Transport shutdown stops processing
+    /// without acknowledging the message. Exhaustion logs and ends delivery, forwarding to the provider's
+    /// dead-letter destination when configured. Local events and Outbox publishing have separate semantics.
+    /// The budget is per transport delivery and resets after broker redelivery or process restart.
+    /// </summary>
+    public int MessageRetryCount { get; set; } = 1;
+
+    /// <summary>
     /// Gets or sets a value indicating whether automatic discovery is disabled for types that
     /// implement <see cref="IDistributedEventHandler{TEvent}"/> or
     /// <see cref="ILocalEventHandler{TEvent}"/>.
@@ -204,6 +226,10 @@ public class ModuleEventBusOption : ModuleOptions<ModuleEventBus>
     /// When automatic handlers are discovered, the container must expose <see cref="IServiceProviderIsService"/>
     /// so discovery can inspect registrations without activating handlers. Disabled or empty discovery does
     /// not require the inspector. Construction and asynchronous scope disposal occur during delivery.
+    /// Distributed handlers retain the application registration owner captured from their finalized service
+    /// descriptors. Conflicting owners, including mixed owned and unowned registrations, stop composition.
+    /// Concrete closed generic handler types explicitly exposed in DI participate in the same discovery;
+    /// open generic templates and interface-only registrations do not identify a concrete subscription.
     /// </remarks>
     public bool DisableAutoDiscovery { get; set; }
 }

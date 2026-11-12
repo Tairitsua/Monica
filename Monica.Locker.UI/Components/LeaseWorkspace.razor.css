@@ -1,0 +1,5 @@
+.lease-workspace { display:flex; flex-direction:column; gap:22px; min-width:0; container:lease-page / inline-size; }
+.lease-workspace__header { display:flex; gap:22px; align-items:center; }
+.lease-workspace__header ::deep .mo-vl-masthead { flex:1; }
+.lease-workspace__seal { width:52px; height:52px; display:grid; place-items:center; flex:none; border-radius:14px; color:var(--mud-palette-dark-text); background:var(--mud-palette-dark); }
+@media(max-width:600px) { .lease-workspace__header { gap:15px; align-items:flex-start; } .lease-workspace__seal { margin-top:24px; } }

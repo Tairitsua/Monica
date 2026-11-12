@@ -181,7 +181,7 @@ Do not generate optimistic release automation. Add `releaseGates` only when repo
 - Module registration/options/dependencies: `MonicaTestApplicationFactory<TDiscoveryAnchor>`.
 - Give every independently published package its own `tests/Test.<PackageId>` project; this intentionally overrides the first-party `Test.Monica.*` convention.
 - Register graph entry modules only in the composition factory so dependency options are proven transitively. For UI modules, resolve the host-owned read-only `IPageCatalog` and assert the contributed page, category, navigation metadata, and module-owned localization resource marker. The write-only `INavigationRegistryBuilder` exists only inside startup contribution callbacks.
-- Facade flows: public `Res`/`Res<T>` assertions plus observable boundary state.
+- Facade flows: public `Result`/`Result<T>` assertions plus observable boundary state.
 - UI component logic: bUnit.
 - Full visual behavior: bridge host plus Playwright at desktop and narrow widths.
 

@@ -223,21 +223,25 @@
     {
         if (_disposed || Busy) return;
         var result = await State.TakeHeapSnapshotAsync();
-        if (_disposed || result.Status == ResStatus.Conflict) return;
-        if (result.IsFailed(out var error, out var snapshot)) Snackbar.Add(FailureText(error, "Allocation:Messages:SnapshotFailed"), Severity.Error);
-        else Snackbar.Add(L["Allocation:Messages:SnapshotCompleted", snapshot!.UniqueTypeCount], Severity.Success);
+        if (_disposed || result.Status == ResultStatus.Conflict) return;
+        var error = result.WithoutData();
+        var snapshot = result.Data;
+        if (result.IsFailure() || snapshot is null) Snackbar.Add(FailureText(error, "Allocation:Messages:SnapshotFailed"), Severity.Error);
+        else Snackbar.Add(L["Allocation:Messages:SnapshotCompleted", snapshot.UniqueTypeCount], Severity.Success);
     }
-    private void ShowResult(Res result, string fallback, string success, Severity severity)
+    private void ShowResult(Result result, string fallback, string success, Severity severity)
     {
-        if (_disposed || result.Status == ResStatus.Conflict) return;
-        if (result.IsFailed(out var error)) Snackbar.Add(FailureText(error, fallback), Severity.Error);
+        if (_disposed || result.Status == ResultStatus.Conflict) return;
+        var error = result;
+        if (result.IsFailure()) Snackbar.Add(FailureText(error, fallback), Severity.Error);
         else Snackbar.Add(success, severity);
     }
-    private void ShowFailure(Res result, string fallback)
+    private void ShowFailure(Result result, string fallback)
     {
-        if (!_disposed && result.Status != ResStatus.Conflict && result.IsFailed(out var error)) Snackbar.Add(FailureText(error, fallback), Severity.Error);
+        var error = result;
+        if (!_disposed && result.Status != ResultStatus.Conflict && result.IsFailure()) Snackbar.Add(FailureText(error, fallback), Severity.Error);
     }
-    private string FailureText(Res error, string fallback) => string.IsNullOrEmpty(error.Message) ? L[fallback] : error.Message;
+    private string FailureText(Result error, string fallback) => string.IsNullOrEmpty(error.Message) ? L[fallback] : error.Message;
     private string GetModeDisplayName(AllocationSamplingMode mode) => mode switch
     {
         AllocationSamplingMode.Low => L["Allocation:Modes:Low"], AllocationSamplingMode.High => L["Allocation:Modes:High"], _ => L["Common:Unknown"]

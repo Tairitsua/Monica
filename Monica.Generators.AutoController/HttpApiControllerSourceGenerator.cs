@@ -37,6 +37,31 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             candidateCollection,
             static (productionContext, analyses) => Emit(productionContext, analyses));
+
+        context.RegisterSourceOutput(context.CompilationProvider.Select(static (compilation, cancellationToken) =>
+        {
+            var assembly = compilation.Assembly;
+            if (HostGenerationReader.IsApplicationHost(assembly))
+                return ImmutableArray<AnalysisSnapshot<ControllerCandidate>>.Empty;
+            if (!HostGenerationReader.HasOwnedGeneration(assembly))
+                return ImmutableArray<AnalysisSnapshot<ControllerCandidate>>.Empty;
+            var app = HostGenerationReader.ApplicationConfig(assembly);
+            var httpMode = app?.ConstructorArguments.FirstOrDefault().Value is 0;
+            if (!httpMode && HostGenerationReader.HttpConfig(assembly) is null)
+                return ImmutableArray<AnalysisSnapshot<ControllerCandidate>>.Empty;
+            var results = ImmutableArray.CreateBuilder<AnalysisSnapshot<ControllerCandidate>>();
+            if (app is null)
+                results.Add(new AnalysisSnapshot<ControllerCandidate>(null, HostGenerationReader.ValidateOwnership(assembly)));
+            foreach (var owned in HostGenerationReader.HandlerAssemblies(assembly))
+            foreach (var handler in HostGenerationReader.Types(owned.GlobalNamespace))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (handler.IsAbstract || handler.IsGenericType) continue;
+                var analysis = AnalyzeHandler(handler, assembly, Location.None);
+                if (analysis is not null) results.Add(analysis);
+            }
+            return results.ToImmutable();
+        }), static (productionContext, analyses) => Emit(productionContext, analyses));
     }
 
     private static AnalysisSnapshot<ControllerCandidate>? AnalyzeCandidate(
@@ -49,17 +74,35 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
         {
             var handler = syntaxContext.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken)
                 as INamedTypeSymbol;
-            if (!ApplicationServiceSymbolHelper.TryGetContract(handler, out var request, out var handlerResult))
+            if (HostGenerationReader.IsApplicationHost(syntaxContext.SemanticModel.Compilation.Assembly) ||
+                HostGenerationReader.HasOwnedGeneration(syntaxContext.SemanticModel.Compilation.Assembly)) return null;
+            return AnalyzeHandler(handler, syntaxContext.SemanticModel.Compilation.Assembly, fallbackLocation);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception)
+        {
+            return new AnalysisSnapshot<ControllerCandidate>(null, new[] { DiagnosticSnapshot.Create(
+                DiagnosticDescriptors.GenerationFailure, fallbackLocation, exception.ToString()) });
+        }
+    }
+
+    private static AnalysisSnapshot<ControllerCandidate>? AnalyzeHandler(
+        INamedTypeSymbol? handler, IAssemblySymbol currentAssembly, Location fallbackLocation)
+    {
+        try
+        {
+            if (handler is null || handler.IsAbstract || handler.IsGenericType) return null;
+            if (!ApplicationRequestHandlerSymbolHelper.TryGetContract(handler, out var request, out var handlerResult))
             {
                 return null;
             }
 
             var diagnostics = new List<DiagnosticSnapshot>();
-            foreach (var (attribute, name) in ApplicationServiceSymbolHelper.GetLegacyEndpointAttributes(handler!))
+            foreach (var (attribute, name) in ApplicationRequestHandlerSymbolHelper.GetLegacyEndpointAttributes(handler!))
             {
                 diagnostics.Add(DiagnosticSnapshot.Create(
                     DiagnosticDescriptors.LegacyHandlerAttribute,
-                    attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation()
+                    attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? fallbackLocation,
                     handler!.ToDisplayString(),
                     name));
@@ -73,16 +116,15 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
             var endpointAttribute = EndpointModelFactory.GetEndpointAttribute(request);
             if (endpointAttribute is null)
             {
-                return new AnalysisSnapshot<ControllerCandidate>(
-                    null,
-                    new[]
-                    {
-                        DiagnosticSnapshot.Create(
-                            DiagnosticDescriptors.MissingEndpoint,
-                            fallbackLocation,
-                            request.ToDisplayString())
-                    });
+                // Application use cases can remain local. Only explicit endpoint contracts publish HTTP adapters.
+                return null;
             }
+
+            // Legacy request-assembly configuration remains supported. Shared wire metadata alone never publishes a receiver.
+            var legacyPublication = HostGenerationReader.HttpConfig(request.ContainingAssembly) is not null;
+            if (!legacyPublication && HostGenerationReader.HttpConfig(currentAssembly) is null &&
+                HostGenerationReader.ApplicationConfig(currentAssembly)?.ConstructorArguments.FirstOrDefault().Value is not 0)
+                return null;
 
             EndpointModelFactory.TryGetUniqueResultContract(
                 request,
@@ -91,7 +133,7 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
             var endpointAnalysis = EndpointModelFactory.Create(
                 request,
                 endpointAttribute,
-                syntaxContext.SemanticModel.Compilation.Assembly,
+                currentAssembly,
                 fallbackLocation,
                 publishedOnly: false);
             if (endpointAnalysis.Value is null)
@@ -121,7 +163,7 @@ public sealed class HttpApiControllerSourceGenerator : IIncrementalGenerator
             return new AnalysisSnapshot<ControllerCandidate>(
                 new ControllerCandidate(
                     endpointAnalysis.Value,
-                    ApplicationServiceSymbolHelper.GetTags(handler!).ToImmutableArray()),
+                    ApplicationRequestHandlerSymbolHelper.GetTags(handler!).ToImmutableArray()),
                 deleteQueryWarning is null ? null : new[] { deleteQueryWarning });
         }
         catch (OperationCanceledException)

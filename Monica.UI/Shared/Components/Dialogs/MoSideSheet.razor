@@ -1,0 +1,37 @@
+@using Monica.UI.Shared.Components.Dialogs.Internal
+@inject IStringLocalizer<SharedResource> L
+
+<MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
+           Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
+           Class="mo-side-sheet" Style="@($"--mo-side-sheet-width: {Width};")"
+           AriaLabelledBy="@_headingId">
+    <TitleContent>
+        <div class="mo-side-sheet-heading">
+            <div id="@_headingId" class="mo-side-sheet-identity">
+                @if (TitleContent is not null) { @TitleContent }
+                else { <h2>@Title</h2> }
+            </div>
+            <MudIconButton Class="mo-side-sheet-close" Icon="@MoIcons.Close" Disabled="@(!Dismissible)"
+                           aria-label="@(CloseLabel ?? L["Common:Close"].Value)" OnClick="CloseAsync" />
+        </div>
+        @if (HeaderContent is not null)
+        {
+            <div class="mo-side-sheet-header">@HeaderContent</div>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MoSideSheetPolicy Options="CurrentOptions" />
+        @if (TabPanels is not null)
+        {
+            <MudTabs Class="mo-side-sheet-tabs" ActivePanelIndex="ActiveTabIndex" ActivePanelIndexChanged="ActiveTabIndexChanged"
+                     Elevation="0" Rounded="false" MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+                @TabPanels
+            </MudTabs>
+        }
+        else
+        {
+            <div class="mo-side-sheet-body">@ChildContent</div>
+        }
+    </DialogContent>
+    <DialogActions>@FooterContent</DialogActions>
+</MudDialog>

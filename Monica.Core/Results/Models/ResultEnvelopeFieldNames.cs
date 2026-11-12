@@ -9,18 +9,18 @@ namespace Monica.Core.Results;
 /// </summary>
 public sealed class ResultEnvelopeFieldNames
 {
-    private const string MESSAGE_PROPERTY_NAME = nameof(Res.Message);
-    private const string STATUS_PROPERTY_NAME = nameof(Res.Status);
-    private const string DATA_PROPERTY_NAME = nameof(Res<>.Data);
-    private const string METADATA_PROPERTY_NAME = nameof(Res.Metadata);
+    private const string MESSAGE_PROPERTY_NAME = nameof(Result.Message);
+    private const string STATUS_PROPERTY_NAME = nameof(Result.Status);
+    private const string DATA_PROPERTY_NAME = nameof(Result<>.Data);
+    private const string METADATA_PROPERTY_NAME = nameof(Result.Metadata);
 
     /// <summary>
-    /// Gets or sets the JSON field name used for <see cref="Res.Message" />.
+    /// Gets or sets the JSON field name used for <see cref="Result.Message" />.
     /// </summary>
     public string? Message { get; set; }
 
     /// <summary>
-    /// Gets or sets the JSON field name used for <see cref="Res.Status" />.
+    /// Gets or sets the JSON field name used for <see cref="Result.Status" />.
     /// </summary>
     public string? Status { get; set; }
 
@@ -30,7 +30,7 @@ public sealed class ResultEnvelopeFieldNames
     public string? Data { get; set; }
 
     /// <summary>
-    /// Gets or sets the JSON field name used for <see cref="Res.Metadata" />.
+    /// Gets or sets the JSON field name used for <see cref="Result.Metadata" />.
     /// </summary>
     public string? Metadata { get; set; }
 
@@ -41,7 +41,7 @@ public sealed class ResultEnvelopeFieldNames
         Metadata is not null;
 
     /// <summary>
-    /// Gets the effective JSON field name used for <see cref="Res.Message" />.
+    /// Gets the effective JSON field name used for <see cref="Result.Message" />.
     /// </summary>
     /// <param name="options">The serializer options used by the application.</param>
     /// <returns>The effective JSON field name.</returns>
@@ -51,7 +51,7 @@ public sealed class ResultEnvelopeFieldNames
     }
 
     /// <summary>
-    /// Gets the effective JSON field name used for <see cref="Res.Status" />.
+    /// Gets the effective JSON field name used for <see cref="Result.Status" />.
     /// </summary>
     /// <param name="options">The serializer options used by the application.</param>
     /// <returns>The effective JSON field name.</returns>
@@ -71,7 +71,7 @@ public sealed class ResultEnvelopeFieldNames
     }
 
     /// <summary>
-    /// Gets the effective JSON field name used for <see cref="Res.Metadata" />.
+    /// Gets the effective JSON field name used for <see cref="Result.Metadata" />.
     /// </summary>
     /// <param name="options">The serializer options used by the application.</param>
     /// <returns>The effective JSON field name.</returns>

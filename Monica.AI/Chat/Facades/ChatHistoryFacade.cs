@@ -25,23 +25,23 @@ public sealed class ChatHistoryFacade
     }
 
     /// <summary>Loads the persisted catalog and current-session selection.</summary>
-    public async Task<Res<ChatHistoryCatalog>> GetCatalogAsync(CancellationToken ct = default)
+    public async Task<Result<ChatHistoryCatalog>> GetCatalogAsync(CancellationToken ct = default)
     {
         try
         {
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.GetCatalogAsync(partition, ct));
+            return Result.Success(await _historyProvider.GetCatalogAsync(partition, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryCatalog>(ex.GetMessageRecursively());
         }
     }
 
     /// <summary>
     /// Loads a session's transcript as a runtime-lazy <see cref="ChatSession"/>.
     /// </summary>
-    public async Task<Res<ChatSession?>> LoadSessionAsync(
+    public async Task<Result<ChatSession?>> LoadSessionAsync(
         string sessionId,
         CancellationToken ct = default)
     {
@@ -54,16 +54,16 @@ public sealed class ChatHistoryFacade
                 ? null
                 : _chatService.RestoreSession(snapshot, expectedSessionId: sessionId);
             session?.BindPartition(partition);
-            return Res.Ok<ChatSession?>(session);
+            return Result.Success<ChatSession?>(session);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatSession?>(ex.GetMessageRecursively());
         }
     }
 
     /// <summary>Saves a complete snapshot when <paramref name="expectedRevision"/> is current.</summary>
-    public async Task<Res<ChatHistoryWriteResult>> SaveSessionAsync(
+    public async Task<Result<ChatHistoryWriteResult>> SaveSessionAsync(
         ChatSession session,
         long expectedRevision,
         CancellationToken ct = default)
@@ -85,16 +85,16 @@ public sealed class ChatHistoryFacade
                 session.MarkPersisted(result.Revision);
             }
 
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
     /// <summary>Deletes one persisted session when the expected catalog revision is current.</summary>
-    public async Task<Res<ChatHistoryWriteResult>> DeleteSessionAsync(
+    public async Task<Result<ChatHistoryWriteResult>> DeleteSessionAsync(
         string sessionId,
         long expectedRevision,
         CancellationToken ct = default)
@@ -104,7 +104,7 @@ public sealed class ChatHistoryFacade
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.DeleteSessionAsync(
+            return Result.Success(await _historyProvider.DeleteSessionAsync(
                 partition,
                 sessionId,
                 expectedRevision,
@@ -112,7 +112,7 @@ public sealed class ChatHistoryFacade
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
@@ -120,7 +120,7 @@ public sealed class ChatHistoryFacade
     /// Pins or unpins an active conversation in the current user/workspace without changing its transcript recency.
     /// Archived conversations must be restored before they can be pinned.
     /// </summary>
-    public async Task<Res<ChatHistoryWriteResult>> SetPinnedAsync(
+    public async Task<Result<ChatHistoryWriteResult>> SetPinnedAsync(
         string sessionId,
         bool isPinned,
         long expectedRevision,
@@ -131,11 +131,11 @@ public sealed class ChatHistoryFacade
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.SetPinnedAsync(partition, sessionId, isPinned, expectedRevision, ct));
+            return Result.Success(await _historyProvider.SetPinnedAsync(partition, sessionId, isPinned, expectedRevision, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
@@ -143,7 +143,7 @@ public sealed class ChatHistoryFacade
     /// Archives or restores the complete selection atomically in the current user/workspace. Archiving clears pins
     /// and any matching current selection while preserving transcripts and attachments; restoration leaves them unpinned.
     /// </summary>
-    public async Task<Res<ChatHistoryWriteResult>> SetArchivedAsync(
+    public async Task<Result<ChatHistoryWriteResult>> SetArchivedAsync(
         IReadOnlyList<string> sessionIds,
         bool isArchived,
         long expectedRevision,
@@ -154,11 +154,11 @@ public sealed class ChatHistoryFacade
             ValidateSelection(sessionIds);
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.SetArchivedAsync(partition, sessionIds, isArchived, expectedRevision, ct));
+            return Result.Success(await _historyProvider.SetArchivedAsync(partition, sessionIds, isArchived, expectedRevision, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
@@ -167,7 +167,7 @@ public sealed class ChatHistoryFacade
     /// Active or unknown IDs reject the complete request. A successful result with a warning means the catalog
     /// deletion committed but residual physical files still require the provider's automatic cleanup retry.
     /// </summary>
-    public async Task<Res<ChatHistoryWriteResult>> DeleteArchivedSessionsAsync(
+    public async Task<Result<ChatHistoryWriteResult>> DeleteArchivedSessionsAsync(
         IReadOnlyList<string> sessionIds,
         long expectedRevision,
         CancellationToken ct = default)
@@ -177,16 +177,16 @@ public sealed class ChatHistoryFacade
             ValidateSelection(sessionIds);
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.DeleteArchivedSessionsAsync(partition, sessionIds, expectedRevision, ct));
+            return Result.Success(await _historyProvider.DeleteArchivedSessionsAsync(partition, sessionIds, expectedRevision, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
     /// <summary>Clears all persisted sessions when the expected catalog revision is current.</summary>
-    public async Task<Res<ChatHistoryWriteResult>> ClearAsync(
+    public async Task<Result<ChatHistoryWriteResult>> ClearAsync(
         long expectedRevision,
         CancellationToken ct = default)
     {
@@ -194,16 +194,16 @@ public sealed class ChatHistoryFacade
         {
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.ClearAsync(partition, expectedRevision, ct));
+            return Result.Success(await _historyProvider.ClearAsync(partition, expectedRevision, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 
     /// <summary>Persists the current-session selection using optimistic concurrency.</summary>
-    public async Task<Res<ChatHistoryWriteResult>> SetCurrentSessionAsync(
+    public async Task<Result<ChatHistoryWriteResult>> SetCurrentSessionAsync(
         string? sessionId,
         long expectedRevision,
         CancellationToken ct = default)
@@ -212,7 +212,7 @@ public sealed class ChatHistoryFacade
         {
             ArgumentOutOfRangeException.ThrowIfNegative(expectedRevision);
             var partition = await _partitionResolver.ResolveAsync(ct);
-            return Res.Ok(await _historyProvider.SetCurrentSessionAsync(
+            return Result.Success(await _historyProvider.SetCurrentSessionAsync(
                 partition,
                 string.IsNullOrWhiteSpace(sessionId) ? null : sessionId,
                 expectedRevision,
@@ -220,7 +220,7 @@ public sealed class ChatHistoryFacade
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<ChatHistoryWriteResult>(ex.GetMessageRecursively());
         }
     }
 

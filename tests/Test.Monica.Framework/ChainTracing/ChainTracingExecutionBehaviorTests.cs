@@ -5,30 +5,33 @@ using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Models;
 using Monica.Framework.ChainTracing.Providers.Execution;
-using Monica.WebApi.RpcClient.Abstractions;
+using Monica.Invocation.Abstractions;
 using Xunit;
 
 namespace Test.Monica.Framework.ChainTracing;
 
 public sealed class ChainTracingExecutionBehaviorTests
 {
-    [Fact]
-    public async Task ExecuteAsync_WhenResultIsSuccessfulEnvelope_ShouldCompleteSuccessfulTrace()
+    [Theory]
+    [InlineData(ResultStatus.Ok)]
+    [InlineData(ResultStatus.Created)]
+    public async Task ExecuteAsync_WhenResultIsSuccessfulEnvelope_ShouldCompleteSuccessfulTrace(ResultStatus status)
     {
         var tracing = new TrackingChainTracing();
-        var behavior = new ChainTracingExecutionBehavior<string, Res<string>>(tracing);
-        var expected = Res.Ok<string>("payload");
+        var behavior = new ChainTracingExecutionBehavior<string, Result<string>>(tracing);
+        var expected = Result.Success<string>("payload");
+        expected.Status = status;
         expected.Message = "done";
 
         var result = await behavior.ExecuteAsync(
-            CreateContext<LocalComponent, Res<string>>(),
+            CreateContext<LocalComponent, Result<string>>(),
             () => Task.FromResult(expected));
 
         result.Should().BeSameAs(expected);
         tracing.BeginCount.Should().Be(1);
         tracing.EndCount.Should().Be(1);
         tracing.EndSuccess.Should().BeTrue();
-        tracing.EndResult.Should().Contain("String(Ok)");
+        tracing.EndResult.Should().Contain($"String({status})");
         tracing.EndResult.Should().Contain("[done]");
         tracing.EndException.Should().BeNull();
     }
@@ -37,11 +40,11 @@ public sealed class ChainTracingExecutionBehaviorTests
     public async Task ExecuteAsync_WhenResultIsFailedEnvelope_ShouldCompleteFailedTrace()
     {
         var tracing = new TrackingChainTracing();
-        var behavior = new ChainTracingExecutionBehavior<string, Res<string>>(tracing);
-        var expected = new Res<string>("invalid", ResStatus.BadRequest);
+        var behavior = new ChainTracingExecutionBehavior<string, Result<string>>(tracing);
+        var expected = Result.Failure<string>("invalid", ResultStatus.BadRequest);
 
         var result = await behavior.ExecuteAsync(
-            CreateContext<LocalComponent, Res<string>>(),
+            CreateContext<LocalComponent, Result<string>>(),
             () => Task.FromResult(expected));
 
         result.Should().BeSameAs(expected);
@@ -54,12 +57,12 @@ public sealed class ChainTracingExecutionBehaviorTests
     public async Task ExecuteAsync_WhenTerminalThrows_ShouldCompleteTraceWithSameExceptionAndRethrow()
     {
         var tracing = new TrackingChainTracing();
-        var behavior = new ChainTracingExecutionBehavior<string, Res<string>>(tracing);
+        var behavior = new ChainTracingExecutionBehavior<string, Result<string>>(tracing);
         var expected = new InvalidOperationException("terminal failed");
 
         var action = () => behavior.ExecuteAsync(
-            CreateContext<LocalComponent, Res<string>>(),
-            () => Task.FromException<Res<string>>(expected));
+            CreateContext<LocalComponent, Result<string>>(),
+            () => Task.FromException<Result<string>>(expected));
 
         (await action.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(expected);
         tracing.EndCount.Should().Be(1);
@@ -68,7 +71,7 @@ public sealed class ChainTracingExecutionBehaviorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenResultIsNotEnvelope_ShouldBypassTracing()
+    public async Task ExecuteAsync_WhenResultIsNotEnvelope_ShouldCompleteSuccessfulTrace()
     {
         var tracing = new TrackingChainTracing();
         var behavior = new ChainTracingExecutionBehavior<string, string>(tracing);
@@ -78,19 +81,52 @@ public sealed class ChainTracingExecutionBehaviorTests
             () => Task.FromResult("result"));
 
         result.Should().Be("result");
-        tracing.BeginCount.Should().Be(0);
-        tracing.EndCount.Should().Be(0);
+        tracing.BeginCount.Should().Be(1);
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenOutcomeRequestsRollback_ShouldCompleteFailedTrace()
+    {
+        var tracing = new TrackingChainTracing();
+        var behavior = new ChainTracingExecutionBehavior<string, FailedOutcome>(tracing);
+
+        await behavior.ExecuteAsync(
+            CreateContext<LocalComponent, FailedOutcome>(),
+            () => Task.FromResult(new FailedOutcome()));
+
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCanceled_ShouldRetainCancellationAndRethrow()
+    {
+        var tracing = new TrackingChainTracing();
+        var behavior = new ChainTracingExecutionBehavior<string, ExecutionUnit>(tracing);
+        var expected = new OperationCanceledException("canceled");
+
+        var action = () => behavior.ExecuteAsync(
+            CreateContext<LocalComponent, ExecutionUnit>(),
+            () => Task.FromException<ExecutionUnit>(expected));
+
+        (await action.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(expected);
+        tracing.EndCount.Should().Be(1);
+        tracing.EndSuccess.Should().BeFalse();
+        tracing.EndException.Should().BeSameAs(expected);
+        tracing.EndResult.Should().Contain("canceled");
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenComponentIsRemoteApi_ShouldMergeRemoteTraceBeforeCompletion()
     {
         var tracing = new TrackingChainTracing();
-        var behavior = new ChainTracingExecutionBehavior<string, Res<string>>(tracing);
-        var expected = Res.Ok<string>("remote result");
+        var behavior = new ChainTracingExecutionBehavior<string, Result<string>>(tracing);
+        var expected = Result.Success<string>("remote result");
 
         var result = await behavior.ExecuteAsync(
-            CreateContext<RemoteComponent, Res<string>>(),
+            CreateContext<RemoteComponent, Result<string>>(),
             () => Task.FromResult(expected));
 
         result.Should().BeSameAs(expected);
@@ -198,7 +234,12 @@ public sealed class ChainTracingExecutionBehaviorTests
         }
     }
 
-    private sealed class RemoteComponent : IRpcApi
+    private sealed class FailedOutcome : IExecutionOutcome
+    {
+        public bool ShouldRollback => true;
+    }
+
+    private sealed class RemoteComponent : IApplicationApi
     {
         public void Execute()
         {

@@ -1,0 +1,13 @@
+@attribute [Route(PAGE_URL)]
+
+@inject IStringLocalizer<BuildingBlocksResource> L
+
+<PageTitle>@L["Pages:BuildingBlocks:Enums:Title"]</PageTitle>
+
+<BuildingBlocksWorkspace ActiveRoute="@PAGE_URL">
+    <EnumInfoViewer />
+</BuildingBlocksWorkspace>
+
+@code {
+    public const string PAGE_URL = "/building-blocks/enums";
+}

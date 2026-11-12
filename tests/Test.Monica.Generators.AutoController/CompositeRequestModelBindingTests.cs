@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 using Monica.WebApi.AutoControllers.ModelBinding;
 using Monica.WebApi.AutoControllers.Services.Support;
 using Xunit;

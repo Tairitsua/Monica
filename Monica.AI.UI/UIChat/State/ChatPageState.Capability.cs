@@ -8,7 +8,9 @@ public sealed partial class ChatPageState
     {
         var result = await capabilityFacade.GetReferenceCandidatesAsync();
         if (_disposed) return;
-        if (result.IsFailed(out var error, out var candidates))
+        var error = result.WithoutData();
+        var candidates = result.Data;
+        if (result.IsFailure() || candidates is null)
         {
             SetError(error.Message ?? localizer["Error:Generic"]);
             return;
@@ -21,7 +23,9 @@ public sealed partial class ChatPageState
         if (!_options.ShowKnowledgeBaseSelector) return;
         var result = await knowledgeBaseFacade.GetAllAsync();
         if (_disposed) return;
-        if (result.IsFailed(out var error, out var knowledgeBases))
+        var error = result.WithoutData();
+        var knowledgeBases = result.Data;
+        if (result.IsFailure() || knowledgeBases is null)
         {
             SetError(error.Message ?? localizer["Error:Generic"]);
             return;
@@ -37,7 +41,8 @@ public sealed partial class ChatPageState
         if (CurrentSession is { } session)
         {
             var result = chatFacade.UpdateRuntimeContext(session, BuildRuntimeContext(selection));
-            if (result.IsFailed(out var error)) { SetError(error.Message); return; }
+            var error = result;
+            if (result.IsFailure()) { SetError(error.Message); return; }
         }
         SelectedKnowledgeBaseIds = selection;
         NotifyStateChanged();

@@ -1,0 +1,61 @@
+.system-lifeline { --lifeline-role: var(--mud-palette-info); --lifeline-hatch: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mud-palette-text-secondary) 46%, transparent) 0 1.5px, transparent 1.5px 5px), color-mix(in srgb, var(--mud-palette-text-secondary) 8%, transparent); padding: 24px 28px 18px; }
+.lifeline-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-bottom: 14px; }
+.lifeline-heading h2 { margin: 0; font: 600 15px/1.4 var(--mud-typography-default-family); color: var(--mud-palette-text-primary); }
+.lifeline-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.lifeline-legend > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.lifeline-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--lifeline-role); }
+.is-startup, .is-ready { --lifeline-role: var(--mud-palette-primary); }
+.is-running, .is-process, .is-now { --lifeline-role: var(--mud-palette-info); }
+.is-artifact { --lifeline-role: var(--mo-color-role-third); }
+.lifeline-legend .is-artifact { border-radius: 2px; transform: rotate(45deg) scale(.9); }
+.lifeline-legend .is-unobserved { background: var(--lifeline-hatch); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-text-secondary) 36%, transparent); }
+.lifeline-lanes { display: grid; grid-template-columns: minmax(180px, 30%) 28px minmax(0, 1fr); align-items: start; }
+.lifeline-lanes.is-single { grid-template-columns: minmax(0, 1fr); }
+.lifeline-zone { min-width: 0; }
+.lifeline-cap { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 44px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.lifeline-cap > span { min-width: 0; overflow-wrap: anywhere; }
+.lifeline-cap b { margin-right: 8px; color: var(--mud-palette-text-primary); font-weight: 600; }
+.lifeline-cap strong { flex: none; color: color-mix(in srgb, var(--mud-palette-info) 72%, var(--mud-palette-text-primary)); font: 500 11.5px var(--mo-font-family-mono); }
+.lifeline-startup.is-compact .lifeline-cap { margin-bottom: 8px; }
+.lifeline-compact-labels { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: var(--mud-palette-text-secondary); font-size: 11.5px; line-height: 1.35; }
+.lifeline-compact-labels > span { display: grid; min-width: 0; max-width: 48%; }
+.lifeline-compact-labels > span:last-child { text-align: end; }
+.lifeline-compact-labels b { color: var(--mud-palette-text-primary); font: 500 11.5px/1.4 var(--mo-font-family-mono); }
+.lifeline-startup .lifeline-cap strong { color: color-mix(in srgb, var(--mud-palette-primary) 76%, var(--mud-palette-text-primary)); }
+.lifeline-track { position: relative; height: 14px; border-radius: 4px; cursor: crosshair; touch-action: pan-y; }
+.lifeline-track:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 6px; }
+.lifeline-track > * { pointer-events: none; }
+.lifeline-rule { position: absolute; top: 6px; right: 0; left: 0; height: 2px; border-radius: 2px; background: var(--mud-palette-background-gray); box-shadow: inset 0 0 0 1px var(--mud-palette-divider); }
+.lifeline-bar { position: absolute; top: 3px; height: 8px; border-radius: 4px; background: var(--lifeline-role); }
+.lifeline-bar.is-neutral { top: 6px; height: 2px; background: color-mix(in srgb, var(--mud-palette-text-secondary) 45%, transparent); }
+.lifeline-bar.is-unobserved { background: var(--lifeline-hatch); border-radius: 0 4px 4px 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-text-secondary) 30%, transparent); }
+.lifeline-pin { position: absolute; top: 7px; width: 0; }
+.lifeline-pin > i { position: absolute; top: -6px; left: -6px; width: 12px; height: 12px; border-radius: 4px; background: var(--mud-palette-surface); box-shadow: inset 0 0 0 2.5px var(--lifeline-role), 0 0 0 2px var(--mud-palette-surface); }
+.lifeline-pin:is(.is-ready, .is-solid) > i { background: var(--lifeline-role); box-shadow: 0 0 0 3px var(--mud-palette-surface); }
+.lifeline-pin.is-artifact > i { top: -5px; left: -5px; width: 10px; height: 10px; border-radius: 2px; background: var(--lifeline-role); box-shadow: 0 0 0 2.5px var(--mud-palette-surface); transform: rotate(45deg); }
+.lifeline-pin.is-now > i { border-radius: 50%; background: var(--lifeline-role); box-shadow: 0 0 0 3px var(--mud-palette-surface), 0 0 0 5px color-mix(in srgb, var(--lifeline-role) 16%, transparent); }
+.lifeline-pin > span { position: absolute; bottom: 14px; display: grid; color: var(--mud-palette-text-secondary); font-size: 11.5px; line-height: 1.35; text-align: center; white-space: nowrap; transform: translateX(-50%); }
+.lifeline-pin > span b { color: var(--mud-palette-text-primary); font: 500 11.5px/1.4 var(--mo-font-family-mono); }
+.lifeline-pin.is-start > span { left: -6px; text-align: start; transform: none; }
+.lifeline-pin.is-end > span { right: -6px; text-align: end; transform: none; }
+.lifeline-flag { position: absolute; top: -26px; bottom: -6px; width: 0; border-left: 1px dashed color-mix(in srgb, var(--mud-palette-text-primary) 50%, transparent); }
+.lifeline-flag > span { position: absolute; top: -10px; left: -1px; padding: 2px 8px; border-radius: 5px 5px 5px 0; background: var(--mud-palette-dark); color: var(--mud-palette-dark-text); font-size: 11.5px; white-space: nowrap; }
+.lifeline-flag b { font: 500 11.5px var(--mo-font-family-mono); }
+.lifeline-flag.is-end > span { right: 0; left: auto; border-radius: 5px 5px 0 5px; }
+.lifeline-cross { position: absolute; top: -10px; bottom: -10px; width: 0; border-left: 1px solid color-mix(in srgb, var(--mud-palette-text-primary) 62%, transparent); }
+.lifeline-cross > span { position: absolute; bottom: -24px; padding: 1px 6px; border-radius: 4px; background: var(--mud-palette-text-primary); color: var(--mud-palette-surface); font: 400 11px var(--mo-font-family-mono); white-space: nowrap; transform: translateX(-50%); }
+.lifeline-ticks { position: relative; height: 18px; margin-top: 12px; }
+.lifeline-ticks > span { position: absolute; color: var(--mud-palette-text-secondary); font: 400 11px var(--mo-font-family-mono); white-space: nowrap; transform: translateX(-50%); }
+.lifeline-ticks > span::before { content: ''; position: absolute; top: -9px; left: 50%; height: 5px; border-left: 1px solid var(--mud-palette-lines-inputs); }
+.lifeline-ticks > .is-now { color: var(--mud-palette-text-primary); transform: translateX(-100%); }
+.lifeline-ticks > .is-now::before { left: auto; right: 0; }
+.lifeline-zone:has(.lifeline-cross) .lifeline-ticks > span { opacity: .55; }
+.lifeline-break { position: relative; height: 100%; min-height: 96px; }
+.lifeline-break > span { position: absolute; top: 58px; left: 50%; width: 12px; height: 22px; transform: translateX(-50%) skewX(-18deg); box-shadow: inset 2px 0 0 var(--mud-palette-lines-inputs), inset -2px 0 0 var(--mud-palette-lines-inputs); }
+.lifeline-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 30px; margin: 14px 0 0; padding: 5px 10px; border-radius: 6px; background: var(--mud-palette-background); color: var(--mud-palette-text-secondary); font: 400 11.5px/1.5 var(--mo-font-family-mono); }
+.lifeline-caption.is-active { background: color-mix(in srgb, var(--mud-palette-info) 9%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); }
+.lifeline-caption > i { flex: none; width: 6px; height: 6px; border-radius: 2px; background: var(--mud-palette-info); }
+.lifeline-caption > span { min-width: 0; overflow-wrap: anywhere; }
+.lifeline-caption small { margin-left: auto; color: var(--mud-palette-text-secondary); font: 400 12px var(--mud-typography-default-family); }
+@container page (max-width: 760px) { .lifeline-lanes { grid-template-columns: minmax(0, 1fr); row-gap: 8px; } .lifeline-break { display: none; } .lifeline-startup { padding-bottom: 14px; box-shadow: inset 0 -1px 0 var(--mud-palette-divider); } }
+@container page (max-width: 620px) { .system-lifeline { padding-inline: 18px; } .lifeline-caption small { margin-left: 0; } .lifeline-legend { gap: 6px 12px; } }

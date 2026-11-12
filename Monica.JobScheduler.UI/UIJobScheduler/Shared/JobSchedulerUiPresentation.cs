@@ -11,8 +11,8 @@ internal static class JobSchedulerUiPresentation
 {
     internal static Color GetStateColor(JobExecutionState state) => state switch
     {
-        JobExecutionState.Queued => Color.Info,
-        JobExecutionState.Running => Color.Primary,
+        JobExecutionState.Queued => Color.Default,
+        JobExecutionState.Running => Color.Info,
         JobExecutionState.Succeeded => Color.Success,
         JobExecutionState.Failed => Color.Error,
         JobExecutionState.Cancelled => Color.Secondary,
@@ -36,11 +36,11 @@ internal static class JobSchedulerUiPresentation
     internal static bool IsOperatorPaused(JobOperationalSummary summary) =>
         HasSuspensionReason(summary.SuspensionReasons, JobRecurringScheduleSuspensionReason.OperatorPolicy);
 
-    internal static bool IsDebugSuppressed(JobOperationalSummary summary) =>
-        HasSuspensionReason(summary.SuspensionReasons, JobRecurringScheduleSuspensionReason.DebugMode);
+    internal static bool IsManualSuppressed(JobOperationalSummary summary) =>
+        HasSuspensionReason(summary.SuspensionReasons, JobRecurringScheduleSuspensionReason.Manual);
 
-    internal static bool IsDebugOnlySuppressed(JobOperationalSummary summary) =>
-        IsDebugSuppressed(summary) && !IsOperatorPaused(summary);
+    internal static bool IsManualOnlySuppressed(JobOperationalSummary summary) =>
+        IsManualSuppressed(summary) && !IsOperatorPaused(summary);
 
     internal static JobRecurringScheduleSuspensionReason SetOperatorPolicySuspension(
         JobRecurringScheduleSuspensionReason reasons,

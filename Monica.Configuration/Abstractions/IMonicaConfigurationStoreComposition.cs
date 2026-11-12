@@ -3,35 +3,18 @@ using Monica.Modules;
 
 namespace Monica.Configuration.Abstractions;
 
-/// <summary>
-/// Describes one configuration store that can be projected into both runtime module composition and
-/// pre-container startup reading.
-/// </summary>
+/// <summary>Describes one managed configuration store for host-owned runtime composition.</summary>
 /// <remarks>
-/// Implementations must configure equivalent logical stores for both phases. The startup reader must be independently
-/// owned from the runtime store; the snapshot-loading operation disposes it when it supports disposal.
-/// Composition topology must remain immutable after plan creation, and both methods must deterministically target the
-/// same logical store from captured values that remain stable across both phases.
+/// Composition records registrations without opening or initializing the store. Captured inputs and topology must
+/// remain stable after plan creation. Provider and connection inputs belong to frozen Startup definitions, not to
+/// values read from the managed store being configured.
 /// </remarks>
 public interface IMonicaConfigurationStoreComposition
 {
-    /// <summary>
-    /// Gets a stable, developer-facing name used in composition diagnostics.
-    /// </summary>
+    /// <summary>Gets a stable, developer-facing name used in composition diagnostics.</summary>
     string Name { get; }
 
-    /// <summary>
-    /// Applies this store to the runtime Configuration module registration.
-    /// </summary>
+    /// <summary>Applies this store to the runtime Configuration module registration without performing store I/O.</summary>
     /// <param name="module">The host-bound Configuration module registration.</param>
-    /// <remarks>This method records runtime registrations only and must not perform store I/O.</remarks>
     void ConfigureRuntime(ModuleRegistration<ModuleConfiguration, ModuleConfigurationOption> module);
-
-    /// <summary>
-    /// Creates an isolated, read-only effective-value reader for startup options loading.
-    /// </summary>
-    /// <returns>
-    /// A new, independently owned reader. The caller disposes it when it supports synchronous or asynchronous disposal.
-    /// </returns>
-    IConfigurationEffectiveValueReader CreateStartupReader();
 }

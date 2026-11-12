@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Requirement Design"
-  short_description: "Monica requirements and design workflow"
-  default_prompt: "Use $monica-requirement-design to refine Monica requirements and produce implementation-ready architecture plans."

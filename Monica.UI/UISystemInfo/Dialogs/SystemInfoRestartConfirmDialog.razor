@@ -1,13 +1,17 @@
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
+@using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<SystemInfoResource> L
 
 <MudDialog>
+    <TitleContent>
+        <div class="system-info-restart-heading">
+            <span><MoIcon Icon="@MoIcons.Power" Size="18px" /></span>
+            <MoDialogHeading Text="@L["Page:Dialogs:Restart:Title"]" />
+        </div>
+    </TitleContent>
     <DialogContent>
         <div class="system-info-restart-dialog">
-            <span class="system-info-restart-dialog__signal"><MoIcon Icon="@MoIcons.Power" Size="2.25rem" /></span>
-            <p class="system-info-restart-dialog__eyebrow">@L["Page:Dialogs:Restart:Fact"]</p>
-            <h2>@L["Page:Dialogs:Restart:Title"]</h2>
             <p>@L["Page:Dialogs:Restart:Summary"]</p>
             <div class="system-info-restart-dialog__delay">
                 <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />
@@ -15,7 +19,7 @@
             </div>
             <div class="system-info-restart-dialog__fact">
                 <MoIcon Icon="@MoIcons.Info" Size="1.25rem" />
-                @L["Page:Dialogs:Restart:SupervisorNote"]
+                <div><p>@L["Page:Dialogs:Restart:SupervisorNote"]</p><p>@L["Page:Dialogs:Restart:Fact"]</p></div>
             </div>
         </div>
     </DialogContent>

@@ -1,20 +1,29 @@
-.runtime-config { --config-muted: color-mix(in srgb, var(--mud-palette-text-secondary) 25%, var(--mud-palette-text-primary)); min-width: 0; width: 100%; overflow: clip; border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; color: var(--mud-palette-text-primary); background: var(--mud-palette-surface); container: runtime-config / inline-size; }
-.runtime-config__heading { display: flex; align-items: start; gap: 10px; padding: 20px; }
-.runtime-config__heading > div { min-width: 0; }
-.runtime-config__heading ::deep :is(.mud-icon-root, .mo-icon) { flex: none; width: 24px; height: 24px; color: color-mix(in srgb, var(--mud-palette-primary) 45%, var(--mud-palette-text-primary)) !important; }
-.runtime-config h2 { margin: 0 0 5px; font-size: 20px; font-weight: 500; line-height: 1.4; }
-.runtime-config p { margin: 0; color: var(--config-muted); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
-.runtime-config__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; min-width: 0; padding: 0 20px 20px; }
-.runtime-config__group { display: grid; align-content: start; gap: 12px; min-width: 0; }
-.runtime-config h3 { margin: 0; color: color-mix(in srgb, var(--mud-palette-primary) 25%, var(--mud-palette-text-primary)); font-size: 16px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
-.runtime-config dl { display: grid; min-width: 0; margin: 0; }
-.runtime-config dl > div { display: grid; gap: 5px; min-width: 0; padding-block: 12px; border-block-start: 1px solid var(--mud-palette-lines-default); }
-.runtime-config dt { min-width: 0; color: var(--config-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.runtime-config dd { min-width: 0; margin: 0; font-size: 14px; font-weight: 500; line-height: 1.65; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.runtime-config__interval { text-decoration: underline dotted var(--mud-palette-lines-default); text-underline-offset: .25em; cursor: help; }
-.runtime-config__interval:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
-@container runtime-config (max-width: 1100px) { .runtime-config__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container runtime-config (max-width: 600px) {
-    .runtime-config__heading { padding: 16px; }
-    .runtime-config__grid { grid-template-columns: minmax(0, 1fr); padding: 0 16px 16px; gap: 24px; }
+
+.runtime-config { min-width:0;overflow:clip;border:1px solid var(--mud-palette-lines-default);border-radius:12px;background:var(--mud-palette-surface); }
+.runtime-config__heading { display:flex;align-items:center;gap:10px;padding:20px 22px 16px; }
+.runtime-config__heading ::deep .mo-icon { flex:none;width:32px;height:32px;padding:7px;border-radius:8px;color:var(--mud-palette-text-secondary);background:var(--mud-palette-background-gray); }
+.runtime-config h2 { margin:0;font-size:15px;font-weight:600; }
+.runtime-config p { margin:5px 0 0;color:var(--mud-palette-text-secondary);font-size:12.5px;line-height:1.7; }
+.runtime-config__grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 22px;padding:10px 22px 20px; }
+.runtime-config__group { min-width:0; }
+.runtime-config__group + .runtime-config__group { border-left:1px solid var(--mud-palette-divider);padding-left:20px; }
+.runtime-config__group:nth-child(4) { padding-left:0;border-left:0; }
+.runtime-config h3 { display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin:0 0 12px; }
+.runtime-config dl { margin:0; }
+.runtime-config dl > div { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:8px 0;border-bottom:1px dotted var(--mud-palette-divider);font-size:11.5px; }
+.runtime-config dt { color:var(--mud-palette-text-secondary); }
+.runtime-config dd { margin:0;text-align:right;font-family:var(--mo-font-family-mono);white-space:nowrap; }
+.runtime-config__interval { cursor:help; }
+.runtime-config__interval:focus-visible { outline:2px solid var(--mud-palette-primary);outline-offset:3px; }
+.runtime-config .runtime-config__note { display:flex;gap:10px;align-items:start;margin:0;padding:12px 22px;border-top:1px solid var(--mud-palette-divider);font-size:12px;line-height:1.7; }
+.runtime-config__note ::deep .mo-icon { flex:none;color:var(--mud-palette-info);margin-top:2px; }
+@container scheduler (max-width:1050px) {
+ .runtime-config__grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:22px; }
+ .runtime-config__group:nth-child(3),.runtime-config__group:nth-child(5) { border-left:0;padding-left:0; }
+ .runtime-config__group:nth-child(4) { border-left:1px solid var(--mud-palette-divider);padding-left:20px; }
+}
+@container scheduler (max-width:490px) {
+ .runtime-config__grid { grid-template-columns:1fr;padding-inline:18px;gap:20px; }
+ .runtime-config__group + .runtime-config__group { padding:18px 0 0;border-left:0;border-top:1px solid var(--mud-palette-divider); }
+ .runtime-config dt,.runtime-config dd { font-size:12px; }
 }

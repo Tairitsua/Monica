@@ -3,10 +3,18 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Builder;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.JsonSerialization.Abstractions;
+using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
+using Monica.DataChannel.Abstractions;
+using Monica.DataChannel.Providers.Default;
+using Monica.Modules;
+using Monica.Testing.Hosting;
 using Test.Monica.DataChannel.Support;
 using Xunit;
 
@@ -14,6 +22,86 @@ namespace Test.Monica.DataChannel.Modules;
 
 public sealed class ModuleDataChannelTests
 {
+    [Fact]
+    public async Task ManualHost_DoesNotConstructSetupsAndKeepsHttpAvailable()
+    {
+        await using var app = await new ManualChannelFactory().CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Empty(app.Services.GetRequiredService<IDataChannelManager>().FetchAll());
+        Assert.Contains(app.Services.GetRequiredService<MonicaApplication>().ActivationResources,
+            resource => resource.ImplementationType == typeof(ForbiddenSetup) && resource.Mode == ActivationMode.Manual);
+        using var client = ((TestServer)app.Services.GetRequiredService<IServer>()).CreateClient();
+        using var response = await client.GetAsync("/channels", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private sealed class ManualChannelFactory : MonicaTestApplicationFactory<ModuleDataChannelTests>
+    {
+        protected override void ConfigureHost(WebApplicationBuilder builder)
+        {
+            base.ConfigureHost(builder);
+            builder.Configuration["Application:AutonomousWork"] = "false";
+        }
+        protected override void ConfigureMonica(IMonicaBuilder builder)
+        {
+            builder.ConfigureModuleSystem(options => { options.AutoAddMonicaHttpListener = false; options.EnableMinimalApiByDefault = true; });
+            builder.AddDataChannel().UseSetup<ForbiddenSetup>();
+        }
+    }
+
+    private sealed class ForbiddenSetup : IDataChannelSetup
+    {
+        public ForbiddenSetup() => throw new InvalidOperationException("A held channel setup must not be constructed.");
+        public void Setup(IDataChannelRegistrar channels) => throw new InvalidOperationException("A held channel setup must not execute.");
+    }
+
+    [Fact]
+    public async Task AddDataChannel_WhenDaprIsNotSelected_ShouldRunWithoutDaprModulesOrRuntimeDependencies()
+    {
+        await using var application = await new DataChannelTestApplicationFactory(new DataChannelScenario())
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(application.ModuleSnapshots,
+            module => module.ModuleType.Assembly.GetName().Name is "Monica.Dapr" or "Monica.DataChannel.Dapr");
+        var channel = application.Services.GetRequiredService<IDataChannelManager>().FetchAll().Single();
+        await channel.SendDataFromInnerAsync("native", TestContext.Current.CancellationToken);
+        Assert.True(channel.Pipe.IsInitialized);
+
+        using var dependencyManifest = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Test.Monica.DataChannel.deps.json"),
+            TestContext.Current.CancellationToken));
+        Assert.DoesNotContain(dependencyManifest.RootElement.GetProperty("libraries").EnumerateObject(),
+            dependency => dependency.Name.StartsWith("Dapr.", StringComparison.OrdinalIgnoreCase)
+                          || dependency.Name.StartsWith("Monica.Dapr/", StringComparison.OrdinalIgnoreCase)
+                          || dependency.Name.StartsWith("Monica.DataChannel.Dapr/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task UseSetup_WhenSeveralContributorsAreRegistered_ShouldRunEachTypeOnceInOrderBeforeMaterialization()
+    {
+        var scenario = new SetupCompositionScenario();
+        await using var application = await new SetupCompositionApplicationFactory(scenario)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        scenario.SetupCalls.Should().Equal("first", "second");
+        scenario.MaterializedChannelCountsAtSetup.Should().Equal(0, 0);
+        var channels = application.Services.GetRequiredService<IDataChannelManager>().FetchAll();
+        channels.Select(channel => channel.Id).Should().BeEquivalentTo(new[] { "first", "second" });
+        channels.Should().OnlyContain(channel => channel.Pipe.IsInitialized);
+    }
+
+    [Fact]
+    public async Task UseSetup_WhenContributorsRepeatAChannelId_ShouldRejectBeforeMaterialization()
+    {
+        var scenario = new SetupCompositionScenario { DuplicateChannelId = true };
+        var create = () => new SetupCompositionApplicationFactory(scenario)
+            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        await create.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Data channel 'first' is already registered in the current host.");
+        scenario.SetupCalls.Should().Equal("first", "second");
+        scenario.MaterializedChannelCountsAtSetup.Should().Equal(0, 0);
+    }
+
     [Fact]
     public async Task AddDataChannel_WhenOnlySetupAndMinimalApiAreSelected_ShouldExecuteProductionResultProjection()
     {
@@ -28,8 +116,8 @@ public sealed class ModuleDataChannelTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var options = application.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var envelope = JsonSerializer.Deserialize<Res<JsonElement>>(body, options)!;
-        envelope.Status.Should().Be(ResStatus.Ok);
+        var envelope = JsonSerializer.Deserialize<Result<JsonElement>>(body, options)!;
+        envelope.Status.Should().Be(ResultStatus.Ok);
         envelope.Message.Should().BeNullOrEmpty();
         envelope.Data.ValueKind.Should().Be(JsonValueKind.Array);
         envelope.Data.GetArrayLength().Should().Be(1);
@@ -38,5 +126,58 @@ public sealed class ModuleDataChannelTests
         channel.GetProperty("groupId").GetString().Should().Be(scenario.Primary.GroupId);
         channel.GetProperty("isInitialized").GetBoolean().Should().BeTrue();
         channel.GetProperty("outerEndpoint").GetProperty("metadata").GetProperty("json").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    private sealed class SetupCompositionScenario
+    {
+        public bool DuplicateChannelId { get; init; }
+        public List<string> SetupCalls { get; } = [];
+        public List<int> MaterializedChannelCountsAtSetup { get; } = [];
+    }
+
+    private sealed class FirstChannelSetup(SetupCompositionScenario scenario, IDataChannelManager manager)
+        : IDataChannelSetup
+    {
+        public void Setup(IDataChannelRegistrar channels)
+        {
+            scenario.SetupCalls.Add("first");
+            scenario.MaterializedChannelCountsAtSetup.Add(manager.FetchAll().Count);
+            channels.Add("first", pipeline => pipeline.SetOuterEndpoint(new DefaultEndpointOptions()));
+        }
+    }
+
+    private sealed class SecondChannelSetup(SetupCompositionScenario scenario, IDataChannelManager manager)
+        : IDataChannelSetup
+    {
+        public void Setup(IDataChannelRegistrar channels)
+        {
+            scenario.SetupCalls.Add("second");
+            scenario.MaterializedChannelCountsAtSetup.Add(manager.FetchAll().Count);
+            channels.Add(scenario.DuplicateChannelId ? "first" : "second",
+                pipeline => pipeline.SetOuterEndpoint(new DefaultEndpointOptions()));
+        }
+    }
+
+    private sealed class SetupCompositionApplicationFactory(SetupCompositionScenario scenario)
+        : MonicaTestApplicationFactory<ModuleDataChannelTests>
+    {
+        protected override void ConfigureMonica(IMonicaBuilder builder)
+        {
+            builder.ConfigureModuleSystem(options =>
+            {
+                options.AutoAddMonicaHttpListener = false;
+                options.EnableMinimalApiByDefault = false;
+            });
+            builder.AddDataChannel()
+                .UseSetup<FirstChannelSetup>()
+                .UseSetup<SecondChannelSetup>()
+                .UseSetup<FirstChannelSetup>();
+        }
+
+        protected override void ConfigureServices(IServiceCollection services)
+        {
+            base.ConfigureServices(services);
+            services.AddSingleton(scenario);
+        }
     }
 }

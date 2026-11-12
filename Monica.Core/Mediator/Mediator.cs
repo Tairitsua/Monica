@@ -3,15 +3,14 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Execution;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.Core.Mediator;
 
 /// <summary>
 /// Default request dispatcher for Monica request handlers.
 /// </summary>
-public sealed class Mediator(
-    IServiceProvider serviceProvider,
-    IEnumerable<IReadOnlyRequestConvention> readOnlyConventions) : IMediator
+public sealed class Mediator(IServiceProvider serviceProvider) : IMediator
 {
     private static readonly ConcurrentDictionary<(Type RequestType, Type ResponseType), Func<Mediator, object, CancellationToken, Task<object?>>> _dispatcherCache = new();
 
@@ -62,9 +61,10 @@ public sealed class Mediator(
     private async Task<TResponse> Execute<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         where TRequest : IRequest<TResponse>
     {
+        serviceProvider.GetService<ITypeActivationPolicy>()?.EnsureCanExecuteRequest(typeof(TRequest));
         var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
         var handlerType = handler.GetType();
-        var readOnly = readOnlyConventions.Any(convention => convention.IsReadOnly(typeof(TRequest)));
+        var readOnly = request is IQueryRequest;
         var descriptor = ExecutionDescriptor.ForInterface<TRequest, TResponse>(
             MediatorExecutionPoints.Request,
             handlerType,

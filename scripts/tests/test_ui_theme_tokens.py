@@ -31,10 +31,6 @@ class ThemeRoleValidationTests(unittest.TestCase):
     def test_color_role_identifiers_are_not_color_literals(self):
         self.assertEqual([], self.scan(".reader { color: var(--caption-black); background: var(--paper-white); }"))
 
-    def test_guide_palette_exception_does_not_cover_component_styles(self):
-        root = REPOSITORY / "Monica.Guide.App" / "wwwroot" / "css"
-        self.assertTrue(VALIDATOR.is_theme_definition_file(root / "themes" / "guide" / "guide-theme.css"))
-        self.assertFalse(VALIDATOR.is_theme_definition_file(root / "guide-components.css"))
 
 
 if __name__ == "__main__":

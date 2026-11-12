@@ -258,7 +258,7 @@
             if (!IsCurrent(revision))
                 return;
             _pendingRevealRevision = revision;
-            _pendingErrorFocus = result.IsFailed(out _, out _);
+            _pendingErrorFocus = result.IsFailure();
         }
         catch (OperationCanceledException exception) when (_disposed || exception.CancellationToken.IsCancellationRequested)
         {

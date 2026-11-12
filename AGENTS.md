@@ -6,7 +6,8 @@ Monica is modular .NET infrastructure for agent-driven development. `Monica.slnx
 
 - Code comments and XML documentation in this repository are also English; sibling and consumer repositories own their own conventions.
 - Prefer clear boundaries and behavior on the types that own it. Simplify the design instead of accumulating workarounds. Breaking changes are allowed unless the task requires compatibility; keep refactoring within the requested scope.
-- Document public and developer-facing contracts, including meaningful option defaults, registration prerequisites, and lifecycle/ownership constraints. Use the [coding contracts](skills/monica-development/references/coding-contracts.md) when changing C# APIs.
+- Apply the [Monica coding standards](skills/monica-coding-standards/SKILL.md) when designing, implementing, reviewing, or simplifying framework code. Breaking changes are allowed unless the task requires compatibility; keep refactoring within the requested scope.
+- Document public and developer-facing contracts, including meaningful option defaults, registration prerequisites, and lifecycle/ownership constraints. Use the [C# contracts](skills/monica-coding-standards/references/csharp-contracts.md) when changing C# APIs.
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before committing or preparing a release; follow its Conventional Commit policy.
 
 ## Task routing
@@ -21,7 +22,7 @@ Load the skills relevant to the current work; details belong there rather than i
 | Framework tests and shared test infrastructure | `monica-unit-testing` |
 | Canonical skills, public guidance, or documentation ownership | `monica-docs-authoring` |
 | Guide engine, setup, or release contracts | `monica-guide`; engine changes use its framework-development reference |
-| Focused simplification of selected code | `code-simplifier`; architecture redesign uses `monica-architecture` |
+| Coding standards, code review, and focused simplification | `monica-coding-standards`; module-boundary redesign uses `monica-architecture` |
 
 For exact dependency behavior, use `inspect-dependency-source` when available and resolve the version actually in use. For uncertain Microsoft APIs, use `microsoft-docs` or `microsoft-code-reference` with official sources. Read dependency versions from project/package metadata instead of copying them into these instructions.
 
@@ -42,8 +43,8 @@ powershell -File scripts/run-tests.ps1 -NoBuild
 
 ## Knowledge ownership
 
-- Edit Monica skills only in `skills/<name>/`. `.agents/skills/` and `.claude/skills/` are generated projections. Regenerate with `python scripts/sync_agent_skills.py --write` and include canonical and generated changes together.
-- Before completing a skill change, run `python scripts/validate_agent_skills.py`, `python scripts/sync_agent_skills.py --check`, and `python scripts/test_agent_skills.py`.
+- Edit Monica skills only in `skills/<name>/`. `.agents/` and `.claude/` are ignored local agent state; their `skills/` subdirectories are generated projections. Regenerate with `python scripts/sync_agent_skills.py --write` after cloning or changing skills, and never commit either root, including during merges or synchronization.
+- Before completing a skill change, run `python scripts/validate_agent_skills.py`, `python scripts/sync_agent_skills.py --write`, `python scripts/sync_agent_skills.py --check`, and `python scripts/test_agent_skills.py`.
 - When implementation changes public behavior or yields verified reusable guidance, update the owning task reference, its routing when needed, and the relevant example or behavioral check in the same change. Follow `monica-docs-authoring` for topic boundaries; replace obsolete guidance rather than appending session notes.
 - Run `python scripts/check_knowledge_impact.py --base <base-ref>` for infrastructure changes. If guidance is unaffected, pass `--no-impact "<concrete reason>"` and record that rationale in the PR's Knowledge impact section.
 - The catalog at `.monica/agent-skill-catalog.json` owns skill routing, source ownership, and release projections. Monica.Docs owns stable editorial guides and renders published skills; do not create parallel module manuals here.
@@ -51,3 +52,7 @@ powershell -File scripts/run-tests.ps1 -NoBuild
 ## Maintaining instructions
 
 Keep this file limited to stable repository-wide rules and task routing. Put implementation procedures in the owning skill, contributor/release workflows in `CONTRIBUTING.md`, and machine-specific setup in personal skills or user-level instructions. Dates, incident narratives, test counts, timings, and migration status belong in change history or memory. Update the existing owner instead of duplicating a rule. `CLAUDE.md` imports this file.
+
+## Standalone Guide ownership
+
+The Guide engine and client live in the sibling private `../Monica.Guide` repository. This repository publishes Framework code and skills-only bundles with `scripts/build_framework_bundle.py`; it does not build or distribute a Guide executable. Guide implementation fixes belong in its repository.

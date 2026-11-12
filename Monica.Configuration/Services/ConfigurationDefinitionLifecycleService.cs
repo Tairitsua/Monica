@@ -1,6 +1,7 @@
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
+using Monica.Configuration.Services.Support;
 
 namespace Monica.Configuration.Services;
 
@@ -10,7 +11,8 @@ namespace Monica.Configuration.Services;
 internal sealed class ConfigurationDefinitionLifecycleService(
     IConfigurationDefinitionRegistry definitionRegistry,
     IConfigurationDefinitionMaintenanceStore maintenanceStore,
-    ConfigurationDefinitionResolver definitionResolver)
+    ConfigurationDefinitionResolver definitionResolver,
+    ConfigurationRuntimeContext? runtimeContext = null)
 {
     /// <summary>
     /// Gets the store-level purge impact enriched with current-process registration state.
@@ -30,14 +32,14 @@ internal sealed class ConfigurationDefinitionLifecycleService(
     }
 
     /// <summary>
-    /// Treats a locally registered definition as active before its publication batch reaches the store.
+    /// Treats an Automatic local definition as active before publication; Manual reads preserve persisted lifecycle.
     /// </summary>
     /// <param name="overview">The persisted publication overview.</param>
     /// <returns>The overview enriched with current-process registration state.</returns>
     public ConfigurationDefinitionPublicationOverview EnrichWithLocalRegistration(
         ConfigurationDefinitionPublicationOverview overview)
     {
-        return definitionRegistry.TryGet(overview.DefinitionKey, out _)
+        return runtimeContext?.AutonomousWork != false && definitionRegistry.TryGet(overview.DefinitionKey, out _)
             ? overview with { LifecycleState = ConfigurationDefinitionLifecycleState.Active }
             : overview;
     }
@@ -56,6 +58,8 @@ internal sealed class ConfigurationDefinitionLifecycleService(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (runtimeContext?.MaintenanceReadOnlyReason is { } reason)
+            throw new ConfigurationValidationFailedException(reason);
         var normalizedRequest = request with
         {
             DefinitionKey = NormalizeDefinitionKey(request.DefinitionKey)
@@ -85,7 +89,8 @@ internal sealed class ConfigurationDefinitionLifecycleService(
         return preview with
         {
             IsLocallyRegistered = isLocallyRegistered,
-            LifecycleState = isLocallyRegistered
+            ReadOnlyReason = runtimeContext?.MaintenanceReadOnlyReason,
+            LifecycleState = runtimeContext?.AutonomousWork != false && isLocallyRegistered
                 ? ConfigurationDefinitionLifecycleState.Active
                 : preview.LifecycleState
         };

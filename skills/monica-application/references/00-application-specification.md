@@ -1,6 +1,12 @@
 # Shared Application Specification
 
-The five `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the two architecture profiles own topology and boundaries; ProjectUnit development owns unit responsibilities and shapes; application testing owns verification boundaries. Infrastructure skills explain the native capabilities used by these patterns.
+The `monica-application*` skills form the shared specification for Monica applications. The router owns applicability and evolution; the unified architecture owns topology and boundaries; the legacy microservice and modular-monolith skills cover split/combined deployment and migration; Building Block development owns building block responsibilities and kinds; application testing owns verification boundaries. Application UI owns the presentation branch and its development workflow; role placement and UI inclusion are independent selections. Pure backend applications need no UI skills. Infrastructure skills explain the native capabilities used by these patterns.
+
+Read [unified architecture](03-unified-architecture.md) for the single domain-core/role-project layout, selective host composition, generated ownership catalogs, placement, activation, API and migration ownership. Backend-only and backend-with-UI remain independent skill installation choices.
+
+Use [startup and local execution](04-startup-and-local-execution.md) for configuration authority, environment inputs and the single-host Manual profile. These use the same domain/role placement and native lifecycle; local development adds no separate application model.
+
+Use [database layout and migrations](05-database-migrations.md) for migration placement, schema and history ownership, deployment preflight, and consolidation. The project specification owns concrete store mappings and installation choices; environment cutover assets own the execution and rollback procedure.
 
 ## Rule Strength
 
@@ -14,15 +20,17 @@ Recommendations and defaults guide selection among allowed choices. When a proje
 
 ## Shared and Project Ownership
 
-Shared skills own reusable architecture profiles, role vocabulary, dependency direction, lifecycle boundaries, native extension mechanisms, and test patterns. The repository-owned `<project>-application-spec` owns the selected profile, actual domains/services/hosts, dependency map, local naming and placement, adopted specializations, explicit deviations, validation commands, and known migration gaps. Locate it through `AGENTS.md` or the repository's equivalent instructions. Use its references as the current application architecture source; do not maintain a parallel `docs/architecture.md` or Workflow architecture topic.
+Shared skills own the unified domain/role architecture, role vocabulary, dependency direction, lifecycle boundaries, native extension mechanisms, and test patterns. The repository-owned `<project>-application-spec` owns the adopted layout and deployment placement, actual domains/roles/hosts, dependency map, local naming and placement, adopted specializations, explicit deviations, validation commands, and known migration gaps. Locate it through `AGENTS.md` or the repository's equivalent instructions. Use its references as the current application architecture source; do not maintain a parallel `docs/architecture.md` or Workflow architecture topic.
 
-The project specification links to shared rules instead of copying their catalog. A local specialization remains in its native role and preserves the role's ownership and execution contracts. Existing code is evidence of current facts, including drift; it is not implicit approval for a new pattern. A known migration gap describes that drift without making it the target convention for new work.
+[Application test project naming](../../monica-application-unit-testing/references/project-naming.md) follows the production behavior owner across domain cores, roles, shared libraries, and executable hosts. The project specification records its test root, shared support library, concrete migration mappings, and remaining mixed-owner projects.
+
+The project specification links to shared rules instead of copying their catalog. A local specialization preserves its native building block kind and preserves the role's ownership and execution contracts. Existing code is evidence of current facts, including drift; it is not implicit approval for a new pattern. A known migration gap describes that drift without making it the target convention for new work.
 
 ## Apply Rules to a Change
 
-1. Load this router and the designated project specification, then read the affected architecture, unit, and test references.
+1. Load this router and the designated project specification, then read the affected architecture, building block, and test references.
 2. Identify the owning state and business boundary. Entities protect their invariants; handlers orchestrate use cases; repositories stage and materialize persistence operations. Add a DomainService only for a meaningful domain rule that has no natural entity owner.
-3. Map the work to existing ProjectUnit responsibilities and compose native capabilities already allowed by the profile. New concrete units, business state transitions, delivery steps, and documented transaction-boundary choices are ordinary implementation when they preserve those contracts. The specification supplies composable building blocks; it need not contain an exact recipe for every business flow.
+3. Map the work to existing Building Block responsibilities and compose native capabilities already allowed by the profile. New concrete building blocks, business state transitions, delivery steps, and documented transaction-boundary choices are ordinary implementation when they preserve those contracts. The specification supplies composable building blocks; it need not contain an exact recipe for every business flow.
 4. If no compliant composition meets the requirement, identify the specific conflicting or missing architectural contract and use [specification evolution](01-specification-evolution.md) before changing it. An unfamiliar combination or an absent end-to-end example alone is not a specification gap. Keep independent work inside the current contract moving.
 5. Validate the changed behavior and reconcile impacted project-specification facts and rules. Explain a rule's rationale where the rule lives; retain approval evidence in Git/history or the project's existing decision mechanism.
 

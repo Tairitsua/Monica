@@ -142,9 +142,11 @@
         {
             var result = await Facade.ListTopicConsumerGroupsAsync(ClusterId, TopicName, _lifetime.Token);
             if (_isDisposed) return;
-            if (result.IsFailed(out var error)) { _errorMessage = error.Message; return; }
+            if (result.IsFailure()) { _errorMessage = result.Message; return; }
+            var groups = result.Data
+                ?? throw new InvalidOperationException("Kafka consumer group discovery returned no data.");
             _groups.Clear();
-            _groups.AddRange(result.Data!);
+            _groups.AddRange(groups);
             _hasLoaded = true;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }

@@ -1,13 +1,17 @@
 # Exception response diagnostics
 
-`AddExceptionHandling()` requires a Web host and converts unhandled failures into Monica result envelopes. Configure diagnostic visibility on `AddResultEnvelope(...)`; `ExposeDiagnosticDetails` defaults to `false` and does not follow the ASP.NET Core environment automatically. For a host whose consumers may inspect technical details, add these registrations inside the existing `builder.AddMonica(...)` callback:
+`AddExceptionHandling()` requires a Web host and converts unhandled failures into Monica result envelopes. The shared [application debug policy](debug-mode.md) owns diagnostic visibility and defaults to `false`, independently of the ASP.NET Core environment. For a host whose consumers may inspect technical details, configure it inside the existing `builder.AddMonica(...)` callback:
 
 ```csharp
 monica.AddExceptionHandling();
-monica.AddResultEnvelope(options => options.ExposeDiagnosticDetails = true);
+monica.ConfigureApplication(options => options.DebugMode = true);
 ```
 
+`BusinessException` represents a business-rule rejection. The HTTP exception handler projects it as `Result.Failure(business.Message)`. Its type does not select EventBus retry behavior; distributed consumers apply the same [finite processing retry budget](../../monica-infra-messaging/references/event-bus.md#processing-retries-and-dead-letters) to all failures. Response diagnostic visibility does not change delivery or retry decisions.
+
 With the switch enabled, an exception response contains `metadata.diagnostics`, an `ExceptionDiagnosticDocument` with `schemaVersion: 1`, a root `exceptionId`, optional request context, and an `exceptions` catalog. Each entry has an `id`, CLR `type`, its own `message`, its own `stackTrace` array, and optional `innerExceptionIds`. Runtime exceptions are captured once by object identity at response projection: the same propagated exception and shared causes use the same ID, while distinct exceptions with identical text remain distinct. Aggregate exceptions retain their direct causes. This avoids copying `Exception.ToString()` into each boundary or chain node; repeated frames within one actual stack remain meaningful evidence and are retained.
+
+For a failed local transaction, `TransactionRollbackOnlyException` identifies the rejected action and the first failure's operation, reason, and correlations. Its inner exception is the original failure even when application code caught it earlier; the catalog preserves that original stack by identity. Result-only rollback causes have a status and message but no artificial inner exception. The scoped failure snapshot and structured transaction log are described in [first-failure diagnostics](../../monica-infra-persistence/references/transactions.md#first-failure-diagnostics).
 
 The following diagnostic metadata fragment shows a wrapper and its cause. Call-chain nodes, when enabled, refer to the same catalog through `exceptionId`:
 

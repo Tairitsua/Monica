@@ -21,7 +21,7 @@ public sealed class ObservableInstanceFacade(
     /// </summary>
     /// <param name="cancellationToken">Cancels before the read and between tracker captures.</param>
     /// <returns>Detached instance evidence, or a read failure.</returns>
-    public Task<Res<IReadOnlyList<ObservableInstanceSnapshot>>> CaptureAsync(CancellationToken cancellationToken = default)
+    public Task<Result<IReadOnlyList<ObservableInstanceSnapshot>>> CaptureAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -33,13 +33,13 @@ public sealed class ObservableInstanceFacade(
                 try { snapshots.Add(tracker.CaptureSnapshot(cancellationToken)); }
                 catch (ObjectDisposedException) { /* A registration was retired after the membership read. */ }
             }
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceSnapshot>>>(Res.Ok<IReadOnlyList<ObservableInstanceSnapshot>>(snapshots.AsReadOnly()));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceSnapshot>>>(Result.Success<IReadOnlyList<ObservableInstanceSnapshot>>(snapshots.AsReadOnly()));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to capture observable instances.");
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceSnapshot>>>(Res.Fail(exception.Message));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceSnapshot>>>(Result.Failure<IReadOnlyList<ObservableInstanceSnapshot>>(exception.Message));
         }
     }
 
@@ -47,151 +47,159 @@ public sealed class ObservableInstanceFacade(
     /// <param name="identity">The registration identity captured by the caller.</param>
     /// <param name="cancellationToken">Cancels before the clear operation.</param>
     /// <returns>A failure for a missing, retired, or replacement registration.</returns>
-    public Task<Res> ClearInstanceHistoryAsync(ObservableInstanceReference identity, CancellationToken cancellationToken = default)
+    public Task<Result> ClearInstanceHistoryAsync(ObservableInstanceReference identity, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var tracker = _registry.GetById(identity.InstanceId);
             if (tracker is null || tracker.RegistrationId != identity.RegistrationId)
-                return Task.FromResult<Res>(Res.Fail("The captured registration is no longer available. Refresh before clearing history."));
+                return Task.FromResult<Result>(Result.Failure("The captured registration is no longer available. Refresh before clearing history."));
             cancellationToken.ThrowIfCancellationRequested();
             tracker.ClearHistory();
-            return Task.FromResult<Res>(Res.Ok());
+            return Task.FromResult<Result>(Result.Success());
         }
-        catch (ObjectDisposedException) { return Task.FromResult<Res>(Res.Fail("The captured registration was retired.")); }
+        catch (ObjectDisposedException) { return Task.FromResult<Result>(Result.Failure("The captured registration was retired.")); }
         catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to clear retained history for captured registration {InstanceId}.", identity.InstanceId);
-            return Task.FromResult<Res>(Res.Fail(exception.Message));
+            return Task.FromResult<Result>(Result.Failure(exception.Message));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableInstanceTracker>>> GetAllInstancesAsync()
+    public Task<Result<IReadOnlyList<ObservableInstanceTracker>>> GetAllInstancesAsync()
     {
         try
         {
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Ok(_registry.GetAllInstances()));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Success(_registry.GetAllInstances()));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get all observable instances.");
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Fail($"Failed to get observable instances: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Failure<IReadOnlyList<ObservableInstanceTracker>>($"Failed to get observable instances: {ex.Message}"));
         }
     }
 
-    public Task<Res<ObservableInstanceTracker?>> GetByIdAsync(string instanceId)
+    public Task<Result<ObservableInstanceTracker?>> GetByIdAsync(string instanceId)
     {
         try
         {
-            return Task.FromResult<Res<ObservableInstanceTracker?>>(Res.Ok(_registry.GetById(instanceId)));
+            return Task.FromResult<Result<ObservableInstanceTracker?>>(Result.Success(_registry.GetById(instanceId)));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instance {InstanceId}.", instanceId);
-            return Task.FromResult<Res<ObservableInstanceTracker?>>(Res.Fail($"Failed to get observable instance details: {ex.Message}"));
+            return Task.FromResult<Result<ObservableInstanceTracker?>>(Result.Failure<ObservableInstanceTracker?>($"Failed to get observable instance details: {ex.Message}"));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesByTypeAsync(Type type)
+    public Task<Result<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesByTypeAsync(Type type)
     {
         try
         {
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Ok(_registry.GetInstancesByType(type)));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Success(_registry.GetInstancesByType(type)));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instances by type {Type}.", type);
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Fail($"Failed to get observable instances by type: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Failure<IReadOnlyList<ObservableInstanceTracker>>($"Failed to get observable instances by type: {ex.Message}"));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesByGroupAsync(string groupId)
+    public Task<Result<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesByGroupAsync(string groupId)
     {
         try
         {
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Ok(_registry.GetInstancesByGroup(groupId)));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Success(_registry.GetInstancesByGroup(groupId)));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instances by group {GroupId}.", groupId);
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Fail($"Failed to get observable instances by group: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Failure<IReadOnlyList<ObservableInstanceTracker>>($"Failed to get observable instances by group: {ex.Message}"));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesWithExceptionsAsync()
+    public Task<Result<IReadOnlyList<ObservableInstanceTracker>>> GetInstancesWithExceptionsAsync()
     {
         try
         {
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Ok(_registry.GetInstancesWithExceptions()));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Success(_registry.GetInstancesWithExceptions()));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instances with exceptions.");
-            return Task.FromResult<Res<IReadOnlyList<ObservableInstanceTracker>>>(Res.Fail($"Failed to get observable instances with exceptions: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableInstanceTracker>>>(Result.Failure<IReadOnlyList<ObservableInstanceTracker>>($"Failed to get observable instances with exceptions: {ex.Message}"));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableStateEntry>>> GetInstanceHistoryAsync(string instanceId, int? limit = null)
+    public Task<Result<IReadOnlyList<ObservableStateEntry>>> GetInstanceHistoryAsync(string instanceId, int? limit = null)
     {
         try
         {
             var tracker = _registry.GetById(instanceId);
             if (tracker == null)
             {
-                return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Fail(InstanceNotFoundMessage));
+                return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Failure<IReadOnlyList<ObservableStateEntry>>(InstanceNotFoundMessage));
             }
 
             IReadOnlyList<ObservableStateEntry> history = limit.HasValue && limit.Value > 0
                 ? tracker.GetRecentHistory(limit.Value)
                 : tracker.GetHistory();
 
-            return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Ok(history));
+            return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Success(history));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instance history for {InstanceId}.", instanceId);
-            return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Fail($"Failed to get observable instance history: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Failure<IReadOnlyList<ObservableStateEntry>>($"Failed to get observable instance history: {ex.Message}"));
         }
     }
 
-    public Task<Res<IReadOnlyList<ObservableStateEntry>>> GetInstanceExceptionsAsync(string instanceId)
+    public Task<Result<IReadOnlyList<ObservableStateEntry>>> GetInstanceExceptionsAsync(string instanceId)
     {
         try
         {
             var tracker = _registry.GetById(instanceId);
             if (tracker == null)
             {
-                return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Fail(InstanceNotFoundMessage));
+                return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Failure<IReadOnlyList<ObservableStateEntry>>(InstanceNotFoundMessage));
             }
 
-            return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Ok(tracker.GetExceptions()));
+            return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Success(tracker.GetExceptions()));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get observable instance exceptions for {InstanceId}.", instanceId);
-            return Task.FromResult<Res<IReadOnlyList<ObservableStateEntry>>>(Res.Fail($"Failed to get observable instance exceptions: {ex.Message}"));
+            return Task.FromResult<Result<IReadOnlyList<ObservableStateEntry>>>(Result.Failure<IReadOnlyList<ObservableStateEntry>>($"Failed to get observable instance exceptions: {ex.Message}"));
         }
     }
 
-    public Task<Res> ClearInstanceHistoryAsync(string instanceId)
+    public Task<Result> ClearInstanceHistoryAsync(string instanceId)
     {
         try
         {
             var tracker = _registry.GetById(instanceId);
             if (tracker == null)
             {
-                return Task.FromResult<Res>(Res.Fail(InstanceNotFoundMessage));
+                return Task.FromResult<Result>(Result.Failure(InstanceNotFoundMessage));
             }
 
             tracker.ClearHistory();
-            return Task.FromResult<Res>(Res.Ok("Observable instance history was cleared."));
+            return Task.FromResult<Result>(Result.Success().WithMessage("Observable instance history was cleared."));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to clear observable instance history for {InstanceId}.", instanceId);
-            return Task.FromResult<Res>(Res.Fail($"Failed to clear observable instance history: {ex.Message}"));
+            return Task.FromResult<Result>(Result.Failure($"Failed to clear observable instance history: {ex.Message}"));
         }
     }
 }

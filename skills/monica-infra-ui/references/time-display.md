@@ -61,6 +61,36 @@ Verify a configured zone different from the server zone, a conversion crossing
 midnight, a DST zone and a non-default format. Inspect the ordinary table and its
 phone layout; removing text must not remove exact identities or query semantics.
 
+## Prototype time display
+
+Every new or revised prototype page follows this same display contract. Model the
+target deployment's `ModuleClockOption.LocalTimeZone` explicitly in the fixture and
+use a shared prototype formatter that represents `MoTimeFormatter`. Do not choose
+the browser or server timezone, hard-code a different zone in each page, or render
+an ISO UTC string as the ordinary timestamp label. If host configuration is not
+available, declare the demonstration timezone in the fixture and design note.
+That choice is a prototype assumption; the framework's unset Clock default remains
+UTC.
+
+Ordinary full timestamps use `yyyy-MM-dd HH:mm:ss`, matching the default shell
+format, without a repeated `UTC`, `Z`, or numeric offset suffix. Honor an explicitly
+configured display-format override when the prototype models one. Compact labels
+may use the configured date/time formats when their date context is visible.
+Identify the effective deployment timezone once in the appropriate context when
+operators need it, rather than repeating it in every row or evidence value.
+
+Keep fixture instants and HTML `datetime` metadata exact; convert only their
+human-readable labels. For example, with `CommonTimeZone.China`, the instant
+`2026-10-28T16:05:09Z` displays as `2026-10-29 00:05:09`. Do not strip the source
+offset and reinterpret the remaining digits as deployment wall time. Schedule
+inputs and previews retain their declared schedule timezone as described above;
+elapsed durations, chart geometry and UTC query boundaries are unchanged.
+
+Verify the prototype's configured-zone conversion across midnight and with a
+browser timezone different from that zone. Check full timestamps in tables,
+evidence sheets, dialogs and capture labels in both UI languages. For DST-sensitive
+views, also retain the offset-change distinction required by the range contract.
+
 ## Migrating custom display owners
 
 Replace `SystemInfoDisplayFormatter.FormatDateTime` / `FormatTime` and removed

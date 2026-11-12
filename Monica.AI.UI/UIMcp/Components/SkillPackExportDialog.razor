@@ -124,7 +124,9 @@
             // File writes are synchronous; drain the actual host operation even when retirement cancels its UI owner.
             var result = await Task.Run(() => McpFacade.ExportSkillPack(server, endpoint, targetRoot), cancellationToken);
             if (_lifetime.IsRetired || cancellationToken.IsCancellationRequested) return;
-            if (result.IsFailed(out var error, out var export))
+            var error = result.WithoutData();
+            var export = result.Data;
+            if (result.IsFailure() || export is null)
             {
                 _error = string.IsNullOrWhiteSpace(error.Message) ? L["Error:Generic"] : error.Message;
                 return;

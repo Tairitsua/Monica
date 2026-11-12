@@ -15,6 +15,14 @@ namespace Monica.JobScheduler.Abstractions;
 /// </remarks>
 public interface IJobExecutionStore
 {
+    /// <summary>Aggregates exact retained execution evidence using the ledger's filters except state selection.</summary>
+    /// <param name="query">Identity, search and inclusive time bounds. State, sort and page fields do not affect the distribution.</param>
+    /// <param name="bucketCount">Number of time buckets, from 1 through 200; defaults to 48.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <remarks>Completion bounds select completion time; otherwise creation time is used. All buckets share one store snapshot.</remarks>
+    Task<JobExecutionDistribution> GetExecutionDistributionAsync(JobExecutionQuery query, int bucketCount = 48,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Durably enqueues an execution against a present definition. Repeating an identical request is idempotent. When
     /// availability is omitted, the store captures its authoritative current time only for the initial insert and
@@ -99,6 +107,7 @@ public interface IJobExecutionStore
     /// </summary>
     /// <remarks>
     /// Only queued executions whose owner matches the request and whose job key is locally executable are claimable.
+    /// A durably retired owner cannot claim queued work, including requests without a manifest hash.
     /// </remarks>
     Task<IReadOnlyList<JobExecutionLease>> ClaimAsync(
         JobClaimRequest request,

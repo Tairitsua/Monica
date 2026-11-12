@@ -38,7 +38,7 @@ public sealed class ConnectivityProbeFacadeTests
 
         var result = await pending.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.BadRequest);
+        result.Status.Should().Be(ResultStatus.BadRequest);
         result.Message.Should().NotBeNullOrWhiteSpace();
         result.Data.Should().BeNull();
         await endpoint.ObserveCanceledConnectionDrainAsync();

@@ -11,9 +11,9 @@ public static class ResultAssertionExtensions
     /// <summary>
     /// Asserts that the result succeeded and optionally verifies the message.
     /// </summary>
-    public static Res ShouldSucceed(this Res result, string? expectedMessage = null)
+    public static Result ShouldSucceed(this Result result, string? expectedMessage = null)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.IsSuccess().Should().BeTrue();
         if (expectedMessage is not null)
         {
             result.Message.Should().Be(expectedMessage);
@@ -25,9 +25,9 @@ public static class ResultAssertionExtensions
     /// <summary>
     /// Asserts that the result failed and optionally verifies the status and message.
     /// </summary>
-    public static Res ShouldFail(
-        this Res result,
-        ResStatus expectedStatus = ResStatus.BadRequest,
+    public static Result ShouldFail(
+        this Result result,
+        ResultStatus expectedStatus = ResultStatus.BadRequest,
         string? expectedMessage = null)
     {
         result.Status.Should().Be(expectedStatus);
@@ -42,9 +42,9 @@ public static class ResultAssertionExtensions
     /// <summary>
     /// Asserts that the result succeeded and returns the payload for additional checks.
     /// </summary>
-    public static T? ShouldSucceed<T>(this Res<T> result, string? expectedMessage = null)
+    public static T? ShouldSucceed<T>(this Result<T> result, string? expectedMessage = null)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.IsSuccess().Should().BeTrue();
         if (expectedMessage is not null)
         {
             result.Message.Should().Be(expectedMessage);
@@ -56,9 +56,9 @@ public static class ResultAssertionExtensions
     /// <summary>
     /// Asserts that the result failed and optionally verifies the status and message.
     /// </summary>
-    public static Res<T> ShouldFail<T>(
-        this Res<T> result,
-        ResStatus expectedStatus = ResStatus.BadRequest,
+    public static Result<T> ShouldFail<T>(
+        this Result<T> result,
+        ResultStatus expectedStatus = ResultStatus.BadRequest,
         string? expectedMessage = null)
     {
         result.Status.Should().Be(expectedStatus);
@@ -73,9 +73,9 @@ public static class ResultAssertionExtensions
     /// <summary>
     /// Asserts that the paged result succeeded and returns the page payload.
     /// </summary>
-    public static ResPaged<T>.PageData ShouldSucceed<T>(this ResPaged<T> result, string? expectedMessage = null)
+    public static PagedResult<T>.PageData ShouldSucceed<T>(this PagedResult<T> result, string? expectedMessage = null)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.IsSuccess().Should().BeTrue();
         if (expectedMessage is not null)
         {
             result.Message.Should().Be(expectedMessage);

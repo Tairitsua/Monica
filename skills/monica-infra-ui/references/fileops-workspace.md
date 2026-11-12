@@ -75,7 +75,7 @@ Batch deletion uses one policy snapshot, deduplicates target paths in their orig
 
 ## Developer ownership
 
-`IFileOpsWorkspaceService` and `IFileOpsTransferService` expose the actual scoped filesystem and transfer boundaries. The module aliases them to its existing scoped concrete services, preserving one instance per scope. `FileOpsFacade` borrows these interfaces and projects exceptions into `Res` envelopes; controlled behavior tests can replace these external boundaries while retaining the real facade. Direct facade construction now supplies those interface contracts; existing concrete implementations implement them.
+`IFileOpsWorkspaceService` and `IFileOpsTransferService` expose the actual scoped filesystem and transfer boundaries. The module aliases them to its existing scoped concrete services, preserving one instance per scope. `FileOpsFacade` borrows these interfaces and projects exceptions into `Result` envelopes; controlled behavior tests can replace these external boundaries while retaining the real facade. Direct facade construction now supplies those interface contracts; existing concrete implementations implement them.
 
 The workspace controller belongs to one routed visit. Native dialog ownership must observe late `ShowAsync` references, close them on retirement and join the actual result and close dispatch. Retire dialog owners before waiting for work that awaits their result. Download interop owns its imported module and `DotNetStreamReference`, while the descriptor's stream belongs to the invoking operation. Cancellation alone is not drainage; once a UI mutation starts, the visit joins it without promising cancellation or rollback.
 

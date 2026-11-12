@@ -1,8 +1,14 @@
 # Inspect Kafka broker evidence
 
+`KafkaConsoleDbContext` marks its cluster and performance snapshot tables for [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md). Configure its context options and migration factory with the same layout and a dedicated history key. Existing table identifiers remain module-owned; selecting an infrastructure schema does not rename tables or move broker configuration data.
+
 Register `monica.AddEventBusKafkaUI()` in an ASP.NET Core host with the Monica shell. The UI requires the Kafka backend and contributes its localization resource and five shell/search pages. Configure cluster access with `AddEventBusKafka().AddConfiguredCluster(cluster)` for console visibility, or `UseKafkaProvider(cluster)` when Kafka also supplies the distributed EventBus transport. Console configuration alone does not select that transport. Direct administration requires broker addresses and Monica-owned credentials; externally managed credentials permit configuration visibility without enabling native broker actions.
 
 When the backend's Minimal API is enabled, its endpoints use Monica's normal result-envelope serialization and message policy. The Kafka backend declares `ModuleResultEnvelope` as a dependency; a host does not need to add it separately to make these responses work. The browser workspace and HTTP API consume the same facade, while the shell's operational-page access policy still controls page access.
+
+The cluster selected by `UseKafkaProvider(...)` is owned by startup configuration. Its identity takes precedence over configured or persisted console records, and console upsert/delete operations reject that identity. Change its connection through the host's startup configuration and restart the host. Broker administration still targets the actual runtime cluster.
+
+Cluster summaries returned to the UI or HTTP API omit SASL usernames and passwords. Connection probes and broker operations resolve the private configuration on the server; redacted summary configuration must never be used as their credential source. When editing a console-managed cluster, leaving either credential empty preserves its stored value, while a nonempty replacement updates it. Passwords retain their exact characters, including whitespace. Persisted cluster records continue to store the real credentials; redaction applies at the presentation boundary. A saved edit changes `UpdatedAt`, invalidating earlier connection evidence even when only credentials changed; ordinary listing retains that revision.
 
 ## Routes and broker context
 

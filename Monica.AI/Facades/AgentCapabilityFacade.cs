@@ -13,7 +13,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
     /// <summary>
     /// Gets the current management view for all registered capability sources.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> GetManagementInfoAsync(CancellationToken ct = default)
+    public Task<Result<AgentCapabilityManagementInfo>> GetManagementInfoAsync(CancellationToken ct = default)
     {
         return ExecuteAsync(() => capabilityService.GetManagementInfoAsync(ct));
     }
@@ -21,7 +21,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
     /// <summary>
     /// Gets reference-completion candidates from enabled and disabled capabilities.
     /// </summary>
-    public Task<Res<IReadOnlyList<AgentCapabilityReferenceCandidate>>> GetReferenceCandidatesAsync(
+    public Task<Result<IReadOnlyList<AgentCapabilityReferenceCandidate>>> GetReferenceCandidatesAsync(
         string? query = null,
         CancellationToken ct = default)
     {
@@ -31,7 +31,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
     /// <summary>
     /// Sets the global runtime switch for a capability catalog.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> SetCatalogEnabledAsync(
+    public Task<Result<AgentCapabilityManagementInfo>> SetCatalogEnabledAsync(
         AgentCapabilityKind kind,
         bool isEnabled,
         CancellationToken ct = default)
@@ -42,7 +42,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
     /// <summary>
     /// Sets the runtime switch for one capability entry.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> SetEntryEnabledAsync(
+    public Task<Result<AgentCapabilityManagementInfo>> SetEntryEnabledAsync(
         AgentCapabilityKind kind,
         string name,
         bool isEnabled,
@@ -54,7 +54,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
     /// <summary>
     /// Sets whether a skill should be exposed as an MCP server on the next host startup.
     /// </summary>
-    public Task<Res<AgentCapabilityManagementInfo>> SetSkillMcpServerEnabledAsync(
+    public Task<Result<AgentCapabilityManagementInfo>> SetSkillMcpServerEnabledAsync(
         string skillName,
         bool isEnabled,
         CancellationToken ct = default)
@@ -62,11 +62,11 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
         return ExecuteAsync(() => capabilityService.SetSkillMcpServerEnabledAsync(skillName, isEnabled, ct));
     }
 
-    private static async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> operation)
+    private static async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> operation)
     {
         try
         {
-            return await operation();
+            return Result.Success(await operation());
         }
         catch (OperationCanceledException)
         {
@@ -74,7 +74,7 @@ public sealed class AgentCapabilityFacade(IAgentCapabilityService capabilityServ
         }
         catch (Exception ex)
         {
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<T>(ex.GetMessageRecursively());
         }
     }
 }

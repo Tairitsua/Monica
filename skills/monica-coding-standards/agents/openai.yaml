@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monica Coding Standards"
+  short_description: "Clear contracts and simpler Monica implementations"
+  default_prompt: "Use $monica-coding-standards to implement, review, or simplify Monica code with explicit responsibilities and minimal necessary mechanisms."

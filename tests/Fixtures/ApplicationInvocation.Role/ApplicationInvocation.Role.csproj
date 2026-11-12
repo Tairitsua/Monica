@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ApplicationModel.Domain/ApplicationModel.Domain.csproj" />
+    <ProjectReference Include="../../../Monica.Application/Monica.Application.csproj" />
+    <ProjectReference Include="../../../Monica.WebApi/Monica.WebApi.csproj" />
+  </ItemGroup>
+</Project>

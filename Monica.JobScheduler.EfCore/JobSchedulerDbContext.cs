@@ -1,4 +1,9 @@
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Monica.Modules;
+using Monica.Locker.EfCore;
 using Microsoft.EntityFrameworkCore;
+using Monica.EntityFrameworkCore.Extensions;
 using Monica.DependencyInjection.Abstractions;
 using Monica.JobScheduler.EfCore.Entities;
 using Monica.JobScheduler.Models;
@@ -20,10 +25,16 @@ public sealed class JobSchedulerDbContext(
     internal DbSet<JobExecutionHistoryEntity> ExecutionHistory => Set<JobExecutionHistoryEntity>();
     internal DbSet<JobExecutionGateEntity> ExecutionGates => Set<JobExecutionGateEntity>();
     internal DbSet<JobRecurringCursorEntity> RecurringCursors => Set<JobRecurringCursorEntity>();
+    internal DbSet<JobSchedulerOwnerEntity> SchedulerOwners => Set<JobSchedulerOwnerEntity>();
+
+    /// <inheritdoc />
+    protected override object ModelCacheKey => (base.ModelCacheKey,
+        CachedServiceProvider.GetService<IOptions<ModuleJobSchedulerEfCoreOption>>()?.Value.LeaseTable.ExcludeFromMigrations == true);
 
     protected override void OnModelCreatingExtend(ModelBuilder modelBuilder)
     {
         base.OnModelCreatingExtend(modelBuilder);
+        modelBuilder.ConfigureMonicaLeases(CachedServiceProvider.GetService<IOptions<ModuleJobSchedulerEfCoreOption>>()?.Value.LeaseTable);
         ConfigureDefinitions(modelBuilder);
         ConfigureExecution(modelBuilder);
         RemoveInheritedStringDefaults(modelBuilder);
@@ -31,9 +42,17 @@ public sealed class JobSchedulerDbContext(
 
     private static void ConfigureDefinitions(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<JobSchedulerOwnerEntity>(entity =>
+        {
+            entity.ToMonicaInfrastructureTable("JobSchedulerOwners");
+            entity.HasKey(row => new { row.SchedulerScopeKey, row.OwnerKey });
+            entity.Property(row => row.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
+            entity.Property(row => row.ManifestHash).HasMaxLength(64);
+        });
         modelBuilder.Entity<JobDefinitionEntity>(entity =>
         {
-            entity.ToTable("JobDefinitions");
+            entity.ToMonicaInfrastructureTable("JobDefinitions");
             entity.HasKey(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey });
             entity.Property(item => item.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(item => item.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
@@ -50,7 +69,7 @@ public sealed class JobSchedulerDbContext(
 
         modelBuilder.Entity<JobRecurringCursorEntity>(entity =>
         {
-            entity.ToTable("JobRecurringCursors");
+            entity.ToMonicaInfrastructureTable("JobRecurringCursors");
             entity.HasKey(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey });
             entity.Property(item => item.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(item => item.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
@@ -64,7 +83,7 @@ public sealed class JobSchedulerDbContext(
 
         modelBuilder.Entity<JobExecutionGateEntity>(entity =>
         {
-            entity.ToTable("JobExecutionGates");
+            entity.ToMonicaInfrastructureTable("JobExecutionGates");
             entity.HasKey(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey });
             entity.Property(item => item.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(item => item.OwnerKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
@@ -77,7 +96,7 @@ public sealed class JobSchedulerDbContext(
     {
         modelBuilder.Entity<JobExecutionEntity>(entity =>
         {
-            entity.ToTable("JobExecutions");
+            entity.ToMonicaInfrastructureTable("JobExecutions");
             entity.HasKey(item => new { item.SchedulerScopeKey, item.InstanceId });
             entity.Property(item => item.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(item => item.InstanceId).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
@@ -99,7 +118,13 @@ public sealed class JobSchedulerDbContext(
                 item.OwnerKey
             });
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.State });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.State, item.LeaseExpiresAtUtcTicks, item.InstanceId });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.State,
+                item.AvailableAtUtcTicks, item.CreatedAtUtcTicks, item.InstanceId });
             entity.HasIndex(item => new { item.SchedulerScopeKey, item.OwnerKey, item.JobKey, item.CreatedAtUtcTicks });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.CreatedAtUtcTicks, item.InstanceId });
+            entity.HasIndex(item => new { item.SchedulerScopeKey, item.CompletedAtUtcTicks, item.InstanceId })
+                .HasFilter("\"CompletedAtUtcTicks\" IS NOT NULL");
             entity.HasMany(item => item.History)
                 .WithOne(item => item.Execution)
                 .HasForeignKey(item => new { item.SchedulerScopeKey, item.InstanceId })
@@ -108,7 +133,7 @@ public sealed class JobSchedulerDbContext(
 
         modelBuilder.Entity<JobExecutionHistoryEntity>(entity =>
         {
-            entity.ToTable("JobExecutionHistory");
+            entity.ToMonicaInfrastructureTable("JobExecutionHistory");
             entity.HasKey(item => new { item.SchedulerScopeKey, item.InstanceId, item.Sequence });
             entity.Property(item => item.SchedulerScopeKey).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);
             entity.Property(item => item.InstanceId).HasMaxLength(JobSchedulerIdentity.STANDARD_MAX_LENGTH);

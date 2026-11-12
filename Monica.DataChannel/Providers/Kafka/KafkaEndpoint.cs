@@ -1,195 +1,196 @@
+using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Monica.DataChannel.Abstractions.Communication;
+using Monica.DataChannel.Abstractions.Partitioning;
 using Monica.DataChannel.Pipeline;
-using Monica.Tool.Extensions;
 
 namespace Monica.DataChannel.Providers.Kafka;
 
-public class KafkaEndpoint(KafkaOptions metadata, ILogger<KafkaEndpoint> logger) : CommunicationEndpointBase<KafkaOptions>(metadata)
+/// <summary>Owns native Kafka clients and explicitly acknowledges completed pipeline deliveries.</summary>
+/// <remarks>
+/// Input has one unacknowledged head per partition and bounded cross-partition workers. Processing failures block
+/// their partition after finite retries. Reinitialization drains the old runtime and retries from committed offsets.
+/// Partition cancellation is cooperative; application transactions and receipts must reject stale or repeated effects.
+/// </remarks>
+public class KafkaEndpoint(
+    KafkaOptions metadata,
+    ILogger<KafkaEndpoint> logger,
+    IKafkaDataChannelClientFactory clients,
+    IDataChannelPartitionKeyResolver? partitionKeyResolver = null) : CommunicationEndpointBase<KafkaOptions>(metadata)
 {
-    private IProducer<string, string>? _producer;
-    private IConsumer<string, string>? _consumer;
-    private CancellationTokenSource? _consumerCts;
-    private Task? _consumerTask;
+    private static readonly UTF8Encoding UTF8 = new(false, true);
+    private readonly SemaphoreSlim _lifecycle = new(1, 1);
+    private readonly object _sendGate = new();
+    private readonly HashSet<Task> _sends = [];
+    private IProducer<byte[], byte[]>? _producer;
+    private KafkaConsumerRuntime? _consumer;
+    private bool _acceptingSends;
 
+    /// <inheritdoc />
     public override async Task ReceiveDataAsync(ChannelDataContext data)
     {
-        if (_producer != null && !string.IsNullOrEmpty(Metadata.Topic))
+        Task send;
+        lock (_sendGate)
+        {
+            if (!_acceptingSends || _producer is null)
+                throw new InvalidOperationException("The Kafka endpoint is not initialized for output.");
+            send = ProduceAsync(_producer, data);
+            _sends.Add(send);
+        }
+        try { await send; }
+        finally { lock (_sendGate) _sends.Remove(send); }
+    }
+
+    private async Task ProduceAsync(IProducer<byte[], byte[]> producer, ChannelDataContext data)
+    {
+        var token = data.CancellationToken;
+        token.ThrowIfCancellationRequested();
+        var entries = (IDictionary<string, object?>)data.Metadata;
+        byte[]? key;
+        if (entries.TryGetValue(KafkaMessageMetadata.OUTPUT_KEY_METADATA_KEY, out var explicitKey))
+            key = Encode(explicitKey, allowNull: true);
+        else if (partitionKeyResolver is not null)
+        {
+            // Application ordering policies inspect the original envelope before payload encoding.
+            var resolved = await partitionKeyResolver.ResolvePartitionKeyAsync(data, token);
+            key = string.IsNullOrWhiteSpace(resolved) ? null : UTF8.GetBytes(resolved);
+        }
+        else key = UTF8.GetBytes(data.DataType?.Name ?? "default");
+        token.ThrowIfCancellationRequested();
+        var headers = new Headers();
+        if (entries.TryGetValue(KafkaMessageMetadata.OUTPUT_HEADERS_METADATA_KEY, out var rawHeaders))
+        {
+            if (rawHeaders is not IEnumerable<KafkaMessageHeader> outputHeaders)
+                throw new ArgumentException("Kafka.Headers must contain KafkaMessageHeader values.");
+            foreach (var header in outputHeaders)
+                headers.Add(header.Key, header.Value?.ToArray());
+        }
+        else headers.Add("Type", UTF8.GetBytes(data.DataType?.Name ?? "unknown"));
+        var message = new Message<byte[], byte[]>
+        {
+            Key = key!,
+            Value = Encode(data.Data, allowNull: true)!,
+            Headers = headers
+        };
+        var delivery = await producer.ProduceAsync(Metadata.Topic!, message, token);
+        token.ThrowIfCancellationRequested();
+        if (delivery.Status != PersistenceStatus.Persisted)
+            throw new IOException("Kafka did not confirm persistence of the output record.");
+    }
+
+    private static byte[]? Encode(object? value, bool allowNull) => value switch
+    {
+        null when allowNull => null,
+        string text => UTF8.GetBytes(text),
+        byte[] bytes => bytes.ToArray(),
+        ReadOnlyMemory<byte> bytes => bytes.ToArray(),
+        Memory<byte> bytes => bytes.ToArray(),
+        _ => throw new ArgumentException("Kafka payloads and keys must be explicit UTF-8 strings or bytes.")
+    };
+
+    /// <inheritdoc />
+    public override async Task InitAsync(CancellationToken cancellationToken = default)
+    {
+        await _lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            await StopCoreAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            Metadata.EnrichOrValidate();
+            try
+            {
+                if (Metadata.Direction is ConnectionDirection.Output or ConnectionDirection.InputAndOutput)
+                {
+                    _producer = clients.CreateProducer(KafkaClientConfiguration.Producer(Metadata), Metadata.Partitioner);
+                    lock (_sendGate) _acceptingSends = true;
+                }
+                if (Metadata.Direction is ConnectionDirection.Input or ConnectionDirection.InputAndOutput)
+                {
+                    _consumer = new KafkaConsumerRuntime(Metadata, clients, DeliverAsync,
+                        ReportFailure, unavailable => Pipe.IsNotAvailable = unavailable);
+                    await _consumer.StartAsync(cancellationToken);
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                try { await StopCoreAsync(); }
+                catch (Exception cleanupFailure) { ReportFailure(cleanupFailure, "Kafka initialization rollback failed."); }
+                throw;
+            }
+        }
+        finally { _lifecycle.Release(); }
+    }
+
+    private async Task DeliverAsync(ConsumeResult<byte[], byte[]> record, CancellationToken cancellationToken)
+    {
+        if (record.Message is null) throw new InvalidDataException("Kafka supplied a record without a message.");
+        var value = record.Message.Value;
+        object? payload = value is null ? null : Metadata.InputPayloadFormat == KafkaInputPayloadFormat.RawBytes
+            ? value.ToArray() : UTF8.GetString(value);
+        var context = CreateData(payload);
+        context.CancellationToken = cancellationToken;
+        ((IDictionary<string, object?>)context.Metadata)[KafkaMessageMetadata.METADATA_KEY] = new KafkaMessageMetadata(
+            record.Topic, record.Partition.Value, record.Offset.Value, record.Message.Key?.ToArray(),
+            Array.AsReadOnly(record.Message.Headers?.Select(header => new KafkaMessageHeader(header.Key, header.GetValueBytes()?.ToArray())).ToArray() ?? []),
+            record.Message.Timestamp);
+        await SendDataAsync(context);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    /// <inheritdoc />
+    public override async Task DisposeAsync(CancellationToken cancellationToken = default)
+    {
+        // Teardown must finish even if the caller stops waiting; releasing inner endpoints early abandons live work.
+        await _lifecycle.WaitAsync(CancellationToken.None);
+        try { await StopCoreAsync(); }
+        finally { _lifecycle.Release(); }
+    }
+
+    private async Task StopCoreAsync()
+    {
+        Task[] sends;
+        lock (_sendGate)
+        {
+            _acceptingSends = false;
+            sends = _sends.ToArray();
+        }
+        List<Exception>? failures = null;
+        var consumer = _consumer;
+        _consumer = null;
+        if (consumer is not null)
+        {
+            try { await consumer.StopAsync(); }
+            catch (Exception exception) { (failures ??= []).Add(exception); }
+        }
+        // Already-faulted publication tasks belong to their callers. Await all operations before releasing the producer.
+        try { await Task.WhenAll(sends); }
+        catch { }
+        var producer = _producer;
+        _producer = null;
+        if (producer is not null)
         {
             try
             {
-                var message = new Message<string, string>
-                {
-                    Key = data.DataType?.Name ?? "default",
-                    Value = data.Data?.ToString() ?? string.Empty,
-                    Headers = new Headers
-                    {
-                        { "Type", System.Text.Encoding.UTF8.GetBytes(data.DataType?.Name ?? "unknown") }
-                    }
-                };
-
-                var deliveryReport = await _producer.ProduceAsync(Metadata.Topic, message);
-                logger.LogInformation("Kafka message sent to topic {Topic}, partition {Partition}, offset {Offset}", 
-                    deliveryReport.Topic, deliveryReport.Partition, deliveryReport.Offset);
+                if (producer.Flush(Metadata.ProducerShutdownTimeout) != 0)
+                    throw new TimeoutException("Kafka producer still has outstanding deliveries after its shutdown deadline.");
             }
-            catch (ProduceException<string, string> ex)
+            catch (Exception exception) { (failures ??= []).Add(exception); }
+            finally
             {
-                CollectException(ex, this, $"Failed to send message to Kafka: {ex.Error.Reason}", logger);
+                try { producer.Dispose(); }
+                catch (Exception exception) { (failures ??= []).Add(exception); }
             }
         }
+        if (failures is not null) throw new AggregateException("Kafka endpoint cleanup failed.", failures);
     }
 
-    public override async Task InitAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            // Initialize producer for output direction
-            if (Metadata.Direction == ConnectionDirection.Output || Metadata.Direction == ConnectionDirection.InputAndOutput)
-            {
-                var producerConfig = new ProducerConfig
-                {
-                    BootstrapServers = Metadata.BootstrapServers,
-                    ClientId = Metadata.ClientId,
-                    SecurityProtocol = Metadata.SecurityProtocol
-                };
+    private void ReportFailure(Exception exception, string message) => CollectException(exception, this, message, logger);
 
-                if (!string.IsNullOrEmpty(Metadata.Username) && !string.IsNullOrEmpty(Metadata.Password))
-                {
-                    producerConfig.SaslMechanism = Metadata.SaslMechanism;
-                    producerConfig.SaslUsername = Metadata.Username;
-                    producerConfig.SaslPassword = Metadata.Password;
-                }
+    /// <summary>Returns safe configuration and detached input state, including paused and blocked counts.</summary>
+    public override dynamic GetMetadata() => new { Options = Metadata, Consumer = _consumer?.Snapshot };
 
-                _producer = new ProducerBuilder<string, string>(producerConfig).Build();
-                logger.LogInformation("Kafka producer initialized for topic: {Topic}", Metadata.Topic);
-            }
-
-            // Initialize consumer for input direction
-            if (Metadata.Direction == ConnectionDirection.Input || Metadata.Direction == ConnectionDirection.InputAndOutput)
-            {
-                var consumerConfig = new ConsumerConfig
-                {
-                    BootstrapServers = Metadata.BootstrapServers,
-                    GroupId = Metadata.ConsumerGroupId,
-                    ClientId = Metadata.ClientId,
-                    AutoOffsetReset = Metadata.AutoOffsetReset,
-                    EnableAutoCommit = Metadata.EnableAutoCommit,
-                    SecurityProtocol = Metadata.SecurityProtocol
-                };
-
-                if (Metadata.EnableAutoCommit)
-                {
-                    consumerConfig.AutoCommitIntervalMs = Metadata.AutoCommitIntervalMs;
-                }
-
-                if (!string.IsNullOrEmpty(Metadata.Username) && !string.IsNullOrEmpty(Metadata.Password))
-                {
-                    consumerConfig.SaslMechanism = Metadata.SaslMechanism;
-                    consumerConfig.SaslUsername = Metadata.Username;
-                    consumerConfig.SaslPassword = Metadata.Password;
-                }
-
-                _consumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
-                
-                if (!string.IsNullOrEmpty(Metadata.Topic))
-                {
-                    _consumer.Subscribe(Metadata.Topic);
-                    
-                    _consumerCts = new CancellationTokenSource();
-                    _consumerTask = Task.Run(async () => await ConsumeMessages(_consumerCts.Token), _consumerCts.Token);
-                    
-                    logger.LogInformation("Kafka consumer initialized and subscribed to topic: {Topic}", Metadata.Topic);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            CollectException(ex, this, "Kafka initialization failed", logger);
-            throw;
-        }
-    }
-
-    private async Task ConsumeMessages(CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (!cancellationToken.IsCancellationRequested && _consumer != null)
-            {
-                try
-                {
-                    var consumeResult = _consumer.Consume(cancellationToken);
-                    if (consumeResult != null && !string.IsNullOrEmpty(consumeResult.Message?.Value))
-                    {
-                        logger.LogInformation("Kafka message received from topic {Topic}, partition {Partition}, offset {Offset}",
-                            consumeResult.Topic, consumeResult.Partition, consumeResult.Offset);
-
-                        SendData(consumeResult.Message.Value);
-
-                        // Manual commit if auto-commit is disabled
-                        if (!Metadata.EnableAutoCommit)
-                        {
-                            _consumer.Commit(consumeResult);
-                        }
-                    }
-                }
-                catch (ConsumeException ex)
-                {
-                    CollectException(ex, this, $"Failed to consume message from Kafka: {ex.Error.Reason}", logger);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected when cancellation is requested
-                    break;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            CollectException(ex, this, "Kafka consumer loop failed", logger);
-        }
-    }
-
-    public override async Task DisposeAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            // Cancel consumer loop
-            if (_consumerCts != null)
-            {
-                try { await _consumerCts.CancelAsync(); }
-                catch (ObjectDisposedException) { }
-            }
-
-            // Wait for consumer task to complete
-            if (_consumerTask != null)
-            {
-                await _consumerTask.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-            }
-
-            // Close consumer
-            _consumer?.Close();
-            _consumer?.Dispose();
-
-            // Flush and dispose producer
-            if (_producer != null)
-            {
-                _producer.Flush(TimeSpan.FromSeconds(10));
-                _producer.Dispose();
-            }
-
-            _consumerCts.SafeCancelAndDispose();
-
-            logger.LogInformation("Kafka core disposed successfully");
-        }
-        catch (Exception ex)
-        {
-            CollectException(ex, this, "Kafka disposal failed", logger);
-        }
-    }
-
-    public override ConnectionDirection SupportedConnectionDirection()
-    {
-        return ConnectionDirection.InputAndOutput;
-    }
+    /// <inheritdoc />
+    public override ConnectionDirection SupportedConnectionDirection() => ConnectionDirection.InputAndOutput;
 }

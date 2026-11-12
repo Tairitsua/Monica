@@ -1,23 +1,29 @@
 ---
 name: monica-application
-description: Apply the shared Monica application specification and the repository's project specification before designing, implementing, refactoring, or reviewing a Monica application, its boundaries, or ProjectUnits.
+description: Apply the shared Monica application specification and the repository's project specification before designing, implementing, refactoring, or reviewing a Monica application, its boundaries, or BuildingBlocks.
 ---
 
 # Monica Application
 
-Use this skill before application design, implementation, refactoring, or review, including when entering through a granular application skill. Read the [shared specification](references/00-application-specification.md), then the repository-designated `<project>-application-spec` skill and the references relevant to the affected boundary. That project skill owns the application's actual architecture and adopted conventions.
+Use this skill before application design, implementation, refactoring, or review, including when entering through a granular application skill. Read the [shared specification](references/00-application-specification.md) and [unified domain/role architecture](references/03-unified-architecture.md), then the repository-designated `<project>-application-spec` skill and the references relevant to the affected boundary. That project skill owns the application's actual architecture and adopted conventions.
 
-Compose existing ProjectUnits and documented infrastructure capabilities first. A new business flow or a combination without an exact example is ordinary implementation when each unit preserves its approved responsibility and contracts. Read [specification evolution](references/01-specification-evolution.md) when that composition exposes a concrete rule conflict or an uncovered architectural contract. Use the [project specification contract and template](references/02-project-specification-skill.md) when adopting or maintaining a repository specification. A missing project specification does not authorize inventing its architecture; inspect the source and prepare a concrete adoption proposal while continuing work within already approved patterns.
+Compose existing Building Blocks and documented infrastructure capabilities first. A new business flow or a combination without an exact example is ordinary implementation when each building block preserves its approved responsibility and contracts. Read [specification evolution](references/01-specification-evolution.md) when that composition exposes a concrete rule conflict or an uncovered architectural contract. Use the [project specification contract and template](references/02-project-specification-skill.md) when adopting or maintaining a repository specification. A missing project specification does not authorize inventing its architecture; inspect the source and prepare a concrete adoption proposal while continuing work within already approved patterns.
 
 ## Routing
 
-- Exact Monica framework source needed outside the active checkout: use `$monica-guide source resolve --repository monica --json` as a read-only locator.
-- Microservice solution layout, service boundaries, `Platform.Protocol`, published language, migrations, or cross-service collaboration: use `$monica-application-microservice`.
-- Modular monolith layout, bounded contexts under `Domains/`, AppHost composition, cross-domain collaboration, or persistence ownership: use `$monica-application-modular-monolith`.
-- Feature implementation or review of handlers, entities, repositories, events, jobs, seeders, host services, CRUD adapters, controllers, Facades, and other support types: use `$monica-application-project-unit-development`.
+- Runtime failures, missing routes, inactive UI, or unsuccessful infrastructure operations: use `$monica-troubleshooting` to select the failed boundary and its diagnostic guidance.
+
+- Business presentation layout, references, product navigation, or local/remote calls: use `$monica-application-ui`; implement its pages and state with `$monica-application-ui-development`.
+
+- Exact Monica source or an unavailable named skill/reference: use `$monica-guide source resolve --repository monica --json` as a read-only locator, then read canonical `skills/<name>/SKILL.md` and the specified reference.
+- Split role placement or migration from existing service hosts: use `$monica-application-microservice`.
+- Combined role placement or migration from merged monolith projects: use `$monica-application-modular-monolith`.
+- Startup versus managed settings, environment-file selection, or the local Manual profile: read [startup and local execution](references/04-startup-and-local-execution.md).
+- Migration project placement, schema/history ownership, database consolidation or deployment preflight: read [database layout and migrations](references/05-database-migrations.md), then the project's migration and deployment guidance.
+- Feature implementation or review of handlers, entities, repositories, events, jobs, seeders, host services, CRUD adapters, controllers, Facades, and other support types: use `$monica-application-building-block-development`.
 - Sociable application tests, `MonicaTestApplicationFactory`, handler or repository scenarios, database isolation, and migration away from mock-heavy tests: use `$monica-application-unit-testing`.
 - Consumer setup and use of Monica infrastructure: route to `$monica-infra-persistence`, `$monica-infra-messaging`, `$monica-infra-jobs`, `$monica-infra-configuration`, `$monica-infra-hosting`, `$monica-infra-observability`, `$monica-infra-ai`, `$monica-infra-web`, or `$monica-infra-ui` for the capability in use.
 
 ## Apply the Specification
 
-Use the architecture profile adopted by the project specification; do not choose a new deployment model for an ordinary feature. Load the matching architecture and unit references before changing their contracts. Reconcile affected project-specification facts and approved rules with the implementation in the same change. Record the rationale beside a rule; use Git history and existing project decision records for its evolution.
+Use the unified domain/role layout and the deployment placement adopted by the project specification; do not choose a new deployment model for an ordinary feature. Load the matching architecture and building block references before changing their contracts. Reconcile affected project-specification facts and approved rules with the implementation in the same change. Record the rationale beside a rule; use Git history and existing project decision records for its evolution.

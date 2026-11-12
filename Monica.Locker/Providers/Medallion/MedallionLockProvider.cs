@@ -7,6 +7,11 @@ namespace Monica.Locker.Providers.Medallion;
 /// <summary>
 /// Adapts a Medallion distributed lock provider to Monica's locker abstraction.
 /// </summary>
+/// <remarks>
+/// Wait timeout and cancellation are forwarded to the native provider. Backend failures propagate, and an acquired
+/// handle forwards the native ownership-loss token and asynchronous release. Configure lease expiry and renewal on
+/// the native provider; Monica's per-acquisition owner and lease-duration options are not applied by this adapter.
+/// </remarks>
 public sealed class MedallionLockProvider(
     IDistributedLockProvider distributedLockProvider)
     : ILockProvider

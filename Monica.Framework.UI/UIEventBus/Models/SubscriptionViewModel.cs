@@ -1,4 +1,5 @@
 using Monica.EventBus.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 using MudBlazor;
 
 namespace Monica.Framework.UI.UIEventBus.Models;
@@ -97,6 +98,17 @@ public class SubscriptionViewModel
     /// </summary>
     public EventSubscriptionState State { get; set; }
 
+    /// <summary>Gets or sets the immutable automatic-work policy projected by the registry.</summary>
+    public ActivationMode Activation { get; set; } = ActivationMode.Automatic;
+
+    /// <summary>Gets whether automatic receipt can be activated without changing the startup policy.</summary>
+    public bool CanActivate => Activation == ActivationMode.Automatic &&
+        State is EventSubscriptionState.Pending or EventSubscriptionState.Inactive;
+
+    /// <summary>Gets whether explicit delivery to this one local handler is allowed.</summary>
+    public bool CanDeliverLocally => Activation != ActivationMode.Disabled &&
+        State is EventSubscriptionState.Active or EventSubscriptionState.Held;
+
     /// <summary>
     /// The color corresponding to the subscription status
     /// </summary>
@@ -106,6 +118,8 @@ public class SubscriptionViewModel
         EventSubscriptionState.Pending => Color.Warning,
         EventSubscriptionState.Inactive => Color.Default,
         EventSubscriptionState.Disposed => Color.Error,
+        EventSubscriptionState.Held => Color.Info,
+        EventSubscriptionState.Disabled => Color.Default,
         _ => Color.Default
     };
 

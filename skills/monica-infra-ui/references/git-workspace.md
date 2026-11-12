@@ -69,4 +69,4 @@ presentation. That bounded hygiene is not an arbitrary-secret detector. Keep cre
 complete module options out of UI payloads, copied evidence, and screenshots. The page-created
 state and interop belong to its visit; injected facades and repository services remain borrowed.
 Component authoring and responsive review follow the
-[working-interface language](../../monica-ui-development/references/monica-workbench-design-language.md).
+working-interface language in `$monica-ui-development` (`references/monica-workbench-design-language.md`).

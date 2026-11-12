@@ -1,6 +1,6 @@
 # Inspect Repository contexts and database evidence
 
-Activity rows, inspection timestamps and capture receipts follow [page time display](../../monica-infra-ui/references/time-display.md). UTC activity instants and database audit wall-time values keep their distinct source semantics; UI formatting does not rewrite either stored representation.
+Activity rows, inspection timestamps and capture receipts follow page time display in `$monica-infra-ui` (`references/time-display.md`). UTC activity instants and database audit wall-time values keep their distinct source semantics; UI formatting does not rewrite either stored representation.
 
 `Monica.Repository.UI` adds operational views for contexts registered through `AddRepositoryDbContext<TContext>()`. It does not enumerate every EF Core context in DI. Register the application's context and provider through [repositories](repositories.md), then add the UI to the same web host:
 
@@ -21,7 +21,25 @@ app.MapMonica();
 app.Run();
 ```
 
-`AddRepositoryUI()` requires Repository, module-local localization, and the shell. The host owns access to these diagnostics and to any exposed facade operations; navigation visibility and the migration-production option are not authorization. Configure the host through [shell and access](../../monica-infra-ui/references/shell-and-access.md).
+`AddRepositoryUI()` requires Repository, module-local localization, and the shell. The host owns access to these diagnostics and to any exposed facade operations; navigation visibility and the migration-production option are not authorization. Configure the host through shell and access in `$monica-infra-ui` (`references/shell-and-access.md`).
+
+## Inspect an explicitly selected entity design model
+
+Use `Monica.EntityFrameworkCore.EntityModelInspector` when tooling needs bounded, portable model evidence. The caller selects and safely creates the context; the inspector receives its design model and performs no database query, migration or host startup:
+
+```csharp
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Monica.EntityFrameworkCore;
+
+var snapshot = EntityModelInspector.Inspect(
+    context.GetService<IDesignTimeModel>().Model,
+    typeof(Order),
+    context.GetType().FullName!,
+    context.Database.ProviderName!);
+```
+
+The `monica-entity-model/v1` export includes the selected CLR entity and its owned dependents, inherited table mappings, property/column names, store types, nullability, shadow properties, concurrency tokens, length/precision, generation, SQL defaults/computed expressions, indexes and foreign keys. A single entity can span several tables. Runtime/compiled models can omit design metadata, so pass `IDesignTimeModel.Model`. Missing entities fail explicitly. Serialize the snapshot with the application's normal JSON options; a consumer such as Workflow must retain context/provider and source-revision provenance. The export describes the supplied model, never whether a deployed database matches it. Do not execute arbitrary application contexts merely for discovery.
 
 ## Navigate by the exact context identity
 
@@ -80,7 +98,7 @@ Distinguish result states before reporting counts:
 | Nonempty snapshot with zero filtered rows | A search miss; clearing the native input restores the snapshot's rows. |
 | Refresh with an earlier capture | Retained evidence, explicitly presented as the previous snapshot until a new result is adopted. |
 
-The facade returns `Res<T>`, but a successful envelope can still contain `Support.Failed`, a migration status with `HasError`, or a failed per-context command outcome. Inspect the model's diagnostic status as well as the envelope.
+The facade returns `Result<T>`, but a successful envelope can still contain `Support.Failed`, a migration status with `HasError`, or a failed per-context command outcome. Inspect the model's diagnostic status as well as the envelope.
 
 The Options workspace also checks the selected registry snapshot's `HasError`. A failed context snapshot has no successfully captured options; surface its `ErrorMessage` rather than treating the default empty list as a successful empty configuration ledger.
 
@@ -109,6 +127,6 @@ Cancellation can interrupt observation after database changes committed. Provide
 
 `RepositoryDashboardState` is a scoped, circuit-owned service borrowed by the four routed workbenches. It serializes selection, reads, and commands through one gate and rechecks the caller's token before adopting results. This coordination is local to the circuit, not a distributed or cross-user migration lock.
 
-The consuming component owns its cancellation source and admitted operation, parameter synchronization, confirmation, and focus tasks. Retirement stops admission, cancels, closes or observes late native dialog references, drains all admitted tasks, and then disposes the component lifetime. A failure while draining one task does not excuse abandoning another. Session/guide dialogs own and drain their clipboard work. Do not dispose injected state during route retirement. The backend diagnostics service owns its separate async scopes and DbContexts; UI code does not retain or dispose those contexts. See [page-state ownership](../../monica-architecture/references/page-state-pattern.md) and [Blazor lifecycle mechanics](../../monica-ui-development/references/blazor-best-practices.md).
+The consuming component owns its cancellation source and admitted operation, parameter synchronization, confirmation, and focus tasks. Retirement stops admission, cancels, closes or observes late native dialog references, drains all admitted tasks, and then disposes the component lifetime. A failure while draining one task does not excuse abandoning another. Session/guide dialogs own and drain their clipboard work. Do not dispose injected state during route retirement. The backend diagnostics service owns its separate async scopes and DbContexts; UI code does not retain or dispose those contexts. See page-state ownership in `$monica-architecture` (`references/page-state-pattern.md`) and Blazor lifecycle mechanics in `$monica-ui-development` (`references/blazor-best-practices.md`).
 
 Source: `Monica.Repository.UI/Modules/ModuleRepositoryUI.cs`, its four `Pages/UIRepository*Page.razor` wrappers, `UIRepository/Components/RepositoryWorkbench.razor`, `RepositoryActivityTable.razor`, `RepositoryActivityDetailDialog.razor`, `UIRepository/State/RepositoryDashboardState.cs`, `Monica.Repository/Facades/RepositoryDiagnosticsFacade.cs`, `Persistence/Models/RepositoryDiagnosticsModels.cs`, and `Persistence/Services/RepositoryDbContextDiagnosticsService.cs` with its `Support/` activity queries, registry, guide catalog, and pool parser.

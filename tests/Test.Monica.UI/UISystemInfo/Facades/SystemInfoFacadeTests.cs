@@ -32,7 +32,7 @@ public sealed class SystemInfoFacadeTests
             var application = host.Services.GetRequiredService<MonicaApplication>();
             var result = CreateFacade(host).GetSnapshot();
 
-            result.Status.Should().Be(ResStatus.Ok);
+            result.Status.Should().Be(ResultStatus.Ok);
             result.Message.Should().BeNull();
             var snapshot = result.Data;
             snapshot.Should().NotBeNull();
@@ -59,7 +59,7 @@ public sealed class SystemInfoFacadeTests
         {
             var result = CreateFacade(host).GetSnapshot();
 
-            result.Status.Should().Be(ResStatus.Ok);
+            result.Status.Should().Be(ResultStatus.Ok);
             result.Message.Should().BeNull();
             var snapshot = result.Data;
             snapshot.Should().NotBeNull();
@@ -88,7 +88,7 @@ public sealed class SystemInfoFacadeTests
         {
             var result = facade.GetSnapshot();
 
-            result.Status.Should().Be(ResStatus.Ok);
+            result.Status.Should().Be(ResultStatus.Ok);
             result.Message.Should().BeNull();
             var snapshot = result.Data;
             snapshot.Should().NotBeNull();

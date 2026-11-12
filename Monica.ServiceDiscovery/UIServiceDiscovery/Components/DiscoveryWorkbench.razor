@@ -11,7 +11,7 @@
         <div class="discovery-heading-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     </header>
     <nav class="discovery-routes" aria-label="@L["Workbench:Navigation"]">
-        @foreach (var route in Routes)
+        @foreach (var route in Routes.Where(r => ShowRegistry || r.View == "Endpoints"))
         {
             <a href="@route.Url" aria-current="@(View == route.View ? "page" : null)"><MoIcon Icon="@route.Icon" Size="1.25rem" /><span>@L[$"Workbench:Views:{route.View}:Label"]</span></a>
         }
@@ -22,12 +22,14 @@
 @code {
     [Parameter] public string View { get; set; } = "Registry";
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool ShowRegistry { get; set; } = true;
     private static readonly (string View, string Url, string Icon)[] Routes =
     [
         ("Registry", "/service-discovery-manage", MoIcons.Server),
         ("Atlas", "/service-discovery-manage/service-map", MoIcons.ChartScatter),
         ("Dependencies", "/service-discovery-manage/dependencies", MoIcons.Workflow),
         ("Domains", "/service-discovery-manage/subdomains", MoIcons.Building),
-        ("Host", "/service-discovery-manage/current-host", MoIcons.Monitor)
+        ("Host", "/service-discovery-manage/current-host", MoIcons.Monitor),
+        ("Endpoints", "/service-discovery-manage/endpoints", MoIcons.Network)
     ];
 }

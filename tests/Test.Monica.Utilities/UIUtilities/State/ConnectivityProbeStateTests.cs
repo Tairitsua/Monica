@@ -139,7 +139,7 @@ public sealed class ConnectivityProbeStateTests
         await using var endpoint = await ControlledHttpEndpoint.StartAsync();
         var state = CreateHttpState(endpoint, "/complete");
         var first = await state.RunAsync(TestContext.Current.CancellationToken);
-        first.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
         first.Message.Should().BeNull();
         first.Data.Should().NotBeNull();
         first.Data!.Succeeded.Should().BeTrue();
@@ -171,7 +171,7 @@ public sealed class ConnectivityProbeStateTests
 
         var returnedVisit = await state.RunAsync(TestContext.Current.CancellationToken);
 
-        returnedVisit.Status.Should().Be(ResStatus.Ok);
+        returnedVisit.Status.Should().Be(ResultStatus.Ok);
         returnedVisit.Message.Should().BeNull();
         returnedVisit.Data.Should().NotBeNull();
         returnedVisit.Data!.Succeeded.Should().BeTrue();
@@ -194,7 +194,7 @@ public sealed class ConnectivityProbeStateTests
 
         var result = await state.RunAsync(TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
         result.Data!.Succeeded.Should().BeTrue(
@@ -240,7 +240,7 @@ public sealed class ConnectivityProbeStateTests
         return state;
     }
 
-    private static async Task AssertCanceledAndDrainedAsync(Task<Res<ConnectivityProbeResult>> pending,
+    private static async Task AssertCanceledAndDrainedAsync(Task<Result<ConnectivityProbeResult>> pending,
         ControlledHttpEndpoint endpoint)
     {
         Func<Task> completion = async () => await pending.WaitAsync(

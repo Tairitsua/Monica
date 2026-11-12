@@ -1,4 +1,33 @@
 {
+  "Setup": {
+    "Title": "通道组合",
+    "Help": "使用本机配置启动所选组合，其他自主任务保持挂起。停止释放该组合的连接与监听；重启沿用已冻结的配置。",
+    "Empty": "本机选定的角色未声明通道组合。",
+    "Host": "宿主基础设施",
+    "Channels": "已声明通道",
+    "Undeclared": "首次显式启动后才会取得通道标识。",
+    "NoChannels": "未声明通道",
+    "Start": "启动",
+    "Stop": "停止",
+    "Restart": "重启",
+    "Started": "通道组合已启动。",
+    "Stopped": "通道组合已停止。",
+    "Restarted": "通道组合已重启。",
+    "States": {
+      "Held": "已挂起",
+      "Disabled": "不可用",
+      "Stopped": "已停止",
+      "Starting": "正在启动",
+      "Running": "已初始化",
+      "Stopping": "正在停止",
+      "Failed": "失败"
+    },
+    "Modes": {
+      "Manual": "手动运行",
+      "Automatic": "自动运行",
+      "Disabled": "所属角色不在本机运行"
+    }
+  },
   "Pages": {
     "DataChannelManage": {
       "Title": "通道目录"

@@ -371,7 +371,7 @@ public sealed class InProcessMetricsCollectorTests
     private static async Task<OpenTelemetrySnapshot> ReadAsync(OpenTelemetryFacade facade)
     {
         var result = await facade.GetSnapshotAsync();
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNullOrEmpty();
         result.Data.Should().NotBeNull();
         return result.Data!;

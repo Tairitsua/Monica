@@ -1,4 +1,4 @@
-"""Bound infrastructure entrypoints and check navigation without fixing topic layouts."""
+"""Bound task-selection entrypoints and check navigation without fixing topic layouts."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def validate_entrypoint_budget(entrypoint: Path) -> list[str]:
     ):
         if actual > limit:
             errors.append(
-                f"{entrypoint}: infrastructure entrypoint has {actual} body {unit} "
+                f"{entrypoint}: skill entrypoint has {actual} body {unit} "
                 f"(limit {limit}); keep selection guidance here and move execution detail "
                 "to its owning reference without compressing the prose"
             )

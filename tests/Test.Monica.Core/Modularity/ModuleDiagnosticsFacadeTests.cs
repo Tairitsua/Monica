@@ -31,7 +31,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var first = facade.GetSnapshot();
         var second = facade.GetSnapshot();
 
-        first.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
         first.Data.Should().NotBeNull();
         first.Data!.IsFinal.Should().BeTrue();
         first.Data.Outcome.Should().Be(ModuleCompositionOutcome.Succeeded);
@@ -65,7 +65,7 @@ public sealed class ModuleDiagnosticsFacadeTests
 
         var diagnostics = facade.GetModuleOptions(module.ModuleKey);
 
-        diagnostics.Status.Should().Be(ResStatus.Ok);
+        diagnostics.Status.Should().Be(ResultStatus.Ok);
         diagnostics.Data!.IsFinalized.Should().BeTrue();
         diagnostics.Data.ExposureMode.Should().Be(ModuleOptionDiagnosticsExposureMode.Redacted);
         diagnostics.Data.ProfileResolution.Should().Be(ModuleOptionProfileResolution.Default);
@@ -157,7 +157,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var diagnostics = facade.GetModuleOptions(
             ModuleKey.FromModuleType(typeof(DiagnosticsConsumerModule)));
 
-        diagnostics.Status.Should().Be(ResStatus.Ok);
+        diagnostics.Status.Should().Be(ResultStatus.Ok);
         diagnostics.Data!.IsTruncated.Should().BeTrue();
         var faultingItems = diagnostics.Data.Entries.Single(entry => entry.Name == "FaultingItems");
         faultingItems.Kind.Should().Be(ModuleOptionDiagnosticValueKind.Collection);
@@ -176,8 +176,8 @@ public sealed class ModuleDiagnosticsFacadeTests
         var first = facade.GetModuleOptions(moduleKey);
         var second = facade.GetModuleOptions(moduleKey);
 
-        first.Status.Should().Be(ResStatus.Ok);
-        second.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
+        second.Status.Should().Be(ResultStatus.Ok);
         second.Data.Should().BeSameAs(first.Data);
     }
 
@@ -222,7 +222,7 @@ public sealed class ModuleDiagnosticsFacadeTests
     }
 
     [Fact]
-    public void GetModuleOptions_WhenSensitiveDebugModeIsEnabled_ShouldRevealBoundedSensitiveValues()
+    public void GetModuleOptions_WhenSensitiveValueRevealIsEnabled_ShouldRevealBoundedSensitiveValues()
     {
         using var host = CreateHost(
             exposureMode: ModuleOptionDiagnosticsExposureMode.RevealSensitive,
@@ -233,7 +233,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var first = facade.GetModuleOptions(moduleKey);
         var second = facade.GetModuleOptions(moduleKey);
 
-        first.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
         first.Data!.ExposureMode.Should().Be(ModuleOptionDiagnosticsExposureMode.RevealSensitive);
         first.Data.ContainsRevealedSensitiveValues.Should().BeTrue();
         var apiKey = first.Data.Entries.Single(entry => entry.Name == "ApiKey");
@@ -293,7 +293,7 @@ public sealed class ModuleDiagnosticsFacadeTests
     }
 
     [Fact]
-    public void Composition_WhenSensitiveDebugModeRunsOutsideDevelopment_ShouldRejectTheHostConfiguration()
+    public void Composition_WhenSensitiveValueRevealRunsOutsideDevelopment_ShouldRejectTheHostConfiguration()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Environment.EnvironmentName = Environments.Production;
@@ -322,7 +322,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var diagnostics = facade.GetModuleOptions(
             ModuleKey.FromModuleType(typeof(DiagnosticsConsumerModule)));
 
-        diagnostics.Status.Should().Be(ResStatus.BadRequest);
+        diagnostics.Status.Should().Be(ResultStatus.BadRequest);
         diagnostics.Data.Should().BeNull();
         diagnostics.Message.Should().Be("Failed to load the module option diagnostics.");
     }
@@ -347,22 +347,22 @@ public sealed class ModuleDiagnosticsFacadeTests
             moduleKey,
             ModuleOptionProfileSelector.Named("missing"));
 
-        named.Status.Should().Be(ResStatus.Ok);
+        named.Status.Should().Be(ResultStatus.Ok);
         named.Data!.RequestedProfileName.Should().Be("blue");
         named.Data.ProfileName.Should().Be("blue");
         named.Data.ProfileResolution.Should().Be(ModuleOptionProfileResolution.Named);
         named.Data.Entries.Should().Contain(entry => entry.Name == "Mode" && entry.Value == "profile-blue");
-        namedOrDefault.Status.Should().Be(ResStatus.Ok);
+        namedOrDefault.Status.Should().Be(ResultStatus.Ok);
         namedOrDefault.Data!.RequestedProfileName.Should().Be("blue");
         namedOrDefault.Data.ProfileName.Should().Be("blue");
         namedOrDefault.Data.ProfileResolution.Should().Be(ModuleOptionProfileResolution.Named);
         namedOrDefault.Data.Entries.Should().Contain(entry => entry.Name == "Mode" && entry.Value == "profile-blue");
-        fallback.Status.Should().Be(ResStatus.Ok);
+        fallback.Status.Should().Be(ResultStatus.Ok);
         fallback.Data!.RequestedProfileName.Should().Be("missing");
         fallback.Data.ProfileName.Should().BeNull();
         fallback.Data.ProfileResolution.Should().Be(ModuleOptionProfileResolution.DefaultFallback);
         fallback.Data.Entries.Should().Contain(entry => entry.Name == "Mode" && entry.Value == "probe");
-        missing.Status.Should().Be(ResStatus.BadRequest);
+        missing.Status.Should().Be(ResultStatus.BadRequest);
         missing.Data.Should().BeNull();
         missing.Message.Should().Be("Failed to load the module option diagnostics.");
     }
@@ -377,7 +377,7 @@ public sealed class ModuleDiagnosticsFacadeTests
             ModuleKey.FromModuleType(typeof(DiagnosticsConsumerModule)),
             null!);
 
-        diagnostics.Status.Should().Be(ResStatus.BadRequest);
+        diagnostics.Status.Should().Be(ResultStatus.BadRequest);
         diagnostics.Data.Should().BeNull();
         diagnostics.Message.Should().Be("Failed to load the module option diagnostics.");
     }
@@ -391,7 +391,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var export = facade.CreateExport();
         var json = JsonSerializer.Serialize(export.Data);
 
-        export.Status.Should().Be(ResStatus.Ok);
+        export.Status.Should().Be(ResultStatus.Ok);
         export.Data!.Modules.Should().Contain(module =>
             module.ModuleId == ModuleKey.FromModuleType(typeof(DiagnosticsConsumerModule)).Id);
         export.Data.Edges.Should().Contain(edge =>
@@ -421,7 +421,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var exportJson = JsonSerializer.Serialize(facade.CreateExport().Data);
         var snapshotJson = JsonSerializer.Serialize(facade.GetSnapshot().Data);
 
-        materialized.Status.Should().Be(ResStatus.Ok);
+        materialized.Status.Should().Be(ResultStatus.Ok);
         optionJson.Should().Contain("super-secret");
         exportJson.Should().NotContain("super-secret");
         exportJson.Should().NotContain("credential-with-benign-child-name");
@@ -504,7 +504,7 @@ public sealed class ModuleDiagnosticsFacadeTests
         var first = facade.GetAssemblyInventory();
         var second = facade.GetAssemblyInventory();
 
-        first.Status.Should().Be(ResStatus.Ok);
+        first.Status.Should().Be(ResultStatus.Ok);
         second.Data.Should().BeSameAs(first.Data);
         first.Data!.Assemblies.Should().OnlyContain(assembly =>
             Enum.IsDefined(assembly.Outcome));

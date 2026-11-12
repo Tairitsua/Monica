@@ -11,6 +11,7 @@ namespace Monica.DataChannel;
 /// <param name="pipeline">The data pipeline instance.</param>
 public class DataChannel(ChannelPipeline pipeline)
 {
+    internal Func<CancellationToken, Task>? Reinitializer { get; init; }
     /// <summary>
     /// Gets the underlying data pipeline.
     /// Contains the core data transfer and processing logic.
@@ -34,7 +35,8 @@ public class DataChannel(ChannelPipeline pipeline)
     /// <exception cref="OperationCanceledException">The supplied token cancels initialization.</exception>
     public async Task ReInitialize(CancellationToken cancellationToken = default)
     {
-        await Pipe.InitAsync(cancellationToken);
+        if (Reinitializer is { } reinitialize) await reinitialize(cancellationToken);
+        else await Pipe.InitAsync(cancellationToken);
     }
 
     /// <summary>

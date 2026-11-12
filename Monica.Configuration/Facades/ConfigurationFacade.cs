@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Exceptions;
@@ -5,6 +6,8 @@ using Monica.Configuration.Models;
 using Monica.Configuration.Models.Internal;
 using Monica.Configuration.Services;
 using Monica.Configuration.Services.Support;
+using Monica.Core;
+using Monica.Core.Configuration;
 using Monica.Core.Extensions;
 using Monica.Core.Results;
 using Monica.Tool.Extensions;
@@ -14,55 +17,64 @@ namespace Monica.Configuration.Facades;
 /// <summary>
 /// Host-facing entry point for configuration management APIs and UI consumers.
 /// </summary>
-public sealed class ConfigurationFacade(
-    ConfigurationDefinitionResolver definitionResolver,
-    IConfigurationDefinitionRegistry definitionRegistry,
-    IConfigurationDefinitionMaintenanceStore definitionMaintenanceStore,
-    IConfigurationDefinitionChangeImpactService definitionChangeImpactService,
-    IConfigurationMutationGroupApplyService mutationGroupApplyService,
-    IConfigurationHistoryService historyService,
-    IConfigurationMutationGroupService mutationGroupService,
-    IConfigurationRollbackService rollbackService,
-    IConfigurationUnifiedVersionService unifiedVersionService,
-    IConfigurationEffectiveValueStore effectiveValueStore,
-    IConfigurationHistoryStore historyStore,
-    IConfigurationMetadataStore metadataStore,
-    IEnumerable<IConfigurationChangeNotifier> changeNotifiers,
-    IConfigurationStoreStateTracker storeStateTracker,
-    ConfigurationEffectiveStateReader effectiveStateReader,
-    IConfigurationSourceInspector sourceInspector,
-    IConfigurationJsonFileSourceWriter sourceWriter,
-    ConfigurationRuntimeContext runtimeContext,
-    IConfigurationRuntimeValidationService runtimeValidationService,
-    IConfigurationOptionsValidationDiagnostics optionsValidationDiagnostics,
-    IConfigurationCandidateValidationService candidateValidationService,
-    IConfigurationRuntimeReloadService runtimeReloadService,
-    IConfigurationReloadBroadcastService reloadBroadcastService)
+/// <param name="services">The host provider; store capabilities are resolved only by operations that need them.</param>
+/// <remarks>Resolve this facade from the configured host. Startup inspection does not require a managed store.</remarks>
+public sealed class ConfigurationFacade(IServiceProvider services)
 {
-    private readonly ConfigurationDefinitionLifecycleService _definitionLifecycleService = new(
-        definitionRegistry,
-        definitionMaintenanceStore,
-        definitionResolver);
+    /// <summary>Inspects the frozen Core debug policy, its source, and the current restart candidate without accessing a store.</summary>
+    /// <remarks>This deployment-owned policy cannot be changed through Managed configuration mutations.</remarks>
+    public Result<ApplicationDebugModeState> GetDebugModeState() =>
+        Result.Success(services.GetRequiredService<MonicaApplication>().GetDebugModeState());
+
+    private ConfigurationDefinitionResolver definitionResolver => services.GetRequiredService<ConfigurationDefinitionResolver>();
+    private IConfigurationDefinitionRegistry definitionRegistry => services.GetRequiredService<IConfigurationDefinitionRegistry>();
+    private IConfigurationDefinitionMaintenanceStore definitionMaintenanceStore => services.GetRequiredService<IConfigurationDefinitionMaintenanceStore>();
+    private IConfigurationDefinitionChangeImpactService definitionChangeImpactService => services.GetRequiredService<IConfigurationDefinitionChangeImpactService>();
+    private IConfigurationMutationGroupApplyService mutationGroupApplyService => services.GetRequiredService<IConfigurationMutationGroupApplyService>();
+    private IConfigurationHistoryService historyService => services.GetRequiredService<IConfigurationHistoryService>();
+    private IConfigurationMutationGroupService mutationGroupService => services.GetRequiredService<IConfigurationMutationGroupService>();
+    private IConfigurationRollbackService rollbackService => services.GetRequiredService<IConfigurationRollbackService>();
+    private IConfigurationUnifiedVersionService unifiedVersionService => services.GetRequiredService<IConfigurationUnifiedVersionService>();
+    private IConfigurationEffectiveValueStore effectiveValueStore => services.GetRequiredService<IConfigurationEffectiveValueStore>();
+    private IConfigurationHistoryStore historyStore => services.GetRequiredService<IConfigurationHistoryStore>();
+    private IConfigurationMetadataStore metadataStore => services.GetRequiredService<IConfigurationMetadataStore>();
+    private IEnumerable<IConfigurationChangeNotifier> changeNotifiers => services.GetRequiredService<IEnumerable<IConfigurationChangeNotifier>>();
+    private IConfigurationStoreStateTracker storeStateTracker => services.GetRequiredService<IConfigurationStoreStateTracker>();
+    private ConfigurationEffectiveStateReader effectiveStateReader => services.GetRequiredService<ConfigurationEffectiveStateReader>();
+    private IConfigurationSourceInspector sourceInspector => services.GetRequiredService<IConfigurationSourceInspector>();
+    private IConfigurationJsonFileSourceWriter sourceWriter => services.GetRequiredService<IConfigurationJsonFileSourceWriter>();
+    private ConfigurationRuntimeContext runtimeContext => services.GetRequiredService<ConfigurationRuntimeContext>();
+    private IConfigurationRuntimeValidationService runtimeValidationService => services.GetRequiredService<IConfigurationRuntimeValidationService>();
+    private IConfigurationOptionsValidationDiagnostics optionsValidationDiagnostics => services.GetRequiredService<IConfigurationOptionsValidationDiagnostics>();
+    private IConfigurationCandidateValidationService candidateValidationService => services.GetRequiredService<IConfigurationCandidateValidationService>();
+    private IConfigurationRuntimeReloadService runtimeReloadService => services.GetRequiredService<IConfigurationRuntimeReloadService>();
+    private IConfigurationReloadBroadcastService reloadBroadcastService => services.GetRequiredService<IConfigurationReloadBroadcastService>();
+
+    private ConfigurationDefinitionLifecycleService DefinitionLifecycleService => new(
+        definitionRegistry, definitionMaintenanceStore, definitionResolver, services.GetService<ConfigurationRuntimeContext>());
 
     /// <summary>
     /// Gets active configuration definition summaries for operational consumers.
     /// </summary>
     /// <returns>Definition summaries.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationDefinitionSummary>>> GetDefinitionsAsync()
+    public async Task<Result<IReadOnlyList<ConfigurationDefinitionSummary>>> GetDefinitionsAsync()
     {
         try
         {
-            IReadOnlyList<ConfigurationDefinitionSummary> summaries = (await definitionResolver.GetMergedDefinitionsAsync(CancellationToken.None))
-                .Select(ToSummary)
-                .ToArray();
+            var summaries = new List<ConfigurationDefinitionSummary>();
+            foreach (var definition in await definitionResolver.GetMergedDefinitionsAsync(CancellationToken.None))
+                summaries.Add(await WithMutationAuthorityAsync(ToSummary(definition), definition));
 
-            return Res.Ok(summaries);
+            return Result.Success<IReadOnlyList<ConfigurationDefinitionSummary>>(summaries);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definitions: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationDefinitionSummary>>($"Failed to get configuration definitions: {ex.GetMessageRecursively()}");
         }
     }
+
+    /// <summary>Gets the process-policy reason that disables publication and saved-version maintenance.</summary>
+    public string? MaintenanceReadOnlyReason => services.GetService<ConfigurationRuntimeContext>()?.MaintenanceReadOnlyReason;
 
     /// <summary>
     /// Gets a fault-isolated active and retired definition catalog for management UI diagnostics.
@@ -73,29 +85,68 @@ public sealed class ConfigurationFacade(
     /// is incomplete instead of treating a partial catalog as complete.
     /// </remarks>
     /// <returns>Available definitions, unavailable metadata entries, and any store-wide read diagnostic.</returns>
-    public async Task<Res<ConfigurationDefinitionCatalog>> GetDefinitionCatalogAsync()
+    public async Task<Result<ConfigurationDefinitionCatalog>> GetDefinitionCatalogAsync()
     {
         try
         {
             var snapshot = await definitionResolver.GetDiagnosticCatalogAsync(CancellationToken.None);
-            return Res.Ok(new ConfigurationDefinitionCatalog
+            var summaries = new List<ConfigurationDefinitionSummary>();
+            foreach (var entry in snapshot.Entries)
+                summaries.Add(await WithMutationAuthorityAsync(ToSummary(entry), entry.Definition));
+            return Result.Success(new ConfigurationDefinitionCatalog
             {
-                Definitions = snapshot.Entries.Select(ToSummary).ToArray(),
+                Definitions = summaries,
                 StoreDiagnostic = snapshot.StoreDiagnostic
             });
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definition diagnostics: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationDefinitionCatalog>($"Failed to get configuration definition diagnostics: {ex.GetMessageRecursively()}");
         }
     }
+
+    private async Task<ConfigurationDefinitionSummary> WithMutationAuthorityAsync(
+        ConfigurationDefinitionSummary summary, ConfigurationDefinition? definition)
+        => summary with { MutationReadOnlyReason = await GetMutationReadOnlyReasonAsync(definition) };
+
+    private async Task<string?> GetMutationReadOnlyReasonAsync(
+        ConfigurationDefinition? definition, bool mergeReadMetadata = false)
+    {
+        var authority = services.GetService<ConfigurationWriteAuthority>();
+        if (definition is null || authority?.IsManual != true || definition.Kind == ConfigurationKind.Startup) return null;
+        try
+        {
+            if (mergeReadMetadata)
+                definition = await definitionResolver.GetRequiredForReadAsync(definition.DefinitionKey, CancellationToken.None);
+            var (_, reason) = await authority.InspectAsync(definition, CancellationToken.None);
+            return reason;
+        }
+        catch (Exception)
+        {
+            return "The active publication or existing document could not be read. Manual edits are unavailable.";
+        }
+    }
+
+    private static ConfigurationSourceDescriptor WithMutationAuthority(ConfigurationSourceDescriptor source, string? readOnlyReason)
+        => readOnlyReason is not null && source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
+            ? source with { IsWritable = false, ReadOnlyReason = readOnlyReason }
+            : source;
+
+    private static ConfigurationSourceChain WithMutationAuthority(ConfigurationSourceChain chain, string? readOnlyReason)
+        => readOnlyReason is null ? chain : chain with
+        {
+            Values = chain.Values.Select(value => value with
+            {
+                Source = WithMutationAuthority(value.Source, readOnlyReason)
+            }).ToArray()
+        };
 
     /// <summary>
     /// Gets one configuration definition.
     /// </summary>
     /// <param name="definitionKey">The definition key.</param>
     /// <returns>The definition detail.</returns>
-    public async Task<Res<ConfigurationDefinitionDetail>> GetDefinitionAsync(string definitionKey)
+    public async Task<Result<ConfigurationDefinitionDetail>> GetDefinitionAsync(string definitionKey)
     {
         try
         {
@@ -103,15 +154,15 @@ public sealed class ConfigurationFacade(
             {
                 Definition = await definitionResolver.GetRequiredForReadAsync(definitionKey, CancellationToken.None)
             };
-            return detail;
+            return Result.Success(detail);
         }
         catch (ConfigurationDefinitionNotFoundException ex)
         {
-            return Res.Fail(ex.Message);
+            return Result.Failure<ConfigurationDefinitionDetail>(ex.Message);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definition: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationDefinitionDetail>($"Failed to get configuration definition: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -119,17 +170,17 @@ public sealed class ConfigurationFacade(
     /// Gets source-aware runtime validation diagnostics for the current process.
     /// </summary>
     /// <returns>The runtime validation report.</returns>
-    public Task<Res<ConfigurationValidationReport>> GetRuntimeValidationReportAsync(CancellationToken cancellationToken = default)
+    public Task<Result<ConfigurationValidationReport>> GetRuntimeValidationReportAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return Task.FromResult(Res.Ok(runtimeValidationService.GetReport()));
+            return Task.FromResult(Result.Success(runtimeValidationService.GetReport()));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<ConfigurationValidationReport>>(
-                Res.Fail(SafeMutationFailure(ex)));
+            return Task.FromResult<Result<ConfigurationValidationReport>>(
+                Result.Failure<ConfigurationValidationReport>(SafeMutationFailure(ex)));
         }
     }
 
@@ -140,18 +191,18 @@ public sealed class ConfigurationFacade(
     /// <param name="scopePath">The logical path whose complete value is represented by <paramref name="json"/>.</param>
     /// <param name="json">The normalized candidate JSON value.</param>
     /// <returns>A structured report containing every candidate validation issue.</returns>
-    public Res<ConfigurationCandidateValidationReport> ValidateCandidateValue(
+    public Result<ConfigurationCandidateValidationReport> ValidateCandidateValue(
         ConfigurationDefinition definition,
         LogicalPath scopePath,
         string json)
     {
         try
         {
-            return Res.Ok(candidateValidationService.Validate(definition, scopePath, json));
+            return Result.Success(candidateValidationService.Validate(definition, scopePath, json));
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationCandidateValidationReport>(SafeMutationFailure(ex));
         }
     }
 
@@ -159,15 +210,15 @@ public sealed class ConfigurationFacade(
     /// Gets runtime reload status for Monica-managed configuration definitions.
     /// </summary>
     /// <returns>The runtime reload status report.</returns>
-    public async Task<Res<ConfigurationReloadStatusReport>> GetRuntimeReloadStatusAsync()
+    public async Task<Result<ConfigurationReloadStatusReport>> GetRuntimeReloadStatusAsync()
     {
         try
         {
-            return Res.Ok(await runtimeReloadService.GetStatusAsync(CancellationToken.None));
+            return Result.Success(await runtimeReloadService.GetStatusAsync(CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get runtime configuration reload status: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationReloadStatusReport>($"Failed to get runtime configuration reload status: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -175,15 +226,15 @@ public sealed class ConfigurationFacade(
     /// Reloads runtime configuration providers and returns the refreshed reload status report.
     /// </summary>
     /// <returns>The refreshed runtime reload status report.</returns>
-    public async Task<Res<ConfigurationReloadStatusReport>> ReloadRuntimeConfigurationAsync()
+    public async Task<Result<ConfigurationReloadStatusReport>> ReloadRuntimeConfigurationAsync()
     {
         try
         {
-            return Res.Ok(await runtimeReloadService.ReloadAsync(CancellationToken.None));
+            return Result.Success(await runtimeReloadService.ReloadAsync(CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to reload runtime configuration: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationReloadStatusReport>($"Failed to reload runtime configuration: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -191,15 +242,15 @@ public sealed class ConfigurationFacade(
     /// Reloads the current Monica projection and broadcasts a best-effort reload-all signal to other processes.
     /// </summary>
     /// <returns>The local reload and distributed publication outcome.</returns>
-    public async Task<Res<ConfigurationReloadBroadcastResult>> BroadcastReloadAllAsync()
+    public async Task<Result<ConfigurationReloadBroadcastResult>> BroadcastReloadAllAsync()
     {
         try
         {
-            return Res.Ok(await reloadBroadcastService.BroadcastAllAsync(CancellationToken.None));
+            return Result.Success(await reloadBroadcastService.BroadcastAllAsync(CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to broadcast configuration reload: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationReloadBroadcastResult>($"Failed to broadcast configuration reload: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -210,16 +261,16 @@ public sealed class ConfigurationFacade(
     /// <param name="logicalPath">The logical path.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>The effective value, if one exists.</returns>
-    public async Task<Res<ConfigurationEffectiveValue>> GetEffectiveValueAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
+    public async Task<Result<ConfigurationEffectiveValue>> GetEffectiveValueAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
     {
         try
         {
             var definition = await definitionResolver.GetRequiredForReadAsync(definitionKey, CancellationToken.None);
-            return await effectiveStateReader.ReadValueAsync(definition, logicalPath, CancellationToken.None, includeSensitive);
+            return Result.Success(await effectiveStateReader.ReadValueAsync(definition, logicalPath, CancellationToken.None, includeSensitive));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get effective configuration value: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationEffectiveValue>($"Failed to get effective configuration value: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -229,16 +280,16 @@ public sealed class ConfigurationFacade(
     /// <param name="definitionKey">The definition key.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>The definition state snapshot.</returns>
-    public async Task<Res<ConfigurationDefinitionState>> GetDefinitionStateAsync(string definitionKey, bool includeSensitive = false)
+    public async Task<Result<ConfigurationDefinitionState>> GetDefinitionStateAsync(string definitionKey, bool includeSensitive = false)
     {
         try
         {
             var definition = await definitionResolver.GetRequiredForReadAsync(definitionKey, CancellationToken.None);
-            return Res.Ok(await effectiveStateReader.ReadDefinitionAsync(definition, CancellationToken.None, includeSensitive));
+            return Result.Success(await effectiveStateReader.ReadDefinitionAsync(definition, CancellationToken.None, includeSensitive));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definition state: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationDefinitionState>($"Failed to get configuration definition state: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -252,16 +303,16 @@ public sealed class ConfigurationFacade(
     /// </remarks>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>All definition state snapshots.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationDefinitionState>>> GetDefinitionStatesAsync(bool includeSensitive = false)
+    public async Task<Result<IReadOnlyList<ConfigurationDefinitionState>>> GetDefinitionStatesAsync(bool includeSensitive = false)
     {
         try
         {
             var definitions = await definitionResolver.GetMergedDefinitionsAsync(CancellationToken.None);
-            return Res.Ok(await effectiveStateReader.ReadDefinitionsAsync(definitions, CancellationToken.None, includeSensitive));
+            return Result.Success(await effectiveStateReader.ReadDefinitionsAsync(definitions, CancellationToken.None, includeSensitive));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definition states: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationDefinitionState>>($"Failed to get configuration definition states: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -269,6 +320,7 @@ public sealed class ConfigurationFacade(
     {
         return new ConfigurationDefinitionSummary
         {
+            Kind = definition.Kind,
             DefinitionKey = definition.DefinitionKey,
             SectionPath = definition.SectionPath,
             DisplayName = definition.DisplayName,
@@ -357,11 +409,11 @@ public sealed class ConfigurationFacade(
     /// Gets the active configuration storage overview.
     /// </summary>
     /// <returns>The storage overview.</returns>
-    public Task<Res<ConfigurationStorageOverview>> GetStorageOverviewAsync()
+    public Task<Result<ConfigurationStorageOverview>> GetStorageOverviewAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(new ConfigurationStorageOverview
+            return Task.FromResult(Result.Success(new ConfigurationStorageOverview
             {
                 EffectiveValueStore = effectiveValueStore.Descriptor,
                 HistoryStore = historyStore.Descriptor,
@@ -371,8 +423,8 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<ConfigurationStorageOverview>>(
-                Res.Fail($"Failed to get configuration storage overview: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<ConfigurationStorageOverview>>(
+                Result.Failure<ConfigurationStorageOverview>($"Failed to get configuration storage overview: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -382,7 +434,7 @@ public sealed class ConfigurationFacade(
     /// <param name="definitionKey">The definition key.</param>
     /// <param name="limit">Maximum number of newest entries to return.</param>
     /// <returns>The current publication overview with newest revisions first.</returns>
-    public async Task<Res<ConfigurationDefinitionPublicationOverview>> GetDefinitionPublicationOverviewAsync(
+    public async Task<Result<ConfigurationDefinitionPublicationOverview>> GetDefinitionPublicationOverviewAsync(
         string definitionKey,
         int limit = 20)
     {
@@ -392,11 +444,11 @@ public sealed class ConfigurationFacade(
                 definitionKey,
                 limit,
                 CancellationToken.None);
-            return Res.Ok(_definitionLifecycleService.EnrichWithLocalRegistration(overview));
+            return Result.Success(DefinitionLifecycleService.EnrichWithLocalRegistration(overview));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration definition publication overview: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationDefinitionPublicationOverview>($"Failed to get configuration definition publication overview: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -407,18 +459,18 @@ public sealed class ConfigurationFacade(
     /// <returns>
     /// Participating logical publishers, parameter reload behavior, and parameters without known consumers.
     /// </returns>
-    public async Task<Res<ConfigurationDefinitionChangeImpact>> GetDefinitionChangeImpactAsync(
+    public async Task<Result<ConfigurationDefinitionChangeImpact>> GetDefinitionChangeImpactAsync(
         IReadOnlyCollection<ConfigurationParameterChangeTarget> targets)
     {
         try
         {
-            return Res.Ok(await definitionChangeImpactService.GetImpactAsync(
+            return Result.Success(await definitionChangeImpactService.GetImpactAsync(
                 targets,
                 CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail(
+            return Result.Failure<ConfigurationDefinitionChangeImpact>(
                 $"Failed to get configuration definition change impact: {ex.GetMessageRecursively()}");
         }
     }
@@ -428,23 +480,23 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="definitionKey">The stable definition key.</param>
     /// <returns>The purge impact and current concurrency revision.</returns>
-    public async Task<Res<ConfigurationDefinitionPurgePreview>> PreviewDefinitionPurgeAsync(string definitionKey)
+    public async Task<Result<ConfigurationDefinitionPurgePreview>> PreviewDefinitionPurgeAsync(string definitionKey)
     {
         try
         {
-            return Res.Ok(await _definitionLifecycleService.PreviewPurgeAsync(
+            return Result.Success(await DefinitionLifecycleService.PreviewPurgeAsync(
                 definitionKey,
                 CancellationToken.None));
         }
         catch (KeyNotFoundException ex)
         {
-            return Res.Fail(
+            return Result.Failure<ConfigurationDefinitionPurgePreview>(
                 $"Failed to preview configuration definition purge: {ex.GetMessageRecursively()}",
-                ResStatus.NotFound);
+                ResultStatus.NotFound);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to preview configuration definition purge: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationDefinitionPurgePreview>($"Failed to preview configuration definition purge: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -457,28 +509,28 @@ public sealed class ConfigurationFacade(
     /// </remarks>
     /// <param name="request">The definition key and revision returned by the purge preview.</param>
     /// <returns>A successful result when the retired definition was purged.</returns>
-    public async Task<Res> PurgeDefinitionAsync(ConfigurationDefinitionPurgeRequest request)
+    public async Task<Result> PurgeDefinitionAsync(ConfigurationDefinitionPurgeRequest request)
     {
         try
         {
-            await _definitionLifecycleService.PurgeAsync(request, CancellationToken.None);
-            return Res.Ok();
+            await DefinitionLifecycleService.PurgeAsync(request, CancellationToken.None);
+            return Result.Success();
         }
         catch (ConfigurationConcurrencyConflictException ex)
         {
-            return Res.Fail(
+            return Result.Failure(
                 $"Failed to purge configuration definition: {ex.GetMessageRecursively()}",
-                ResStatus.Conflict);
+                ResultStatus.Conflict);
         }
         catch (KeyNotFoundException ex)
         {
-            return Res.Fail(
+            return Result.Failure(
                 $"Failed to purge configuration definition: {ex.GetMessageRecursively()}",
-                ResStatus.NotFound);
+                ResultStatus.NotFound);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to purge configuration definition: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to purge configuration definition: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -486,16 +538,16 @@ public sealed class ConfigurationFacade(
     /// Gets all runtime store states currently known by this process.
     /// </summary>
     /// <returns>The store states.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationStoreState>>> GetStoreStatesAsync()
+    public Task<Result<IReadOnlyList<ConfigurationStoreState>>> GetStoreStatesAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(storeStateTracker.GetStates()));
+            return Task.FromResult(Result.Success(storeStateTracker.GetStates()));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationStoreState>>>(
-                Res.Fail($"Failed to get configuration store states: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<IReadOnlyList<ConfigurationStoreState>>>(
+                Result.Failure<IReadOnlyList<ConfigurationStoreState>>($"Failed to get configuration store states: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -503,16 +555,16 @@ public sealed class ConfigurationFacade(
     /// Gets all runtime Microsoft configuration sources.
     /// </summary>
     /// <returns>Configuration source descriptors ordered by runtime priority index.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationSourceDescriptor>>> GetConfigurationSourcesAsync()
+    public Task<Result<IReadOnlyList<ConfigurationSourceDescriptor>>> GetConfigurationSourcesAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(sourceInspector.GetSources()));
+            return Task.FromResult(Result.Success(sourceInspector.GetSources()));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationSourceDescriptor>>>(
-                Res.Fail($"Failed to get configuration sources: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<IReadOnlyList<ConfigurationSourceDescriptor>>>(
+                Result.Failure<IReadOnlyList<ConfigurationSourceDescriptor>>($"Failed to get configuration sources: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -521,76 +573,81 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>Source inventories ordered from highest priority to lowest priority.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationSourceInventory>>> GetConfigurationSourceInventoriesAsync(bool includeSensitive = false)
+    public async Task<Result<IReadOnlyList<ConfigurationSourceInventory>>> GetConfigurationSourceInventoriesAsync(bool includeSensitive = false)
     {
         try
         {
-            return Res.Ok(await sourceInspector.GetSourceInventoriesAsync(CancellationToken.None, includeSensitive));
+            return Result.Success(await sourceInspector.GetSourceInventoriesAsync(CancellationToken.None, includeSensitive));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration source inventory: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationSourceInventory>>($"Failed to get configuration source inventory: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>
     /// Gets source contribution counts for one definition.
     /// </summary>
+    /// <remarks>Managed-store editability includes the current Manual publication and document authority.</remarks>
     /// <param name="definitionKey">The definition key.</param>
     /// <returns>Source contribution rows.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>> GetDefinitionSourceContributionsAsync(string definitionKey)
+    public async Task<Result<IReadOnlyList<ConfigurationDefinitionSourceContribution>>> GetDefinitionSourceContributionsAsync(string definitionKey)
     {
         try
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Result.Failure<IReadOnlyList<ConfigurationDefinitionSourceContribution>>("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetDefinitionContributions(definition)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Result.Success<IReadOnlyList<ConfigurationDefinitionSourceContribution>>(
+                sourceInspector.GetDefinitionContributions(definition).Select(contribution => contribution with
+                {
+                    Source = WithMutationAuthority(contribution.Source, reason)
+                }).ToArray());
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationDefinitionSourceContribution>>>(
-                Res.Fail($"Failed to get configuration source contributions: {ex.GetMessageRecursively()}"));
+            return Result.Failure<IReadOnlyList<ConfigurationDefinitionSourceContribution>>($"Failed to get configuration source contributions: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>
     /// Gets the source chain for one configuration path.
     /// </summary>
+    /// <remarks>Managed-store editability includes the current Manual publication and document authority.</remarks>
     /// <param name="definitionKey">The definition key.</param>
     /// <param name="logicalPath">The logical path.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>The source chain.</returns>
-    public Task<Res<ConfigurationSourceChain>> GetSourceChainAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
+    public async Task<Result<ConfigurationSourceChain>> GetSourceChainAsync(string definitionKey, LogicalPath logicalPath, bool includeSensitive = false)
     {
         try
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<ConfigurationSourceChain>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Result.Failure<ConfigurationSourceChain>("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetSourceChain(definition, logicalPath, includeSensitive)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Result.Success(WithMutationAuthority(sourceInspector.GetSourceChain(definition, logicalPath, includeSensitive), reason));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<ConfigurationSourceChain>>(
-                Res.Fail($"Failed to get configuration source chain: {ex.GetMessageRecursively()}"));
+            return Result.Failure<ConfigurationSourceChain>($"Failed to get configuration source chain: {ex.GetMessageRecursively()}");
         }
     }
 
     /// <summary>
     /// Gets source chains for several configuration paths from one runtime-provider snapshot.
     /// </summary>
+    /// <remarks>Managed-store editability is checked once for the definition against current Manual write authority.</remarks>
     /// <param name="definitionKey">The locally scanned definition key.</param>
     /// <param name="logicalPaths">The logical paths to inspect, in result order.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>One source chain for each requested path.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationSourceChain>>> GetSourceChainsAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationSourceChain>>> GetSourceChainsAsync(
         string definitionKey,
         IReadOnlyList<LogicalPath> logicalPaths, bool includeSensitive = false)
     {
@@ -598,16 +655,16 @@ public sealed class ConfigurationFacade(
         {
             if (!definitionResolver.TryGetLocal(definitionKey, out var definition))
             {
-                return Task.FromResult<Res<IReadOnlyList<ConfigurationSourceChain>>>(
-                    Res.Fail("Configuration source-chain inspection is only available for definitions scanned by the current process."));
+                return Result.Failure<IReadOnlyList<ConfigurationSourceChain>>("Configuration source-chain inspection is only available for definitions scanned by the current process.");
             }
 
-            return Task.FromResult(Res.Ok(sourceInspector.GetSourceChains(definition, logicalPaths, includeSensitive)));
+            var reason = await GetMutationReadOnlyReasonAsync(definition, mergeReadMetadata: true);
+            return Result.Success<IReadOnlyList<ConfigurationSourceChain>>(sourceInspector.GetSourceChains(definition, logicalPaths, includeSensitive)
+                .Select(chain => WithMutationAuthority(chain, reason)).ToArray());
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<IReadOnlyList<ConfigurationSourceChain>>>(
-                Res.Fail($"Failed to get configuration source chains: {ex.GetMessageRecursively()}"));
+            return Result.Failure<IReadOnlyList<ConfigurationSourceChain>>($"Failed to get configuration source chains: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -617,15 +674,15 @@ public sealed class ConfigurationFacade(
     /// <param name="sourceKey">The source key.</param>
     /// <param name="includeSensitive">Whether to include unmasked sensitive values; false by default. Callers own disclosure.</param>
     /// <returns>The source file view.</returns>
-    public async Task<Res<ConfigurationSourceFileView>> GetSourceFileViewAsync(string sourceKey, bool includeSensitive = false)
+    public async Task<Result<ConfigurationSourceFileView>> GetSourceFileViewAsync(string sourceKey, bool includeSensitive = false)
     {
         try
         {
-            return Res.Ok(await sourceInspector.GetSourceFileViewAsync(sourceKey, CancellationToken.None, includeSensitive));
+            return Result.Success(await sourceInspector.GetSourceFileViewAsync(sourceKey, CancellationToken.None, includeSensitive));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration source file: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationSourceFileView>($"Failed to get configuration source file: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -633,7 +690,7 @@ public sealed class ConfigurationFacade(
     /// Gets the current Microsoft configuration debug view.
     /// </summary>
     /// <returns>The debug view text.</returns>
-    public Task<Res<string>> GetDebugViewAsync()
+    public Task<Result<string>> GetDebugViewAsync()
     {
         try
         {
@@ -643,11 +700,11 @@ public sealed class ConfigurationFacade(
                     .Select(pair => $"{pair.Key}={pair.Value}")
                     .JoinAsString(Environment.NewLine);
 
-            return Task.FromResult(Res.Ok<string>(debugView));
+            return Task.FromResult(Result.Success<string>(debugView));
         }
         catch (Exception ex)
         {
-            return Task.FromResult<Res<string>>(Res.Fail($"Failed to get configuration debug view: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<string>>(Result.Failure<string>($"Failed to get configuration debug view: {ex.GetMessageRecursively()}"));
         }
     }
 
@@ -656,19 +713,19 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The mutation group request.</param>
     /// <returns>The group outcome, including post-commit reload and notification issues.</returns>
-    public async Task<Res<ConfigurationMutationGroupApplyResult>> ApplyMutationGroupAsync(
+    public async Task<Result<ConfigurationMutationGroupApplyResult>> ApplyMutationGroupAsync(
         ConfigurationMutationGroupApplyRequest request)
     {
         try
         {
             var result = await mutationGroupApplyService.ApplyAsync(request, CancellationToken.None);
             return result.Status == ConfigurationMutationGroupApplyStatus.Rejected
-                ? Res.Fail("The complete configuration validation rejected this group before persistence.").WithData(result)
-                : Res.Ok(result);
+                ? Result.Failure("The complete configuration validation rejected this group before persistence.").WithData(result)
+                : Result.Success(result);
         }
         catch (ConfigurationValidationExecutionException ex)
         {
-            return Res.Fail(SafeMutationFailure(ex)).WithData(new ConfigurationMutationGroupApplyResult
+            return Result.Failure(SafeMutationFailure(ex)).WithData(new ConfigurationMutationGroupApplyResult
             {
                 Status = ConfigurationMutationGroupApplyStatus.Rejected,
                 ValidationPreview = new ConfigurationMutationGroupValidationPreview
@@ -696,7 +753,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationMutationGroupApplyResult>(SafeMutationFailure(ex));
         }
     }
 
@@ -704,33 +761,33 @@ public sealed class ConfigurationFacade(
     /// <param name="request">The proposed mutation commands and their physical targets.</param>
     /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
     /// <returns>The complete validation reports and review fingerprint.</returns>
-    public async Task<Res<ConfigurationMutationGroupValidationPreview>> PreviewMutationGroupAsync(
+    public async Task<Result<ConfigurationMutationGroupValidationPreview>> PreviewMutationGroupAsync(
         ConfigurationMutationGroupApplyRequest request, CancellationToken cancellationToken = default)
     {
-        try { return Res.Ok(await mutationGroupApplyService.PreviewAsync(request, cancellationToken)); }
+        try { return Result.Success(await mutationGroupApplyService.PreviewAsync(request, cancellationToken)); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (Exception ex) { return Res.Fail(SafeMutationFailure(ex)); }
+        catch (Exception ex) { return Result.Failure<ConfigurationMutationGroupValidationPreview>(SafeMutationFailure(ex)); }
     }
 
     /// <summary>Reads the latest observed default-options attempt without resolving or retaining options instances.</summary>
     /// <param name="definitionKey">The locally discovered configuration owner.</param>
     /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
     /// <returns>The latest attempt, or null when default options have not been observed.</returns>
-    public Task<Res<ConfigurationOptionsValidationReport?>> GetOptionsValidationReportAsync(
+    public Task<Result<ConfigurationOptionsValidationReport?>> GetOptionsValidationReportAsync(
         string definitionKey, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(Res.Ok(optionsValidationDiagnostics.GetLatestReport(definitionKey)));
+        return Task.FromResult(Result.Success(optionsValidationDiagnostics.GetLatestReport(definitionKey)));
     }
 
     /// <summary>Reads bounded latest default-options attempts separately from effective-source validation.</summary>
     /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
     /// <returns>The latest observed attempts for locally discovered definitions.</returns>
-    public Task<Res<IReadOnlyList<ConfigurationOptionsValidationReport>>> GetOptionsValidationReportsAsync(
+    public Task<Result<IReadOnlyList<ConfigurationOptionsValidationReport>>> GetOptionsValidationReportsAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(Res.Ok(optionsValidationDiagnostics.GetReports()));
+        return Task.FromResult(Result.Success(optionsValidationDiagnostics.GetReports()));
     }
 
     private static string SafeMutationFailure(Exception exception) => exception switch
@@ -746,7 +803,7 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The mutation request.</param>
     /// <returns>The mutation result.</returns>
-    public async Task<Res<ConfigurationMutationResult>> MutateAsync(ConfigurationMutationRequest request)
+    public async Task<Result<ConfigurationMutationResult>> MutateAsync(ConfigurationMutationRequest request)
     {
         try
         {
@@ -772,11 +829,11 @@ public sealed class ConfigurationFacade(
                     }
                 ]
             }, CancellationToken.None);
-            return Res.Ok(GetSingleAppliedResult(applied));
+            return Result.Success(GetSingleAppliedResult(applied));
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationMutationResult>(SafeMutationFailure(ex));
         }
     }
 
@@ -785,7 +842,7 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The source mutation request.</param>
     /// <returns>The mutation result.</returns>
-    public async Task<Res<ConfigurationMutationResult>> MutateSourceAsync(ConfigurationSourceMutationRequest request)
+    public async Task<Result<ConfigurationMutationResult>> MutateSourceAsync(ConfigurationSourceMutationRequest request)
     {
         try
         {
@@ -812,11 +869,11 @@ public sealed class ConfigurationFacade(
                     }
                 ]
             }, CancellationToken.None);
-            return Res.Ok(GetSingleAppliedResult(applied));
+            return Result.Success(GetSingleAppliedResult(applied));
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationMutationResult>(SafeMutationFailure(ex));
         }
     }
 
@@ -836,16 +893,16 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="sourceKey">The source key.</param>
     /// <returns>The current source revision, or null when no revision is available.</returns>
-    public async Task<Res<string?>> GetSourceRevisionAsync(string sourceKey)
+    public async Task<Result<string?>> GetSourceRevisionAsync(string sourceKey)
     {
         try
         {
             var source = sourceInspector.GetRequiredSource(sourceKey);
-            return Res.Ok<string?>(await sourceWriter.GetRevisionAsync(source, CancellationToken.None));
+            return Result.Success<string?>(await sourceWriter.GetRevisionAsync(source, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration source revision: {ex.GetMessageRecursively()}");
+            return Result.Failure<string?>($"Failed to get configuration source revision: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -855,16 +912,16 @@ public sealed class ConfigurationFacade(
     /// <param name="definitionKey">The definition key.</param>
     /// <param name="logicalPath">The logical path.</param>
     /// <returns>History records.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationValueHistory>>> GetHistoryAsync(string definitionKey, LogicalPath logicalPath)
+    public async Task<Result<IReadOnlyList<ConfigurationValueHistory>>> GetHistoryAsync(string definitionKey, LogicalPath logicalPath)
     {
         try
         {
             var history = await historyService.GetHistoryAsync(definitionKey, logicalPath, CancellationToken.None);
-            return Res.Ok(history);
+            return Result.Success(history);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration value history: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationValueHistory>>($"Failed to get configuration value history: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -877,7 +934,7 @@ public sealed class ConfigurationFacade(
     /// <param name="logicalPath">Logical path filter.</param>
     /// <param name="mutationGroupId">Mutation group filter.</param>
     /// <returns>The matching history rows.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationValueHistory>>> QueryHistoryAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationValueHistory>>> QueryHistoryAsync(
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? definitionKey = null,
@@ -886,11 +943,11 @@ public sealed class ConfigurationFacade(
     {
         try
         {
-            return Res.Ok(await historyService.QueryHistoryAsync(from, to, definitionKey, logicalPath, mutationGroupId, CancellationToken.None));
+            return Result.Success(await historyService.QueryHistoryAsync(from, to, definitionKey, logicalPath, mutationGroupId, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to query configuration value history: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationValueHistory>>($"Failed to query configuration value history: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -899,16 +956,16 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The filters and mutation-unit pagination bounds.</param>
     /// <returns>The matching history page in deterministic newest-first order.</returns>
-    public async Task<Res<ConfigurationHistoryPageResult>> QueryHistoryPageAsync(
+    public async Task<Result<ConfigurationHistoryPageResult>> QueryHistoryPageAsync(
         ConfigurationHistoryPageRequest request)
     {
         try
         {
-            return Res.Ok(await historyService.QueryHistoryPageAsync(request, CancellationToken.None));
+            return Result.Success(await historyService.QueryHistoryPageAsync(request, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to query configuration value history page: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationHistoryPageResult>($"Failed to query configuration value history page: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -920,7 +977,7 @@ public sealed class ConfigurationFacade(
     /// <param name="definitionKey">Definition key filter.</param>
     /// <param name="limit">Maximum number of versions to return.</param>
     /// <returns>The matching unified version summaries.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>> GetUnifiedVersionsAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>> GetUnifiedVersionsAsync(
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? definitionKey = null,
@@ -928,7 +985,7 @@ public sealed class ConfigurationFacade(
     {
         try
         {
-            return Res.Ok(await unifiedVersionService.ListVersionsAsync(
+            return Result.Success(await unifiedVersionService.ListVersionsAsync(
                 from,
                 to,
                 definitionKey,
@@ -937,7 +994,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get unified configuration versions: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>($"Failed to get unified configuration versions: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -946,18 +1003,18 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="version">The version number.</param>
     /// <returns>The version snapshot.</returns>
-    public async Task<Res<ConfigurationUnifiedVersionSnapshot>> GetUnifiedVersionAsync(long version)
+    public async Task<Result<ConfigurationUnifiedVersionSnapshot>> GetUnifiedVersionAsync(long version)
     {
         try
         {
             var snapshot = await unifiedVersionService.GetVersionAsync(version, CancellationToken.None);
             return snapshot is null
-                ? Res.Fail($"Unified configuration version '{version}' was not found.")
-                : Res.Ok(snapshot);
+                ? Result.Failure<ConfigurationUnifiedVersionSnapshot>($"Unified configuration version '{version}' was not found.")
+                : Result.Success(snapshot);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get unified configuration version: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationUnifiedVersionSnapshot>($"Failed to get unified configuration version: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -972,16 +1029,16 @@ public sealed class ConfigurationFacade(
     /// <returns>
     /// A success result when the version has been deleted; otherwise, a failure result with the store diagnostic.
     /// </returns>
-    public async Task<Res> DeleteUnifiedVersionAsync(long version)
+    public async Task<Result> DeleteUnifiedVersionAsync(long version)
     {
         try
         {
             await unifiedVersionService.DeleteVersionAsync(version, CancellationToken.None);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to delete unified configuration version: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to delete unified configuration version: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -991,20 +1048,20 @@ public sealed class ConfigurationFacade(
     /// <param name="originVersion">The origin version number.</param>
     /// <param name="targetVersion">The target version number.</param>
     /// <returns>The version comparison.</returns>
-    public async Task<Res<ConfigurationUnifiedVersionComparison>> CompareUnifiedVersionsAsync(
+    public async Task<Result<ConfigurationUnifiedVersionComparison>> CompareUnifiedVersionsAsync(
         long originVersion,
         long targetVersion)
     {
         try
         {
-            return Res.Ok(await unifiedVersionService.CompareVersionsAsync(
+            return Result.Success(await unifiedVersionService.CompareVersionsAsync(
                 originVersion,
                 targetVersion,
                 CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to compare unified configuration versions: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationUnifiedVersionComparison>($"Failed to compare unified configuration versions: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -1014,17 +1071,17 @@ public sealed class ConfigurationFacade(
     /// <param name="version">The version number.</param>
     /// <returns>The apply preview.</returns>
     /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
-    public async Task<Res<ConfigurationUnifiedVersionApplyPreview>> PreviewUnifiedVersionRollbackAsync(
+    public async Task<Result<ConfigurationUnifiedVersionApplyPreview>> PreviewUnifiedVersionRollbackAsync(
         long version, CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await unifiedVersionService.PreviewRollbackAsync(version, cancellationToken));
+            return Result.Success(await unifiedVersionService.PreviewRollbackAsync(version, cancellationToken));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationUnifiedVersionApplyPreview>(SafeMutationFailure(ex));
         }
     }
 
@@ -1033,24 +1090,24 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The reviewed rollback request, including its preview fingerprint and acknowledgements.</param>
     /// <returns>The rollback result.</returns>
-    public async Task<Res<ConfigurationUnifiedVersionRollbackResult>> RollbackUnifiedVersionAsync(
+    public async Task<Result<ConfigurationUnifiedVersionRollbackResult>> RollbackUnifiedVersionAsync(
         ConfigurationUnifiedVersionRollbackRequest request)
     {
         try
         {
-            return Res.Ok(await unifiedVersionService.RollbackToVersionAsync(
+            return Result.Success(await unifiedVersionService.RollbackToVersionAsync(
                 request,
                 CancellationToken.None));
         }
         catch (ConfigurationConcurrencyConflictException ex)
         {
-            return Res.Fail(
+            return Result.Failure<ConfigurationUnifiedVersionRollbackResult>(
                 SafeMutationFailure(ex),
-                ResStatus.Conflict);
+                ResultStatus.Conflict);
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationUnifiedVersionRollbackResult>(SafeMutationFailure(ex));
         }
     }
 
@@ -1061,18 +1118,18 @@ public sealed class ConfigurationFacade(
     /// <param name="to">Latest creation time to include.</param>
     /// <param name="definitionKey">Definition key filter.</param>
     /// <returns>The matching groups.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationMutationGroup>>> GetMutationGroupsAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationMutationGroup>>> GetMutationGroupsAsync(
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? definitionKey = null)
     {
         try
         {
-            return Res.Ok(await mutationGroupService.ListAsync(from, to, definitionKey, CancellationToken.None));
+            return Result.Success(await mutationGroupService.ListAsync(from, to, definitionKey, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration mutation groups: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationMutationGroup>>($"Failed to get configuration mutation groups: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -1081,16 +1138,16 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="request">The filters and pagination bounds.</param>
     /// <returns>The matching group page in deterministic newest-first order.</returns>
-    public async Task<Res<ConfigurationMutationGroupPageResult>> QueryMutationGroupsPageAsync(
+    public async Task<Result<ConfigurationMutationGroupPageResult>> QueryMutationGroupsPageAsync(
         ConfigurationMutationGroupPageRequest request)
     {
         try
         {
-            return Res.Ok(await mutationGroupService.QueryPageAsync(request, CancellationToken.None));
+            return Result.Success(await mutationGroupService.QueryPageAsync(request, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to query configuration mutation group page: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationMutationGroupPageResult>($"Failed to query configuration mutation group page: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -1099,18 +1156,18 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="groupId">The group identity.</param>
     /// <returns>The group.</returns>
-    public async Task<Res<ConfigurationMutationGroup>> GetMutationGroupAsync(string groupId)
+    public async Task<Result<ConfigurationMutationGroup>> GetMutationGroupAsync(string groupId)
     {
         try
         {
             var group = await mutationGroupService.GetAsync(groupId, CancellationToken.None);
             return group is null
-                ? Res.Fail($"Configuration mutation group '{groupId}' was not found.")
-                : Res.Ok(group);
+                ? Result.Failure<ConfigurationMutationGroup>($"Configuration mutation group '{groupId}' was not found.")
+                : Result.Success(group);
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration mutation group: {ex.GetMessageRecursively()}");
+            return Result.Failure<ConfigurationMutationGroup>($"Failed to get configuration mutation group: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -1119,15 +1176,15 @@ public sealed class ConfigurationFacade(
     /// </summary>
     /// <param name="groupId">The group identity.</param>
     /// <returns>The group history rows.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationValueHistory>>> GetGroupHistoryAsync(string groupId)
+    public async Task<Result<IReadOnlyList<ConfigurationValueHistory>>> GetGroupHistoryAsync(string groupId)
     {
         try
         {
-            return Res.Ok(await mutationGroupService.GetGroupHistoryAsync(groupId, CancellationToken.None));
+            return Result.Success(await mutationGroupService.GetGroupHistoryAsync(groupId, CancellationToken.None));
         }
         catch (Exception ex)
         {
-            return Res.Fail($"Failed to get configuration mutation group history: {ex.GetMessageRecursively()}");
+            return Result.Failure<IReadOnlyList<ConfigurationValueHistory>>($"Failed to get configuration mutation group history: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -1137,17 +1194,17 @@ public sealed class ConfigurationFacade(
     /// <param name="historyIds">The history identities to preview.</param>
     /// <param name="cancellationToken">Cancellation token owned by the caller.</param>
     /// <returns>The current values and concurrency-bound rollback plan.</returns>
-    public async Task<Res<ConfigurationHistoryRollbackPreview>> PreviewHistoryRollbackAsync(
+    public async Task<Result<ConfigurationHistoryRollbackPreview>> PreviewHistoryRollbackAsync(
         IReadOnlyList<string> historyIds, CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await rollbackService.PreviewHistoriesAsync(historyIds, cancellationToken));
+            return Result.Success(await rollbackService.PreviewHistoriesAsync(historyIds, cancellationToken));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationHistoryRollbackPreview>(SafeMutationFailure(ex));
         }
     }
 
@@ -1158,14 +1215,14 @@ public sealed class ConfigurationFacade(
     /// <param name="planToken">The current-state preview token reviewed by the operator.</param>
     /// <param name="reason">Optional rollback reason.</param>
     /// <returns>The rollback mutation result.</returns>
-    public async Task<Res<ConfigurationMutationResult>> RollbackHistoryAsync(
+    public async Task<Result<ConfigurationMutationResult>> RollbackHistoryAsync(
         string historyId,
         string planToken,
         string? reason = null)
     {
         try
         {
-            return Res.Ok(await rollbackService.RollbackHistoryAsync(
+            return Result.Success(await rollbackService.RollbackHistoryAsync(
                 historyId,
                 planToken,
                 new ConfigurationMutationContext { Reason = reason },
@@ -1173,7 +1230,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<ConfigurationMutationResult>(SafeMutationFailure(ex));
         }
     }
 
@@ -1184,14 +1241,14 @@ public sealed class ConfigurationFacade(
     /// <param name="planToken">The current-state preview token reviewed by the operator.</param>
     /// <param name="reason">Optional rollback reason.</param>
     /// <returns>The rollback mutation results.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationMutationResult>>> RollbackHistoriesAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationMutationResult>>> RollbackHistoriesAsync(
         IReadOnlyList<string> historyIds,
         string planToken,
         string? reason = null)
     {
         try
         {
-            return Res.Ok(await rollbackService.RollbackHistoriesAsync(
+            return Result.Success(await rollbackService.RollbackHistoriesAsync(
                 historyIds,
                 planToken,
                 new ConfigurationMutationContext { Reason = reason },
@@ -1199,7 +1256,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<IReadOnlyList<ConfigurationMutationResult>>(SafeMutationFailure(ex));
         }
     }
 
@@ -1210,14 +1267,14 @@ public sealed class ConfigurationFacade(
     /// <param name="planToken">The current-state preview token reviewed by the operator.</param>
     /// <param name="reason">Optional rollback reason.</param>
     /// <returns>The rollback mutation results.</returns>
-    public async Task<Res<IReadOnlyList<ConfigurationMutationResult>>> RollbackGroupAsync(
+    public async Task<Result<IReadOnlyList<ConfigurationMutationResult>>> RollbackGroupAsync(
         string groupId,
         string planToken,
         string? reason = null)
     {
         try
         {
-            return Res.Ok(await rollbackService.RollbackGroupAsync(
+            return Result.Success(await rollbackService.RollbackGroupAsync(
                 groupId,
                 planToken,
                 new ConfigurationMutationContext { Reason = reason },
@@ -1225,7 +1282,7 @@ public sealed class ConfigurationFacade(
         }
         catch (Exception ex)
         {
-            return Res.Fail(SafeMutationFailure(ex));
+            return Result.Failure<IReadOnlyList<ConfigurationMutationResult>>(SafeMutationFailure(ex));
         }
     }
 }

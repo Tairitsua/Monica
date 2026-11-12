@@ -4,18 +4,59 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Locker.Leases;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Models;
 using Monica.ServiceDiscovery.Providers;
 using Monica.ServiceDiscovery.Services.Support;
 using Monica.StateStore.Providers.Memory;
+using Monica.StateStore.Abstractions;
+using NSubstitute;
 using Xunit;
 
 namespace Test.Monica.ServiceDiscovery.Services.Support;
 
 public sealed class RegistrationStateManagerTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task GetLeaderStateAsync_WhenReadingOneApplication_ShouldUseExactEvidenceAndItsAuthorityClock(
+        bool exists, bool expired)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var observedAt = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var resource = new LeaseResource("deployment", "service-discovery:app");
+        var leases = Substitute.For<IExclusiveLeaseStore>();
+        LeaseObservation[] observations = exists
+            ? [new(resource, "holder", observedAt.AddSeconds(-10), observedAt.AddSeconds(-5),
+                observedAt.AddSeconds(expired ? -1 : 10))] : [];
+        leases.GetSnapshotAsync(resource, token).Returns(new LeaseSnapshot(observedAt, observations));
+        var info = Substitute.For<IServiceDiscoveryClientInfo>();
+        info.GetServiceStatus(Arg.Any<bool>()).Returns(new InstanceState
+            { AppId = "app", InstanceId = "instance", AppName = "Application", ProjectName = "Project" });
+        var manager = new RegistrationStateManager(Substitute.For<IStateStore>(), info,
+            Substitute.For<ILeaderElectionService>(), Options.Create(new ModuleServiceDiscoveryOption
+            {
+                LeaderLeaseStore = new("leases", resource.Scope)
+            }), NullLogger<RegistrationStateManager>.Instance, leases);
+
+        var leader = await manager.GetLeaderStateAsync(token);
+
+        if (exists && !expired)
+        {
+            Assert.NotNull(leader);
+            Assert.Equal("app", leader.AppId);
+            Assert.Equal("holder", leader.InstanceId);
+            Assert.Equal(observations[0].AcquiredAtUtc.UtcDateTime, leader.BecomeLeaderTime);
+        }
+        else Assert.Null(leader);
+        await leases.Received(1).GetSnapshotAsync(resource, token);
+        await leases.DidNotReceive().GetSnapshotAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -48,10 +89,11 @@ public sealed class RegistrationStateManagerTests
             serverAddresses.Addresses.Add(listeningAddress);
             IServiceDiscoveryClientInfo clientInfo = new DefaultServiceDiscoveryClientInfo(
                 options, new MonicaApplicationOptions(), serverAddresses);
-            var leaderService = new LeaderElectionService(
-                clientInfo, options, NullLogger<LeaderElectionService>.Instance);
+            var leases = new InMemoryLeaseStore(TimeProvider.System);
+            using var leaderService = new LeaderElectionService(
+                clientInfo, options, NullLogger<LeaderElectionService>.Instance, leases, TimeProvider.System);
             var manager = new RegistrationStateManager(
-                store, clientInfo, leaderService, options, NullLogger<RegistrationStateManager>.Instance);
+                store, clientInfo, leaderService, options, NullLogger<RegistrationStateManager>.Instance, leases);
 
             var registration = await manager.RegisterOrHeartbeatAsync(cancellationToken);
 

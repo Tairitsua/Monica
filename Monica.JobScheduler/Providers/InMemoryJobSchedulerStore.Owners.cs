@@ -31,7 +31,10 @@ public sealed partial class InMemoryJobSchedulerStore
                     AbsentCount = group.Count(definition => !definition.IsPresent),
                     QueuedCount = 0,
                     RunningCount = 0,
-                    LastObservedAtUtc = group.Max(definition => definition.LastObservedAtUtc)
+                    LastObservedAtUtc = _owners.TryGetValue((schedulerScopeKey, group.Key), out var observation)
+                        ? observation.Observed : group.Max(definition => definition.LastObservedAtUtc),
+                    ManifestHash = observation.Hash,
+                    ManifestPublishedAtUtc = observation.Published == default ? null : observation.Published
                 })
                 .ToDictionary(static summary => summary.OwnerKey, StringComparer.Ordinal);
 

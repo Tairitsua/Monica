@@ -116,7 +116,9 @@ public sealed partial class RAGManagePageState
         var catalogResult = await _knowledgeBaseFacade.GetAllAsync();
         _session.CheckCurrent();
         if (revision != _catalogReadRevision) return false;
-        if (catalogResult.IsFailed(out var error, out var knowledgeBases))
+        var error = catalogResult.WithoutData();
+        var knowledgeBases = catalogResult.Data;
+        if (catalogResult.IsFailure() || knowledgeBases is null)
         {
             CatalogErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             NotifyStateChanged();
@@ -149,7 +151,9 @@ public sealed partial class RAGManagePageState
         _session.CheckCurrent();
         var modelsResult = await _embeddingFacade.GetEmbeddingModelsAsync();
         _session.CheckCurrent();
-        if (modelsResult.IsFailed(out var error, out var models))
+        var error = modelsResult.WithoutData();
+        var models = modelsResult.Data;
+        if (modelsResult.IsFailure() || models is null)
         {
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
             return false;
@@ -190,7 +194,9 @@ public sealed partial class RAGManagePageState
         _session.CheckCurrent();
         if (revision != _queueReadRevision) return;
 
-        if (queueResult.IsFailed(out var error, out var queue))
+        var error = queueResult.WithoutData();
+        var queue = queueResult.Data;
+        if (queueResult.IsFailure() || queue is null)
         {
             QueueErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             _snackbar.Add($"{_localizer["Common:Error"]}: {error.Message}", Severity.Error);
@@ -268,7 +274,9 @@ public sealed partial class RAGManagePageState
             return;
         }
 
-        if (result.IsFailed(out var error, out var validation))
+        var error = result.WithoutData();
+        var validation = result.Data;
+        if (result.IsFailure())
         {
             VectorValidationErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             SelectedKnowledgeBaseVectorValidation = null;
@@ -337,10 +345,12 @@ public sealed partial class RAGManagePageState
         ApplySelectedMetadata(knowledgeBaseId, result);
     }
 
-    private void ApplySelectedMetadata(string knowledgeBaseId, Res<KnowledgeBaseModel> result)
+    private void ApplySelectedMetadata(string knowledgeBaseId, Result<KnowledgeBaseModel> result)
     {
         if (!string.Equals(SelectedKnowledgeBase?.Id, knowledgeBaseId, StringComparison.OrdinalIgnoreCase)) return;
-        if (result.IsFailed(out var error, out var knowledgeBase))
+        var error = result.WithoutData();
+        var knowledgeBase = result.Data;
+        if (result.IsFailure() || knowledgeBase is null)
         {
             CatalogErrorMessage = error.Message ?? _localizer["Common:Error"].Value;
             return;

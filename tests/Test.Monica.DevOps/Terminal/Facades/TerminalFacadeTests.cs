@@ -15,7 +15,7 @@ public sealed class TerminalFacadeTests
         var process = fixture.Factory.NextProcess;
         process.DrainFailure = new InvalidOperationException("late producer failure");
         var response = await fixture.Facade.StartCommandAsync("owner", session.Id, new() { Command = "harmless" });
-        Assert.Equal(ResStatus.Ok, response.Status);
+        Assert.Equal(ResultStatus.Ok, response.Status);
         Assert.Null(response.Message);
         var acceptance = Assert.IsType<TerminalCommandAcceptance>(response.Data);
         Assert.True(acceptance.Session.IsRunning);
@@ -35,13 +35,13 @@ public sealed class TerminalFacadeTests
         var process = fixture.Factory.NextProcess;
         var accepted = await fixture.Facade.StartCommandAsync("owner", session.Id, new() { Command = "harmless" });
         var request = await fixture.Facade.CancelCommandAsync("owner", session.Id, accepted.Data!.CommandId);
-        Assert.Equal(ResStatus.Ok, request.Status);
+        Assert.Equal(ResultStatus.Ok, request.Status);
         Assert.Null(request.Message);
         var snapshot = Assert.IsType<TerminalSessionSnapshot>(request.Data);
         Assert.True(snapshot.IsRunning);
         Assert.True(snapshot.ActiveCommand!.CancellationRequested);
         var stale = await fixture.Facade.CancelCommandAsync("owner", session.Id, "stale-command");
-        Assert.Equal(ResStatus.BadRequest, stale.Status);
+        Assert.Equal(ResultStatus.BadRequest, stale.Status);
         Assert.Contains("Messages:CancelFailed", stale.Message, StringComparison.Ordinal);
         Assert.Null(stale.Data);
         await process.KillRequested.WaitAsync(TestContext.Current.CancellationToken);
@@ -61,7 +61,7 @@ public sealed class TerminalFacadeTests
         process.Emit("diagnostic", TerminalOutputStreams.Stderr);
         process.Complete(9);
         var response = await execution;
-        Assert.Equal(ResStatus.Ok, response.Status);
+        Assert.Equal(ResultStatus.Ok, response.Status);
         Assert.Null(response.Message);
         var result = Assert.IsType<TerminalCommandResult>(response.Data);
         Assert.Equal(9, result.ExitCode);
@@ -81,7 +81,7 @@ public sealed class TerminalFacadeTests
         var busy = await fixture.Facade.StartCommandAsync("owner", session.Id, new() { Command = "another" });
         foreach (var response in new[] { invalid, missing, busy })
         {
-            Assert.Equal(ResStatus.BadRequest, response.Status);
+            Assert.Equal(ResultStatus.BadRequest, response.Status);
             Assert.Contains("Messages:RunCommandFailed", response.Message, StringComparison.Ordinal);
             Assert.Null(response.Data);
         }
@@ -94,7 +94,7 @@ public sealed class TerminalFacadeTests
     {
         await using var fixture = new TerminalRuntimeFixture();
         var response = await fixture.Facade.GetEnvironmentAsync();
-        Assert.Equal(ResStatus.Ok, response.Status);
+        Assert.Equal(ResultStatus.Ok, response.Status);
         Assert.Null(response.Message);
         var evidence = Assert.IsType<TerminalEnvironmentSnapshot>(response.Data);
         var modified = evidence with { ShellPath = "caller-value", ShellArguments = [] };

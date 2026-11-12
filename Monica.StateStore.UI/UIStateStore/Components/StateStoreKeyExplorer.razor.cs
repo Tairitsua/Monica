@@ -164,8 +164,10 @@ public partial class StateStoreKeyExplorer
         {
             var result = await StateStoreService.SearchKeysAsync(scope.ServiceKey, request, queryToken);
             if (!Current(scope) || generation != _queryGeneration) return;
-            if (result.IsFailed(out var error)) { browseError = error.Message; return; }
-            browseResult = result.Data! with { Items = result.Data!.Items.Select(Copy).ToList() };
+            var error = result;
+            if (result.IsFailure()) { browseError = error.Message; return; }
+            var data = result.Data ?? throw new InvalidOperationException("The key browse returned no data.");
+            browseResult = data with { Items = data.Items.Select(Copy).ToList() };
             _acceptedProvider = selectedProvider; keys = browseResult.Items.ToList();
             if (keys.Count > 0) await SelectCoreAsync(keys[0], false);
         }
@@ -213,8 +215,9 @@ public partial class StateStoreKeyExplorer
         {
             var response = await StateStoreService.GetKeyAsync(scope.ServiceKey, key.Key, loadToken);
             if (!Current(scope) || result != _resultGeneration || selection != _selectionGeneration || !keys.Contains(key)) return false;
-            if (response.IsOk(out var loaded)) CopyInto(key, loaded);
-            else { key.Error = response.Message; key.IsValueLoaded = true; }
+            var loaded = response.Data;
+            if (response.IsSuccess() && loaded is not null) CopyInto(key, loaded);
+            else { key.Error = response.Message ?? "The key read returned no data."; key.IsValueLoaded = true; }
             return true;
         }
         catch (OperationCanceledException) when (!Current(scope) || loadToken.IsCancellationRequested) { return false; }
@@ -329,7 +332,8 @@ public partial class StateStoreKeyExplorer
             var response = batch ? await StateStoreService.DeleteKeysAsync(scope.ServiceKey, names, scope.Token)
                 : await StateStoreService.DeleteKeyAsync(scope.ServiceKey, names[0], etag, scope.Token);
             if (!Current(scope) || result != _resultGeneration) return;
-            if (response.IsFailed(out var error)) { Snackbar.Add(L["KeyExplorer:Messages:KeyDeleteFailed", error.Message ?? string.Empty], Severity.Error); return; }
+            var error = response;
+            if (response.IsFailure()) { Snackbar.Add(L["KeyExplorer:Messages:KeyDeleteFailed", error.Message ?? string.Empty], Severity.Error); return; }
             var captured = names.ToHashSet(StringComparer.Ordinal); var removed = keys.RemoveAll(item => captured.Contains(item.Key));
             selectedKeyNames.ExceptWith(captured);
             browseResult = browseResult! with { Items = keys.ToList(), TotalCount = Math.Max(0, browseResult.TotalCount - removed) };

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Docs Authoring"
-  short_description: "Monica public API documentation standards"
-  default_prompt: "Use $monica-docs-authoring to draft or revise Monica documentation from current source code, including request-owned Web API and RPC contracts."

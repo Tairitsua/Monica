@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Reflection;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Framework.Seeder.Abstractions;
 using Monica.Framework.Seeder.Annotations;
 using Monica.Tool.Extensions;
@@ -24,7 +25,21 @@ internal sealed class SeederGraph
 
     public FrozenDictionary<Type, SeederDescriptor> NodesByType { get; }
 
-    public static SeederGraph Create(IEnumerable<Type> seederTypes, Monica.Modules.ModuleSeederOption options)
+    public string? GetAutomaticBlockReason(Type seederType)
+    {
+        foreach (var dependency in NodesByType[seederType].Dependencies)
+        {
+            var prerequisite = NodesByType[dependency];
+            if (prerequisite.Activation != ActivationMode.Automatic)
+                return $"Prerequisite '{prerequisite.SeederTypeName}' requires {prerequisite.Activation} admission.";
+            if (GetAutomaticBlockReason(dependency) is { } blocked)
+                return $"Prerequisite '{prerequisite.SeederTypeName}': {blocked}";
+        }
+        return null;
+    }
+
+    public static SeederGraph Create(IEnumerable<Type> seederTypes, Monica.Modules.ModuleSeederOption options,
+        Func<Type, ActivationMode>? getActivation = null)
     {
         ArgumentNullException.ThrowIfNull(seederTypes);
         ArgumentNullException.ThrowIfNull(options);
@@ -83,7 +98,8 @@ internal sealed class SeederGraph
                 GetSource(declaredFailureBehavior == SeederFailureBehavior.Inherit),
                 maxAttempts,
                 GetSource(policy is not { MaxAttempts: > 0 }),
-                dependencies));
+                dependencies,
+                getActivation?.Invoke(seederType) ?? ActivationMode.Automatic));
         }
 
         var graph = new SeederGraph(nodes.MoveToImmutable());

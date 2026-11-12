@@ -1,95 +1,15 @@
-@using Monica.JobScheduler.Models
-@using Monica.JobScheduler.Models.Definitions
-@using Monica.JobScheduler.Models.Execution
-@using Monica.JobScheduler.Models.Operations
-@using Monica.JobScheduler.UI.Localization
-
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
-
 <section class="job-schedule-panel" aria-labelledby="job-schedule-heading">
-    <header class="job-schedule-panel__heading">
-        <div>
-            <MudText Typo="Typo.h6" HtmlTag="h2" id="job-schedule-heading">
-                @L["JobDetail:Schedule:Title"]
-            </MudText>
-            <MudText Typo="Typo.body2">
-                @L["JobDetail:Schedule:Description"]
-            </MudText>
-        </div>
-        @if (Declaration.JobType == JobType.Recurring)
-        {
-            <span class="job-schedule-panel__status" data-tone="@ScheduleStatusColor.ToString().ToLowerInvariant()">
-                <MoIcon Icon="@ScheduleStatusIcon" Size="1.5rem" />@ScheduleStatusLabel
-            </span>
-        }
-    </header>
-
-    @if (Declaration.JobType == JobType.Recurring)
+    <header><div><h2 id="job-schedule-heading">@L[Declaration.JobType==JobType.Recurring ? "Architecture:Cursor" : "JobDetail:Schedule:TriggeredTitle"]</h2><p>@L[Declaration.JobType==JobType.Recurring ? "Architecture:CursorNote" : "JobDetail:Schedule:TriggeredDescription"]</p></div>@if(Declaration.JobType==JobType.Recurring) { <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.CalendarDays" OnClick="OnInspectSchedule">@L["Workspace:EditCron"]</MudButton> }</header>
+    <div class="job-schedule-panel__cursor"><SchedulerScheduleState Summary="@Summary" /></div>
+    @if(Declaration.JobType==JobType.Recurring)
     {
-        <div class="job-schedule-panel__next">
-            <div>
-                <MudText Typo="Typo.overline" >
-                    @L["JobDetail:Schedule:NextOccurrence"]
-                </MudText>
-                <strong>@(Summary.NextOccurrenceUtc is { } next ? TimePresentation.FormatTimestamp(next) : L["JobDetail:Schedule:NoNextOccurrence"])</strong>
-            </div>
-            <MudButton Variant="Variant.Text"
-                       EndIcon="@MoIcons.ArrowRight"
-                       OnClick="OnInspectSchedule">
-                @L["JobDetail:Actions:InspectSchedule"]
-            </MudButton>
-        </div>
-
-        <MudText Typo="Typo.body2"  Class="job-schedule-panel__status-note">
-            @ScheduleStatusDescription
-        </MudText>
-
-        @if (IsDebugSuppressed)
-        {
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Icon="@MoIcons.Info">
-                @L["JobDetail:Schedule:DebugManualOnly"]
-            </MudAlert>
-        }
-
-        <dl class="job-schedule-panel__facts">
-            <div class="job-schedule-panel__fact job-schedule-panel__fact--wide">
-                <dt>@L["JobDetail:Schedule:CronExpression"]</dt>
-                <dd>
-                    <div class="job-schedule-panel__cron">
-                        <code>@Schedule.CronExpression</code>
-                        <CronDescriptionBadge Expression="@Schedule.CronExpression" ShowExpression="false" ResolveDescription="true" />
-                    </div>
-                </dd>
-            </div>
-            <div>
-                <dt>@L["JobDetail:Schedule:TimeZone"]</dt>
-                <dd><code>@Schedule.TimeZoneId</code></dd>
-            </div>
-            <div>
-                <dt>@L["JobDetail:Schedule:StartBoundary"]</dt>
-                <dd>@(Schedule.StartTimeUtc is { } start ? TimePresentation.FormatTimestamp(start) : L["Policy:BoundaryModes:None"])</dd>
-            </div>
-            <div>
-                <dt>@L["JobDetail:Schedule:EndBoundary"]</dt>
-                <dd>@(Schedule.EndTimeUtc is { } end ? TimePresentation.FormatTimestamp(end) : L["Policy:BoundaryModes:None"])</dd>
-            </div>
-        </dl>
+        <dl><div><dt>@L["JobDetail:Schedule:CronExpression"]</dt><dd><code>@Schedule.CronExpression</code><CronDescriptionBadge Expression="@Schedule.CronExpression" ShowExpression="false" ResolveDescription="true" /></dd></div><div><dt>@L["JobDetail:Schedule:TimeZone"]</dt><dd><code>@Schedule.TimeZoneId</code></dd></div><div><dt>@L["Policy:Provenance:Declared"]</dt><dd><code>@Declaration.CronExpression</code></dd></div><div><dt>@L["Policy:Provenance:Override"]</dt><dd><code>@(Summary.Definition.Policy.Overrides.ScheduleOverride?.CronExpression ?? L["Policy:InheritDefault"])</code></dd></div><div><dt>@L["Architecture:StartBound"]</dt><dd>@(Schedule.StartTimeUtc is {} start ? TimePresentation.FormatScheduleTimestamp(start) : L["Architecture:Unbounded"])</dd></div><div><dt>@L["Architecture:EndBound"]</dt><dd>@(Schedule.EndTimeUtc is {} end ? TimePresentation.FormatScheduleTimestamp(end) : L["Architecture:Unbounded"])</dd></div></dl>
+        @if(IsManualSuppressed || IsOperatorPaused || !Summary.Definition.IsPresent) { <p class="job-schedule-panel__notice">@ScheduleStatusDescription</p> }
     }
-    else
-    {
-        <div class="job-schedule-panel__triggered">
-            <MoIcon Icon="@MoIcons.Zap" Size="2.25rem" />
-            <div>
-                <MudText Typo="Typo.subtitle1">@L["JobDetail:Schedule:TriggeredTitle"]</MudText>
-                <MudText Typo="Typo.body2">
-                    @L["JobDetail:Schedule:TriggeredDescription"]
-                </MudText>
-            </div>
-        </div>
-    }
+    else { <dl><div><dt>@L["JobDetail:Contract:ArgumentsKey"]</dt><dd><code>@Declaration.JobArgsKey</code></dd></div></dl> }
 </section>
-
 @code {
     /// <summary>
     /// Gets the operational snapshot whose schedule is rendered.
@@ -109,33 +29,33 @@
 
     private bool IsOperatorPaused => JobSchedulerUiPresentation.IsOperatorPaused(Summary);
 
-    private bool IsDebugSuppressed => JobSchedulerUiPresentation.IsDebugSuppressed(Summary);
+    private bool IsManualSuppressed => JobSchedulerUiPresentation.IsManualSuppressed(Summary);
 
-    private string ScheduleStatusLabel => (IsOperatorPaused, IsDebugSuppressed) switch
+    private string ScheduleStatusLabel => (IsOperatorPaused, IsManualSuppressed) switch
     {
-        (true, true) => L["Catalog:Lifecycle:OperatorAndDebug"],
+        (true, true) => L["Catalog:Lifecycle:OperatorAndManual"],
         (true, false) => L["Catalog:Lifecycle:OperatorPaused"],
-        (false, true) => L["Catalog:Lifecycle:DebugSuppressed"],
+        (false, true) => L["Catalog:Lifecycle:ManualSuppressed"],
         _ => L[$"RecurringScheduleStatuses:{Summary.RecurringScheduleStatus}"]
     };
 
-    private string ScheduleStatusDescription => (IsOperatorPaused, IsDebugSuppressed) switch
+    private string ScheduleStatusDescription => (IsOperatorPaused, IsManualSuppressed) switch
     {
-        (true, true) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorAndDebug"],
+        (true, true) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorAndManual"],
         (true, false) => L["JobDetail:Schedule:SuspensionDescriptions:OperatorPolicy"],
-        (false, true) => L["JobDetail:Schedule:SuspensionDescriptions:DebugMode"],
+        (false, true) => L["JobDetail:Schedule:SuspensionDescriptions:ManualMode"],
         _ => L[$"JobDetail:Schedule:StatusDescriptions:{Summary.RecurringScheduleStatus}"]
     };
 
     private Color ScheduleStatusColor => IsOperatorPaused
         ? Color.Warning
-        : IsDebugSuppressed
+        : IsManualSuppressed
             ? Color.Info
             : JobSchedulerUiPresentation.GetRecurringScheduleStatusColor(Summary.RecurringScheduleStatus);
 
     private string ScheduleStatusIcon => IsOperatorPaused
         ? MoIcons.PauseCircle
-        : IsDebugSuppressed
+        : IsManualSuppressed
             ? MoIcons.Bug
             : Summary.RecurringScheduleStatus == JobRecurringScheduleStatus.Scheduled
                 ? MoIcons.Clock

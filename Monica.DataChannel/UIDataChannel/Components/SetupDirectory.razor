@@ -1,0 +1,97 @@
+@using Monica.Core.TypeDiscovery.Abstractions
+@using Monica.DataChannel.Models
+@using Monica.DataChannel.Pages
+@inject IStringLocalizer<DataChannelResource> L
+
+<section class="setup-directory" aria-label="@L["Setup:Title"]">
+    <header>
+        <h2>@L["Setup:Title"] <span>@Setups.Count</span></h2>
+        <p>@L["Setup:Help"]</p>
+    </header>
+    @if (Setups.Count == 0)
+    {
+        <p class="setup-empty">@L["Setup:Empty"]</p>
+    }
+    @foreach (var setup in Setups)
+    {
+        var blocked = IsBusy || Setups.Any(item => item.State is DataChannelSetupState.Starting or DataChannelSetupState.Stopping)
+            || setup.Mode == ActivationMode.Disabled;
+        <article class="setup-row" @key="setup.Id" data-setup="@setup.Id">
+            <div class="setup-identity">
+                <strong>@(setup.Owner ?? L["Setup:Host"].Value)</strong>
+                <code>@setup.ImplementationType</code>
+                <span class="setup-mode">@ModeText(setup.Mode)</span>
+            </div>
+            <div class="setup-evidence">
+                <MudChip T="string" Size="Size.Small" Color="@StateColor(setup.State)" Variant="Variant.Outlined">@StateText(setup.State)</MudChip>
+                @if (setup.ChannelIds.Count > 0)
+                {
+                    <div class="setup-channels" aria-label="@L["Setup:Channels"]">
+                        @foreach (var id in setup.ChannelIds)
+                        {
+                            <a href="@(UIDataChannelPage.PAGE_URL + "?channel=" + Uri.EscapeDataString(id))">@id</a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <span>@L[setup.State == DataChannelSetupState.Held ? "Setup:Undeclared" : "Setup:NoChannels"]</span>
+                }
+            </div>
+            <div class="setup-actions">
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Play"
+                           Disabled="@(blocked || setup.State == DataChannelSetupState.Running)" OnClick="() => OnStart.InvokeAsync(setup.Id)">@L["Setup:Start"]</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@MoIcons.Stop"
+                           Disabled="@(blocked || setup.State is DataChannelSetupState.Held or DataChannelSetupState.Stopped)" OnClick="() => OnStop.InvokeAsync(setup.Id)">@L["Setup:Stop"]</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@MoIcons.Refresh"
+                           Disabled="@(blocked || setup.State == DataChannelSetupState.Held)" OnClick="() => OnRestart.InvokeAsync(setup.Id)">@L["Setup:Restart"]</MudButton>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(setup.Error))
+            {
+                <div class="setup-error" role="alert">@setup.Error</div>
+            }
+        </article>
+    }
+</section>
+
+@code {
+    /// <summary>Gets or sets detached host-owned setup evidence.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<DataChannelSetupSnapshot> Setups { get; set; } = [];
+    /// <summary>Gets or sets whether this circuit has a pending lifecycle operation.</summary>
+    [Parameter] public bool IsBusy { get; set; }
+    /// <summary>Gets or sets the selected setup start callback.</summary>
+    [Parameter] public EventCallback<string> OnStart { get; set; }
+    /// <summary>Gets or sets the selected setup stop callback.</summary>
+    [Parameter] public EventCallback<string> OnStop { get; set; }
+    /// <summary>Gets or sets the selected setup restart callback.</summary>
+    [Parameter] public EventCallback<string> OnRestart { get; set; }
+
+    private string StateText(DataChannelSetupState state) => state switch
+    {
+        DataChannelSetupState.Held => L["Setup:States:Held"],
+        DataChannelSetupState.Disabled => L["Setup:States:Disabled"],
+        DataChannelSetupState.Stopped => L["Setup:States:Stopped"],
+        DataChannelSetupState.Starting => L["Setup:States:Starting"],
+        DataChannelSetupState.Running => L["Setup:States:Running"],
+        DataChannelSetupState.Stopping => L["Setup:States:Stopping"],
+        DataChannelSetupState.Failed => L["Setup:States:Failed"],
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
+    };
+
+    private string ModeText(ActivationMode mode) => mode switch
+    {
+        ActivationMode.Manual => L["Setup:Modes:Manual"],
+        ActivationMode.Automatic => L["Setup:Modes:Automatic"],
+        ActivationMode.Disabled => L["Setup:Modes:Disabled"],
+        _ => throw new ArgumentOutOfRangeException(nameof(mode))
+    };
+
+    private static Color StateColor(DataChannelSetupState state) => state switch
+    {
+        DataChannelSetupState.Running => Color.Success,
+        DataChannelSetupState.Failed => Color.Error,
+        DataChannelSetupState.Starting or DataChannelSetupState.Stopping => Color.Info,
+        DataChannelSetupState.Held => Color.Warning,
+        _ => Color.Default
+    };
+}

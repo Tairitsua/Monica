@@ -86,9 +86,10 @@
 
         // Discovery is synchronous. Keep the mounted explorer and its accepted query
         // alive while replacing only a successfully retrieved registration snapshot.
-        if (StateStoreService.GetRegisteredProviders().IsFailed(out var error, out var data))
+        var result = StateStoreService.GetRegisteredProviders();
+        if (result.IsFailure() || result.Data is not { } data)
         {
-            _providerError = L["Dashboard:Messages:LoadProviderFailed", error];
+            _providerError = L["Dashboard:Messages:LoadProviderFailed", result.Message ?? string.Empty];
         }
         else
         {

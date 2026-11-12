@@ -7,9 +7,7 @@
     padding: 30px 32px 40px;
     container: module-workbench / inline-size;
 }
-.module-workbench-page ::deep .workbench-drawer-container { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; background: transparent; }
-/* A closed fixed drawer must not enlarge the shell document. */
-.module-workbench-page ::deep .mud-drawer.mud-drawer-pos-right.mud-drawer--closed { display: none; }
+.module-workbench-page .workbench-content { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; background: transparent; }
 .workbench-centered-state { display: flex; min-height: 24rem; padding: 28px; align-items: center; justify-content: center; flex-direction: column; gap: 16px; text-align: center; }
 .workbench-section-navigation { min-width: 0; margin: 28px 0 26px; border-bottom: 1px solid var(--mud-palette-divider); }
 .workbench-desktop-sections { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; min-width: 0; }

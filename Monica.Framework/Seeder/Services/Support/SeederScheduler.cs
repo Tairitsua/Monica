@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Monica.Core.Extensions;
 using Monica.Core.Execution;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Framework.Seeder.Abstractions;
 using Monica.Framework.Seeder.Models;
 using Monica.Framework.Seeder.Models.Internal;
@@ -15,14 +17,74 @@ internal sealed class SeederScheduler(
     SeederState state,
     ISeederRetryDelay retryDelay,
     IOptions<Monica.Modules.ModuleSeederOption> options,
-    ILogger<SeederScheduler> logger)
+    ILogger<SeederScheduler> logger,
+    IHostApplicationLifetime? applicationLifetime = null) : ISeederExecutor
 {
     private readonly Monica.Modules.ModuleSeederOption _options = options.Value;
+    private int _batchRunning;
+    private volatile bool _startupFinished;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        EnterBatch();
+        try
+        {
+            if (_startupFinished) return;
+            var selected = graph.Nodes.Where(node => state.GetStatus(node.SeederType) == SeederStatus.Pending).ToArray();
+            await RunBatchAsync(selected, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _startupFinished = true;
+            Volatile.Write(ref _batchRunning, 0);
+        }
+    }
+
+    public async Task<SeederStateSnapshot> RunAsync(string seederTypeName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(seederTypeName);
+        cancellationToken.ThrowIfCancellationRequested();
+        EnterBatch();
+        try
+        {
+            if (!_startupFinished)
+                throw new InvalidOperationException("Automatic seeder startup has not completed. Try again after startup.");
+            var target = graph.Nodes.FirstOrDefault(node => node.SeederTypeName == seederTypeName)
+                ?? throw new InvalidOperationException($"Seeder '{seederTypeName}' does not belong to this host's graph.");
+            var selected = new Dictionary<Type, SeederDescriptor>();
+            void Include(SeederDescriptor node)
+            {
+                if (node.Activation == ActivationMode.Disabled)
+                    throw new InvalidOperationException($"Seeder '{node.SeederTypeName}' is disabled in this application's placement.");
+                if (!selected.TryAdd(node.SeederType, node)) return;
+                foreach (var dependency in node.Dependencies)
+                    if (!state.IsSucceeded(dependency)) Include(graph.NodesByType[dependency]);
+            }
+            Include(target);
+            using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, applicationLifetime?.ApplicationStopping ?? CancellationToken.None);
+            lifetime.Token.ThrowIfCancellationRequested();
+            await RunBatchAsync(selected.Values, lifetime.Token).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return state.GetSnapshot();
+        }
+        finally
+        {
+            Volatile.Write(ref _batchRunning, 0);
+        }
+    }
+
+    private void EnterBatch()
+    {
+        if (Interlocked.CompareExchange(ref _batchRunning, 1, 0) != 0)
+            throw new InvalidOperationException("A seeder batch is already running. Wait for it to finish before starting another.");
+    }
+
+    private async Task RunBatchAsync(IEnumerable<SeederDescriptor> selected, CancellationToken cancellationToken)
+    {
+        var pending = selected.ToDictionary(static node => node.SeederType);
+        state.AdmitBatch(pending.Keys);
         state.MarkSchedulerStarted();
-        var pending = graph.Nodes.ToDictionary(static node => node.SeederType);
         var running = new Dictionary<Type, RunningSeeder>();
         using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 

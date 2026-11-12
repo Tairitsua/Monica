@@ -1,0 +1,40 @@
+@using Microsoft.Extensions.Localization
+@using Monica.UI.Localization
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SystemInfoResource> L
+@implements IDisposable
+
+<button type="button" class="system-info-copy @Class" @onclick="CopyAsync" disabled="@_copying"
+        title="@Value" aria-label="@L["Page:Copy:Action", Value]">
+    <span>@(Text ?? Value)</span><MoIcon Icon="@MoIcons.Copy" Size="13px" />
+</button>
+
+@code {
+    /// <summary>The exact source written to the clipboard.</summary>
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    /// <summary>Optional compact display text. Copying always uses the complete Value.</summary>
+    [Parameter] public string? Text { get; set; }
+    /// <summary>Optional presentation modifiers, including is-path for wrapping evidence.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private bool _copying;
+    private bool _disposed;
+
+    private async Task CopyAsync()
+    {
+        if (_copying || _disposed) return;
+        _copying = true;
+        var copied = false;
+        try
+        {
+            copied = await JS.InvokeAsync<bool>("MoClipboard.copyText", Value);
+        }
+        catch (JSDisconnectedException) { return; }
+        catch (JSException) { /* Browser rejection is reported through localized feedback. */ }
+        finally { _copying = false; }
+        if (!_disposed) Snackbar.Add(L[copied ? "Page:Copy:Succeeded" : "Page:Copy:Failed"], copied ? Severity.Success : Severity.Error);
+    }
+
+    public void Dispose() => _disposed = true;
+}

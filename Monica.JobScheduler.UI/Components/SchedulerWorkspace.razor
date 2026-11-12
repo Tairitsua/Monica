@@ -1,32 +1,31 @@
 @using Monica.JobScheduler.UI.Localization
 @using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.Visual
+@using Microsoft.AspNetCore.Components.Sections
 
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 @inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@implements IAsyncDisposable
 
+<HeadContent><link rel="stylesheet" href="@Assets["_content/Monica.JobScheduler.UI/css/execution-inspector.css"]" /></HeadContent>
+<CascadingValue Value="@this" IsFixed="true">
+<CascadingValue Value="@_actionsKey" Name="SchedulerWorkspaceActions" IsFixed="true">
+<div class="scheduler-page-frame">
 <div class="scheduler-workspace mo-page-shell mo-page-shell--full-width">
-    <header class="scheduler-workspace__header">
-        <div class="scheduler-workspace__heading">
-            <MudText Typo="Typo.overline" Class="scheduler-workspace__eyebrow">@L["Workspace:Eyebrow"]</MudText>
-            <MudText Typo="Typo.h4" HtmlTag="h1" Class="scheduler-workspace__title">@Title</MudText>
-            <MudText Typo="Typo.body1" Class="scheduler-workspace__description">@Description</MudText>
-        </div>
-        <div class="scheduler-workspace__metadata">
-            <div class="scheduler-workspace__context">
-                <MoIcon Icon="@MoIcons.Layers" aria-hidden="true" Size="1.5rem" />
-                <span title="@SchedulerOptions.Value.SchedulerScopeKey">
-                    @L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]
-                </span>
-            </div>
-            <div class="scheduler-workspace__context">
-                <MoIcon Icon="@MoIcons.Clock" aria-hidden="true" Size="1.5rem" />
-                <span title="@TimePresentation.TimeZoneDisplayName">
-                    @L["Workspace:TimeZone", TimePresentation.TimeZoneId]
-                </span>
-            </div>
-        </div>
-    </header>
+    <div class="scheduler-workspace__header">
+        <span class="scheduler-workspace__seal" aria-hidden="true"><MoIcon Icon="@CurrentIcon" Size="1.5rem" /></span>
+        <MoPageMasthead Title="@Title" Crumb="@L["Workspace:Eyebrow"]">
+            <Meta>
+                <span class="scheduler-workspace__readiness" data-manual="@((!SchedulerOptions.Value.AutonomousWork).ToString().ToLowerInvariant())" data-ready="@(_ready?.ToString().ToLowerInvariant())" title="@L["Runtime:Plane:LocalOnly"]"><i aria-hidden="true"></i>@L[!SchedulerOptions.Value.AutonomousWork ? "Runtime:Identity:ManualMode" : _ready is true ? ActivePanelIndex == 4 ? "Workspace:LocalLoopsReady" : "Workspace:LoopsReady" : _ready is false ? "Workspace:LoopsPending" : "Workspace:ReadinessUnknown"]</span>
+                <span class="scheduler-workspace__scope">@L["Workspace:Scope", SchedulerOptions.Value.SchedulerScopeKey]</span>
+                <span class="scheduler-workspace__zone" title="@TimePresentation.TimeZoneDisplayName">@L["Workspace:TimeZone", TimePresentation.TimeZoneId]</span>
+            </Meta>
+            <Actions><SectionOutlet SectionId="@_actionsKey" /></Actions>
+        </MoPageMasthead>
+    </div>
 
     <MoWorkbenchNavigation Label="@L["Workspace:Navigation:AriaLabel"]">
         @foreach (var route in ROUTES)
@@ -36,12 +35,23 @@
                 <span>@L[route.LabelKey]</span>
             </a>
         }
+        @if (Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.StartsWith("/job-scheduler/jobs/", StringComparison.OrdinalIgnoreCase))
+        {
+            <a href="@Navigation.Uri" aria-current="page"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><span>@L["Pages:JobDetail:Title"]</span></a>
+        }
     </MoWorkbenchNavigation>
 
     <div class="scheduler-workspace__content">
+        @if (!SchedulerOptions.Value.AutonomousWork)
+        {
+            <div class="scheduler-workspace__manual"><MoIcon Icon="@MoIcons.Info" Size="18px" /><div><b>@L["Runtime:Identity:ManualMode"]</b><p>@L["Architecture:ManualNote"]</p></div></div>
+        }
         @ChildContent
     </div>
 </div>
+</div>
+</CascadingValue>
+</CascadingValue>
 
 @code {
     private static readonly (string Url, string LabelKey, string Icon)[] ROUTES =
@@ -50,7 +60,8 @@
         ("/job-scheduler/catalog", "Workspace:Navigation:Catalog", MoIcons.Package),
         ("/job-scheduler/executions", "Workspace:Navigation:Executions", MoIcons.Receipt),
         ("/job-scheduler/statistics", "Workspace:Navigation:Statistics", MoIcons.ChartTrend),
-        ("/job-scheduler/runtime", "Workspace:Navigation:Runtime", MoIcons.HeartPulse)
+        ("/job-scheduler/runtime", "Workspace:Navigation:Runtime", MoIcons.HeartPulse),
+        ("/job-scheduler/cleanup", "Cleanup:Title", MoIcons.Archive)
     ];
 
     /// <summary>
@@ -77,6 +88,43 @@
     /// </summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
+
+    private readonly object _actionsKey = new();
+    private string CurrentIcon => ActivePanelIndex == 0 ? MoIcons.CalendarCheck : ROUTES[Math.Clamp(ActivePanelIndex, 0, ROUTES.Length - 1)].Icon;
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private bool? _ready;
+    private DateTimeOffset? _readinessCapture;
+    private int _readinessVersion;
+
+    internal async Task ObserveCaptureAsync(DateTimeOffset? capturedAtUtc)
+    {
+        if (_lifetime.IsRetired || capturedAtUtc is null || capturedAtUtc == _readinessCapture) return;
+        _readinessCapture = capturedAtUtc;
+        var version = ++_readinessVersion;
+        try
+        {
+            await _lifetime.RunAsync(async token =>
+            {
+                var authorized = await Access.IsAuthorizedAsync(token);
+                if (!authorized) { _lifetime.TryApply(() => _ready = null); return; }
+                var result = await Facade.GetRuntimeOverviewAsync(token);
+                _lifetime.TryApply(() =>
+                {
+                    if (version == _readinessVersion)
+                        _ready = result.IsFailure() || result.Data is not { } overview ? null
+                            : overview.LocalPlane.SchedulingReady && overview.LocalPlane.WorkerReady;
+                });
+            });
+            if (!_lifetime.IsRetired) await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch (Exception)
+        {
+            if (_lifetime.TryApply(() => _ready = null)) await InvokeAsync(StateHasChanged);
+        }
+    }
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
 
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;

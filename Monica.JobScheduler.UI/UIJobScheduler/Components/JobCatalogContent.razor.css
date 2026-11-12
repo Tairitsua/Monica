@@ -15,3 +15,6 @@
     .catalog-selection__actions { width: 100%; }
     .catalog-selection__actions ::deep .mud-button-root { flex: 1 1 auto; }
 }
+
+.catalog-evidence-notice{display:flex;align-items:start;gap:10px;padding:14px 18px;border:1px solid var(--mud-palette-lines-default);border-radius:8px;background:var(--mud-palette-surface);font-size:12.5px;line-height:1.7;color:var(--mud-palette-text-secondary)}
+.catalog-evidence-notice b{color:var(--mud-palette-text-primary);font-weight:600}.catalog-evidence-notice p{margin:3px 0 6px}.catalog-evidence-notice a{display:inline-flex;align-items:center;gap:5px;color:var(--mud-palette-primary)}.catalog-evidence-notice ::deep .mo-icon{flex:none;margin-top:3px}

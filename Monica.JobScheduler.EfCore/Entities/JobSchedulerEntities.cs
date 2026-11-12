@@ -23,6 +23,7 @@ internal sealed class JobDefinitionEntity
     public JobType JobType { get; set; }
     public bool IsDisabled { get; set; }
     public bool IsPresent { get; set; }
+    public long? AbsentSinceUtcTicks { get; set; }
     public long LastObservedAtUtcTicks { get; set; }
     public Guid ConcurrencyToken { get; set; }
 }

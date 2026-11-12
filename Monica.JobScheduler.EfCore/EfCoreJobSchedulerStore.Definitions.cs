@@ -19,9 +19,55 @@ public sealed partial class EfCoreJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var normalized = snapshot.NormalizeAndValidate();
+        normalized.CoordinatorLease?.ValidatePartition(normalized.SchedulerScopeKey, "owner:" + normalized.OwnerKey);
         return WriteAsync(async (dbContext, token) =>
         {
+            var owner = await LockOwnerAsync(dbContext, normalized.SchedulerScopeKey, normalized.OwnerKey, token);
+            if (owner?.RetiredAtUtcTicks is not null)
+                throw new InvalidOperationException($"Owner '{normalized.OwnerKey}' is retired and cannot publish definitions.");
             var now = await GetUtcNowAsync(dbContext, token);
+            var manifestHash = normalized.ComputeManifestHash();
+            if (owner is not null && owner.ManifestHash != manifestHash
+                && owner.ManifestHash != normalized.ExpectedPreviousManifestHash)
+            {
+                throw new InvalidOperationException($"Owner '{normalized.OwnerKey}' rejected an incompatible declaration manifest. Stop incompatible writers and authorize its previous hash before replacement.");
+            }
+            if (owner is not null && owner.ManifestHash == manifestHash)
+            {
+                owner.LastObservedAtUtcTicks = ToTicks(now);
+                return new JobDefinitionSyncResult
+                {
+                    ManifestHash = manifestHash, ContentChanged = false,
+                    PresentCount = normalized.Declarations.Count, ObservedAtUtc = now
+                };
+            }
+            if (owner is null)
+            {
+                owner = new JobSchedulerOwnerEntity
+                {
+                    SchedulerScopeKey = normalized.SchedulerScopeKey, OwnerKey = normalized.OwnerKey,
+                    ManifestHash = manifestHash, ManifestPublishedAtUtcTicks = ToTicks(now),
+                    LastObservedAtUtcTicks = ToTicks(now)
+                };
+                dbContext.SchedulerOwners.Add(owner);
+                // Establish the owner mutex before touching definitions, including concurrent first publication.
+                await dbContext.SaveChangesAsync(token);
+            }
+            owner.ManifestHash = manifestHash;
+            owner.ManifestPublishedAtUtcTicks = ToTicks(now);
+            owner.LastObservedAtUtcTicks = ToTicks(now);
+            // Publication is rare and owner-scoped. Lock existing gates in one sorted statement, avoiding one
+            // round trip per declaration. New gates are protected by the already established owner mutex.
+            if (UsesNativeRowLocks(dbContext))
+            {
+                var sql = "SELECT * FROM " + TableSql<JobExecutionGateEntity>(dbContext)
+                          + " WHERE \"SchedulerScopeKey\" = {0} AND \"OwnerKey\" = {1} ORDER BY \"JobKey\" FOR UPDATE";
+                await dbContext.ExecutionGates.FromSqlRaw(sql, normalized.SchedulerScopeKey, normalized.OwnerKey)
+                    .ToListAsync(token);
+            }
+            else
+                await dbContext.ExecutionGates.Where(row => row.SchedulerScopeKey == normalized.SchedulerScopeKey
+                    && row.OwnerKey == normalized.OwnerKey).OrderBy(row => row.JobKey).ToListAsync(token);
             var existingEntities = await dbContext.Definitions
                 .Where(item => item.SchedulerScopeKey == normalized.SchedulerScopeKey
                                && item.OwnerKey == normalized.OwnerKey)
@@ -44,11 +90,10 @@ public sealed partial class EfCoreJobSchedulerStore
                 if (entity.IsPresent)
                 {
                     markedAbsent++;
+                    entity.IsPresent = false;
+                    entity.AbsentSinceUtcTicks = ToTicks(now);
+                    entity.LastObservedAtUtcTicks = ToTicks(now);
                 }
-
-                entity.IsPresent = false;
-                entity.LastObservedAtUtcTicks = ToTicks(now);
-                entity.ConcurrencyToken = NewVersion();
                 if (existingCursors.Remove(entity.JobKey, out var cursor))
                 {
                     dbContext.RecurringCursors.Remove(cursor);
@@ -61,6 +106,10 @@ public sealed partial class EfCoreJobSchedulerStore
                 if (existingByJobKey.TryGetValue(declaration.JobKey, out var existing))
                 {
                     entity = existing;
+                    if (entity.IsPresent && entity.DeclarationJson == Serialize(declaration))
+                    {
+                        continue;
+                    }
                 }
                 else
                 {
@@ -80,6 +129,7 @@ public sealed partial class EfCoreJobSchedulerStore
                 // Declaration fields follow the code; operator policy is sticky and never overwritten by a sync.
                 entity.DeclarationJson = Serialize(declaration);
                 entity.IsPresent = true;
+                entity.AbsentSinceUtcTicks = null;
                 entity.LastObservedAtUtcTicks = ToTicks(now);
                 if (declaration.JobType != JobType.Recurring
                     && existingCursors.Remove(declaration.JobKey, out var cursor))
@@ -93,11 +143,13 @@ public sealed partial class EfCoreJobSchedulerStore
 
             return new JobDefinitionSyncResult
             {
+                ManifestHash = manifestHash,
+                ContentChanged = true,
                 PresentCount = normalized.Declarations.Count,
                 MarkedAbsentCount = markedAbsent,
                 ObservedAtUtc = now
             };
-        }, cancellationToken);
+        }, cancellationToken, normalized.CoordinatorLease);
     }
 
     /// <inheritdoc />
@@ -117,7 +169,11 @@ public sealed partial class EfCoreJobSchedulerStore
                         && item.OwnerKey == ownerKey
                         && item.JobKey == jobKey,
                 token);
-            return entity is null ? null : ToDefinition(entity);
+            if (entity is null) return null;
+            var observed = await dbContext.SchedulerOwners.AsNoTracking()
+                .Where(row => row.SchedulerScopeKey == schedulerScopeKey && row.OwnerKey == ownerKey)
+                .Select(row => (long?)row.LastObservedAtUtcTicks).SingleOrDefaultAsync(token);
+            return ToDefinition(entity) with { LastObservedAtUtc = FromTicks(observed ?? entity.LastObservedAtUtcTicks) };
         }, cancellationToken);
     }
 
@@ -142,7 +198,14 @@ public sealed partial class EfCoreJobSchedulerStore
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .ToListAsync(token);
-            return new QueryResult<JobDefinition>(entities.Select(ToDefinition).ToList(), totalCount);
+            var owners = entities.Select(row => row.OwnerKey).Distinct().ToArray();
+            var observed = await dbContext.SchedulerOwners.AsNoTracking()
+                .Where(row => row.SchedulerScopeKey == schedulerScopeKey && owners.Contains(row.OwnerKey))
+                .ToDictionaryAsync(row => row.OwnerKey, row => row.LastObservedAtUtcTicks, token);
+            return new QueryResult<JobDefinition>(entities.Select(row => ToDefinition(row) with
+            {
+                LastObservedAtUtc = FromTicks(observed.GetValueOrDefault(row.OwnerKey, row.LastObservedAtUtcTicks))
+            }).ToList(), totalCount);
         }, cancellationToken);
     }
 
@@ -159,7 +222,7 @@ public sealed partial class EfCoreJobSchedulerStore
         JobSchedulerIdentity.ValidateJobKey(jobKey, nameof(jobKey));
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(change.Overrides);
-        return WriteAsync(async (dbContext, token) =>
+        return WriteJobAsync(schedulerScopeKey, ownerKey, jobKey, async (dbContext, token) =>
         {
             var now = await GetUtcNowAsync(dbContext, token);
             var entity = await dbContext.Definitions.SingleOrDefaultAsync(
@@ -261,16 +324,17 @@ public sealed partial class EfCoreJobSchedulerStore
             ? filtered.OrderByDescending(selector)
             : filtered.OrderBy(selector);
 
-    private async Task ApplyEffectiveConcurrencyAsync(
+    private Task ApplyEffectiveConcurrencyAsync(
         JobSchedulerDbContext dbContext,
         JobDefinition definition,
         CancellationToken cancellationToken)
     {
-        var gate = await dbContext.ExecutionGates.SingleOrDefaultAsync(
+        // Every caller has already loaded/locked the relevant Gate before changing its definition.
+        cancellationToken.ThrowIfCancellationRequested();
+        var gate = dbContext.ExecutionGates.Local.SingleOrDefault(
             item => item.SchedulerScopeKey == definition.SchedulerScopeKey
                     && item.OwnerKey == definition.OwnerKey
-                    && item.JobKey == definition.Declaration.JobKey,
-            cancellationToken);
+                    && item.JobKey == definition.Declaration.JobKey);
         if (gate is null)
         {
             gate = new JobExecutionGateEntity
@@ -282,12 +346,9 @@ public sealed partial class EfCoreJobSchedulerStore
             };
             dbContext.ExecutionGates.Add(gate);
         }
-        else
-        {
-            gate.ConcurrencyToken = NewVersion();
-        }
 
         gate.MaxConcurrency = definition.EffectiveConfiguration.MaxConcurrency;
+        return Task.CompletedTask;
     }
 
     private static JobDefinition ToDefinition(JobDefinitionEntity entity)
@@ -302,6 +363,7 @@ public sealed partial class EfCoreJobSchedulerStore
         Declaration = declaration,
         Policy = ToPolicy(entity),
         IsPresent = entity.IsPresent,
+        AbsentSinceUtc = FromTicks(entity.AbsentSinceUtcTicks),
         LastObservedAtUtc = FromTicks(entity.LastObservedAtUtcTicks)
     };
 

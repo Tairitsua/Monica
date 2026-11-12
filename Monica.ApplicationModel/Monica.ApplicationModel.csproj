@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Compiled domain and role ownership, deployment placement, and immutable application activation for Monica.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monica.Core/Monica.Core.csproj" />
+  </ItemGroup>
+</Project>

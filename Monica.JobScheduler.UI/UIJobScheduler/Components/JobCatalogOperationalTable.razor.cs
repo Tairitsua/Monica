@@ -39,6 +39,11 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
     [Inject]
     private IDialogService DialogService { get; set; } = null!;
 
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+
+    /// <summary>Gets an optional route-owned inspector callback. Omission retains this table's standalone native inspector.</summary>
+    [Parameter] public EventCallback<string> ExecutionSelected { get; set; }
+
     /// <summary>
     /// Gets the server query used by the native table.
     /// </summary>
@@ -115,6 +120,15 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
     [Parameter]
     public string? EmptyText { get; set; }
 
+    /// <summary>Gets the standing derived from the accepted catalog capture.</summary>
+    [Parameter] public Func<JobOperationalSummary, string>? StandingResolver { get; set; }
+    /// <summary>Gets the bounded evidence explanation displayed beneath a row's standing.</summary>
+    [Parameter] public Func<JobOperationalSummary, string?>? StandingDetailResolver { get; set; }
+    /// <summary>Gets the semantic tone of the accepted finding, including warning-level overrun and skip signals.</summary>
+    [Parameter] public Func<JobOperationalSummary, string>? StandingToneResolver { get; set; }
+    private string RowTone(JobOperationalSummary row) => StandingToneResolver?.Invoke(row) ?? StandingTone(CatalogStanding(row));
+    private string CatalogStanding(JobOperationalSummary row) => StandingResolver?.Invoke(row) ?? (!row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused" : row.LatestExecution?.State == JobExecutionState.Failed ? "attention" : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy");
+    private static string StandingTone(string standing) => standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => "neutral" };
     private readonly Dictionary<string, string?> _cronDescriptions = new(StringComparer.Ordinal);
     private readonly SchedulerOperationLifetime _operations = new();
     private IReadOnlyList<JobOperationalSummary> _visibleSummaries = [];
@@ -312,8 +326,9 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
             ? description ?? L["Catalog:Cron:Unavailable"]
             : L["Catalog:Cron:Parsing"];
 
-    private Task OpenLatestExecutionAsync(string instanceId) =>
-        IsDisposed || _dialogs is null ? Task.CompletedTask : _dialogs.OpenAsync(instanceId);
+    private Task OpenLatestExecutionAsync(string instanceId) => IsDisposed ? Task.CompletedTask
+        : ExecutionSelected.HasDelegate ? ExecutionSelected.InvokeAsync(instanceId)
+        : _dialogs is null ? Task.CompletedTask : _dialogs.OpenAsync(instanceId);
 
     private async Task CopyJobKeyAsync(string jobKey)
     {
@@ -382,12 +397,12 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         }
 
         var operatorPaused = IsOperatorPaused(summary);
-        var debugSuppressed = IsDebugSuppressed(summary);
-        return (operatorPaused, debugSuppressed) switch
+        var manualSuppressed = IsManualSuppressed(summary);
+        return (operatorPaused, manualSuppressed) switch
         {
-            (true, true) => L["Catalog:Lifecycle:OperatorAndDebug"],
+            (true, true) => L["Catalog:Lifecycle:OperatorAndManual"],
             (true, false) => L["Catalog:Lifecycle:OperatorPaused"],
-            (false, true) => L["Catalog:Lifecycle:DebugSuppressed"],
+            (false, true) => L["Catalog:Lifecycle:ManualSuppressed"],
             _ => summary.RecurringScheduleStatus switch
             {
                 JobRecurringScheduleStatus.AwaitingSynchronization => L["Catalog:ScheduleStatus:Awaiting"],
@@ -407,12 +422,12 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         }
 
         var operatorPaused = IsOperatorPaused(summary);
-        var debugSuppressed = IsDebugSuppressed(summary);
-        return (operatorPaused, debugSuppressed) switch
+        var manualSuppressed = IsManualSuppressed(summary);
+        return (operatorPaused, manualSuppressed) switch
         {
-            (true, true) => L["Catalog:Lifecycle:OperatorAndDebugDescription"],
+            (true, true) => L["Catalog:Lifecycle:OperatorAndManualDescription"],
             (true, false) => L["Catalog:Lifecycle:OperatorPausedDescription"],
-            (false, true) => L["Catalog:Lifecycle:DebugSuppressedDescription"],
+            (false, true) => L["Catalog:Lifecycle:ManualSuppressedDescription"],
             _ => summary.RecurringScheduleStatus switch
             {
                 JobRecurringScheduleStatus.AwaitingSynchronization =>
@@ -423,80 +438,34 @@ public partial class JobCatalogOperationalTable : IAsyncDisposable
         };
     }
 
-    private static Color GetLifecycleColor(JobOperationalSummary summary)
-    {
-        if (!IsRecurring(summary))
-        {
-            return summary.Definition.IsDisabled ? Color.Warning : Color.Success;
-        }
-
-        if (IsOperatorPaused(summary))
-        {
-            return Color.Warning;
-        }
-
-        return IsDebugSuppressed(summary)
-            ? Color.Info
-            : JobSchedulerUiPresentation.GetRecurringScheduleStatusColor(summary.RecurringScheduleStatus);
-    }
-
-    private static string GetLifecycleIcon(JobOperationalSummary summary)
-    {
-        if (!IsRecurring(summary))
-        {
-            return summary.Definition.IsDisabled
-                ? MoIcons.PauseCircle
-                : MoIcons.Success;
-        }
-
-        if (IsOperatorPaused(summary))
-        {
-            return MoIcons.PauseCircle;
-        }
-
-        if (IsDebugSuppressed(summary))
-        {
-            return MoIcons.Bug;
-        }
-
-        return summary.RecurringScheduleStatus switch
-        {
-            JobRecurringScheduleStatus.AwaitingSynchronization => MoIcons.Refresh,
-            JobRecurringScheduleStatus.Exhausted => MoIcons.CalendarX,
-            _ => MoIcons.Clock
-        };
-    }
-
     private string GetToggleDisabledLabel(JobOperationalSummary summary) =>
         IsOperatorPaused(summary) ? L["Catalog:Actions:Resume"] : L["Catalog:Actions:Pause"];
 
     private string GetToggleDisabledTooltip(JobOperationalSummary summary) =>
-        JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary)
-            ? L["Catalog:Actions:PauseUnavailableDebug"]
+        JobSchedulerUiPresentation.IsManualOnlySuppressed(summary)
+            ? L["Catalog:Actions:PauseUnavailableManual"]
             : GetToggleDisabledLabel(summary);
 
     private static bool IsOperatorPaused(JobOperationalSummary summary) =>
         JobSchedulerUiPresentation.IsOperatorPaused(summary);
 
-    private static bool IsDebugSuppressed(JobOperationalSummary summary) =>
-        JobSchedulerUiPresentation.IsDebugSuppressed(summary);
+    private static bool IsManualSuppressed(JobOperationalSummary summary) =>
+        JobSchedulerUiPresentation.IsManualSuppressed(summary);
 
     private static bool IsRecurring(JobOperationalSummary summary) =>
         summary.Definition.Declaration.JobType == JobType.Recurring;
 
-    private static string GetStateIcon(JobExecutionState state) => state switch
-    {
-        JobExecutionState.Queued => MoIcons.Clock,
-        JobExecutionState.Running => MoIcons.PlayCircle,
-        JobExecutionState.Succeeded => MoIcons.Success,
-        JobExecutionState.Failed => MoIcons.Error,
-        JobExecutionState.Cancelled => MoIcons.Error,
-        JobExecutionState.Skipped => MoIcons.SkipNext,
-        _ => MoIcons.Circle
-    };
+    private static string StandingTone(JobOperationalSummary summary) => !summary.Definition.IsPresent || summary.Definition.IsDisabled ? "neutral"
+        : summary.LatestExecution?.State == JobExecutionState.Failed ? "error"
+        : summary.RunningExecutionCount > 0 ? "info" : IsRecurring(summary) ? "success" : "primary";
 
-    private static string GetDetailHref(JobOperationalSummary summary) =>
-        JobSchedulerUiUrls.JobDefinition(summary.Definition.Id);
+    private string StandingLabel(JobOperationalSummary summary) => !summary.Definition.IsPresent ? L["Catalog:AbsentDefinition"]
+        : summary.Definition.IsDisabled ? L["Catalog:Policy:Paused"]
+        : summary.LatestExecution?.State == JobExecutionState.Failed ? L["Workspace:LatestFailed"]
+        : summary.RunningExecutionCount > 0 ? L["ExecutionStates:Running"] : GetLifecycleLabel(summary);
+
+    private string GetDetailHref(JobOperationalSummary summary) =>
+        JobSchedulerUiUrls.JobDefinition(summary.Definition.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()

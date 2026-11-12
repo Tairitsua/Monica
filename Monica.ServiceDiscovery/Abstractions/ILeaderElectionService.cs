@@ -1,60 +1,26 @@
+using Monica.Locker.Leases;
 using Monica.ServiceDiscovery.Events;
 using Monica.ServiceDiscovery.Models;
 
 namespace Monica.ServiceDiscovery.Abstractions;
 
-/// <summary>
-/// Leader election service interface
-/// </summary>
+/// <summary>Observes locally confirmed leadership. A new acquisition always has a new lifetime.</summary>
 public interface ILeaderElectionService
 {
-    /// <summary>
-    /// Current Leader status
-    /// </summary>
+    /// <summary>Current local role, with expired terms reported as followers.</summary>
     LeaderStatus CurrentStatus { get; }
-
-    /// <summary>
-    /// Whether it is Leader
-    /// </summary>
+    /// <summary>Whether a locally confirmed, uncancelled term is available.</summary>
     bool IsLeader { get; }
-
-    /// <summary>
-    /// Time to become Leader (null if not Leader)
-    /// </summary>
+    /// <summary>Local acquisition time; renewal does not reset it.</summary>
     DateTime? LeaderBecomeTime { get; }
-
-    /// <summary>
-    /// Current ETag (for renewal verification)
-    /// </summary>
-    string? CurrentETag { get; }
-
-    /// <summary>
-    /// Leader gets events
-    /// </summary>
+    /// <summary>Current opaque acquisition identifier, not an increasing fencing sequence.</summary>
+    string? CurrentTermId { get; }
+    /// <summary>Current immutable term. Pass its stopping token to all leader-scoped work.</summary>
+    LeaseContext? CurrentLease { get; }
+    /// <summary>Ordered asynchronous notification of a new term; check its token before starting work.</summary>
     event EventHandler<LeaderGainedEvent>? OnLeaderGained;
-
-    /// <summary>
-    /// Leader loss event
-    /// </summary>
+    /// <summary>Ordered notification that the identified term ended. Cancellation does not wait for this notification.</summary>
     event EventHandler<LeaderLostEvent>? OnLeaderLost;
-
-    /// <summary>
-    /// Set as Leader
-    /// </summary>
-    void SetAsLeader(DateTime becomeTime, string eTag);
-
-    /// <summary>
-    /// Update ETag
-    /// </summary>
-    void UpdateETag(string newETag);
-
-    /// <summary>
-    /// Trigger Leader loss
-    /// </summary>
+    /// <summary>Stops renewal and signals local loss. The grant expires without early release of subscriber-owned work.</summary>
     void TriggerLeaderLost(LeaderLostReason reason);
-
-    /// <summary>
-    /// Reset Leader state
-    /// </summary>
-    void ResetLeaderState();
 }

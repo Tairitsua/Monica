@@ -93,6 +93,10 @@
                                                 <MudText Typo="Typo.body2">
                                                     <MudHighlighter Text="@definition.DisplayName" HighlightedTexts="@SearchTerms" />
                                                 </MudText>
+                                                @if (definition.Kind == ConfigurationKind.Startup)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@L["Startup:Kind"]</MudChip>
+                                                }
                                                 @if (definition.Origin == ConfigurationDefinitionOrigin.PublishedMetadata)
                                                 {
                                                     <MudTooltip Text="@L["State:Definitions:PublishedMetadataTooltip"]">

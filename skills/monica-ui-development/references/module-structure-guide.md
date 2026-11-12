@@ -9,7 +9,7 @@ This guide defines the architecture patterns, folder conventions, and component 
 
 UI modules are **pure presentation layers**. They:
 
-- Inject Facades from the infrastructure module directly (Facades return `Res<T>`)
+- Inject Facades from the infrastructure module directly (Facades return `Result<T>`)
 - Do NOT have their own service layer for data access
 - Focus on components, page composition, state management, and localization
 - Maximize reuse of Models from the infrastructure module's public `Models/` folder

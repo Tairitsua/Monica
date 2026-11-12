@@ -1,5 +1,5 @@
 /**
- * A directed atlas of declarations in the captured registry. Dashed endpoints
+ * A directed atlas of compiled API usages, with observed service membership. Dashed endpoints
  * identify domain names absent from the catalog; they are not registered domains.
  */
 import { GraphBase } from '../../Monica.UI/js/d3js/d3-graph-base.js';
@@ -74,7 +74,7 @@ class DomainDependencyGraph extends GraphBase {
             .attr('stroke-width', 1.5).attr('marker-end', `url(#${this.markerIds.markerId})`)
             .on('mouseenter.atlas', (event, link) => this.showTooltip(event,
                 `${this.nodeId(link.source)} → ${this.nodeId(link.target)}`,
-                [[this.texts.labels.dependencyServiceCount, link.serviceCount]]))
+                [[this.texts.labels.dependencyServiceCount, link.evidenceCount]]))
             .on('mouseleave.atlas', () => this.hideTooltip());
         this.nodeElements = this.nodeLayer.selectAll('.domain-node').data(this.nodes, node => node.id).join(
             enter => {
@@ -102,6 +102,8 @@ class DomainDependencyGraph extends GraphBase {
                 if (node.description) rows.push(['', node.description]);
                 for (const service of node.services || []) {
                     rows.push(['', `${service.name ?? service.appName} · ${this.statusText(service.status ?? service.overallStatus)}`]);
+                    rows.push([this.texts.labels.appId, service.appId]);
+                    if (service.roles?.length) rows.push([this.texts.labels.roles, service.roles.join(', ')]);
                 }
                 this.showTooltip(event, node.name, rows);
             })

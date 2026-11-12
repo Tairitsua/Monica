@@ -19,8 +19,23 @@
       "Title": "Configuration Storage"
     }
   },
+  "Startup": {
+    "Kind": "Startup",
+    "ReadOnly": "Startup configuration is owned by deployment and is read-only here. Update its startup input and restart the service to apply changes; running values remain frozen.",
+    "CandidateUnavailable": "The current startup candidate is unavailable.",
+    "RestartRequired": "Restart required",
+    "Unchanged": "Matches the startup snapshot",
+    "InvalidCandidate": "The candidate is invalid. Fix its input before restarting; running values have not changed.",
+    "CandidateValidation": "Startup candidate validation",
+    "ActualValue": "Running value · frozen at startup",
+    "CandidateValue": "Candidate value · current startup input",
+    "ActualUnavailable": "The frozen running value is unavailable.",
+    "ActualSources": "Sources captured at startup",
+    "CandidateSources": "Current candidate sources",
+    "SourceContributions": "These contribution counts describe the current candidate providers. Running values remain frozen; inspect a field's source chain to see its startup sources."
+  },
   "State": {
-    "Subtitle": "Inspect managed definitions, stage edits, and save them as one audited group.",
+    "Subtitle": "Inspect configuration values and sources, and review managed changes before saving.",
     "SearchPlaceholder": "Search definitions or options",
     "Definitions": {
       "Empty": "No configuration definitions were found.",
@@ -133,6 +148,7 @@
       "Title": "Reload status",
       "OpenDetails": "View reload status",
       "Unavailable": "Reload status is unavailable.",
+      "NoManagedDefinitions": "This service has no local Managed configuration to reload. Startup configuration changes require a restart.",
       "ProviderInactive": "The Monica runtime configuration provider is not active.",
       "CurrentSummary": "Runtime configuration versions match the effective value store.",
       "DriftSummary": "{0} configuration definitions differ from the effective value store.",
@@ -667,6 +683,21 @@
     }
   },
   "Debug": {
+    "Policy": {
+      "Title": "Application debug mode",
+      "Description": "Application:DebugMode controls detailed client errors, API diagnostics and expression logs for registered capabilities. Authorization, sensitive-value reveal and autonomous work remain independent. Change deployment inputs and restart the host to apply this policy.",
+      "Actual": "Running value",
+      "ActualSource": "Startup source",
+      "Candidate": "Deployment candidate",
+      "CandidateSource": "Candidate source",
+      "Enabled": "Enabled",
+      "Disabled": "Disabled",
+      "Unavailable": "Unavailable",
+      "SourceCode": "Host code",
+      "SourceDefault": "Default (disabled)",
+      "InvalidCandidate": "The candidate is invalid or unavailable. Supply a boolean consistent with explicit host code; the running value is unchanged.",
+      "RestartRequired": "The deployment candidate differs from the running value. Restart is required."
+    },
     "Subtitle": "View the current Microsoft configuration debug output.",
     "SearchPlaceholder": "Search debug view",
     "Empty": "The debug view is empty.",
@@ -1101,6 +1132,10 @@
     "StoredDocument": "Stored document at the physical target",
     "EffectiveAggregate": "Final effective aggregate",
     "MaskedChange": "This write is masked by another source or produces no effective change. The stored document must still satisfy its own complete contract."
+  },
+  "Manual": {
+    "Unpersisted": "Not persisted",
+    "UnpersistedDescription": "This process uses a validated temporary value because no managed document exists. It has no stored version. Its deployed owner must publish and initialize the document before it can be edited here."
   },
   "Workbench": {
     "Eyebrow": "MONICA / CONFIGURATION",

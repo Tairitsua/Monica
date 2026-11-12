@@ -5,10 +5,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Facades;
 using Monica.ServiceDiscovery.Localization;
@@ -17,6 +20,7 @@ using Monica.ServiceDiscovery.Providers;
 using Monica.ServiceDiscovery.Services;
 using Monica.ServiceDiscovery.Services.Support;
 using Monica.StateStore.Abstractions;
+using Monica.Locker.Leases;
 using Polly;
 using Polly.Retry;
 
@@ -30,6 +34,14 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void ValidateOptions(ModuleServiceDiscoveryOption options, string? profileName)
     {
+        options.Election.Validate();
+        var applicationIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in options.PredefinedServices)
+        {
+            if (string.IsNullOrWhiteSpace(service.AppId) || service.AppId != service.AppId.Trim() || !applicationIds.Add(service.AppId))
+                throw new InvalidOperationException("Predefined services require unique, nonempty AppIds without surrounding whitespace.");
+        }
+
         if (!Enum.IsDefined(options.Role))
         {
             throw new InvalidOperationException(
@@ -49,6 +61,9 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
             throw new InvalidOperationException(
                 $"Unsupported {nameof(ServiceDiscoveryStorageMode)} value '{storageMode}'.");
         }
+
+        if (storageMode != ServiceDiscoveryStorageMode.Memory && options.LeaderLeaseStore is null)
+            throw new InvalidOperationException("Distributed service discovery requires UseLeaderLeaseStore with an explicit keyed lease authority and scope.");
 
         if (storageMode == ServiceDiscoveryStorageMode.ExternalKeyed)
         {
@@ -72,6 +87,7 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
 
     public override void Describe(ModuleDescriptor module)
     {
+        module.Require<ModuleDomainCatalog, ModuleDomainCatalogOption>();
         module.RequireFeature(STATE_STORE_FEATURE);
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static localization => localization.AddResource<ServiceDiscoveryResource>());
@@ -90,6 +106,10 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     /// <inheritdoc />
     public override void DeclareContracts(ModuleContractDescriptor<ModuleServiceDiscoveryOption> contracts)
     {
+        if (contracts.Options.LeaderLeaseStore is { } leaseSelection)
+            contracts.RequireKeyedService<IExclusiveLeaseStore>(leaseSelection.ServiceKey);
+        if (Application.TypeActivation is IApplicationModel model)
+            ServiceDiscoveryApplicationIdentity.Validate(contracts.Options, model.Deployment);
         switch (contracts.Options.StorageMode)
         {
             case ServiceDiscoveryStorageMode.Memory:
@@ -111,6 +131,16 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
     public override void ConfigureServices(ModuleContext<ModuleServiceDiscoveryOption> context)
     {
         var services = context.Services;
+        services.TryAddSingleton(TimeProvider.System);
+        if (Option.LeaderLeaseStore is { } leaseSelection)
+        {
+            if (leaseSelection.ServiceKey != nameof(ModuleServiceDiscovery))
+                services.AddKeyedSingleton<IExclusiveLeaseStore>(nameof(ModuleServiceDiscovery), (provider, _) =>
+                    provider.GetRequiredKeyedService<IExclusiveLeaseStore>(leaseSelection.ServiceKey));
+        }
+        else
+            services.AddKeyedSingleton<IExclusiveLeaseStore>(nameof(ModuleServiceDiscovery), (provider, _) =>
+                new InMemoryLeaseStore(provider.GetRequiredService<TimeProvider>()));
         switch (Option.StorageMode)
         {
             case ServiceDiscoveryStorageMode.Memory:
@@ -153,14 +183,30 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
 
         // Register the new StateStore foundational services.
         services.TryAddSingleton<IRegistrationStateManager, RegistrationStateManager>();
-        services.TryAddSingleton<ILeaderElectionService, LeaderElectionService>();
+        services.AddSingleton<LeaderElectionService>();
+        services.AddSingleton<ILeaderElectionService>(provider => provider.GetRequiredService<LeaderElectionService>());
 
-        // Register ServiceDiscoveryClientHostedService as a singleton and expose it as both HostedService and Coordinator.
-        services.AddSingleton<ServiceDiscoveryClientHostedService>();
-        services.AddSingleton<IServiceRegistrationCoordinator>(provider =>
-            provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
-        services.AddHostedService(provider =>
-            provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+        var autonomous = Application.Application.AutonomousWork;
+        Application.RecordActivation(new ResourceActivation
+        {
+            Key = "ServiceDiscovery:registration",
+            ImplementationType = typeof(ServiceDiscoveryClientHostedService),
+            Kind = TypeActivationKind.HostedService,
+            Mode = autonomous ? ActivationMode.Automatic : ActivationMode.Manual,
+            Reason = autonomous ? "Registration, heartbeat and election permitted."
+                : "Registry queries remain available; registration, heartbeat, election and deletion are held."
+        });
+        if (autonomous)
+        {
+            services.AddSingleton<ServiceDiscoveryClientHostedService>();
+            services.AddSingleton<IServiceRegistrationCoordinator>(provider =>
+                provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+            services.AddHostedService(provider => provider.GetRequiredService<ServiceDiscoveryClientHostedService>());
+        }
+        else
+        {
+            services.AddSingleton<IServiceRegistrationCoordinator, HeldServiceRegistrationCoordinator>();
+        }
 
         // Register the default information provider implementation.
         services.TryAddSingleton<IServiceDiscoveryCatalogProvider, DefaultServiceDiscoveryCatalogProvider>();
@@ -289,21 +335,7 @@ public static class ModuleServiceDiscoveryBuilderExtensions
                 context.Services.AddSingleton<IServiceDiscoveryCatalogProvider, TProvider>());
         }
 
-        public ModuleRegistration<ModuleServiceDiscovery, ModuleServiceDiscoveryOption> SetDependentSubDomains<TEnum>(
-            TEnum domainFlags)
-            where TEnum : struct, Enum
-        {
-            if (!typeof(TEnum).IsDefined(typeof(FlagsAttribute), false))
-            {
-                throw new ArgumentException("The enum type must be marked with FlagsAttribute.", nameof(domainFlags));
-            }
 
-            var domains = Enum.GetValues<TEnum>()
-                .Where(flag => Convert.ToInt32(flag) != 0 && domainFlags.HasFlag(flag))
-                .Select(static flag => flag.ToString())
-                .ToList();
-            return registration.Configure(options => options.DependentSubDomains = domains);
-        }
 
         /// <summary>
         /// Uses a keyed state store that the host has registered explicitly. The supplied key is the sole external
@@ -321,11 +353,25 @@ public static class ModuleServiceDiscoveryBuilderExtensions
                 })
                 .SatisfyFeature(ModuleServiceDiscovery.STATE_STORE_FEATURE);
         }
+
+        /// <summary>
+        /// Binds leadership and leader observations to a keyed singleton lease authority. Membership remains in the
+        /// selected StateStore. Every participant must share this scope and backend; memory storage may omit this
+        /// selection for process-local election. Redis users accept possible duplicate leaders during failover.
+        /// </summary>
+        public ModuleRegistration<ModuleServiceDiscovery, ModuleServiceDiscoveryOption> UseLeaderLeaseStore(
+            string serviceKey, string scope) => registration.Configure(options =>
+                options.LeaderLeaseStore = new LeaseStoreSelection(serviceKey, scope));
     }
 }
 
 public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServiceDiscovery>
 {
+    /// <summary>
+    /// Explicit keyed authority and namespace for leader election/queries. Required with distributed or external
+    /// membership storage. Null uses one process-local lease store only when memory storage is selected.
+    /// </summary>
+    public LeaseStoreSelection? LeaderLeaseStore { get; set; }
     /// <summary>
     /// Gets the responsibility assigned to this host. The default is <see cref="ServiceDiscoveryRole.Worker"/>.
     /// Use the role registration methods when the host owns registry or standalone control-plane work.
@@ -360,12 +406,14 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
     /// <summary>
     /// Unique application identifier.
     /// When not configured, ServiceDiscovery uses the application defaults configured through <see cref="IMonicaBuilder.ConfigureApplication"/>.
+    /// With an application model, an explicit value must match its canonical AppId.
     /// </summary>
     public string? AppId { get; set; }
 
     /// <summary>
     /// Display name of the application.
     /// When not configured, ServiceDiscovery uses the application defaults configured through <see cref="IMonicaBuilder.ConfigureApplication"/>.
+    /// With an application model, the deployment entry owns this value and conflicting overrides fail composition.
     /// </summary>
     public string? AppName { get; set; }
 
@@ -404,19 +452,16 @@ public class ModuleServiceDiscoveryOption : MinimalApiModuleOptions<ModuleServic
     public string? FromInstance { get; set; }
 
     /// <summary>
-    /// List of dependent subdomains.
+    /// Expected applications and optional display names, including applications without online registrations.
+    /// Defaults to empty. Every application-model deployment entry is included automatically, including empty-role entries.
+    /// Names for known deployment applications must agree with their canonical entries; additional external applications are allowed.
     /// </summary>
-    public List<string>? DependentSubDomains { get; set; }
+    public List<PredefinedServiceInfo> PredefinedServices { get; set; } = [];
 
     /// <summary>
     /// Leader election configuration.
     /// </summary>
     public ElectionConfig Election { get; set; } = new();
-
-    /// <summary>
-    /// Isolation handling mode.
-    /// </summary>
-    public EIsolationHandlingMode IsolationHandlingMode { get; set; } = EIsolationHandlingMode.ContinueRunning;
 
     /// <summary>
     /// Gets the host-owned keyed service used when <see cref="StorageMode"/> is
@@ -480,20 +525,4 @@ public enum ServiceDiscoveryStorageMode
     /// Uses a host-owned keyed <see cref="IStateStore"/> registration.
     /// </summary>
     ExternalKeyed
-}
-
-/// <summary>
-/// Isolation handling mode.
-/// </summary>
-public enum EIsolationHandlingMode
-{
-    /// <summary>
-    /// Continue running in degraded mode without participating in leader election.
-    /// </summary>
-    ContinueRunning,
-
-    /// <summary>
-    /// Shut down quickly.
-    /// </summary>
-    FastShutdown
 }

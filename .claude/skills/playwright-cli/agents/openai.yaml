@@ -1,4 +1,0 @@
-interface:
-  display_name: "Playwright CLI"
-  short_description: "Automate browser testing and screenshots"
-  default_prompt: "Use $playwright-cli to automate browser interactions, capture screenshots, inspect pages, or test web applications."

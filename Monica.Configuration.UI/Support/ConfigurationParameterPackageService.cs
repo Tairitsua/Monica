@@ -247,9 +247,11 @@ internal sealed class ConfigurationParameterPackageService(
         IReadOnlyList<LogicalPath> paths)
     {
         var result = await facade.GetSourceChainsAsync(definition.DefinitionKey, paths, visibility.ShowSensitiveValues);
-        if (result.IsFailed(out var error, out var chains))
+        var error = result;
+        var chains = result.Data;
+        if (result.IsFailure() || chains is null)
         {
-            throw new InvalidOperationException(error.Message);
+            throw new InvalidOperationException(error.Message ?? localizer["Common:Errors:LoadFailed"].Value);
         }
 
         return chains.ToDictionary(
@@ -286,13 +288,16 @@ internal sealed class ConfigurationParameterPackageService(
         int? totalProcessDefinitionCount = null)
     {
         var summariesResult = await facade.GetDefinitionsAsync();
-        if (summariesResult.IsFailed(out var summaryError, out var summaries))
+        var summaryError = summariesResult;
+        var summaries = summariesResult.Data;
+        if (summariesResult.IsFailure() || summaries is null)
         {
-            throw new InvalidOperationException(summaryError.Message);
+            throw new InvalidOperationException(summaryError.Message ?? localizer["Common:Errors:LoadFailed"].Value);
         }
 
         var definitions = new List<ConfigurationDefinition>();
         var orderedSummaries = summaries
+            .Where(summary => summary.Kind == ConfigurationKind.Managed)
             .OrderBy(summary => summary.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var resolvedTotalProcessDefinitionCount = totalProcessDefinitionCount ?? orderedSummaries.Length;
@@ -335,6 +340,10 @@ internal sealed class ConfigurationParameterPackageService(
             1,
             1);
         var definition = await LoadDefinitionAsync(request.DefinitionKey);
+        if (definition.Kind == ConfigurationKind.Startup)
+        {
+            throw new InvalidOperationException(localizer["Startup:ReadOnly"]);
+        }
         ReportLoadDefinitionsProgress(
             progress,
             ConfigurationPackageProgressOperation.Export,
@@ -470,9 +479,11 @@ internal sealed class ConfigurationParameterPackageService(
     private async Task<ConfigurationDefinition> LoadDefinitionAsync(string definitionKey)
     {
         var result = await facade.GetDefinitionAsync(definitionKey);
-        if (result.IsFailed(out var error, out var detail))
+        var error = result;
+        var detail = result.Data;
+        if (result.IsFailure() || detail is null)
         {
-            throw new InvalidOperationException(error.Message);
+            throw new InvalidOperationException(error.Message ?? localizer["Common:Errors:LoadFailed"].Value);
         }
 
         return detail.Definition;
@@ -488,9 +499,11 @@ internal sealed class ConfigurationParameterPackageService(
     public async Task<ConfigurationEffectiveValue> LoadEffectiveValueAsync(string definitionKey, LogicalPath path, bool? includeSensitive = null)
     {
         var result = await facade.GetEffectiveValueAsync(definitionKey, path, includeSensitive ?? visibility.ShowSensitiveValues);
-        if (result.IsFailed(out var error, out var effectiveValue))
+        var error = result;
+        var effectiveValue = result.Data;
+        if (result.IsFailure() || effectiveValue is null)
         {
-            throw new InvalidOperationException(error.Message);
+            throw new InvalidOperationException(error.Message ?? localizer["Common:Errors:LoadFailed"].Value);
         }
 
         return effectiveValue;

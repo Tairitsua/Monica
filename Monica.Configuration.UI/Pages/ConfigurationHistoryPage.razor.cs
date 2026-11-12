@@ -228,7 +228,9 @@ public partial class ConfigurationHistoryPage
     {
         var result = await Facade.GetDefinitionCatalogAsync();
         if (!CanAdopt(owner, query)) return;
-        if (result.IsFailed(out var error, out var catalog))
+        var error = result;
+        var catalog = result.Data;
+        if (result.IsFailure() || catalog is null)
         {
             _queries.TryApply(query, () => { _definitions.Clear(); _definitionDetails.Clear(); _metadataStoreDiagnostic = null; });
             Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error);
@@ -277,7 +279,9 @@ public partial class ConfigurationHistoryPage
     {
         var result = await Facade.QueryHistoryPageAsync(request);
         if (!CanAdopt(owner, query)) return;
-        if (result.IsFailed(out var error, out var page))
+        var error = result;
+        var page = result.Data;
+        if (result.IsFailure() || page is null)
         {
             _queries.TryApply(query, () =>
             {
@@ -307,7 +311,9 @@ public partial class ConfigurationHistoryPage
     {
         var result = await Facade.QueryMutationGroupsPageAsync(request);
         if (!CanAdopt(owner, query)) return;
-        if (result.IsFailed(out var error, out var page))
+        var error = result;
+        var page = result.Data;
+        if (result.IsFailure() || page is null)
         {
             _queries.TryApply(query, () =>
             {
@@ -410,7 +416,9 @@ public partial class ConfigurationHistoryPage
     {
         var result = await Facade.GetGroupHistoryAsync(group.GroupId);
         if (_disposed || owner.IsRetired) return null;
-        if (result.IsFailed(out var error, out var rows)) { Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error); return null; }
+        var error = result;
+        var rows = result.Data;
+        if (result.IsFailure() || rows is null) { Snackbar.Add($"{L["Common:Errors:LoadFailed"]}: {error.Message}", Severity.Error); return null; }
         if (rows.Count == 0) { Snackbar.Add(L["History:Dialog:NoPreview"], Severity.Info); return null; }
         return rows.ToArray();
     }
@@ -452,7 +460,8 @@ public partial class ConfigurationHistoryPage
             if (_definitionDetails.ContainsKey(definitionKey) || !CanManageDefinition(definitionKey)) continue;
             var result = await Facade.GetDefinitionAsync(definitionKey);
             if (!CanAdopt(owner, query)) return;
-            if (!result.IsFailed(out _, out var detail)) _queries.TryApply(query, () => _definitionDetails[definitionKey] = detail.Definition);
+            var detail = result.Data;
+            if (!result.IsFailure() && detail is not null) _queries.TryApply(query, () => _definitionDetails[definitionKey] = detail.Definition);
         }
     }
 

@@ -1,0 +1,205 @@
+{
+  "Navigation": {
+    "Category": "Leases & locks",
+    "Leases": "Coordination leases",
+    "Locks": "Critical-section locks"
+  },
+  "Workspace": {
+    "Title": "Leases & locks",
+    "Eyebrow": "COORDINATION / OWNERSHIP",
+    "ConfiguredSources": "Configured authority observations"
+  },
+  "Common": {
+    "Captured": "Oldest source observation",
+    "Refresh": "Refresh inventory",
+    "Loading": "Reading lease evidence…",
+    "Close": "Close evidence",
+    "Cancel": "Cancel",
+    "Seconds": "s",
+    "Minutes": "min",
+    "Hours": "h"
+  },
+  "Refresh": {
+    "Title": "Automatic refresh",
+    "Every": "Every {0}s",
+    "Off": "Auto off",
+    "Policy": "Automatic reads pause in background. Inventory refreshes share a cached snapshot."
+  },
+  "Access": {
+    "Denied": "Access unavailable",
+    "Description": "The host operational policy does not allow this workspace."
+  },
+  "Map": {
+    "Intro": "One responsibility. One observed holder.",
+    "Population": "observed lease records",
+    "Across": "Across {0} configured authority queries",
+    "Finding": "Ownership is evaluated at each source’s observation time. A retained expired record does not establish whether its worker is running.",
+    "Title": "Ownership map",
+    "Description": "Select a responsibility to inspect its evidence",
+    "Records": "{0} observed records",
+    "More": "View {0} more in the records below"
+  },
+  "Evidence": {
+    "Stale": "A refresh failed. Last successful evidence keeps its original source time; unavailable authorities are shown separately.",
+    "Unavailable": "Observation unavailable",
+    "Retry": "Retry the read. No conclusion about ownership can be made from a failed query.",
+    "Unconfigured": "No lease authorities configured",
+    "UnconfiguredDescription": "Register the lease stores and permitted scope/prefix bindings in the host to inspect them here.",
+    "ClaimsTitle": "A role lease is not a message or job claim",
+    "ClaimsDescription": "Job execution and Outbox delivery claims stay with their business records. This view covers shared coordination responsibilities.",
+    "Unexpired": "Unexpired at observation",
+    "Expired": "Expired record",
+    "RefreshFailed": "Refresh failed",
+    "Truncated": "Showing {0} of {1} records",
+    "Empty": "No retained lease observations",
+    "EmptyDescription": "The configured queries returned no records. Absence does not prove that a responsibility was never acquired.",
+    "Retention": "SQL can retain expired rows. Expired Redis keys disappear from the inventory.",
+    "CaptureNote": "Validity is measured at each authority’s observation. These values are snapshots, not live countdowns.",
+    "Title": "Lease evidence",
+    "ExactFailed": "The exact read failed. Any earlier evidence retains its original observation time.",
+    "ExpiredAgo": "past expiry at observation",
+    "Remaining": "remaining at observation",
+    "RefreshExact": "Refresh this resource",
+    "ExactHint": "An exact lookup reads one resource without enumerating the inventory.",
+    "Identity": "Resource identity",
+    "Scope": "Scope",
+    "Name": "Resource name",
+    "ServiceKey": "Service key",
+    "Timeline": "Current grant timestamps",
+    "TimelineNote": "These points describe one retained grant. Previous holders and renewal history are not recorded here.",
+    "Meaning": "How to interpret this authority",
+    "Missing": "No retained observation for this resource",
+    "MissingDescription": "The record may have expired, been revoked, or been removed. This inventory is not ownership history."
+  },
+  "Inventory": {
+    "Title": "Lease records",
+    "Description": "Find a responsibility, then inspect its exact resource.",
+    "Shown": "{0} of {1} records",
+    "Search": "Search role, holder or resource…",
+    "AllAuthorities": "All authorities",
+    "NoMatch": "No matching records",
+    "NoMatchDescription": "Try another authority or remove the search and evidence filters.",
+    "Resource": "Responsibility / resource",
+    "Holder": "Observed holder",
+    "Authority": "Authority",
+    "Validity": "Validity at observation",
+    "Previous": "Previous",
+    "Next": "Next",
+    "Page": "Page {0} of {1}"
+  },
+  "Filters": {
+    "all": "All records",
+    "unexpired": "Unexpired at observation",
+    "expired": "Expired records"
+  },
+  "Providers": {
+    "Sql": "SQL",
+    "Redis": "Redis",
+    "InMemory": "In-process",
+    "Custom": "Custom"
+  },
+  "Meaning": {
+    "Sql": "A relational authority can support durable coordination. Transactional protection depends on the consumer validating its grant within the protected transaction.",
+    "Redis": "Redis coordinates repeatable background work. Asynchronous failover may lose an acknowledged grant, so this authority is advisory.",
+    "InMemory": "This source coordinates only within its current process. Independent replicas do not share these grants.",
+    "Custom": "The host supplied this authority. Its implementation defines expiry, consistency and transaction guarantees."
+  },
+  "Timestamps": {
+    "Acquired": "Acquired",
+    "Confirmed": "Last confirmed",
+    "Expires": "Expires",
+    "Observed": "Observed by authority"
+  },
+  "Admin": {
+    "Title": "Administration",
+    "Warning": "Revocation does not immediately stop a worker. A successor may acquire while previous work is still active.",
+    "Revoke": "Revoke current lease",
+    "Unavailable": "This binding does not expose administrative revocation.",
+    "ConfirmTitle": "Revoke the current lease for this resource?",
+    "ConfirmDescription": "This removes whichever grant exists when the action executes. It may belong to a different holder than the one shown.",
+    "Acknowledge": "I understand that work may overlap.",
+    "Failed": "Revocation could not be confirmed. Refresh the evidence before deciding whether to retry."
+  },
+  "Roles": {
+    "Recovery": "Execution recovery",
+    "History": "Execution history cleanup",
+    "Outbox": "Outbox cleanup & statistics",
+    "Discovery": "Registry leadership"
+  },
+  "Locks": {
+    "Choose": "Choose a lock mechanism",
+    "PreviewNote": "Changes this view, not the service configuration.",
+    "Selected": "Viewing",
+    "Compare": "Three differences to check first",
+    "CompareNote": "One calling pattern; different coordination and loss guarantees.",
+    "Provider": "Provider",
+    "Scope": "Coordination scope",
+    "Expiry": "Expiry & renewal",
+    "Signal": "Loss signal",
+    "Unknown": "This provider is not in the example",
+    "UnknownNote": "The default mechanism is shown. Choose one of the providers below to continue.",
+    "Stages": "Lock ownership and release flow",
+    "Acquired": "Acquire the lock",
+    "Work": "Run protected work",
+    "Release": "Drain, then release",
+    "AcquireNote": "No handle means no protected work.",
+    "WorkNote": "Pass cancellation into the work and await its completion.",
+    "ReleaseNote": "Await handle disposal when leaving the ownership scope.",
+    "NotAcquired": "Not acquired",
+    "NotAcquiredNote": "Return without running the operation",
+    "SuccessPath": "After obtaining a handle",
+    "LossPath": "While work is running",
+    "DiagramNote": "This is a calling sequence, not live execution, ownership or timing evidence.",
+    "Observe": "What this page can show",
+    "ContractOnly": "Provider capabilities",
+    "ContractNote": "This view compares provider contracts. No lock runtime data from this service is connected.",
+    "Inventory": "Current lock inventory",
+    "NoInventory": "No query capability",
+    "InventoryNote": "Holders, queue depth and wait times cannot be listed from this API.",
+    "Revoke": "Operator force-unlock",
+    "NoRevoke": "No administration capability",
+    "RevokeNote": "The caller that acquired the handle owns its release.",
+    "Boundary": "Business commits still need protection",
+    "BoundaryNote": "Lock loss or cancellation does not undo a sent request. Keep transaction and concurrency checks on database writes.",
+    "RoleLink": "Explore renewable coordination leases",
+    "RoleLinkNote": "Scheduler roles, Outbox maintenance and discovery leadership.",
+    "Mechanisms": {
+      "InProcess": {
+        "Label": "Within one process",
+        "Short": "In-process",
+        "Context": "Current process · Local critical section",
+        "Finding": "For serial access to resources shared within one process. Other replicas have their own locks and do not join this coordination.",
+        "LossTitle": "No independent lease expiry",
+        "LossNote": "Disposing the handle releases the local semaphore. There is no loss notification; still observe caller cancellation.",
+        "WorkHint": "Cancellation belongs to the caller",
+        "Scope": "One process",
+        "Expiry": "Released by handle disposal; no independent expiry",
+        "Signal": "Not observed; token is not cancelable"
+      },
+      "Medallion": {
+        "Label": "Native coordination",
+        "Short": "Medallion",
+        "Context": "Shared backend · Multiple replicas",
+        "Finding": "For coordination across replicas with lock-loss observation. The chosen native backend determines expiry and renewal.",
+        "LossTitle": "On lock loss, stop and drain the work",
+        "LossNote": "Forwards the native HandleLostToken. Reading it may start backend monitoring; the work must respond to cancellation.",
+        "WorkHint": "Caller cancellation + backend loss signal",
+        "Scope": "Selected native backend",
+        "Expiry": "Expiry and renewal follow native provider options",
+        "Signal": "Native handle signal; capability depends on the backend"
+      },
+      "Dapr": {
+        "Label": "A fixed lifetime",
+        "Short": "Dapr",
+        "Context": "Same App ID · Same lock store",
+        "Finding": "For a Dapr lock component and work bounded by a known lifetime. This adapter neither renews the lock nor observes its loss.",
+        "LossTitle": "Expiry does not stop the work",
+        "LossNote": "Give the work a shorter deadline. No loss notification is not proof of ownership; keep work within the known validity window.",
+        "WorkHint": "Work must finish before the lock expires",
+        "Scope": "Configured Dapr lock component",
+        "Expiry": "Fixed lease; Monica's adapter does not renew it",
+        "Signal": "Not observed; token is not cancelable"
+      }
+    }
+  }
+}

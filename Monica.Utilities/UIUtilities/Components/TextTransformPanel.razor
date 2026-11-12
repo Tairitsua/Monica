@@ -111,7 +111,7 @@
         if (_disposed) return;
         _focusVersion++;
         var result = State.Execute(operation);
-        if (result.IsFailed(out _, out _))
+        if (result.IsFailure())
         {
             _announcement = null;
             _pendingFocus = FocusTarget.Error;

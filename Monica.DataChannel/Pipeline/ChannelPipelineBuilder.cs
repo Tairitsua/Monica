@@ -167,6 +167,11 @@ public class ChannelPipelineBuilder
         var logger = provider.GetRequiredService<ILogger<ChannelPipeline>>();
         var options = provider.GetRequiredService<IOptions<ModuleDataChannelOption>>().Value;
 
+        // Resolve every component before allocating the pipeline's observable lifetime.
+        var middlewaresList = new List<IPipelineMiddleware>(_middlewares);
+        foreach (var type in _diMiddlewares)
+            middlewaresList.Add(TransientProxy.CreateMiddlewareProxy(provider, type));
+
         // Create the pipeline.
         var pipe = new ChannelPipeline(
             innerEndpoint,
@@ -176,16 +181,6 @@ public class ChannelPipelineBuilder
             logger,
             options.RecentExceptionToKeep,
             GroupId);
-
-        // Start with directly registered middleware.
-        var middlewaresList = new List<IPipelineMiddleware>(_middlewares);
-
-        // Add middleware resolved from dependency injection.
-        foreach (var type in _diMiddlewares)
-        {
-            var middleware = TransientProxy.CreateMiddlewareProxy(provider, type);
-            middlewaresList.Add(middleware);
-        }
 
         pipe.SetMiddlewares(middlewaresList);
         return pipe;

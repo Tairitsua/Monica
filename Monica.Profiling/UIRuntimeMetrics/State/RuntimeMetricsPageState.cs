@@ -27,7 +27,7 @@ public sealed class RuntimeMetricsPageState(
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly Func<Res<RuntimeMetricsTrend>> _getTrend = runtimeMetricsFacade.GetTrend;
+    private readonly Func<Result<RuntimeMetricsTrend>> _getTrend = runtimeMetricsFacade.GetTrend;
     private CancellationTokenSource? _refreshCancellation;
     private Task _refreshLoop = Task.CompletedTask;
     private Task? _disposeTask;
@@ -47,7 +47,7 @@ public sealed class RuntimeMetricsPageState(
         RuntimeMetricsFacade runtimeMetricsFacade,
         IOptions<ModuleRuntimeMetricsUIOption> options,
         TimeProvider? timeProvider,
-        Func<Res<RuntimeMetricsTrend>> getTrend)
+        Func<Result<RuntimeMetricsTrend>> getTrend)
         : this(runtimeMetricsFacade, options, timeProvider)
     {
         ArgumentNullException.ThrowIfNull(getTrend);
@@ -97,7 +97,7 @@ public sealed class RuntimeMetricsPageState(
     /// Captures current evidence and starts configured polling. A busy or disposed page returns Conflict
     /// with an empty message; it does not change the retained snapshot or error.
     /// </summary>
-    public async Task<Res> InitializeAsync()
+    public async Task<Result> InitializeAsync()
     {
         var result = await RefreshAsync();
         await UpdateAutoRefreshAsync();
@@ -114,7 +114,7 @@ public sealed class RuntimeMetricsPageState(
     /// Reads retained history without forcing a new sample or changing the polling preference. Concurrent or disposed calls
     /// return Conflict with an empty message. Actual query failures retain the previous successful snapshot.
     /// </summary>
-    public Task<Res> RefreshAsync() => Task.FromResult(Refresh());
+    public Task<Result> RefreshAsync() => Task.FromResult(Refresh());
 
     /// <summary>
     /// Stops and drains the page loop and any admitted read. Repeated calls share the same completion.
@@ -136,7 +136,7 @@ public sealed class RuntimeMetricsPageState(
         }
     }
 
-    private Res Refresh(CancellationToken pollingCancellation = default)
+    private Result Refresh(CancellationToken pollingCancellation = default)
     {
         lock (_sync)
         {
@@ -168,7 +168,7 @@ public sealed class RuntimeMetricsPageState(
         }
     }
 
-    private Res LoadData(CancellationToken pollingCancellation)
+    private Result LoadData(CancellationToken pollingCancellation)
     {
         lock (_sync)
         {
@@ -180,10 +180,14 @@ public sealed class RuntimeMetricsPageState(
         }
 
         var trendResult = _getTrend();
-        if (trendResult.IsFailed(out var trendError, out var trend))
+        var trendError = trendResult.WithoutData();
+        var trend = trendResult.Data;
+        if (trendResult.IsFailure())
         {
             return RetainFailure(trendError, pollingCancellation);
         }
+        if (trend is null)
+            return RetainFailure(Result.Failure("The runtime metrics trend was unavailable."), pollingCancellation);
 
         var detachedTrend = new RuntimeMetricsTrend
         {
@@ -206,11 +210,11 @@ public sealed class RuntimeMetricsPageState(
             SnapshotCapturedAt = capturedAt;
             HasSnapshot = true;
             LoadError = null;
-            return Res.Ok();
+            return Result.Success();
         }
     }
 
-    private Res RetainFailure(Res error, CancellationToken pollingCancellation)
+    private Result RetainFailure(Result error, CancellationToken pollingCancellation)
     {
         lock (_sync)
         {
@@ -335,5 +339,5 @@ public sealed class RuntimeMetricsPageState(
         }
     }
 
-    private static Res InactiveResult() => Res.Fail(string.Empty, ResStatus.Conflict);
+    private static Result InactiveResult() => Result.Failure(string.Empty, ResultStatus.Conflict);
 }

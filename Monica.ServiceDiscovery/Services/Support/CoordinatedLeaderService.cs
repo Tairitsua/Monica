@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -5,18 +6,21 @@ using Monica.Core.Extensions;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
+using Monica.Locker.Leases;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
 using Monica.ServiceDiscovery.Events;
-using Monica.Tool.Extensions;
 
 namespace Monica.ServiceDiscovery.Services.Support;
 
-/// <summary>
-/// Abstract base class for background services that coordinate with service registration and only run on leader instances.
-/// Supports dynamic leader status changes through event subscriptions, enabling services to react to leader gain/loss.
-/// Uses the Template Method pattern for consistent lifecycle management.
-/// </summary>
+/// <summary>Runs application work for individual leadership terms after membership registration.</summary>
+/// <remarks>
+/// Work is linked directly to the term token, so slow initialization cannot delay loss cancellation. Transitions are
+/// serialized: old work and its cleanup must finish before this service starts a later term. Implementations must
+/// cooperate with cancellation; the host owns the shutdown deadline. Cancellation alone cannot fence external effects.
+/// Failed initialization or background work is cleaned up and retried after the election standby interval while the
+/// same term remains valid. Each attempt receives a new token; a failure never resigns other services' leadership.
+/// </remarks>
 public abstract class CoordinatedLeaderService(
     ILeaderElectionService leaderService,
     IOptions<ModuleServiceDiscoveryOption> options,
@@ -24,389 +28,171 @@ public abstract class CoordinatedLeaderService(
     IObservableInstanceRegistry observableManager,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     IServiceScopeFactory serviceScopeFactory,
-    ILogger logger) : MoBackgroundService(observableManager, hostedServiceOptions, serviceScopeFactory, logger)
+    ILogger logger,
+    TimeProvider? timeProvider = null) : MoBackgroundService(observableManager, hostedServiceOptions, serviceScopeFactory, logger)
 {
-    /// <summary>
-    /// Module configuration options
-    /// </summary>
+    /// <summary>Host-owned discovery configuration.</summary>
     protected readonly ModuleServiceDiscoveryOption Options = options.Value;
-
-    /// <summary>
-    /// Leader election service for status tracking and event subscriptions
-    /// </summary>
+    /// <summary>Confirmed local leadership and term observations.</summary>
     protected readonly ILeaderElectionService LeaderService = leaderService;
 
-    /// <summary>
-    /// Cancellation token source for leader-scoped operations.
-    /// Cancelled when the instance loses leader status.
-    /// </summary>
+    private readonly Channel<Transition> _transitions = Channel.CreateUnbounded<Transition>(new()
+        { SingleReader = true, AllowSynchronousContinuations = false });
+    private LeaseIdentity? _identity;
     private CancellationTokenSource? _leaderCts;
+    private Task? _work;
+    private LeaderLostReason _lostReason;
+    private bool _cleanupFailed;
 
-    /// <summary>
-    /// Task tracking the background execution started when becoming leader.
-    /// </summary>
-    private Task? _leaderBackgroundTask;
-
-    /// <summary>
-    /// Lock object for thread-safe leader status transitions.
-    /// </summary>
-    private readonly SemaphoreSlim _leaderTransitionLock = new(1, 1);
-
-    /// <summary>
-    /// Serializes leader event handling in arrival order.
-    /// Prevents lost/gained races when the election service emits back-to-back transitions.
-    /// </summary>
-    private readonly Lock _leaderEventQueueLock = new();
-
-    /// <summary>
-    /// Tracks the tail of the leader event processing queue.
-    /// </summary>
-    private Task _leaderEventQueue = Task.CompletedTask;
-
-    /// <summary>
-    /// The application-level stopping token passed from ExecuteBackgroundAsync.
-    /// </summary>
-    private CancellationToken _stoppingToken;
-
-    /// <summary>
-    /// Gets a value indicating whether the service has completed initialization.
-    /// Used by health checks to monitor service status.
-    /// </summary>
-    public bool IsInitialized => RuntimeInfo is { CurrentState: HostedServiceState.Running or HostedServiceState.Executing };
-
-    /// <summary>
-    /// Gets a value indicating whether this instance is currently the leader.
-    /// </summary>
+    /// <summary>Whether initialization has completed without a current failure.</summary>
+    public bool IsInitialized => RuntimeInfo.CurrentState is HostedServiceState.Running or HostedServiceState.Executing;
+    /// <summary>Whether this host currently has a confirmed leadership term.</summary>
     public bool IsCurrentlyLeader => LeaderService.IsLeader;
-
     /// <inheritdoc />
     public override string? ServiceGroupId => nameof(ModuleServiceDiscovery);
+    /// <summary>The most recent lifecycle failure, if any.</summary>
+    public string? InitializationError => RuntimeInfo.StateHistory.Where(item => item.Exception is not null)
+        .OrderByDescending(item => item.Timestamp).FirstOrDefault()?.Exception?.GetMessageRecursively();
 
-    /// <summary>
-    /// Gets the initialization error message if initialization failed.
-    /// Null if initialization succeeded or has not completed yet.
-    /// </summary>
-    public string? InitializationError =>
-        RuntimeInfo.StateHistory
-            .Where(h => h.Exception != null)
-            .OrderByDescending(h => h.Timestamp)
-            .FirstOrDefault()
-            ?.Exception?.GetMessageRecursively();
-
-    /// <summary>
-    /// Executes the background service lifecycle using the Template Method pattern.
-    /// Subscribes to leader events and reacts to dynamic leader status changes.
-    /// This method is sealed to enforce consistent initialization sequence.
-    /// </summary>
-    /// <param name="stoppingToken">Triggered when the application host is performing a graceful shutdown</param>
+    /// <inheritdoc />
     protected sealed override async Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
     {
-        _stoppingToken = stoppingToken;
-
         try
         {
-            // Step 1: Optional pre-initialization hook
-            RecordState("Pre-initialization starting", HostedServiceState.Starting);
             await OnBeforeInitialization(stoppingToken);
-
-            // Step 2: Wait for service registration (if coordinator is available)
-            RecordState("Waiting for registration", HostedServiceState.Starting);
-            await WaitForRegistrationAsync(stoppingToken);
-
-            // Step 3: Subscribe to leader status change events
-            RecordState("Subscribing to leader events", HostedServiceState.Starting);
-            LeaderService.OnLeaderGained += OnLeaderGainedHandler;
-            LeaderService.OnLeaderLost += OnLeaderLostHandler;
-
-            // Step 4: Check if already leader and trigger initial leader gained
-            if (LeaderService.IsLeader)
+            if (!Options.SkipRegistrationWait)
             {
-                RecordState("Already leader, triggering initial leader gained", HostedServiceState.Starting);
-                await EnqueueLeaderEventAsync(
-                    HandleLeaderGainedAsync,
-                    ex =>
-                    {
-                        Logger.LogError(ex, "{ServiceName} failed to handle initial leader gained", ServiceName);
-                        RecordState("Failed to handle initial leader gained", HostedServiceState.Faulted, ex);
-                    });
+                RecordState("Waiting for registration", HostedServiceState.Starting);
+                var registered = await coordinator.WaitForRegistrationAsync(Options.RegistrationWaitTimeout, stoppingToken);
+                if (!registered) RecordState("Registration wait timed out", HostedServiceState.Degraded);
             }
-            else
-            {
-                RecordState($"Not leader (status: {LeaderService.CurrentStatus}), waiting for leader election", HostedServiceState.Running);
-            }
+            LeaderService.OnLeaderGained += OnGained;
+            LeaderService.OnLeaderLost += OnLost;
+            if (LeaderService.CurrentLease is { } current) _transitions.Writer.TryWrite(new(current, null));
+            RecordState("Waiting for leadership", HostedServiceState.Running);
 
-            // Step 5: Wait until the application is stopping
-            // Leader work is handled by event handlers
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown scenario - log at debug level
-            Logger.LogDebug("{ServiceName} background service is shutting down", ServiceName);
-        }
-        catch (Exception ex)
-        {
-            // Initialization failure - capture error and rethrow
-            RecordState("Service failed", HostedServiceState.Faulted, ex);
-            throw;
-        }
-        finally
-        {
-            // Cleanup: unsubscribe from events
-            LeaderService.OnLeaderGained -= OnLeaderGainedHandler;
-            LeaderService.OnLeaderLost -= OnLeaderLostHandler;
-
-            // Ensure leader resources are cleaned up
-            await CleanupLeaderResourcesAsync(LeaderLostReason.GracefulShutdown);
-        }
-    }
-
-    /// <summary>
-    /// Event handler for leader gained event.
-    /// Queues async handling without blocking the event source.
-    /// </summary>
-    private void OnLeaderGainedHandler(object? sender, LeaderGainedEvent e)
-    {
-        _ = EnqueueLeaderEventAsync(
-            HandleLeaderGainedAsync,
-            ex =>
-            {
-                Logger.LogError(ex, "{ServiceName} failed to handle leader gained event", ServiceName);
-                RecordState("Failed to handle leader gained", HostedServiceState.Faulted, ex);
-            });
-    }
-
-    /// <summary>
-    /// Event handler for leader lost event.
-    /// Queues async handling without blocking the event source.
-    /// </summary>
-    private void OnLeaderLostHandler(object? sender, LeaderLostEvent e)
-    {
-        _ = EnqueueLeaderEventAsync(
-            () => HandleLeaderLostAsync(e.Reason),
-            ex => Logger.LogError(ex, "{ServiceName} failed to handle leader lost event", ServiceName));
-    }
-
-    /// <summary>
-    /// Enqueues leader transitions so each service processes gained/lost events in arrival order.
-    /// </summary>
-    private Task EnqueueLeaderEventAsync(Func<Task> handler, Action<Exception> onError)
-    {
-        lock (_leaderEventQueueLock)
-        {
-            _leaderEventQueue = _leaderEventQueue
-                .ContinueWith(
-                    async _ =>
-                    {
-                        try
-                        {
-                            await handler();
-                        }
-                        catch (OperationCanceledException) when (_stoppingToken.IsCancellationRequested)
-                        {
-                            // Ignore cancellation caused by application shutdown.
-                        }
-                        catch (Exception ex)
-                        {
-                            onError(ex);
-                        }
-                    },
-                    CancellationToken.None,
-                    TaskContinuationOptions.None,
-                    TaskScheduler.Default)
-                .Unwrap();
-
-            return _leaderEventQueue;
-        }
-    }
-
-    /// <summary>
-    /// Handles the transition to leader status.
-    /// Initializes leader-scoped resources and starts background work.
-    /// </summary>
-    private async Task HandleLeaderGainedAsync()
-    {
-        await _leaderTransitionLock.WaitAsync(_stoppingToken);
-        try
-        {
-            // Check if already running as leader (avoid re-entrancy)
-            if (_leaderCts is { IsCancellationRequested: false })
-            {
-                RecordState($"{ServiceName} already running as leader, ignoring duplicate leader gained event",
-                    logLevel: LogLevel.Debug);
-                return;
-            }
-
-            // Check if application is shutting down
-            if (_stoppingToken.IsCancellationRequested)
-            {
-                RecordState($"{ServiceName} application is shutting down, ignoring leader gained event", logLevel: LogLevel.Debug);
-                return;
-            }
-
-            RecordState("Becoming leader");
-
-            // Create leader-scoped cancellation token
-            _leaderCts = CancellationTokenSource.CreateLinkedTokenSource(_stoppingToken);
-            var leaderToken = _leaderCts.Token;
-
-            // Perform service-specific initialization
-            RecordState("Initializing as leader", HostedServiceState.Executing);
-            await OnBecameLeaderAsync(leaderToken);
-
-            RecordState("Leader initialized successfully", HostedServiceState.Running);
-
-            // Start background work in a separate task
-            _leaderBackgroundTask = Task.Run(async () =>
+            await foreach (var transition in _transitions.Reader.ReadAllAsync(stoppingToken))
             {
                 try
                 {
-                    await LeaderExecuteBackgroundAsync(leaderToken);
+                    if (transition.Gained is { } term)
+                    {
+                        if (_identity == term.Identity || term.StoppingToken.IsCancellationRequested) continue;
+                        await DrainAsync(LeaderLostReason.LeaderKeyExpired);
+                        if (_cleanupFailed) return;
+                        stoppingToken.ThrowIfCancellationRequested();
+                        if (term.StoppingToken.IsCancellationRequested) continue;
+                        _identity = term.Identity;
+                        _leaderCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, term.StoppingToken);
+                        _lostReason = LeaderLostReason.LeaderKeyExpired;
+                        var token = _leaderCts.Token;
+                        _work = Task.Run(() => ExecuteLeaderWorkAsync(token, stoppingToken), CancellationToken.None);
+                    }
+                    else if (transition.Lost is { } lost && _identity == lost.Identity)
+                        await DrainAsync(lost.Reason);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested
+                    || _leaderCts?.IsCancellationRequested == true)
                 {
-                    // Expected when leader token is cancelled
-                    Logger.LogDebug("{ServiceName} leader background task cancelled", ServiceName);
+                    await DrainAsync(LeaderLostReason.LeaderKeyExpired);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    RecordState("Leader background task failed", HostedServiceState.Faulted, ex);
+                    RecordState("Leadership transition failed", HostedServiceState.Faulted, exception);
+                    await DrainAsync(LeaderLostReason.LeaderKeyExpired);
                 }
-            }, leaderToken);
+            }
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
-            _leaderTransitionLock.Release();
+            LeaderService.OnLeaderGained -= OnGained;
+            LeaderService.OnLeaderLost -= OnLost;
+            _transitions.Writer.TryComplete();
+            await DrainAsync(LeaderLostReason.GracefulShutdown);
         }
     }
 
-    /// <summary>
-    /// Handles the loss of leader status.
-    /// Cancels leader-scoped operations and performs cleanup.
-    /// </summary>
-    private async Task HandleLeaderLostAsync(LeaderLostReason reason)
+    private void OnGained(object? sender, LeaderGainedEvent notification) =>
+        _transitions.Writer.TryWrite(new(notification.Lease, null));
+    private void OnLost(object? sender, LeaderLostEvent notification) =>
+        _transitions.Writer.TryWrite(new(null, notification));
+
+    private async Task ExecuteLeaderWorkAsync(CancellationToken token, CancellationToken stoppingToken)
     {
-        await _leaderTransitionLock.WaitAsync();
         try
         {
-            RecordState($"Lost leader status (reason: {reason})", HostedServiceState.Starting);
-            await CleanupLeaderResourcesAsync(reason);
-            RecordState("Leader cleanup completed, waiting for re-election", HostedServiceState.Running);
+            while (!token.IsCancellationRequested)
+            {
+                using var attempt = CancellationTokenSource.CreateLinkedTokenSource(token);
+                var failed = false;
+                try
+                {
+                    RecordState("Initializing leadership term", HostedServiceState.Executing);
+                    await OnBecameLeaderAsync(attempt.Token);
+                    attempt.Token.ThrowIfCancellationRequested();
+                    RecordState("Leadership term initialized", HostedServiceState.Running);
+                    await LeaderExecuteBackgroundAsync(attempt.Token);
+                    // Completed finite work still owns its initialized resources until the term ends.
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+                catch (Exception exception)
+                {
+                    failed = true;
+                    RecordState("Leader work failed; retrying after cleanup", HostedServiceState.Degraded, exception);
+                }
+                finally
+                {
+                    try { await attempt.CancelAsync(); }
+                    catch (Exception exception) { Logger.LogError(exception, "Leader cancellation callback failed."); }
+                    var reason = stoppingToken.IsCancellationRequested ? LeaderLostReason.GracefulShutdown
+                        : failed ? LeaderLostReason.WorkFailed : _lostReason;
+                    try { await OnLeaderLostAsync(reason); }
+                    catch (Exception exception)
+                    {
+                        _cleanupFailed = true;
+                        RecordState("Leader cleanup failed; this worker requires restart", HostedServiceState.Faulted, exception);
+                    }
+                }
+                if (_cleanupFailed) return;
+                await Task.Delay(Options.Election.LeaseStandbyInterval, timeProvider ?? TimeProvider.System, token);
+            }
         }
-        finally
-        {
-            _leaderTransitionLock.Release();
-        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
 
-    /// <summary>
-    /// Cleans up leader-scoped resources.
-    /// </summary>
-    private async Task CleanupLeaderResourcesAsync(LeaderLostReason reason)
+    private async Task DrainAsync(LeaderLostReason reason)
     {
-        // Cancel leader-scoped operations
-        if (_leaderCts != null)
+        if (_leaderCts is null) return;
+        try
         {
+            _lostReason = reason;
             try { await _leaderCts.CancelAsync(); }
-            catch (ObjectDisposedException) { }
-
-            // Wait for background task to complete
-            if (_leaderBackgroundTask != null)
-            {
-                try
-                {
-                    await _leaderBackgroundTask.WaitAsync(TimeSpan.FromSeconds(30));
-                }
-                catch (TimeoutException)
-                {
-                    Logger.LogWarning("{ServiceName} leader background task did not complete within timeout", ServiceName);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected
-                }
-
-                _leaderBackgroundTask = null;
-            }
-
-            _leaderCts.SafeCancelAndDispose();
+            catch (Exception exception) { Logger.LogError(exception, "Leader cancellation callback failed."); }
+            if (_work is not null) await _work;
+        }
+        catch (Exception exception) { Logger.LogError(exception, "Leader cleanup failed."); }
+        finally
+        {
+            _leaderCts.Dispose();
             _leaderCts = null;
-        }
-
-        // Call subclass cleanup hook
-        try
-        {
-            await OnLeaderLostAsync(reason);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "{ServiceName} failed during OnLeaderLostAsync", ServiceName);
+            _identity = null;
+            _work = null;
         }
     }
 
-    /// <summary>
-    /// Waits for service registration to complete.
-    /// Respects SkipRegistrationWait option for development/testing scenarios.
-    /// </summary>
-    private async Task WaitForRegistrationAsync(CancellationToken cancellationToken)
-    {
-        if (!Options.SkipRegistrationWait)
-        {
-            RecordState("Waiting for service registration", HostedServiceState.Starting);
-
-            var registered = await coordinator.WaitForRegistrationAsync(
-                Options.RegistrationWaitTimeout,
-                cancellationToken);
-
-            if (registered)
-            {
-                RecordState("Registration completed", HostedServiceState.Starting);
-            }
-            else
-            {
-                RecordState($"Registration timeout ({Options.RegistrationWaitTimeout}), starting in degraded mode", HostedServiceState.Degraded);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Called before registration wait and leader event subscription.
-    /// Override this method for pre-initialization setup (e.g., loading configuration, preparing resources).
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token for stopping the operation</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    protected virtual Task OnBeforeInitialization(CancellationToken cancellationToken)
-        => Task.CompletedTask;
-
-    /// <summary>
-    /// Performs service-specific initialization logic.
-    /// Called when this instance becomes the leader.
-    /// Can be called multiple times if leader status is lost and re-gained.
-    /// </summary>
-    /// <param name="leaderToken">Cancellation token that is cancelled when leader status is lost</param>
-    /// <returns>A task representing the asynchronous initialization</returns>
-    /// <remarks>
-    /// Implementations should be idempotent or reset state appropriately,
-    /// as this method may be called multiple times during the service lifetime.
-    /// </remarks>
+    /// <summary>Optional preparation before registration wait and term subscriptions.</summary>
+    protected virtual Task OnBeforeInitialization(CancellationToken cancellationToken) => Task.CompletedTask;
+    /// <summary>Initializes one attempt. Failures retry within the same valid term after cleanup and the election standby interval.</summary>
+    /// <remarks>Initialization must be repeatable and stop promptly when its attempt token is cancelled.</remarks>
     protected abstract Task OnBecameLeaderAsync(CancellationToken leaderToken);
+    /// <summary>Runs work for one attempt. Exceptions trigger cleanup and a fresh initialization; normal completion waits for term loss.</summary>
+    protected virtual Task LeaderExecuteBackgroundAsync(CancellationToken leaderToken) => Task.CompletedTask;
+    /// <summary>Cleans up one attempt after its token is cancelled and initialization/background work have stopped.</summary>
+    /// <remarks>WorkFailed ends only the local attempt. Cleanup must complete before a retry or another term can start.
+    /// Cleanup failure records a fault and prevents all later attempts, including new terms, until the worker is restarted.</remarks>
+    protected virtual Task OnLeaderLostAsync(LeaderLostReason reason) => Task.CompletedTask;
 
-    /// <summary>
-    /// Executes background work while this instance is the leader.
-    /// Override this method for long-running background tasks (e.g., periodic scanning).
-    /// The task is automatically cancelled when leader status is lost.
-    /// </summary>
-    /// <param name="leaderToken">Cancellation token that is cancelled when leader status is lost</param>
-    /// <returns>A task representing the background work</returns>
-    protected virtual Task LeaderExecuteBackgroundAsync(CancellationToken leaderToken)
-        => Task.CompletedTask;
-
-    /// <summary>
-    /// Called when this instance loses leader status.
-    /// Override this method for cleanup (e.g., disposing subscriptions, stopping schedulers).
-    /// </summary>
-    /// <param name="reason">The reason for losing leader status</param>
-    /// <returns>A task representing the cleanup operation</returns>
-    protected virtual Task OnLeaderLostAsync(LeaderLostReason reason)
-        => Task.CompletedTask;
+    private sealed record Transition(LeaseContext? Gained, LeaderLostEvent? Lost);
 }

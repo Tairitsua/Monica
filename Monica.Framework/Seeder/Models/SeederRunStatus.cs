@@ -14,7 +14,7 @@ public enum SeederRunStatus
     /// <summary>A fail-fast failure is cancelling and draining in-flight work.</summary>
     Aborting,
 
-    /// <summary>Every discovered seeder completed successfully.</summary>
+    /// <summary>All admitted work succeeded and no held definitions remain; disabled definitions were not executed.</summary>
     Succeeded,
 
     /// <summary>The run finished without fail-fast, but at least one seeder was unsuccessful.</summary>
@@ -24,5 +24,8 @@ public enum SeederRunStatus
     Aborted,
 
     /// <summary>The host cancelled the run before normal completion.</summary>
-    Cancelled
+    Cancelled,
+
+    /// <summary>No batch is executing; some seeders remain intentionally held and have not succeeded.</summary>
+    Held
 }

@@ -19,26 +19,30 @@ public sealed class ObservableInstanceMonitorService(
     /// <summary>Captures one registry membership read and all retained evidence without live value references.</summary>
     /// <param name="cancellationToken">Cancels the underlying tracker captures.</param>
     /// <returns>A detached capture; independent tracker reads are not globally atomic.</returns>
-    public async Task<Res<ObservableInstanceCapture>> CaptureAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<ObservableInstanceCapture>> CaptureAsync(CancellationToken cancellationToken = default)
     {
         var result = await _facade.CaptureAsync(cancellationToken);
-        if (result.IsFailed(out var error, out var instances)) return Res.Fail(error);
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure()) return Result.FromFailure<ObservableInstanceCapture>(error);
         cancellationToken.ThrowIfCancellationRequested();
-        return Res.Ok(new ObservableInstanceCapture(DateTime.UtcNow, instances ?? []));
+        return Result.Success(new ObservableInstanceCapture(DateTime.UtcNow, instances ?? []));
     }
 
     /// <summary>Clears retained records for the captured registration, preserving current state and lifetime counters.</summary>
     /// <param name="identity">The frozen registration identity to clear.</param>
     /// <param name="cancellationToken">Cancels before the side effect.</param>
-    public Task<Res> ClearHistoryAsync(ObservableInstanceReference identity, CancellationToken cancellationToken = default)
+    public Task<Result> ClearHistoryAsync(ObservableInstanceReference identity, CancellationToken cancellationToken = default)
         => _facade.ClearInstanceHistoryAsync(identity, cancellationToken);
 
-    public async Task<Res<List<ObservableInstanceViewModel>>> GetAllInstancesAsync()
+    public async Task<Result<List<ObservableInstanceViewModel>>> GetAllInstancesAsync()
     {
         var result = await _facade.GetAllInstancesAsync();
-        if (result.IsFailed(out var error, out var instances))
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableInstanceViewModel>>(error);
         }
 
         var viewModels = (instances ?? [])
@@ -47,26 +51,30 @@ public sealed class ObservableInstanceMonitorService(
             .ToList();
 
         logger.LogDebug("Retrieved {Count} observable instances", viewModels.Count);
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public async Task<Res<ObservableInstanceViewModel?>> GetInstanceByIdAsync(string instanceId)
+    public async Task<Result<ObservableInstanceViewModel?>> GetInstanceByIdAsync(string instanceId)
     {
         var result = await _facade.GetByIdAsync(instanceId);
-        if (result.IsFailed(out var error, out var instance))
+        var error = result.WithoutData();
+        var instance = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<ObservableInstanceViewModel?>(error);
         }
 
-        return Res.Ok(instance == null ? null : MapToViewModel(instance));
+        return Result.Success(instance == null ? null : MapToViewModel(instance));
     }
 
-    public async Task<Res<List<ObservableInstanceViewModel>>> GetInstancesByTypeAsync(Type type)
+    public async Task<Result<List<ObservableInstanceViewModel>>> GetInstancesByTypeAsync(Type type)
     {
         var result = await _facade.GetInstancesByTypeAsync(type);
-        if (result.IsFailed(out var error, out var instances))
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableInstanceViewModel>>(error);
         }
 
         var viewModels = (instances ?? [])
@@ -75,15 +83,17 @@ public sealed class ObservableInstanceMonitorService(
             .ToList();
 
         logger.LogDebug("Retrieved {Count} instances of type {Type}", viewModels.Count, type.GetCleanName());
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public async Task<Res<List<ObservableInstanceViewModel>>> GetInstancesByGroupAsync(string groupId)
+    public async Task<Result<List<ObservableInstanceViewModel>>> GetInstancesByGroupAsync(string groupId)
     {
         var result = await _facade.GetInstancesByGroupAsync(groupId);
-        if (result.IsFailed(out var error, out var instances))
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableInstanceViewModel>>(error);
         }
 
         var viewModels = (instances ?? [])
@@ -92,15 +102,17 @@ public sealed class ObservableInstanceMonitorService(
             .ToList();
 
         logger.LogDebug("Retrieved {Count} instances in group {GroupId}", viewModels.Count, groupId);
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public async Task<Res<List<ObservableInstanceViewModel>>> GetInstancesWithExceptionsAsync()
+    public async Task<Result<List<ObservableInstanceViewModel>>> GetInstancesWithExceptionsAsync()
     {
         var result = await _facade.GetInstancesWithExceptionsAsync();
-        if (result.IsFailed(out var error, out var instances))
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableInstanceViewModel>>(error);
         }
 
         var viewModels = (instances ?? [])
@@ -110,15 +122,17 @@ public sealed class ObservableInstanceMonitorService(
             .ToList();
 
         logger.LogDebug("Retrieved {Count} instances with exceptions", viewModels.Count);
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public async Task<Res<List<ObservableInstanceViewModel>>> FilterInstancesAsync(ObservableInstanceFilter filter)
+    public async Task<Result<List<ObservableInstanceViewModel>>> FilterInstancesAsync(ObservableInstanceFilter filter)
     {
         var result = await GetAllInstancesAsync();
-        if (result.IsFailed(out var error, out var viewModels))
+        var error = result.WithoutData();
+        var viewModels = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableInstanceViewModel>>(error);
         }
 
         var query = (viewModels ?? []).AsQueryable();
@@ -175,15 +189,17 @@ public sealed class ObservableInstanceMonitorService(
             .ToList();
 
         logger.LogDebug("Filtered observable instances: {Count} results", filtered.Count);
-        return Res.Ok(filtered);
+        return Result.Success(filtered);
     }
 
-    public async Task<Res<ObservableInstanceStatistics>> GetStatisticsAsync()
+    public async Task<Result<ObservableInstanceStatistics>> GetStatisticsAsync()
     {
         var result = await _facade.GetAllInstancesAsync();
-        if (result.IsFailed(out var error, out var instances))
+        var error = result.WithoutData();
+        var instances = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<ObservableInstanceStatistics>(error);
         }
 
         var allInstances = (instances ?? []).ToList();
@@ -242,15 +258,17 @@ public sealed class ObservableInstanceMonitorService(
             statistics.UnhealthyCount,
             statistics.UnknownHealthCount);
 
-        return Res.Ok(statistics);
+        return Result.Success(statistics);
     }
 
-    public async Task<Res<List<ObservableStateHistoryViewModel>>> GetInstanceHistoryAsync(string instanceId, int? limit = null)
+    public async Task<Result<List<ObservableStateHistoryViewModel>>> GetInstanceHistoryAsync(string instanceId, int? limit = null)
     {
         var result = await _facade.GetInstanceHistoryAsync(instanceId, limit);
-        if (result.IsFailed(out var error, out var history))
+        var error = result.WithoutData();
+        var history = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableStateHistoryViewModel>>(error);
         }
 
         var viewModels = (history ?? [])
@@ -259,15 +277,17 @@ public sealed class ObservableInstanceMonitorService(
             .ThenByDescending(vm => vm.Sequence)
             .ToList();
 
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public async Task<Res<List<ObservableStateHistoryViewModel>>> GetInstanceExceptionsAsync(string instanceId)
+    public async Task<Result<List<ObservableStateHistoryViewModel>>> GetInstanceExceptionsAsync(string instanceId)
     {
         var result = await _facade.GetInstanceExceptionsAsync(instanceId);
-        if (result.IsFailed(out var error, out var exceptions))
+        var error = result.WithoutData();
+        var exceptions = result.Data;
+        if (result.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<List<ObservableStateHistoryViewModel>>(error);
         }
 
         var viewModels = (exceptions ?? [])
@@ -276,10 +296,10 @@ public sealed class ObservableInstanceMonitorService(
             .ThenByDescending(vm => vm.Sequence)
             .ToList();
 
-        return Res.Ok(viewModels);
+        return Result.Success(viewModels);
     }
 
-    public Task<Res> ClearInstanceHistoryAsync(string instanceId)
+    public Task<Result> ClearInstanceHistoryAsync(string instanceId)
     {
         return _facade.ClearInstanceHistoryAsync(instanceId);
     }

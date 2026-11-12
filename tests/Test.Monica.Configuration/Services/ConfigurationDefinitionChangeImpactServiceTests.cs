@@ -341,9 +341,9 @@ public sealed class ConfigurationDefinitionChangeImpactServiceTests
 
         var result = await facade.GetDefinitionChangeImpactAsync([Target("Test.Definition")]);
 
-        result.IsFailed(out var error, out _).Should().BeTrue();
-        error!.Message.Should().Contain("outer impact failure");
-        error.Message.Should().Contain("inner metadata failure");
+        result.IsFailure().Should().BeTrue();
+        result.Message.Should().Contain("outer impact failure");
+        result.Message.Should().Contain("inner metadata failure");
     }
 
     private static ConfigurationDefinitionChangeImpactService CreateService(
@@ -531,29 +531,8 @@ public sealed class ConfigurationDefinitionChangeImpactServiceTests
     private static ConfigurationFacade CreateFacade(
         IConfigurationDefinitionChangeImpactService definitionChangeImpactService)
     {
-        return new ConfigurationFacade(
-            definitionResolver: null!,
-            definitionRegistry: null!,
-            definitionMaintenanceStore: null!,
-            definitionChangeImpactService,
-            mutationGroupApplyService: null!,
-            historyService: null!,
-            mutationGroupService: null!,
-            rollbackService: null!,
-            unifiedVersionService: null!,
-            effectiveValueStore: null!,
-            historyStore: null!,
-            metadataStore: null!,
-            changeNotifiers: [],
-            storeStateTracker: null!,
-            effectiveStateReader: null!,
-            sourceInspector: null!,
-            sourceWriter: null!,
-            runtimeContext: null!,
-            runtimeValidationService: null!,
-            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
-            candidateValidationService: null!,
-            runtimeReloadService: null!,
-            reloadBroadcastService: null!);
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IConfigurationDefinitionChangeImpactService)).Returns(definitionChangeImpactService);
+        return new ConfigurationFacade(provider);
     }
 }

@@ -148,7 +148,7 @@ public sealed class ConnectivityProbeState(
     /// <returns>The real facade result, accepted only while this request remains current.</returns>
     /// <exception cref="InvalidOperationException">Another request is already active.</exception>
     /// <exception cref="OperationCanceledException">The caller canceled or Reset invalidated this request.</exception>
-    public async Task<Res<ConnectivityProbeResult>> RunAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<ConnectivityProbeResult>> RunAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy)
             throw new InvalidOperationException("A connectivity request is already active.");
@@ -181,7 +181,9 @@ public sealed class ConnectivityProbeState(
             if (revision != _revision)
                 throw new OperationCanceledException(operationCancellation.Token);
 
-            if (result.IsFailed(out var error, out var probeResult))
+            var error = result.WithoutData();
+            var probeResult = result.Data;
+            if (result.IsFailure())
             {
                 ErrorMessage = error.Message;
                 LastResult = null;

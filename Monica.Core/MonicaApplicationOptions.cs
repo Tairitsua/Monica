@@ -5,7 +5,7 @@ using Monica.Core.Modularity.Abstractions;
 namespace Monica.Core;
 
 /// <summary>
-/// Read-only view of shared Monica application identity defaults.
+/// Read-only view of shared Monica application identity and startup policies.
 /// </summary>
 public interface IMonicaApplicationOptions
 {
@@ -34,6 +34,16 @@ public interface IMonicaApplicationOptions
     /// </summary>
     string? DomainName { get; }
 
+    /// <summary>Gets the deployment environment identity shared by participating applications, or null when unset.</summary>
+    string? DeploymentScope { get; }
+
+    /// <summary>Gets whether this host may initiate shared or environmental work without an explicit request. Defaults to true.</summary>
+    bool AutonomousWork { get; }
+
+    /// <summary>Gets whether this host exposes additional client diagnostics and expression-debug output. Defaults to false.</summary>
+    /// <remarks>Frozen at startup. Does not change authorization, sensitive-value reveal, logging levels, or autonomous work.</remarks>
+    bool DebugMode { get; }
+
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.
     /// </summary>
@@ -52,7 +62,7 @@ public interface IMonicaApplicationOptions
     string ResolveAppId(string? configuredValue = null, string? fallback = null);
 
     /// <summary>
-    /// Resolves an application display name using module configuration, global configuration, and project-name fallback.
+    /// Resolves an application display name using module configuration, global configuration, and application-identity fallback.
     /// </summary>
     /// <param name="configuredValue">The module-specific value, when explicitly configured.</param>
     /// <param name="fallback">The local fallback used when no display name is configured.</param>
@@ -76,40 +86,105 @@ public interface IMonicaApplicationOptions
 }
 
 /// <summary>
-/// Mutable configuration model for shared Monica application identity defaults.
+/// Configuration model for shared Monica application identity and startup policies.
 /// Configure it through <see cref="IMonicaBuilder.ConfigureApplication"/>.
 /// </summary>
+/// <remarks>Identity and policies freeze before owned application registrations; retained references reject subsequent mutation.</remarks>
 public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
 {
+    private bool _frozen;
+    private string? _projectName = Assembly.GetEntryAssembly()?.GetName().Name;
+    private string? _appId;
+    private string? _appName;
+    private string? _appVersion = ResolveEntryAssemblyAppVersion();
+    private string? _domainName;
+    private string? _deploymentScope;
+    private bool? _autonomousWork;
+    private bool? _debugMode;
+    private bool? _resolvedDebugMode;
+
     /// <summary>
     /// Gets or sets the application project name.
     /// Defaults to the entry assembly name and is the root fallback for application identity values.
     /// </summary>
-    public string? ProjectName { get; set; } = Assembly.GetEntryAssembly()?.GetName().Name;
+    public string? ProjectName { get => _projectName; set => Set(ref _projectName, value); }
 
     /// <summary>
     /// Gets or sets the application identifier.
-    /// When not configured, modules fall back to <see cref="ProjectName"/>.
+    /// Application:AppId is the canonical startup input; contradictory code configuration fails composition.
+    /// Without that input, this code value is used, falling back to <see cref="ProjectName"/> when unset.
     /// </summary>
-    public string? AppId { get; set; }
+    public string? AppId { get => _appId; set => Set(ref _appId, value); }
 
     /// <summary>
     /// Gets or sets the display name of the application.
     /// When not configured, modules fall back to <see cref="ProjectName"/>.
     /// </summary>
-    public string? AppName { get; set; }
+    public string? AppName { get => _appName; set => Set(ref _appName, value); }
 
     /// <summary>
     /// Gets or sets the display or release version of the application.
     /// Defaults to the entry assembly informational or product version when available.
     /// </summary>
-    public string? AppVersion { get; set; } = ResolveEntryAssemblyAppVersion();
+    public string? AppVersion { get => _appVersion; set => Set(ref _appVersion, value); }
 
     /// <summary>
     /// Gets or sets the application domain or subdomain name.
     /// Modules treat this as unset when it is <see langword="null"/> or whitespace.
     /// </summary>
-    public string? DomainName { get; set; }
+    public string? DomainName { get => _domainName; set => Set(ref _domainName, value); }
+
+    /// <summary>
+    /// Gets or sets the shared deployment environment identity. Defaults to null; Deployment:Scope
+    /// supplies the canonical startup input. Conflicting code configuration fails composition.
+    /// </summary>
+    public string? DeploymentScope { get => _deploymentScope; set => Set(ref _deploymentScope, value); }
+
+    /// <summary>Gets or sets whether this process initiates autonomous work. Defaults to true.</summary>
+    /// <remarks>Application:AutonomousWork is the canonical frozen input. False retains eligible explicit operations and passive behavior.</remarks>
+    public bool AutonomousWork
+    {
+        get => _autonomousWork ?? true;
+        set
+        {
+            if (_frozen) throw new InvalidOperationException("Application execution policy is frozen before owned registration begins.");
+            _autonomousWork = value;
+        }
+    }
+
+    internal bool? ConfiguredAutonomousWork => _autonomousWork;
+
+    /// <summary>Gets or sets the shared diagnostic policy. Defaults to false in every environment and build configuration.</summary>
+    /// <remarks>
+    /// Application:DebugMode supplies the canonical startup input; contradictory code configuration fails composition.
+    /// Enabled capabilities expose detailed Blazor and SignalR errors, bounded result and downstream diagnostics,
+    /// existing call-chain evidence, and ModelQuery expression logs. Details may contain SQL, parameter values, paths,
+    /// and stack traces. Only already registered capabilities participate. Authorization, sensitive configuration
+    /// reveal, EF sensitive-data logging, log levels, and autonomous work retain their independent policies.
+    /// Changes require a host restart. Server exception logging and public trace identifiers remain available when false.
+    /// </remarks>
+    public bool DebugMode
+    {
+        get => _resolvedDebugMode ?? _debugMode ?? false;
+        set
+        {
+            if (_frozen) throw new InvalidOperationException("Application diagnostic policy is frozen before owned registration begins.");
+            _debugMode = value;
+            _resolvedDebugMode = null;
+        }
+    }
+
+    internal bool? ConfiguredDebugMode => _debugMode;
+
+    internal void ResolveDebugMode(bool value) => _resolvedDebugMode = value;
+
+    internal void Freeze() => _frozen = true;
+
+    private void Set(ref string? field, string? value)
+    {
+        if (_frozen) throw new InvalidOperationException("Application identity is frozen before owned registration begins.");
+        field = value;
+    }
 
     /// <summary>
     /// Resolves a project name using module configuration, global configuration, and an optional local fallback.
@@ -140,7 +215,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     }
 
     /// <summary>
-    /// Resolves an application display name using module configuration, global configuration, and project-name fallback.
+    /// Resolves an application display name using module configuration, global configuration, and application-identity fallback.
     /// </summary>
     /// <param name="configuredValue">The module-specific value, when explicitly configured.</param>
     /// <param name="fallback">The local fallback used when no display name is configured.</param>
@@ -149,7 +224,7 @@ public sealed class MonicaApplicationOptions : IMonicaApplicationOptions
     {
         return Normalize(configuredValue)
                ?? Normalize(AppName)
-               ?? ResolveProjectName(fallback: fallback);
+               ?? ResolveAppId(fallback: fallback);
     }
 
     /// <summary>

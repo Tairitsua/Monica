@@ -1,16 +1,75 @@
+using Monica.Locker.EfCore;
+using Monica.Locker.Leases;
+
 namespace Monica.Repository.Outbox.Models;
 
 /// <summary>Controls durable delivery for one repository context. Event contracts come from EventBus metadata.</summary>
 public sealed class RepositoryOutboxOptions
 {
+    /// <summary>
+    /// Uses the context's registered native insert provider for prepared Outbox rows; false keeps EF insertion.
+    /// Requires a provider registered on Repository and an active managed transaction on a physical context.
+    /// Does not change message identity, capture,
+    /// delivery, or audit fields. Native failures never fall back to EF. Both synchronous and asynchronous saves are supported.
+    /// </summary>
+    public bool UseBulkInsert { get; set; }
+
+    /// <summary>
+    /// Stable identity of a shared physical Outbox, or null for a context-owned store (the default).
+    /// Automatic contributions with the same key share one delivery/maintenance loop per host after validating
+    /// their physical target and operational settings. This does not enable a held context's worker.
+    /// All writers and replicas of that table must use the same key, schema, delivery and maintenance policy.
+    /// Shared delivery claims only destinations supported by this host; migrate or drain older unqualified rows first.
+    /// </summary>
+    public string? SharedStoreKey { get; set; }
+
+    /// <summary>Shared coordinator table mapping. Select one migration owner when Outbox and JobScheduler share a database.</summary>
+    public LeaseTableOptions LeaseTable { get; } = new();
+
+    /// <summary>Maintenance coordination: 30-second grant, five-second standby/operation bounds. Delivery claims remain independent.</summary>
+    public LeaseCoordinatorOptions MaintenanceLease { get; set; } = new();
+
+    /// <summary>
+    /// Optional keyed authority for duplicate-tolerant cleanup and statistics. Null uses the local database's
+    /// transaction-fenced leases. An external store (for example Redis) suppresses redundant work without a SQL
+    /// lease-row guard; retention predicates still protect pending/recent messages. Scope must identify this database.
+    /// All replicas sharing a physical Outbox table must select the same authority and scope.
+    /// </summary>
+    public LeaseStoreSelection? MaintenanceLeaseStore { get; set; }
+
     /// <summary>Claim duration, five minutes by default. Configure above the transport's normal send timeout.</summary>
     public TimeSpan DeliveryLease { get; set; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Maximum due rows each store scans per worker pass; defaults to 100.</summary>
+    /// <summary>Maximum messages claimed per delivery pass, including failed attempts; defaults to 100. Does not limit cleanup.</summary>
     public int BatchSize { get; set; } = 100;
 
-    /// <summary>Delay between worker passes; defaults to five seconds.</summary>
+    /// <summary>
+    /// Maximum simultaneous deliveries per dispatcher across all drain invocations; defaults to one. Timed-out
+    /// sends retain capacity until they finish. Claims only free slots. Compatible distributed messages use their
+    /// transport's batch capability within this message budget; each batch also obeys that transport's count/byte limits.
+    /// Local and non-batch deliveries keep independent scopes. Increasing this value does not guarantee ordering,
+    /// including messages with the same transport key. A native batch retains all its slots until it finishes.
+    /// </summary>
+    public int DeliveryConcurrency { get; set; } = 1;
+
+    /// <summary>Delay after an incomplete delivery batch or a failed scan; defaults to five seconds. Full successful batches continue immediately.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Maximum acknowledged rows deleted by one cleanup statement; defaults to 1,000.</summary>
+    public int CleanupBatchSize { get; set; } = 1000;
+
+    /// <summary>Delay before the first cleanup and between cleanup passes; defaults to one minute, independently of delivery.</summary>
+    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Maximum elapsed time before starting another cleanup batch; defaults to two seconds.
+    /// Each statement commits independently. This budget does not interrupt an in-flight database command;
+    /// configure the provider's command timeout to bound individual commands.
+    /// </summary>
+    public TimeSpan CleanupTimeBudget { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Delay before the first backlog query and between status samples; defaults to one minute, independently of delivery.</summary>
+    public TimeSpan StatusInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Enables the host-owned delivery worker; disable only when another host drains this store or in deterministic tests.</summary>
     public bool EnableWorker { get; set; } = true;

@@ -15,6 +15,6 @@ Choose conversational runs, document inventory or retrieval, and agent tool expo
 | Make class or file skills available inside an agent | [Runtime skills](references/runtime-skills.md) |
 | Expose tools through MCP or connect an external MCP server | [MCP](references/mcp.md) |
 
-For shell hosting, use [UI](../monica-infra-ui/SKILL.md). For implementing Monica modules, use `$monica-framework`, then `$monica-development`.
+For shell hosting, use UI in `$monica-infra-ui`. For implementing Monica modules, use `$monica-framework`, then `$monica-development`.
 
-If a routed authoring skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md`.
+If a named skill is unavailable, use `$monica-guide` to resolve the verified Monica checkout (`source resolve --repository monica --json`) and read its canonical `skills/<name>/SKILL.md` and specified reference.

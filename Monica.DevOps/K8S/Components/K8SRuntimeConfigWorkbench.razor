@@ -10,41 +10,50 @@
 <div class="k8s-config-workbench">
     <K8SFamilyHeader IsConfig="true" />
     <section class="k8s-config-editor">
-        <p class="config-lifetime">@L["Workbench:Config:Lifetime"]</p>
+        <div class="config-lifetime"><MoIcon Icon="@MoIcons.Info" Size="1.125rem" /><p>@L["Workbench:Config:Lifetime"]</p></div>
         @if (Visit.Failure is { } error) { <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@error @if (Visit.ReloadFailed) { <p>@L["Workbench:Config:ReloadFailed"]</p> }</MudAlert> }
         @if (Visit.Saved && !Visit.IsDirty) { <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Icon="@MoIcons.Success">@L["Workbench:Config:Saved"]</MudAlert> }
-        @if (Visit.IsBusy) { <div role="status"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /><p>@L[_saving ? "Workbench:Config:Saving" : "Workbench:Config:Loading"]</p></div> }
+        @if (Visit.IsBusy) { <div class="config-progress" role="status"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /><p>@L[_saving ? "Workbench:Config:Saving" : "Workbench:Config:Loading"]</p></div> }
         @if (Visit.Draft is { } draft)
         {
             <div class="config-groups">
-                <div class="config-group">
-                    <h2>@L["Workbench:Config:Execution"]</h2>
-                    <div class="provider"><span>@L["Workbench:Config:Provider"]</span><span>@L["Workbench:Config:ProviderName"]</span></div>
-                    <MudTextField T="string" Label="@L["RuntimeConfigDialog:ExecutionNode"]" @bind-Value="draft.ExecutionNode" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
-                    <p class="field-help">@L["Workbench:Config:Fallback"]</p>
-                    <MudTextField T="string" Label="@L["RuntimeConfigDialog:SshUserName"]" @bind-Value="draft.UserName" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
-                    <MudTextField T="string" Label="@L["RuntimeConfigDialog:SshPassword"]" @bind-Value="draft.Password" InputType="@(Visit.ShowPassword ? InputType.Text : InputType.Password)" Adornment="Adornment.End" AdornmentIcon="@(Visit.ShowPassword ? MoIcons.EyeOff : MoIcons.Eye)" AdornmentAriaLabel="@L[Visit.ShowPassword ? "Workbench:Config:HidePassword" : "Workbench:Config:ShowPassword"]" OnAdornmentClick="TogglePassword" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
-                    <MudExpansionPanels Elevation="0"><MudExpansionPanel Text="@L["Workbench:Config:Addresses"]" Icon="@MoIcons.ChevronDown">
-                        <div class="configured-addresses">
-                            <MudTextField T="string" Label="@L["Workbench:Config:MasterAddresses"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.MasterAddresses" Variant="Variant.Outlined" Lines="3" Immediate="true" Disabled="@Visit.IsBusy" />
-                            <MudTextField T="string" Label="@L["Workbench:Config:WorkerAddresses"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.WorkerAddresses" Variant="Variant.Outlined" Lines="3" Immediate="true" Disabled="@Visit.IsBusy" />
-                        </div>
-                    </MudExpansionPanel></MudExpansionPanels>
-                </div>
-                <div class="config-group">
-                    <h2>@L["Workbench:Config:Scope"]</h2>
-                    <MudTextField T="string" Label="@L["Workbench:Config:AllowedNamespaces"]" HelperText="@L["RuntimeConfigDialog:NamespaceScopeHelper"]" @bind-Value="Visit.NamespaceScope" Variant="Variant.Outlined" Lines="4" Immediate="true" Disabled="@Visit.IsBusy" />
-                    @if (Visit.AllowsAllNamespaces) { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["RuntimeConfigDialog:AllowAllNamespacesWarning"]</MudAlert> }
-                    <MudTextField T="string" Label="@L["Workbench:Config:AllowedKeywords"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.NameKeywords" Variant="Variant.Outlined" Lines="4" Immediate="true" Disabled="@Visit.IsBusy" />
-                    <p class="field-help">@L["Workbench:Config:KeywordHelp"]</p>
-                </div>
+                <section class="config-group config-group--execution">
+                    <header class="config-group-heading">
+                        <span class="config-group-icon"><MoIcon Icon="@MoIcons.Terminal" Size="1.25rem" /></span>
+                        <div><h2>@L["Workbench:Config:Execution"]</h2><div class="provider"><span>@L["Workbench:Config:Provider"]</span><strong>@L["Workbench:Config:ProviderName"]</strong></div></div>
+                    </header>
+                    <div class="config-fields">
+                        <MudTextField T="string" spellcheck="false" Label="@L["RuntimeConfigDialog:ExecutionNode"]" @bind-Value="draft.ExecutionNode" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
+                        <p class="field-help">@L["Workbench:Config:Fallback"]</p>
+                        <MudTextField T="string" spellcheck="false" Label="@L["RuntimeConfigDialog:SshUserName"]" @bind-Value="draft.UserName" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
+                        <MudTextField T="string" spellcheck="false" Label="@L["RuntimeConfigDialog:SshPassword"]" @bind-Value="draft.Password" InputType="@(Visit.ShowPassword ? InputType.Text : InputType.Password)" Adornment="Adornment.End" AdornmentIcon="@(Visit.ShowPassword ? MoIcons.EyeOff : MoIcons.Eye)" AdornmentAriaLabel="@L[Visit.ShowPassword ? "Workbench:Config:HidePassword" : "Workbench:Config:ShowPassword"]" OnAdornmentClick="TogglePassword" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="@Visit.IsBusy" />
+                        <MudExpansionPanels Elevation="0"><MudExpansionPanel Text="@L["Workbench:Config:Addresses"]" Icon="@MoIcons.ChevronDown">
+                            <div class="configured-addresses">
+                                <MudTextField T="string" spellcheck="false" Label="@L["Workbench:Config:MasterAddresses"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.MasterAddresses" Variant="Variant.Outlined" Lines="3" Immediate="true" Disabled="@Visit.IsBusy" />
+                                <MudTextField T="string" spellcheck="false" Label="@L["Workbench:Config:WorkerAddresses"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.WorkerAddresses" Variant="Variant.Outlined" Lines="3" Immediate="true" Disabled="@Visit.IsBusy" />
+                            </div>
+                        </MudExpansionPanel></MudExpansionPanels>
+                    </div>
+                </section>
+                <section class="config-group config-group--scope">
+                    <header class="config-group-heading">
+                        <span class="config-group-icon"><MoIcon Icon="@MoIcons.Shield" Size="1.25rem" /></span>
+                        <div><h2>@L["Workbench:Config:Scope"]</h2></div>
+                    </header>
+                    <div class="config-fields">
+                        <MudTextField T="string" spellcheck="false" Label="@L["Workbench:Config:AllowedNamespaces"]" HelperText="@L["RuntimeConfigDialog:NamespaceScopeHelper"]" @bind-Value="Visit.NamespaceScope" Variant="Variant.Outlined" Lines="4" Immediate="true" Disabled="@Visit.IsBusy" />
+                        @if (Visit.AllowsAllNamespaces) { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["RuntimeConfigDialog:AllowAllNamespacesWarning"]</MudAlert> }
+                        <MudTextField T="string" spellcheck="false" Label="@L["Workbench:Config:AllowedKeywords"]" HelperText="@L["RuntimeConfigDialog:MultiValueHelper"]" @bind-Value="Visit.NameKeywords" Variant="Variant.Outlined" Lines="4" Immediate="true" Disabled="@Visit.IsBusy" />
+                        <p class="field-help">@L["Workbench:Config:KeywordHelp"]</p>
+                    </div>
+                </section>
             </div>
         }
-        <div class="config-actions">
-            <span>@L[Visit.IsDirty ? "Workbench:Config:Dirty" : "Workbench:Config:Clean"]</span>
+        <footer class="config-actions">
+            <span class="draft-state @(Visit.IsDirty ? "draft-state--dirty" : string.Empty)"><i></i>@L[Visit.IsDirty ? "Workbench:Config:Dirty" : "Workbench:Config:Clean"]</span>
             <MudButton Variant="Variant.Text" Disabled="@Visit.IsBusy" OnClick="Visit.LoadAsync">@L["Workbench:Config:Discard"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Save" Disabled="@(Visit.IsBusy || Visit.Draft is null || !Visit.IsDirty)" OnClick="SaveAsync">@L["Workbench:Config:Save"]</MudButton>
-        </div>
+        </footer>
     </section>
 </div>
 

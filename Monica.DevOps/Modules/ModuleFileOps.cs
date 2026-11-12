@@ -184,7 +184,7 @@ public class ModuleFileOps : MonicaModule<ModuleFileOpsOption>, IWebModule
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to download FileOps file {Path}.", path);
-            var response = Res.Fail(
+            var response = Result.Failure(
                 localizer["ServiceMessages:DownloadFailed", path, messageLocalizer.TranslateExceptionMessage(ex)].Value,
                 GetResultStatus(ex));
             return response.GetResponse();
@@ -211,26 +211,26 @@ public class ModuleFileOps : MonicaModule<ModuleFileOpsOption>, IWebModule
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to download FileOps archive with {PathCount} selected path(s).", request.Paths?.Count ?? 0);
-            var response = Res.Fail(
+            var response = Result.Failure(
                 localizer["ServiceMessages:ArchiveDownloadFailed", messageLocalizer.TranslateExceptionMessage(ex)].Value,
                 GetResultStatus(ex));
             return response.GetResponse();
         }
     }
 
-    private static ResStatus GetResultStatus(Exception exception)
+    private static ResultStatus GetResultStatus(Exception exception)
     {
         return exception switch
         {
-            ArgumentException => ResStatus.BadRequest,
-            InvalidOperationException => ResStatus.BadRequest,
-            KeyNotFoundException => ResStatus.BadRequest,
-            DirectoryNotFoundException => ResStatus.BadRequest,
-            FileNotFoundException => ResStatus.BadRequest,
-            IOException => ResStatus.BadRequest,
-            UnauthorizedAccessException => ResStatus.Forbidden,
-            DevOps.FileOps.Exceptions.FileOpsOperationException => ResStatus.BadRequest,
-            _ => ResStatus.InternalError
+            ArgumentException => ResultStatus.BadRequest,
+            InvalidOperationException => ResultStatus.BadRequest,
+            KeyNotFoundException => ResultStatus.BadRequest,
+            DirectoryNotFoundException => ResultStatus.BadRequest,
+            FileNotFoundException => ResultStatus.BadRequest,
+            IOException => ResultStatus.BadRequest,
+            UnauthorizedAccessException => ResultStatus.Forbidden,
+            DevOps.FileOps.Exceptions.FileOpsOperationException => ResultStatus.BadRequest,
+            _ => ResultStatus.InternalError
         };
     }
 }

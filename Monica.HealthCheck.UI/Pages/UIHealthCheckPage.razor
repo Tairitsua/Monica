@@ -25,7 +25,7 @@
     }
     else if (_session is { } session)
     {
-        <MudDrawerContainer Class="health-drawer-container">
+        <div class="health-workspace">
             <header class="health-page-header">
                 <div class="health-page-heading">
                     <span class="health-page-eyebrow">@L["Page:Eyebrow"]</span>
@@ -90,7 +90,7 @@
             }
 
             <HealthCheckEntryDrawer Session="@session" />
-        </MudDrawerContainer>
+        </div>
     }
 </div>
 

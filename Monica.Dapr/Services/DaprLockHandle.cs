@@ -7,9 +7,12 @@ namespace Monica.Dapr.Services;
 /// <summary>
 /// Wraps Dapr's lock response so Monica code can release it through <see cref="IDistributedLockHandle"/>.
 /// </summary>
+/// <remarks>Dapr uses a fixed lease; this adapter neither renews it nor observes ownership loss.</remarks>
 internal sealed class DaprLockHandle(LockResponse lockResponse) : IDistributedLockHandle
 {
     private LockResponse LockResponse { get; } = lockResponse;
+
+    public CancellationToken HandleLostToken => CancellationToken.None;
 
     public async ValueTask DisposeAsync()
     {

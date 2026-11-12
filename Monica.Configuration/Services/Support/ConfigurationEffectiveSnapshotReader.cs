@@ -18,6 +18,7 @@ internal sealed class ConfigurationEffectiveSnapshotReader(
         ConfigurationDefinition definition,
         CancellationToken cancellationToken)
     {
+        RequireManaged(definition);
         var document = await effectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
         return Resolve(definition, document);
     }
@@ -31,6 +32,8 @@ internal sealed class ConfigurationEffectiveSnapshotReader(
             return [];
         }
 
+        foreach (var definition in definitions) RequireManaged(definition);
+
         var documents = await effectiveValueStore.GetManyAsync(
             definitions.Select(static definition => definition.DefinitionKey).ToArray(),
             cancellationToken);
@@ -41,6 +44,12 @@ internal sealed class ConfigurationEffectiveSnapshotReader(
         }
 
         return snapshots;
+    }
+
+    private static void RequireManaged(ConfigurationDefinition definition)
+    {
+        if (definition.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Startup configuration '{definition.DefinitionKey}' has no managed effective snapshot.");
     }
 
     private ConfigurationResolvedEffectiveSnapshot Resolve(

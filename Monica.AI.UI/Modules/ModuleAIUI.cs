@@ -50,9 +50,9 @@ public class ModuleAIUI : MonicaModule<ModuleAIUIOption>, IUIModule
         module.Require<ModuleMcp, ModuleMcpOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<AIResource>());
+        module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
-            option.EnableMarkdown = true;
             option.ConfigureNavigation(RegisterNavigation);
         });
     }

@@ -86,7 +86,7 @@
     {
         if (_disposed || _pageState is null) return;
         var result = await _pageState.RefreshAsync();
-        if (!_disposed && result.Status != ResStatus.Conflict && result.IsFailed(out _))
+        if (!_disposed && result.Status != ResultStatus.Conflict && result.IsFailure())
             Snackbar.Add(L["Page:Messages:RefreshFailed"], Severity.Error);
     }
     private Task SetAutoRefresh(bool value) => _pageState?.SetAutoRefreshAsync(value) ?? Task.CompletedTask;

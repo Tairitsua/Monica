@@ -50,27 +50,27 @@ public sealed class ModuleAIChatHistoryTests
         bob.Resolve<TestIdentityAccessor>().Subject = "bob";
 
         var created = await alice.Resolve<ChatFacade>().CreateSessionAsync(ct: ct);
-        created.Status.Should().Be(ResStatus.Ok);
+        created.Status.Should().Be(ResultStatus.Ok);
         created.Message.Should().BeNull();
         await using var session = created.Data!;
         var saved = await alice.Resolve<ChatHistoryFacade>().SaveSessionAsync(session, 0, ct);
-        saved.Status.Should().Be(ResStatus.Ok);
+        saved.Status.Should().Be(ResultStatus.Ok);
         saved.Message.Should().BeNull();
         saved.Data!.IsPersisted.Should().BeTrue();
 
         var otherCatalog = await bob.Resolve<ChatHistoryFacade>().GetCatalogAsync(ct);
-        otherCatalog.Status.Should().Be(ResStatus.Ok);
+        otherCatalog.Status.Should().Be(ResultStatus.Ok);
         otherCatalog.Data!.Sessions.Should().BeEmpty();
         var otherSession = await bob.Resolve<ChatHistoryFacade>().LoadSessionAsync(session.SessionId, ct);
-        otherSession.Status.Should().Be(ResStatus.Ok);
+        otherSession.Status.Should().Be(ResultStatus.Ok);
         otherSession.Data.Should().BeNull();
         var crossUserSave = await bob.Resolve<ChatHistoryFacade>().SaveSessionAsync(session, 0, ct);
-        crossUserSave.Status.Should().NotBe(ResStatus.Ok);
+        crossUserSave.Status.Should().NotBe(ResultStatus.Ok);
 
         var aliceSettings = await alice.Resolve<AIConfigurationFacade>().GetAsync(ct);
         var bobSettings = await bob.Resolve<AIConfigurationFacade>().GetAsync(ct);
-        aliceSettings.Status.Should().Be(ResStatus.Ok);
-        bobSettings.Status.Should().Be(ResStatus.Ok);
+        aliceSettings.Status.Should().Be(ResultStatus.Ok);
+        bobSettings.Status.Should().Be(ResultStatus.Ok);
         bobSettings.Data.Should().BeEquivalentTo(aliceSettings.Data);
         bobSettings.Data!.Providers.Should().ContainSingle();
     }

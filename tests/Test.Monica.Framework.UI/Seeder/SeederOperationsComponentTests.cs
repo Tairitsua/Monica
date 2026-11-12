@@ -156,7 +156,7 @@ public sealed class SeederOperationsComponentTests
     private static async Task<SeederPageSession> CreateReadySessionAsync(SeederDiagnosticsSnapshot snapshot)
     {
         var session = new SeederPageSession(
-            _ => Task.FromResult(Res.Ok(snapshot)),
+            _ => Task.FromResult(Result.Success(snapshot)),
             _ => Task.FromResult(true),
             "test-host",
             refreshInterval: TimeSpan.FromHours(1));

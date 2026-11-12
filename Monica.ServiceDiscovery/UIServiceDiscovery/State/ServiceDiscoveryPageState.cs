@@ -23,11 +23,11 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public int RefreshInterval { get; set; } = 3;
     public string FilterText { get; set; } = string.Empty;
     public HashSet<ServiceStatus> SelectedStatuses { get; set; } = Enum.GetValues<ServiceStatus>().ToHashSet();
-    public HashSet<string> SelectedDomains { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SelectedDomains { get; set; } = new(StringComparer.Ordinal);
     public bool ShowOnlyWithInstances { get; set; }
 
     /// <summary>Captures one complete registry, retaining prior evidence on failure and rejecting canceled work.</summary>
-    public async Task<Res<List<RegisteredServiceStatus>>> RefreshServicesAsync(bool showLoading = true, CancellationToken cancellationToken = default)
+    public async Task<Result<List<RegisteredServiceStatus>>> RefreshServicesAsync(bool showLoading = true, CancellationToken cancellationToken = default)
     {
         await _captureGate.WaitAsync(cancellationToken);
         try
@@ -35,7 +35,9 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
             IsLoading = showLoading;
             var result = await facade.CaptureServicesAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var services))
+            var error = result.WithoutData();
+            var services = result.Data;
+            if (result.IsFailure())
             {
                 ErrorMessage = error.Message;
                 return result;
@@ -45,7 +47,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
             CapturedAt = DateTime.UtcNow;
             ErrorMessage = null;
             if (_allDomainsSelected)
-                SelectedDomains = Services.Select(GetServiceDomainName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.Ordinal);
             ApplyFilters();
             return result;
         }
@@ -59,7 +61,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     /// <summary>Updates a deliberate domain selection, including an empty selection that means none.</summary>
     public void SetSelectedDomains(IEnumerable<string> domains, bool selectAll = false)
     {
-        SelectedDomains = domains.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelectedDomains = domains.ToHashSet(StringComparer.Ordinal);
         _allDomainsSelected = selectAll;
     }
 
@@ -67,7 +69,7 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
     public void SelectAllDomains()
     {
         _allDomainsSelected = true;
-        SelectedDomains = Services.Select(GetServiceDomainName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelectedDomains = Services.SelectMany(GetServiceDomainNames).ToHashSet(StringComparer.Ordinal);
     }
 
     public void ApplyFilters()
@@ -75,13 +77,13 @@ public sealed class ServiceDiscoveryPageState(ServiceDiscoveryFacade facade, Ser
         var query = FilterText.Trim();
         FilteredServices = Services.Where(service =>
             SelectedStatuses.Contains(service.OverallStatus) &&
-            SelectedDomains.Contains(GetServiceDomainName(service)) &&
+            GetServiceDomainNames(service).Any(SelectedDomains.Contains) &&
             (!ShowOnlyWithInstances || service.TotalInstanceCount > 0) &&
             (query.Length == 0 || service.AppName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
              service.AppId.Contains(query, StringComparison.OrdinalIgnoreCase) ||
              service.ProjectName?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
-             GetServiceDomainName(service).Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
+             GetServiceDomainNames(service).Any(domain => domain.Contains(query, StringComparison.OrdinalIgnoreCase)))).ToList();
     }
 
-    private string GetServiceDomainName(RegisteredServiceStatus service) => string.IsNullOrWhiteSpace(service.DomainName) ? UnknownDomainLabel : service.DomainName;
+    private IEnumerable<string> GetServiceDomainNames(RegisteredServiceStatus service) => service.GetDomainNames().DefaultIfEmpty(UnknownDomainLabel);
 }

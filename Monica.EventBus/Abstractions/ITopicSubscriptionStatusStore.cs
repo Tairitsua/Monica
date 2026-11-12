@@ -7,8 +7,8 @@ namespace Monica.EventBus.Abstractions;
 /// distributed event bus providers (for example Dapr streaming subscriptions or Kafka consumer loops).
 /// Providers report state transitions and message-level errors; monitoring surfaces consume
 /// the snapshots and the <see cref="StatusChanged"/> notification.
-/// The store granularity is (serviceKey, topicName) because the physical subscription unit
-/// of a distributed provider is the topic, not the individual registered handler.
+/// The store granularity is (serviceKey, topicName). Providers with independent workload-owner
+/// consumers aggregate their states here; a healthy owner must not hide a failed or recovering owner.
 /// All members are thread-safe.
 /// </summary>
 public interface ITopicSubscriptionStatusStore

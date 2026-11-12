@@ -19,23 +19,23 @@
   English | <a href="README.zh_CN.md">简体中文</a>
 </p>
 
-Monica is modular .NET infrastructure for agent-driven development. Applications can adopt its modules independently, while developers and coding agents share a typed vocabulary for composition, DDD application units, and runtime diagnostics. That makes generated code structurally predictable and running systems inspectable.
+Monica is modular .NET infrastructure for agent-driven development. Applications can adopt its modules independently, while developers and coding agents share a typed vocabulary for composition, DDD Building Blocks, and runtime diagnostics. That makes generated code structurally predictable and running systems inspectable.
 
 > Monica is approaching 1.0 and is still allowed to make breaking architectural improvements before the stable release.
 
 ## Why Monica
 
 - **A graph, not startup glue.** `AddMonica(...)` records the complete module graph for one host, validates dependencies and cycles, then applies registrations in deterministic phases.
-- **A vocabulary agents can follow.** ProjectUnits describe application services, domain services, entities, repositories, events, handlers, configurations, and jobs as explicit architectural roles.
+- **A vocabulary agents can follow.** Building Blocks describe application services, domain services, entities, repositories, events, handlers, configurations, and jobs by their supported responsibilities.
 - **Inspectable by default.** Operational modules expose the same graph, configuration, jobs, telemetry, and application structure that produced the running process.
-- **Host-scoped state.** A Monica composition belongs to its host. Multiple hosts in one process do not share module registries, options, mapping rules, or ProjectUnit catalogs.
+- **Host-scoped state.** A Monica composition belongs to its host. Multiple hosts in one process do not share module registries, options, mapping rules, or Building Block catalogs.
 
 ## Start in one minute
 
 Install only the packages used by your application:
 
 ```bash
-dotnet add package Monica.ProjectUnits --prerelease
+dotnet add package Monica.BuildingBlocks --prerelease
 dotnet add package Monica.JobScheduler --prerelease
 dotnet add package Monica.JobScheduler.UI --prerelease
 ```
@@ -61,9 +61,10 @@ builder.AddMonica(monica =>
         options.DefaultApiGroupName = "Orders";
     });
 
-    monica.AddProjectUnits(options =>
+    monica.AddEventBus().UseNoOpDistributedEventBus();
+    monica.AddBuildingBlocks(options =>
     {
-        options.ConventionOptions.EnableNameConvention = true;
+        options.Naming.Enabled = true;
     });
 
     monica.AddJobScheduler(options =>
@@ -101,26 +102,25 @@ Every module follows the same public shape:
 
 The strategy declares hard dependencies and optional ordering in `Describe(ModuleDescriptor)`. It reads its own finalized `Option` directly and can read another module's options only through one of those declared relationships. Business-type work is declared once through `DeclareTypeDiscovery(...)`; Monica combines non-empty structural queries into one type-universe scan and commits matches serially in graph order.
 
-ProjectUnits add the application vocabulary:
+A Building Block is an application code element with a defined responsibility that Monica recognizes through a supported kind contract. The current discoverable kinds are:
 
-`ApplicationService` · `RequestDto` · `DomainService` · `Entity` · `Repository` · `DomainEvent` · `DomainEventHandler` · `LocalEventHandler` · `Configuration` · `RecurringJob` · `TriggeredJob`
+`ApplicationRequestHandler` · `CrudApplicationService` · `DomainService` · `Repository` · `DomainEvent` · `DistributedEventHandler` · `LocalEventHandler` · `Seeder` · `RecurringJob` · `TriggeredJob` · `HttpApi` · `Entity` · `RequestDto` · `Configuration` · `HostedService`
 
-Each discovered unit can also carry explicit agent context and requirement traceability:
+Each discovered Building Block can carry explicit agent context and requirement traceability:
 
 ```csharp
-[ProjectUnitMetadata(
+using Monica.Application.Abstractions;
+using Monica.BuildingBlocks.Annotations;
+
+[BuildingBlockMetadata(
     "Approve Order",
-    Owner = "Ordering Team",
     Description = "Approves an eligible order.",
     Tags = ["ordering", "approval"])]
-[ProjectUnitRequirement("ORD-REQ-001")]
-public sealed class CommandHandlerApproveOrder : ApplicationService<CommandApproveOrder>
-{
-    // ...
-}
+[BuildingBlockRequirement("ORD-REQ-001")]
+public sealed record CommandApproveOrder(Guid OrderId) : ICommand;
 ```
 
-`Monica.Framework.UI` exposes a first-tab status dashboard for the current host with unit distribution, dependency health, alerts, and independent metadata, description, ownership, and requirement coverage. The typed `/framework/units`, `/framework/units/dashboard`, and `/framework/units/{key}` APIs expose the same catalog without leaking reflection objects.
+Metadata describes a Building Block; it does not make an unsupported type discoverable. Add metadata separately to handlers and other discovered types. When `AddBuildingBlocksUI()` is registered in a web host, `Monica.Framework.UI` exposes a `/building-blocks` workspace with kind distribution, dependencies, alerts, and independent metadata, description, ownership, and requirement coverage. When Minimal APIs are enabled with `EnableMinimalApi = true` or the host default, the typed `/framework/building-blocks`, `/framework/building-blocks/dashboard`, and `/framework/building-blocks/{key}` APIs expose catalog data without leaking reflection objects.
 
 ## Module diagnostics
 
@@ -132,7 +132,7 @@ Every public module-option property remains visible by clean type name. Ordinary
 
 The canonical Monica Agent Skills live under [`skills/`](skills/). Nine consumer skills are the single source of reusable infrastructure usage guidance: [`monica-infra-persistence`](skills/monica-infra-persistence), [`monica-infra-messaging`](skills/monica-infra-messaging), [`monica-infra-jobs`](skills/monica-infra-jobs), [`monica-infra-configuration`](skills/monica-infra-configuration), [`monica-infra-hosting`](skills/monica-infra-hosting), [`monica-infra-observability`](skills/monica-infra-observability), [`monica-infra-ai`](skills/monica-infra-ai), [`monica-infra-web`](skills/monica-infra-web), and [`monica-infra-ui`](skills/monica-infra-ui). Other skills cover application architecture, framework authoring, testing, UI development, and contribution workflows. Start with `monica-guide` for installation and framework source discovery, then use the skill that owns the task.
 
-Release tooling projects managed skills into `.agents/skills/` and `.claude/skills/` for repository-local discovery; these are generated copies, not authoring sources. [Monica.Docs](https://monica.dpdns.org/) publishes the skills from an immutable release knowledge archive (`monica-knowledge.json` and its checksum) alongside stable editorial guides. Local site development can preview the current source checkout.
+Repository-local discovery copies under `.agents/skills/` and `.claude/skills/` are generated on demand by `python scripts/sync_agent_skills.py --write`; they are local agent state and are not tracked in git. [Monica.Docs](https://monica.dpdns.org/) publishes the skills from an immutable release knowledge archive (`monica-knowledge.json` and its checksum) alongside stable editorial guides. Local site development can preview the current source checkout.
 
 ## Third-party ecosystem
 
@@ -146,7 +146,7 @@ The maturity label describes the compatibility promise, not package quality.
 
 | Tier | Promise | Representative packages |
 |---|---|---|
-| **Stable** | The supported 1.0 application path | Core, ProjectUnits, WebApi, Configuration, Repository, JobScheduler, OpenTelemetry, UI |
+| **Stable** | The supported 1.0 application path | Core, BuildingBlocks, WebApi, Configuration, Repository, JobScheduler, OpenTelemetry, UI |
 | **Integrations** | Versioned adapters around external systems | EF Core, Kafka, Redis/StackExchange, Dapr, SignalR |
 | **Labs** | Deliberately fast-moving exploration | AI/RAG/MCP, DataChannel, DevOps and profiling, Office, Experimental |
 
@@ -154,7 +154,7 @@ Applications can adopt Stable without taking a dependency on Labs. Integration p
 
 ## Runtime surfaces
 
-Monica includes operational Blazor surfaces for module dependencies, ProjectUnits, configuration, jobs, dependency injection, telemetry, repositories, and other registered capabilities. They share a theme contract and first-party `en-US` and `zh-CN` localization resources.
+Monica includes operational Blazor surfaces for module dependencies, Building Blocks, configuration, jobs, dependency injection, telemetry, repositories, and other registered capabilities. They share a theme contract and first-party `en-US` and `zh-CN` localization resources.
 
 The one-minute demo shows JobScheduler operations, module dependency inspection, and runtime configuration:
 

@@ -1,0 +1,29 @@
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+<div class="schedule-state" data-schedule="@Status">
+    @if (Status == "Scheduled" && Summary.NextOccurrenceUtc is { } next)
+    { <time datetime="@next.ToString("O")">@TimePresentation.FormatTimestamp(next)</time> }
+    <span class="schedule-state__status" data-role="@(Status == "AwaitingSynchronization" ? "warning" : "neutral")"><i></i>@L[$"Architecture:Schedule:{Status}"]</span>
+    @if (!Compact) { <p>@L[$"Architecture:ScheduleHelp:{Status}"]</p> }
+    @if (Status == "Suspended")
+    {
+        <small>@string.Join(" · ", Reasons)</small>
+    }
+    @if (Status == "AwaitingSynchronization")
+    { <a href="@($"/job-scheduler/runtime?coordinator={Uri.EscapeDataString(Summary.Definition.OwnerKey)}")">@L["Architecture:InspectCoordinator"] <MoIcon Icon="@MoIcons.ArrowRight" Size="12px" /></a> }
+</div>
+@code {
+    /// <summary>Gets the authoritative persisted cursor and suspension reasons, distinct from Cron projections.</summary>
+    [Parameter, EditorRequired] public JobOperationalSummary Summary { get; set; } = null!;
+    /// <summary>Omits explanatory prose inside a compact catalog cell.</summary>
+    [Parameter] public bool Compact { get; set; }
+    private string Status => !Summary.Definition.IsPresent ? "Unpublished" : Summary.RecurringScheduleStatus.ToString();
+    private IEnumerable<string> Reasons
+    {
+        get
+        {
+            if (JobSchedulerUiPresentation.IsOperatorPaused(Summary)) yield return L["Architecture:OperatorPause"];
+            if (JobSchedulerUiPresentation.IsManualSuppressed(Summary)) yield return L["Architecture:ManualPause"];
+        }
+    }
+}

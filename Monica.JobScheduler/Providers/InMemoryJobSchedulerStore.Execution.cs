@@ -102,52 +102,7 @@ public sealed partial class InMemoryJobSchedulerStore
 
         lock (_gate)
         {
-            IEnumerable<StoredExecution> filtered = _executionInstances.Values
-                .Where(execution => string.Equals(
-                    execution.Template.SchedulerScopeKey,
-                    query.SchedulerScopeKey,
-                    StringComparison.Ordinal));
-
-            if (!string.IsNullOrWhiteSpace(query.OwnerKey))
-            {
-                filtered = filtered.Where(execution => string.Equals(
-                    execution.Template.OwnerKey,
-                    query.OwnerKey,
-                    StringComparison.Ordinal));
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.JobKey))
-            {
-                filtered = filtered.Where(execution => string.Equals(
-                    execution.Template.JobKey,
-                    query.JobKey,
-                    StringComparison.Ordinal));
-            }
-
-            if (query.States is { Count: > 0 })
-            {
-                var states = query.States.ToHashSet();
-                filtered = filtered.Where(execution => states.Contains(execution.State));
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.SearchText))
-            {
-                filtered = filtered.Where(execution =>
-                    execution.InstanceId.Contains(query.SearchText, StringComparison.OrdinalIgnoreCase)
-                    || execution.Template.JobKey.Contains(query.SearchText, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (query.CreatedAfterUtc is { } createdAfter)
-            {
-                var normalized = NormalizeUtc(createdAfter);
-                filtered = filtered.Where(execution => execution.CreatedAtUtc >= normalized);
-            }
-
-            if (query.CreatedBeforeUtc is { } createdBefore)
-            {
-                var normalized = NormalizeUtc(createdBefore);
-                filtered = filtered.Where(execution => execution.CreatedAtUtc <= normalized);
-            }
+            var filtered = FilterExecutions(query);
 
             var materialized = filtered.ToList();
             var totalCount = materialized.Count;
@@ -160,6 +115,63 @@ public sealed partial class InMemoryJobSchedulerStore
 
             return Task.FromResult(new QueryResult<JobExecutionInstance>(page, totalCount));
         }
+    }
+
+    private IEnumerable<StoredExecution> FilterExecutions(JobExecutionQuery query)
+    {
+        IEnumerable<StoredExecution> filtered = _executionInstances.Values
+            .Where(execution => string.Equals(
+                execution.Template.SchedulerScopeKey,
+                query.SchedulerScopeKey,
+                StringComparison.Ordinal));
+
+        if (!string.IsNullOrWhiteSpace(query.OwnerKey))
+        {
+            filtered = filtered.Where(execution => string.Equals(
+                execution.Template.OwnerKey,
+                query.OwnerKey,
+                StringComparison.Ordinal));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.JobKey))
+        {
+            filtered = filtered.Where(execution => string.Equals(
+                execution.Template.JobKey,
+                query.JobKey,
+                StringComparison.Ordinal));
+        }
+
+        if (query.States is { Count: > 0 })
+        {
+            var states = query.States.ToHashSet();
+            filtered = filtered.Where(execution => states.Contains(execution.State));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.SearchText))
+        {
+            filtered = filtered.Where(execution =>
+                execution.InstanceId.Contains(query.SearchText, StringComparison.OrdinalIgnoreCase)
+                || execution.Template.JobKey.Contains(query.SearchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (query.CreatedAfterUtc is { } createdAfter)
+        {
+            var normalized = NormalizeUtc(createdAfter);
+            filtered = filtered.Where(execution => execution.CreatedAtUtc >= normalized);
+        }
+
+        if (query.CreatedBeforeUtc is { } createdBefore)
+        {
+            var normalized = NormalizeUtc(createdBefore);
+            filtered = filtered.Where(execution => execution.CreatedAtUtc <= normalized);
+        }
+
+        if (query.CompletedAfterUtc is { } completedAfter)
+            filtered = filtered.Where(execution => execution.CompletedAtUtc >= NormalizeUtc(completedAfter));
+        if (query.CompletedBeforeUtc is { } completedBefore)
+            filtered = filtered.Where(execution => execution.CompletedAtUtc <= NormalizeUtc(completedBefore));
+
+        return filtered;
     }
 
     /// <inheritdoc />
@@ -362,6 +374,12 @@ public sealed partial class InMemoryJobSchedulerStore
 
         lock (_gate)
         {
+            if (_retiredOwners.ContainsKey((request.SchedulerScopeKey, request.OwnerKey)))
+                return Task.FromResult<IReadOnlyList<JobExecutionLease>>([]);
+            if (request.OwnerManifestHash is { } expectedManifest
+                && (!_owners.TryGetValue((request.SchedulerScopeKey, request.OwnerKey), out var owner)
+                    || owner.Hash != expectedManifest))
+                return Task.FromResult<IReadOnlyList<JobExecutionLease>>([]);
             var now = UtcNow;
             var executableKeys = request.JobKeys.ToHashSet(StringComparer.Ordinal);
             var eligibleExecutions = _executionInstances.Values
@@ -370,7 +388,9 @@ public sealed partial class InMemoryJobSchedulerStore
                     && execution.AvailableAtUtc <= now
                     && string.Equals(execution.Template.SchedulerScopeKey, request.SchedulerScopeKey, StringComparison.Ordinal)
                     && string.Equals(execution.Template.OwnerKey, request.OwnerKey, StringComparison.Ordinal)
-                    && executableKeys.Contains(execution.Template.JobKey))
+                    && executableKeys.Contains(execution.Template.JobKey)
+                    && _executionGates.TryGetValue(GetExecutionGateKey(execution.Template), out var eligibleGate)
+                    && eligibleGate.ActiveCount < eligibleGate.MaxConcurrency)
                 .OrderBy(execution => execution.AvailableAtUtc)
                 .ThenBy(execution => execution.CreatedAtUtc)
                 .ThenBy(execution => execution.InstanceId, StringComparer.Ordinal);
@@ -427,6 +447,7 @@ public sealed partial class InMemoryJobSchedulerStore
 
                 leases.Add(new JobExecutionLease
                 {
+                    GrantedAtUtc = now,
                     Execution = ToSummary(execution),
                     LeaseKey = new JobLeaseKey
                     {
@@ -467,6 +488,7 @@ public sealed partial class InMemoryJobSchedulerStore
                 Status = execution.CancellationRequestedAtUtc.HasValue
                     ? JobLeaseRenewalStatus.CancellationRequested
                     : JobLeaseRenewalStatus.Active,
+                GrantedAtUtc = now,
                 LeaseExpiresAtUtc = execution.LeaseExpiresAtUtc
             });
         }
@@ -624,10 +646,12 @@ public sealed partial class InMemoryJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(request);
         request.Validate();
+        request.CoordinatorLease?.ValidatePartition(request.SchedulerScopeKey, "maintenance");
 
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
+            ValidateCoordinatorLeaseUnsafe(request.CoordinatorLease);
             var now = UtcNow;
             var expired = _executionInstances.Values
                 .Where(execution =>

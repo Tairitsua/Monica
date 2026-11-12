@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Contribution"
-  short_description: "Prepare safe Monica issues, discussions, and PRs"
-  default_prompt: "Use $monica-contribution to classify this finding and prepare the safest Monica contribution path."

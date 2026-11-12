@@ -97,7 +97,8 @@
     protected override void OnInitialized() => _session = new(async key =>
     {
         var result = await Facade.GetDefinitionAsync(key);
-        return result.IsFailed(out _, out var detail) ? null : detail.Definition;
+        var detail = result.Data;
+        return result.IsFailure() ? null : detail?.Definition;
     }, Visibility.ShowSensitiveValues);
 
     protected override Task OnParametersSetAsync()

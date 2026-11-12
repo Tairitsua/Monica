@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Exceptions;
@@ -11,7 +12,8 @@ namespace Monica.Configuration.Services;
 /// Connects the module-owned Microsoft configuration provider to the final application service provider.
 /// </summary>
 internal sealed class MonicaConfigurationProviderActivationHostedService(
-    MonicaConfigurationProviderActivationCoordinator activationCoordinator,
+    IServiceProvider serviceProvider,
+    IConfigurationDefinitionRegistry definitions,
     IConfigurationRuntimeValidationService validationService,
     ConfigurationValidationPolicy policy,
     ILogger<MonicaConfigurationProviderActivationHostedService> logger)
@@ -20,7 +22,8 @@ internal sealed class MonicaConfigurationProviderActivationHostedService(
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await activationCoordinator.ActivateAsync(cancellationToken);
+        if (MonicaConfigurationProviderActivationCoordinator.ShouldActivate(definitions, serviceProvider))
+            await serviceProvider.GetRequiredService<MonicaConfigurationProviderActivationCoordinator>().ActivateAsync(cancellationToken);
         var report = validationService.GetReport();
         if (report.IsValid) return;
         if (policy.Behavior == ConfigurationRuntimeValidationBehavior.FailFast)

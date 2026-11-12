@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica UI Design"
-  short_description: "Monica UI prototype and design workflow"
-  default_prompt: "Use $monica-ui-design to create an interactive UI prototype before implementing Monica MudBlazor components."

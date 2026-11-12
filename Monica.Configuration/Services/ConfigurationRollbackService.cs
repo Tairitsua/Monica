@@ -282,6 +282,8 @@ internal sealed class ConfigurationRollbackService(
         {
             cancellationToken.ThrowIfCancellationRequested();
             definitions[definitionKey] = await definitionResolver.GetRequiredAsync(definitionKey, cancellationToken);
+            if (definitions[definitionKey].Kind == ConfigurationKind.Startup)
+                throw new InvalidOperationException($"Startup configuration '{definitionKey}' cannot be restored from managed history.");
         }
 
         return definitions;

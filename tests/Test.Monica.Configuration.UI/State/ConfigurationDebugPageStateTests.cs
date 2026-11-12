@@ -9,10 +9,10 @@ public sealed class ConfigurationDebugPageStateTests
     [Fact]
     public async Task Refresh_ShouldRemaskAcceptedLinesAndNeverCarryRevealIntoReplacementData()
     {
-        var pending = NewCompletion<Res<string>>();
+        var pending = NewCompletion<Result<string>>();
         var calls = 0;
         await using var state = new ConfigurationDebugPageState(() => ++calls == 1
-            ? Task.FromResult(Res.Ok<string>("Credentials:Password=first-test-secret")) : pending.Task, "unavailable");
+            ? Task.FromResult(Result.Success<string>("Credentials:Password=first-test-secret")) : pending.Task, "unavailable");
         await ObserveAsync(state.LoadAsync());
         var accepted = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationDebugLine>>(state.Read.Value));
         Assert.DoesNotContain("first-test-secret", accepted.SearchText);
@@ -27,7 +27,7 @@ public sealed class ConfigurationDebugPageStateTests
         state.ToggleSensitiveLine(accepted.Index);
         Assert.Empty(state.RevealedLines);
         Assert.DoesNotContain("first-test-secret", accepted.GetDisplayText(state.RevealedLines.Contains(accepted.Index)));
-        pending.SetResult(Res.Ok<string>("Credentials:Password=replacement-test-secret"));
+        pending.SetResult(Result.Success<string>("Credentials:Password=replacement-test-secret"));
         await ObserveAsync(refresh);
 
         var replacement = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ConfigurationDebugLine>>(state.Read.Value));
@@ -46,11 +46,11 @@ public sealed class ConfigurationDebugPageStateTests
     [InlineData("empty")]
     public async Task Load_ShouldDistinguishUnavailablePayloadFromSuccessfulEmptyText(string outcome)
     {
-        await using var state = new ConfigurationDebugPageState(() => Task.FromResult<Res<string>>(outcome switch
+        await using var state = new ConfigurationDebugPageState(() => Task.FromResult<Result<string>>(outcome switch
         {
-            "failure" => Res.Fail("debug unavailable"),
-            "missing" => Res.Ok<string>(null!),
-            _ => Res.Ok<string>(string.Empty)
+            "failure" => Result.Failure<string>("debug unavailable"),
+            "missing" => new Result<string> { Status = ResultStatus.Ok, Data = null },
+            _ => Result.Success<string>(string.Empty)
         }), "unavailable");
         await ObserveAsync(state.LoadAsync());
 
@@ -75,13 +75,13 @@ public sealed class ConfigurationDebugPageStateTests
     [InlineData(true)]
     public async Task Refresh_WhenOldReadCompletesLate_ShouldKeepNewerMaskedEvidence(bool olderFails)
     {
-        var pending = NewCompletion<Res<string>>();
+        var pending = NewCompletion<Result<string>>();
         var calls = 0;
         await using var state = new ConfigurationDebugPageState(() => ++calls == 1
-            ? pending.Task : Task.FromResult(Res.Ok<string>("Credentials:Password=new-test-secret")), "unavailable");
+            ? pending.Task : Task.FromResult(Result.Success<string>("Credentials:Password=new-test-secret")), "unavailable");
         var older = state.LoadAsync();
         await ObserveAsync(state.LoadAsync());
-        pending.SetResult(olderFails ? Res.Fail("old unavailable") : Res.Ok<string>("Credentials:Password=old-test-secret"));
+        pending.SetResult(olderFails ? Result.Failure<string>("old unavailable") : Result.Success<string>("Credentials:Password=old-test-secret"));
         await ObserveAsync(older);
 
         Assert.True(state.Read.HasLoaded);
@@ -95,13 +95,13 @@ public sealed class ConfigurationDebugPageStateTests
     [Fact]
     public async Task Dispose_ShouldDrainActualDebugReadWithoutLateAdoptionOrReveal()
     {
-        var pending = NewCompletion<Res<string>>();
+        var pending = NewCompletion<Result<string>>();
         var state = new ConfigurationDebugPageState(() => pending.Task, "unavailable");
         var load = state.LoadAsync();
         var disposal = state.DisposeAsync().AsTask();
         Assert.Same(disposal, state.DisposeAsync().AsTask());
         Assert.False(disposal.IsCompleted);
-        pending.SetResult(Res.Ok<string>("Credentials:Password=late-test-secret"));
+        pending.SetResult(Result.Success<string>("Credentials:Password=late-test-secret"));
         await ObserveAsync(load);
         await ObserveAsync(disposal);
 

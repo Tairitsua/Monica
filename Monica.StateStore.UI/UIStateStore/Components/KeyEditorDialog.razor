@@ -196,7 +196,8 @@
                 return;
             }
 
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 errorMessage = error.Message;
             }
@@ -208,7 +209,9 @@
                     return;
                 }
                 StateStoreKeyInfo savedKey;
-                if (refreshedKey.IsFailed(out var refreshError, out var loadedKey))
+                var refreshError = refreshedKey.WithoutData();
+                var loadedKey = refreshedKey.Data;
+                if (refreshedKey.IsFailure() || loadedKey is null)
                 {
                     // The write succeeded, but the submitted draft is not fresh provider metadata.
                     savedKey = new StateStoreKeyInfo
@@ -219,7 +222,7 @@
                         ETag = null,
                         TTL = null,
                         TTLStatus = EStateStoreKeyTtlStatus.Unknown,
-                        Error = refreshError.Message
+                        Error = refreshError.Message ?? "The saved key could not be reloaded."
                     };
                 }
                 else

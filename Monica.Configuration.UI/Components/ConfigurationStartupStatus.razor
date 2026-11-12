@@ -1,0 +1,38 @@
+@inject IStringLocalizer<ConfigurationUIResource> L
+
+<MudStack Spacing="2">
+    <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:ReadOnly"]</MudAlert>
+    @if (Candidate is null)
+    {
+        <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:CandidateUnavailable"]</MudAlert>
+    }
+    else
+    {
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
+            @if (Candidate.RequiresRestart)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">@L["Startup:RestartRequired"]</MudChip>
+            }
+            else if (Candidate.ValidationReport.IsValid)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@L["Startup:Unchanged"]</MudChip>
+            }
+        </MudStack>
+        @if (!Candidate.ValidationReport.IsValid)
+        {
+            <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error" Dense="true">@L["Startup:InvalidCandidate"]</MudAlert>
+            <ConfigurationValidationReportView Title="@L["Startup:CandidateValidation"]"
+                                               Coverage="@Candidate.ValidationReport.Coverage"
+                                               Scope="@Candidate.ValidationReport.Scope"
+                                               ValidationRevision="@Candidate.ValidationReport.ValidationRevision"
+                                               IsValid="@Candidate.ValidationReport.IsValid"
+                                               IsSchemaValid="@Candidate.ValidationReport.IsSchemaValid"
+                                               Issues="@Candidate.ValidationReport.Issues.Select(issue => ConfigurationValidationPresentation.FromRuntime(issue, actualOptions: true)).ToArray()" />
+        }
+    }
+</MudStack>
+
+@code {
+    /// <summary>Gets the runtime's candidate assessment; presentation never compares masked values or applies candidates.</summary>
+    [Parameter] public ConfigurationStartupCandidate? Candidate { get; set; }
+}

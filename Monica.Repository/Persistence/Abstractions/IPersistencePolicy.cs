@@ -11,5 +11,6 @@ namespace Monica.Repository.Persistence.Abstractions;
 public interface IPersistencePolicy
 {
     /// <summary>Applies synchronous, deterministic storage rules to the captured batch.</summary>
+    /// <remarks>Throw when a storage rule rejects the save. The context propagates the exception and faults the operation.</remarks>
     void Apply(DbContext context, IReadOnlyList<PersistenceChange> changes);
 }

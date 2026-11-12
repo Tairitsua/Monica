@@ -52,7 +52,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         var live = state.LiveSnapshot;
@@ -77,8 +77,8 @@ public sealed class TypeAllocationPanelStateTests
         var boundary = Boundary(scope);
         var liveInput = Registry(TypeAllocationDataSource.AllocationTracking);
         var heapInput = Registry(TypeAllocationDataSource.HeapSnapshot, byteOffset: 5000);
-        boundary.LiveResult = Res.Ok(liveInput);
-        boundary.HeapResult = Res.Ok(heapInput);
+        boundary.LiveResult = Result.Success(liveInput);
+        boundary.HeapResult = Result.Success(heapInput);
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         clock.Advance(TimeSpan.FromSeconds(2));
@@ -126,7 +126,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         state.TopN = 5;
@@ -150,7 +150,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         state.TopN = 5;
@@ -192,7 +192,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         state.TopN = 5;
@@ -242,17 +242,17 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         var live = state.LiveSnapshot;
         var capturedAt = state.LiveCapturedAt;
         clock.Advance(TimeSpan.FromSeconds(5));
-        boundary.LiveResult = new() { Status = ResStatus.BadGateway, Message = message };
+        boundary.LiveResult = new() { Status = ResultStatus.BadGateway, Message = message };
 
         var failed = state.RefreshData();
 
-        failed.Status.Should().Be(ResStatus.BadGateway);
+        failed.Status.Should().Be(ResultStatus.BadGateway);
         state.LoadError.Should().Be(message ?? string.Empty);
         state.LiveSnapshot.Should().BeSameAs(live);
         state.LiveCapturedAt.Should().Be(capturedAt);
@@ -273,15 +273,15 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.HeapResult = Res.Ok(Registry(TypeAllocationDataSource.HeapSnapshot));
+        boundary.HeapResult = Result.Success(Registry(TypeAllocationDataSource.HeapSnapshot));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         AssertSuccess(await state.TakeHeapSnapshotAsync());
         var heap = state.HeapSnapshot;
         var capture = state.HeapCapturedAt;
-        boundary.LiveResult = new() { Status = ResStatus.ServiceUnavailable, Message = "Prior read failure" };
-        state.RefreshData().Status.Should().Be(ResStatus.ServiceUnavailable);
-        boundary.HeapResult = new() { Status = ResStatus.GatewayTimeout, Message = null };
+        boundary.LiveResult = new() { Status = ResultStatus.ServiceUnavailable, Message = "Prior read failure" };
+        state.RefreshData().Status.Should().Be(ResultStatus.ServiceUnavailable);
+        boundary.HeapResult = new() { Status = ResultStatus.GatewayTimeout, Message = null };
         var startedAt = clock.GetUtcNow();
         clock.Advance(TimeSpan.FromSeconds(1));
 
@@ -291,7 +291,7 @@ public sealed class TypeAllocationPanelStateTests
         var failedAction = state.LastAction!;
         failedAction.Operation.Should().Be(TypeAllocationOperation.HeapCapture);
         failedAction.IsSuccessful.Should().BeFalse();
-        failedAction.Status.Should().Be(ResStatus.GatewayTimeout);
+        failedAction.Status.Should().Be(ResultStatus.GatewayTimeout);
         failedAction.Message.Should().BeNull();
         failedAction.StartedAt.Should().Be(startedAt.AddSeconds(1));
         state.HeapSnapshot.Should().BeSameAs(heap);
@@ -346,7 +346,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.HeapResult = Res.Ok(Registry(TypeAllocationDataSource.HeapSnapshot));
+        boundary.HeapResult = Result.Success(Registry(TypeAllocationDataSource.HeapSnapshot));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         using var gate = boundary.HoldNextHeap();
@@ -389,7 +389,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.HeapResult = Res.Ok(Registry(TypeAllocationDataSource.HeapSnapshot));
+        boundary.HeapResult = Result.Success(Registry(TypeAllocationDataSource.HeapSnapshot));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         AssertSuccess(await state.TakeHeapSnapshotAsync());
@@ -399,7 +399,7 @@ public sealed class TypeAllocationPanelStateTests
         var lastAction = state.LastAction;
         var notifications = 0;
         state.StateChanged += () => notifications++;
-        boundary.HeapResult = Res.Ok(Registry(TypeAllocationDataSource.HeapSnapshot, byteOffset: 8000));
+        boundary.HeapResult = Result.Success(Registry(TypeAllocationDataSource.HeapSnapshot, byteOffset: 8000));
         using var gate = boundary.HoldNextHeap();
         var action = state.TakeHeapSnapshotAsync();
         Task? disposal = null;
@@ -446,7 +446,7 @@ public sealed class TypeAllocationPanelStateTests
         await using var application = await Start(clock);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var boundary = Boundary(scope);
-        boundary.LiveResult = Res.Ok(Registry(TypeAllocationDataSource.AllocationTracking));
+        boundary.LiveResult = Result.Success(Registry(TypeAllocationDataSource.AllocationTracking));
         await using var state = Create(scope, clock, boundary);
         AssertSuccess(await state.InitializeAsync());
         var snapshot = state.LiveSnapshot;
@@ -515,10 +515,10 @@ public sealed class TypeAllocationPanelStateTests
     private static void RequireHeapPageAdmission() => Assert.SkipUnless(OperatingSystem.IsWindowsVersionAtLeast(6, 3),
         "The production page admits heap capture only on Windows with the PSS capability. The controlled boundary never invokes the native provider.");
     private static Task AwaitBounded(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-    private static void AssertSuccess(IResultEnvelope result) => result.IsOk().Should().BeTrue($"status={result.Status}, message={result.Message}");
+    private static void AssertSuccess(IResultEnvelope result) => result.IsSuccess().Should().BeTrue($"status={result.Status}, message={result.Message}");
     private static void AssertInactive(IResultEnvelope result)
     {
-        result.Status.Should().Be(ResStatus.Conflict);
+        result.Status.Should().Be(ResultStatus.Conflict);
         result.Message.Should().BeEmpty();
     }
 }

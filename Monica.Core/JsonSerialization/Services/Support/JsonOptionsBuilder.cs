@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Monica.Core.JsonSerialization.Converters;
 using Monica.Modules;
 
@@ -28,6 +29,17 @@ internal static class JsonOptionsBuilder
         }
 
         options.DefaultIgnoreCondition = extraOption.DefaultIgnoreCondition;
+
+        // Required members are wire-mandatory: null-omitting ignore conditions must never drop
+        // them, or a strict reader would reject the envelope as a malformed contract.
+        options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver())
+            .WithAddedModifier(static typeInfo =>
+            {
+                if (typeInfo.Kind != JsonTypeInfoKind.Object) return;
+                foreach (var property in typeInfo.Properties)
+                    if (property.IsRequired)
+                        property.ShouldSerialize = static (_, _) => true;
+            });
 
         if (extraOption.ReferenceHandlerPreserve)
         {

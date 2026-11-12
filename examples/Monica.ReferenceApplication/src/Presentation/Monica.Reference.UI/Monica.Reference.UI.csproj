@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Shared/Platform.Protocol/Platform.Protocol.csproj" />
+    <ProjectReference Include="../../../../../Monica.Application.UI/Monica.Application.UI.csproj" />
+    <EmbeddedResource Include="Localization/**/*.json" />
+  </ItemGroup>
+</Project>

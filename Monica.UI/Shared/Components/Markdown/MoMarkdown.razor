@@ -12,6 +12,8 @@
                    HasTableOfContents="@HasTableOfContents"
                    TableOfContentsHeader="@TableOfContentsHeader"
                    EnableMermaid="@EnableMermaid"
+                   MermaidNodes="@MermaidNodes"
+                   MermaidNodeActivated="@MermaidNodeActivated"
                    EnableCodeCopy="@EnableCodeCopy"
                    LinkTemplate="@LinkTemplate"
                    HeadingsChanged="@HeadingsChanged" />
@@ -47,6 +49,12 @@
 
     [Parameter]
     public bool EnableMermaid { get; set; } = true;
+
+    /// <summary>Trusted flowchart node aliases mapped to accessible labels; authored callbacks remain disabled.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? MermaidNodes { get; set; }
+
+    /// <summary>Invoked only for an alias explicitly supplied through MermaidNodes.</summary>
+    [Parameter] public EventCallback<string> MermaidNodeActivated { get; set; }
 
     /// <summary>
     /// Enables click-to-copy for recognizable file paths in prose or inline code. Defaults to true.

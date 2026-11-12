@@ -3,10 +3,12 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.HealthCheck.Extensions;
 using Monica.JobScheduler.Abstractions;
@@ -19,6 +21,7 @@ using Monica.JobScheduler.Models.Execution;
 using Monica.JobScheduler.Providers;
 using Monica.JobScheduler.Services;
 using Monica.JobScheduler.Services.Support;
+using Monica.Locker.Leases;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -28,9 +31,10 @@ public static class ModuleJobSchedulerBuilderExtensions
     extension(IMonicaBuilder builder)
     {
         /// <summary>
-        /// Adds the durable JobScheduler runtime. Every host schedules and executes the jobs it discovers under its
-        /// own owner identity; a store and scope must be selected on the returned registration before the module graph
-        /// is finalized.
+        /// Adds the JobScheduler runtime for the host's selected logical owners. Automatic hosts require a store;
+        /// Manual hosts use a fresh isolated memory store and execute only explicit work. The scheduler scope comes
+        /// from Deployment:Scope unless UseSchedulerScope overrides it. Application activation selects
+        /// role-owned jobs before they enter the local catalog.
         /// </summary>
         public ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> AddJobScheduler(
             Action<ModuleJobSchedulerOption>? action = null)
@@ -41,23 +45,39 @@ public static class ModuleJobSchedulerBuilderExtensions
 }
 
 /// <summary>
-/// Composes the owner-local scheduling plane and the durable execution plane. Every host runs both.
+/// Composes owner-local scheduling and execution. Manual hosts initialize a local catalog and retain the native
+/// executor while automatic recurring scheduling and shared maintenance remain held.
 /// </summary>
 public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
 {
-    internal const string STORE_FEATURE = "scheduler-store";
-    internal const string SCOPE_FEATURE = "scheduler-scope";
-
     private readonly List<LocalJobDefinition> _localJobDefinitions = [];
 
     /// <inheritdoc />
     public override void ValidateOptions(ModuleJobSchedulerOption options, string? profileName)
     {
+        options.AutonomousWork = Application.Application.AutonomousWork;
+        if (string.IsNullOrWhiteSpace(options.SchedulerScopeKey))
+            options.SchedulerScopeKey = Application.Application.DeploymentScope ?? string.Empty;
+        ValidateRuntimeOptions(options);
+    }
+
+    internal static void ValidateRuntimeOptions(ModuleJobSchedulerOption options)
+    {
         ValidatePositive(options.SchedulingPollInterval, nameof(options.SchedulingPollInterval));
         ValidatePositive(options.WorkerPollInterval, nameof(options.WorkerPollInterval));
         ValidatePositive(options.SnapshotSyncInterval, nameof(options.SnapshotSyncInterval));
+        ValidatePositive(options.CoordinatorLeaseDuration, nameof(options.CoordinatorLeaseDuration));
+        ValidatePositive(options.StoreOperationTimeout, nameof(options.StoreOperationTimeout));
+        if (options.MaxConcurrentStoreOperations < 2 || options.ReservedLeaseStoreOperations < 1
+            || options.ReservedLeaseStoreOperations >= options.MaxConcurrentStoreOperations)
+            throw new InvalidOperationException("Store admission must reserve at least one slot for leases and one for other operations.");
         ValidatePositive(options.ExecutionLeaseDuration, nameof(options.ExecutionLeaseDuration));
         ValidatePositive(options.ExecutionLeaseRenewInterval, nameof(options.ExecutionLeaseRenewInterval));
+        ValidatePositive(options.ExecutionLeaseSafetyMargin, nameof(options.ExecutionLeaseSafetyMargin));
+        ValidatePositive(options.ExecutionLeaseRenewalTimeout, nameof(options.ExecutionLeaseRenewalTimeout));
+        ValidatePositive(options.ExecutionFinalizationTimeout, nameof(options.ExecutionFinalizationTimeout));
+        ValidatePositive(options.ExecutionStoreDrainTimeout, nameof(options.ExecutionStoreDrainTimeout));
+        ValidatePositive(options.ExecutionStoreRecoveryDelay, nameof(options.ExecutionStoreRecoveryDelay));
         ValidatePositive(options.ExecutionRetryDelay, nameof(options.ExecutionRetryDelay));
         ValidatePositive(options.ExecutionCancellationGracePeriod, nameof(options.ExecutionCancellationGracePeriod));
         ValidatePositive(options.WorkerShutdownGracePeriod, nameof(options.WorkerShutdownGracePeriod));
@@ -68,6 +88,14 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             throw new InvalidOperationException(
                 $"{nameof(options.ExecutionLeaseRenewInterval)} must be shorter than " +
                 $"{nameof(options.ExecutionLeaseDuration)}.");
+        }
+
+        if (options.ExecutionLeaseRenewInterval + options.ExecutionCancellationGracePeriod
+            + options.ExecutionLeaseSafetyMargin >= options.ExecutionLeaseDuration)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(options.ExecutionLeaseDuration)} must exceed {nameof(options.ExecutionLeaseRenewInterval)} + " +
+                $"{nameof(options.ExecutionCancellationGracePeriod)} + {nameof(options.ExecutionLeaseSafetyMargin)}.");
         }
 
         // Grace-period waits stop lease renewal, so a grace period at or beyond the lease duration could let another
@@ -142,7 +170,7 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
 
         if (string.IsNullOrWhiteSpace(options.SchedulerScopeKey))
         {
-            throw new InvalidOperationException("A scheduler scope must be configured with UseSchedulerScope(...).");
+            throw new InvalidOperationException("A scheduler scope requires Deployment:Scope or UseSchedulerScope(...).");
         }
 
         if (string.IsNullOrWhiteSpace(options.WorkerInstanceId))
@@ -169,6 +197,23 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             {
                 foreach (var match in matches)
                 {
+                    var mode = Application.TypeActivation!.GetActivation(match.Type, TypeActivationKind.Job);
+                    Application.RecordActivation(new ResourceActivation
+                    {
+                        Key = $"job:{match.Type.FullName}", ImplementationType = match.Type,
+                        Kind = TypeActivationKind.Job, Mode = mode,
+                        Reason = mode switch
+                        {
+                            ActivationMode.Manual => "Explicit jobs execute in this process's isolated memory store.",
+                            ActivationMode.Disabled => "This job's owner is not placed in this application.",
+                            _ => "Normal scheduling and execution are admitted."
+                        }
+                    });
+                    if (mode == ActivationMode.Disabled)
+                    {
+                        continue;
+                    }
+
                     var isRecurring = match.Shape.IsAssignableTo(typeof(IRecurringJob));
                     var argumentsType = isRecurring
                         ? null
@@ -189,6 +234,8 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
     /// <inheritdoc />
     public override void PostConfigureServices(ModuleContext<ModuleJobSchedulerOption> context)
     {
+        foreach (var owner in Application.TypeActivation?.ActiveWorkloadOwners ?? [])
+            JobSchedulerIdentity.ValidateStandard(owner, "WorkloadOwner");
         var services = context.Services;
         IReadOnlyList<LocalJobDefinition> localDefinitions =
             Array.AsReadOnly(_localJobDefinitions.OrderBy(
@@ -204,10 +251,32 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         services.AddSingleton<JobOrchestrator>();
         services.AddSingleton<ITriggeredJobManager, TriggeredJobManager>();
         services.AddSingleton<JobSchedulerFacade>();
+        if (Option.AutonomousWork && Option.HistoryCleanupLeaseStore is { } cleanupSelection)
+            services.AddSingleton(provider => new HistoryCleanupLeaseStore(
+                provider.GetRequiredKeyedService<IExclusiveLeaseStore>(cleanupSelection.ServiceKey)));
         services.AddSingleton<JobSchedulingHostedService>();
         services.AddSingleton<JobExecutionWorkerHostedService>();
         services.AddHostedService(static provider => provider.GetRequiredService<JobSchedulingHostedService>());
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobSchedulingHostedService));
         services.AddHostedService(static provider => provider.GetRequiredService<JobExecutionWorkerHostedService>());
+        context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobExecutionWorkerHostedService));
+
+        if (!Option.AutonomousWork)
+        {
+            ServiceDescriptor? localStore = null;
+            context.Composition.OnServicesFinalized(finalServices =>
+            {
+                finalServices.RemoveAll<IJobSchedulerStore>();
+                localStore = ServiceDescriptor.Singleton<IJobSchedulerStore>(provider =>
+                    new InMemoryJobSchedulerStore(provider.GetRequiredService<TimeProvider>(),
+                        provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ModuleJobSchedulerOption>>()));
+                finalServices.Add(localStore);
+            }, descriptors =>
+            {
+                if (descriptors.Where(descriptor => descriptor.ServiceType == typeof(IJobSchedulerStore)).Any(descriptor => !ReferenceEquals(descriptor, localStore)))
+                    throw new InvalidOperationException("Manual JobScheduler requires its isolated process-local store.");
+            });
+        }
 
         services.AddHealthChecks().AddMonicaReadinessCheck<JobSchedulerHealthCheck>(
             "monica.job-scheduler",
@@ -219,14 +288,14 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
     {
         module.Require<ModuleHostedService, ModuleHostedServiceOption>();
         module.Require<ModuleHealthCheck, ModuleHealthCheckOption>();
-        module.RequireFeature(STORE_FEATURE);
-        module.RequireFeature(SCOPE_FEATURE);
     }
 
     /// <inheritdoc />
     public override void DeclareContracts(ModuleContractDescriptor<ModuleJobSchedulerOption> contracts)
     {
         contracts.RequireService<IJobSchedulerStore>();
+        if (contracts.Options.AutonomousWork && contracts.Options.HistoryCleanupLeaseStore is { } cleanupSelection)
+            contracts.RequireKeyedService<IExclusiveLeaseStore>(cleanupSelection.ServiceKey);
     }
 
     private LocalJobDefinition CreateLocalDefinition(
@@ -266,8 +335,11 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
         };
 
         declaration = NormalizeDeclaration(declaration);
+        var ownerKey = Application.TypeActivation?.GetWorkloadOwner(jobClrType) ?? Option.GetProjectName();
+        JobSchedulerIdentity.ValidateStandard(ownerKey, nameof(LocalJobDefinition.OwnerKey));
         return new LocalJobDefinition
         {
+            OwnerKey = ownerKey,
             Declaration = declaration,
             JobClrType = jobClrType,
             JobArgsClrType = argumentsType
@@ -327,10 +399,8 @@ public static class ModuleJobSchedulerRegistrationExtensions
         this ModuleRegistration<ModuleJobScheduler, ModuleJobSchedulerOption> registration)
         where TStore : class, IJobSchedulerStore
     {
-        return registration
-            .PostConfigureServices(static context =>
-                context.Services.TryAddSingleton<IJobSchedulerStore, TStore>())
-            .SatisfyFeature(ModuleJobScheduler.STORE_FEATURE);
+        return registration.PostConfigureServices(static context =>
+            context.Services.TryAddSingleton<IJobSchedulerStore, TStore>());
     }
 
     /// <summary>
@@ -353,9 +423,7 @@ public static class ModuleJobSchedulerRegistrationExtensions
         string scopeKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scopeKey);
-        return registration
-            .Configure(options => options.SchedulerScopeKey = scopeKey)
-            .SatisfyFeature(ModuleJobScheduler.SCOPE_FEATURE);
+        return registration.Configure(options => options.SchedulerScopeKey = scopeKey);
     }
 }
 
@@ -376,8 +444,8 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public string SchedulerScopeKey { get; internal set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the Monica project name used as the local owner identity. Jobs discovered by this host are
-    /// registered, scheduled, and executed under this owner.
+    /// Gets or sets the fallback owner identity for jobs without application-model workload ownership.
+    /// Role-owned jobs use the logical owner selected by the host's activation policy instead.
     /// </summary>
     public string? ProjectName { get; set; }
 
@@ -389,11 +457,10 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
         Environment.GetEnvironmentVariable("HOSTNAME") ?? $"{Environment.MachineName}:{Environment.ProcessId}";
 
     /// <summary>
-    /// Gets or sets whether automatic recurring occurrence materialization is suppressed with an explicit debug-mode
-    /// reason. This setting does not change operator policy or prevent an explicit recurring run-now command. Triggered
-    /// work is unaffected. The default is <see langword="false"/>.
+    /// Gets the frozen host's permission to initiate scheduling and maintenance. Derived from Application:AutonomousWork;
+    /// false selects an isolated local store and keeps explicit native execution available.
     /// </summary>
-    public bool RecurringJobDebugMode { get; set; }
+    public bool AutonomousWork { get; internal set; } = true;
 
     /// <summary>
     /// Gets or sets the maximum number of attempts this process executes concurrently. The default is 4.
@@ -424,6 +491,38 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     public TimeSpan SnapshotSyncInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Gets or sets the grant duration for owner scheduling and scope maintenance coordinators. The default is
+    /// 30 seconds. Coordinated mutations recheck the grant under its row lock before touching job state.
+    /// </summary>
+    public TimeSpan CoordinatorLeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Optional keyed authority for duplicate-tolerant terminal-history pruning. Null shares the scheduler store's
+    /// maintenance lease. An external store only coordinates cleanup; owner scheduling and execution recovery
+    /// always retain the scheduler database's transaction guards. Scope must identify the protected database.
+    /// All replicas must use the same selection. Ignored when autonomous work is disabled.
+    /// </summary>
+    public LeaseStoreSelection? HistoryCleanupLeaseStore { get; set; }
+
+    /// <summary>
+    /// Gets explicit previous-manifest hashes authorized for replacement, indexed by logical owner. Configure this
+    /// only during a drained, all-writers-stopped deployment. Empty by default; incompatible manifests fail closed.
+    /// </summary>
+    public Dictionary<string, string> OwnerManifestReplacements { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets or sets the total per-process relational store concurrency limit. The default is eight.</summary>
+    public int MaxConcurrentStoreOperations { get; set; } = 8;
+
+    /// <summary>Gets or sets slots reserved from ordinary reads, admission and maintenance for renewal/completion. The default is two.</summary>
+    public int ReservedLeaseStoreOperations { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the total local admission, transaction and retry budget for a relational store operation.
+    /// Completion and release use <see cref="ExecutionFinalizationTimeout"/> instead. The default is five seconds.
+    /// </summary>
+    public TimeSpan StoreOperationTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Gets or sets the duration of each fenced execution lease. It must exceed
     /// <see cref="ExecutionLeaseRenewInterval"/>, <see cref="ExecutionCancellationGracePeriod"/>, and
     /// <see cref="WorkerShutdownGracePeriod"/> so a grace-period wait never outlives the lease that fences the
@@ -436,6 +535,38 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     /// default is 10 seconds.
     /// </summary>
     public TimeSpan ExecutionLeaseRenewInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Gets or sets the time reserved before a conservatively estimated lease expiration. The watchdog starts
+    /// cancellation one cancellation grace period before this boundary. The default is two seconds.
+    /// </summary>
+    public TimeSpan ExecutionLeaseSafetyMargin { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Gets or sets the independent deadline of a renewal request. An unresponsive request never blocks the lease
+    /// watchdog and no second renewal is started until the first request exits. The default is five seconds.
+    /// </summary>
+    public TimeSpan ExecutionLeaseRenewalTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets or sets the maximum wait for recording completion or releasing a stopped attempt, including relational
+    /// store admission, commands and retries. This budget does not extend the execution lease. Expired finalization
+    /// enters a bounded cancellation drain and durable recovery remains authoritative. The default is 30 seconds.
+    /// </summary>
+    public TimeSpan ExecutionFinalizationTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the maximum time from the first cancellation of a store call until both I/O and cancellation
+    /// callbacks exit. New claims pause during cleanup; exceeding this budget requests host termination. This
+    /// budget never extends the execution lease or the host shutdown deadline. The default is 30 seconds.
+    /// </summary>
+    public TimeSpan ExecutionStoreDrainTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the backoff after timed-out store calls exit. Ordinary cancellation during job completion
+    /// does not add this delay. Recovery probes with at most one claim before normal batches. The default is five seconds.
+    /// </summary>
+    public TimeSpan ExecutionStoreRecoveryDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Gets or sets the delay applied by the durable store before a failed attempt becomes retryable. The default is
@@ -529,8 +660,9 @@ public sealed class ModuleJobSchedulerOption : ModuleOptions<ModuleJobScheduler>
     };
 
     /// <summary>
-    /// Resolves the local project identity from explicit scheduler configuration, Monica application configuration,
-    /// or the process entry assembly. An explicitly configured project name resolves without host binding.
+    /// Resolves the fallback job-owner identity from explicit scheduler configuration, Monica application configuration,
+    /// or the process entry assembly. Workload-specific owners take precedence for discovered jobs.
+    /// An explicitly configured project name resolves without host binding.
     /// </summary>
     public string GetProjectName()
     {

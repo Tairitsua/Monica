@@ -61,7 +61,7 @@ public class ChainTracingControllerActionFilter(IChainTracing chainTracing, ILog
                 var result = ChainTracingResultHelper.ExtractResult(context.Result);
                 if (result is IResultEnvelope response)
                 {
-                    chainTracing.EndTrace(actionTraceId, $"{ChainTracingResultHelper.GetResponseTypeName(response.GetType())}({response.Status}){(response.Message?.LimitMaxLength(100, "...").BeNullIfWhiteSpace() is { } msg ? $"[{msg}]" : null)}", response.Status == ResStatus.Ok);
+                    chainTracing.EndTrace(actionTraceId, $"{ChainTracingResultHelper.GetResponseTypeName(response.GetType())}({response.Status}){(response.Message?.LimitMaxLength(100, "...").BeNullIfWhiteSpace() is { } msg ? $"[{msg}]" : null)}", response.Status == ResultStatus.Ok);
                   
                 }
                 else

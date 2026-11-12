@@ -1,0 +1,7 @@
+.product-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100dvh; background: var(--mud-palette-background); color: var(--mud-palette-text-primary); }
+aside { padding: 28px 20px; display: flex; flex-direction: column; align-items: stretch; gap: 20px; background: var(--mud-palette-surface); border-right: 1px solid var(--mud-palette-divider); }
+aside strong { font-size: 1.2rem; }
+aside a, aside ::deep a { color: var(--mud-palette-primary); text-decoration: none; }
+aside button { border: 1px solid var(--mud-palette-divider); border-radius: 6px; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); min-height: 44px; padding: 8px; cursor: pointer; }
+main { padding: clamp(20px, 4vw, 56px); min-width: 0; }
+@media (max-width: 700px) { .product-layout { grid-template-columns: 1fr; } aside { flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--mud-palette-divider); } }

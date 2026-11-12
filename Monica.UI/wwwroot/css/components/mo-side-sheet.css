@@ -1,0 +1,39 @@
+/* Native dialog portals sit outside page isolation and container-query layout bounds. */
+.mud-dialog.mo-side-sheet {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: min(var(--mo-side-sheet-width, 480px), 100vw);
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: 0 12px 32px -8px color-mix(in srgb, var(--mud-palette-text-primary) 18%, transparent), 0 4px 10px -4px color-mix(in srgb, var(--mud-palette-text-primary) 8%, transparent) !important;
+    animation: mo-side-sheet-enter .18s ease-out;
+}
+.mo-side-sheet > .mud-dialog-title { flex: none; border-bottom: 1px solid var(--mud-palette-divider); }
+.mo-side-sheet-heading { display: flex; align-items: flex-start; gap: 14px; padding: 22px; min-width: 0; }
+.mo-side-sheet-identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mo-side-sheet-identity > h2 { margin: 0; font-size: 22px; line-height: 1.4; font-weight: 600; }
+.mo-side-sheet .mo-side-sheet-close { flex: none; padding: 7px; width: 32px; height: 32px; }
+.mo-side-sheet .mo-side-sheet-close .mud-icon-root { width: 18px; height: 18px; }
+.mo-side-sheet-header { min-width: 0; }
+.mo-side-sheet .mud-dialog-content.mo-side-sheet-content { display: flex; min-height: 0; min-width: 0; padding: 0; overflow: hidden; }
+.mo-side-sheet-body, .mo-side-sheet-tabs > .mud-tabs-panels { flex: 1; min-height: 0; min-width: 0; padding: 22px; overflow-y: auto; overscroll-behavior: contain; }
+.mo-side-sheet-tabs { flex: 1; width: 100%; min-width: 0; min-height: 0; }
+.mo-side-sheet-tabs > .mud-tabs-tabbar { flex: none; border-bottom: 1px solid var(--mud-palette-divider); }
+.mo-side-sheet-tabs .mud-tab { font-size: 13px; text-transform: none; }
+.mo-side-sheet-tabs > .mud-tabs-panels > .mud-tabpanel { min-width: 0; }
+.mo-side-sheet .mud-dialog-actions.mo-side-sheet-footer { flex: none; padding: 16px 22px; border-top: 1px solid var(--mud-palette-divider); }
+.mo-side-sheet .mud-dialog-actions.mo-side-sheet-footer:empty { display: none; }
+@media (max-width: 560px) {
+    .mo-side-sheet-heading, .mo-side-sheet-body, .mo-side-sheet-tabs > .mud-tabs-panels { padding: 20px; }
+    .mo-side-sheet .mud-dialog-actions.mo-side-sheet-footer { padding: 12px 20px; }
+}
+.mo-side-sheet-backdrop { backdrop-filter: blur(2px); }
+.mud-overlay.mo-side-sheet-backdrop .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 55%, transparent); }
+[data-theme$="-dark"] .mud-dialog.mo-side-sheet { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mud-palette-text-primary) 6%, transparent), 0 18px 40px -12px color-mix(in srgb, var(--mud-palette-black) 65%, transparent) !important; }
+@keyframes mo-side-sheet-enter { from { opacity: 0; transform: translateX(14px); } }
+@media (prefers-reduced-motion: reduce) { .mud-dialog.mo-side-sheet { animation: none; } }

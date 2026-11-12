@@ -9,14 +9,14 @@ namespace Monica.Configuration.UI.State;
 internal sealed class ConfigurationDebugPageState : IAsyncDisposable
 {
     private readonly ConfigurationOperationLifetime _lifetime;
-    private readonly Func<Task<Res<string>>> _load;
+    private readonly Func<Task<Result<string>>> _load;
     private readonly string _unavailableText;
     private readonly HashSet<int> _revealedLines = [];
 
     internal ConfigurationDebugPageState(ConfigurationFacade facade, string unavailableText,
         ConfigurationOperationLifetime lifetime) : this(facade.GetDebugViewAsync, unavailableText, lifetime) { }
 
-    internal ConfigurationDebugPageState(Func<Task<Res<string>>> load, string unavailableText,
+    internal ConfigurationDebugPageState(Func<Task<Result<string>>> load, string unavailableText,
         ConfigurationOperationLifetime? lifetime = null)
     {
         _load = load;
@@ -39,9 +39,10 @@ internal sealed class ConfigurationDebugPageState : IAsyncDisposable
         await Read.ReadReservedAsync(request, async () =>
         {
             var result = await _load();
-            if (result.IsFailed(out var failure, out var text)) return Res.Fail(failure.Message ?? _unavailableText);
-            return text is null ? Res.Fail(_unavailableText)
-                : Res.Ok<IReadOnlyList<ConfigurationDebugLine>>(Array.AsReadOnly(ConfigurationDebugValueRedactor.Parse(text).ToArray()));
+            var text = result.Data;
+            if (result.IsFailure()) return Result.FromFailure<IReadOnlyList<ConfigurationDebugLine>>(result);
+            return text is null ? Result.Failure<IReadOnlyList<ConfigurationDebugLine>>(_unavailableText)
+                : Result.Success<IReadOnlyList<ConfigurationDebugLine>>(Array.AsReadOnly(ConfigurationDebugValueRedactor.Parse(text).ToArray()));
         });
     });
 

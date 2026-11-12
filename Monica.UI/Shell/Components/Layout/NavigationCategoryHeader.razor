@@ -1,0 +1,14 @@
+@using Monica.UI.Shell.Models
+
+<div class="category-heading">
+    <h2>@Group.DisplayName <span class="category-count">@Group.DestinationCount</span></h2>
+    @if (!string.IsNullOrWhiteSpace(Group.Description))
+    {
+        <p>@Group.Description</p>
+    }
+</div>
+
+@code {
+    /// <summary>The authorized category whose localized identity and destination count are shown.</summary>
+    [Parameter, EditorRequired] public NavigationGroup Group { get; set; } = default!;
+}

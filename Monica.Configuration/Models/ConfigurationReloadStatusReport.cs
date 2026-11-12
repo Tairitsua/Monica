@@ -11,9 +11,9 @@ public sealed record ConfigurationReloadStatusReport
     public DateTimeOffset GeneratedAt { get; init; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    /// Gets the effective value store that runtime versions are compared against.
+    /// Gets the effective value store used for local Managed comparisons, or null when no local Managed owner exists.
     /// </summary>
-    public required ConfigurationStoreDescriptor EffectiveValueStore { get; init; }
+    public ConfigurationStoreDescriptor? EffectiveValueStore { get; init; }
 
     /// <summary>
     /// Gets runtime reload counters and timestamps for Monica's projection provider.

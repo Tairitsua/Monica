@@ -9,6 +9,90 @@ namespace Test.Monica.Framework.UI.Seeder;
 public sealed class SeederPageSessionTests
 {
     [Fact]
+    public async Task RunSelectedAsync_WhenAccessChanges_ShouldRejectBeforeExecutorCall()
+    {
+        var allowed = true;
+        var executions = 0;
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Result.Success(snapshot)), _ => Task.FromResult(allowed), "test-host",
+            runAsync: (_, _) =>
+            {
+                executions++;
+                return Task.FromResult(Result.Success(snapshot.Run));
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        allowed = false;
+
+        (await session.RunSelectedAsync()).Should().BeFalse();
+
+        executions.Should().Be(0);
+        session.IsAccessDenied.Should().BeTrue();
+        session.IsExecuting.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RunSelectedAsync_WhenBusy_ShouldRejectAnotherSubmissionAndRefreshOutcome()
+    {
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var executions = 0;
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Result.Success(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: async (identity, cancellationToken) =>
+            {
+                identity.Should().Be(seeder.SeederTypeName);
+                executions++;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+                snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Succeeded,
+                    [seeder with { Status = SeederStatus.Succeeded }]);
+                return Result.Success(snapshot.Run);
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        var execution = session.RunSelectedAsync();
+        await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        session.IsExecuting.Should().BeTrue();
+        session.CanRunSelected.Should().BeFalse();
+        (await session.RunSelectedAsync()).Should().BeFalse();
+        release.TrySetResult();
+        (await execution).Should().BeTrue();
+        executions.Should().Be(1);
+        session.IsExecuting.Should().BeFalse();
+        session.SelectedSeeder!.Status.Should().Be(SeederStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenExecutionIsPending_ShouldCancelAndObserveIt()
+    {
+        var seeder = SeederUiTestData.CreateSeeder("HeldSeeder", SeederStatus.Held);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [seeder]);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var never = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new SeederPageSession(
+            _ => Task.FromResult(Result.Success(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: async (_, cancellationToken) =>
+            {
+                entered.TrySetResult();
+                await never.Task.WaitAsync(cancellationToken);
+                return Result.Success(snapshot.Run);
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(seeder);
+        var execution = session.RunSelectedAsync();
+        await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        await session.DisposeAsync();
+
+        (await execution).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShouldExposeConfigurationAndComposableFilters()
     {
         var required = SeederUiTestData.CreateSeeder(
@@ -20,7 +104,7 @@ public sealed class SeederPageSessionTests
             SeederFailureBehavior.FailFast,
             errorMessage: "Search service unavailable");
         await using var session = CreateSession(_ => Task.FromResult(
-            Res.Ok(SeederUiTestData.CreateSnapshot(
+            Result.Success(SeederUiTestData.CreateSnapshot(
                 SeederRunStatus.CompletedWithFailures,
                 [required, optional]))));
 
@@ -54,7 +138,7 @@ public sealed class SeederPageSessionTests
             SeederUiTestData.CreateSeeder("Blocked", SeederStatus.Blocked),
             SeederUiTestData.CreateSeeder("Failed", SeederStatus.Failed)
         };
-        await using var session = CreateSession(_ => Task.FromResult(Res.Ok(
+        await using var session = CreateSession(_ => Task.FromResult(Result.Success(
             SeederUiTestData.CreateSnapshot(SeederRunStatus.Running, seeders))));
 
         await session.InitializeAsync();
@@ -72,7 +156,7 @@ public sealed class SeederPageSessionTests
     public async Task RefreshAsync_WhenRequestIsActive_ShouldJoinTrackedRequestWithoutOverlap()
     {
         var facadeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseFacade = new TaskCompletionSource<Res<SeederDiagnosticsSnapshot>>(
+        var releaseFacade = new TaskCompletionSource<Result<SeederDiagnosticsSnapshot>>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var facadeCalls = 0;
         await using var session = CreateSession(async _ =>
@@ -89,7 +173,7 @@ public sealed class SeederPageSessionTests
         second.Should().BeSameAs(first);
         facadeCalls.Should().Be(1);
 
-        releaseFacade.SetResult(Res.Ok(SeederUiTestData.CreateSnapshot()));
+        releaseFacade.SetResult(Result.Success(SeederUiTestData.CreateSnapshot()));
         (await first).Should().BeTrue();
     }
 
@@ -102,8 +186,8 @@ public sealed class SeederPageSessionTests
         {
             facadeCalls++;
             return facadeCalls == 1
-                ? Task.FromResult(Res.Ok(initial))
-                : Task.FromResult<Res<SeederDiagnosticsSnapshot>>("refresh unavailable");
+                ? Task.FromResult(Result.Success(initial))
+                : Task.FromResult(Result.Failure<SeederDiagnosticsSnapshot>("refresh unavailable"));
         });
 
         await session.InitializeAsync();
@@ -121,7 +205,7 @@ public sealed class SeederPageSessionTests
         var firstFailureCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var repeatedFailureEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var repeatedFailureCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseRepeatedFailure = new TaskCompletionSource<Res<SeederDiagnosticsSnapshot>>(
+        var releaseRepeatedFailure = new TaskCompletionSource<Result<SeederDiagnosticsSnapshot>>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var facadeCalls = 0;
         await using var session = CreateSession(
@@ -130,12 +214,12 @@ public sealed class SeederPageSessionTests
                 var call = Interlocked.Increment(ref facadeCalls);
                 return call switch
                 {
-                    1 => Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running))),
-                    2 => Task.FromResult<Res<SeederDiagnosticsSnapshot>>("refresh unavailable"),
+                    1 => Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running))),
+                    2 => Task.FromResult(Result.Failure<SeederDiagnosticsSnapshot>("refresh unavailable")),
                     _ => WaitForRepeatedFailureAsync()
                 };
 
-                async Task<Res<SeederDiagnosticsSnapshot>> WaitForRepeatedFailureAsync()
+                async Task<Result<SeederDiagnosticsSnapshot>> WaitForRepeatedFailureAsync()
                 {
                     repeatedFailureEntered.TrySetResult();
                     return await releaseRepeatedFailure.Task;
@@ -173,7 +257,7 @@ public sealed class SeederPageSessionTests
         session.IsRefreshing.Should().BeTrue();
         session.RefreshError.Should().Be("refresh unavailable");
 
-        releaseRepeatedFailure.SetResult("refresh unavailable");
+        releaseRepeatedFailure.SetResult(Result.Failure<SeederDiagnosticsSnapshot>("refresh unavailable"));
         await repeatedFailureCompleted.Task.WaitAsync(
             TimeSpan.FromSeconds(2),
             TestContext.Current.CancellationToken);
@@ -189,7 +273,7 @@ public sealed class SeederPageSessionTests
             _ =>
             {
                 facadeCalls++;
-                return Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot()));
+                return Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot()));
             },
             _ => Task.FromResult(false));
 
@@ -211,7 +295,7 @@ public sealed class SeederPageSessionTests
             _ =>
             {
                 facadeCalls++;
-                return Task.FromResult(Res.Ok(snapshot));
+                return Task.FromResult(Result.Success(snapshot));
             },
             _ => Task.FromResult(Interlocked.Increment(ref authorizationCalls) == 1),
             timeProvider: timeProvider);
@@ -240,10 +324,10 @@ public sealed class SeederPageSessionTests
                 var call = Interlocked.Increment(ref facadeCalls);
                 if (call == 1)
                 {
-                    return Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running)));
+                    return Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running)));
                 }
 
-                return Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot(SeederRunStatus.Succeeded)));
+                return Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot(SeederRunStatus.Succeeded)));
             },
             timeProvider: timeProvider);
         session.Changed += () =>
@@ -280,7 +364,7 @@ public sealed class SeederPageSessionTests
             _ =>
             {
                 facadeCalls++;
-                return Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot()));
+                return Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot()));
             },
             _ =>
             {
@@ -320,7 +404,7 @@ public sealed class SeederPageSessionTests
             {
                 registration = cancellationToken.Register(static () =>
                     throw new InvalidOperationException("Expected cancellation callback failure."));
-                return Task.FromResult(Res.Ok(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running)));
+                return Task.FromResult(Result.Success(SeederUiTestData.CreateSnapshot(SeederRunStatus.Running)));
             },
             timeProvider: timeProvider);
 
@@ -347,7 +431,7 @@ public sealed class SeederPageSessionTests
             try
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                return Res.Ok(SeederUiTestData.CreateSnapshot());
+                return Result.Success(SeederUiTestData.CreateSnapshot());
             }
             finally
             {
@@ -366,7 +450,7 @@ public sealed class SeederPageSessionTests
     }
 
     private static SeederPageSession CreateSession(
-        Func<CancellationToken, Task<Res<SeederDiagnosticsSnapshot>>> getSnapshot,
+        Func<CancellationToken, Task<Result<SeederDiagnosticsSnapshot>>> getSnapshot,
         Func<CancellationToken, Task<bool>>? authorize = null,
         TimeProvider? timeProvider = null)
     {

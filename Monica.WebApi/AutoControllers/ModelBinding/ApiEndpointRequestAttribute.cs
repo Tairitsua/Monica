@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Monica.WebApi.Annotations;
+using Monica.Application.Annotations;
 
 namespace Monica.WebApi.AutoControllers.ModelBinding;
 

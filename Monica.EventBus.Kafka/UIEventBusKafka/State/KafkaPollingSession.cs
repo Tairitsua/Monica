@@ -13,7 +13,7 @@ internal sealed record KafkaSamplingTarget(string ClusterId, string? GroupId = n
 /// before retirement may finish during teardown; subscribers own and drain their renderer work.
 /// </remarks>
 internal sealed class KafkaPollingSession<TSnapshot>(
-    Func<KafkaSamplingTarget, CancellationToken, Task<Res<TSnapshot>>> capture,
+    Func<KafkaSamplingTarget, CancellationToken, Task<Result<TSnapshot>>> capture,
     Func<TSnapshot, bool> isUsable,
     Func<TSnapshot, string?> diagnostic,
     Func<TSnapshot, DateTimeOffset> capturedAt,
@@ -271,13 +271,14 @@ internal sealed class KafkaPollingSession<TSnapshot>(
             lock (_sync)
             {
                 if (_retired || generation != _generation) return false;
-                if (result.IsFailed(out var error))
+                if (result.IsFailure())
                 {
                     LastAttemptedAt = DateTimeOffset.UtcNow;
-                    LastError = error.Message;
+                    LastError = result.Message;
                     return false;
                 }
-                var snapshot = result.Data!;
+                var snapshot = result.Data
+                    ?? throw new InvalidOperationException("Kafka capture returned no snapshot.");
                 _snapshotTarget = target;
                 LastAttemptedAt = capturedAt(snapshot);
                 LastError = diagnostic(snapshot);

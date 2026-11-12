@@ -71,6 +71,11 @@
 .atlas-native__tabs button[aria-pressed='true'] { color: var(--atlas-accent); border-color: color-mix(in srgb, var(--mud-palette-primary) 22%, var(--mud-palette-divider)); background: color-mix(in srgb, var(--mud-palette-primary) 7%, var(--mud-palette-surface)); }
 .atlas-ledger__row { display: grid; gap: 9px; padding: 16px 10px; border-top: 1px solid var(--mud-palette-divider); }
 .atlas-ledger__row:first-child { border-top: 0; }
+.atlas-ledger__row details { min-width: 0; font-size: 11px; line-height: 1.6; }
+.atlas-ledger__row summary { color: var(--atlas-accent); cursor: pointer; }
+.atlas-ledger__row details ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.atlas-ledger__row details li { display: grid; gap: 3px; padding: 8px 0; overflow-wrap: anywhere; }
+.atlas-ledger__row details code { font-family: var(--mo-font-family-mono); }
 .atlas-ledger__direction { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .atlas-ledger__direction button { border: 0; border-radius: 3px; padding: 0; background: transparent; color: var(--mud-palette-text-primary); font-family: var(--mo-font-family-mono); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; text-align: start; cursor: pointer; }
 .atlas-ledger__direction button:hover { color: var(--atlas-accent); text-decoration: underline; }

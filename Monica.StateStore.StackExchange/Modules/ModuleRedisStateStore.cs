@@ -21,7 +21,7 @@ public static class ModuleRedisStateStoreBuilderExtensions
     /// <returns>The Redis StateStore module registration for chaining.</returns>
     /// <remarks>
     /// Typed values use the canonical JSON contract configured for this Monica host. Changing that contract can make
-    /// existing persisted state incompatible.
+    /// existing persisted state incompatible. The host owns and disposes the created Redis connection.
     /// </remarks>
     public static ModuleRegistration<ModuleRedisStateStore, ModuleRedisStateStoreOption> UseRedisStateStoreProvider(
         this ModuleRegistration<ModuleStateStore, ModuleStateStoreOption> module,
@@ -53,6 +53,7 @@ public static class ModuleRedisStateStoreBuilderExtensions
     /// <returns>The StateStore module registration for chaining.</returns>
     /// <remarks>
     /// The service key isolates Redis connection settings, but every keyed store uses the host's canonical JSON contract.
+    /// The host owns and disposes each keyed Redis connection.
     /// </remarks>
     public static ModuleRegistration<ModuleStateStore, ModuleStateStoreOption> AddKeyedRedisStateStore(
         this ModuleRegistration<ModuleStateStore, ModuleStateStoreOption> module,
@@ -143,12 +144,15 @@ public class ModuleRedisStateStoreOption : ModuleOptions<ModuleRedisStateStore>
     public RedisConnectionConfiguration? Connection { get; set; }
 
     /// <summary>
-    /// Key prefix for all state store keys (optional)
+    /// Literal namespace for all state keys. A colon is inserted between this prefix and each logical key.
+    /// The default is no prefix. Do not append a separator unless it is part of the intended namespace.
     /// </summary>
     public string? KeyPrefix { get; set; }
 
     /// <summary>
-    /// Default TTL for state entries (optional, null = no expiration)
+    /// Expiry used when a write omits its TTL. Null or zero means permanent; negative values are invalid.
+    /// A write's explicit zero TTL overrides this default and clears any previous expiry. Positive durations
+    /// round up to whole milliseconds and replace any previous expiry atomically with the write.
     /// </summary>
     public TimeSpan? DefaultTTL { get; set; }
 
@@ -184,7 +188,8 @@ public class ModuleRedisStateStoreOption : ModuleOptions<ModuleRedisStateStore>
     /// <param name="sentinelHost">Primary Sentinel host</param>
     /// <param name="sentinelPort">Sentinel port (default: 26379)</param>
     /// <param name="serviceName">Master service name (default: mymaster)</param>
-    /// <param name="password">Redis password (optional)</param>
+    /// <param name="password">Password shared by the data server and Sentinel endpoints (optional).
+    /// Configure <see cref="Connection"/> directly when their credentials differ.</param>
     /// <param name="additionalSentinels">Additional sentinel endpoints (format: host:port)</param>
     public ModuleRedisStateStoreOption UseSentinelConnection(
         string sentinelHost,
@@ -200,6 +205,7 @@ public class ModuleRedisStateStoreOption : ModuleOptions<ModuleRedisStateStore>
             Port = sentinelPort,
             ServiceName = serviceName,
             Password = password,
+            SentinelPassword = password,
             AdditionalEndpoints = [..additionalSentinels],
             AbortOnConnectFail = false
         };

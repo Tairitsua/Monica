@@ -523,7 +523,7 @@ public sealed class JobSchedulerStoreContractTests
             new RecurringScheduleSynchronization
             {
                 CursorKey = cursor.Key,
-                HostSuspensionReasons = JobRecurringScheduleSuspensionReason.DebugMode
+                HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
             }, TestContext.Current.CancellationToken);
         suspended.Status.Should().Be(RecurringScheduleSynchronizationStatus.Updated);
         suspended.Cursor!.IsSuspended.Should().BeTrue();

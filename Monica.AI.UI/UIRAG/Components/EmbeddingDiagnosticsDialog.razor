@@ -172,7 +172,9 @@
                 var result = await EmbeddingFacade.GetEmbeddingModelDiagnosticsAsync();
                 _lifetime.TryApply(() =>
                 {
-                    if (result.IsFailed(out var error, out var models))
+                    var error = result.WithoutData();
+                    var models = result.Data;
+                    if (result.IsFailure() || models is null)
                     {
                         _models = [];
                         _loadErrorMessage = error.Message ?? L["Common:Error"].Value;
@@ -203,7 +205,9 @@
             await _lifetime.RunAsync(async token =>
             {
                 var result = await EmbeddingFacade.TestEmbeddingModelConnectionAsync(model.ProviderId, model.ModelName, token);
-                if (result.IsFailed(out var error, out var testResult))
+                var error = result.WithoutData();
+                var testResult = result.Data;
+                if (result.IsFailure() || testResult is null)
                 {
                     testResult = new EmbeddingModelConnectionTestResult
                     {

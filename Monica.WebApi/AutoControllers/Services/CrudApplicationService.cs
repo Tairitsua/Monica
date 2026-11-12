@@ -100,7 +100,7 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// <returns>A standardized success response for the created entity.</returns>
     /// <remarks>Overrides the base method to return the standardized response format.</remarks>
     [OverrideService(-999)]
-    public new virtual async Task<Res> CreateAsync(TCreateInput input)
+    public new virtual async Task<Result> CreateAsync(TCreateInput input)
     {
         var dto = await base.CreateAsync(input);
         return ResEntityCreateSuccess(dto);
@@ -113,7 +113,7 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// <returns>A standardized success response for the deleted entity.</returns>
     /// <remarks>Overrides the base method to return the standardized response format.</remarks>
     [OverrideService(-999)]
-    public new virtual async Task<Res> DeleteAsync(TKey id)
+    public new virtual async Task<Result> DeleteAsync(TKey id)
     {
         await base.DeleteAsync(id);
         return ResEntityDeleteSuccess(id?.ToString() ?? "");
@@ -125,7 +125,7 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// <param name="input">The input containing the IDs of the entities to delete.</param>
     /// <returns>A standardized response for the bulk delete operation.</returns>
     /// <remarks>Bulk deletion is executed only when the input implements <see cref="IHasRequestIds{TKey}"/>.</remarks>
-    public virtual async Task<Res> BulkDeleteAsync(TBulkDeleteInput input)
+    public virtual async Task<Result> BulkDeleteAsync(TBulkDeleteInput input)
     {
         if (input is IHasRequestIds<TKey> keys)
         {
@@ -147,7 +147,7 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// Guideline: <typeparamref name="TUpdateInput"/> and <typeparamref name="TCreateInput"/> should not inherit from entity-style base classes.
     /// </remarks>
     [OverrideService(-999)]
-    public new virtual async Task<Res> UpdateAsync(TKey id, TUpdateInput input)
+    public new virtual async Task<Result> UpdateAsync(TKey id, TUpdateInput input)
     {
         // Guideline: TUpdateInput and TCreateInput should not inherit from entity-style base classes.
         var dto = await base.UpdateAsync(id, input);
@@ -161,15 +161,15 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// <returns>The standardized response that wraps the requested entity.</returns>
     [OverrideService(-999)]
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public new virtual async Task<Res<TGetOutputDto>> GetAsync(TKey id)
+    public new virtual async Task<Result<TGetOutputDto>> GetAsync(TKey id)
     {
         try
         {
-            return await base.GetAsync(id);
+            return Result.Success(await base.GetAsync(id));
         }
         catch (EntityNotFoundException)
         {
-            return ResEntityNotFound(id!.ToString()!);
+            return Result.FromFailure<TGetOutputDto>(ResEntityNotFound(id!.ToString()!));
         }
     }
 
@@ -177,7 +177,7 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     // TODO: When overriding a method with a different signature, add the POST attribute explicitly because it is not inherited.
     [HttpPost]
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public virtual async Task<ResPaged<dynamic>> ListAsync(TGetListInput input)
+    public virtual async Task<PagedResult<dynamic>> ListAsync(TGetListInput input)
     {
         return await GetListAsync(input);
     }
@@ -191,115 +191,115 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
     /// </summary>
     /// <param name="entityId">The identifier that could not be found.</param>
     /// <returns>A standardized not-found response.</returns>
-    protected virtual Res ResEntityNotFound(string entityId)
+    protected virtual Result ResEntityNotFound(string entityId)
     {
         if (EntityName is { } name)
         {
-            return $"{name} was not found.";
+            return Result.Failure($"{name} was not found.");
         }
-        return "The requested data was not found.";
+        return Result.Failure("The requested data was not found.");
     }
     /// <summary>
     /// Creates the standard success response after an entity update.
     /// </summary>
     /// <param name="dto">The updated DTO.</param>
     /// <returns>A standardized success response.</returns>
-    protected virtual Res ResEntityUpdateSuccess(TGetOutputDto dto)
+    protected virtual Result ResEntityUpdateSuccess(TGetOutputDto dto)
     {
         if (EntityName is { } name)
         {
-            return Res.Ok($"{name} updated successfully");
+            return Result.Success().WithMessage($"{name} updated successfully");
         }
-        return Res.Ok($"Updated successfully: {dto.Id}");
+        return Result.Success().WithMessage($"Updated successfully: {dto.Id}");
     }
     /// <summary>
     /// Creates the standard success response after an entity update.
     /// </summary>
     /// <param name="entityId">The identifier of the updated entity.</param>
     /// <returns>A standardized success response.</returns>
-    protected virtual Res ResEntityUpdateSuccess(string entityId)
+    protected virtual Result ResEntityUpdateSuccess(string entityId)
     {
         if (EntityName is { } name)
         {
-            return Res.Ok($"{name} updated successfully");
+            return Result.Success().WithMessage($"{name} updated successfully");
         }
-        return Res.Ok($"Updated successfully: {entityId}");
+        return Result.Success().WithMessage($"Updated successfully: {entityId}");
     }
     /// <summary>
     /// Creates the standard failure response for an entity update.
     /// </summary>
     /// <param name="entityId">The identifier of the entity that failed to update.</param>
     /// <returns>A standardized failure response.</returns>
-    protected virtual Res ResEntityUpdateFailed(string entityId)
+    protected virtual Result ResEntityUpdateFailed(string entityId)
     {
         if (EntityName is { } name)
         {
-            return $"{name} update failed.";
+            return Result.Failure($"{name} update failed.");
         }
-        return "Update failed.";
+        return Result.Failure("Update failed.");
     }
     /// <summary>
     /// Creates the standard success response after an entity is created.
     /// </summary>
     /// <param name="dto">The created DTO.</param>
     /// <returns>A standardized success response.</returns>
-    protected virtual Res ResEntityCreateSuccess(TGetOutputDto dto)
+    protected virtual Result ResEntityCreateSuccess(TGetOutputDto dto)
     {
         if (EntityName is { } name)
         {
-            return Res.Ok($"{name} created successfully: {dto.Id}");
+            return Result.Success().WithMessage($"{name} created successfully: {dto.Id}");
         }
-        return Res.Ok($"Created successfully: {dto.Id}");
+        return Result.Success().WithMessage($"Created successfully: {dto.Id}");
     }
     /// <summary>
     /// Creates the standard success response after an entity is created.
     /// </summary>
     /// <param name="entityId">The identifier of the created entity.</param>
     /// <returns>A standardized success response.</returns>
-    protected virtual Res ResEntityCreateSuccess(string entityId)
+    protected virtual Result ResEntityCreateSuccess(string entityId)
     {
         if (EntityName is { } name)
         {
-            return Res.Ok($"{name} created successfully: {entityId}");
+            return Result.Success().WithMessage($"{name} created successfully: {entityId}");
         }
-        return Res.Ok($"Created successfully: {entityId}");
+        return Result.Success().WithMessage($"Created successfully: {entityId}");
     }
     /// <summary>
     /// Creates the standard failure response for entity creation.
     /// </summary>
     /// <returns>A standardized failure response.</returns>
-    protected virtual Res ResEntityCreateFailed()
+    protected virtual Result ResEntityCreateFailed()
     {
         if (EntityName is { } name)
         {
-            return $"{name} creation failed.";
+            return Result.Failure($"{name} creation failed.");
         }
-        return "Creation failed.";
+        return Result.Failure("Creation failed.");
     }
     /// <summary>
     /// Creates the standard success response after an entity is deleted.
     /// </summary>
     /// <param name="id">The identifier of the deleted entity.</param>
     /// <returns>A standardized success response.</returns>
-    protected virtual Res ResEntityDeleteSuccess(string id)
+    protected virtual Result ResEntityDeleteSuccess(string id)
     {
         if (EntityName is { } name)
         {
-            return Res.Ok($"{name} deleted successfully: {id}");
+            return Result.Success().WithMessage($"{name} deleted successfully: {id}");
         }
-        return Res.Ok($"Deleted successfully: {id}");
+        return Result.Success().WithMessage($"Deleted successfully: {id}");
     }
     /// <summary>
     /// Creates the standard failure response for entity deletion.
     /// </summary>
     /// <returns>A standardized failure response.</returns>
-    protected virtual Res ResEntityDeleteFailed()
+    protected virtual Result ResEntityDeleteFailed()
     {
         if (EntityName is { } name)
         {
-            return $"{name} deletion failed.";
+            return Result.Failure($"{name} deletion failed.");
         }
-        return "Deletion failed.";
+        return Result.Failure("Deletion failed.");
     }
     #endregion
 }

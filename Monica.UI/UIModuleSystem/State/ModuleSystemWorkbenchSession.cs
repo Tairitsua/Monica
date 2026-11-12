@@ -7,10 +7,11 @@ using Monica.UI.UIModuleSystem.Support;
 namespace Monica.UI.UIModuleSystem.State;
 
 internal sealed record ModuleDiagnosticsCalls(
-    Func<Res<ModuleDiagnosticsSnapshot>> GetSnapshot,
-    Func<Res<TypeDiscoveryAssemblyInventory>> GetAssemblyInventory,
-    Func<ModuleKey, Res<ModuleOptionDiagnostics>> GetModuleOptions,
-    Func<Res<ModuleDiagnosticsExport>> CreateExport);
+    Func<Result<ModuleDiagnosticsSnapshot>> GetSnapshot,
+    Func<Result<TypeDiscoveryAssemblyInventory>> GetAssemblyInventory,
+    Func<ModuleKey, Result<ModuleOptionDiagnostics>> GetModuleOptions,
+    Func<Result<ModuleDiagnosticsExport>> CreateExport,
+    Func<Result<IReadOnlyList<ResourceActivationObservation>>>? GetResourceActivations = null);
 
 /// <summary>
 /// Owns the immutable snapshot, filters, selection, lazy requests, comparison, and polling lifetime of one page.
@@ -39,6 +40,7 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
     private int _inventoryRequestVersion;
     private int _baselineRequestVersion;
     private int _optionRequestVersion;
+    private int _activationRequestVersion;
     private bool _disposed;
 
     internal ModuleSystemWorkbenchSession(
@@ -66,6 +68,12 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
 
     /// <summary>Gets the most recent refresh failure while older data remains visible.</summary>
     public string? RefreshError { get; private set; }
+
+    /// <summary>Gets the last successful live resource admission view, separate from the startup snapshot.</summary>
+    public IReadOnlyList<ResourceActivationObservation>? ResourceActivations { get; private set; }
+
+    /// <summary>Gets the live resource view's read state; a failed refresh retains the previous successful view.</summary>
+    public ModuleSystemLazyLoadState ResourceActivationsState { get; private set; }
 
     /// <summary>Gets whether the most recent facade boundary denied the current circuit.</summary>
     public bool IsAccessDenied { get; private set; }
@@ -427,6 +435,28 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
         return RequestSnapshotAsync(isInitial: Snapshot is null);
     }
 
+    /// <summary>Reads current native resource admission after rechecking the page's access policy.</summary>
+    public async Task RefreshResourceActivationsAsync()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var version = Interlocked.Increment(ref _activationRequestVersion);
+        ResourceActivationsState = ModuleSystemLazyLoadState.Loading;
+        NotifyChanged();
+        if (!await EnsureAuthorizedAsync(() => version == Volatile.Read(ref _activationRequestVersion))) return;
+        var result = _calls.GetResourceActivations?.Invoke();
+        if (_disposed || version != Volatile.Read(ref _activationRequestVersion)) return;
+        if (result is not null && result.IsSuccess() && result.Data is { } resources)
+        {
+            ResourceActivations = resources;
+            ResourceActivationsState = ModuleSystemLazyLoadState.Ready;
+        }
+        else
+        {
+            ResourceActivationsState = ModuleSystemLazyLoadState.Failed;
+        }
+        NotifyChanged();
+    }
+
     /// <summary>Updates the deep-linkable workbench section.</summary>
     public void SetSection(ModuleSystemWorkbenchSection section)
     {
@@ -563,11 +593,11 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
     }
 
     /// <summary>Returns the sanitized current-schema payload produced by Core after rechecking access.</summary>
-    public async Task<Res<ModuleDiagnosticsExport>> CreateExportAsync()
+    public async Task<Result<ModuleDiagnosticsExport>> CreateExportAsync()
     {
         return await EnsureAuthorizedAsync()
             ? _calls.CreateExport()
-            : Res.Fail("Module diagnostics access was denied.");
+            : Result.Failure<ModuleDiagnosticsExport>("Module diagnostics access was denied.");
     }
 
     /// <summary>Loads or retries the selected module's public configuration catalog with bounded values.</summary>
@@ -611,11 +641,13 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
             return;
         }
 
-        if (result.IsFailed(out var error, out var options))
+        var error = result.WithoutData();
+        var options = result.Data;
+        if (result.IsFailure() || options is null)
         {
             _optionLoadsByModule[moduleKey] = new ModuleOptionLoadEntry(
                 ModuleSystemLazyLoadState.Failed,
-                error.Message);
+                error.Message ?? "The module options were unavailable.");
         }
         else
         {
@@ -786,24 +818,26 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
         return requestVersion;
     }
 
-    internal bool CompleteSnapshotRequest(int requestVersion, Res<ModuleDiagnosticsSnapshot> result)
+    internal bool CompleteSnapshotRequest(int requestVersion, Result<ModuleDiagnosticsSnapshot> result)
     {
         if (_disposed || requestVersion != Volatile.Read(ref _snapshotRequestVersion))
         {
             return false;
         }
 
-        if (result.IsFailed(out var error, out var snapshot))
+        var error = result.WithoutData();
+        var snapshot = result.Data;
+        if (result.IsFailure() || snapshot is null)
         {
             if (Snapshot is null)
             {
                 LoadState = ModuleSystemWorkbenchLoadState.Failed;
-                LoadError = error.Message;
+                LoadError = error.Message ?? "The module diagnostics snapshot was unavailable.";
             }
             else
             {
                 LoadState = ModuleSystemWorkbenchLoadState.Ready;
-                RefreshError = error.Message;
+                RefreshError = error.Message ?? "The module diagnostics snapshot was unavailable.";
             }
 
             NotifyChanged();
@@ -835,17 +869,19 @@ public sealed class ModuleSystemWorkbenchSession : IAsyncDisposable
 
     internal bool CompleteAssemblyInventoryRequest(
         int requestVersion,
-        Res<TypeDiscoveryAssemblyInventory> result)
+        Result<TypeDiscoveryAssemblyInventory> result)
     {
         if (_disposed || requestVersion != Volatile.Read(ref _inventoryRequestVersion))
         {
             return false;
         }
 
-        if (result.IsFailed(out var error, out var inventory))
+        var error = result.WithoutData();
+        var inventory = result.Data;
+        if (result.IsFailure() || inventory is null)
         {
             AssemblyInventoryState = ModuleSystemLazyLoadState.Failed;
-            AssemblyInventoryError = error.Message;
+            AssemblyInventoryError = error.Message ?? "The assembly inventory was unavailable.";
         }
         else
         {

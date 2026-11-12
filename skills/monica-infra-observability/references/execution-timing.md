@@ -16,7 +16,7 @@ Resolve `ExecutionTimingFacade` for `GetStatistics()` and `GetRunningOperations(
 
 ## Reading the UI evidence
 
-Capture and invocation labels follow the shell's [Clock-based page time display](../../monica-infra-ui/references/time-display.md). Duration measurements and original collector/log payloads retain their precision.
+Capture and invocation labels follow the shell's Clock-based page time display in `$monica-infra-ui` (`references/time-display.md`). Duration measurements and original collector/log payloads retain their precision.
 
 The `/execution-timing` page reads the local facade independently of Minimal API exposure. `AutoRefreshIntervalMs` defaults to 2000 ms; a non-positive value selects manual-only refresh. Pausing stops page polling, not recording. Manual refresh still works while paused. A successful completed/running read pair replaces the displayed snapshot and capture time together; these are sequential queries, not an atomic collector transaction. A failed pair retains the last successful snapshot and reports the failure. Each page owns and drains its polling and in-flight reads on disposal.
 

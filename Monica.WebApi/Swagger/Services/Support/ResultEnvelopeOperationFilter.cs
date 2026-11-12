@@ -24,7 +24,7 @@ internal sealed class ResultEnvelopeOperationFilter : IOperationFilter
                 {
                     ["application/json"] = new()
                     {
-                        Schema = context.SchemaGenerator.GenerateSchema(typeof(Res), context.SchemaRepository)
+                        Schema = context.SchemaGenerator.GenerateSchema(typeof(Result), context.SchemaRepository)
                     }
                 }
             });

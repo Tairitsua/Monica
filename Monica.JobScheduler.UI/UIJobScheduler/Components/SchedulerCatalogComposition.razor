@@ -1,0 +1,89 @@
+@inject NavigationManager Navigation
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<JobSchedulerResource> L
+<section class="catalog-composition" aria-labelledby="catalog-composition-title">
+    <div class="catalog-composition__decision">
+        <div><p id="catalog-composition-title">@L["Workspace:Inventory"]</p><MoDisplayValue Value="@_present.Count.ToString()" Unit="@L["Workspace:PublishedDefinitions"]" /><small>@L["Workspace:DefinitionBreakdown", _recurring, _present.Count - _recurring, Definitions.Count - _present.Count]</small></div>
+        <p class="catalog-composition__finding">
+            <MoRichFinding Template="@L["Workspace:CatalogOwners"].Value" Values="@([CountMark(_present.Count, MoVisualRole.Primary), CountMark(_owners.Length)])" />@(" ")
+            @if (_largestOwner is { } largest)
+            {
+                <MoRichFinding Template="@L["Workspace:CatalogOwnerCount"].Value" Values="@([OwnerMark(largest), CountMark(_present.Count(d => d.OwnerKey == largest))])" />@(" ")
+            }
+            @if (_failures > 0)
+            {
+                <MoRichFinding Template="@L["Workspace:CatalogFailures"].Value" Values="@([CountMark(_failures, MoVisualRole.Error)])" />@(" ")
+            }
+            @if (_slow > 0)
+            {
+                <MoRichFinding Template="@L["Workspace:CatalogSlow"].Value" Values="@([CountMark(_slow, MoVisualRole.Error)])" />@(" ")
+            }
+            @if (_never > 0)
+            {
+                <MoRichFinding Template="@L["Workspace:CatalogNever"].Value" Values="@([CountMark(_never, MoVisualRole.Primary)])" />
+            }
+        </p>
+    </div>
+    @if (!_expanded)
+    {
+        <div class="catalog-composition__cadences">@foreach(var bucket in SchedulerCadence.Buckets)
+        {
+            var definitions = Definitions.Where(d => _buckets.GetValueOrDefault(d.Id) == bucket).ToArray();
+            @if (definitions.Length > 0) { <div><a href="@FilterUrl("cadence", Cadence == bucket ? null : bucket)" aria-pressed="@((Cadence == bucket).ToString().ToLowerInvariant())">@L[$"Workspace:Cadences:{bucket}"]<b>@definitions.Length</b></a><div class="catalog-composition__marks">@foreach(var definition in definitions) { @Mark(definition) }</div></div> }
+        }</div>
+    }
+    <button class="catalog-composition__toggle" type="button" aria-expanded="@((_expanded).ToString().ToLowerInvariant())" @onclick="@(() => _expanded = !_expanded)"><span><MoIcon Icon="@MoIcons.Grid" Size="1rem" /><b>@L["Workspace:OwnerCadence"]</b><small>@L["Workspace:MapDescription"]</small></span><span>@L[_expanded ? "Workspace:CollapseMap" : "Workspace:ExpandMap"]<MoIcon Icon="@(_expanded ? MoIcons.ChevronUp : MoIcons.ChevronDown)" Size="1rem" /></span></button>
+    @if (_expanded)
+    {
+        <div class="catalog-composition__matrix">
+            <div class="catalog-composition__legend">@foreach(var standing in new[] { "attention", "unknown", "healthy", "ondemand", "paused", "absent" }) { <span><i data-tone="@(standing switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => standing })"></i>@L[$"Workspace:Standings:{standing}"]</span> }</div>
+            <table><thead><tr><th>@L["Catalog:Columns:Owner"]</th>@foreach(var bucket in SchedulerCadence.Buckets) { <th><a href="@FilterUrl("cadence", Cadence == bucket ? null : bucket)" aria-pressed="@((Cadence == bucket).ToString().ToLowerInvariant())">@L[$"Workspace:Cadences:{bucket}"]</a></th> }<th></th></tr></thead><tbody>@foreach(var owner in _owners)
+            {
+                <tr><th><a href="@FilterUrl("owner", owner)">@owner</a></th>@foreach(var bucket in SchedulerCadence.Buckets) { <td data-label="@L[$"Workspace:Cadences:{bucket}"]"><div class="catalog-composition__marks">@foreach(var definition in Definitions.Where(d => d.OwnerKey == owner && _buckets.GetValueOrDefault(d.Id) == bucket)) { @Mark(definition) }</div></td> }<td class="catalog-composition__total">@Definitions.Count(d => d.OwnerKey == owner)</td></tr>
+            }</tbody></table>
+        </div>
+    }
+    @if (Truncated) { <footer>@L["Workspace:CatalogTruncated"]</footer> }
+</section>
+@code {
+    /// <summary>Gets the accepted definition capture shared with the inventory.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobDefinition> Definitions { get; set; } = [];
+    /// <summary>Gets the accepted operational summaries, including exact latest execution evidence.</summary>
+    [Parameter] public IReadOnlyList<JobOperationalSummary> Catalog { get; set; } = [];
+    /// <summary>Gets semantic mark roles derived from the same loaded execution sample.</summary>
+    [Parameter] public IReadOnlyDictionary<JobId,string> Tones { get; set; } = new Dictionary<JobId,string>();
+    /// <summary>Gets the selected standing.</summary>
+    [Parameter] public string? Standing { get; set; }
+    /// <summary>Gets the selected cadence.</summary>
+    [Parameter] public string? Cadence { get; set; }
+    /// <summary>Gets whether the definition capture reached its disclosed bound.</summary>
+    [Parameter] public bool Truncated { get; set; }
+    /// <summary>Gets the snapshot instant for calendar-aware cadence projection.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    private bool _expanded;
+    private int _recurring, _failures, _slow, _never;
+    private List<JobDefinition> _present = [];
+    private string[] _owners = [];
+    private string? _largestOwner;
+    private Dictionary<JobId,string> _buckets = [];
+    protected override void OnParametersSet()
+    {
+        _present = Definitions.Where(d => d.IsPresent).ToList();
+        _recurring = _present.Count(d => d.Declaration.JobType == JobType.Recurring);
+        _owners = Definitions.GroupBy(d => d.OwnerKey,StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key,StringComparer.Ordinal).Select(g => g.Key).ToArray();
+        _largestOwner = _present.GroupBy(d => d.OwnerKey,StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key,StringComparer.Ordinal).Select(g => g.Key).FirstOrDefault();
+        _buckets = Definitions.ToDictionary(d => d.Id,d => SchedulerCadence.Bucket(d,ObservedAtUtc));
+        var failing = Catalog.Where(row => row.LatestExecution?.State == JobExecutionState.Failed).ToArray();
+        _failures = failing.Length;
+        _slow = failing.Count(row => row.Definition.EffectiveConfiguration.RetryCount == 0 && _buckets.GetValueOrDefault(row.Definition.Id) is "1h" or "hours" or "1d" or "1mo");
+        _never = Catalog.Count(row => row.Definition.IsPresent && row.Definition.Declaration.JobType == JobType.Triggered && row.LatestExecution is null);
+    }
+    private string Tone(JobDefinition definition) => !definition.IsPresent ? "absent" : definition.IsDisabled ? "paused" : Tones.GetValueOrDefault(definition.Id) ?? (definition.Declaration.JobType == JobType.Triggered ? "primary" : "success");
+    private string Label(JobDefinition definition) => $"{definition.EffectiveConfiguration.JobName} · {definition.OwnerKey}";
+    private string FilterUrl(string key,string? value) => Navigation.GetUriWithQueryParameters(new Dictionary<string,object?> { [key] = value, ["instanceId"] = null });
+    private RenderFragment CountMark(int value, MoVisualRole role = MoVisualRole.Neutral) =>
+        @<MoValueMark Role="@(value == 0 ? MoVisualRole.Neutral : role)">@value.ToString("N0")</MoValueMark>;
+    private RenderFragment OwnerMark(string owner) =>
+        @<MoValueMark Role="MoVisualRole.Neutral" Href="@FilterUrl("owner", owner)">@owner</MoValueMark>;
+    private RenderFragment Mark(JobDefinition definition) => @<a class="catalog-composition__mark" data-tone="@Tone(definition)" href="@JobSchedulerUiUrls.JobDefinition(definition.Id,Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery)" title="@Label(definition)" aria-label="@Label(definition)"></a>;
+}

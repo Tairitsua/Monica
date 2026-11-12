@@ -14,7 +14,7 @@ public sealed class ModuleOptionDiagnosticsPolicy<TOptions> where TOptions : cla
 
     /// <summary>
     /// Marks a property path as sensitive. Redacted diagnostics disclose only presence, while the explicit
-    /// sensitive-debug mode may reveal a bounded scalar representation.
+    /// sensitive-value reveal policy may reveal a bounded scalar representation.
     /// </summary>
     /// <typeparam name="TValue">The selected property type.</typeparam>
     /// <param name="property">A direct or nested property path rooted at the option object.</param>

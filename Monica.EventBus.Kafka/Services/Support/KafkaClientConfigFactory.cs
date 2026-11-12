@@ -20,20 +20,48 @@ internal static class KafkaClientConfigFactory
 
     public static ProducerConfig BuildProducerConfig(KafkaClusterConfig cluster, ModuleEventBusKafkaOption option)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(option.ProducerMessageMaxBytes, 1);
         var config = new ProducerConfig
         {
-            Acks = Acks.All
+            Acks = Acks.All,
+            EnableIdempotence = true,
+            MessageMaxBytes = option.ProducerMessageMaxBytes,
+            MessageTimeoutMs = RequireTimeoutMilliseconds(option.ProducerDeliveryTimeout,
+                nameof(option.ProducerDeliveryTimeout))
         };
         ApplyCommon(config, cluster, option);
         return config;
     }
 
-    public static ConsumerConfig BuildConsumerConfig(KafkaClusterConfig cluster, ModuleEventBusKafkaOption option, string? serviceKey)
+    public static ConsumerConfig BuildConsumerConfig(KafkaClusterConfig cluster, ModuleEventBusKafkaOption option,
+        string? serviceKey, string? workloadOwner = null)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(option.ConsumerFetchMessageMaxBytes, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(option.ConsumerFetchMaxBytes, 1);
+        if (!Enum.IsDefined(option.AutoOffsetReset))
+        {
+            throw new ArgumentOutOfRangeException(nameof(option.AutoOffsetReset), option.AutoOffsetReset,
+                "The native Kafka offset reset policy is invalid.");
+        }
+
+        var sessionTimeoutMs = RequireTimeoutMilliseconds(option.ConsumerSessionTimeout,
+            nameof(option.ConsumerSessionTimeout));
+        var maxPollIntervalMs = RequireTimeoutMilliseconds(option.ConsumerMaxPollInterval,
+            nameof(option.ConsumerMaxPollInterval));
+        if (maxPollIntervalMs < sessionTimeoutMs)
+        {
+            throw new ArgumentException("The Kafka consumer maximum poll interval must be at least its session timeout.",
+                nameof(option.ConsumerMaxPollInterval));
+        }
+
         var config = new ConsumerConfig
         {
-            GroupId = BuildConsumerGroupId(option, serviceKey),
-            AutoOffsetReset = AutoOffsetReset.Earliest,
+            GroupId = BuildConsumerGroupId(option, serviceKey, workloadOwner),
+            AutoOffsetReset = option.AutoOffsetReset,
+            MaxPartitionFetchBytes = option.ConsumerFetchMessageMaxBytes,
+            FetchMaxBytes = option.ConsumerFetchMaxBytes,
+            SessionTimeoutMs = sessionTimeoutMs,
+            MaxPollIntervalMs = maxPollIntervalMs,
             EnableAutoCommit = false,
             EnableAutoOffsetStore = false
         };
@@ -104,7 +132,7 @@ internal static class KafkaClientConfigFactory
             config.SaslUsername = normalized.SaslUsername;
         }
 
-        if (!string.IsNullOrWhiteSpace(normalized.SaslPassword))
+        if (!string.IsNullOrEmpty(normalized.SaslPassword))
         {
             config.SaslPassword = normalized.SaslPassword;
         }
@@ -115,12 +143,20 @@ internal static class KafkaClientConfigFactory
         }
     }
 
-    private static string BuildConsumerGroupId(ModuleEventBusKafkaOption option, string? serviceKey)
+    internal static string BuildConsumerGroupId(ModuleEventBusKafkaOption option, string? serviceKey,
+        string? workloadOwner = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(option.ConsumerGroupId);
+        var group = string.IsNullOrWhiteSpace(workloadOwner)
+            ? $"{option.ConsumerGroupId.Trim()}.default"
+            : $"{option.ConsumerGroupId.Trim()}.owner.{EscapeGroupSegment(workloadOwner)}";
         return string.IsNullOrWhiteSpace(serviceKey)
-            ? option.ConsumerGroupId
-            : $"{option.ConsumerGroupId}-{serviceKey}";
+            ? group
+            : $"{group}.bus.{EscapeGroupSegment(serviceKey)}";
     }
+
+    private static string EscapeGroupSegment(string value)
+        => Uri.EscapeDataString(value).Replace(".", "%2E", StringComparison.Ordinal);
 
     internal static int NormalizeTimeoutMilliseconds(TimeSpan timeout)
     {
@@ -128,6 +164,17 @@ internal static class KafkaClientConfigFactory
             timeout.TotalMilliseconds,
             MINIMUM_KAFKA_TIMEOUT_MS,
             int.MaxValue);
+    }
+
+    private static int RequireTimeoutMilliseconds(TimeSpan timeout, string parameterName)
+    {
+        if (timeout.TotalMilliseconds is < MINIMUM_KAFKA_TIMEOUT_MS or > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, timeout,
+                "Kafka delivery and consumer timeouts must be between one second and Int32.MaxValue milliseconds.");
+        }
+
+        return (int)timeout.TotalMilliseconds;
     }
 
     private static bool TryParseEnum<TEnum>(string? value, string propertyName, out TEnum result) where TEnum : struct, Enum
@@ -138,7 +185,7 @@ internal static class KafkaClientConfigFactory
             return false;
         }
 
-        if (Enum.TryParse(value, ignoreCase: true, out result))
+        if (Enum.TryParse(value, ignoreCase: true, out result) && Enum.IsDefined(result))
         {
             return true;
         }

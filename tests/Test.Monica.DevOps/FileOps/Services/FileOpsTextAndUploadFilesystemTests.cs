@@ -24,9 +24,9 @@ public sealed class FileOpsTextAndUploadFilesystemTests
         }, TestContext.Current.CancellationToken);
         var read = await fixture.Facade.ReadTextFileAsync(path, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, saved.Status);
+        Assert.Equal(ResultStatus.Ok, saved.Status);
         Assert.Contains("Messages:TextFileSaved", saved.Message);
-        Assert.Equal(ResStatus.Ok, read.Status);
+        Assert.Equal(ResultStatus.Ok, read.Status);
         Assert.Null(read.Message);
         var data = Assert.IsType<FileOpsFileTextContent>(read.Data);
         var disk = new FileInfo(path);
@@ -56,10 +56,10 @@ public sealed class FileOpsTextAndUploadFilesystemTests
             Path = retained, Content = oversized, EncodingName = "utf-8"
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, read.Status);
+        Assert.Equal(ResultStatus.BadRequest, read.Status);
         Assert.Contains("GeneratedMessages:TextFileTooLarge", read.Message);
         Assert.Null(read.Data);
-        Assert.Equal(ResStatus.BadRequest, saved.Status);
+        Assert.Equal(ResultStatus.BadRequest, saved.Status);
         Assert.Contains("GeneratedMessages:TextFileTooLarge", saved.Message);
         Assert.Equal("retained harmless content", await File.ReadAllTextAsync(retained, TestContext.Current.CancellationToken));
     }
@@ -77,11 +77,11 @@ public sealed class FileOpsTextAndUploadFilesystemTests
             Path = path, Content = "Rejected replacement", EncodingName = "utf-8"
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, read.Status);
+        Assert.Equal(ResultStatus.Ok, read.Status);
         var data = Assert.IsType<FileOpsFileTextContent>(read.Data);
         Assert.Equal("Harmless plain text", data.Content);
         Assert.False(data.CanSave);
-        Assert.Equal(ResStatus.BadRequest, saved.Status);
+        Assert.Equal(ResultStatus.BadRequest, saved.Status);
         Assert.Contains("GeneratedMessages:EditableExtensionRequired", saved.Message);
         Assert.Equal("Harmless plain text", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
     }
@@ -98,7 +98,7 @@ public sealed class FileOpsTextAndUploadFilesystemTests
             [new FileOpsUploadPayload("partial.txt", input.Length, input)], overwrite: true,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         Assert.Contains("Controlled copy failure after prefix", result.Message);
         Assert.Null(result.Data);
         Assert.True(input.CanRead);

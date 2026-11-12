@@ -684,13 +684,14 @@ internal sealed class MarkdownViewerPageState(
             cancellationToken.ThrowIfCancellationRequested();
             if (IsDisposeRequested || readVersion != _catalogReadVersion) return false;
 
-            if (response.IsFailed(out var error, out var groups))
+            if (response.IsFailure())
             {
-                CatalogError = error;
-                snackbar.Add(error, Severity.Error);
+                CatalogError = response.Message ?? string.Empty;
+                snackbar.Add(CatalogError, Severity.Error);
                 return false;
             }
 
+            var groups = response.Data ?? throw new InvalidOperationException("The document group read returned no data.");
             var sidebarWasPinned = CanPinSidebar;
             Groups = groups;
             if (sidebarWasPinned != CanPinSidebar) ShowSidebar = CanPinSidebar && _wideSidebarVisible;
@@ -908,15 +909,15 @@ internal sealed class MarkdownViewerPageState(
         var response = await markdownFacade.GetDocumentTreeAsync(groupKey, culture);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (response.IsFailed(out var error, out var tree))
+        if (response.IsFailure())
         {
-            TreeError = error;
-            snackbar.Add(error, Severity.Error);
+            TreeError = response.Message ?? string.Empty;
+            snackbar.Add(TreeError, Severity.Error);
             await NotifyStateChangedAsync();
             return;
         }
 
-        CurrentTree = tree;
+        CurrentTree = response.Data;
         _currentTreeCulture = group.IsMultilingual ? culture : null;
         await NotifyStateChangedAsync();
         cancellationToken.ThrowIfCancellationRequested();
@@ -950,14 +951,14 @@ internal sealed class MarkdownViewerPageState(
             var response = await markdownFacade.GetDocumentContentAsync(document);
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (response.IsFailed(out var error, out var content))
+            if (response.IsFailure())
             {
-                ContentError = error;
-                snackbar.Add(error, Severity.Error);
+                ContentError = response.Message ?? string.Empty;
+                snackbar.Add(ContentError, Severity.Error);
                 return;
             }
 
-            DocumentContent = content;
+            DocumentContent = response.Data;
         }
         finally
         {

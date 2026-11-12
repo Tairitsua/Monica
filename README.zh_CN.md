@@ -20,7 +20,7 @@
   <strong>AI agent 能遵循的架构，人类能检查的系统。</strong>
 </p>
 
-Monica 是面向 Agent 驱动开发的模块化 .NET 基础设施库。应用可按需采用各个模块；开发者与编码 Agent 共用模块组合、DDD ProjectUnit 和运行时诊断的类型化语言，使生成的代码结构可预期，运行中的系统可检查。
+Monica 是面向 Agent 驱动开发的模块化 .NET 基础设施库。应用可按需采用各个模块；开发者与编码 Agent 共用模块组合、DDD 构件和运行时诊断的类型化语言，使生成的代码结构可预期，运行中的系统可检查。
 
 > **候选版本**：Monica 1.0.0-rc.12 是用于验证和反馈的预发布版本。在 1.0.0 稳定版之前仍可能出现破坏性变更。
 
@@ -35,8 +35,8 @@ Monica 是面向 Agent 驱动开发的模块化 .NET 基础设施库。应用可
 
 - AI 可以很快产出代码，但如果没有统一规格，代码会在规模增长后变得脆弱且难以观测。
 - Monica 把基础设施本身变成规格：`AddMonica(...)` 先记录一个宿主的完整模块图，验证依赖与循环，再按确定性阶段应用注册。
-- 每个组合都属于具体宿主；同一进程中的多个宿主不共享模块注册表、选项或 ProjectUnit 目录。
-- 仓库以 `skills/` 作为 Monica Agent Skills 的唯一源码，并把每个受管 Monica Skill 按字节一致地投影到 `.claude/skills/` 与 `.agents/skills/`；不属于 Monica 的外部 Skill 会原样保留。
+- 每个组合都属于具体宿主；同一进程中的多个宿主不共享模块注册表、选项或构件目录。
+- 仓库以 `skills/` 作为 Monica Agent Skills 的唯一源码；`.agents/` 与 `.claude/` 下的投影由 `python scripts/sync_agent_skills.py --write` 按需生成，属于本地 Agent 状态、不进入 git，生成器只接管受管 Monica 目录，外部 Skill 原样保留。
 
 ## 演示视频
 
@@ -127,11 +127,11 @@ builder.AddMonica(monica =>
 
 ## 仪表板、主题与国际化
 
-Monica.UI 之上还提供多个运维型 Blazor UI：JobScheduler、Configuration、DependencyInjection、ProjectUnits、ModuleSystem、AI 等。UI 层共用同一套主题契约，支持多个可切换主题，并内置 `en-US` + `zh-CN` 本地化资源。
+Monica.UI 之上还提供多个运维型 Blazor UI：JobScheduler、Configuration、DependencyInjection、BuildingBlocks、ModuleSystem、AI 等。UI 层共用同一套主题契约，支持多个可切换主题，并内置 `en-US` + `zh-CN` 本地化资源。
 
 ## 随仓库交付的 Agent Skills
 
-Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.agents/skills/` 中对应的受管 Monica 子目录是面向仓库内发现的生成投影，不应直接编辑。
+Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.agents/skills/` 中对应的受管 Monica 子目录是面向仓库内发现的生成投影（本地按需生成、不进入 git），不应直接编辑或提交。
 
 九个 `monica-infra-*` Skill 是基础设施使用知识的唯一维护位置：[`persistence`](skills/monica-infra-persistence)、[`messaging`](skills/monica-infra-messaging)、[`jobs`](skills/monica-infra-jobs)、[`configuration`](skills/monica-infra-configuration)、[`hosting`](skills/monica-infra-hosting)、[`observability`](skills/monica-infra-observability)、[`ai`](skills/monica-infra-ai)、[`web`](skills/monica-infra-web) 和 [`ui`](skills/monica-infra-ui)。应用架构、框架开发、测试和 UI 实现分别由其他 Skill 负责。
 
@@ -140,7 +140,7 @@ Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.ag
 - 初始化、配置与诊断入口：`monica-guide`；上游问题分类与草稿准备：`monica-contribution`
 - 框架入口：`monica-framework`、`monica-development`、`monica-architecture`、`monica-ui-development`、`monica-ui-design`、`monica-ui-audit`、`monica-docs-authoring`、`monica-requirement-design`、`monica-unit-testing`、`monica-ui-bridge-debug`
 - 第三方生态入口：`monica-third-party-module-development`，用于创建、校验、测试、打包和发布 `<Publisher>.Monica.<Package>` 包；一个 NuGet 包可以包含多个内聚模块
-- 基于 Monica 的应用系统入口：`monica-application`、`monica-application-microservice`、`monica-application-modular-monolith`、`monica-application-project-unit-development`
+- 基于 Monica 的应用系统入口：`monica-application`、`monica-application-microservice`、`monica-application-modular-monolith`、`monica-application-building-block-development`
 - 外部配套 Skill（例如 `inspect-dependency-source` 与 `playwright-cli`）由各 Agent 环境单独安装和管理，Monica 的投影与更新流程不会改写它们
 
 第三方包不得使用官方 `Monica.*` 前缀与紫色 Logo。兼容标识、包命名和独立维护声明见 [BRANDING.md](BRANDING.md)，完整中英文规范见 [Monica.Docs](https://monica.dpdns.org/)。
@@ -149,7 +149,7 @@ Monica 自有 Skill 的唯一源码位于 `skills/`；`.claude/skills/` 与 `.ag
 
 | 层级 | 承诺 | 代表能力 |
 |---|---|---|
-| **Stable** | 1.0 支持的应用主路径 | Core、ProjectUnits、WebApi、Configuration、Repository、JobScheduler、OpenTelemetry、UI |
+| **Stable** | 1.0 支持的应用主路径 | Core、BuildingBlocks、WebApi、Configuration、Repository、JobScheduler、OpenTelemetry、UI |
 | **Integrations** | 围绕外部系统的版本化适配器 | EF Core、Kafka、Redis/StackExchange、Dapr、SignalR |
 | **Labs** | 保持快速演进的实验能力 | AI/RAG/MCP、DataChannel、DevOps/Profiling、Office、Experimental |
 
@@ -166,28 +166,28 @@ Stable 不依赖 Labs，Integration 也始终是按需引入的 provider-specifi
 
 模块通过 `Describe(ModuleDescriptor)` 声明硬依赖与可选顺序关系。模块可直接读取自己的最终 `Option`；读取其他模块配置时，只能沿这些已声明关系访问。业务类型工作通过 `DeclareTypeDiscovery(...)` 声明一次；Monica 会把所有非空结构化查询合并到一次类型全集扫描中，再按模块图顺序串行提交匹配结果。
 
-### ProjectUnit 模式
+### 构件模式
 
-用于约束 AI 能写什么的类型化 DDD 单元：`ApplicationService`、`RequestDto`、`DomainService`、`Entity`、`Repository`、`DomainEvent`、`DomainEventHandler`、`LocalEventHandler`、`Configuration`、`RecurringJob`、`TriggeredJob`。
+构件是职责明确且可由 Monica 根据受支持的类型契约识别的应用代码元素。当前可发现的类型包括 `ApplicationService`、`CrudApplicationService`、`DomainService`、`Repository`、`DomainEvent`、`DomainEventHandler`、`LocalEventHandler`、`Seeder`、`RecurringJob`、`TriggeredJob`、`HttpApi`、`Entity`、`RequestDto`、`Configuration` 和 `HostedService`。
 
-每个被发现的单元还可以声明明确的 Agent 上下文和需求追踪关系：
+每个被发现的构件还可以声明明确的 Agent 上下文和需求追踪关系：
 
 ```csharp
-[ProjectUnitMetadata(
+using Monica.Application.Abstractions;
+using Monica.BuildingBlocks.Annotations;
+
+[BuildingBlockMetadata(
     "审核订单",
     Owner = "订单团队",
     Description = "审核满足条件的订单。",
     Tags = ["ordering", "approval"])]
-[ProjectUnitRequirement("ORD-REQ-001")]
-public sealed class CommandHandlerApproveOrder : ApplicationService<CommandApproveOrder>
-{
-    // ...
-}
+[BuildingBlockRequirement("ORD-REQ-001")]
+public sealed record CommandApproveOrder(Guid OrderId) : ICommand;
 ```
 
-`Monica.Framework.UI` 的第一个 Tab 会展示当前宿主的项目单元状态，包括类型分布、依赖健康度、告警，以及彼此独立的元数据、描述、负责人和需求覆盖率。`/framework/units`、`/framework/units/dashboard` 与 `/framework/units/{key}` 提供相同的类型化目录数据，不会把反射对象暴露到 UI 或 API 边界。
+元数据用于描述构件，不会使不受支持的类型自动成为构件；处理器等其他构件应各自声明元数据。`Monica.Framework.UI` 的 `/building-blocks` 工作区展示当前宿主的构件状态，包括类型分布、依赖关系、告警，以及彼此独立的元数据、描述、负责人和需求覆盖率。`/framework/building-blocks`、`/framework/building-blocks/dashboard` 与 `/framework/building-blocks/{key}` 提供类型化目录数据，不会把反射对象暴露到 UI 或 API 边界。
 
-ProjectUnit 的详细约定可以在 `monica-application-project-unit-development` 和 Monica.Docs 的概念页里继续查看。
+构件的详细约定可以在 `monica-application-building-block-development` 和 Monica.Docs 的概念页里继续查看。
 
 ### 模块诊断
 

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 1367 1367" role="img" aria-labelledby="title description">
-  <title id="title">Monica Compatibility Mark</title>
-  <desc id="description">The Monica package silhouette in the canonical emerald compatibility colorway.</desc>
-  <path d="M0 132H1235V1367H0Z M1103 0H1367V264H1103Z" fill="#10B981"/>
-  <path
-    d="M229 413H444L596 840C608 875 616 905 617 925H620C622 912 625 898 630 883L796 414H1005V1101H859V680C859 626 861 578 865 538H861C857 570 850 602 840 630L671 1101H553L383 636C371 598 362 560 360 538H356C360 579 362 620 362 658V948H229Z"
-    fill="#FFFFFF"/>
-  <path d="M1103 132H1235V264H1103Z M229 971H362V1101H229Z" fill="#FFFFFF"/>
-</svg>

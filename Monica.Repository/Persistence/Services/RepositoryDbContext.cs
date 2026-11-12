@@ -1,4 +1,6 @@
-using System.Transactions;
+using Monica.Locker.EfCore;
+using Monica.Core.Execution;
+using Monica.EntityFrameworkCore.Extensions;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
@@ -29,14 +31,17 @@ using Monica.Repository.Inbox.Services;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Monica.Tool.Extensions;
+using Monica.Repository.Snapshots.Models;
+using Monica.Repository.Snapshots.Services;
+using Monica.Repository.Bulk.Abstractions;
 
 namespace Monica.Repository.Persistence.Services;
 
 /// <summary>
 /// Base DbContext for Monica repositories. Persistence concepts — audit stamping, soft-delete rewriting,
 /// concurrency stamps, and optional durable notification capture — are intrinsic to
-/// <see cref="SaveChangesAsync(bool, CancellationToken)"/> and apply on every save path, with or without
-/// a scoped operation. External notification delivery runs separately after commit.
+/// <see cref="SaveChangesAsync(bool, CancellationToken)"/>. Storage policies apply on every save path;
+/// durable notification capture requires a managed UnitOfWork transaction. External delivery runs after commit.
 /// </summary>
 public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContext> options, ICachedServiceProvider serviceProvider)
     : DbContext(options), IRepositoryModelFeatures, IRepositoryContextLifetime, IOutboxStoreContext, IInboxStoreContext
@@ -54,11 +59,18 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
     private bool _saveFailed;
     private bool _saving;
+    Type IRepositoryContextLifetime.RegistrationType => typeof(TDbContext);
+    IServiceProvider IRepositoryContextLifetime.Services => CachedServiceProvider.UnderlyingProvider;
     private readonly List<OutboxMessage> _pendingMessages = [];
     private RepositoryOutboxOptions? OutboxOptions => CachedServiceProvider.GetService<OutboxRegistration<TDbContext>>()?.Options;
     private RepositoryEntityEventOptions? EntityEventOptions => CachedServiceProvider.GetService<RepositoryEntityEventOptionsRegistration<TDbContext>>()?.Options;
     bool IRepositoryModelFeatures.HasOutbox => OutboxOptions is not null;
     bool IRepositoryModelFeatures.HasInbox => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>() is not null;
+    bool IRepositoryModelFeatures.ExcludeOutboxFromMigrations => OutboxOptions?.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.ExcludeInboxFromMigrations => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>()?.Options.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.ExcludeLeasesFromMigrations => OutboxOptions?.LeaseTable.ExcludeFromMigrations == true;
+    bool IRepositoryModelFeatures.HasSnapshots => CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>() is not null;
+    bool IRepositoryModelFeatures.ExcludeSnapshotsFromMigrations => CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>()?.ExcludeFromMigrations == true;
     bool IOutboxStoreContext.HasOutbox => OutboxOptions is not null;
     bool IOutboxStoreContext.HasPendingOutboxMessages => _pendingMessages.Count != 0;
     bool IInboxStoreContext.HasInbox => CachedServiceProvider.GetService<InboxRegistration<TDbContext>>() is not null;
@@ -67,7 +79,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     /// <summary>
     /// Identifies this context's model variant. Override for dynamic mappings such as table shards,
     /// including <c>base.ModelCacheKey</c> and every value that changes the model in the returned key.
-    /// Monica adds outbox configuration and design-time mode to this key automatically.
+    /// Monica adds message-store participation, migration exclusions, and design-time mode automatically.
+    /// UseMonicaTableLayout isolates EF's internal model cache by the immutable provider/layout identity.
     /// The getter runs before model initialization and must not access <see cref="DbContext.Model"/>.
     /// </summary>
     protected virtual object ModelCacheKey => GetType();
@@ -128,7 +141,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     protected readonly DbContextOptions DbContextOptions = options;
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.ReplaceService<IModelCacheKeyFactory, RepositoryModelCacheKeyFactory>();
+        ConfigureRepositoryModel(optionsBuilder);
         optionsBuilder.AddInterceptors(RepositoryOperationInterceptor.Instance);
         var enableSensitiveDataLogging = Options.EnableSensitiveDataLogging
             ?? CachedServiceProvider.GetService<IHostEnvironment>()?.IsDevelopment()
@@ -139,6 +152,13 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             // EF Core must receive this setting during OnConfiguring for parameter values to be included in diagnostics.
             optionsBuilder.EnableSensitiveDataLogging();
         }
+    }
+
+    /// <summary>Installs repository model variants without changing interception or sensitive logging.</summary>
+    /// <remarks>Contexts with their own OnConfiguring policy call this method to preserve repository model identity.</remarks>
+    protected void ConfigureRepositoryModel(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, RepositoryModelCacheKeyFactory>();
     }
 
     #region Model conventions
@@ -224,10 +244,22 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         builder.ApplyEntitySeparateConfigurations(Options, Logger);
 
         OnModelCreatingExtend(builder);
+        if (CachedServiceProvider.GetService<SnapshotTableRegistration<TDbContext>>() is { } snapshotTable)
+        {
+            var versions = builder.Entity<RepositorySnapshotVersion>();
+            versions.ToMonicaInfrastructureTable("MonicaSnapshotVersions", table =>
+            {
+                if (snapshotTable.ExcludeFromMigrations) table.ExcludeFromMigrations();
+            });
+            versions.HasKey(x => new { x.SourceId, x.DatasetKey });
+            versions.Property(x => x.SourceId).HasMaxLength(200).IsRequired();
+            versions.Property(x => x.DatasetKey).HasMaxLength(200).IsRequired();
+        }
         if (OutboxOptions is not null)
         {
+            builder.ConfigureMonicaLeases(OutboxOptions.LeaseTable);
             var outbox = builder.Entity<OutboxMessage>();
-            outbox.ToTable("MonicaOutbox", table =>
+            outbox.ToMonicaInfrastructureTable("MonicaOutbox", table =>
             {
                 if (OutboxOptions.ExcludeFromMigrations) table.ExcludeFromMigrations();
             });
@@ -235,11 +267,13 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             outbox.Property(x => x.Sequence).ValueGeneratedOnAdd();
             outbox.HasIndex(x => x.MessageId).IsUnique();
             outbox.HasIndex(x => new { x.DeliveredAtUtc, x.NextAttemptAtUtc, x.LeaseUntilUtc, x.Sequence });
+            outbox.HasIndex(x => new { x.DeliveryTarget, x.DeliveredAtUtc, x.NextAttemptAtUtc, x.LeaseUntilUtc, x.Sequence });
             outbox.Property(x => x.MessageId).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.Source).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.EventName).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.TopicName).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.ServiceKey).HasMaxLength(200);
+            outbox.Property(x => x.DeliveryTarget).HasMaxLength(66);
             outbox.Property(x => x.TransportKey).HasMaxLength(500);
             outbox.Property(x => x.Body).IsRequired();
             outbox.Property(x => x.LastError).HasMaxLength(1000);
@@ -252,7 +286,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         if (inboxRegistration is not null)
         {
             var inbox = builder.Entity<InboxReceipt>();
-            inbox.ToTable("MonicaInbox", table =>
+            inbox.ToMonicaInfrastructureTable("MonicaInbox", table =>
             {
                 if (inboxRegistration.Options.ExcludeFromMigrations) table.ExcludeFromMigrations();
             });
@@ -269,13 +303,18 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
 
     /// <summary>
-    /// Saves through fixed persistence policies. Outbox snapshots and business rows share a transaction.
+    /// Saves through fixed persistence policies. Outbox snapshots and business rows share the managed UnitOfWork transaction.
     /// No transport is invoked. A failed save faults this context; retry in a fresh scope.
     /// </summary>
     /// <remarks>
     /// SaveChanges(false) is deliberately unsupported: accepting business changes between two internal flushes
     /// is necessary for generated-key outbox capture. Use a transaction and a fresh context when retrying.
-    /// A caller-owned transaction is never committed here.
+    /// Managed saves omit automatic savepoints because any failure requires the whole operation to roll back.
+    /// Save callbacks must throw when they cannot continue. Their original exception is propagated unchanged.
+    /// If a callback only marks the operation rollback-only, the save rejects completion after the EF flush
+    /// instead of returning success. Catching either failure does not make the operation committable.
+    /// Other saves retain EF's transaction and savepoint behavior. This method never commits a caller-owned transaction
+    /// or starts an additional transaction merely because Outbox is configured.
     /// </remarks>
     public sealed override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         => SaveCoreAsync(true, acceptAllChangesOnSuccess, cancellationToken);
@@ -288,11 +327,15 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     {
         if (_saveFailed) throw new InvalidOperationException("This context's save failed. Retry in a fresh operation scope.");
         if (OutboxOptions is null) throw new InvalidOperationException("The selected transaction owner must enable AddOutbox.");
-        _pendingMessages.Add(OutboxMessage.Capture(message, CachedServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System));
+        var captured = OutboxMessage.Capture(message, CachedServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System);
+        if (OutboxOptions.SharedStoreKey is not null)
+            captured.DeliveryTarget = CachedServiceProvider.GetRequiredService<OutboxDeliveryCapabilities>().Capture(message);
+        _pendingMessages.Add(captured);
     }
 
-    private void ValidateSave()
+    private bool ValidateSave()
     {
+        CachedServiceProvider.GetService<UnitOfWorkManager>()?.ThrowIfRollbackOnly("access the database");
         if (_saveFailed) throw new InvalidOperationException("This context's save failed. Dispose it and retry in a fresh scope.");
         if (_saving) throw new InvalidOperationException("Recursive or concurrent saves are not supported.");
         if (this is IRepositoryContextAdapter { TransactionOwner: { } owner }
@@ -302,32 +345,100 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 || Database.CurrentTransaction is not { } physicalTransaction
                 || !ReferenceEquals(physicalTransaction.GetDbTransaction(), transaction.GetDbTransaction())))
             throw new NotSupportedException("A physical context must share its logical owner's connection and transaction.");
-        CachedServiceProvider.GetService<UnitOfWorkManager>()?.ValidateSave(this);
+        return CachedServiceProvider.GetService<UnitOfWorkManager>()?.ValidateSave(this) == true;
     }
 
-    void IRepositoryContextLifetime.ValidateDatabaseAccess()
+    /// <summary>
+    /// Validates native database access against this context's save state, operation lifetime,
+    /// transaction participation, and physical adapter ownership before provider I/O begins.
+    /// </summary>
+    /// <remarks>
+    /// Provider APIs that bypass EF command interceptors, such as binary COPY, must call this method
+    /// immediately before access. It performs no database I/O, starts no transaction, and does not
+    /// apply save policies. Callers still own provider-specific prerequisites and failure handling.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The context or operation is failed, terminal, or not a selected participant.</exception>
+    /// <exception cref="NotSupportedException">A physical adapter does not share its owner's connection and transaction.</exception>
+    public void ValidateDatabaseAccess()
     {
-        // Save owns its internal commands and rollback/savepoint cleanup. Outside it, native EF access
+        // Save validates its transaction before executing internal commands. Outside it, native EF access
         // must obey the same operation lifetime and participant selection as tracked saves.
         if (!_saving) ValidateSave();
     }
 
+    /// <summary>Executes a controlled set-based/native write and declares its complete snapshot dependency effects before I/O.</summary>
+    /// <remarks>Call from a named repository method inside a managed UnitOfWork. Declarations are conservative even if no row changes.
+    /// This does not synthesize per-entity audit, synchronization or domain events skipped by bulk SQL. The delegate must use this context's transaction.</remarks>
+    public async Task<TResult> ExecuteSnapshotWriteAsync<TResult>(IReadOnlyCollection<Type> affectedEntityTypes,
+        Func<CancellationToken, Task<TResult>> write, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(affectedEntityTypes);
+        ArgumentNullException.ThrowIfNull(write);
+        PrepareNativeWrite(affectedEntityTypes);
+        try { return await write(cancellationToken); }
+        catch (Exception exception)
+        {
+            ((IRepositoryContextLifetime)this).MarkDatabaseFailure(
+                ExecutionTransactionFailure.FromException("SnapshotBulkWrite", exception));
+            throw;
+        }
+    }
+
+    void IRepositoryContextLifetime.PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes)
+        => PrepareNativeWrite(affectedEntityTypes);
+
+    private void PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes)
+    {
+        if (affectedEntityTypes.Count == 0) throw new ArgumentException("Declare at least one affected entity type.", nameof(affectedEntityTypes));
+        ValidateDatabaseAccess();
+        var manager = CachedServiceProvider.GetRequiredService<UnitOfWorkManager>();
+        if (!manager.IsActive || Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Native writes require an active managed transaction.");
+        if (affectedEntityTypes.Any(type => !Model.GetEntityTypes().Any(entity => type.IsAssignableFrom(entity.ClrType))))
+            throw new ArgumentException("Every affected entity type must be mapped by this context.", nameof(affectedEntityTypes));
+        CaptureSnapshotChanges(affectedEntityTypes);
+    }
+
+    private void CaptureSnapshotChanges(IEnumerable<Type> entityTypes)
+    {
+        if (CachedServiceProvider.GetService<SnapshotRegistration<TDbContext>>() is { } registration)
+            CachedServiceProvider.GetRequiredService<SnapshotTransaction>().Capture(this, registration, entityTypes);
+    }
+
+    /// <summary>Checks staged and already-flushed changes affecting a registered dataset in this operation.</summary>
+    /// <remarks>Use only to select an explicit application-owned current-state read. This method never merges business state into shared snapshots.</remarks>
+    public bool HasUncommittedSnapshotChanges(string datasetKey)
+    {
+        ValidateDatabaseAccess();
+        var registration = CachedServiceProvider.GetService<SnapshotRegistration<TDbContext>>()
+            ?? throw new InvalidOperationException("This context has no registered snapshot datasets.");
+        var dataset = registration.Datasets.SingleOrDefault(x => x.Key == datasetKey)
+            ?? throw new ArgumentException("Unknown snapshot dataset.", nameof(datasetKey));
+        return CachedServiceProvider.GetRequiredService<SnapshotTransaction>().HasChanges(this, registration.SourceId, dataset);
+    }
+
+    void IRepositoryContextLifetime.MarkDatabaseFailure(ExecutionTransactionFailure failure)
+        => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
+            failure with { DbContextType = GetType().FullName });
+
     private async Task<int> SaveCoreAsync(bool useAsync, bool acceptAll, CancellationToken token)
     {
         if (!acceptAll) throw new NotSupportedException("RepositoryDbContext requires acceptAllChangesOnSuccess=true. Retry failures in a fresh scope.");
-        ValidateSave();
+        var managedTransaction = ValidateSave();
+        var unitOfWork = CachedServiceProvider.GetService<UnitOfWorkManager>();
         _saving = true;
         var autoDetect = ChangeTracker.AutoDetectChangesEnabled;
-        IDbContextTransaction? ownedTransaction = null;
-        IDbContextTransaction? externalTransaction = null;
-        string? savepoint = null;
-        Exception? failure = null;
+        var autoSavepoints = Database.AutoSavepointsEnabled;
         try
         {
+            token.ThrowIfCancellationRequested();
+            // The operation owns recovery across both business and Outbox flushes. A failed context cannot retry.
+            if (managedTransaction) Database.AutoSavepointsEnabled = false;
             // Sharding coordinators delegate their EF save to physical RepositoryDbContexts. Policies
             // belong to those actual saves, never to both the aggregate tracker and its physical trackers.
             IReadOnlyList<PersistenceChange> changes = this is IRepositoryContextAdapter { CoordinatesSave: true }
                 ? [] : PersistencePolicies.Apply(this, AuditPropertySetter, CachedServiceProvider.GetServices<IPersistencePolicy>());
+            CaptureSnapshotChanges(changes.Select(change => change.Entry.Metadata.ClrType));
             ChangeTracker.AutoDetectChangesEnabled = false;
             var outbox = OutboxOptions;
             var switches = CachedServiceProvider.GetServices<IEntityEventPublishSwitch>().ToArray();
@@ -342,93 +453,51 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
                 if (projectedChanges.Length != 0)
                     CachedServiceProvider.GetRequiredService<UnitOfWorkManager>().RequireOutboxOwner();
             }
-            if (outbox is not null)
-            {
-                if (!Database.IsRelational()) throw new NotSupportedException("Transactional outbox requires a relational provider.");
-                externalTransaction = Database.CurrentTransaction;
-                if (externalTransaction is null)
-                {
-                    // Some relational adapters support local EF transactions without System.Transactions enlistment.
-                    if (System.Transactions.Transaction.Current is not null
-                        || this.GetService<IDbContextTransactionManager>() is ITransactionEnlistmentManager { EnlistedTransaction: not null })
-                        throw new NotSupportedException("Outbox saves require an explicit EF transaction, not an ambient system transaction.");
-                    ownedTransaction = useAsync ? await Database.BeginTransactionAsync(token) : Database.BeginTransaction();
-                }
-                else
-                {
-                    if (!externalTransaction.SupportsSavepoints)
-                        throw new NotSupportedException("Outbox capture inside an existing transaction requires savepoint support.");
-                    savepoint = "monica_" + Guid.NewGuid().ToString("N");
-                    if (useAsync) await externalTransaction.CreateSavepointAsync(savepoint, token);
-                    else externalTransaction.CreateSavepoint(savepoint);
-                }
-            }
+            if (outbox is not null && !Database.IsRelational())
+                throw new NotSupportedException("Transactional outbox requires a relational provider.");
 
             var affected = useAsync ? await base.SaveChangesAsync(true, token) : base.SaveChanges(true);
+            unitOfWork?.ThrowIfRollbackOnly("complete saving changes");
             if (useAsync) await CaptureEntityEventsAsync(changes, switches, token);
             else CaptureEntityEvents(changes, switches);
             if (outbox is not null)
             {
                 if (_pendingMessages.Count != 0)
-                    Set<OutboxMessage>().AddRange(_pendingMessages);
+                {
+                    if (outbox.UseBulkInsert)
+                    {
+                        var insert = CachedServiceProvider.GetRequiredService<IBulkWriter>().Insert(this, _pendingMessages);
+                        if (useAsync) await insert.ExecuteAsync(token);
+                        else insert.Execute(token);
+                    }
+                    else Set<OutboxMessage>().AddRange(_pendingMessages);
+                }
             }
             ChangeTracker.DetectChanges();
             if (ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
+                CaptureSnapshotChanges(ChangeTracker.Entries()
+                    .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                    .Select(entry => entry.Metadata.ClrType));
                 if (useAsync) await base.SaveChangesAsync(true, token);
                 else base.SaveChanges(true);
             }
-            if (ownedTransaction is not null)
-            {
-                if (useAsync) await ownedTransaction.CommitAsync(token);
-                else ownedTransaction.Commit();
-            }
-            if (savepoint is not null)
-            {
-                if (useAsync) await externalTransaction!.ReleaseSavepointAsync(savepoint, token);
-                else externalTransaction!.ReleaseSavepoint(savepoint);
-            }
+            unitOfWork?.ThrowIfRollbackOnly("complete saving changes");
             _pendingMessages.Clear();
             return affected;
         }
         catch (Exception exception)
         {
-            failure = exception;
             _saveFailed = true;
-            CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly();
-            try
-            {
-                if (ownedTransaction is not null)
-                {
-                    if (useAsync) await ownedTransaction.RollbackAsync(CancellationToken.None);
-                    else ownedTransaction.Rollback();
-                }
-                else if (savepoint is not null)
-                {
-                    if (useAsync) await externalTransaction!.RollbackToSavepointAsync(savepoint, CancellationToken.None);
-                    else externalTransaction!.RollbackToSavepoint(savepoint);
-                }
-            }
-            catch (Exception cleanup) { exception.Data["Monica.Repository.SaveRollbackException"] = cleanup; }
+            CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
+                ExecutionTransactionFailure.FromException("SaveChanges", exception) with { DbContextType = GetType().FullName });
             throw;
         }
         finally
         {
             ChangeTracker.AutoDetectChangesEnabled = autoDetect;
+            if (managedTransaction) Database.AutoSavepointsEnabled = autoSavepoints;
             _saving = false;
-            if (ownedTransaction is not null)
-            {
-                try
-                {
-                    if (useAsync) await ownedTransaction.DisposeAsync();
-                    else ownedTransaction.Dispose();
-                }
-                catch (Exception cleanup)
-                {
-                    if (failure is not null) failure.Data["Monica.Repository.SaveDisposeException"] = cleanup;
-                    Logger.LogError(cleanup, "Transaction cleanup failed after the save outcome was established.");
-                }
-            }
         }
     }
 

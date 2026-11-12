@@ -1,0 +1,51 @@
+@using Monica.JobScheduler.Models.Operations
+@using Monica.JobScheduler.UI.Localization
+@using Monica.JobScheduler.UI.UIJobScheduler.Support
+@using Monica.UI.Shared.Components.States
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+
+<section class="runtime-coordinators" aria-labelledby="runtime-coordinators-heading">
+    <header>
+        <h2 id="runtime-coordinators-heading">@L["Runtime:Coordinators:Title"]</h2>
+        <p>@L["Runtime:Coordinators:Description"]</p>
+        @if (Snapshot is { } observation)
+        {
+            <p>@L["Runtime:Coordinators:Observed"]: @TimePresentation.FormatTimestamp(observation.ObservedAtUtc)</p>
+        }
+    </header>
+    @if (Snapshot is null)
+    {
+        <MoContentState Compact="true"><p>@L["Runtime:Coordinators:Unavailable"]</p></MoContentState>
+    }
+    else if (Snapshot.Coordinators.Count == 0)
+    {
+        <MoContentState Compact="true"><p>@L["Runtime:Coordinators:Empty"]</p></MoContentState>
+    }
+    else
+    {
+        <div class="runtime-coordinators__table">
+            <MudTable T="JobCoordinatorSummary" Items="@Snapshot.Coordinators" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>@L["Runtime:Coordinators:Partition"]</MudTh>
+                    <MudTh>@L["Runtime:Coordinators:Holder"]</MudTh>
+                    <MudTh>@L["Runtime:Coordinators:Expiry"]</MudTh>
+                    <MudTh>@L["Runtime:Coordinators:State"]</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="@L["Runtime:Coordinators:Partition"]"><code>@context.CoordinatorKey</code></MudTd>
+                    <MudTd DataLabel="@L["Runtime:Coordinators:Holder"]"><code>@context.WorkerInstanceId</code></MudTd>
+                    <MudTd DataLabel="@L["Runtime:Coordinators:Expiry"]">@TimePresentation.FormatTimestamp(context.ExpiresAtUtc)</MudTd>
+                    <MudTd DataLabel="@L["Runtime:Coordinators:State"]">@(context.ExpiresAtUtc > Snapshot.ObservedAtUtc ? L["Runtime:Coordinators:Active"] : L["Runtime:Coordinators:Expired"])</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </div>
+    }
+</section>
+
+@code {
+    /// <summary>Gets or sets store-clock ownership evidence without fencing tokens.</summary>
+    /// <remarks>The caller owns authorization and refresh. Recorded active grants do not establish process health.</remarks>
+    [Parameter]
+    public JobCoordinatorSnapshot? Snapshot { get; set; }
+}

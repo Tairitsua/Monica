@@ -1,5 +1,6 @@
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.EventBus.Abstractions;
 
@@ -9,6 +10,9 @@ namespace Monica.EventBus.Abstractions;
 /// </summary>
 public interface IEventSubscription : IAsyncDisposable
 {
+    /// <summary>Gets the frozen permission for automatic and explicit local delivery.</summary>
+    ActivationMode Activation { get; }
+
     #region Identity
 
     /// <summary>
@@ -20,6 +24,9 @@ public interface IEventSubscription : IAsyncDisposable
     /// Service key for keyed EventBus instances. Null for default EventBus.
     /// </summary>
     string? ServiceKey { get; }
+
+    /// <summary>Gets the stable logical consumer owner, or null for an unowned subscription.</summary>
+    string? WorkloadOwner { get; }
 
     /// <summary>
     /// Event type this subscription listens to.
@@ -39,6 +46,10 @@ public interface IEventSubscription : IAsyncDisposable
     /// Handler type (if using type-based handler).
     /// </summary>
     Type? HandlerType { get; }
+
+    /// <summary>Whether this subscription explicitly uses the distributed batch handler contract.</summary>
+    bool IsBatch => HandlerType is { } handlerType
+        && typeof(IDistributedBatchEventHandler<>).MakeGenericType(EventType).IsAssignableFrom(handlerType);
 
     /// <summary>
     /// Handler factory for creating/managing handler instances.

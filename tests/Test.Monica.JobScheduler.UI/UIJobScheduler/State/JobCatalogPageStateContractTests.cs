@@ -91,7 +91,9 @@ public sealed class JobCatalogPageStateContractTests
             state.ToggleSelection(other);
             authorize.TrySetResult(true);
             var result = await mutation.WaitAsync(ObservationTimeout, TestContext.Current.CancellationToken);
-            Assert.False(result.IsFailed(out _, out var batch));
+            var batch = result.Data;
+            Assert.False(result.IsFailure());
+            Assert.NotNull(batch);
             Assert.Equal(SchedulerStateTestBoundary.Job, Assert.Single(batch.Items).JobKey);
             var targetDefinition = await boundary.Store.GetDefinitionAsync(SchedulerStateTestBoundary.Scope, SchedulerStateTestBoundary.Owner,
                 SchedulerStateTestBoundary.Job, TestContext.Current.CancellationToken);
@@ -128,7 +130,9 @@ public sealed class JobCatalogPageStateContractTests
 
         var result = await state.SetSelectedDisabledAsync(true, items.ToArray());
 
-        Assert.False(result.IsFailed(out _, out var batch));
+        var batch = result.Data;
+        Assert.False(result.IsFailure());
+        Assert.NotNull(batch);
         Assert.Equal(1, batch.SucceededCount);
         Assert.Equal(1, batch.FailedCount);
         Assert.Equal(stale.Definition.Id, Assert.Single(state.SelectedJobIds));
@@ -217,7 +221,7 @@ public sealed class JobCatalogPageStateContractTests
         var target = items.First();
         boundary.Access.Authorized = false;
         var result = await state.SetDisabledAsync(target, true);
-        Assert.True(result.IsFailed(out _));
+        Assert.True(result.IsFailure());
         Assert.False(state.IsAuthorized);
         Assert.Empty(state.Summaries);
         Assert.Empty(state.OwnerFacets);
@@ -307,13 +311,15 @@ public sealed class JobCatalogPageStateContractTests
         if (runNow)
         {
             var result = await state.RunRecurringNowAsync(target);
-            Assert.True(result.IsFailed(out var error));
+            var error = result;
+            Assert.True(result.IsFailure());
             Assert.Equal("Operator access lookup unavailable.", error.Message);
         }
         else
         {
             var result = await state.SetDisabledAsync(target, true);
-            Assert.True(result.IsFailed(out var error));
+            var error = result;
+            Assert.True(result.IsFailure());
             Assert.Equal("Operator access lookup unavailable.", error.Message);
         }
         Assert.Equal("Operator access lookup unavailable.", state.Error);
@@ -344,7 +350,8 @@ public sealed class JobCatalogPageStateContractTests
 
         var result = await state.SetSelectedDisabledAsync(true, items.ToArray());
 
-        Assert.True(result.IsFailed(out var error));
+        var error = result;
+        Assert.True(result.IsFailure());
         Assert.Equal("Batch access unavailable.", error.Message);
         Assert.Equal("Batch access unavailable.", state.Error);
         Assert.False(state.IsAuthorized);

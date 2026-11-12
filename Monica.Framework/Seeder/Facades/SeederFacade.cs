@@ -14,14 +14,37 @@ namespace Monica.Framework.Seeder.Facades;
 public sealed class SeederFacade(
     ISeederState state,
     IOptions<ModuleSeederOption> options,
-    ILogger<SeederFacade> logger)
+    ILogger<SeederFacade> logger,
+    ISeederExecutor executor)
 {
+    /// <summary>
+    /// Explicitly runs one discovered seeder and its unsatisfied eligible prerequisites through the native executor.
+    /// This can mutate external resources. Disabled dependencies, unknown identities, and overlapping batches are
+    /// rejected before execution. Required failures continue to affect readiness until a successful explicit retry.
+    /// </summary>
+    public async Task<Result<SeederStateSnapshot>> RunAsync(string seederTypeName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return Result.Success(await executor.RunAsync(seederTypeName, cancellationToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to execute Seeder {SeederTypeName}.", seederTypeName);
+            return Result.Failure<SeederStateSnapshot>($"Failed to execute Seeder: {exception.GetMessageRecursively()}");
+        }
+    }
+
     /// <summary>
     /// Captures the effective module configuration and current host-owned Seeder run.
     /// </summary>
     /// <param name="cancellationToken">Cancels snapshot capture before it begins.</param>
     /// <returns>A successful result containing the diagnostics snapshot, or a failure result when capture fails.</returns>
-    public Task<Res<SeederDiagnosticsSnapshot>> GetSnapshotAsync(CancellationToken cancellationToken = default)
+    public Task<Result<SeederDiagnosticsSnapshot>> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -41,7 +64,7 @@ public sealed class SeederFacade(
                 },
                 Run = state.GetSnapshot()
             };
-            return Task.FromResult<Res<SeederDiagnosticsSnapshot>>(Res.Ok(snapshot));
+            return Task.FromResult<Result<SeederDiagnosticsSnapshot>>(Result.Success(snapshot));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -50,8 +73,8 @@ public sealed class SeederFacade(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to capture Seeder diagnostics.");
-            return Task.FromResult<Res<SeederDiagnosticsSnapshot>>(
-                Res.Fail($"Failed to capture Seeder diagnostics: {ex.GetMessageRecursively()}"));
+            return Task.FromResult<Result<SeederDiagnosticsSnapshot>>(
+                Result.Failure<SeederDiagnosticsSnapshot>($"Failed to capture Seeder diagnostics: {ex.GetMessageRecursively()}"));
         }
     }
 }

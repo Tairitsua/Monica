@@ -104,7 +104,9 @@ public sealed partial class ChatPageState
         }
         var result = await chatFacade.CreateSessionAsync(CurrentProviderId, CurrentModelName,
             systemPrompt: _options.DefaultSystemPrompt, runtimeContext: BuildRuntimeContext(SelectedKnowledgeBaseIds), ct: _lifetime.Token);
-        if (result.IsFailed(out var error, out var session)) { SetError(error.Message); return null; }
+        var error = result.WithoutData();
+        var session = result.Data;
+        if (result.IsFailure() || session is null) { SetError(error.Message); return null; }
         if (_disposed) { await session.DisposeAsync(); return null; }
         await workspace.AddSessionAsync(session, _lifetime.Token);
         ErrorMessage = null;

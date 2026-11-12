@@ -28,7 +28,7 @@ public partial class ModelConfigurationDialog
     /// </summary>
     [Parameter] public Func<AIModelConfiguration, CancellationToken, Task<string?>>? OnSaveWithCancellation { get; set; }
     /// <summary>Optional cancellable discovery using the owning provider's current connection. Does not persist edits.</summary>
-    [Parameter] public Func<CancellationToken, Task<Res<IReadOnlyList<AIModelConfiguration>>>>? OnDiscover { get; set; }
+    [Parameter] public Func<CancellationToken, Task<Result<IReadOnlyList<AIModelConfiguration>>>>? OnDiscover { get; set; }
 
     private readonly AIAdministrationOperationLifetime _lifetime = new();
     private bool _saving, _fetching;
@@ -137,7 +137,9 @@ public partial class ModelConfigurationDialog
             var result = await OnDiscover(cancellationToken);
             if (_lifetime.IsRetired) return;
             if (!DraftMatches(draft)) { _metadataMessage = L["Settings:ModelDraftChanged"]; return; }
-            if (result.IsFailed(out var error, out var models)) { _error = error.Message; return; }
+            var error = result.WithoutData();
+            var models = result.Data;
+            if (result.IsFailure() || models is null) { _error = error.Message ?? L["Error:Generic"]; return; }
             var evidence = models.FirstOrDefault(model => model.ModelName.Equals(draft.ModelName, StringComparison.OrdinalIgnoreCase));
             if (evidence is null) { _metadataMessage = L["Settings:MetadataNotFound"]; return; }
             Load(draft.WithDiscoveredMetadata(evidence));

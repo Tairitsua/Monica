@@ -29,7 +29,7 @@ public sealed class FileOpsTransferServiceTests
             [new FileOpsUploadPayload("protected.txt", content.Length, content)], overwrite: true,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         Assert.Equal($"ServiceMessages:UploadFailed [{fixture.Root}, GeneratedMessages:PathReadOnly [{target}]]", result.Message);
         Assert.Null(result.Data);
         Assert.Equal(0, content.Position);
@@ -64,7 +64,7 @@ public sealed class FileOpsTransferServiceTests
             [new FileOpsUploadPayload("writable.txt", content.Length, content)], overwrite,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(ResStatus.Ok, result.Status);
+        Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.Null(result.Message);
         var data = Assert.IsType<FileOpsUploadResult>(result.Data);
         Assert.Equal(fixture.Root, data.DirectoryPath);

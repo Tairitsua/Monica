@@ -17,16 +17,17 @@ public sealed class ExecutionPipelineCatalogFacade(
     /// Gets all behavior registrations and observed plans for the current host.
     /// </summary>
     /// <returns>A successful immutable snapshot, or a diagnostic failure result.</returns>
-    public Task<Res<ExecutionPipelineCatalogSnapshot>> GetSnapshotAsync()
+    public Task<Result<ExecutionPipelineCatalogSnapshot>> GetSnapshotAsync()
     {
         try
         {
-            return Task.FromResult<Res<ExecutionPipelineCatalogSnapshot>>(Res.Ok(catalog.GetSnapshot()));
+            return Task.FromResult<Result<ExecutionPipelineCatalogSnapshot>>(Result.Success(catalog.GetSnapshot()));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to build the execution-pipeline catalog snapshot.");
-            return Task.FromResult<Res<ExecutionPipelineCatalogSnapshot>>(Res.Fail(
+            return Task.FromResult(Result.Failure<ExecutionPipelineCatalogSnapshot>(
                 $"Failed to build the execution-pipeline catalog snapshot: {exception.GetMessageRecursively()}"));
         }
     }

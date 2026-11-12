@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core.Extensions;
 using Monica.Core.Results;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Exceptions;
 using Monica.JobScheduler.Models;
@@ -21,14 +22,17 @@ namespace Monica.JobScheduler.Facades;
 /// The facade never reconstructs scheduler state from events or caches. Every operation delegates to the unified
 /// scheduler store, which owns admission, definition, policy, execution, lease, and cancellation atomicity.
 /// </remarks>
-public sealed class JobSchedulerFacade(
+public sealed partial class JobSchedulerFacade(
     IJobSchedulerStore store,
     IOptions<ModuleJobSchedulerOption> options,
     TimeProvider timeProvider,
     JobSchedulerRuntimeState runtimeState,
-    ILogger<JobSchedulerFacade> logger)
+    ILogger<JobSchedulerFacade> logger,
+    IReadOnlyList<LocalJobDefinition>? localDefinitions = null,
+    ITypeActivationPolicy? activation = null)
 {
     private const int MAX_PAGE_SIZE = 200;
+    private const int EXECUTION_SAMPLE_LIMIT = 2000;
     private const int RECENT_EXECUTION_COUNT = 12;
     private const int OVERVIEW_DEFINITION_LIMIT = 500;
     private const int THROUGHPUT_WINDOW_HOURS = 24;
@@ -47,24 +51,30 @@ public sealed class JobSchedulerFacade(
     /// </summary>
     /// <param name="cancellationToken">Cancels snapshot loading.</param>
     /// <returns>A result containing the host-scoped runtime snapshot.</returns>
-    public Task<Res<JobSchedulerRuntimeOverview>> GetRuntimeOverviewAsync(
+    public Task<Result<JobSchedulerRuntimeOverview>> GetRuntimeOverviewAsync(
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(async () =>
         {
             var option = options.Value;
             var owners = await store.QueryOwnerSummariesAsync(_schedulerScopeKey, cancellationToken);
+            var coordination = await store.GetCoordinatorSnapshotAsync(_schedulerScopeKey, cancellationToken);
             return new JobSchedulerRuntimeOverview
             {
                 Configuration = new JobSchedulerRuntimeConfiguration
                 {
                     SchedulerScopeKey = option.SchedulerScopeKey,
                     OwnerKey = option.GetProjectName(),
+                    OwnerKeys = GetLocalOwnerKeys(),
                     WorkerInstanceId = option.WorkerInstanceId,
-                    RecurringJobDebugMode = option.RecurringJobDebugMode,
+                    AutonomousWork = option.AutonomousWork,
                     CronTimeZoneId = option.CronTimeZone.Id,
                     SchedulingPollInterval = option.SchedulingPollInterval,
                     WorkerPollInterval = option.WorkerPollInterval,
                     SnapshotSyncInterval = option.SnapshotSyncInterval,
+                    CoordinatorLeaseDuration = option.CoordinatorLeaseDuration,
+                    MaxConcurrentStoreOperations = option.MaxConcurrentStoreOperations,
+                    ReservedLeaseStoreOperations = option.ReservedLeaseStoreOperations,
+                    StoreOperationTimeout = option.StoreOperationTimeout,
                     ExecutionLeaseDuration = option.ExecutionLeaseDuration,
                     ExecutionLeaseRenewInterval = option.ExecutionLeaseRenewInterval,
                     ExecutionRetryDelay = option.ExecutionRetryDelay,
@@ -87,14 +97,30 @@ public sealed class JobSchedulerFacade(
                     SchedulingReady = runtimeState.SchedulingReady,
                     SchedulingMessage = runtimeState.SchedulingMessage,
                     WorkerReady = runtimeState.WorkerReady,
+                    WorkerAdmissionPaused = runtimeState.WorkerAdmissionPaused,
                     WorkerMessage = runtimeState.WorkerMessage,
-                    InFlightExecutions = runtimeState.InFlightExecutions
+                    InFlightExecutions = runtimeState.InFlightExecutions,
+                    LastOwnerSchedulingWorkAtUtc = runtimeState.LastOwnerSchedulingWorkAtUtc,
+                    LastLeaseRecoveryWorkAtUtc = runtimeState.LastLeaseRecoveryWorkAtUtc,
+                    LastHistoryCleanupWorkAtUtc = runtimeState.LastHistoryCleanupWorkAtUtc
                 },
                 Owners = owners,
+                Coordination = coordination,
                 OwnerOnlineThreshold = option.SnapshotSyncInterval * OWNER_ONLINE_THRESHOLD_SNAPSHOT_MULTIPLIER,
                 CapturedAtUtc = timeProvider.GetUtcNow()
             };
         }, "load the scheduler runtime overview", cancellationToken);
+
+    private IReadOnlyList<string> GetLocalOwnerKeys()
+    {
+        var owners = (localDefinitions ?? [])
+            .Select(definition => definition.OwnerKey ?? options.Value.GetProjectName())
+            .Concat(activation?.ActiveWorkloadOwners ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+        if (activation?.ActiveWorkloadOwners is null && owners.Count == 0)
+            owners.Add(options.Value.GetProjectName());
+        return owners.Order(StringComparer.Ordinal).ToArray();
+    }
 
     private JobSchedulerStoreInfo DescribeStore() =>
         store is IJobSchedulerStoreDescriptor descriptor
@@ -106,7 +132,7 @@ public sealed class JobSchedulerFacade(
     /// </summary>
     /// <param name="cancellationToken">Cancels snapshot loading.</param>
     /// <returns>A result containing one bounded operational snapshot.</returns>
-    public Task<Res<JobSchedulerOverview>> GetOverviewAsync(CancellationToken cancellationToken = default) =>
+    public Task<Result<JobSchedulerOverview>> GetOverviewAsync(CancellationToken cancellationToken = default) =>
         ExecuteAsync(async () =>
         {
             var definitionsTask = store.QueryDefinitionsAsync(
@@ -131,18 +157,10 @@ public sealed class JobSchedulerFacade(
                     SortDescending = true
                 },
                 cancellationToken);
-            // Page size one is sufficient: only TotalCount feeds the per-hour rate.
-            var throughputTask = store.QueryExecutionsAsync(
-                new JobExecutionQuery
-                {
-                    SchedulerScopeKey = _schedulerScopeKey,
-                    CreatedAfterUtc = timeProvider.GetUtcNow().AddHours(-THROUGHPUT_WINDOW_HOURS),
-                    PageNumber = 1,
-                    PageSize = 1,
-                    SortField = JobExecutionSortField.CreatedAtUtc,
-                    SortDescending = true
-                },
-                cancellationToken);
+            var throughputTask = store.GetExecutionStateStatisticsAsync(
+                _schedulerScopeKey,
+                startTimeUtc: timeProvider.GetUtcNow().AddHours(-THROUGHPUT_WINDOW_HOURS),
+                cancellationToken: cancellationToken);
 
             await Task.WhenAll(definitionsTask, statisticsTask, recentTask, throughputTask);
             return new JobSchedulerOverview
@@ -150,7 +168,7 @@ public sealed class JobSchedulerFacade(
                 Definitions = (await definitionsTask).Items,
                 ExecutionStateCounts = await statisticsTask,
                 RecentExecutions = (await recentTask).Items,
-                ExecutionsPerHourLast24h = (await throughputTask).TotalCount / (double)THROUGHPUT_WINDOW_HOURS,
+                ExecutionsPerHourLast24h = (await throughputTask).Values.Sum(count => (long)count) / (double)THROUGHPUT_WINDOW_HOURS,
                 CapturedAtUtc = timeProvider.GetUtcNow()
             };
         }, "load the scheduler overview", cancellationToken);
@@ -158,7 +176,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Queries persisted definitions together with their independent operator policies.
     /// </summary>
-    public Task<Res<QueryResult<JobDefinition>>> QueryDefinitionsAsync(
+    public Task<Result<QueryResult<JobDefinition>>> QueryDefinitionsAsync(
         JobDefinitionQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -175,7 +193,7 @@ public sealed class JobSchedulerFacade(
     /// <param name="query">Definition filters and page bounds.</param>
     /// <param name="cancellationToken">Cancels the read operation.</param>
     /// <returns>A result containing the bounded operational page.</returns>
-    public Task<Res<QueryResult<JobOperationalSummary>>> QueryOperationalSummariesAsync(
+    public Task<Result<QueryResult<JobOperationalSummary>>> QueryOperationalSummariesAsync(
         JobDefinitionQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -192,7 +210,7 @@ public sealed class JobSchedulerFacade(
     /// <param name="jobId">The definition identity.</param>
     /// <param name="cancellationToken">Cancels the read operation.</param>
     /// <returns>A result containing the projection, or <see langword="null"/> when the identity is unknown.</returns>
-    public Task<Res<JobOperationalSummary?>> GetOperationalSummaryAsync(
+    public Task<Result<JobOperationalSummary?>> GetOperationalSummaryAsync(
         JobId jobId,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -203,7 +221,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Gets one definition by its exact identity.
     /// </summary>
-    public Task<Res<JobDefinition?>> GetDefinitionAsync(
+    public Task<Result<JobDefinition?>> GetDefinitionAsync(
         JobId jobId,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -214,7 +232,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Replaces only operator-owned policy fields using optimistic concurrency.
     /// </summary>
-    public Task<Res<JobPolicy>> UpdatePolicyAsync(
+    public Task<Result<JobPolicy>> UpdatePolicyAsync(
         string ownerKey,
         string jobKey,
         JobPolicyChange change,
@@ -234,7 +252,7 @@ public sealed class JobSchedulerFacade(
     /// <param name="request">The bounded ordered set of complete policy replacements.</param>
     /// <param name="cancellationToken">Cancels the batch between items.</param>
     /// <returns>A result containing one ordered success or failure outcome per item.</returns>
-    public Task<Res<JobPolicyBatchUpdateResult>> UpdatePoliciesAsync(
+    public Task<Result<JobPolicyBatchUpdateResult>> UpdatePoliciesAsync(
         JobPolicyBatchUpdateRequest request,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -245,7 +263,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Admits one execution for a present definition through the durable queue.
     /// </summary>
-    public Task<Res<JobExecutionInstance>> TriggerAsync(
+    public Task<Result<JobExecutionInstance>> TriggerAsync(
         JobTriggerRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -272,7 +290,7 @@ public sealed class JobSchedulerFacade(
     /// Queues one immediate execution of a recurring job without changing its recurring schedule cursor.
     /// A paused schedule remains eligible for this explicit operator action.
     /// </summary>
-    public Task<Res<JobExecutionInstance>> RunRecurringNowAsync(
+    public Task<Result<JobExecutionInstance>> RunRecurringNowAsync(
         JobRecurringRunNowRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -295,7 +313,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Queries durable executions through a bounded page. The configured scheduler scope always overrides caller data.
     /// </summary>
-    public Task<Res<QueryResult<JobExecutionInstance>>> QueryExecutionsAsync(
+    public Task<Result<QueryResult<JobExecutionInstance>>> QueryExecutionsAsync(
         JobExecutionQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -313,12 +331,39 @@ public sealed class JobSchedulerFacade(
     }
 
     /// <summary>
+    /// Gets the newest 2,000 matching executions and their total count for a diagnostic timeline.
+    /// </summary>
+    /// <remarks>
+    /// Preserves identity, state, search and time filters, but replaces scope, ordering and pagination.
+    /// One bounded store query avoids repeated counts and shifting offsets across sample pages.
+    /// Returned records omit audit history; fewer records than TotalCount means the sample is truncated.
+    /// </remarks>
+    public Task<Result<QueryResult<JobExecutionInstance>>> GetExecutionSampleAsync(
+        JobExecutionQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var bounded = query with
+        {
+            SchedulerScopeKey = _schedulerScopeKey,
+            PageNumber = 1,
+            PageSize = EXECUTION_SAMPLE_LIMIT,
+            SortField = JobExecutionSortField.CreatedAtUtc,
+            SortDescending = true
+        };
+        return ExecuteAsync(
+            () => store.QueryExecutionsAsync(bounded, cancellationToken),
+            "load the job execution sample",
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Gets bounded execution analytics for the configured scheduler scope.
     /// </summary>
     /// <param name="query">The required time range, interval, optional owner and job filters, and ranking bounds.</param>
     /// <param name="cancellationToken">Cancels analytics loading.</param>
     /// <returns>A result containing cohort, outcome, duration, trend, ranking, and slow-attempt analytics.</returns>
-    public Task<Res<JobExecutionAnalyticsSnapshot>> GetExecutionAnalyticsAsync(
+    public Task<Result<JobExecutionAnalyticsSnapshot>> GetExecutionAnalyticsAsync(
         JobExecutionAnalyticsQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -327,6 +372,19 @@ public sealed class JobSchedulerFacade(
             () => store.GetExecutionAnalyticsAsync(_schedulerScopeKey, query, cancellationToken),
             "load job execution analytics",
             cancellationToken);
+    }
+
+    /// <summary>Gets exact retained ledger distribution for the configured scope, independently of pagination and state selection.</summary>
+    /// <param name="query">Ledger identity, search and creation or completion bounds; caller scope is always replaced.</param>
+    /// <param name="bucketCount">Number of intervals, from 1 through 200; defaults to 48.</param>
+    /// <param name="cancellationToken">Cancels the aggregate read.</param>
+    public Task<Result<JobExecutionDistribution>> GetExecutionDistributionAsync(JobExecutionQuery query, int bucketCount = 48,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var bounded = query with { SchedulerScopeKey = _schedulerScopeKey, States = null, PageNumber = 1, PageSize = 1 };
+        return ExecuteAsync(() => store.GetExecutionDistributionAsync(bounded, bucketCount, cancellationToken),
+            "load execution distribution", cancellationToken);
     }
 
     private static JobDefinitionQuery BoundDefinitionQuery(JobDefinitionQuery query)
@@ -400,7 +458,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Gets one durable execution including its append-only history.
     /// </summary>
-    public Task<Res<JobExecutionInstance?>> GetExecutionAsync(
+    public Task<Result<JobExecutionInstance?>> GetExecutionAsync(
         string instanceId,
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
@@ -411,7 +469,7 @@ public sealed class JobSchedulerFacade(
     /// <summary>
     /// Cancels queued work immediately or records a cooperative request for the current fenced worker.
     /// </summary>
-    public Task<Res<JobCancellationResult>> CancelExecutionAsync(
+    public Task<Result<JobCancellationResult>> CancelExecutionAsync(
         string instanceId,
         string? reason = null,
         CancellationToken cancellationToken = default) =>
@@ -424,14 +482,14 @@ public sealed class JobSchedulerFacade(
             "cancel a job execution",
             cancellationToken);
 
-    private async Task<Res<T>> ExecuteAsync<T>(
+    private async Task<Result<T>> ExecuteAsync<T>(
         Func<Task<T>> action,
         string operation,
         CancellationToken cancellationToken)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -440,18 +498,18 @@ public sealed class JobSchedulerFacade(
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to {SchedulerOperation}.", operation);
-            return Res.Fail($"Failed to {operation}: {exception.GetMessageRecursively()}");
+            return Result.Failure<T>($"Failed to {operation}: {exception.GetMessageRecursively()}");
         }
     }
 
-    private async Task<Res<JobPolicy>> ExecutePolicyUpdateAsync(
+    private async Task<Result<JobPolicy>> ExecutePolicyUpdateAsync(
         Func<Task<JobPolicy>> action,
         string jobKey,
         CancellationToken cancellationToken)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -460,32 +518,32 @@ public sealed class JobSchedulerFacade(
         catch (JobPolicyConcurrencyException exception)
         {
             logger.LogWarning(exception, "Policy update for job {JobKey} lost optimistic concurrency.", jobKey);
-            return new Res<JobPolicy>(exception.GetMessageRecursively(), ResStatus.Conflict);
+            return Result.Failure<JobPolicy>(exception.GetMessageRecursively(), ResultStatus.Conflict);
         }
         catch (JobDefinitionNotFoundException exception)
         {
             logger.LogWarning(exception, "Policy update target {JobKey} was not found.", jobKey);
-            return new Res<JobPolicy>(exception.GetMessageRecursively(), ResStatus.NotFound);
+            return Result.Failure<JobPolicy>(exception.GetMessageRecursively(), ResultStatus.NotFound);
         }
         catch (ArgumentException exception)
         {
             logger.LogWarning(exception, "Policy update for job {JobKey} failed validation.", jobKey);
-            return new Res<JobPolicy>(exception.GetMessageRecursively(), ResStatus.BadRequest);
+            return Result.Failure<JobPolicy>(exception.GetMessageRecursively(), ResultStatus.BadRequest);
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "Failed to update policy for job {JobKey}.", jobKey);
-            return new Res<JobPolicy>(
+            return Result.Failure<JobPolicy>(
                 $"Failed to update job policy: {exception.GetMessageRecursively()}",
-                ResStatus.InternalError);
+                ResultStatus.InternalError);
         }
     }
 
-    private static ResStatus ResolvePolicyFailureStatus(Exception exception) => exception switch
+    private static ResultStatus ResolvePolicyFailureStatus(Exception exception) => exception switch
     {
-        JobPolicyConcurrencyException => ResStatus.Conflict,
-        JobDefinitionNotFoundException => ResStatus.NotFound,
-        ArgumentException => ResStatus.BadRequest,
-        _ => ResStatus.InternalError
+        JobPolicyConcurrencyException => ResultStatus.Conflict,
+        JobDefinitionNotFoundException => ResultStatus.NotFound,
+        ArgumentException => ResultStatus.BadRequest,
+        _ => ResultStatus.InternalError
     };
 }

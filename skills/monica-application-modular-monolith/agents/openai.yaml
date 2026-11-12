@@ -1,4 +1,4 @@
 interface:
-  display_name: "Monica Application Modular Monolith"
-  short_description: "Apply Monica domain boundaries and host composition"
-  default_prompt: "Use $monica-application-modular-monolith after loading $monica-application and the project specification to extend or review this application's domain boundary."
+  display_name: "Monica Combined Deployment"
+  short_description: "Combine roles and migrate merged application projects"
+  default_prompt: "Use $monica-application-modular-monolith after loading $monica-application and the project specification to plan combined role placement or migrate merged contexts."

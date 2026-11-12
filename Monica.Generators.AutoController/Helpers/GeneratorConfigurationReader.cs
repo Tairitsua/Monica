@@ -17,7 +17,9 @@ internal static class GeneratorConfigurationReader
     public static GeneratorConfigReadResult Read(IAssemblySymbol assembly)
     {
         var attribute = assembly.GetAttributes().FirstOrDefault(static attributeData =>
-            attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.WEB_API_CONFIG_ATTRIBUTE);
+            attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.HTTP_CONTRACT_ATTRIBUTE)
+            ?? assembly.GetAttributes().FirstOrDefault(static attributeData =>
+                attributeData.AttributeClass?.ToDisplayString() == GeneratorConstants.WEB_API_CONFIG_ATTRIBUTE);
         if (attribute is null)
         {
             return GeneratorConfigReadResult.MissingConfiguration;
@@ -44,7 +46,7 @@ internal static class GeneratorConfigurationReader
                 case "DomainName":
                     domainName = namedArgument.Value.Value as string;
                     break;
-                case "RpcClientTargets":
+                case "ApiClientTargets":
                     targets = namedArgument.Value.Value is int value ? value : 0;
                     break;
                 case "HttpClientBaseType":
@@ -65,14 +67,14 @@ internal static class GeneratorConfigurationReader
         if ((targets & ~3) != 0)
         {
             return GeneratorConfigReadResult.Invalid(
-                $"RpcClientTargets contains unsupported flag value '{targets}'.");
+                $"ApiClientTargets contains unsupported flag value '{targets}'.");
         }
 
         if (httpClientBaseType is not null &&
             !TryValidateClientBaseType(
                 httpClientBaseType,
                 assembly,
-                "Monica.WebApi.RpcClient.Abstractions.HttpRpcApi",
+                "Monica.Invocation.Abstractions.HttpApiClient",
                 new[] { CACHED_SERVICE_PROVIDER, HTTP_CLIENT },
                 out var httpBaseError))
         {
@@ -84,7 +86,7 @@ internal static class GeneratorConfigurationReader
             !TryValidateClientBaseType(
                 localClientBaseType,
                 assembly,
-                "Monica.WebApi.RpcClient.Abstractions.LocalRpcApi",
+                "Monica.Invocation.Abstractions.LocalApiClient",
                 new[] { CACHED_SERVICE_PROVIDER },
                 out var localBaseError))
         {
@@ -123,7 +125,7 @@ internal static class GeneratorConfigurationReader
         return false;
     }
 
-    private static bool TryValidateClientBaseType(
+    internal static bool TryValidateClientBaseType(
         INamedTypeSymbol type,
         IAssemblySymbol generatedAssembly,
         string requiredBaseType,

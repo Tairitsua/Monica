@@ -1,37 +1,9 @@
-# Platform Protocol and Internal Collaboration
+# Published collaboration in a combined process
 
-Use this file before introducing a new dependency between domains.
+The [unified specification](../../monica-application/references/03-unified-architecture.md) owns project direction, identifiers and generation. Protocol owns requests, DTOs, events and generated domain API interfaces. Role libraries implement handlers; each Host compiles callers and a manifest combining shared ownership with its actual local implementation inventory. A specialized artifact can omit implementations while retaining their published ownership through the generated lightweight catalog.
 
-## Default Rule
+Call published operations through I{Domain}CommandApi / I{Domain}QueryApi even in one process. Ordinary included operations remain locally callable when their role is inactive; omitted published operations route to their known remote owner. Do not substitute a peer domain repository or concrete handler call for that boundary. Shared same-domain invariants can be reused directly from the core.
 
-Other domains may depend on `Shared/Platform.Protocol/PublishedLanguages`, shared `Contracts/`, and only the deliberate `Implementations/*` surfaces exposed there, not on another domain's internal implementation or another domain's `Application` handlers.
+Compose AddApplicationModel and AddApplicationInvocation. Local calls preserve trusted caller/tenant context: outer calls create fresh scopes and nested calls default to Shared. Prefer a common database with a scoped shared connection for atomic collaboration. Choose `.WithTransaction(ApiTransaction.Independent)` explicitly when a child may commit separately, whether local or remote. Shared rejects remote dispatch during an active transaction. Never retain scope-owned services or detach nested work; use the [transaction contract](../../monica-infra-persistence/references/transactions.md) for database composition and commit behavior.
 
-Within solution-project references, use the chain `Domains.{Subdomain} -> Platform.Infrastructure -> Platform.Protocol -> Platform.BuildingBlocks`. Do not make domains jump directly to `Platform.Protocol` or `Platform.BuildingBlocks`.
-
-## What Belongs in Platform.Protocol
-
-- Stable published requests under strict `PublishedLanguages.Domain{Domain}.Requests` namespaces. Add `[ApiEndpoint]` only when the request is an RPC operation.
-- Published RPC results use `Res`, `Res<T>`, `ResPaged<T>`, or a custom `IRemoteResultEnvelope<TSelf>` whose `CreateRemoteFailure` preserves constructor invariants.
-- DTOs
-- Enums
-- Cross-domain events
-- Optional `Contracts/` for deliberate synchronous collaboration
-- Optional `Implementations/Local` for checked-in local or actor-backed providers
-
-## What Stays Internal
-
-- Entities
-- Repositories
-- EF configuration
-- Infrastructure adapters
-- Domain-owned application handlers and background workers
-- Internal domain services and implementation details
-
-## Collaboration Choices
-
-- Use direct contract-driven requests when another domain needs synchronous data or command execution.
-- Use events when the collaboration can be asynchronous and loosely coupled.
-- Generated synchronous contracts are `I{Domain}CommandApi` and `I{Domain}QueryApi`; `WebApiGenerationConfig` selects HTTP and/or local implementations. Only check in wrappers when intentionally extending that surface.
-- Keep multipart, download, raw-object, and other transport-only requests beside their handlers as local HTTP endpoints; they must not enter published RPC language.
-- Do not use JSON snapshots, `AdditionalFiles`, bootstrap scans, or source-tree writes for RPC discovery.
-- Keep collaboration intentional. A modular monolith should not simulate service calls for everything, but it should still preserve domain boundaries.
+ApiEndpoint preserves HTTP mapping for Local clients. Host publication selects owned receivers in Release; optional diagnostic exposure is separate. See [API](../../monica-infra-messaging/references/invocation.md) and [operation scopes](../../monica-application-ui/references/application-invocation.md).

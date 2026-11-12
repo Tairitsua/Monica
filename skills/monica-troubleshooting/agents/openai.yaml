@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monica Troubleshooting"
+  short_description: "Route Monica failures to verified diagnostic guidance"
+  default_prompt: "Use $monica-troubleshooting to identify the failed boundary, read its diagnostic guidance, and verify the fix."

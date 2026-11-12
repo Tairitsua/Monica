@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Application Microservice"
-  short_description: "Apply Monica service boundaries and dependencies"
-  default_prompt: "Use $monica-application-microservice after loading $monica-application and the project specification to extend or review this application's service boundary."

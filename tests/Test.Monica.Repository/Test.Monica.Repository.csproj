@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Monica.ApplicationModel\Monica.ApplicationModel.csproj" />
     <ProjectReference Include="..\..\Monica.Repository\Monica.Repository.csproj" />
     <ProjectReference Include="..\..\Monica.Repository.UI\Monica.Repository.UI.csproj" />
     <ProjectReference Include="..\..\Monica.Testing\Monica.Testing.csproj" />

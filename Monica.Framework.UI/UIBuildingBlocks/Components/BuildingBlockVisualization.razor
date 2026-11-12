@@ -1,0 +1,984 @@
+@using Monica.UI.Shared.Components.States
+@using Monica.BuildingBlocks.Facades
+@using Monica.Core.Results;
+@using Monica.BuildingBlocks.Models
+@using static Monica.Framework.UI.UIBuildingBlocks.Components.BuildingBlockLayoutPanel
+@using Monica.UI.Shared.Components.ContextMenu
+@inject BuildingBlocksFacade BuildingBlocksFacade
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<BuildingBlocksResource> L
+@implements IAsyncDisposable
+
+<section class="building-block-graph-workspace" aria-labelledby="@(_graphContainerId + "-title")" data-testid="building-block-visualization">
+    <header class="graph-heading">
+        <div class="graph-heading__identity">
+            <span class="graph-eyebrow">@L["BuildingBlockVisualization:Workspace:Eyebrow"]</span>
+            <h1 id="@(_graphContainerId + "-title")">@L["BuildingBlockVisualization:Header:Title"]</h1>
+            <p>@L["BuildingBlockVisualization:Header:Description"]</p>
+        </div>
+        <div class="graph-heading__actions">
+            <button type="button" class="graph-action" disabled="@_loading" @onclick="LoadBuildingBlocksAsync">
+                <MoIcon Icon="@MoIcons.Refresh" Size="1.25rem" />@L["BuildingBlockVisualization:Actions:RefreshTooltip"]
+            </button>
+            <button type="button" class="graph-action" aria-expanded="@(_showFilterPanel ? "true" : "false")" @onclick="ToggleFilterPanel">
+                <MoIcon Icon="@MoIcons.Filter" Size="1.25rem" />@L["BuildingBlockVisualization:Actions:FilterSettingsTooltip"]
+            </button>
+            <button type="button" class="graph-action" aria-expanded="@(_showLayoutPanel ? "true" : "false")" @onclick="ToggleLayoutPanel">
+                <MoIcon Icon="@MoIcons.Dashboard" Size="1.25rem" />@L["BuildingBlockVisualization:Actions:LayoutSettingsTooltip"]
+            </button>
+        </div>
+    </header>
+
+    @if (_showLayoutPanel)
+    {
+        <BuildingBlockLayoutPanel CurrentLayout="_currentLayout" ForceDistance="_forceDistance" ForceStrength="_forceStrength"
+                                CurrentLayoutChanged="OnLayoutChanged" ForceDistanceChanged="OnForceDistanceChanged" ForceStrengthChanged="OnForceStrengthChanged" />
+    }
+    @if (_showFilterPanel)
+    {
+        <BuildingBlockFilterPanel @ref="_filterPanel" BuildingBlocks="_allBuildingBlocks" @bind-FilterText="_filterText" @bind-SelectedKinds="_selectedKinds"
+                               @bind-ShowOnlyWithDependencies="_showOnlyWithDependencies" @bind-ShowOnlyWithAlerts="_showOnlyWithAlerts" OnFiltersChanged="ApplyFilters" />
+    }
+    @if (!string.IsNullOrEmpty(_relatedToNodeId))
+    {
+        var relatedUnit = _allBuildingBlocks.FirstOrDefault(unit => unit.Key == _relatedToNodeId);
+        <div class="graph-related-scope" role="status">
+            <MoIcon Icon="@MoIcons.Workflow" Size="1.25rem" />
+            <div><span>@L["BuildingBlockVisualization:Workspace:ConnectedScope"]</span><strong>@(relatedUnit?.Title ?? _relatedToNodeId)</strong><p>@L["BuildingBlockVisualization:Workspace:ConnectedScopeHint"]</p></div>
+            <button type="button" class="graph-text-action" @onclick="ClearRelatedFilterClick">@L["BuildingBlockVisualization:ContextMenu:ClearRelatedFilter"]</button>
+        </div>
+    }
+
+    <div class="graph-explorer">
+        <section class="graph-canvas-panel" aria-label="@L["BuildingBlockVisualization:Workspace:CanvasLabel"]">
+            <div class="graph-canvas-toolbar">
+                <div class="graph-scope"><strong>@_filteredUnits.Count</strong><span>@L["BuildingBlockVisualization:Workspace:VisibleBuildingBlocks", _allBuildingBlocks.Count]</span><span class="graph-scope__divider" aria-hidden="true"></span><strong>@_visibleRelationships.Count</strong><span>@L["BuildingBlockVisualization:Workspace:DirectedEdges"]</span></div>
+                <div class="graph-camera-controls">
+                    <button type="button" class="graph-camera-button" disabled="@(_loading || _filteredUnits.Count == 0)" @onclick="FitView" title="@L["BuildingBlockVisualization:Workspace:Fit"]" aria-label="@L["BuildingBlockVisualization:Workspace:Fit"]"><MoIcon Icon="@MoIcons.Scan" Size="1.25rem" /></button>
+                    <button type="button" class="graph-camera-button" disabled="@_loading" @onclick="ZoomOut" title="@L["BuildingBlockVisualization:Workspace:ZoomOut"]" aria-label="@L["BuildingBlockVisualization:Workspace:ZoomOut"]"><MoIcon Icon="@MoIcons.Minus" Size="1.25rem" /></button>
+                    <button type="button" class="graph-camera-button" disabled="@_loading" @onclick="ZoomIn" title="@L["BuildingBlockVisualization:Workspace:ZoomIn"]" aria-label="@L["BuildingBlockVisualization:Workspace:ZoomIn"]"><MoIcon Icon="@MoIcons.Add" Size="1.25rem" /></button>
+                    <button type="button" class="graph-camera-button" disabled="@_loading" @onclick="ResetView" title="@L["BuildingBlockVisualization:Actions:ResetViewTooltip"]" aria-label="@L["BuildingBlockVisualization:Actions:ResetViewTooltip"]"><MoIcon Icon="@MoIcons.Restart" Size="1.25rem" /></button>
+                </div>
+            </div>
+            <div class="graph-canvas-owner" aria-busy="@(_loading ? "true" : "false")">
+                <div id="@_graphContainerId" class="building-block-graph" @onclick="OnBackgroundClick" @oncontextmenu:preventDefault="true"></div>
+                @if (_loading)
+                {
+                    <div class="graph-canvas-state" role="status"><MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" /><span>@L["BuildingBlockVisualization:Workspace:Loading"]</span></div>
+                }
+                else if (!string.IsNullOrEmpty(_loadError))
+                {
+                    <div class="graph-canvas-state graph-canvas-state--error" role="alert"><MoIcon Icon="@MoIcons.Error" Size="1.5rem" /><strong>@L["BuildingBlockVisualization:Workspace:LoadError"]</strong><p>@_loadError</p></div>
+                }
+                else if (_filteredUnits.Count == 0)
+                {
+                    <div class="graph-canvas-state"><MoIcon Icon="@MoIcons.Network" Size="1.5rem" /><strong>@L[_allBuildingBlocks.Count == 0 ? "BuildingBlockVisualization:Workspace:EmptyCatalog" : "BuildingBlockVisualization:Workspace:NoMatches"]</strong><p>@L[_allBuildingBlocks.Count == 0 ? "BuildingBlockVisualization:Workspace:EmptyCatalogHint" : "BuildingBlockVisualization:Workspace:NoMatchesHint"]</p>@if (_allBuildingBlocks.Count > 0){<button type="button" class="graph-action" @onclick="() => ClearAllFiltersAsync(null)">@L["BuildingBlockVisualization:ContextMenu:ClearAllFilters"]</button>}</div>
+                }
+            </div>
+            <footer class="graph-canvas-footer"><div class="graph-legend"><span><i class="graph-legend__simple" aria-hidden="true"></i>@L["BuildingBlockVisualization:Legend:SimpleBuildingBlock"]</span><span><i class="graph-legend__complex" aria-hidden="true"></i>@L["BuildingBlockVisualization:Legend:ComplexBuildingBlock"]</span></div><p>@L["BuildingBlockVisualization:Workspace:CanvasHint"]</p></footer>
+        </section>
+
+        <aside class="graph-selected-evidence" aria-label="@L["BuildingBlockVisualization:Workspace:SelectedLabel"]">
+            <div class="graph-evidence-heading"><span class="graph-eyebrow">@L["BuildingBlockVisualization:Workspace:SelectedLabel"]</span><MoIcon Icon="@MoIcons.Globe" Size="1.25rem" /></div>
+            @if (GetEvidenceUnit() is { } evidenceUnit)
+            {
+                <span class="graph-building-block-type">@L.GetBuildingBlockKindText(evidenceUnit.Kind)</span>
+                <h3>@evidenceUnit.Title</h3><code class="graph-building-block-key">@evidenceUnit.Key</code>
+                @if (!string.IsNullOrWhiteSpace(evidenceUnit.Description)){<p class="graph-building-block-description">@evidenceUnit.Description</p>}
+                @if (!_filteredUnits.Any(unit => unit.Key == evidenceUnit.Key)){<p class="graph-scope-note">@L["BuildingBlockVisualization:Workspace:OutsideScope"]</p>}
+                <dl class="graph-building-block-facts"><div><dt>@L["BuildingBlockVisualization:Workspace:Dependencies"]</dt><dd>@evidenceUnit.Dependencies.Count</dd></div><div><dt>@L["BuildingBlockVisualization:Workspace:Dependents"]</dt><dd>@evidenceUnit.DependedByCount</dd></div><div><dt>@L["BuildingBlockVisualization:Workspace:Methods"]</dt><dd>@evidenceUnit.MethodCount</dd></div></dl>
+                <div class="graph-selected-actions">
+                    <button type="button" class="graph-action graph-action--primary" @onclick="() => ShowContextDetailsAsync(evidenceUnit)"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" />@L["BuildingBlockVisualization:ContextMenu:Details"]</button>
+                    <button type="button" class="graph-action" disabled="@(!_filteredUnits.Any(unit => unit.Key == evidenceUnit.Key))" @onclick="() => FocusOnNodeAsync(evidenceUnit)"><MoIcon Icon="@MoIcons.Focus" Size="1.25rem" />@L["BuildingBlockVisualization:ContextMenu:FocusNode"]</button>
+                    <button type="button" class="graph-text-action" @onclick="() => FilterByTypeAsync(evidenceUnit)">@L["BuildingBlockVisualization:ContextMenu:FilterByType"]</button>
+                    <button type="button" class="graph-text-action" @onclick="() => ShowRelatedNodesAsync(evidenceUnit)">@L["BuildingBlockVisualization:ContextMenu:ShowRelatedNodes"]</button>
+                    <button type="button" class="graph-text-action" @onclick="() => CopyFullNameAsync(evidenceUnit)"><MoIcon Icon="@MoIcons.Copy" Size="1.25rem" />@L["BuildingBlockVisualization:ContextMenu:CopyFullName"]</button>
+                </div>
+                <div class="graph-selected-relations">
+                    <section><h4>@L["BuildingBlockVisualization:Workspace:Dependencies"] <span>@evidenceUnit.Dependencies.Count</span></h4><div class="graph-relation-list">@foreach(var reference in evidenceUnit.Dependencies){<button type="button" class="graph-relation" @onclick="() => SelectReference(reference.Key)"><span>@reference.Title</span><code>@reference.Key</code><MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button>}@if(evidenceUnit.Dependencies.Count == 0){<p>@L["BuildingBlockVisualization:Workspace:NoDependencies"]</p>}</div></section>
+                    <section><h4>@L["BuildingBlockVisualization:Workspace:Dependents"] <span>@evidenceUnit.DependedByCount</span></h4><div class="graph-relation-list">@foreach(var dependent in GetIncomingUnits(evidenceUnit)){<button type="button" class="graph-relation" @onclick="() => SelectReference(dependent.Key)"><span>@dependent.Title</span><code>@dependent.Key</code><MoIcon Icon="@MoIcons.ArrowDown" Size="1.25rem" /></button>}@if(evidenceUnit.DependedByCount == 0){<p>@L["BuildingBlockVisualization:Workspace:NoDependents"]</p>}</div></section>
+                </div>
+            }
+            else
+            {
+                <MoContentState><MoIcon Icon="@MoIcons.Navigation" Size="1.5rem" /><h3>@L["BuildingBlockVisualization:Workspace:SelectBuildingBlock"]</h3><p>@L["BuildingBlockVisualization:Workspace:SelectBuildingBlockHint"]</p><button type="button" class="graph-action" @onclick="ToggleNativeEvidence">@L["BuildingBlockVisualization:Workspace:NativeEvidence"]</button></MoContentState>
+            }
+        </aside>
+    </div>
+
+    <section class="graph-native-evidence" aria-labelledby="@(_graphContainerId + "-native-title")">
+        <header><div><span class="graph-eyebrow">@L["BuildingBlockVisualization:Workspace:NativeEyebrow"]</span><h3 id="@(_graphContainerId + "-native-title")">@L["BuildingBlockVisualization:Workspace:NativeEvidence"]</h3><p>@L["BuildingBlockVisualization:Workspace:NativeHint"]</p></div><button type="button" class="graph-action" aria-expanded="@(_showNativeEvidence ? "true" : "false")" @onclick="ToggleNativeEvidence"><MoIcon Icon="@(_showNativeEvidence ? MoIcons.ChevronUp : MoIcons.ChevronDown)" Size="1.25rem" />@L[_showNativeEvidence ? "BuildingBlockVisualization:Workspace:HideEvidence" : "BuildingBlockVisualization:Workspace:ShowEvidence"]</button></header>
+        @if (_showNativeEvidence)
+        {
+            <div class="graph-native-tabs" role="group" aria-label="@L["BuildingBlockVisualization:Workspace:NativeEvidence"]"><button type="button" aria-pressed="@(!_showRelationships ? "true" : "false")" @onclick="() => SetEvidenceView(false)">@L["BuildingBlockVisualization:Workspace:BuildingBlocksTab", _filteredUnits.Count]</button><button type="button" aria-pressed="@(_showRelationships ? "true" : "false")" @onclick="() => SetEvidenceView(true)">@L["BuildingBlockVisualization:Workspace:RelationshipsTab", _visibleRelationships.Count]</button><button type="button" class="graph-text-action" @onclick="() => ClearAllFiltersAsync(null)">@L["BuildingBlockVisualization:ContextMenu:ClearAllFilters"]</button></div>
+            <div class="graph-evidence-table-owner">
+                @if (!_showRelationships)
+                {
+                    <table class="graph-evidence-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:BuildingBlockColumn"]</th>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:Dependencies"]</th>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:Dependents"]</th>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:ActionsColumn"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var unit in _filteredUnits.Skip(_evidencePage * EVIDENCE_PAGE_SIZE).Take(EVIDENCE_PAGE_SIZE))
+                            {
+                                <tr @key="unit.Key" data-building-block-id="@unit.Key" data-selected="@(_evidenceUnitKey == unit.Key ? "true" : "false")">
+                                    <td>
+                                        <button type="button" class="graph-ledger-building-block" aria-pressed="@(_evidenceUnitKey == unit.Key ? "true" : "false")" @onclick="() => SelectEvidenceUnit(unit)">
+                                            <strong>@unit.Title</strong>
+                                            <span>@L.GetBuildingBlockKindText(unit.Kind)</span>
+                                            <code>@unit.Key</code>
+                                        </button>
+                                    </td>
+                                    <td data-label="@L["BuildingBlockVisualization:Workspace:Dependencies"]">@unit.Dependencies.Count</td>
+                                    <td data-label="@L["BuildingBlockVisualization:Workspace:Dependents"]">@unit.DependedByCount</td>
+                                    <td>
+                                        <div class="graph-ledger-actions">
+                                            <button type="button" class="graph-text-action" @onclick="() => ShowContextDetailsAsync(unit)">@L["BuildingBlockVisualization:ContextMenu:Details"]</button>
+                                            <button type="button" class="graph-text-action" @onclick="() => FocusOnNodeAsync(unit)">@L["BuildingBlockVisualization:ContextMenu:FocusNode"]</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <table class="graph-evidence-table graph-evidence-table--relationships">
+                        <thead>
+                            <tr>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:SourceColumn"]</th>
+                                <th scope="col" class="graph-direction-cell">
+                                    <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" />
+                                    <span class="graph-sr-only">@L["BuildingBlockVisualization:Workspace:DependencyDirection"]</span>
+                                </th>
+                                <th scope="col">@L["BuildingBlockVisualization:Workspace:TargetColumn"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var edge in _visibleRelationships.Skip(_evidencePage * EVIDENCE_PAGE_SIZE).Take(EVIDENCE_PAGE_SIZE))
+                            {
+                                <tr @key="edge" data-source-id="@edge.Source.Key" data-target-id="@edge.Target.Key">
+                                    <td>
+                                        <button type="button" class="graph-ledger-building-block" aria-pressed="@(_evidenceUnitKey == edge.Source.Key ? "true" : "false")" @onclick="() => SelectEvidenceUnit(edge.Source)">
+                                            <strong>@edge.Source.Title</strong>
+                                            <code>@edge.Source.Key</code>
+                                        </button>
+                                    </td>
+                                    <td class="graph-direction-cell">
+                                        <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" />
+                                        <span class="graph-sr-only">@L["BuildingBlockVisualization:Workspace:DependencyDirection"]</span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="graph-ledger-building-block" aria-pressed="@(_evidenceUnitKey == edge.Target.Key ? "true" : "false")" @onclick="() => SelectEvidenceUnit(edge.Target)">
+                                            <strong>@edge.Target.Title</strong>
+                                            <code>@edge.Target.Key</code>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                @if (EvidenceCount == 0){<MoContentState Compact="true"><p>@L["BuildingBlockVisualization:Workspace:NoEvidence"]</p></MoContentState>}
+            </div>
+            <footer class="graph-evidence-pager"><span>@L["BuildingBlockVisualization:Workspace:PageRange", EvidenceCount == 0 ? 0 : _evidencePage * EVIDENCE_PAGE_SIZE + 1, Math.Min((_evidencePage + 1) * EVIDENCE_PAGE_SIZE, EvidenceCount), EvidenceCount]</span><div><button type="button" class="graph-camera-button" aria-label="@L["BuildingBlockVisualization:Workspace:PreviousPage"]" disabled="@(_evidencePage == 0)" @onclick="() => ChangeEvidencePage(-1)"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.25rem" /></button><button type="button" class="graph-camera-button" aria-label="@L["BuildingBlockVisualization:Workspace:NextPage"]" disabled="@((_evidencePage + 1) * EVIDENCE_PAGE_SIZE >= EvidenceCount)" @onclick="() => ChangeEvidencePage(1)"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.25rem" /></button></div></footer>
+        }
+    </section>
+</section>
+
+<BuildingBlockDetailDialog @bind-Visible="_detailDialogVisible" SelectedBuildingBlock="_selectedUnit" OnNodeFocus="HandleNodeFocusFromDialog" />
+<MoContextMenu TItem="BuildingBlockSummary" Items="@_contextMenuItems" Visible="@_contextMenuOpen" InitialX="@_contextMenuX" InitialY="@_contextMenuY" ContextItem="@_contextMenuUnit" OpeningRevision="@_contextMenuOpeningRevision" OnItemClick="@OnContextMenuItemClick" OnClose="@CloseContextMenu" />
+
+@code {
+    private const string JS_MODULE_PATH = "./_content/Monica.Framework.UI/UIBuildingBlocks/buildingBlockGraph.js";
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
+    private readonly SemaphoreSlim _interopGate = new(1, 1);
+    private readonly object _disposeSync = new();
+    private readonly string _graphContainerId = $"building-block-graph-{Guid.NewGuid():N}";
+    private long _contextMenuOpeningRevision;
+    private IJSObjectReference? _graphController;
+    private DotNetObjectReference<BuildingBlockVisualization>? _dotNetReference;
+    private Task? _disposeTask;
+    private List<BuildingBlockSummary> _allBuildingBlocks = [];
+    private const int EVIDENCE_PAGE_SIZE = 10;
+    private List<BuildingBlockSummary> _filteredUnits = [];
+    private List<VisibleRelationship> _visibleRelationships = [];
+    private BuildingBlockFilterPanel? _filterPanel;
+    private string? _evidenceUnitKey;
+    private string? _loadError;
+    private bool _showNativeEvidence;
+    private bool _showRelationships;
+    private int _evidencePage;
+    private long _loadRequestId;
+    private long _projectionRevision;
+    private int EvidenceCount => _showRelationships ? _visibleRelationships.Count : _filteredUnits.Count;
+    private sealed record VisibleRelationship(BuildingBlockSummary Source, BuildingBlockSummary Target);
+    private bool _loading;
+    private bool _detailDialogVisible;
+    private BuildingBlockSummary? _selectedUnit;
+    private BuildingBlockSummary? _contextMenuUnit;
+    private bool _showFilterPanel;
+    private bool _showLayoutPanel;
+    private string _filterText = string.Empty;
+    private IReadOnlyCollection<BuildingBlockKind> _selectedKinds = new HashSet<BuildingBlockKind>();
+    private bool _kindFilterInitialized;
+    private bool _showOnlyWithDependencies;
+    private bool _showOnlyWithAlerts;
+    private string? _relatedToNodeId;
+    private bool _contextMenuOpen;
+    private double _contextMenuX;
+    private double _contextMenuY;
+    private LayoutType _currentLayout = LayoutType.Force;
+    private int _forceDistance = 500;
+    private int _forceStrength = -300;
+    private List<ContextMenuItem<BuildingBlockSummary>> _contextMenuItems = [];
+    private volatile bool _disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await InitializeGraphAsync();
+            if (!_disposed)
+            {
+                await LoadBuildingBlocksAsync();
+            }
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+        }
+        catch (JSDisconnectedException) when (_disposed)
+        {
+        }
+    }
+
+    private async Task InitializeGraphAsync()
+    {
+        await _interopGate.WaitAsync(_lifetimeCancellation.Token);
+
+        IJSObjectReference? module = null;
+        IJSObjectReference? graphController = null;
+        DotNetObjectReference<BuildingBlockVisualization>? dotNetReference = null;
+        try
+        {
+            module = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                JS_MODULE_PATH);
+
+            if (_disposed)
+            {
+                return;
+            }
+
+            dotNetReference = DotNetObjectReference.Create(this);
+            graphController = await module.InvokeAsync<IJSObjectReference>(
+                "createGraph",
+                _graphContainerId,
+                false,
+                dotNetReference);
+
+            if (_disposed)
+            {
+                return;
+            }
+
+            _graphController = graphController;
+            _dotNetReference = dotNetReference;
+            graphController = null;
+            dotNetReference = null;
+        }
+        finally
+        {
+            await DisposeGraphControllerAsync(graphController);
+            dotNetReference?.Dispose();
+            await ReleaseModuleReferenceAsync(module);
+
+            _interopGate.Release();
+        }
+    }
+
+    private async Task LoadBuildingBlocksAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var requestId = ++_loadRequestId;
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+        try
+        {
+            var result = await BuildingBlocksFacade.GetAllAsync();
+            if (_disposed || requestId != _loadRequestId)
+            {
+                return;
+            }
+
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure() || data is null)
+            {
+                _loadError = L["Shared:Messages:LoadFailed", error].Value;
+                Snackbar.Add(_loadError, Severity.Error);
+                return;
+            }
+
+            _allBuildingBlocks = data;
+            var availableKinds = GetAvailableKinds();
+            _selectedKinds = !_kindFilterInitialized
+                ? availableKinds
+                : new HashSet<BuildingBlockKind>(_selectedKinds.Where(availableKinds.Contains));
+            _kindFilterInitialized = true;
+            if (_selectedUnit is not null)
+            {
+                var selectedKey = _selectedUnit.Key;
+                _selectedUnit = _allBuildingBlocks.FirstOrDefault(unit => unit.Key == selectedKey);
+                _detailDialogVisible &= _selectedUnit is not null;
+            }
+
+            if (!_allBuildingBlocks.Any(unit => unit.Key == _evidenceUnitKey))
+            {
+                _evidenceUnitKey = null;
+            }
+
+            _contextMenuOpen = false;
+            await ApplyFilters();
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+        }
+        catch (JSDisconnectedException) when (_disposed)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (!_disposed && requestId == _loadRequestId)
+            {
+                _loadError = L["Shared:Messages:LoadException", ex.Message].Value;
+                Snackbar.Add(_loadError, Severity.Error);
+            }
+        }
+        finally
+        {
+            if (!_disposed && requestId == _loadRequestId)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task UpdateGraph()
+    {
+        var revision = ++_projectionRevision;
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            await _interopGate.WaitAsync(_lifetimeCancellation.Token);
+            try
+            {
+                if (!_disposed && revision == _projectionRevision && _graphController is not null)
+                {
+                    // One admitted call publishes coherent data and its current layout configuration.
+                    await _graphController.InvokeVoidAsync("updateGraph", _lifetimeCancellation.Token,
+                        PrepareGraphData(), new
+                        {
+                            layout = GetLayoutName(_currentLayout),
+                            forceDistance = _forceDistance,
+                            forceStrength = _forceStrength,
+                            selectedId = _evidenceUnitKey
+                        });
+                }
+            }
+            finally
+            {
+                _interopGate.Release();
+            }
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+        }
+        catch (JSDisconnectedException) when (_disposed)
+        {
+        }
+    }
+
+    private object PrepareGraphData()
+    {
+        var nodes = _filteredUnits.Select(unit => new
+        {
+            id = unit.Key,
+            title = unit.Title,
+            type = L.GetBuildingBlockKindText(unit.Kind),
+            typeValue = (int)unit.Kind,
+            dependencyCount = unit.Dependencies.Count,
+            dependedByCount = unit.DependedByCount,
+            hasAttributes = unit.HasExplicitMetadata,
+            methodCount = unit.MethodCount,
+            hasMethod = unit.MethodCount > 0,
+            isComplex = BuildingBlockVisualizationConfig.IsComplexKind(unit.Kind),
+            colorRole = BuildingBlockVisualizationConfig.GetKindColorRole(unit.Kind),
+            icon = BuildingBlockVisualizationConfig.GetKindIcon(unit.Kind),
+            chips = L.BuildBuildingBlockGraphChips(unit),
+            metadata = L.BuildBuildingBlockGraphMetadata(unit),
+            alertLevel = BuildingBlockVisualizationConfig.GetHighestAlertLevel(unit),
+            alertCount = unit.Alerts.Count,
+            tooltip = L.BuildBuildingBlockGraphTooltip(unit),
+            summary = L.BuildBuildingBlockGraphSummary(unit),
+            noMetadataText = L["BuildingBlockVisualization:Graph:NoMetadata"].Value
+        }).ToList();
+
+        var links = _visibleRelationships.Select(edge => new
+        {
+            source = edge.Source.Key,
+            target = edge.Target.Key
+        }).ToList();
+
+        return new { nodes, links };
+    }
+
+    private void ToggleFilterPanel()
+    {
+        _showFilterPanel = !_showFilterPanel;
+        if (_showFilterPanel)
+        {
+            _showLayoutPanel = false;
+        }
+    }
+
+    private void ToggleLayoutPanel()
+    {
+        _showLayoutPanel = !_showLayoutPanel;
+        if (_showLayoutPanel)
+        {
+            _showFilterPanel = false;
+        }
+    }
+
+    private static string GetLayoutName(LayoutType layoutType) => layoutType switch
+    {
+        LayoutType.Force => "force",
+        LayoutType.Hierarchy => "hierarchy",
+        LayoutType.Circular => "circular",
+        LayoutType.MultiCircular => "multi_circular",
+        _ => "force"
+    };
+
+    private async Task SetLayout(LayoutType layoutType)
+    {
+        _currentLayout = layoutType;
+        await InvokeGraphAsync("setLayout", GetLayoutName(layoutType));
+    }
+
+    private async Task OnForceDistanceChanged(int value)
+    {
+        _forceDistance = value;
+        await InvokeGraphAsync("setForceDistance", value);
+    }
+
+    private async Task OnForceStrengthChanged(int value)
+    {
+        _forceStrength = value;
+        await InvokeGraphAsync("setForceStrength", value);
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var related = string.IsNullOrEmpty(_relatedToNodeId) ? null : GetAllRelatedNodes(_relatedToNodeId);
+        _filteredUnits = _allBuildingBlocks.Where(unit =>
+        {
+            if (related is not null)
+            {
+                return related.Contains(unit.Key);
+            }
+
+            var matchesText = string.IsNullOrWhiteSpace(_filterText)
+                || unit.Title.Contains(_filterText, StringComparison.OrdinalIgnoreCase)
+                || unit.Key.Contains(_filterText, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrEmpty(unit.Owner) && unit.Owner.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+                || unit.Tags.Any(tag => tag.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(unit.Description) && unit.Description.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+            return matchesText && _selectedKinds.Contains(unit.Kind)
+                && (!_showOnlyWithDependencies || unit.Dependencies.Count > 0 || unit.DependedByCount > 0)
+                && (!_showOnlyWithAlerts || unit.Alerts.Count > 0);
+        }).ToList();
+
+        var visible = _filteredUnits.ToDictionary(unit => unit.Key, StringComparer.Ordinal);
+        _visibleRelationships = _filteredUnits.SelectMany(source => source.Dependencies
+            .Where(reference => visible.ContainsKey(reference.Key))
+            .Select(reference => new VisibleRelationship(source, visible[reference.Key]))).ToList();
+        _evidencePage = 0;
+        _contextMenuOpen = false;
+        await UpdateGraph();
+    }
+
+    private Task ResetView() => InvokeGraphAsync("resetView");
+    private Task FitView() => InvokeGraphAsync("fitView");
+    private Task ZoomIn() => InvokeGraphAsync("zoomIn");
+    private Task ZoomOut() => InvokeGraphAsync("zoomOut");
+
+    private BuildingBlockSummary? GetEvidenceUnit() => _allBuildingBlocks.FirstOrDefault(unit => unit.Key == _evidenceUnitKey);
+
+    private IEnumerable<BuildingBlockSummary> GetIncomingUnits(BuildingBlockSummary unit) =>
+        _allBuildingBlocks.Where(candidate => candidate.Dependencies.Any(reference => reference.Key == unit.Key));
+
+    private async Task SelectEvidenceUnit(BuildingBlockSummary unit)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _evidenceUnitKey = unit.Key;
+        await InvokeGraphAsync("selectNode", unit.Key);
+    }
+
+    private Task SelectReference(string key)
+    {
+        var unit = _allBuildingBlocks.FirstOrDefault(candidate => candidate.Key == key);
+        return unit is null ? Task.CompletedTask : SelectEvidenceUnit(unit);
+    }
+
+    private void ToggleNativeEvidence() => _showNativeEvidence = !_showNativeEvidence;
+
+    private void SetEvidenceView(bool relationships)
+    {
+        _showRelationships = relationships;
+        _evidencePage = 0;
+    }
+
+    private void ChangeEvidencePage(int delta) =>
+        _evidencePage = Math.Clamp(_evidencePage + delta, 0, Math.Max(0, (EvidenceCount - 1) / EVIDENCE_PAGE_SIZE));
+
+    [JSInvokable]
+    public void OnNodeClick(string nodeId)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _selectedUnit = _allBuildingBlocks.FirstOrDefault(unit => unit.Key == nodeId);
+        if (_selectedUnit is null)
+        {
+            return;
+        }
+
+        _evidenceUnitKey = nodeId;
+        _detailDialogVisible = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnNodeRightClick(string nodeId, double x, double y)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _contextMenuUnit = _allBuildingBlocks.FirstOrDefault(unit => unit.Key == nodeId);
+        if (_contextMenuUnit is null)
+        {
+            return;
+        }
+
+        _evidenceUnitKey = nodeId;
+        _contextMenuX = x;
+        _contextMenuY = y;
+        _contextMenuItems = BuildContextMenuItems(_contextMenuUnit);
+        ++_contextMenuOpeningRevision;
+        _contextMenuOpen = true;
+        StateHasChanged();
+    }
+
+    private void OnBackgroundClick()
+    {
+        if (!_contextMenuOpen)
+        {
+            return;
+        }
+
+        _contextMenuOpen = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnSvgBackgroundClick()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (!_contextMenuOpen)
+        {
+            return;
+        }
+
+        _contextMenuOpen = false;
+        StateHasChanged();
+    }
+
+    private void CloseContextMenu()
+    {
+        if (_disposed) return;
+        _contextMenuOpen = false;
+    }
+
+    private List<ContextMenuItem<BuildingBlockSummary>> BuildContextMenuItems(BuildingBlockSummary unit)
+    {
+        var builder = ContextMenuBuilder<BuildingBlockSummary>.Create()
+            .AddItem(L["BuildingBlockVisualization:ContextMenu:Details"], MoIcons.Info, ShowContextDetailsAsync)
+            .AddItem(L["BuildingBlockVisualization:ContextMenu:FocusNode"], MoIcons.Focus, FocusOnNodeAsync)
+            .AddItem(L["BuildingBlockVisualization:ContextMenu:FilterByType"], MoIcons.Filter, FilterByTypeAsync);
+
+        if (!string.IsNullOrEmpty(_relatedToNodeId))
+        {
+            if (_relatedToNodeId == unit.Key)
+            {
+                builder.AddItem(L["BuildingBlockVisualization:ContextMenu:ClearRelatedFilter"], MoIcons.Close, ClearRelatedFilterAsync);
+            }
+            else
+            {
+                builder.AddItem(L["BuildingBlockVisualization:ContextMenu:ShowOtherRelatedNodes"], MoIcons.Workflow, ShowRelatedNodesAsync);
+            }
+        }
+        else
+        {
+            builder.AddItem(L["BuildingBlockVisualization:ContextMenu:ShowRelatedNodes"], MoIcons.Workflow, ShowRelatedNodesAsync);
+        }
+
+        builder
+            .AddItem(L["BuildingBlockVisualization:ContextMenu:ClearAllFilters"], MoIcons.ClearList, ClearAllFiltersAsync)
+            .AddDivider()
+            .AddItem(L["BuildingBlockVisualization:ContextMenu:CopyFullName"], MoIcons.Copy, CopyFullNameAsync);
+
+        return builder.Build();
+    }
+
+    private Task OnContextMenuItemClick(ContextMenuItem<BuildingBlockSummary> item)
+    {
+        if (_disposed) return Task.CompletedTask;
+        _contextMenuOpen = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task ShowContextDetailsAsync(BuildingBlockSummary? unit)
+    {
+        if (_disposed)
+        {
+            return Task.CompletedTask;
+        }
+
+        _selectedUnit = unit ?? _contextMenuUnit;
+        _evidenceUnitKey = _selectedUnit?.Key;
+        _detailDialogVisible = _selectedUnit is not null;
+        return Task.CompletedTask;
+    }
+
+    private async Task FocusOnNodeAsync(BuildingBlockSummary? unit)
+    {
+        var targetUnit = unit ?? _contextMenuUnit;
+        if (!_disposed && targetUnit is not null)
+        {
+            _evidenceUnitKey = targetUnit.Key;
+            await InvokeGraphAsync("focusOnNode", targetUnit.Key);
+        }
+    }
+
+    private Task OnLayoutChanged(LayoutType layoutType)
+    {
+        return SetLayout(layoutType);
+    }
+
+    private async Task FilterByTypeAsync(BuildingBlockSummary? unit)
+    {
+        var targetUnit = unit ?? _contextMenuUnit;
+        if (_disposed || targetUnit is null)
+        {
+            return;
+        }
+
+        _selectedKinds = new HashSet<BuildingBlockKind> { targetUnit.Kind };
+        _showFilterPanel = true;
+        await ApplyFilters();
+    }
+
+    private async Task ClearAllFiltersAsync(BuildingBlockSummary? unit)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_showFilterPanel && _filterPanel is { } filterPanel)
+        {
+            await filterPanel.ClearQueryAsync();
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _filterText = string.Empty;
+        _selectedKinds = GetAvailableKinds();
+        _showOnlyWithDependencies = false;
+        _showOnlyWithAlerts = false;
+        _relatedToNodeId = null;
+        await ApplyFilters();
+    }
+
+    private HashSet<BuildingBlockKind> GetAvailableKinds()
+    {
+        return _allBuildingBlocks
+            .Select(static unit => unit.Kind)
+            .Where(static type => type != BuildingBlockKind.None)
+            .ToHashSet();
+    }
+
+    private async Task ShowRelatedNodesAsync(BuildingBlockSummary? unit)
+    {
+        var targetUnit = unit ?? _contextMenuUnit;
+        if (_disposed || targetUnit is null)
+        {
+            return;
+        }
+
+        _relatedToNodeId = targetUnit.Key;
+        _showFilterPanel = true;
+        await ApplyFilters();
+        if (!_disposed)
+        {
+            Snackbar.Add(L["BuildingBlockVisualization:Messages:ShowingRelatedNodes", targetUnit.Title], Severity.Info);
+        }
+    }
+
+    private Task ClearRelatedFilterAsync(BuildingBlockSummary? unit)
+    {
+        if (_disposed) return Task.CompletedTask;
+        _relatedToNodeId = null;
+        return ApplyFilters();
+    }
+
+    private Task ClearRelatedFilterClick()
+    {
+        _relatedToNodeId = null;
+        return ApplyFilters();
+    }
+
+    private async Task CopyFullNameAsync(BuildingBlockSummary? unit)
+    {
+        var targetUnit = unit ?? _contextMenuUnit;
+        if (targetUnit is null)
+        {
+            return;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "navigator.clipboard.writeText",
+                _lifetimeCancellation.Token,
+                targetUnit.Key);
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+            return;
+        }
+        catch (JSDisconnectedException) when (_disposed)
+        {
+            return;
+        }
+        if (!_disposed)
+        {
+            Snackbar.Add(L["BuildingBlockVisualization:Messages:CopiedToClipboard"], Severity.Success);
+        }
+    }
+
+    private HashSet<string> GetAllRelatedNodes(string nodeId)
+    {
+        var catalog = _allBuildingBlocks.ToDictionary(unit => unit.Key, StringComparer.Ordinal);
+        var incoming = _allBuildingBlocks.SelectMany(unit => unit.Dependencies.Select(reference => (reference.Key, BuildingBlock: unit)))
+            .ToLookup(edge => edge.Key, edge => edge.BuildingBlock, StringComparer.Ordinal);
+        var related = new HashSet<string>(StringComparer.Ordinal) { nodeId };
+        var queue = new Queue<string>();
+        queue.Enqueue(nodeId);
+        while (queue.TryDequeue(out var currentId))
+        {
+            if (catalog.TryGetValue(currentId, out var currentUnit))
+            {
+                foreach (var dependency in currentUnit.Dependencies)
+                {
+                    if (related.Add(dependency.Key))
+                    {
+                        queue.Enqueue(dependency.Key);
+                    }
+                }
+            }
+
+            foreach (var dependent in incoming[currentId])
+            {
+                if (related.Add(dependent.Key))
+                {
+                    queue.Enqueue(dependent.Key);
+                }
+            }
+        }
+
+        return related;
+    }
+
+    private async Task HandleNodeFocusFromDialog(string nodeKey)
+    {
+        if (!_disposed)
+        {
+            _evidenceUnitKey = nodeKey;
+        }
+
+        await InvokeGraphAsync("focusOnNode", nodeKey);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeSync)
+        {
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        _disposed = true;
+        ++_loadRequestId;
+        ++_projectionRevision;
+        await _lifetimeCancellation.CancelAsync();
+
+        await _interopGate.WaitAsync();
+        try
+        {
+            var graphController = Interlocked.Exchange(ref _graphController, null);
+            var dotNetReference = Interlocked.Exchange(ref _dotNetReference, null);
+
+            await DisposeGraphControllerAsync(graphController);
+            dotNetReference?.Dispose();
+        }
+        finally
+        {
+            _interopGate.Release();
+        }
+
+        // A caller may have observed the pre-disposal state immediately before teardown began and still be
+        // approaching the gate. Keep these lightweight primitives alive so cancellation settles that admission
+        // race without turning an expected lifetime transition into ObjectDisposedException.
+    }
+
+    private async Task InvokeGraphAsync(string identifier, params object?[] arguments)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            await _interopGate.WaitAsync(_lifetimeCancellation.Token);
+            try
+            {
+                if (!_disposed && _graphController is not null)
+                {
+                    await _graphController.InvokeVoidAsync(identifier, _lifetimeCancellation.Token, arguments);
+                }
+            }
+            finally
+            {
+                _interopGate.Release();
+            }
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+        }
+        catch (JSDisconnectedException) when (_disposed)
+        {
+        }
+    }
+
+    private static async ValueTask DisposeGraphControllerAsync(IJSObjectReference? graphController)
+    {
+        if (graphController is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await graphController.InvokeVoidAsync("dispose");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+
+        try
+        {
+            await graphController.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private static async ValueTask ReleaseModuleReferenceAsync(IJSObjectReference? module)
+    {
+        if (module is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+    }
+}

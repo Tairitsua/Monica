@@ -30,12 +30,12 @@ public sealed record MemoryDiagnosticActionResult(
     int? Generation,
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt,
-    ResStatus Status,
+    ResultStatus Status,
     string? Message,
     string? ServerDumpPath)
 {
     /// <summary>Gets whether the action succeeded, irrespective of its follow-up read.</summary>
-    public bool IsSuccessful => Status is ResStatus.Ok or ResStatus.Created;
+    public bool IsSuccessful => Status is ResultStatus.Ok or ResultStatus.Created;
 }
 
 /// <summary>Owns one page's retained memory evidence, explicit actions and polling loop.</summary>
@@ -62,11 +62,11 @@ public sealed class MemoryAnalysisPageState(
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly ModuleMemoryAnalysisUIOption _option = options.Value;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly Func<Res<MemorySnapshot>> _getSnapshot = memoryDiagnosticsFacade.GetCurrentSnapshot;
-    private readonly Func<Res<GcDetails>> _getGcDetails = () => memoryDiagnosticsFacade.GetGcDetails();
-    private readonly Func<Res<RuntimeMetricsTrend>> _getTrend = runtimeMetricsFacade.GetTrend;
-    private readonly Func<int, Res> _forceGarbageCollection = generation => memoryDiagnosticsFacade.ForceGarbageCollection(generation);
-    private readonly Func<Task<Res<string>>> _createGcDump = () => memoryDiagnosticsFacade.TriggerGcDumpAsync();
+    private readonly Func<Result<MemorySnapshot>> _getSnapshot = memoryDiagnosticsFacade.GetCurrentSnapshot;
+    private readonly Func<Result<GcDetails>> _getGcDetails = () => memoryDiagnosticsFacade.GetGcDetails();
+    private readonly Func<Result<RuntimeMetricsTrend>> _getTrend = runtimeMetricsFacade.GetTrend;
+    private readonly Func<int, Result> _forceGarbageCollection = generation => memoryDiagnosticsFacade.ForceGarbageCollection(generation);
+    private readonly Func<Task<Result<string>>> _createGcDump = () => memoryDiagnosticsFacade.TriggerGcDumpAsync();
     private CancellationTokenSource? _refreshCancellation;
     private Task _refreshLoop = Task.CompletedTask;
     private Task? _disposeTask;
@@ -92,11 +92,11 @@ public sealed class MemoryAnalysisPageState(
         IOptions<ModuleMemoryAnalysisUIOption> options,
         TimeProvider? timeProvider,
         bool autoRefresh,
-        Func<Res<MemorySnapshot>> getSnapshot,
-        Func<Res<GcDetails>> getGcDetails,
-        Func<Res<RuntimeMetricsTrend>> getTrend,
-        Func<int, Res> forceGarbageCollection,
-        Func<Task<Res<string>>> createGcDump)
+        Func<Result<MemorySnapshot>> getSnapshot,
+        Func<Result<GcDetails>> getGcDetails,
+        Func<Result<RuntimeMetricsTrend>> getTrend,
+        Func<int, Result> forceGarbageCollection,
+        Func<Task<Result<string>>> createGcDump)
         : this(memoryDiagnosticsFacade, runtimeMetricsFacade, options, timeProvider, autoRefresh)
     {
         ArgumentNullException.ThrowIfNull(getSnapshot);
@@ -152,7 +152,7 @@ public sealed class MemoryAnalysisPageState(
     public MemoryDiagnosticActionResult? LastAction { get; private set; }
 
     /// <summary>Reads current evidence and starts the effective polling preference.</summary>
-    public async Task<Res> InitializeAsync()
+    public async Task<Result> InitializeAsync()
     {
         var result = await RefreshAsync();
         await UpdateAutoRefreshAsync();
@@ -166,14 +166,14 @@ public sealed class MemoryAnalysisPageState(
     /// Reads without forcing a collection. Busy or retired calls return Conflict with an empty
     /// message and leave prior evidence and failures unchanged.
     /// </summary>
-    public Task<Res> RefreshAsync() => Task.FromResult(Refresh());
+    public Task<Result> RefreshAsync() => Task.FromResult(Refresh());
 
     /// <summary>
     /// Runs permitted collection, then attempts a view read on success. Its returned envelope and
     /// LastAction describe collection; LoadError describes a separate follow-up failure.
     /// </summary>
     /// <param name="generation">The requested generation, including -1 for a full collection.</param>
-    public Task<Res> ForceGarbageCollectionAsync(int generation)
+    public Task<Result> ForceGarbageCollectionAsync(int generation)
     {
         var admission = TryAdmit(MemoryDiagnosticAction.GarbageCollection);
         if (admission is not null) return Task.FromResult(admission);
@@ -184,7 +184,7 @@ public sealed class MemoryAnalysisPageState(
             var result = _forceGarbageCollection(generation);
             if (!CompleteAction(MemoryDiagnosticAction.GarbageCollection, generation, result.Status, result.Message, null))
                 return Task.FromResult(InactiveResult());
-            if (result.IsOk()) LoadData();
+            if (result.IsSuccess()) LoadData();
             return Task.FromResult(IsRetired() ? InactiveResult() : result);
         }
         finally
@@ -197,19 +197,19 @@ public sealed class MemoryAnalysisPageState(
     /// Creates a permitted dump and retains its actual server path, then attempts a view read on
     /// success. Disposal drains the provider; the facade supplies no cancellation token.
     /// </summary>
-    public async Task<Res<string>> CreateGcDumpAsync()
+    public async Task<Result<string>> CreateGcDumpAsync()
     {
         var admission = TryAdmit(MemoryDiagnosticAction.GcDump);
-        if (admission is not null) return admission;
+        if (admission is not null) return Result.FromFailure<string>(admission);
         try
         {
             NotifyStateChanged();
-            if (IsRetired()) return InactiveResult();
+            if (IsRetired()) return Result.FromFailure<string>(InactiveResult());
             var result = await _createGcDump();
-            if (!CompleteAction(MemoryDiagnosticAction.GcDump, null, result.Status, result.Message, result.IsOk() ? result.Data : null))
-                return InactiveResult();
-            if (result.IsOk()) LoadData();
-            if (IsRetired()) return InactiveResult();
+            if (!CompleteAction(MemoryDiagnosticAction.GcDump, null, result.Status, result.Message, result.IsSuccess() ? result.Data : null))
+                return Result.FromFailure<string>(InactiveResult());
+            if (result.IsSuccess()) LoadData();
+            if (IsRetired()) return Result.FromFailure<string>(InactiveResult());
             return result;
         }
         finally
@@ -240,7 +240,7 @@ public sealed class MemoryAnalysisPageState(
         }
     }
 
-    private Res Refresh(CancellationToken pollingCancellation = default)
+    private Result Refresh(CancellationToken pollingCancellation = default)
     {
         var admission = TryAdmit(pollingCancellation: pollingCancellation);
         if (admission is not null) return admission;
@@ -255,14 +255,14 @@ public sealed class MemoryAnalysisPageState(
         }
     }
 
-    private Res? TryAdmit(MemoryDiagnosticAction? action = null, CancellationToken pollingCancellation = default)
+    private Result? TryAdmit(MemoryDiagnosticAction? action = null, CancellationToken pollingCancellation = default)
     {
         lock (_sync)
         {
             if (_disposed || pollingCancellation.IsCancellationRequested) return InactiveResult();
             if (action == MemoryDiagnosticAction.GarbageCollection && !_option.AllowManualGC ||
                 action == MemoryDiagnosticAction.GcDump && !_option.AllowGcDump)
-                return Res.Fail(string.Empty, ResStatus.Forbidden);
+                return Result.Failure(string.Empty, ResultStatus.Forbidden);
             if (!_operationGate.Wait(0)) return InactiveResult();
             IsLoading = true;
             IsActionRunning = action.HasValue;
@@ -272,20 +272,29 @@ public sealed class MemoryAnalysisPageState(
         }
     }
 
-    private Res LoadData(CancellationToken pollingCancellation = default)
+    private Result LoadData(CancellationToken pollingCancellation = default)
     {
         if (IsRetired(pollingCancellation)) return InactiveResult();
         var snapshotResult = _getSnapshot();
-        if (snapshotResult.IsFailed(out _, out var snapshot))
+        var snapshot = snapshotResult.Data;
+        if (snapshotResult.IsFailure())
             return RetainFailure(snapshotResult, pollingCancellation);
+        if (snapshot is null)
+            return RetainFailure(Result.Failure<MemorySnapshot>("The memory snapshot was unavailable."), pollingCancellation);
         if (IsRetired(pollingCancellation)) return InactiveResult();
         var gcResult = _getGcDetails();
-        if (gcResult.IsFailed(out _, out var gcDetails))
+        var gcDetails = gcResult.Data;
+        if (gcResult.IsFailure())
             return RetainFailure(gcResult, pollingCancellation);
+        if (gcDetails is null)
+            return RetainFailure(Result.Failure<GcDetails>("The GC details were unavailable."), pollingCancellation);
         if (IsRetired(pollingCancellation)) return InactiveResult();
         var trendResult = _getTrend();
-        if (trendResult.IsFailed(out _, out var trend))
+        var trend = trendResult.Data;
+        if (trendResult.IsFailure())
             return RetainFailure(trendResult, pollingCancellation);
+        if (trend is null)
+            return RetainFailure(Result.Failure<RuntimeMetricsTrend>("The runtime metrics trend was unavailable."), pollingCancellation);
         var detachedSnapshot = Detach(snapshot);
         var detachedGcDetails = Detach(gcDetails);
         var detachedTrend = new RuntimeMetricsTrend
@@ -303,21 +312,21 @@ public sealed class MemoryAnalysisPageState(
             SnapshotCapturedAt = _timeProvider.GetUtcNow();
             HasSnapshot = true;
             LoadError = null;
-            return Res.Ok();
+            return Result.Success();
         }
     }
 
-    private Res RetainFailure<T>(Res<T> error, CancellationToken pollingCancellation)
+    private Result RetainFailure<T>(Result<T> error, CancellationToken pollingCancellation)
     {
         lock (_sync)
         {
             if (_disposed || pollingCancellation.IsCancellationRequested) return InactiveResult();
             LoadError = error.Message ?? string.Empty;
-            return new Res { Status = error.Status, Message = error.Message, Metadata = error.Metadata };
+            return Result.FromFailure(error);
         }
     }
 
-    private bool CompleteAction(MemoryDiagnosticAction action, int? generation, ResStatus status, string? message, string? serverDumpPath)
+    private bool CompleteAction(MemoryDiagnosticAction action, int? generation, ResultStatus status, string? message, string? serverDumpPath)
     {
         lock (_sync)
         {
@@ -442,7 +451,7 @@ public sealed class MemoryAnalysisPageState(
         }
     }
 
-    private static Res InactiveResult() => Res.Fail(string.Empty, ResStatus.Conflict);
+    private static Result InactiveResult() => Result.Failure(string.Empty, ResultStatus.Conflict);
 
     private static MemorySnapshot Detach(MemorySnapshot value) => new()
     {

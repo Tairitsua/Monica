@@ -18,10 +18,12 @@ public sealed partial class InMemoryJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(synchronization);
         synchronization.Validate();
+        synchronization.CoordinatorLease?.ValidatePartition(synchronization.CursorKey.SchedulerScopeKey, "owner:" + synchronization.CursorKey.OwnerKey);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
+            ValidateCoordinatorLeaseUnsafe(synchronization.CoordinatorLease);
             var key = new DefinitionKey(
                 synchronization.CursorKey.SchedulerScopeKey,
                 synchronization.CursorKey.OwnerKey,
@@ -151,10 +153,12 @@ public sealed partial class InMemoryJobSchedulerStore
     {
         ArgumentNullException.ThrowIfNull(materialization);
         materialization.Validate();
+        materialization.CoordinatorLease?.ValidatePartition(materialization.CursorKey.SchedulerScopeKey, "owner:" + materialization.CursorKey.OwnerKey);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
+            ValidateCoordinatorLeaseUnsafe(materialization.CoordinatorLease);
             var expectedOccurrence = NormalizeUtc(materialization.ExpectedOccurrenceUtc);
             var key = new DefinitionKey(
                 materialization.CursorKey.SchedulerScopeKey,

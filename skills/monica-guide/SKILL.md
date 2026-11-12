@@ -13,14 +13,16 @@ When changing the Guide implementation, use [framework-development.md](reference
 
 Try in order:
 
-1. The installed guide executable: read `ExecutablePath` from `%LOCALAPPDATA%\Monica\installation.json` (Windows; `~/.local/share/Monica` on Linux, `~/Library/Application Support/Monica` on macOS). `MONICA_GUIDE_DATA_ROOT` overrides the data root.
-2. Inside a canonical Monica checkout: `dotnet run --project Monica.Guide.App -- <command> …` (development form; commands and envelopes are identical).
+1. The installed guide executable: read `executablePath` from `%LOCALAPPDATA%\Monica.Guide\installation.json` (Windows; `~/.local/share/Monica.Guide` on Linux, `~/Library/Application Support/Monica.Guide` on macOS). `MONICA_GUIDE_DATA_ROOT` overrides the data root.
+2. Inside an authorized standalone Monica.Guide checkout: `dotnet run --project Monica.Guide.App --framework net10.0 -- <command> …` (development form; commands and envelopes are identical).
+
+If no client is installed, download it from https://monica.dpdns.org/downloads. The complete Guide archive includes its Framework skill bundle. Open Guide, choose the workspace and modules, review the shared skill/instruction plan, and apply it once. No separate product download or installation path is required. CLI commands also resolve the bundled payload by default; `--bundle <directory>` is an explicit release override. Client and module versions remain independent.
 
 Every mutating command is preview-first: it prints a plan with a `planDigest`, changes nothing, and only `--apply --plan-digest <digest>` executes the unchanged approved plan. Exit codes are stable machine contracts: `0` ready, `1` warnings, `2` usage error, `3` errors/blockers. Prefer `--json` for machine parsing.
 
 ## Workflow
 
-Monica skills install **into the project by default**, never globally unless the user explicitly asks for a machine-wide install. The one built-in exception is the guide skill itself: the product's `GlobalGuideSkill` preference (default on, persisted in `%LOCALAPPDATA%\<product>\configuration\preferences.json`) keeps the guide skill global-first, so workspace closures exclude it and a workspace update removes its stale local copy instead of reinstalling one per workspace.
+Monica skills install **into the project by default**, never globally unless the user explicitly asks for a machine-wide install. The guide skill is included locally by default. The product's optional `GlobalGuideSkill` preference (default off, persisted in `%LOCALAPPDATA%\<product>\configuration\preferences.json`) keeps the guide skill global-first, so workspace closures exclude it and a workspace update removes its stale local copy instead of reinstalling one per workspace.
 
 1. Start without assuming a repository or development path:
 
@@ -44,10 +46,12 @@ Monica skills install **into the project by default**, never globally unless the
 3. Initialize a repository workspace after the user confirms a concrete profile:
 
    ```bash
-   $monica-guide init --workspace <path> --profile <application|extension-author|framework-contributor> --capability <microservice|modular-monolith|ui> --json
+   $monica-guide init --workspace <path> --profile <application|extension-author|framework-contributor> --json
    ```
 
-   `init` writes `.monica/guide.json` (including the optional `skillTargets` list of workspace-relative install directories, default `.agents/skills`) plus one managed instruction block in the root `AGENTS.md` (and the minimal `@AGENTS.md` import in `CLAUDE.md` when a Claude target is installed), and registers the workspace in the engine registry. The managed block also projects this machine's verified first-party source locators and the issue-reporting policy while the wizard's projection switches are on; a workspace update converges those sections with the same preview and apply. Inspect advisory detection with `status --workspace <path>` first; detection is a suggestion, confirmation is the user's.
+   `init` writes `.monica/guide.json` (including the optional `skillTargets` list of workspace-relative install directories, default `.agents/skills`) plus one managed instruction block in the root `AGENTS.md` (and the minimal `@AGENTS.md` import in `CLAUDE.md` when a Claude target is installed), and registers the workspace in the engine registry. The managed block also projects this machine's verified first-party source locators and the issue-reporting policy while their Framework managed rules are enabled for that workspace; a workspace update converges those sections with the same preview and apply. Inspect advisory detection with `status --workspace <path>` first; detection is a suggestion, confirmation is the user's.
+
+   For `application`, the unified domain/role architecture is built in. Without `--capability ui` the workspace is backend-only. Legacy `microservice` / `modular-monolith` capabilities remain accepted deployment/migration hints, not alternative project layouts. Add `--capability ui` to include the application UI specification, development skills and shared UI mechanics. The workspace wizard exposes this optional UI capability under advanced settings. One project application spec owns both sides.
 
 4. Install or refresh that workspace's skills — this is the default skill flow:
 
@@ -60,11 +64,13 @@ Monica skills install **into the project by default**, never globally unless the
 
 5. Global installs are explicit opt-ins only (`configure --environment windows --target shared|claude`), for users who want the skills in every project; never choose them on the user's behalf. The guide skill is the exception already covered above: it rides the global-first preference, and disabling that preference restores the per-workspace copy on the next update.
 
-6. Diagnose with `status` or `doctor` (add `--workspace` for repository-specific checks, including the installed-versus-profile skill count). The wizard runs the same diagnosis at startup in the background and promotes any skill-projection or workspace staleness finding to a warning banner on every page: one chip per drifted target — a global catalog (shared/claude) or a workspace path — with the check messages naming the drifted skills in each chip's tooltip, cleared by a refresh once the projections reconverge. Update skills by configuring a newer release bundle — or with the wizard's Update page, which verifies the release `SHA256SUMS` before activation. The wizard also offers a Workspaces page listing every registered workspace and a Sources page observing the global source bindings and the issue-reporting mode.
+6. Diagnose with `status` or `doctor` (add `--workspace` for repository checks). The Guide Health page checks configured modules and workspaces together; agent hosts are scanned once on the native environment when the user requests a check, and results survive page navigation. Initial setup uses bundled modules offline. The separate Updates page checks installed modules, verifies release checksums, and previews activation before updating their recorded skill projections. Framework source bindings remain a shared lookup feature.
 
 7. Before application design, implementation, refactoring, or review, load `$monica-application` and the repository-designated project specification, then the affected architecture/unit references. Follow [specification evolution](../monica-application/references/01-specification-evolution.md) for a gap or new pattern. Route framework and extension work to `$monica-framework`, documentation work to `$monica-docs-authoring`, and upstream contribution preparation to `$monica-contribution`.
 
 ## Operating rules
+
+- Guide `status` and `doctor` inspect toolbox and installation state. For a failing application host, route, UI page, or infrastructure operation, use `$monica-troubleshooting` and its owning runtime guidance.
 
 - One active skill release per product, recorded in the unified guide ledger; installations are keyed by environment and target root, so many project directories coexist with the global catalogs, and each is removable through its own `unconfigure` preview.
 - Maintain at most one global binding per first-party repository. Bindings record exact provenance (ref, commit, resolver) and remain lookup-only locators; never treat them as permission for remote or repository mutations.

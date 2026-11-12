@@ -1,13 +1,6 @@
-.help-drawer-content { width:100%; height:100%; min-width:0; min-height:0; overflow:hidden; background:var(--mud-palette-surface); }
-.help-drawer-content ::deep .help-drawer-focus,
-.help-drawer-content ::deep .mud-focus-trap-child-container { display:flex; flex-direction:column; width:100%; height:100%; min-width:0; min-height:0; }
-.help-drawer-content ::deep .mud-drawer-header { flex-shrink:0; height:auto; min-height:0; padding:24px; border-bottom:1px solid var(--mud-palette-divider); }
-.help-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; width:100%; min-width:0; }
-.help-header > div { order:0; min-width:0; }
-.help-header ::deep .help-close { order:1; flex-shrink:0; margin-top:-5px; }
 .help-eyebrow { color:var(--module-workbench-accent-ink, var(--mud-palette-text-primary)); font-size:10px; font-weight:500; line-height:1.6; letter-spacing:.08em; }
 .help-header h2 { margin:9px 0 0; font-family:var(--mud-typography-default-family); font-size:22px; line-height:1.4; font-weight:600; color:var(--mud-palette-text-primary); }
-.help-topics { flex:1 1 auto; min-height:0; min-width:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 24px 24px; }
+.help-topics { min-width:0; }
 .help-topics article { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:start; gap:12px; min-width:0; padding:22px 0; border-bottom:1px solid var(--mud-palette-divider); }
 .help-topics article:last-child { border-bottom:0; }
 .help-topics ::deep :is(.mud-icon-root, .mo-icon) { width:19px; height:19px; margin-top:2px; }

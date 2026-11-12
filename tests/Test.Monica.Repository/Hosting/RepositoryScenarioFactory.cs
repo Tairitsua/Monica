@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Modularity.Abstractions;
@@ -19,12 +20,22 @@ internal sealed class RepositoryScenarioFactory(
     IInterceptor? interceptor = null,
     Action<IServiceCollection>? configure = null,
     Action<RepositoryOutboxOptions>? configureOutbox = null,
-    Action<RepositoryEntityEventOptions>? configureProjections = null) : MonicaTestApplicationFactory<TestRepositoryDbContext>
+    Action<RepositoryEntityEventOptions>? configureProjections = null,
+    bool manual = false,
+    Action<ModuleRegistration<ModuleRepository, ModuleRepositoryOption>>? configureRepository = null)
+    : MonicaTestApplicationFactory<TestRepositoryDbContext>
 {
+    protected override void ConfigureHost(WebApplicationBuilder builder)
+    {
+        base.ConfigureHost(builder);
+        builder.Configuration["Application:AutonomousWork"] = manual ? "false" : "true";
+    }
+
     protected override void ConfigureMonica(IMonicaBuilder builder)
     {
         var repository = builder.AddRepository()
             .AddRepositoryDbContext<TestRepositoryDbContext>((_, db) => db.UseSqlite("Data Source=unused"));
+        configureRepository?.Invoke(repository);
         if (outbox)
         {
             builder.AddEventBus().UseNoOpDistributedEventBus();

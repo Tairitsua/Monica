@@ -1,4 +1,33 @@
 {
+  "Setup": {
+    "Title": "Channel setups",
+    "Help": "Start only the selected setup using this host's configuration. Other autonomous work remains held. Stop releases its endpoints; restart reuses frozen configuration.",
+    "Empty": "No channel setups were contributed by locally selected roles.",
+    "Host": "Host infrastructure",
+    "Channels": "Declared channels",
+    "Undeclared": "Channel identities become available after the first explicit start.",
+    "NoChannels": "No declared channels",
+    "Start": "Start",
+    "Stop": "Stop",
+    "Restart": "Restart",
+    "Started": "Channel setup started.",
+    "Stopped": "Channel setup stopped.",
+    "Restarted": "Channel setup restarted.",
+    "States": {
+      "Held": "Held",
+      "Disabled": "Disabled",
+      "Stopped": "Stopped",
+      "Starting": "Starting",
+      "Running": "Initialized",
+      "Stopping": "Stopping",
+      "Failed": "Failed"
+    },
+    "Modes": {
+      "Manual": "Manual participation",
+      "Automatic": "Automatic participation",
+      "Disabled": "Owner is not eligible here"
+    }
+  },
   "Pages": {
     "DataChannelManage": {
       "Title": "Channel directory"

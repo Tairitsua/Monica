@@ -1,0 +1,65 @@
+@inject IStringLocalizer<LockerResource> L
+
+<section class="ls-inventory">
+    <header><div><h2>@L["Inventory:Title"]</h2><p>@L["Inventory:Description"]</p></div><span>@L["Inventory:Shown", Filtered.Count, Rows.Count]</span></header>
+    <div class="ls-filterbar">
+        <label class="ls-search"><MoIcon Icon="@MoIcons.Search" Size="1rem" /><input value="@Search" @oninput="@(e => Filter.InvokeAsync(("q", e.Value?.ToString())))" aria-label="@L["Inventory:Search"]" placeholder="@L["Inventory:Search"]" /></label>
+        <div class="ls-authority-filters"><button aria-pressed="@(string.IsNullOrEmpty(Authority) ? "true" : "false")" @onclick="@(() => Filter.InvokeAsync(("authority", null)))">@L["Inventory:AllAuthorities"]</button>
+            @foreach (var source in Authorities) { <button class="@LeasePresentation.Role(source.Authority.Kind)" aria-pressed="@(Authority == source.Authority.Id ? "true" : "false")" @onclick="@(() => Filter.InvokeAsync(("authority", source.Authority.Id)))">@source.Authority.DisplayName</button> }
+        </div>
+    </div>
+    <div class="ls-states">
+        @foreach (var state in new[] { "all", "unexpired", "expired" })
+        {
+            <button class="@(state == "expired" ? "warning" : state == "unexpired" ? "success" : "neutral")" aria-pressed="@((EvidenceState ?? "all") == state ? "true" : "false")" @onclick="@(() => Filter.InvokeAsync(("state", state == "all" ? null : state)))"><i></i>@L[$"Filters:{state}"]<b>@ScopeRows.Count(row => MatchesState(row, state))</b></button>
+        }
+    </div>
+    @if (Filtered.Count == 0)
+    {
+        var unavailable = Authorities.Any(source => (string.IsNullOrEmpty(Authority) || source.Authority.Id == Authority)
+            && source.RefreshFailed && source.Snapshot is null);
+        <MoContentState><MoIcon Icon="@MoIcons.Inbox" Size="2rem" /><h3>@L[unavailable ? "Evidence:Unavailable" : Rows.Count == 0 ? "Evidence:Empty" : "Inventory:NoMatch"]</h3><p>@L[unavailable ? "Evidence:Retry" : Rows.Count == 0 ? "Evidence:EmptyDescription" : "Inventory:NoMatchDescription"]</p></MoContentState>
+    }
+    else
+    {
+        <table class="ls-table"><thead><tr><th scope="col">@L["Inventory:Resource"]</th><th scope="col">@L["Inventory:Holder"]</th><th scope="col">@L["Inventory:Authority"]</th><th scope="col">@L["Inventory:Validity"]</th></tr></thead>
+            <tbody>@foreach (var row in Filtered.Skip(_page * PAGE_SIZE).Take(PAGE_SIZE))
+            {
+                var duration = LeasePresentation.Duration(row.RemainingSeconds, L);
+                <tr><td data-label="@L["Inventory:Resource"]"><button class="ls-record-link" @onclick="@(() => Inspect.InvokeAsync(row))">@LeasePresentation.Title(row.Record.Resource.Name, L)</button><span class="ls-record-name">@row.Record.Resource.Name</span></td>
+                    <td data-label="@L["Inventory:Holder"]"><span class="ls-holder">@row.Record.HolderId</span></td>
+                    <td data-label="@L["Inventory:Authority"]"><span class="ls-provider-chip @LeasePresentation.Role(row.Authority.Kind)">@L[$"Providers:{row.Authority.Kind}"]</span><span class="ls-record-meta">@row.Authority.DisplayName</span></td>
+                    <td class="ls-validity" data-label="@L["Inventory:Validity"]"><span class="ls-time @(row.Expired ? "warning" : "success")">@(row.Expired ? "−" : null)@duration.Value<small>@duration.Unit</small></span><span class="ls-record-meta">@L[row.Expired ? "Evidence:Expired" : "Evidence:Unexpired"]</span></td></tr>
+            }</tbody>
+        </table>
+        @if (Filtered.Count > PAGE_SIZE)
+        {
+            <div class="ls-paging"><MudButton Variant="Variant.Text" Disabled="@(_page == 0)" OnClick="@(() => _page--)">@L["Inventory:Previous"]</MudButton><span>@L["Inventory:Page", _page + 1, (Filtered.Count + PAGE_SIZE - 1) / PAGE_SIZE]</span><MudButton Variant="Variant.Text" Disabled="@((_page + 1) * PAGE_SIZE >= Filtered.Count)" OnClick="@(() => _page++)">@L["Inventory:Next"]</MudButton></div>
+        }
+    }
+    <footer><MoIcon Icon="@MoIcons.Timer" Size="1rem" /><span>@L["Evidence:CaptureNote"]</span></footer>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    [Parameter] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
+    [Parameter] public string? Authority { get; set; }
+    [Parameter] public string? EvidenceState { get; set; }
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public EventCallback<(string Key, string? Value)> Filter { get; set; }
+    [Parameter] public EventCallback<LeaseRow> Inspect { get; set; }
+    private const int PAGE_SIZE = 25;
+    private int _page;
+    private (string?, string?, string?) _filters;
+    private IReadOnlyList<LeaseRow> ScopeRows { get; set; } = [];
+    private IReadOnlyList<LeaseRow> Filtered { get; set; } = [];
+    protected override void OnParametersSet()
+    {
+        if (_filters != (Authority, EvidenceState, Search)) { _filters = (Authority, EvidenceState, Search); _page = 0; }
+        ScopeRows = Rows.Where(row => (string.IsNullOrEmpty(Authority) || row.Authority.Id == Authority) &&
+            (string.IsNullOrWhiteSpace(Search) || string.Join(' ', row.Record.Resource.Name, row.Record.HolderId, row.Authority.DisplayName, LeasePresentation.Title(row.Record.Resource.Name, L)).Contains(Search, StringComparison.OrdinalIgnoreCase))).ToArray();
+        Filtered = ScopeRows.Where(row => MatchesState(row, EvidenceState ?? "all")).ToArray();
+        _page = Math.Min(_page, Math.Max(0, (Filtered.Count - 1) / PAGE_SIZE));
+    }
+    private static bool MatchesState(LeaseRow row, string state) => state switch { "expired" => row.Expired, "unexpired" => !row.Expired, _ => true };
+}

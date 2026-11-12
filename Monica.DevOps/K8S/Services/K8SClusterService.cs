@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Monica.DevOps.K8S.Abstractions;
 using Monica.DevOps.K8S.Exceptions;
@@ -95,6 +95,48 @@ public class K8SClusterService(
     public async Task<K8SResourceListResult> ListResourcesAsync(string namespaceName, K8SResourceType resourceType, CancellationToken cancellationToken = default)
     {
         return await ListResourcesAsync(runtimeConfigStore.GetCurrent(), namespaceName, resourceType, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads every supported resource kind and its Pod and Service relationships in a namespace.
+    /// One detached configuration is reused for the entire read; failed or canceled reads return no partial capture.
+    /// </summary>
+    public async Task<K8SNamespaceInventoryResult> ListNamespaceInventoryAsync(
+        string namespaceName,
+        CancellationToken cancellationToken = default)
+    {
+        var runtimeConfig = runtimeConfigStore.GetCurrent();
+        runtimeConfig.EnsureNamespaceAllowed(namespaceName);
+        var services = await discoveryService.ListServiceSummariesAsync(runtimeConfig, namespaceName, cancellationToken);
+        var workloads = await discoveryService.ListWorkloadsAsync(runtimeConfig, namespaceName,
+            K8SResourceDiscoveryService.RestartableWorkloadTypes, cancellationToken);
+        var pods = await discoveryService.ListPodsForWorkloadsAsync(runtimeConfig, namespaceName, workloads, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        workloads = K8SPodWorkloadBinder.ApplyPodStartFallback(workloads, pods);
+
+        var items = new List<K8SResourceSummary>();
+        var workloadServices = new Dictionary<(string Kind, string Name, string Namespace), List<K8SServiceSummary>>();
+        foreach (var service in services)
+        {
+            var backingWorkloads = K8SPodWorkloadBinder.ResolveServiceWorkloads(service, workloads, failOnMissing: false);
+            items.Add(ToResourceSummary(service, backingWorkloads, pods));
+            foreach (var workload in backingWorkloads)
+            {
+                var key = (workload.Kind, workload.Name, workload.Namespace);
+                if (!workloadServices.TryGetValue(key, out var relatedServices))
+                    workloadServices[key] = relatedServices = [];
+                relatedServices.Add(service);
+            }
+        }
+        items.AddRange(workloads.Select(workload => ToResourceSummary(workload, pods,
+            workloadServices.GetValueOrDefault((workload.Kind, workload.Name, workload.Namespace)))));
+
+        return new K8SNamespaceInventoryResult
+        {
+            Namespace = namespaceName,
+            Items = items,
+            FetchedAtUtc = DateTimeOffset.UtcNow
+        };
     }
 
     private async Task<K8SResourceListResult> ListResourcesAsync(
@@ -239,7 +281,8 @@ public class K8SClusterService(
             includePodStartFallback: true);
 
         return services
-            .Select(service => ToResourceSummary(service, workloads))
+            .Select(service => ToResourceSummary(service,
+                K8SPodWorkloadBinder.ResolveServiceWorkloads(service, workloads, failOnMissing: false)))
             .ToList();
     }
 
@@ -254,9 +297,10 @@ public class K8SClusterService(
 
     private static K8SResourceSummary ToResourceSummary(
         K8SServiceSummary service,
-        IReadOnlyCollection<K8SWorkloadReference> workloads)
+        IReadOnlyCollection<K8SWorkloadReference> backingWorkloads,
+        IReadOnlyCollection<K8SPodSummary>? pods = null)
     {
-        var lastRestartedAtUtc = K8SPodWorkloadBinder.ResolveServiceWorkloads(service, workloads, failOnMissing: false)
+        var lastRestartedAtUtc = backingWorkloads
             .Select(workload => workload.LastRestartedAtUtc)
             .Where(restartedAt => restartedAt.HasValue)
             .OrderByDescending(restartedAt => restartedAt!.Value)
@@ -272,15 +316,21 @@ public class K8SClusterService(
             ClusterIp = service.ClusterIp,
             Selector = service.Selector,
             Ports = service.Ports,
-            Images = [],
-            DesiredReplicas = 0,
-            ReadyReplicas = 0,
+            Images = backingWorkloads.SelectMany(workload => workload.Images).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            DesiredReplicas = backingWorkloads.Sum(workload => workload.DesiredReplicas),
+            ReadyReplicas = backingWorkloads.Sum(workload => workload.ReadyReplicas),
             LastRestartedAtUtc = lastRestartedAtUtc,
-            RestartSupported = true
+            RestartSupported = true,
+            RelatedWorkloads = backingWorkloads.ToList(),
+            RelatedPods = GetRelatedPods(backingWorkloads, pods)
         };
     }
 
-    private static K8SResourceSummary ToResourceSummary(K8SWorkloadReference workload)
+    private static K8SResourceSummary ToResourceSummary(K8SWorkloadReference workload) =>
+        ToResourceSummary(workload, null, null);
+
+    private static K8SResourceSummary ToResourceSummary(K8SWorkloadReference workload,
+        IReadOnlyCollection<K8SPodSummary>? pods, List<K8SServiceSummary>? services)
     {
         var resourceType = workload.Kind switch
         {
@@ -302,9 +352,18 @@ public class K8SClusterService(
             DesiredReplicas = workload.DesiredReplicas,
             ReadyReplicas = workload.ReadyReplicas,
             LastRestartedAtUtc = workload.LastRestartedAtUtc,
-            RestartSupported = true
+            RestartSupported = true,
+            RelatedWorkloads = [workload],
+            RelatedServices = services ?? [],
+            RelatedPods = GetRelatedPods([workload], pods)
         };
     }
+
+    private static List<K8SPodSummary> GetRelatedPods(IReadOnlyCollection<K8SWorkloadReference> workloads,
+        IReadOnlyCollection<K8SPodSummary>? pods) => pods?.Where(pod => workloads.Any(workload =>
+            string.Equals(pod.Namespace, workload.Namespace, StringComparison.Ordinal) &&
+            string.Equals(pod.WorkloadKind, workload.Kind, StringComparison.Ordinal) &&
+            string.Equals(pod.WorkloadName, workload.Name, StringComparison.Ordinal))).ToList() ?? [];
 
     private static K8SWorkloadReference ToWorkloadReference(K8SResourceSummary summary)
     {

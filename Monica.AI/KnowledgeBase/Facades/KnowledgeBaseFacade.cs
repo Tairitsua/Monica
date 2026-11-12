@@ -24,20 +24,20 @@ public sealed class KnowledgeBaseFacade
     /// <summary>
     /// Returns all knowledge bases.
     /// </summary>
-    public async Task<Res<IReadOnlyList<Models.KnowledgeBase>>> GetAllAsync()
+    public async Task<Result<IReadOnlyList<Models.KnowledgeBase>>> GetAllAsync()
         => await ExecuteAsync(() => service.GetAllAsync(), "load knowledge bases");
 
     /// <summary>
     /// Returns one knowledge base by id.
     /// </summary>
-    public async Task<Res<Models.KnowledgeBase>> GetByIdAsync(string id)
+    public async Task<Result<Models.KnowledgeBase>> GetByIdAsync(string id)
     {
         try
         {
             var knowledgeBase = await service.GetByIdAsync(id);
             return knowledgeBase is null
-                ? Res.Fail($"Knowledge base '{id}' was not found.")
-                : Res.Ok(knowledgeBase);
+                ? Result.Failure<Models.KnowledgeBase>($"Knowledge base '{id}' was not found.")
+                : Result.Success(knowledgeBase);
         }
         catch (Exception ex)
         {
@@ -48,14 +48,14 @@ public sealed class KnowledgeBaseFacade
     /// <summary>
     /// Creates a knowledge base.
     /// </summary>
-    public async Task<Res<Models.KnowledgeBase>> CreateAsync(
+    public async Task<Result<Models.KnowledgeBase>> CreateAsync(
         string id,
         string name,
         string? description = null)
     {
         try
         {
-            return Res.Ok(await service.CreateAsync(id, name, description));
+            return Result.Success(await service.CreateAsync(id, name, description));
         }
         catch (Exception ex)
         {
@@ -66,14 +66,14 @@ public sealed class KnowledgeBaseFacade
     /// <summary>
     /// Updates a knowledge base.
     /// </summary>
-    public async Task<Res<Models.KnowledgeBase>> UpdateAsync(
+    public async Task<Result<Models.KnowledgeBase>> UpdateAsync(
         string id,
         string name,
         string? description = null)
     {
         try
         {
-            return Res.Ok(await service.UpdateAsync(id, name, description));
+            return Result.Success(await service.UpdateAsync(id, name, description));
         }
         catch (Exception ex)
         {
@@ -84,25 +84,25 @@ public sealed class KnowledgeBaseFacade
     /// <summary>
     /// Deletes a knowledge base and all resources owned by participating optional features.
     /// </summary>
-    public async Task<Res> DeleteAsync(string id)
+    public async Task<Result> DeleteAsync(string id)
     {
         try
         {
             await service.DeleteAsync(id);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to delete knowledge base '{KnowledgeBaseId}'.", id);
-            return Res.Fail($"Failed to delete knowledge base: {ex.GetMessageRecursively()}");
+            return Result.Failure($"Failed to delete knowledge base: {ex.GetMessageRecursively()}");
         }
     }
 
-    private async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
+    private async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
         catch (Exception ex)
         {
@@ -110,9 +110,9 @@ public sealed class KnowledgeBaseFacade
         }
     }
 
-    private Res<T> Failure<T>(Exception exception, string operation)
+    private Result<T> Failure<T>(Exception exception, string operation)
     {
         logger.LogError(exception, "Failed to {Operation}.", operation);
-        return Res.Fail($"Failed to {operation}: {exception.GetMessageRecursively()}");
+        return Result.Failure<T>($"Failed to {operation}: {exception.GetMessageRecursively()}");
     }
 }

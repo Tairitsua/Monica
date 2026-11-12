@@ -375,7 +375,7 @@ public class OrderService
                 _chainTracing.MergeRemoteChain(traceId, result);
             }
             
-            _chainTracing.EndTrace(traceId, $"Status: {result.Status}", result.Status == ResStatus.Ok);
+            _chainTracing.EndTrace(traceId, $"Status: {result.Status}", result.Status == ResultStatus.Ok);
             return result;
         }
         catch (Exception ex)

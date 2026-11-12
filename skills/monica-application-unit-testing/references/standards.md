@@ -4,30 +4,11 @@
 
 A sociable scenario creates a complete Monica host, replaces only boundaries before host build, and resolves production handlers, domain services, repositories, mappers, options, and module services from DI.
 
-Use focused direct or raw ProjectUnit tests only when host composition adds no relevant behavior.
+Use focused direct or raw Building Block tests only when host composition adds no relevant behavior.
 
 ## Project Layout
 
-Name the runnable project `Test.` plus the exact production project stem. Keep its folder, project file, assembly, and root namespace identical.
-
-```text
-Test.UserService.API/
-  Test.UserService.API.csproj
-  GlobalUsings.cs
-  Factories/
-    UserServiceTestApplicationFactory.cs
-  HandlersCommand/
-  HandlersQuery/
-  DomainServices/
-  Repositories/
-  Entities/
-  Modules/
-  Builders/
-  TestDoubles/
-  TestData/
-```
-
-Do not shorten suffixes such as `.API`, `.Domain`, `.Infrastructure`, `.Adaptor`, or `.WebAPI`.
+Use [test project ownership and naming](project-naming.md) to select the production owner, project identity, cross-domain scenario placement, and shared support boundary. Keep role behavior in its role's test project and domain-core behavior in its core's test project even when both use a complete scenario host.
 
 ## Factory Rules
 
@@ -61,7 +42,7 @@ Replace leaves and adapters:
 - state stores and caches
 - event transports
 - database connection/provider options, retaining production context/session resolution
-- HTTP/RPC clients
+- HTTP/API clients
 - current user or tenant context
 - local configuration adapters
 - clocks, random sources, or ID generators when nondeterminism matters; retain the real audit policy
@@ -70,7 +51,7 @@ Do not replace application services, domain services, repositories, or mappers u
 
 ## Fast Path
 
-Use `ProjectUnitFixture<TUnit>` only as a raw activation harness with explicit collaborators. Its assertions must not claim to cover Monica module wiring, type discovery, conventional registration, dynamic proxies, interceptors, options binding, hosted lifecycle, or host isolation.
+Use `BuildingBlockFixture<TBuildingBlock>` only as a raw activation harness with explicit collaborators. Its assertions must not claim to cover Monica module wiring, type discovery, conventional registration, dynamic proxies, interceptors, options binding, hosted lifecycle, or host isolation.
 
 Do not maintain a parallel `ApplicationServiceFixture<THandler>` abstraction.
 
@@ -85,14 +66,14 @@ Do not maintain a parallel `ApplicationServiceFixture<THandler>` abstraction.
 
 ## Trait Rules
 
-Two trait keys are reserved for linking test classes into the ProjectUnit chain: `[ProjectUnitRequirement]` ties units to requirement IDs, and test classes declare the same IDs plus the unit under test.
+Two trait keys are reserved for linking test classes into the Building Block chain: `[BuildingBlockRequirement]` ties units to requirement IDs, and test classes declare the same IDs plus the unit under test.
 
 - `REQ` — the governing requirement ID of the spec under test. Class-level declares the default for every test in the class; a method-level `[Trait("REQ", "...")]` adds a requirement only one test exercises.
 - `Unit` — the project-qualified catalog reference `<workspace-relative-project.csproj>::<runtime-key>`. Required when the class name does not follow `{TypeUnderTest}Tests`, or when the stem names more than one unit. Runtime keys alone do not disambiguate projects.
 
 ```csharp
 [Trait("REQ", "FIPS-REQ-FLIGHT-20260920-531942")]
-[Trait("Unit", "src/Services/Flight/FlightService.API/FlightService.API.csproj::Fips.Flight.FlightPlan.FlightPlanAppService")]
+[Trait("BuildingBlock", "src/Domains/Flight/Roles.Flight/Roles.Flight.csproj::Roles.Flight.HandlersCommand.CommandHandlerUpdateFlight")]
 public sealed class FlightPlanAppServiceTests
 {
     [Fact]

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Messaging"
-  short_description: "EventBus, RPC, DataChannel, and SignalR"
-  default_prompt: "Use $monica-infra-messaging to choose and configure Monica messaging for this application."

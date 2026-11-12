@@ -1,0 +1,49 @@
+@using Monica.Framework.UI.Pages
+@inject IStringLocalizer<BuildingBlocksResource> L
+
+<div class="building-blocks-workspace">
+    <div class="building-blocks-workspace__navigation">
+        <div class="building-blocks-workspace__context">
+            <MoIcon Icon="@MoIcons.Workflow" Size="1.25rem" />
+            <span>@L["Workspace:Context"]</span>
+            <span class="building-blocks-workspace__separator" aria-hidden="true">/</span>
+            <span>@L["Pages:BuildingBlocks:Title"]</span>
+        </div>
+        <nav class="building-blocks-workspace__nav" aria-label="@L["Workspace:NavigationLabel"]">
+            @foreach (var entry in Entries)
+            {
+                <NavLink href="@entry.Route" Match="NavLinkMatch.All" ActiveClass="is-active"
+                         class="building-blocks-workspace__link"
+                         aria-current="@(string.Equals(ActiveRoute, entry.Route, StringComparison.OrdinalIgnoreCase) ? "page" : null)">
+                    <MoIcon Icon="@entry.Icon" Size="1.25rem" />
+                    <span>@L[entry.LabelKey]</span>
+                </NavLink>
+            }
+        </nav>
+    </div>
+    <div class="building-blocks-workspace__content">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets or sets the exact route rendered by this workspace instance.</summary>
+    [Parameter, EditorRequired]
+    public string ActiveRoute { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the active page content; other route content is not mounted.</summary>
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    private static readonly WorkspaceEntry[] Entries =
+    [
+        new(UIBuildingBlocksPage.PAGE_URL, "Page:Tabs:StatusOverview", MoIcons.Dashboard),
+        new(UIBuildingBlocksCatalogPage.PAGE_URL, "Page:Tabs:BuildingBlock", MoIcons.Workflow),
+        new(UIBuildingBlocksGraphPage.PAGE_URL, "Page:Tabs:ArchitectureVisualization", MoIcons.Network),
+        new(UIBuildingBlocksEventsPage.PAGE_URL, "Page:Tabs:DomainEventTester", MoIcons.Calendar),
+        new(UIBuildingBlocksRequestFiltersPage.PAGE_URL, "Page:Tabs:RequestFilterManager", MoIcons.Filter),
+        new(UIBuildingBlocksEnumsPage.PAGE_URL, "Page:Tabs:EnumInfo", MoIcons.Braces)
+    ];
+
+    private sealed record WorkspaceEntry(string Route, string LabelKey, string Icon);
+}

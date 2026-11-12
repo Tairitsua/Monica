@@ -79,6 +79,8 @@ before disposing the service.
 
 Do not create an unmanaged scope around the permanent background loop. For finite business work that should run through Monica's execution pipeline, register an `IHostedServiceWorkItem` and invoke `ExecuteWorkItemAsync<TWorkItem>(...)` or its typed input/result overload.
 
+`TWorkItem` may be a concrete class or a registered interface deriving from the matching work-item contract. Each invocation resolves it and the real execution pipeline from one fresh asynchronous scope, then disposes that scope after execution. The descriptor uses the resolved implementation type and its mapped entry method, so concrete method attributes such as `ExecutionTransaction` apply even when the service requests an interface.
+
 Register the service normally:
 
 ```csharp
@@ -146,7 +148,7 @@ public sealed class MyCleanupService(
 }
 ```
 
-`OnBecameLeaderAsync` is required and may execute more than once during one host lifetime. Make it idempotent or reset leader-owned state explicitly. `LeaderExecuteBackgroundAsync` and `OnLeaderLostAsync` are optional hooks; always honor the leader token.
+`OnBecameLeaderAsync` is required and may execute more than once within a leadership term after a work failure. Make it repeatable and reset attempt-owned state explicitly. `LeaderExecuteBackgroundAsync` and `OnLeaderLostAsync` are optional hooks; always honor the attempt token. The [discovery lifecycle contract](../../monica-infra-hosting/references/service-discovery.md#leadership-authority-and-lifetime) owns retry, `WorkFailed` cleanup, finite-work completion, and unrecoverable cleanup semantics. An optional `TimeProvider` constructor argument controls retry delays; pass the host clock when it is customized.
 
 ## Checklist
 

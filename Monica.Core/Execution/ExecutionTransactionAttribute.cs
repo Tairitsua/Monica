@@ -1,3 +1,5 @@
+using System.Data;
+
 namespace Monica.Core.Execution;
 
 /// <summary>
@@ -29,4 +31,11 @@ public sealed class ExecutionTransactionAttribute(ExecutionTransactionMode mode)
     /// <see cref="ExecutionTransactionMode.None"/>. Explicit execution scope options take precedence over this selection.
     /// </remarks>
     public Type[] DbContextTypes { get; set; } = [];
+
+    /// <summary>Gets or sets the required isolation. Unspecified, the default, uses the provider's default.</summary>
+    /// <remarks>
+    /// Requires Automatic. A nested declaration must match the already-open transaction's isolation;
+    /// it cannot upgrade or replace that transaction. Explicit execution scope options take precedence.
+    /// </remarks>
+    public IsolationLevel IsolationLevel { get; set; } = IsolationLevel.Unspecified;
 }

@@ -1,15 +1,38 @@
-.k8s-config-workbench { display: grid; gap: 24px; width: 100%; min-width: 0; padding: 24px; font-family: var(--mud-typography-default-family); }
-.k8s-config-editor { container: k8s-config / inline-size; min-width: 0; padding: 24px; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; display: grid; gap: 20px; }
-.config-lifetime { margin: 0; color: var(--mud-palette-text-secondary); font-size: 14px; line-height: 1.5; }
-.config-groups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
-.config-group { display: grid; align-content: start; gap: 16px; min-width: 0; }
-.config-group h2 { font-size: 18px; font-weight: 500; margin: 0; }
-.provider { display: flex; flex-wrap: wrap; gap: 12px; font-size: 14px; }
-.provider span:first-child { color: var(--mud-palette-text-secondary); }
-.field-help { margin: 0; font-size: 14px; line-height: 1.5; color: var(--mud-palette-text-secondary); }
-.configured-addresses { display: grid; gap: 20px; padding: 8px 0; }
-.config-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; border-top: 1px solid var(--mud-palette-lines-default); padding-top: 20px; }
-.config-actions > span { flex: 1; font-size: 14px; color: var(--mud-palette-text-secondary); }
-.k8s-config-workbench ::deep input, .k8s-config-workbench ::deep textarea, .k8s-config-workbench ::deep .mud-input-control { font-family: var(--mud-typography-default-family); }
-@container k8s-config (max-width: 800px) { .config-groups { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
-@media (max-width: 600px) { .k8s-config-workbench { padding: 16px; gap: 20px; } .k8s-config-editor { padding: 20px 16px; } .config-actions > span { flex-basis: 100%; } }
+.k8s-config-workbench { display: grid; gap: 24px; width: 100%; min-width: 0; padding: 24px; font-family: var(--mud-typography-default-family, var(--mo-font-family-body)); }
+.k8s-config-editor { container: k8s-config / inline-size; display: grid; gap: 22px; min-width: 0; padding: 24px; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; }
+.config-lifetime { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; color: var(--mud-palette-text-secondary); background: color-mix(in srgb, var(--mud-palette-info) 5%, var(--mud-palette-surface)); border: 1px solid color-mix(in srgb, var(--mud-palette-info) 16%, var(--mud-palette-lines-default)); border-radius: 10px; }
+.config-lifetime p { margin: 0; font-size: 13px; line-height: 1.65; }
+.config-lifetime ::deep .mo-icon { flex-shrink: 0; margin-top: 2px; color: color-mix(in srgb, var(--mud-palette-info) 65%, var(--mud-palette-text-primary)); }
+.config-progress { min-width: 0; }
+.config-progress p { margin: 8px 0 0; color: var(--mud-palette-text-secondary); font-size: 13px; }
+.config-groups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+.config-group { display: grid; align-content: start; gap: 22px; min-width: 0; }
+.config-group--execution { --config-role: var(--mud-palette-primary); }
+.config-group--scope { --config-role: var(--mud-palette-info); padding-inline-start: 28px; border-inline-start: 1px solid var(--mud-palette-lines-default); }
+.config-group-heading { display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.config-group-heading > div { min-width: 0; }
+.config-group-icon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 12px; color: color-mix(in srgb, var(--config-role) 65%, var(--mud-palette-text-primary)); background: color-mix(in srgb, var(--config-role) 10%, var(--mud-palette-surface)); }
+.config-group h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 600; }
+.provider { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 4px; font-size: 12px; line-height: 1.5; }
+.provider > span { color: var(--mud-palette-text-secondary); }
+.provider > strong { font-weight: 400; color: color-mix(in srgb, var(--config-role) 65%, var(--mud-palette-text-primary)); }
+.config-fields { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.field-help { margin: -8px 0 0; font-size: 12px; line-height: 1.65; color: var(--mud-palette-text-secondary); }
+.configured-addresses { display: grid; gap: 20px; min-width: 0; padding: 8px 0 12px; }
+.config-fields ::deep .mud-expand-panel { border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: transparent; }
+.config-fields ::deep .mud-expand-panel-header { min-height: 44px; padding: 12px; font-size: 13px; }
+.config-fields ::deep .mud-expand-panel-content { padding: 0 12px; }
+.config-fields ::deep .mud-input-helper-text { line-height: 1.6; }
+.config-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--mud-palette-lines-default); padding-top: 20px; }
+.draft-state { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 13px; line-height: 1.6; color: var(--mud-palette-text-secondary); }
+.draft-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--mud-palette-text-disabled); }
+.draft-state--dirty { color: color-mix(in srgb, var(--mud-palette-warning) 55%, var(--mud-palette-text-primary)); }
+.draft-state--dirty i { background: var(--mud-palette-warning); }
+.k8s-config-workbench ::deep input,
+.k8s-config-workbench ::deep textarea,
+.k8s-config-workbench ::deep .mud-input-control { font-family: var(--mud-typography-default-family, var(--mo-font-family-body)); }
+@container k8s-config (max-width: 800px) { .config-groups { grid-template-columns: minmax(0, 1fr); gap: 26px; } .config-group--scope { padding-inline-start: 0; padding-top: 26px; border-inline-start: 0; border-top: 1px solid var(--mud-palette-lines-default); } .config-group-heading { min-height: 0; } }
+@media (max-width: 600px) { .k8s-config-workbench { padding: 16px; gap: 20px; } .k8s-config-editor { padding: 18px 16px; gap: 20px; } .config-lifetime { padding: 12px; } .config-group { gap: 18px; } .config-group-icon { flex-basis: 36px; height: 36px; border-radius: 10px; } .config-group h2 { font-size: 16px; } .draft-state { flex-basis: 100%; } .config-actions { gap: 8px; } }
+
+.k8s-config-workbench ::deep input,
+.k8s-config-workbench ::deep textarea { font-size: 14px; font-weight: 400; line-height: 1.5; }

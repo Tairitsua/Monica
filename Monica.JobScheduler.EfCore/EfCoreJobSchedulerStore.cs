@@ -1,13 +1,19 @@
 using System.Data;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
 using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.EfCore.Entities;
+using Monica.JobScheduler.EfCore.Metrics;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
 using Monica.JobScheduler.Models.Execution;
+using Monica.Locker.Leases;
 using Monica.Modules;
 
 namespace Monica.JobScheduler.EfCore;
@@ -16,15 +22,16 @@ namespace Monica.JobScheduler.EfCore;
 /// Persists the immutable job catalog and durable execution queue in one relational database.
 /// </summary>
 /// <remarks>
-/// Every compound mutation uses a serializable transaction and optimistic row fencing. The store is safe to inject
-/// into singleton hosted services because every operation creates and disposes its own DbContext. Claims use the
-/// same provider-neutral serializable boundary; PostgreSQL may abort competing claim transactions and the store
-/// retries them instead of relying on process-local coordination.
+/// PostgreSQL and Vastbase mutations use short read-committed transactions and explicit Gate-before-Execution row
+/// locks. SQLite retains a serializable fixture boundary. Every operation owns its context; no connection survives
+/// into user job code. Renewal locks only its execution and never acquires a Gate.
 /// </remarks>
 public sealed partial class EfCoreJobSchedulerStore(
     IDbContextFactory<JobSchedulerDbContext> dbContextFactory,
     TimeProvider? timeProvider = null,
-    IOptions<ModuleJobSchedulerOption>? options = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor
+    IOptions<ModuleJobSchedulerOption>? options = null,
+    IMeterFactory? meterFactory = null,
+    ILogger<EfCoreJobSchedulerStore>? logger = null) : IJobSchedulerStore, IJobSchedulerStoreDescriptor, IExclusiveLeaseStore, IDisposable
 {
     private const int MAX_TRANSACTION_ATTEMPTS = 5;
     private static readonly JsonSerializerOptions JSON_OPTIONS = new(JsonSerializerDefaults.Web);
@@ -37,6 +44,19 @@ public sealed partial class EfCoreJobSchedulerStore(
         options?.Value.MaxExecutionHistoryMessageLength
         ?? JobExecutionHistoryLimits.DEFAULT_MAX_MESSAGE_LENGTH);
     private string? _providerName;
+    private readonly TimeSpan _operationTimeout = options?.Value.StoreOperationTimeout ?? TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _finalizationTimeout = options?.Value.ExecutionFinalizationTimeout ?? TimeSpan.FromSeconds(30);
+    private readonly SemaphoreSlim _allOperations = new(options?.Value.MaxConcurrentStoreOperations ?? 8);
+    private readonly SemaphoreSlim _ordinaryOperations = new((options?.Value.MaxConcurrentStoreOperations ?? 8)
+        - (options?.Value.ReservedLeaseStoreOperations ?? 2));
+    private readonly JobSchedulerStoreMetrics? _metrics = meterFactory is null ? null : new(meterFactory);
+
+    /// <summary>Releases process-local admission resources after the host has stopped its scheduler services.</summary>
+    public void Dispose()
+    {
+        _allOperations.Dispose();
+        _ordinaryOperations.Dispose();
+    }
 
     /// <inheritdoc />
     public string StoreKind => "EF Core";
@@ -75,52 +95,142 @@ public sealed partial class EfCoreJobSchedulerStore(
         return UtcNow;
     }
 
-    private async Task<TResult> ReadAsync<TResult>(
+    private Task<TResult> ReadAsync<TResult>(
         Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [CallerMemberName] string operationName = "") =>
+        RunStoreOperationAsync(operationName, false, async (trace, token) =>
+        {
+            trace.Enter("context");
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(token);
+            if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(_operationTimeout);
+            try
+            {
+                trace.Enter("query");
+                return await operation(dbContext, token);
+            }
+            finally { trace.Enter("dispose"); }
+        }, cancellationToken);
+
+    private Task<TResult> WriteAsync<TResult>(
+        Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken, JobCoordinatorLeaseKey? coordinatorLease = null,
+        [CallerMemberName] string operationName = "") =>
+        RunStoreOperationAsync(operationName, operationName is nameof(RenewLeaseAsync) or nameof(CompleteAttemptAsync)
+            or nameof(ReleaseLeaseAsync), (trace, token) => WriteCoreAsync(operation, token,
+                GetOperationTimeout(operationName), trace, coordinatorLease), cancellationToken);
+
+    private TimeSpan GetOperationTimeout(string operationName) =>
+        operationName is nameof(CompleteAttemptAsync) or nameof(ReleaseLeaseAsync)
+            ? _finalizationTimeout
+            : _operationTimeout;
+
+    private async Task<TResult> RunStoreOperationAsync<TResult>(string operationName, bool critical,
+        Func<JobSchedulerStoreOperationTrace, CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await operation(dbContext, cancellationToken);
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "failed";
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var trace = new JobSchedulerStoreOperationTrace();
+        using var cancellationRegistration = deadline.Token.Register(trace.Cancel);
+        deadline.CancelAfter(GetOperationTimeout(operationName));
+        var ordinaryEntered = false;
+        var allEntered = false;
+        try
+        {
+            if (!critical)
+            {
+                await _ordinaryOperations.WaitAsync(deadline.Token);
+                ordinaryEntered = true;
+            }
+            await _allOperations.WaitAsync(deadline.Token);
+            allEntered = true;
+            trace.Enter("operation");
+            var result = await operation(trace, deadline.Token);
+            outcome = "succeeded";
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = cancellationToken.IsCancellationRequested ? "cancelled" : "deadline";
+            throw;
+        }
+        finally
+        {
+            if (allEntered) _allOperations.Release();
+            if (ordinaryEntered) _ordinaryOperations.Release();
+            _metrics?.Record(operationName, outcome, Stopwatch.GetElapsedTime(started));
+            if (trace.GetCancellation() is { } cancellation)
+            {
+                _metrics?.Cancelled(operationName, cancellation.Phase, cancellation.Elapsed);
+                var elapsed = Stopwatch.GetElapsedTime(started);
+                logger?.Log(elapsed >= GetOperationTimeout(operationName) ? LogLevel.Warning : LogLevel.Debug,
+                    "Scheduler store {Operation} exited after cancellation. ReasonCode={ReasonCode}, Phase={Phase}, " +
+                    "CancellationElapsed={CancellationElapsed}, Elapsed={Elapsed}, Outcome={Outcome}",
+                    operationName, "StoreCancellationExited", cancellation.Phase, cancellation.Elapsed,
+                    elapsed, outcome);
+            }
+        }
     }
 
-    private async Task<TResult> WriteAsync<TResult>(
+    private async Task<TResult> WriteCoreAsync<TResult>(
         Func<JobSchedulerDbContext, CancellationToken, Task<TResult>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan operationTimeout,
+        JobSchedulerStoreOperationTrace trace,
+        JobCoordinatorLeaseKey? coordinatorLease = null)
     {
         for (var attempt = 1; ; attempt++)
         {
+            trace.Enter("context");
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = dbContext.Database.IsRelational()
-                ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
-                : null;
+            if (dbContext.Database.IsRelational()) dbContext.Database.SetCommandTimeout(operationTimeout);
             try
             {
-                var result = await operation(dbContext, cancellationToken);
-                await TrimExecutionHistoryAsync(dbContext, cancellationToken);
-                SetMutationVersions(dbContext);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                if (transaction is not null)
+                trace.Enter("open-transaction");
+                await using var transaction = dbContext.Database.IsRelational()
+                    ? await dbContext.Database.BeginTransactionAsync(
+                        UsesNativeRowLocks(dbContext) ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,
+                        cancellationToken)
+                    : null;
+                try
                 {
-                    await transaction.CommitAsync(cancellationToken);
-                }
+                    trace.Enter("query");
+                    await ValidateCoordinatorLeaseAsync(dbContext, coordinatorLease, cancellationToken);
+                    var result = await operation(dbContext, cancellationToken);
+                    await TrimExecutionHistoryAsync(dbContext, cancellationToken);
+                    SetMutationVersions(dbContext);
+                    trace.Enter("save");
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        trace.Enter("commit");
+                        await transaction.CommitAsync(cancellationToken);
+                    }
 
-                return result;
-            }
-            catch (Exception exception) when (attempt < MAX_TRANSACTION_ATTEMPTS && IsRetryable(exception))
-            {
-                if (transaction is not null)
+                    return result;
+                }
+                catch (Exception exception) when (attempt < MAX_TRANSACTION_ATTEMPTS && IsRetryable(exception))
                 {
-                    await transaction.RollbackAsync(CancellationToken.None);
-                }
+                    _metrics?.Retry();
+                    if (transaction is not null)
+                    {
+                        trace.Enter("rollback");
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 10), cancellationToken);
+                    trace.Enter("retry-delay");
+                    await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 25) * attempt), cancellationToken);
+                }
+                finally { trace.Enter("dispose"); }
             }
+            finally { trace.Enter("dispose"); }
         }
     }
 
     private static bool IsRetryable(Exception exception)
     {
-        if (exception is DbUpdateConcurrencyException or DbUpdateException)
+        if (exception is DbUpdateConcurrencyException)
         {
             return true;
         }
@@ -129,9 +239,26 @@ public sealed partial class EfCoreJobSchedulerStore(
         {
             var type = current.GetType();
             var sqlState = type.GetProperty("SqlState")?.GetValue(current) as string;
-            if (sqlState is "40001" or "40P01" or "23505")
+            if (sqlState is "40001" or "40P01")
             {
                 return true;
+            }
+
+            // Only known scheduler identity races are replayable. Arbitrary integrity/commit/connection errors
+            // are surfaced to the caller rather than turning an unknown outcome into an automatic replay.
+            if (sqlState == "23505")
+            {
+                var constraint = type.GetProperty("ConstraintName")?.GetValue(current) as string;
+                if (string.IsNullOrEmpty(constraint) && type.FullName == "GaussDB.PostgresException"
+                    && exception is DbUpdateException updateException)
+                {
+                    constraint = GetVastbaseIdentityConstraint(current, updateException);
+                }
+
+                if (constraint is "PK_JobExecutions" or "PK_JobExecutionGates" or "PK_JobSchedulerOwners")
+                {
+                    return true;
+                }
             }
 
             if (type.GetProperty("SqliteErrorCode")?.GetValue(current) is int errorCode
@@ -142,6 +269,30 @@ public sealed partial class EfCoreJobSchedulerStore(
         }
 
         return false;
+    }
+
+    private static string? GetVastbaseIdentityConstraint(Exception exception, DbUpdateException updateException)
+    {
+        // Vastbase G100 Build15 can omit ConstraintName from its 23505 protocol response. Accept only its exact
+        // primary-key message and a matching tracked insertion; unrelated integrity errors remain non-retryable.
+        var message = exception.GetType().GetProperty("MessageText")?.GetValue(exception) as string;
+        foreach (var entry in updateException.Entries.Where(entry => entry.State == EntityState.Added))
+        {
+            var constraint = entry.Entity switch
+            {
+                JobExecutionEntity => "PK_JobExecutions",
+                JobExecutionGateEntity => "PK_JobExecutionGates",
+                JobSchedulerOwnerEntity => "PK_JobSchedulerOwners",
+                _ => null
+            };
+            if (constraint is not null
+                && message == $"duplicate key value violates unique constraint \"{constraint}\"")
+            {
+                return constraint;
+            }
+        }
+
+        return null;
     }
 
     private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, JSON_OPTIONS);

@@ -15,7 +15,7 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
     private readonly object _sync = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
-    private readonly Func<Task<Res<OpenTelemetrySnapshot>>> _getSnapshot;
+    private readonly Func<Task<Result<OpenTelemetrySnapshot>>> _getSnapshot;
     private readonly string _loadFailedMessage;
     private readonly TimeProvider _clock;
     private CancellationTokenSource? _pollingCancellation;
@@ -34,7 +34,7 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
 
     // This boundary can hold or fail a genuine facade query in structural tests without replacing host composition.
     internal OpenTelemetryDashboardPageState(OpenTelemetryFacade facade, string snapshotLoadFailedMessage,
-        TimeProvider clock, Func<Task<Res<OpenTelemetrySnapshot>>> getSnapshot)
+        TimeProvider clock, Func<Task<Result<OpenTelemetrySnapshot>>> getSnapshot)
     {
         ArgumentNullException.ThrowIfNull(facade);
         ArgumentNullException.ThrowIfNull(clock);
@@ -80,9 +80,9 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
     public TimeSpan? AutoRefreshInterval { get; private set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Reads the initial snapshot and starts the configured page polling loop.</summary>
-    public async Task<Res> LoadAsync() { var result = await RefreshAsync(); await UpdatePollingAsync(null, false); return result; }
+    public async Task<Result> LoadAsync() { var result = await RefreshAsync(); await UpdatePollingAsync(null, false); return result; }
     /// <summary>Reads retained evidence without forcing observable sampling. Busy or retired calls return empty Conflict.</summary>
-    public Task<Res> RefreshAsync() => RefreshCoreAsync();
+    public Task<Result> RefreshAsync() => RefreshCoreAsync();
     /// <summary>Serializes polling stop/drain/start. Non-positive or null intervals mean manual reads.</summary>
     /// <remarks>Positive intervals must fit PeriodicTimer's inclusive 1–4294967294ms range. Host collection continues.</remarks>
     public Task SetAutoRefreshIntervalAsync(TimeSpan? interval)
@@ -147,7 +147,7 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
         }
     }
 
-    private async Task<Res> RefreshCoreAsync(CancellationToken pollingCancellation = default)
+    private async Task<Result> RefreshCoreAsync(CancellationToken pollingCancellation = default)
     {
         lock (_sync) { if (_disposed || pollingCancellation.IsCancellationRequested || !_refreshGate.Wait(0)) return Inactive(); IsLoading = true; }
         try
@@ -155,8 +155,10 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
             Notify();
             lock (_sync) { if (_disposed || pollingCancellation.IsCancellationRequested) return Inactive(); }
             var result = await _getSnapshot();
-            if (result.IsFailed(out var error, out var snapshot)) return RetainFailure(error, pollingCancellation);
-            if (snapshot is null) return RetainFailure(Res.Fail(_loadFailedMessage, ResStatus.InternalError), pollingCancellation);
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure()) return RetainFailure(error, pollingCancellation);
+            if (snapshot is null) return RetainFailure(Result.Failure(_loadFailedMessage, ResultStatus.InternalError), pollingCancellation);
             var detached = OpenTelemetrySnapshotOwnership.Detach(snapshot);
             var capturedAt = _clock.GetUtcNow();
             lock (_sync)
@@ -178,13 +180,13 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
                 }
                 Snapshot = detached; HasSnapshot = true; SnapshotCapturedAt = capturedAt; Error = null;
                 SelectedInstrument = selectedInstrument; SelectedSeries = selectedSeries; _initialSelectionMade = initialSelectionMade;
-                return Res.Ok();
+                return Result.Success();
             }
         }
-        catch (Exception exception) { return RetainFailure(Res.Fail(exception.Message, ResStatus.InternalError), pollingCancellation); }
+        catch (Exception exception) { return RetainFailure(Result.Failure(exception.Message, ResultStatus.InternalError), pollingCancellation); }
         finally { lock (_sync) { if (!_disposed) IsLoading = false; } _refreshGate.Release(); Notify(); }
     }
-    private Res RetainFailure(Res error, CancellationToken cancellation)
+    private Result RetainFailure(Result error, CancellationToken cancellation)
     {
         lock (_sync) { if (_disposed || cancellation.IsCancellationRequested) return Inactive(); Error = error.Message ?? string.Empty; return error; }
     }
@@ -241,5 +243,5 @@ public sealed class OpenTelemetryDashboardPageState : IAsyncDisposable
             }
         }
     }
-    private static Res Inactive() => Res.Fail(string.Empty, ResStatus.Conflict);
+    private static Result Inactive() => Result.Failure(string.Empty, ResultStatus.Conflict);
 }

@@ -22,6 +22,10 @@
             </header>
 
             <div class="configuration-sources-explanation">
+                @if (_definitionKind == ConfigurationKind.Startup)
+                {
+                    <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:SourceContributions"]</MudAlert>
+                }
                 <p>@L["Sources:Definition:PriorityHelp"]</p>
                 <p>@L["Sources:Definition:CountsHelp"]</p>
             </div>

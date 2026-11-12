@@ -1,5 +1,7 @@
+using System.Diagnostics.Metrics;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus;
+using Monica.Locker.Leases;
 using Monica.Repository.Inbox.Annotations;
 using Monica.Repository.Inbox.Models;
 using Monica.Repository.Inbox.Services;
@@ -15,7 +17,11 @@ using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.Repository;
+using Monica.Repository.Bulk.Abstractions;
+using Monica.Repository.Bulk.Services;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Services;
 using Monica.Repository.Facades;
@@ -52,6 +58,7 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
     public override void ConfigureServices(ModuleContext<ModuleRepositoryOption> context)
     {
         var services = context.Services;
+        services.TryAddSingleton<IBulkWriter, BulkWriter>();
         services.AddOptions<SequentialGuidGeneratorOptions>();
         services.TryAddTransient<IGuidGenerator, SequentialGuidGenerator>();
         services.TryAddSingleton<IRepositoryDbContextRegistry, RepositoryDbContextRegistry>();
@@ -75,7 +82,8 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(InboxExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork + 100,
                 static descriptor => (descriptor.Point == EventBusExecutionPoints.LocalHandler
-                    || descriptor.Point == EventBusExecutionPoints.DistributedHandler)
+                    || descriptor.Point == EventBusExecutionPoints.DistributedHandler
+                    || descriptor.Point == EventBusExecutionPoints.DistributedBatchHandler)
                     && (Attribute.IsDefined(descriptor.ComponentType, typeof(InboxAttribute), inherit: true)
                         || descriptor.EntryMethod?.IsDefined(typeof(InboxAttribute), inherit: true) == true)));
     }
@@ -127,22 +135,15 @@ public static class ModuleRepositoryRegistrationExtensions
             context.Services.TryAddSingleton(
                 typeof(IDbContextOperation<TDbContext>),
                 typeof(ScopedDbContextOperation<TDbContext>));
-            context.Services.AddDbContext<TDbContext>(
-                (serviceProvider, builder) => ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction));
+            context.Services.AddDbContext<TDbContext>((serviceProvider, builder) =>
+                {
+                    builder.UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>());
+                    ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction);
+                }, contextLifetime: ServiceLifetime.Scoped, optionsLifetime: ServiceLifetime.Transient);
             context.Services.RemoveAll<IDbContextFactory<TDbContext>>();
             context.Services.AddSingleton<IDbContextFactory<TDbContext>, OwnedScopeDbContextFactory<TDbContext>>();
 
-            //TODO Use Module to optimize automatic registration
             var options = new EfRepositoryRegistrationOptions(typeof(TDbContext), context.Services);
-
-            context.Services.AddTransient(serviceProvider =>
-            {
-                var builder = new DbContextOptionsBuilder<TDbContext>()
-                    .UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>())
-                    .UseApplicationServiceProvider(serviceProvider);
-                ConfigureDbContextOptions(context.Options, serviceProvider, builder, optionsAction);
-                return builder.Options;
-            });
 
             new EfCoreRepositoryRegistrar(options).AddRepositories();
 
@@ -157,6 +158,11 @@ public static class ModuleRepositoryRegistrationExtensions
     /// Generate an EF migration before deployment. Event names, payload serialization and transport routing
     /// come from the configured EventBus; the primary context in an operation must enable this capability.
     /// </summary>
+    /// <remarks>
+    /// Register each context once. Its declared domain or role owns delivery; a registration callback cannot
+    /// transfer that ownership. Manual or disabled activation holds its worker contribution while retaining
+    /// transactional staging and passive dispatch services.
+    /// </remarks>
     public static ModuleRegistration<ModuleRepository, ModuleRepositoryOption> AddOutbox<TDbContext>(
         this ModuleRegistration<ModuleRepository, ModuleRepositoryOption> module,
         Action<RepositoryOutboxOptions>? configure = null)
@@ -164,9 +170,22 @@ public static class ModuleRepositoryRegistrationExtensions
     {
         var options = new RepositoryOutboxOptions();
         configure?.Invoke(options);
+        if (options.SharedStoreKey is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.SharedStoreKey);
+            if (options.SharedStoreKey.Length > 200)
+                throw new ArgumentOutOfRangeException(nameof(configure), "Shared store keys must be at most 200 characters.");
+        }
+        ArgumentNullException.ThrowIfNull(options.MaintenanceLease);
+        options.MaintenanceLease.Validate();
         if (options.DeliveryLease <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery lease must be positive.");
         if (options.PollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Poll interval must be positive.");
         if (options.BatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Batch size must be positive.");
+        if (options.DeliveryConcurrency <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Delivery concurrency must be positive.");
+        if (options.CleanupBatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup batch size must be positive.");
+        if (options.CleanupInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup interval must be positive.");
+        if (options.CleanupTimeBudget <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Cleanup time budget must be positive.");
+        if (options.StatusInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(configure), "Status interval must be positive.");
         if (options.RetryBaseDelay <= TimeSpan.Zero || options.RetryMaxDelay < options.RetryBaseDelay)
             throw new ArgumentOutOfRangeException(nameof(configure), "Retry delays must be positive and ordered.");
         if (options.DeliveredRetention <= TimeSpan.Zero)
@@ -176,13 +195,45 @@ public static class ModuleRepositoryRegistrationExtensions
         module.Require<ModuleHostedService, ModuleHostedServiceOption>();
         module.ConfigureServices(context =>
         {
+            if (context.Services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistration<TDbContext>)))
+                throw new InvalidOperationException($"Outbox context '{typeof(TDbContext).FullName}' must be registered once with one declaring owner.");
             context.Services.AddSingleton(new OutboxRegistration<TDbContext>(options));
+            // Inspect the completed host collection at first resolution, including host overrides applied
+            // after AddMonica. Never construct scoped transports while building this singleton catalog.
+            context.Services.TryAddSingleton(sp => new OutboxDeliveryCapabilities(
+                sp.GetRequiredService<IEventSubscriptionRegistry>(),
+                context.Services.Where(descriptor => descriptor.ServiceType == typeof(IEventTransport)
+                        && (!descriptor.IsKeyedService || descriptor.ServiceKey is string))
+                    .Select(descriptor => descriptor.IsKeyedService ? (string?)descriptor.ServiceKey : null)
+                    .Distinct().ToArray()));
             context.Services.TryAddScoped<ITransactionalEventSink, TransactionalEventSink>();
-            context.Services.AddSingleton<OutboxDispatcher<TDbContext>>();
-            if (options.EnableWorker)
+            context.Services.AddSingleton(sp => new OutboxDispatcher<TDbContext>(
+                sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredService<OutboxRegistration<TDbContext>>(),
+                sp.GetRequiredService<ILogger<OutboxDispatcher<TDbContext>>>(),
+                sp.GetRequiredService<IDbContextFactory<TDbContext>>(),
+                options.MaintenanceLeaseStore is { } selection
+                    ? sp.GetRequiredKeyedService<IExclusiveLeaseStore>(selection.ServiceKey) : null,
+                sp.GetService<IMeterFactory>()));
+            var mode = options.EnableWorker
+                ? context.Application.TypeActivation!.GetActivation(typeof(TDbContext), TypeActivationKind.Outbox)
+                : ActivationMode.Disabled;
+            context.Application.RecordActivation(new ResourceActivation
+            {
+                Key = $"Outbox:{typeof(TDbContext).FullName}",
+                ImplementationType = typeof(TDbContext),
+                RegistrationOwner = context.RegistrationOwner,
+                Kind = TypeActivationKind.Outbox,
+                Mode = mode,
+                Reason = mode == ActivationMode.Automatic ? "Automatic dispatch permitted for this context."
+                    : "Background dispatch is held; transactional staging remains available."
+            });
+            if (mode == ActivationMode.Automatic)
             {
                 context.Services.AddSingleton<IOutboxStore>(sp => sp.GetRequiredService<OutboxDispatcher<TDbContext>>());
                 context.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, OutboxWorker>());
+                context.Composition.AdmitHostedLifecycle(
+                    context.Services.Last(descriptor => !descriptor.IsKeyedService && descriptor.ImplementationType == typeof(OutboxWorker)), typeof(OutboxWorker));
             }
         });
         return module;

@@ -1,0 +1,1272 @@
+{
+  "capturedAtUtc": "2026-10-28T07:41:07.0825174+00:00",
+  "provider": "vastbase",
+  "poolLimit": 3,
+  "messageCount": 128,
+  "batchSize": 32,
+  "samples": 5,
+  "payloadBytes": 512,
+  "transport": "recording-immediate-acceptance",
+  "results": [
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 14891.7669,
+        "MessagesPerSecond": 8.595353449965698,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 3484.7667,
+        "DrainP95Ms": 4406.0716,
+        "DrainMaxMs": 4406.0716
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 19003.2339,
+        "MessagesPerSecond": 6.735695654411747,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 4376.5722,
+        "DrainP95Ms": 5940.6678,
+        "DrainMaxMs": 5940.6678
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 18868.2538,
+        "MessagesPerSecond": 6.7838816117684395,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 4791.1873,
+        "DrainP95Ms": 5481.0267,
+        "DrainMaxMs": 5481.0267
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 15556.4905,
+        "MessagesPerSecond": 8.228076891764244,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 3637.0784,
+        "DrainP95Ms": 4621.6881,
+        "DrainMaxMs": 4621.6881
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 13832.927,
+        "MessagesPerSecond": 9.253283849470181,
+        "SqlCommands": 261,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 3313.0869,
+        "DrainP95Ms": 4225.5065,
+        "DrainMaxMs": 4225.5065
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 22655.2883,
+        "MessagesPerSecond": 5.649894996039402,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 5480.5022,
+        "DrainP95Ms": 7089.4731,
+        "DrainMaxMs": 7089.4731
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 20312.2941,
+        "MessagesPerSecond": 6.301602338457673,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 4893.9037,
+        "DrainP95Ms": 6074.0273,
+        "DrainMaxMs": 6074.0273
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 20263.505,
+        "MessagesPerSecond": 6.316774911349246,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 5241.9132,
+        "DrainP95Ms": 5862.8469,
+        "DrainMaxMs": 5862.8469
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 20183.3927,
+        "MessagesPerSecond": 6.341847572534226,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 4443.4297,
+        "DrainP95Ms": 6140.4115,
+        "DrainMaxMs": 6140.4115
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 18107.5605,
+        "MessagesPerSecond": 7.068870486446807,
+        "SqlCommands": 257,
+        "ReturningClaims": 129,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 4097.524,
+        "DrainP95Ms": 5137.3963,
+        "DrainMaxMs": 5137.3963
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 5041.3792,
+        "MessagesPerSecond": 25.389877436714144,
+        "SqlCommands": 159,
+        "ReturningClaims": 31,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 1153.9378,
+        "DrainP95Ms": 1347.9334,
+        "DrainMaxMs": 1347.9334
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 5158.6808,
+        "MessagesPerSecond": 24.812545098739196,
+        "SqlCommands": 159,
+        "ReturningClaims": 31,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 1086.9306,
+        "DrainP95Ms": 1538.2508,
+        "DrainMaxMs": 1538.2508
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 3635.8681,
+        "MessagesPerSecond": 35.20479744575992,
+        "SqlCommands": 158,
+        "ReturningClaims": 30,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 703.8695,
+        "DrainP95Ms": 1400.6406,
+        "DrainMaxMs": 1400.6406
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 4730.6497,
+        "MessagesPerSecond": 27.05759422431976,
+        "SqlCommands": 157,
+        "ReturningClaims": 29,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 986.6674,
+        "DrainP95Ms": 1557.1747,
+        "DrainMaxMs": 1557.1747
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 1,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 4684.6481,
+        "MessagesPerSecond": 27.323290302210744,
+        "SqlCommands": 158,
+        "ReturningClaims": 30,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          128
+        ],
+        "DrainCalls": 5,
+        "DrainP50Ms": 1061.2059,
+        "DrainP95Ms": 1357.8578,
+        "DrainMaxMs": 1357.8578
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 9836.43,
+        "MessagesPerSecond": 13.012851207196107,
+        "SqlCommands": 658,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          23,
+          38,
+          30,
+          37
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 2158.5734,
+        "DrainP95Ms": 2744.971,
+        "DrainMaxMs": 2748.0128
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 9430.1687,
+        "MessagesPerSecond": 13.573458129121276,
+        "SqlCommands": 647,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          38,
+          23,
+          37,
+          30
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 2415.1371,
+        "DrainP95Ms": 2754.274,
+        "DrainMaxMs": 2759.3412
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 9526.3802,
+        "MessagesPerSecond": 13.436373240698497,
+        "SqlCommands": 645,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          34,
+          30,
+          35,
+          29
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 2205.3661,
+        "DrainP95Ms": 3284.2552,
+        "DrainMaxMs": 3359.5578
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 11997.1754,
+        "MessagesPerSecond": 10.669178013351376,
+        "SqlCommands": 651,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          31,
+          34,
+          25,
+          38
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 2837.5314,
+        "DrainP95Ms": 3668.1808,
+        "DrainMaxMs": 3760.9002
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 13367.9131,
+        "MessagesPerSecond": 9.575166972023478,
+        "SqlCommands": 645,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          27,
+          33,
+          33,
+          35
+        ],
+        "DrainCalls": 20,
+        "DrainP50Ms": 3205.2958,
+        "DrainP95Ms": 3599.95,
+        "DrainMaxMs": 3647.8959
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 9076.1475,
+        "MessagesPerSecond": 14.102899936344139,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          31,
+          33,
+          32
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 209.7923,
+        "DrainP95Ms": 9036.1006,
+        "DrainMaxMs": 9036.1006
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 9745.4716,
+        "MessagesPerSecond": 13.134305373174552,
+        "SqlCommands": 263,
+        "ReturningClaims": 135,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          33,
+          33,
+          30,
+          32
+        ],
+        "DrainCalls": 10,
+        "DrainP50Ms": 210.2251,
+        "DrainP95Ms": 9595.7439,
+        "DrainMaxMs": 9595.7439
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 9013.1494,
+        "MessagesPerSecond": 14.201473238643976,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          34,
+          30,
+          32,
+          32
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 802.594,
+        "DrainP95Ms": 8631.1955,
+        "DrainMaxMs": 8631.1955
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 7664.1724,
+        "MessagesPerSecond": 16.70108569060894,
+        "SqlCommands": 262,
+        "ReturningClaims": 134,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          31,
+          33
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 177.4747,
+        "DrainP95Ms": 7595.7438,
+        "DrainMaxMs": 7595.7438
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 9135.885,
+        "MessagesPerSecond": 14.010684241318712,
+        "SqlCommands": 263,
+        "ReturningClaims": 135,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          35,
+          31,
+          32,
+          30
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 328.4193,
+        "DrainP95Ms": 9026.1928,
+        "DrainMaxMs": 9026.1928
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 4240.5639,
+        "MessagesPerSecond": 30.18466482724149,
+        "SqlCommands": 162,
+        "ReturningClaims": 34,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 201.0938,
+        "DrainP95Ms": 4069.2222,
+        "DrainMaxMs": 4069.2222
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 4274.6739,
+        "MessagesPerSecond": 29.943804602264514,
+        "SqlCommands": 163,
+        "ReturningClaims": 35,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          33,
+          32,
+          32,
+          31
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 995.5824,
+        "DrainP95Ms": 3990.6035,
+        "DrainMaxMs": 3990.6035
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 3447.1452,
+        "MessagesPerSecond": 37.13217534323764,
+        "SqlCommands": 164,
+        "ReturningClaims": 36,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          33,
+          32,
+          31,
+          32
+        ],
+        "DrainCalls": 9,
+        "DrainP50Ms": 450.1087,
+        "DrainP95Ms": 3240.9565,
+        "DrainMaxMs": 3240.9565
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 4097.2076,
+        "MessagesPerSecond": 31.24078945865472,
+        "SqlCommands": 161,
+        "ReturningClaims": 33,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 517.6706,
+        "DrainP95Ms": 4016.5448,
+        "DrainMaxMs": 4016.5448
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 4,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 2117.3877,
+        "MessagesPerSecond": 60.45184828456309,
+        "SqlCommands": 161,
+        "ReturningClaims": 33,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "DrainCalls": 8,
+        "DrainP50Ms": 228.8213,
+        "DrainP95Ms": 2070.3365,
+        "DrainMaxMs": 2070.3365
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 31300.5405,
+        "MessagesPerSecond": 4.08938625197223,
+        "SqlCommands": 2219,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          11,
+          9,
+          6,
+          7,
+          10,
+          9,
+          9,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          9,
+          8
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 7624.6101,
+        "DrainP95Ms": 8679.9993,
+        "DrainMaxMs": 8827.498
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 22456.6789,
+        "MessagesPerSecond": 5.699863304364208,
+        "SqlCommands": 2215,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          9,
+          8,
+          9,
+          8,
+          9,
+          8,
+          9,
+          7,
+          7,
+          6,
+          6,
+          9,
+          9,
+          7,
+          8
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 5230.0922,
+        "DrainP95Ms": 6608.349,
+        "DrainMaxMs": 6741.4428
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 15031.4025,
+        "MessagesPerSecond": 8.515506121268457,
+        "SqlCommands": 2130,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          5,
+          9,
+          7,
+          9,
+          8,
+          7,
+          11,
+          8,
+          7,
+          11,
+          10,
+          9,
+          7,
+          10,
+          2,
+          8
+        ],
+        "DrainCalls": 74,
+        "DrainP50Ms": 3713.5939,
+        "DrainP95Ms": 3829.5435,
+        "DrainMaxMs": 4014.3087
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 18155.2464,
+        "MessagesPerSecond": 7.050303652171859,
+        "SqlCommands": 2219,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          9,
+          6,
+          8,
+          7,
+          8,
+          10,
+          7,
+          8,
+          7,
+          8,
+          8,
+          8,
+          7,
+          9,
+          9
+        ],
+        "DrainCalls": 79,
+        "DrainP50Ms": 4316.1578,
+        "DrainP95Ms": 4898.4412,
+        "DrainMaxMs": 5003.879
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "previous-serial-cas",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 12871.8437,
+        "MessagesPerSecond": 9.944185385035402,
+        "SqlCommands": 2232,
+        "ReturningClaims": 0,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          9,
+          6,
+          8,
+          8,
+          9,
+          7,
+          8,
+          10,
+          7,
+          9,
+          7,
+          9,
+          7,
+          9,
+          7,
+          8
+        ],
+        "DrainCalls": 80,
+        "DrainP50Ms": 3137.8702,
+        "DrainP95Ms": 3412.8376,
+        "DrainMaxMs": 3485.7385
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 7069.3173,
+        "MessagesPerSecond": 18.106416018418074,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 274.2254,
+        "DrainP95Ms": 6883.7591,
+        "DrainMaxMs": 6944.3198
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 9154.9499,
+        "MessagesPerSecond": 13.98150742474298,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          9,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          7,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 600.217,
+        "DrainP95Ms": 8977.9616,
+        "DrainMaxMs": 9063.8797
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 9962.6646,
+        "MessagesPerSecond": 12.847968403954901,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 600.0513,
+        "DrainP95Ms": 9675.0046,
+        "DrainMaxMs": 9897.5793
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 10775.9756,
+        "MessagesPerSecond": 11.878274854297182,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          9,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          7,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 545.2558,
+        "DrainP95Ms": 10238.4941,
+        "DrainMaxMs": 10364.2289
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 1,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 11904.996,
+        "MessagesPerSecond": 10.751788576829425,
+        "SqlCommands": 288,
+        "ReturningClaims": 160,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 572.9058,
+        "DrainP95Ms": 11453.3343,
+        "DrainMaxMs": 11571.4024
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 0,
+      "sample": {
+        "ElapsedMs": 4818.4966,
+        "MessagesPerSecond": 26.564302234850597,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 739.5815,
+        "DrainP95Ms": 4078.3312,
+        "DrainMaxMs": 4078.4993
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 1,
+      "sample": {
+        "ElapsedMs": 3971.5352,
+        "MessagesPerSecond": 32.229350504056974,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 818.0357,
+        "DrainP95Ms": 3553.742,
+        "DrainMaxMs": 3566.5229
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 2,
+      "sample": {
+        "ElapsedMs": 3713.7473,
+        "MessagesPerSecond": 34.466534650863295,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 383.3429,
+        "DrainP95Ms": 3329.8492,
+        "DrainMaxMs": 3330.3793
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 3,
+      "sample": {
+        "ElapsedMs": 4679.5305,
+        "MessagesPerSecond": 27.353171434612936,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 713.3681,
+        "DrainP95Ms": 3996.6204,
+        "DrainMaxMs": 4081.7416
+      }
+    },
+    {
+      "provider": "vastbase",
+      "serverVersion": "(Vastbase G100 V2.2 (Build 15) Release) compiled at 2023-12-21 00:22:23 commit 17408 last mr   \n product name:Vastbase G100 \n version:V2.2 (Build 15) Release \n patch:0 \n commit:17408 \n openGauss version:5.0.0 \n host:x86_64-pc-linux-gnu",
+      "replicas": 16,
+      "algorithm": "native-sliding-window",
+      "deliveryConcurrency": 8,
+      "iteration": 4,
+      "sample": {
+        "ElapsedMs": 5296.2181,
+        "MessagesPerSecond": 24.16818899508689,
+        "SqlCommands": 176,
+        "ReturningClaims": 48,
+        "SqlTransactions": 0,
+        "DeliveriesPerReplica": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "DrainCalls": 32,
+        "DrainP50Ms": 921.6922,
+        "DrainP95Ms": 4702.4596,
+        "DrainMaxMs": 4756.0899
+      }
+    }
+  ]
+}

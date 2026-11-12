@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
@@ -60,7 +61,8 @@ public class ModuleSwagger : MonicaModule<ModuleSwaggerOption>, IWebHostRequired
 
     private SwaggerDocumentCatalog GetDocumentCatalog()
     {
-        return _documentCatalog ??= new SwaggerDocumentCatalog(Option, Application.Application, Logger);
+        return _documentCatalog ??= new SwaggerDocumentCatalog(Option, Application.Application, Logger,
+            Application.TypeActivation as IApplicationModel);
     }
 }
 
@@ -69,7 +71,8 @@ public static class ModuleSwaggerBuilderExtensions
     extension(IMonicaBuilder builder)
     {
         /// <summary>
-        /// Registers and configures the Swagger module.
+        /// Registers Swagger generation and UI. An application model adds one role.{roleId} document for each
+        /// selected locally available role; mapped operations alone populate those documents.
         /// </summary>
         public ModuleRegistration<ModuleSwagger, ModuleSwaggerOption> AddSwagger(
             Action<ModuleSwaggerOption>? action = null)
@@ -84,6 +87,7 @@ public class ModuleSwaggerOption : ModuleOptions<ModuleSwagger>
     /// <summary>
     /// Callback that can extend Swagger generation after Monica's document defaults have been applied.
     /// </summary>
+    /// <remarks>A custom inclusion predicate can exclude operations from native documents, but native document routing still applies. Documents registered directly by this callback retain its predicate.</remarks>
     public Action<SwaggerGenOptions>? ExtendSwaggerGenAction { get; set; }
 
     /// <summary>
@@ -128,13 +132,15 @@ public class ModuleSwaggerOption : ModuleOptions<ModuleSwagger>
     public MonicaDocumentSettings Monica { get; set; } = new();
 
     /// <summary>
-    /// Additional Swagger documents registered beyond the primary business and Monica framework documents.
+    /// Additional Swagger documents registered beyond the primary business, Monica framework and selected-role documents.
+    /// Names must be unique across all these documents, ignoring case.
     /// </summary>
     public IList<SwaggerDocumentDescriptor> AdditionalDocuments { get; } = new List<SwaggerDocumentDescriptor>();
 
     /// <summary>
     /// Optional endpoint-to-document override. Return a registered document name to force the document, or <see langword="null"/> to fall through to the default resolution chain.
     /// </summary>
+    /// <remarks>Recognized API Explorer groups follow this override, then framework ownership, compiled operation or controller role ownership, and the default business document.</remarks>
     public Func<ApiDescription, string?>? DocumentNameResolver { get; set; }
 
     /// <summary>

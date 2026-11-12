@@ -144,7 +144,9 @@
                         token.ThrowIfCancellationRequested();
                         _operations.TryApply(() =>
                         {
-                            if (result.IsFailed(out var error, out var rows)) _error = error.Message;
+                            var error = result;
+                            var rows = result.Data;
+                            if (result.IsFailure() || rows is null) _error = error.Message ?? L["Common:Errors:LoadFailed"].Value;
                             else _loadedGroupRows = rows.ToArray();
                         });
                     }
@@ -183,9 +185,12 @@
             _operations.TryApply(() =>
             {
                 if (generation != _previewGeneration) return;
-                if (result.IsFailed(out var error, out var preview))
+                var error = result;
+                var preview = result.Data;
+                if (result.IsFailure() || preview is null)
                 {
-                    _error = preserveError && !string.IsNullOrWhiteSpace(_error) ? $"{_error}{Environment.NewLine}{error.Message}" : error.Message;
+                    var message = error.Message ?? L["Common:Errors:LoadFailed"].Value;
+                    _error = preserveError && !string.IsNullOrWhiteSpace(_error) ? $"{_error}{Environment.NewLine}{message}" : message;
                     _rollbackPreview = result.Data;
                 }
                 else _rollbackPreview = preview;
@@ -223,21 +228,27 @@
                     {
                         var result = await Facade.RollbackGroupAsync(group.GroupId, preview.PlanToken, reason);
                         if (_operations.IsRetired) return;
-                        if (result.IsFailed(out var error, out var mutations)) { await DisplayRejectionAsync(error.Message, token); return; }
+                        var error = result;
+                        var mutations = result.Data;
+                        if (result.IsFailure() || mutations is null) { await DisplayRejectionAsync(error.Message ?? L["Common:Errors:LoadFailed"].Value, token); return; }
                         MudDialog.Close(DialogResult.Ok(ConfigurationHistoryRollbackDialogResult.Applied(mutations)));
                     }
                     else if (history is not null)
                     {
                         var result = await Facade.RollbackHistoryAsync(history.HistoryId, preview.PlanToken, reason);
                         if (_operations.IsRetired) return;
-                        if (result.IsFailed(out var error, out var mutation)) { await DisplayRejectionAsync(error.Message, token); return; }
+                        var error = result;
+                        var mutation = result.Data;
+                        if (result.IsFailure() || mutation is null) { await DisplayRejectionAsync(error.Message ?? L["Common:Errors:LoadFailed"].Value, token); return; }
                         MudDialog.Close(DialogResult.Ok(ConfigurationHistoryRollbackDialogResult.Applied(mutation)));
                     }
                     else
                     {
                         var result = await Facade.RollbackHistoriesAsync(ids, preview.PlanToken, reason);
                         if (_operations.IsRetired) return;
-                        if (result.IsFailed(out var error, out var mutations)) { await DisplayRejectionAsync(error.Message, token); return; }
+                        var error = result;
+                        var mutations = result.Data;
+                        if (result.IsFailure() || mutations is null) { await DisplayRejectionAsync(error.Message ?? L["Common:Errors:LoadFailed"].Value, token); return; }
                         MudDialog.Close(DialogResult.Ok(ConfigurationHistoryRollbackDialogResult.Applied(mutations)));
                     }
                     closed = true;

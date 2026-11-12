@@ -19,7 +19,7 @@ For example, the distinction between local database work and delivery after comm
 
 Use a concise `Task | Read` table in `monica-infra-*` entrypoints. Express the decision in the task column and link directly to its owner. Distill capability selection into this table and, when needed, a short preceding explanation; do not move an entire overview into the entrypoint. Route neighboring work only where confusion is likely.
 
-Keep the body within **26 physical lines and 300 whitespace-separated words**, excluding frontmatter and outer blank lines. These are context-budget ceilings, not targets or proof of quality. Keep readable paragraphs and table rows; move execution detail to its owner instead of packing it into long lines. The validator checks both limits so joining paragraphs cannot hide growth. References have no corresponding quota.
+Keep the body within **26 physical lines and 300 whitespace-separated words**, excluding frontmatter and outer blank lines. The same budget applies to the cross-capability `monica-troubleshooting` router. These are context-budget ceilings, not targets or proof of quality. Keep readable paragraphs and table rows; move execution detail to its owner instead of packing it into long lines. The validator checks both limits so joining paragraphs cannot hide growth. References have no corresponding quota.
 
 A reminder is an exception for a consequential distinction: at most one short sentence with a link to its owner, such as "A flush is not a commit; see [transactions](../../monica-infra-persistence/references/transactions.md)." Do not append its mechanism, default values, sequence, or exceptions. Each contract has one authoritative explanation; the reminder must not become another place to maintain that explanation.
 
@@ -30,6 +30,16 @@ A reminder is an exception for a consequential distinction: at most one short se
 Split or merge references by independently selectable work, prerequisites, and reasons for change. A setup guide, transaction contract, and diagnostic guide need different structures. Do not impose a section template, file count, or repeated host setup on every topic. Keep necessary prerequisites explicit, using direct links where shared setup already has an owner.
 
 Preserve the useful public call sequence and observable outcome for operational guidance. Explain application-owned types and placeholders. Keep defaults, ownership, failure semantics, and source/test evidence with the contract they qualify. Diagnostic guidance maps symptoms to checks and the owning explanation. A reference should let an ordinary consumer perform its task without repeatedly rediscovering documented behavior in implementation files.
+
+## Troubleshooting ownership
+
+`monica-troubleshooting` selects the failed boundary across capabilities. Concrete diagnostic knowledge stays in the owning `monica-infra-*` reference, where implementation changes already trigger the knowledge-impact check. Add symptom routes to that infra entrypoint so a known UI, persistence, or messaging fault can reach its case directly. Use named skill routes with exact reference paths for targets absent from a supported profile; the application and framework routers explain source lookup for unavailable skills. Adding a diagnostic entry must not silently install optional capabilities or their whole authoring stack.
+
+A reusable case identifies its symptoms and applicable runtime conditions, the checks that distinguish likely causes, the supported correction, and how to verify the original failure. Link normal configuration and lifecycle contracts to their existing owner. Inspect current source and behavioral evidence before promoting an incident into guidance; an observed workaround alone does not establish the cause.
+
+After a verified fix, merge the reusable finding into its existing case, add the missing read-when route, or create a separately selectable case when needed. Keep a small diagnostic table in one reference while it remains sufficient; introduce a `references/troubleshooting/` directory only for distinct tasks. Consolidate matching causes and replace guidance invalidated by the current contract. Preserve version conditions when they materially change diagnosis. Machine paths, temporary commands, dates, and unverified theories remain in project notes or personal knowledge.
+
+When canonical knowledge edits are part of the task, complete the same projection and validation flow as other skill changes. In a consumer workspace, preserve a verified reusable finding for the existing contribution workflow without treating a source lookup binding as upstream write authorization. Website troubleshooting pages project these owners instead of maintaining another case library.
 
 ## Maintain existing owners
 

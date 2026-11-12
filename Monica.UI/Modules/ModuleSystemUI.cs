@@ -92,7 +92,7 @@ public class ModuleSystemUIOption : ModuleOptions<ModuleSystemUI>, IOperationalP
     /// Gets or sets the host authorization policy that overrides the shell-wide operational policy for this page.
     /// The default is <see langword="null"/>. A missing or blank value inherits
     /// <see cref="OperationalPageAccessOption.AuthorizationPolicy"/>. Configure an override only when this page needs
-    /// a different policy; Development access and operational Debug mode ignore it.
+    /// a different policy; Development access and the explicit operational authorization bypass ignore it.
     /// </summary>
     public string? AuthorizationPolicyOverride { get; set; }
 }

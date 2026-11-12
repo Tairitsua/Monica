@@ -64,9 +64,9 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     {
         var result = await Facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channelId, component.ComponentKey);
         token.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error, out var middleware) || middleware is null)
+        if (result.IsFailure() || result.Data is not { } middleware)
         {
-            Snackbar.Add(error?.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
+            Snackbar.Add(result.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
             return;
         }
         await ShowOwnedAsync<MessageDebuggerDialog>(L["Workbench:DebuggerDialogTitle"].Value, new DialogParameters
@@ -82,9 +82,9 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     {
         var result = await Facade.GetChannelExceptionsAsync(channelId, cancellationToken: token);
         token.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error, out var details))
+        if (result.IsFailure() || result.Data is not { } details)
         {
-            Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
+            Snackbar.Add(result.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
             return;
         }
         await ShowOwnedAsync<ExceptionDetailsDialog>(L["Exceptions:Details:Title"].Value, new DialogParameters
@@ -95,6 +95,18 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     }, ownerToken);
 
     private Task ReinitializeAsync(string channelId) => ReinitializeAsync(channelId, default);
+
+    private Task StartSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StartSetupAsync, "Setup:Started");
+    private Task StopSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StopSetupAsync, "Setup:Stopped");
+    private Task RestartSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.RestartSetupAsync, "Setup:Restarted");
+
+    private Task ExecuteSetupAsync(string setupId, Func<string, CancellationToken, Task<Result>> command, string successKey) =>
+        ExecuteChannelAsync("setup:" + setupId, async token =>
+        {
+            var outcome = await command(setupId, token);
+            Report(outcome, successKey, setupId, token);
+            await State.RefreshAsync(token);
+        });
 
     private Task ReinitializeAsync(string channelId, CancellationToken ownerToken) => ExecuteChannelAsync(channelId, async token =>
     {
@@ -132,10 +144,10 @@ public partial class DataChannelWorkbench : IAsyncDisposable
         }, ownerToken);
     }
 
-    private void Report(Res result, string successKey, string channelId, CancellationToken cancellationToken)
+    private void Report(Result result, string successKey, string channelId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error)) Snackbar.Add(error.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
+        if (result.IsFailure()) Snackbar.Add(result.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
         else Snackbar.Add(L[successKey, channelId].Value, Severity.Success);
     }
 

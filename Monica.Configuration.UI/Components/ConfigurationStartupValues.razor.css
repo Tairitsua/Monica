@@ -1,0 +1,25 @@
+.configuration-startup-values {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+}
+
+.configuration-startup-values dt {
+    color: var(--mud-palette-text-secondary);
+    font-size: 12px;
+}
+
+.configuration-startup-values dd {
+    margin: 4px 0 0;
+}
+
+.configuration-startup-values pre {
+    max-height: 18rem;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    color: var(--mud-palette-text-primary);
+}

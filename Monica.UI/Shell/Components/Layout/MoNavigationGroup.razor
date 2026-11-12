@@ -6,7 +6,7 @@
             aria-controls="@_contentId" @onclick="Toggle">
         @if (ShowGroupIcon && !string.IsNullOrEmpty(Group.Icon))
         {
-            <MoIcon Icon="@Group.Icon" Size="20px" Class="mo-navigation-group__icon" />
+            <MoIcon Icon="@Group.Icon" Size="16px" Class="mo-navigation-group__icon" />
         }
         <span class="mo-navigation-group__label">@Group.DisplayName</span>
         <span class="mo-navigation-group__count">@Group.DestinationCount</span>
@@ -31,7 +31,7 @@
     /// <summary>Gets or sets the shell's single longest matching destination. A changed active destination reveals its containing branch.</summary>
     [Parameter] public NavigationItem? ActiveItem { get; set; }
 
-    /// <summary>Gets or sets whether page destinations show registered icons instead of quiet dots. Defaults to false.</summary>
+    /// <summary>Gets or sets whether page destinations show registered icons instead of text-only rows. Defaults to false.</summary>
     [Parameter] public bool ShowPageIcons { get; set; }
 
     /// <summary>Gets or sets whether the category heading shows its registered icon. Defaults to false.</summary>

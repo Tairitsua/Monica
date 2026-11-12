@@ -1,0 +1,14 @@
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+<button type="button" class="job-evidence-row" @onclick="@(() => ExecutionSelected.InvokeAsync(Execution.InstanceId))" aria-label="@L["JobDetail:Activity:OpenDetails",Execution.InstanceId]">
+    <span class="job-evidence-row__status" data-state="@Execution.State.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{Execution.State}"]</span><span class="job-evidence-row__time"><b>@TimePresentation.FormatListTimestamp(Execution.RecurringOccurrenceUtc ?? Execution.CreatedAtUtc,ObservedAtUtc)</b><small>@L[$"ExecutionOrigins:{Execution.Origin}"]</small></span><span class="job-evidence-row__duration">@TimePresentation.FormatExecutionDuration(Execution,ObservedAtUtc)</span><code title="@Execution.InstanceId">#@Execution.InstanceId[..Math.Min(8,Execution.InstanceId.Length)]</code><MoIcon Icon="@MoIcons.ChevronRight" Size="14px"/>
+</button>
+@code {
+    /// <summary>Gets the exact retained record shown in this compact evidence row.</summary>
+    [Parameter,EditorRequired] public JobExecutionInstance Execution { get; set; } = null!;
+    /// <summary>Gets the accepted observation time for running durations.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    /// <summary>Opens the retained record through the page's dialog owner.</summary>
+    [Parameter] public EventCallback<string> ExecutionSelected { get; set; }
+}

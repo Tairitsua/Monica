@@ -29,29 +29,30 @@ internal static class MonicaTypographyDefaults
 
     internal static Typography CreatePrecision()
     {
+        string[] precisionFamily = ["MoPrecision", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "system-ui", "sans-serif"];
         return new Typography
         {
             Default = new DefaultTypography
             {
-                FontFamily = CloneBodyFamily(),
+                FontFamily = [.. precisionFamily],
                 FontSize = "0.9375rem",
                 FontWeight = "400",
                 LineHeight = "1.5",
                 LetterSpacing = "0"
             },
-            H1 = new H1Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "2.5rem", FontWeight = "650", LineHeight = "1.08", LetterSpacing = "-0.035em" },
-            H2 = new H2Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "2rem", FontWeight = "650", LineHeight = "1.12", LetterSpacing = "-0.03em" },
-            H3 = new H3Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "1.625rem", FontWeight = "650", LineHeight = "1.18", LetterSpacing = "-0.025em" },
-            H4 = new H4Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "1.375rem", FontWeight = "650", LineHeight = "1.25", LetterSpacing = "-0.02em" },
-            H5 = new H5Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "1.125rem", FontWeight = "650", LineHeight = "1.35", LetterSpacing = "-0.012em" },
-            H6 = new H6Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "1rem", FontWeight = "650", LineHeight = "1.4", LetterSpacing = "-0.006em" },
-            Subtitle1 = new Subtitle1Typography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "1rem", FontWeight = "600", LineHeight = "1.5", LetterSpacing = "0" },
-            Subtitle2 = new Subtitle2Typography { FontFamily = CloneBodyFamily(), FontSize = "0.875rem", FontWeight = "600", LineHeight = "1.4", LetterSpacing = "0" },
-            Body1 = new Body1Typography { FontFamily = CloneBodyFamily(), FontSize = "0.95rem", FontWeight = "400", LineHeight = "1.55", LetterSpacing = "0" },
-            Body2 = new Body2Typography { FontFamily = CloneBodyFamily(), FontSize = "0.875rem", FontWeight = "400", LineHeight = "1.5", LetterSpacing = "0" },
-            Button = new ButtonTypography { FontFamily = CloneBodyFamily(), FontSize = "0.875rem", FontWeight = "600", LineHeight = "1.25", LetterSpacing = "0", TextTransform = "none" },
-            Caption = new CaptionTypography { FontFamily = CloneBodyFamily(), FontSize = "0.75rem", FontWeight = "400", LineHeight = "1.35", LetterSpacing = "0.01em" },
-            Overline = new OverlineTypography { FontFamily = [.. PrecisionDisplayFontFamily], FontSize = "0.6875rem", FontWeight = "600", LineHeight = "1.25", LetterSpacing = "0.09em", TextTransform = "uppercase" }
+            H1 = new H1Typography { FontFamily = [.. precisionFamily], FontSize = "2.5rem", FontWeight = "650", LineHeight = "1.08", LetterSpacing = "-0.035em" },
+            H2 = new H2Typography { FontFamily = [.. precisionFamily], FontSize = "2rem", FontWeight = "650", LineHeight = "1.12", LetterSpacing = "-0.03em" },
+            H3 = new H3Typography { FontFamily = [.. precisionFamily], FontSize = "1.625rem", FontWeight = "650", LineHeight = "1.18", LetterSpacing = "-0.025em" },
+            H4 = new H4Typography { FontFamily = [.. precisionFamily], FontSize = "1.375rem", FontWeight = "650", LineHeight = "1.25", LetterSpacing = "-0.02em" },
+            H5 = new H5Typography { FontFamily = [.. precisionFamily], FontSize = "1.125rem", FontWeight = "650", LineHeight = "1.35", LetterSpacing = "-0.012em" },
+            H6 = new H6Typography { FontFamily = [.. precisionFamily], FontSize = "1rem", FontWeight = "650", LineHeight = "1.4", LetterSpacing = "-0.006em" },
+            Subtitle1 = new Subtitle1Typography { FontFamily = [.. precisionFamily], FontSize = "1rem", FontWeight = "600", LineHeight = "1.5", LetterSpacing = "0" },
+            Subtitle2 = new Subtitle2Typography { FontFamily = [.. precisionFamily], FontSize = "0.875rem", FontWeight = "600", LineHeight = "1.4", LetterSpacing = "0" },
+            Body1 = new Body1Typography { FontFamily = [.. precisionFamily], FontSize = "0.95rem", FontWeight = "400", LineHeight = "1.55", LetterSpacing = "0" },
+            Body2 = new Body2Typography { FontFamily = [.. precisionFamily], FontSize = "0.875rem", FontWeight = "400", LineHeight = "1.5", LetterSpacing = "0" },
+            Button = new ButtonTypography { FontFamily = [.. precisionFamily], FontSize = "0.875rem", FontWeight = "600", LineHeight = "1.25", LetterSpacing = "0", TextTransform = "none" },
+            Caption = new CaptionTypography { FontFamily = [.. precisionFamily], FontSize = "0.75rem", FontWeight = "400", LineHeight = "1.35", LetterSpacing = "0.01em" },
+            Overline = new OverlineTypography { FontFamily = [.. precisionFamily], FontSize = "0.6875rem", FontWeight = "600", LineHeight = "1.25", LetterSpacing = "0.09em", TextTransform = "uppercase" }
         };
     }
 

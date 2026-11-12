@@ -3,7 +3,7 @@ using System;
 namespace Monica.Generators.AutoController.Models;
 
 /// <summary>
-/// Immutable semantic model shared by controller and RPC generation.
+/// Immutable semantic model shared by controller and API generation.
 /// </summary>
 internal sealed class EndpointModel : IEquatable<EndpointModel>
 {
@@ -11,6 +11,7 @@ internal sealed class EndpointModel : IEquatable<EndpointModel>
         string requestDisplayName,
         string requestTypeName,
         string resultTypeName,
+        string resultRuntimeTypeName,
         string domain,
         string contractNamespaceRoot,
         string routePrefix,
@@ -27,6 +28,7 @@ internal sealed class EndpointModel : IEquatable<EndpointModel>
         RequestDisplayName = requestDisplayName;
         RequestTypeName = requestTypeName;
         ResultTypeName = resultTypeName;
+        ResultRuntimeTypeName = resultRuntimeTypeName;
         Domain = domain;
         ContractNamespaceRoot = contractNamespaceRoot;
         RoutePrefix = routePrefix;
@@ -46,6 +48,9 @@ internal sealed class EndpointModel : IEquatable<EndpointModel>
     public string RequestTypeName { get; }
 
     public string ResultTypeName { get; }
+
+    /// <summary>The result type without nullable reference annotations for runtime type expressions.</summary>
+    public string ResultRuntimeTypeName { get; }
 
     public string Domain { get; }
 
@@ -81,6 +86,7 @@ internal sealed class EndpointModel : IEquatable<EndpointModel>
                RequestDisplayName == other.RequestDisplayName &&
                RequestTypeName == other.RequestTypeName &&
                ResultTypeName == other.ResultTypeName &&
+               ResultRuntimeTypeName == other.ResultRuntimeTypeName &&
                Domain == other.Domain &&
                ContractNamespaceRoot == other.ContractNamespaceRoot &&
                RoutePrefix == other.RoutePrefix &&
@@ -106,6 +112,7 @@ internal sealed class EndpointModel : IEquatable<EndpointModel>
         {
             var hashCode = StringComparer.Ordinal.GetHashCode(RequestTypeName);
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(ResultTypeName);
+            hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(ResultRuntimeTypeName);
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(CompleteRoute);
             hashCode = (hashCode * 397) ^ StringComparer.Ordinal.GetHashCode(OperationName);
             hashCode = (hashCode * 397) ^ Configuration.GetHashCode();

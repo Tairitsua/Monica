@@ -14,21 +14,24 @@
                 {
                     <MoIcon Icon="@item.Icon" Size="18px" />
                 }
-                else
+                else if (ShowPageIcons)
                 {
                     <span class="mo-navigation-tree__dot" aria-hidden="true"></span>
                 }
                 <span class="mo-navigation-tree__label">@item.ResolveText(LocalizationCatalog)</span>
-                @if (isCurrent)
-                {
-                    <span class="mo-navigation-tree__current" aria-hidden="true"></span>
-                }
             </span>
         </MudNavLink>
     }
     @foreach (var child in Group.Children)
     {
-        <MoNavigationGroup @key="child.Id" Group="@child" ActiveItem="@ActiveItem" ShowPageIcons="@ShowPageIcons" />
+        @if (child.Children.Count == 0 && child.Items.Count == 1)
+        {
+            <NavigationTree @key="child.Id" Group="@child" ActiveItem="@ActiveItem" />
+        }
+        else
+        {
+            <MoNavigationGroup @key="child.Id" Group="@child" ActiveItem="@ActiveItem" ShowPageIcons="false" ShowGroupIcon="true" InitiallyExpanded="false" />
+        }
     }
 </div>
 
@@ -38,6 +41,6 @@
     /// <summary>The single longest matching destination in the complete navigation tree.</summary>
     [Parameter] public NavigationItem? ActiveItem { get; set; }
 
-    /// <summary>Gets or sets whether leaf destinations show their registered icons. Defaults to true; false uses quiet dots.</summary>
+    /// <summary>Gets or sets whether direct destinations show their registered icons. Defaults to true; nested destinations use text rows.</summary>
     [Parameter] public bool ShowPageIcons { get; set; } = true;
 }

@@ -2,11 +2,12 @@ using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.DynamicLinq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Monica.AutoModel.Abstractions;
+using Monica.ModelQuery.Abstractions;
 using Monica.Core.ObjectMapping.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Execution;
@@ -18,6 +19,7 @@ using Monica.Repository.Persistence.Exceptions;
 using Monica.Repository.Persistence.Extensions;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Tool.Extensions;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 using Monica.WebApi.AutoControllers.Models;
@@ -40,9 +42,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     where TEntity : class, IEntity<TKey>
 {
     /// <summary>
-    /// Gets the auto model database operator for entity operations.
+    /// Gets the model query operator for entity operations.
     /// </summary>
-    protected IAutoModelDbOperator<TEntity> AutoModel => CachedServiceProvider.GetRequiredService<IAutoModelDbOperator<TEntity>>();
+    protected IModelQuery<TEntity> ModelQuery => CachedServiceProvider.GetRequiredService<IModelQuery<TEntity>>();
 
     /// <summary>
     /// Gets the unit of work manager.
@@ -55,6 +57,13 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     protected virtual IEfEntityStore<TEntity, TKey> Repository { get; } = repository;
 
     #region Query
+    /// <summary>
+    /// Gets cancellation for database reads and response enrichment. HTTP calls use RequestAborted; direct calls
+    /// outside HTTP have no implicit cancellation. Adapters with another execution owner may override this token.
+    /// </summary>
+    protected virtual CancellationToken QueryCancellationToken => CachedServiceProvider
+        .GetService<IHttpContextAccessor>()?.HttpContext?.RequestAborted ?? CancellationToken.None;
+
     protected virtual bool DisableProjectToType => false;
     /// <summary>
     /// Retrieves an entity by its ID and maps it to a DTO.
@@ -78,7 +87,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <returns>A paged response containing the mapped entity DTOs</returns>
     protected virtual async Task<ListResult> InnerGetListAsync<TCustomDto>(TGetListInput input, IQueryable<TEntity> query)
     {
+        QueryCancellationToken.ThrowIfCancellationRequested();
         ApplyHostPagingDefaults(input);
+
+        var selection = (input as IFieldSelectionRequest)?.GetFieldSelection();
+        if (selection is not null) ModelQuery.ResolveFields(selection);
 
         int? totalCount = null;
 
@@ -93,7 +106,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         {
             if (featureSetting?.ShouldJumpCount() is not true)
             {
-                totalCount = await query.CountAsync();
+                totalCount = await query.CountAsync(QueryCancellationToken);
                 if (totalCount == 0) return new ListResult([]);
             }
         }
@@ -103,21 +116,14 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         var dynamicQuery = (IQueryable) query;
 
         // Cast to IQueryable so dynamic projection can be applied.
-        if (input is IHasRequestSelect select && select.HasUsingSelected())
+        if (selection is not null)
         {
-            if (!select.SelectColumns.IsNullOrWhiteSpace())
-            {
-                dynamicQuery = AutoModel.DynamicSelect(query, select.SelectColumns);
-            }
-            else if (!select.SelectExceptColumns.IsNullOrWhiteSpace())
-            {
-                dynamicQuery = AutoModel.DynamicSelectExcept(query, select.SelectExceptColumns);
-            }
+            dynamicQuery = ModelQuery.SelectFields(query, selection);
 
             if (featureSetting?.FeatureFlags?.HasFlag(ERequestFeature.Distinct) is true)
             {
                 dynamicQuery = dynamicQuery.Distinct();
-                totalCount = await dynamicQuery.CountAsync();
+                totalCount = await dynamicQuery.CountAsync(QueryCancellationToken);
             }
         }
 
@@ -127,7 +133,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         // If dynamic projection has already been applied.
         if (dynamicQuery is not IQueryable<TEntity> finalEntityQuery)
         {
-            var selectedList = await dynamicQuery.ToDynamicListAsync();
+            var selectedList = await dynamicQuery.ToDynamicListAsync(QueryCancellationToken);
             return new ListResult(selectedList)
             {
                 TotalCounts = totalCount ?? selectedList.Count
@@ -177,17 +183,20 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <param name="input">The input parameters for the list operation</param>
     /// <returns>A paged response containing the mapped entity DTOs</returns>
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public virtual async Task<ResPaged<dynamic>> GetListAsync(TGetListInput input)
+    public virtual async Task<Monica.Core.Results.PagedResult<dynamic>> GetListAsync(TGetListInput input)
     {
         var result = await InnerGetListAsync(input);
-        if (result.TotalCounts == 0) return new ResPaged<dynamic>(0, []);
+        if (result.TotalCounts == 0) return Monica.Core.Results.PagedResult.Success<dynamic>(0, []);
 
         if (result.Results is not List<TGetListOutputDto> dtos)
-            return new ResPaged<dynamic>(result.TotalCounts, result.Results, result.CurrentPage,
+            return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, result.Results, result.CurrentPage,
                 result.PageSize, result.Cursor);
         
-        if ((await ApplyCustomActionToResponseListAsync(input, dtos)).IsFailed(out var error, out var data)) return error;
-        return new ResPaged<dynamic>(result.TotalCounts, (IReadOnlyList<dynamic>) data, result.CurrentPage,
+        var customResult = await ApplyCustomActionToResponseListAsync(input, dtos);
+        if (customResult.IsFailure()) return Monica.Core.Results.PagedResult.FromFailure<dynamic>(customResult);
+        var data = customResult.Data
+            ?? throw new InvalidOperationException("The custom response list action returned no data.");
+        return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, (IReadOnlyList<dynamic>) data, result.CurrentPage,
             result.PageSize, result.Cursor);
     }
 
@@ -233,11 +242,9 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         query = ApplySorting(query, input);
 
         // Handle dynamic selection for streaming
-        if (input is IHasRequestSelect select && select.HasUsingSelected())
+        if (input is IFieldSelectionRequest select && select.GetFieldSelection() is { } selection)
         {
-            var dynamicQuery = !select.SelectColumns.IsNullOrWhiteSpace()
-                ? AutoModel.DynamicSelect(query, select.SelectColumns)
-                : AutoModel.DynamicSelectExcept(query, select.SelectExceptColumns!);
+            var dynamicQuery = ModelQuery.SelectFields(query, selection);
 
             await foreach (var item in (dynamicQuery as IAsyncEnumerable<dynamic>)!.WithCancellation(cancellationToken))
             {
@@ -447,7 +454,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// <returns><see langword="true"/> when sorting should be skipped; otherwise, <see langword="false"/>.</returns>
     protected virtual bool ShouldSkipSortingForProjectedShardingQuery(TGetListInput input)
     {
-        return input is IHasRequestSelect select && select.HasUsingSelected() && Repository.IsShardingTable;
+        return input is IFieldSelectionRequest select && select.GetFieldSelection() is not null && Repository.IsShardingTable;
     }
 
     /// <summary>
@@ -586,11 +593,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// </summary>
     /// <param name="input">The input used for the list query.</param>
     /// <param name="dtos">The entity DTOs to process.</param>
-    /// <returns>The processed DTO list wrapped in a <see cref="Res{T}"/> result.</returns>
-    protected virtual async Task<Res<List<TGetListOutputDto>>> ApplyCustomActionToResponseListAsync(TGetListInput input,
+    /// <returns>The processed DTO list wrapped in a <see cref="Result{T}"/> result.</returns>
+    protected virtual async Task<Result<List<TGetListOutputDto>>> ApplyCustomActionToResponseListAsync(TGetListInput input,
         List<TGetListOutputDto> dtos)
     {
-        return dtos;
+        return Result.Success(dtos);
     }
     /// <summary>
     /// Applies custom filter conditions.
@@ -621,31 +628,31 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
 
         query = ApplyListInclude(query, input);
 
-        if (input is IHasRequestFilter filterRequest)
+        if (input is IModelFilterRequest filterRequest)
         {
             if (!string.IsNullOrEmpty(filterRequest.Filter))
             {
-                var result = AutoModel.GetNormalizedResult(filterRequest.Filter);
-                if (result.Context.Tokens.Any(p => p.FieldInfo?.ReflectionName == nameof(IHasSoftDelete.IsDeleted)))
+                var result = ModelQuery.ParseFilter(filterRequest.Filter);
+                if (result.ReferencedFields.Any(p => p.ReflectionName == nameof(IHasSoftDelete.IsDeleted)))
                 {
                     query = query.IncludeSoftDeleted(); // Important: this was observed to stop working with sharded tables.
                 }
 
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
-                queryable = AutoModel.ApplyFilter(queryable, result);
+                queryable = ModelQuery.ApplyFilter(queryable, result);
 
-                if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
+                if (!string.IsNullOrEmpty(filterRequest.SearchText))
                 {
-                    queryable = AutoModel.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                    queryable = ModelQuery.ApplySearch(queryable, filterRequest.SearchText, filterRequest.SearchFields);
                 }
 
                 return await ApplyClientSideFilterAsync(input, queryable);
             }
 
-            if (!string.IsNullOrEmpty(filterRequest.Fuzzy))
+            if (!string.IsNullOrEmpty(filterRequest.SearchText))
             {
                 var queryable = await ApplyCustomFilterQueryAsync(input, query);
-                queryable = AutoModel.ApplyFuzzy(queryable, filterRequest.Fuzzy, filterRequest.FuzzyColumns);
+                queryable = ModelQuery.ApplySearch(queryable, filterRequest.SearchText, filterRequest.SearchFields);
                 return await ApplyClientSideFilterAsync(input, queryable);
             }
         }
@@ -658,7 +665,7 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         var clientSideMethod = ApplyCustomFilterQueryClientSideAsync(input);
         if (clientSideMethod != null)
         {
-            return (await queryable.AsAsyncEnumerable().Where(clientSideMethod).ToListAsync()).AsQueryable();
+            return (await queryable.AsAsyncEnumerable().Where(clientSideMethod).ToListAsync(QueryCancellationToken)).AsQueryable();
         }
 
         return queryable;
@@ -778,11 +785,11 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
 
         if (!DisableProjectToType)
         {
-            return await Mapper.ProjectToType<TCustomDto>(query).ToListAsync();
+            return await Mapper.ProjectToType<TCustomDto>(query).ToListAsync(QueryCancellationToken);
         }
         else
         {
-            return Mapper.Map<List<TEntity>, List<TCustomDto>>(await query.ToListAsync());
+            return Mapper.Map<List<TEntity>, List<TCustomDto>>(await query.ToListAsync(QueryCancellationToken));
         }
     }
 

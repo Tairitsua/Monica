@@ -84,6 +84,18 @@ public partial class OperationalPolicyScheduleEditor : IAsyncDisposable
     [Parameter]
     public EventCallback Changed { get; set; }
 
+    /// <summary>Gets whether this editor presents the compact Cron-only workflow.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Gets the accepted expression shown beside the declaration, independently of the current draft.</summary>
+    [Parameter] public string? CurrentExpression { get; set; }
+
+    /// <summary>Gets whether the owner still publishes the definition; saving does not republish it.</summary>
+    [Parameter] public bool IsPresent { get; set; } = true;
+
+    private static readonly string[] CompactPresets = ["*/5 * * * *", "*/30 * * * *", "0 * * * *", "0 3 * * *", "0 9 * * 1-5", "0 0 1 * *"];
+    private string PresetExpression(int index) => (Draft.Mode == CronExpressionMode.SixFieldsWithSeconds ? "0 " : string.Empty) + CompactPresets[index];
+
     private bool IsDisposed => _lifetime.IsRetired;
 
     private bool IsDraftValid => Draft.Evaluation.IsValid

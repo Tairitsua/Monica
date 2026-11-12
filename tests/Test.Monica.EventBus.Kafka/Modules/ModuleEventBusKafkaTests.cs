@@ -39,7 +39,7 @@ public sealed class ModuleEventBusKafkaTests
         emptyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var emptyEnvelope = await ReadEnvelopeAsync<KafkaIntegrationSnapshot>(
             emptyApplication, emptyResponse, cancellationToken);
-        emptyEnvelope.Status.Should().Be(ResStatus.Ok);
+        emptyEnvelope.Status.Should().Be(ResultStatus.Ok);
         emptyEnvelope.Message.Should().BeNullOrEmpty();
         emptyEnvelope.Data.Should().NotBeNull();
         var emptySnapshot = emptyEnvelope.Data!;
@@ -50,7 +50,7 @@ public sealed class ModuleEventBusKafkaTests
         externalResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var externalEnvelope = await ReadEnvelopeAsync<KafkaIntegrationSnapshot>(
             externalApplication, externalResponse, cancellationToken);
-        externalEnvelope.Status.Should().Be(ResStatus.Ok);
+        externalEnvelope.Status.Should().Be(ResultStatus.Ok);
         externalEnvelope.Message.Should().BeNullOrEmpty();
         externalEnvelope.Data.Should().NotBeNull();
         var externalSnapshot = externalEnvelope.Data!;
@@ -77,7 +77,7 @@ public sealed class ModuleEventBusKafkaTests
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var envelope = await ReadEnvelopeAsync<KafkaTopicMessageBatch>(application, response, cancellationToken);
-        envelope.Status.Should().Be(ResStatus.BadRequest);
+        envelope.Status.Should().Be(ResultStatus.BadRequest);
         envelope.Message.Should().NotBeNullOrWhiteSpace();
         envelope.Message.Should().Contain(EXTERNAL_CLUSTER_ID)
             .And.Contain("direct admin access is not configured");
@@ -93,14 +93,14 @@ public sealed class ModuleEventBusKafkaTests
     private static HttpClient CreateTestServerClient(MonicaTestApplication application) =>
         ((TestServer)application.Services.GetRequiredService<IServer>()).CreateClient();
 
-    private static async Task<Res<T>> ReadEnvelopeAsync<T>(
+    private static async Task<Result<T>> ReadEnvelopeAsync<T>(
         MonicaTestApplication application,
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         var serializerOptions = application.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var envelope = JsonSerializer.Deserialize<Res<T>>(body, serializerOptions);
+        var envelope = JsonSerializer.Deserialize<Result<T>>(body, serializerOptions);
         envelope.Should().NotBeNull();
         return envelope!;
     }

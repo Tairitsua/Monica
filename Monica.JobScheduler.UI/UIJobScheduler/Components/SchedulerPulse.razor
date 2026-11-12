@@ -1,0 +1,450 @@
+@inject NavigationManager Navigation
+@using System.Globalization
+@using Monica.UI.Shared.Components.Visual
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.State
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@inject IDialogService DialogService
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+@inject Monica.UI.Shared.Services.MoTimeFormatter ClockFormatter
+@inject IOptions<ModuleJobSchedulerOption> SchedulerOptions
+@inject IOptions<ModuleJobSchedulerUIOption> UiOptions
+@inject TimeProvider TimeProvider
+@implements IAsyncDisposable
+
+<SchedulerHistoryCoverage />
+<section class="scheduler-pulse" aria-labelledby="scheduler-pulse-title" style="@($"--pl-now:{Position(_acceptedAt)}%")">
+    <div class="scheduler-pulse__decision">
+        <div>
+            <p>@L["Workspace:AttentionJobs"]</p>
+            <div class="scheduler-pulse__value">@(_sample is null ? "—" : _jobs.Count(job => job.NeedsAttention && job.Definition.IsPresent && !job.Definition.IsDisabled).ToString())<small>/ @Definitions.Count(job => job.IsPresent) @L["Workspace:PresentUnit"]</small></div>
+            <div class="scheduler-pulse__reasons">
+                @foreach (var signal in Signals)
+                {
+                    <span data-tone="@signal.Tone" class="@(signal.Count == 0 ? "is-zero" : null)"><i></i>@L[$"Workspace:{signal.Key}"] <b>@signal.Count</b></span>
+                }
+            </div>
+        </div>
+        <p class="scheduler-pulse__finding">
+            @if (_sample is null) { @L["Common:Loading"] }
+            else if (_jobs.FirstOrDefault(job => job.NeedsAttention) is {} worst)
+            {
+                @AttentionFinding(worst)@(" ")
+                @foreach (var job in _jobs.Where(job => job.NeedsAttention && job != worst).Take(2))
+                {
+                    @AttentionFinding(job)@(" ")
+                }
+            }
+            else if (_jobs.Any(job => !job.IsAssessed)) { @L["Architecture:UnknownNote"] }
+            else { @L["Workspace:CalmFinding"] }
+        </p>
+    </div>
+    <div class="scheduler-pulse__scope">
+        <span><MoIcon Icon="@MoIcons.Clock" Size="15px" /> @L["Workspace:PulseWindow",L[$"Workspace:Windows:{_minutes}"]]</span>
+        <div class="pulse-seg" role="group" aria-label="@L["Analytics:Range:Title"]">
+            @foreach (var minutes in new[] { 15, 60, 360 })
+            {
+                <button type="button" aria-pressed="@((_minutes == minutes).ToString().ToLowerInvariant())" @onclick="@(() => ChangeRangeAsync(minutes))">@L[$"Workspace:Windows:{minutes}"]</button>
+            }
+        </div>
+    </div>
+    <dl class="scheduler-pulse__facts">
+        <div data-tone="success"><dt><i></i>@L["ExecutionStates:Succeeded"]</dt><dd>@Count(JobExecutionState.Succeeded).ToString("N0")</dd><small>@L["Workspace:DecidedReliability",Reliability]</small></div>
+        <div data-tone="error"><dt><i></i>@L["ExecutionStates:Failed"]</dt><dd>@Count(JobExecutionState.Failed).ToString("N0")</dd><small>@L["Workspace:FailureJobs",_analytics?.TopJobsByFailures.Count ?? 0]</small></div>
+        <div data-tone="warning"><dt><i></i>@L["ExecutionStates:Skipped"]</dt><dd>@Count(JobExecutionState.Skipped).ToString("N0")</dd><small>@L["Workspace:SkipFact"]</small></div>
+        <div data-tone="info"><dt><i></i>@L["ExecutionStates:Running"]</dt><dd>@StateCounts.GetValueOrDefault(JobExecutionState.Running)</dd><small>@L["Workspace:LiveFact",StateCounts.GetValueOrDefault(JobExecutionState.Queued),Active.Where(record => record.State == JobExecutionState.Running).Select(record => record.RunningWorkerInstanceId).Distinct().Count()]</small></div>
+    </dl>
+    <div class="scheduler-pulse__instrument">
+        <header>
+            <div><h2 id="scheduler-pulse-title">@L["Workspace:PulseTitle"]</h2><p>@L["Workspace:PulseDescription"]</p></div>
+            <div class="pulse-controls">
+                <div class="pulse-seg" role="group" aria-label="@L["Workspace:GroupBy"]">
+                    <button type="button" aria-pressed="@((!_byOwner).ToString().ToLowerInvariant())" @onclick="@(() => _byOwner=false)">@L["Workspace:ByStanding"]</button>
+                    <button type="button" aria-pressed="@((_byOwner).ToString().ToLowerInvariant())" @onclick="@(() => _byOwner=true)">@L["Workspace:ByOwner"]</button>
+                </div>
+                <label><span class="visually-hidden">@L["Workspace:PulseSearch"]</span><MoIcon Icon="@MoIcons.Search" Size="15px"/><input type="search" placeholder="@L["Workspace:PulseSearch"]" value="@_filter" @oninput="ChangeSearchAsync" /></label>
+            </div>
+        </header>
+        @if (_error is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined">@_error</MudAlert> }
+        @if (_sample?.IsTruncated == true) { <p class="scheduler-pulse__limit">@L["Workspace:SampleTruncated"]</p> }
+        <div class="scheduler-pulse__legend">
+            @foreach (var state in new[] { JobExecutionState.Succeeded, JobExecutionState.Failed, JobExecutionState.Skipped, JobExecutionState.Running })
+            {
+                <span data-state="@state.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{state}"]</span>
+            }
+            <span><i class="is-plan"></i>@L["Workspace:Planned"]</span>
+            <span class="pulse-timezone">@TimePresentation.FormatTimestamp(_acceptedAt)</span>
+        </div>
+        <div class="scheduler-pulse__lanes" role="group" aria-label="@L["Workspace:JobTimeline"]" aria-busy="@_loading">
+            <div class="scheduler-pulse__axis">
+                <span title="@ClockFormatter.TimeZone.DisplayName">@AxisZone</span>
+                <div>
+                    @foreach (var at in AxisTicks)
+                    {
+                        <span style="@($"left:{Position(at)}%")">@ClockFormatter.Format(at,"HH:mm")</span>
+                    }
+                    <b>@L["Workspace:Now"] <time>@TimePresentation.FormatClock(_acceptedAt)</time></b>
+                </div>
+                <span>@L["Workspace:Next"]</span>
+            </div>
+            @foreach (var group in Groups)
+            {
+                var expanded = Expanded(group.Key);
+                var groupNext = group.SelectMany(job => NextPlans(job.Definition)).Order().Cast<DateTimeOffset?>().FirstOrDefault();
+                <div class="scheduler-pulse__row @(expanded ? "is-group" : "is-merged")">
+                    <button class="scheduler-pulse__group" type="button" aria-expanded="@expanded.ToString().ToLowerInvariant()" @onclick="@(() => Toggle(group.Key))">
+                        <span class="scheduler-pulse__group-name"><MoIcon Icon="@(expanded ? MoIcons.ChevronDown : MoIcons.ChevronRight)" Size="14px"/>
+                            @if (!_byOwner) { <i data-tone="@GroupTone(group.Key)"></i> }
+                            <b>@GroupLabel(group.Key)</b><small>@group.Count()</small>
+                        </span>
+                        @if (!expanded) { <span class="scheduler-pulse__merged-note">@L["Workspace:MergedJobs",group.Count()]</span> }
+                    </button>
+                    <div class="scheduler-pulse__track">
+                        @GridLines
+                        @if (!expanded)
+                        {
+                            @foreach (var record in VisibleRecords(group.SelectMany(job => job.Records))) { @ExecutionMark(record) }
+                            @foreach (var at in group.SelectMany(job => Plans(job.Definition)).Distinct()) { @PlanMark(at) }
+                        }
+                    </div>
+                    <span class="scheduler-pulse__tail">
+                        @if (!expanded && groupNext is {} groupNextAt) { <small>@L["Workspace:Next"]</small><b>@TimePresentation.FormatClock(groupNextAt)</b> }
+                        else if (!expanded) { <b class="is-dim">—</b> }
+                    </span>
+                </div>
+                @if (expanded)
+                {
+                    @foreach (var job in group)
+                    {
+                        var next = NextPlans(job.Definition).Cast<DateTimeOffset?>().FirstOrDefault();
+                        <div class="scheduler-pulse__row is-job">
+                            <a class="scheduler-pulse__job" href="@JobUrl(job.Definition)" title="@job.Definition.EffectiveConfiguration.JobName">
+                                <b>@job.Definition.EffectiveConfiguration.JobName</b>
+                                <small><span data-tone="@job.Tone">@Reason(job)</span>@if (!_byOwner) { <span class="scheduler-pulse__owner">@job.Definition.OwnerKey</span> }</small>
+                            </a>
+                            <div class="scheduler-pulse__track">
+                                @GridLines
+                                @foreach (var record in VisibleRecords(job.Records)) { @ExecutionMark(record) }
+                                @foreach (var at in Plans(job.Definition)) { @PlanMark(at) }
+                                @if (PriorExecution(job) is {} prior)
+                                {
+                                    <button type="button" class="scheduler-pulse__prior" data-state="@prior.State.ToString().ToLowerInvariant()" title="@($"{L["Workspace:BeforeWindow"]} · {RecordLabel(prior)}")" @onclick="@(() => InspectAsync(prior.InstanceId))"><MoIcon Icon="@MoIcons.ChevronLeft" Size="13px"/><span>@L["Workspace:BeforeWindow"]</span><b>@L[$"ExecutionStates:{prior.State}"]</b><time>@TimePresentation.FormatClock(prior.CompletedAtUtc ?? prior.CreatedAtUtc)</time></button>
+                                }
+                            </div>
+                            <span class="scheduler-pulse__tail">
+                                @if (next is {} nextAt) { <small>@L["Workspace:Next"]</small><b>@TimePresentation.FormatClock(nextAt)</b> }
+                                else if (job.Definition.Declaration.JobType == JobType.Triggered && job.Records.FirstOrDefault() is {} last) { <small>@L["Workspace:Last"]</small><b>@TimePresentation.FormatClock(last.CreatedAtUtc)</b> }
+                                else { <b class="is-dim">—</b> }
+                            </span>
+                        </div>
+                    }
+                }
+            }
+            @if (!FilteredJobs.Any()) { <p class="scheduler-pulse__empty">@L["Catalog:Empty"]</p> }
+        </div>
+        <div class="scheduler-pulse__readout">
+            @if (_hovered is {} hovered)
+            {
+                <i data-state="@hovered.State.ToString().ToLowerInvariant()"></i><b>@JobSchedulerUiPresentation.GetJobDisplayName(hovered.Template)</b><span>@L[$"ExecutionStates:{hovered.State}"]</span><span>@TimePresentation.FormatClock(hovered.CreatedAtUtc)</span><strong>@TimePresentation.FormatExecutionDuration(hovered,_acceptedAt)</strong>
+            }
+            else { <i></i>@L["Workspace:PulseHint"] }
+        </div>
+    </div>
+</section>
+<div class="scheduler-pulse__lower">
+    <section class="pulse-panel">
+        <header><span class="pulse-panel__tile" data-tone="info"><MoIcon Icon="@MoIcons.Pulse" Size="16px"/></span><div><h2>@L["Workspace:RunningNow"]</h2><p>@L["Workspace:RunningNowDescription"]</p></div><b class="pulse-count">@Active.Count()</b></header>
+        <ul class="pulse-running">
+            @foreach (var record in Active)
+            {
+                var running = record.State == JobExecutionState.Running;
+                var tone = IsOverrun(record) ? "warning" : "info";
+                <li><button type="button" data-tone="@tone" class="@(running ? null : "is-queued")" @onclick="@(() => InspectAsync(record.InstanceId))">
+                    <span class="pulse-running__id"><b>@JobSchedulerUiPresentation.GetJobDisplayName(record.Template)</b><small><span>@record.Template.OwnerKey</span>@if (record.RunningWorkerInstanceId is {} worker) { <span>@worker</span> }</small></span>
+                    <strong>@(running ? Elapsed(record) : L["ExecutionStates:Queued"])</strong>
+                    @if (running)
+                    {
+                        <span class="pulse-running__track"><i style="@($"width:{Progress(record)}")"></i>
+                            @if (Quantile(record,.5) is {} p50) { <span class="pulse-running__marker" style="@($"left:{Progress(record,p50)}")" title="P50"></span> }
+                            @if (Quantile(record,.95) is {} p95) { <span class="pulse-running__marker is-p95" style="@($"left:{Progress(record,p95)}")" title="P95"></span> }
+                        </span>
+                        <span class="pulse-running__caption"><span>P50 @TimePresentation.FormatDuration(Quantile(record,.5))</span><span>P95 @TimePresentation.FormatDuration(Quantile(record,.95))</span>@if (record.LeaseExpiresAtUtc is {} lease) { <span>@L["Workspace:LeaseUntil",TimePresentation.FormatClock(lease)]</span> }</span>
+                    }
+                </button></li>
+            }
+        </ul>
+        @if (!Active.Any()) { <p class="pulse-empty">@L["Workspace:NoLive"]</p> }
+    </section>
+    <section class="pulse-panel">
+        <header><span class="pulse-panel__tile is-neutral"><MoIcon Icon="@MoIcons.CalendarDays" Size="16px"/></span><div><h2>@L["Workspace:ArrivalBoard"]</h2><p>@L["Workspace:ArrivalDescription"]</p></div></header>
+        @if (Definitions.Any(job => NextPlans(job).Any() && SchedulerCadence.Bucket(job,_acceptedAt) == "sub"))
+        {
+            <div class="pulse-steady"><span>@L["Workspace:SteadyJobs"]</span>
+                @foreach (var job in Definitions.Where(job => NextPlans(job).Any() && SchedulerCadence.Bucket(job,_acceptedAt) == "sub"))
+                {
+                    <a href="@JobUrl(job)" title="@job.EffectiveConfiguration.Schedule?.CronExpression">@job.EffectiveConfiguration.JobName</a>
+                }
+            </div>
+        }
+        <ol class="pulse-arrivals">
+            @foreach (var arrival in Arrivals)
+            {
+                <li><b>@TimePresentation.FormatClock(arrival.Key)</b><small>@L["Workspace:DueIn",TimePresentation.FormatDuration(arrival.Key-_acceptedAt)]</small><span>
+                    @foreach (var item in arrival.Take(3)) { <a href="@JobUrl(item.Job)">@item.Job.EffectiveConfiguration.JobName</a> }
+                    @if (arrival.Count()>3) { <small>+@(arrival.Count()-3)</small> }
+                </span></li>
+            }
+        </ol>
+        @if (!Arrivals.Any()) { <p class="pulse-empty">@L["Workspace:NoArrivals"]</p> }
+    </section>
+</div>
+@code {
+    /// <summary>Gets the caller's accepted definition sample. Definition publication is not a worker heartbeat.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<JobDefinition> Definitions { get; set; } = [];
+    /// <summary>Gets the parent's accepted observation instant; a failed parent refresh leaves it frozen.</summary>
+    [Parameter] public DateTimeOffset CapturedAtUtc { get; set; }
+    /// <summary>Gets whole-scope state counts from the same accepted overview, independently of timeline sample bounds.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<JobExecutionState, int> StateCounts { get; set; } = new Dictionary<JobExecutionState, int>();
+    /// <summary>Gets the route-held window size in minutes.</summary>
+    [Parameter] public int WindowMinutes { get; set; } = 60;
+    /// <summary>Gets the callback persisting the selected range in the route.</summary>
+    [Parameter] public EventCallback<int> WindowChanged { get; set; }
+    /// <summary>Gets the route-held name, key or owner search.</summary>
+    [Parameter] public string? Search { get; set; }
+    /// <summary>Gets the callback persisting the search without adding a history entry for every keystroke.</summary>
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    /// <summary>Gets the explicit refresh generation, independently of automatic overview captures.</summary>
+    [Parameter] public int RefreshVersion { get; set; }
+    private readonly SchedulerOperationLifetime _lifetime = new();
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private CancellationTokenSource? _loadCancellation;
+    private ExecutionDialogSession? _inspectors;
+    private SchedulerExecutionSample? _sample;
+    private IReadOnlyList<SchedulerJobEvidence> _jobs = [];
+    private IReadOnlyDictionary<JobId, JobOperationalSummary> _cursors = new Dictionary<JobId, JobOperationalSummary>();
+    private int _minutes = 60, _acceptedMinutes = 60, _version;
+    private bool _loading, _byOwner;
+    private JobExecutionInstance? _hovered;
+    private JobExecutionAnalyticsSnapshot? _analytics;
+    private readonly Dictionary<string, bool> _expanded = new();
+    private string _filter = string.Empty;
+    private string? _error;
+    private DateTimeOffset _requestedAt, _acceptedAt;
+    private long? _lastLoadTimestamp;
+    private int _requestedRefreshVersion;
+    private DateTimeOffset Start => _acceptedAt.AddMinutes(-_acceptedMinutes);
+    private DateTimeOffset End => _acceptedAt.AddMinutes(_acceptedMinutes switch { 15 => 5, 360 => 60, 1440 => 240, _ => 15 });
+    private IEnumerable<SchedulerJobEvidence> FilteredJobs => _jobs.Where(job => string.IsNullOrEmpty(_filter)
+        || job.Definition.EffectiveConfiguration.JobName.Contains(_filter, StringComparison.CurrentCultureIgnoreCase)
+        || job.Definition.OwnerKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+        || job.Definition.Declaration.JobKey.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized() => _inspectors = new(id => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, id), LoadAsync);
+    protected override Task OnParametersSetAsync()
+    {
+        _filter = Search ?? string.Empty;
+        var minutes = WindowMinutes is 15 or 60 or 360 or 1440 ? WindowMinutes : 60;
+        var explicitRefresh = _requestedRefreshVersion != RefreshVersion;
+        var rangeChanged = _minutes != minutes;
+        if (_requestedAt == CapturedAtUtc && !rangeChanged && !explicitRefresh) return Task.CompletedTask;
+        _minutes = minutes;
+        _requestedAt = CapturedAtUtc;
+        _requestedRefreshVersion = RefreshVersion;
+        if (!rangeChanged && !explicitRefresh && _lastLoadTimestamp is { } started
+            && (UiOptions.Value.PulseRefreshInterval <= TimeSpan.Zero
+                || TimeProvider.GetElapsedTime(started) < UiOptions.Value.PulseRefreshInterval)) return Task.CompletedTask;
+        return LoadAsync();
+    }
+    private Task ChangeRangeAsync(int minutes) => WindowChanged.HasDelegate ? WindowChanged.InvokeAsync(minutes) : ChangeLocalRangeAsync(minutes);
+    private Task ChangeLocalRangeAsync(int minutes) { _minutes = minutes; return LoadAsync(); }
+    private Task ChangeSearchAsync(ChangeEventArgs args) { _filter = args.Value?.ToString() ?? string.Empty; return SearchChanged.InvokeAsync(_filter); }
+    private async Task LoadAsync()
+    {
+        if (_lifetime.IsRetired) return;
+        _lastLoadTimestamp = TimeProvider.GetTimestamp();
+        // Renderer-owned requests replace pending work, but wait for the old read to actually exit.
+        using var cancellation = new CancellationTokenSource();
+        var previous = _loadCancellation;
+        _loadCancellation = cancellation;
+        var version = ++_version;
+        var at = CapturedAtUtc;
+        var minutes = _minutes;
+        var definitions = Definitions.ToArray();
+        if (_acceptedMinutes != minutes) ClearSnapshot();
+        if (_sample is null) { _acceptedAt = at; _acceptedMinutes = minutes; }
+        _loading = true;
+        var authorized = false;
+        try
+        {
+            await _lifetime.RunAsync(async lifetimeToken =>
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken, cancellation.Token);
+                var token = linked.Token;
+                if (previous is not null) await previous.CancelAsync();
+                await _loadGate.WaitAsync(token);
+                try
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!await Access.IsAuthorizedAsync(token))
+                    {
+                        _lifetime.TryApply(() => { if (version == _version) { ClearSnapshot(); _error = L["Access:DeniedDescription"]; } });
+                        return;
+                    }
+                    authorized = true;
+                    var sample = await SchedulerExecutionSample.LoadAsync(Facade, new JobExecutionQuery
+                    {
+                        SchedulerScopeKey = string.Empty, CreatedAfterUtc = at.AddMinutes(-minutes), CreatedBeforeUtc = at
+                    }, token);
+                    var activeResult = await Facade.QueryExecutionsAsync(new JobExecutionQuery { SchedulerScopeKey = string.Empty, States = [JobExecutionState.Queued, JobExecutionState.Running], CreatedBeforeUtc = at, PageSize = 200 }, token);
+                    var activeError = activeResult.WithoutData();
+                    var active = activeResult.Data;
+                    if (activeResult.IsFailure() || active is null) throw new InvalidOperationException(activeError.Message ?? "The active executions were unavailable.");
+                    var analyticsResult = await Facade.GetExecutionAnalyticsAsync(new JobExecutionAnalyticsQuery { StartTimeUtc = at.AddMinutes(-minutes), EndTimeUtc = at }, token);
+                    var analyticsError = analyticsResult.WithoutData();
+                    var analytics = analyticsResult.Data;
+                    if (analyticsResult.IsFailure() || analytics is null) throw new InvalidOperationException(analyticsError.Message ?? "The execution analytics were unavailable.");
+                    var cursors = new Dictionary<JobId, JobOperationalSummary>();
+                    for (var page = 1; page <= Math.Ceiling(definitions.Length / 200d); page++)
+                    {
+                        var response = await Facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = page, PageSize = 200 }, token);
+                        var cursorError = response.WithoutData();
+                        var cursorPage = response.Data;
+                        if (response.IsFailure() || cursorPage is null) throw new InvalidOperationException(cursorError.Message ?? "The job catalog was unavailable.");
+                        foreach (var summary in cursorPage.Items) cursors[summary.Definition.Id] = summary;
+                        if (page * 200 >= cursorPage.TotalCount) break;
+                    }
+                    token.ThrowIfCancellationRequested();
+                    var records = sample.Records.Concat(active.Items).DistinctBy(record => record.InstanceId, StringComparer.Ordinal).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+                    var jobs = definitions.Select(definition => SchedulerJobEvidence.Create(definition, records[definition.Id], at, !sample.IsTruncated))
+                        .OrderByDescending(job => job.NeedsAttention).ThenByDescending(job => job.FailureStreak).ThenBy(job => job.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture).ToArray();
+                    _lifetime.TryApply(() => { if (version == _version) { _sample = sample; _analytics = analytics; _jobs = jobs; _cursors = cursors; _hovered = null; _acceptedAt = at; _acceptedMinutes = minutes; _error = null; } });
+                }
+                finally { _loadGate.Release(); }
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsRetired || cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { _lifetime.TryApply(() => { if (version == _version) { if (!authorized) ClearSnapshot(); _error = exception.Message; } }); }
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, cancellation)) _loadCancellation = null;
+            _lifetime.TryApply(() => { if (version == _version) _loading = false; });
+        }
+    }
+    private void ClearSnapshot()
+    {
+        _sample = null;
+        _analytics = null;
+        _jobs = [];
+        _cursors = new Dictionary<JobId, JobOperationalSummary>();
+        _hovered = null;
+    }
+    private async Task InspectAsync(string id)
+    {
+        if (_lifetime.IsRetired || _inspectors is not { } inspectors) return;
+        try { await _lifetime.RunAsync(async token => { if (await Access.IsAuthorizedAsync(token) && !_lifetime.IsRetired) await inspectors.OpenAsync(id); }); }
+        catch (OperationCanceledException) when (_lifetime.IsRetired) { }
+    }
+    private IEnumerable<(string Key, string Tone, int Count)> Signals =>
+    [
+        ("FailureSignal","error",_jobs.Count(job => job.FailureStreak > 0)),
+        ("Intermittent","error",_jobs.Count(job => job.IsIntermittent)),
+        ("OverrunSignal","warning",_jobs.Count(job => job.IsOverrun)),
+        ("SkipSignal","warning",_jobs.Count(job => job.IsSkipping))
+    ];
+    private string AxisZone
+    {
+        get
+        {
+            var offset = ClockFormatter.TimeZone.GetUtcOffset(_acceptedAt);
+            return $"UTC{(offset < TimeSpan.Zero ? "−" : "+")}{offset.Duration().ToString(@"hh\:mm",CultureInfo.InvariantCulture)}";
+        }
+    }
+    private IEnumerable<DateTimeOffset> AxisTicks
+    {
+        get
+        {
+            var step = TimeSpan.FromMinutes(_acceptedMinutes switch { 15 => 3, 360 => 60, 1440 => 240, _ => 10 });
+            var offset = ClockFormatter.TimeZone.GetUtcOffset(Start);
+            var first = (long)Math.Ceiling((Start.UtcTicks + offset.Ticks) / (double)step.Ticks) * step.Ticks - offset.Ticks;
+            for (var ticks = first; ticks <= End.UtcTicks; ticks += step.Ticks) yield return new DateTimeOffset(ticks,TimeSpan.Zero);
+        }
+    }
+    private IEnumerable<JobExecutionInstance> VisibleRecords(IEnumerable<JobExecutionInstance> records) => records
+        .Where(record => (record.StartedAtUtc ?? record.RecurringOccurrenceUtc ?? record.CreatedAtUtc) <= _acceptedAt
+            && (record.CompletedAtUtc ?? _acceptedAt) >= Start)
+        .OrderBy(record => record.State switch { JobExecutionState.Skipped => 0, JobExecutionState.Queued => 1, JobExecutionState.Cancelled => 2, JobExecutionState.Succeeded => 3, JobExecutionState.Running => 4, _ => 5 });
+    private JobExecutionInstance? PriorExecution(SchedulerJobEvidence job)
+    {
+        if (VisibleRecords(job.Records).Any()
+            || !_cursors.TryGetValue(job.Definition.Id,out var summary)
+            || summary.LatestExecution is not {} latest || !latest.IsTerminal) return null;
+        return (latest.CompletedAtUtc ?? latest.CreatedAtUtc) < Start ? latest : null;
+    }
+    private RenderFragment GridLines => @<text>@foreach (var at in AxisTicks) { <i class="scheduler-pulse__gridline" style="@($"left:{Position(at)}%")"></i> }</text>;
+    private RenderFragment ExecutionMark(JobExecutionInstance record) => @<button type="button" class="scheduler-pulse__mark" data-state="@record.State.ToString().ToLowerInvariant()" data-kind="@Kind(record)" style="@MarkStyle(record)" title="@RecordLabel(record)" aria-label="@RecordLabel(record)" @onmouseenter="@(() => _hovered=record)" @onfocus="@(() => _hovered=record)" @onclick="@(() => InspectAsync(record.InstanceId))"></button>;
+    private RenderFragment PlanMark(DateTimeOffset at) => @<span class="scheduler-pulse__plan" style="@($"left:{Position(at)}%")" title="@TimePresentation.FormatTimestamp(at)"></span>;
+    private string Position(DateTimeOffset at) => Math.Clamp((at - Start).TotalMilliseconds / (End - Start).TotalMilliseconds * 100, 0, 100).ToString("0.###", CultureInfo.InvariantCulture);
+    private string MarkStyle(JobExecutionInstance record)
+    {
+        var begin = record.StartedAtUtc ?? record.RecurringOccurrenceUtc ?? record.CreatedAtUtc;
+        var end = record.CompletedAtUtc ?? (record.State == JobExecutionState.Running ? _acceptedAt : begin);
+        var width = Math.Max(0, Math.Clamp((end - Start).TotalMilliseconds / (End - Start).TotalMilliseconds * 100, 0, 100) - double.Parse(Position(begin), CultureInfo.InvariantCulture));
+        return $"left:{Position(begin)}%;width:{(record.State == JobExecutionState.Queued ? "7px" : Kind(record) == "bar" ? $"max(3px,{width.ToString("0.###", CultureInfo.InvariantCulture)}%)" : "2px")};";
+    }
+    private IEnumerable<DateTimeOffset> Plans(JobDefinition definition) => NextPlans(definition).Where(at => at <= End);
+    private string RecordLabel(JobExecutionInstance record) => $"{JobSchedulerUiPresentation.GetJobDisplayName(record.Template)} · {L[$"ExecutionStates:{record.State}"]} · {TimePresentation.FormatTimestamp(record.CreatedAtUtc)} · {TimePresentation.FormatExecutionDuration(record, _acceptedAt)}";
+    private IEnumerable<IGrouping<string, SchedulerJobEvidence>> Groups => FilteredJobs.GroupBy(job => _byOwner ? job.Definition.OwnerKey : Standing(job))
+        .OrderBy(group => _byOwner ? 0 : group.Key switch { "attention" => 0, "unknown" => 1, "healthy" => 2, "ondemand" => 3, _ => 4 });
+    private static string GroupTone(string key) => key switch { "attention" => "error", "healthy" => "success", "ondemand" => "primary", _ => "neutral" };
+    private static string Standing(SchedulerJobEvidence job) => !job.Definition.IsPresent || job.Definition.IsDisabled ? "inactive" : job.NeedsAttention ? "attention" : !job.IsAssessed ? "unknown" : job.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    private bool Expanded(string key) => _expanded.GetValueOrDefault($"{_byOwner}:{key}", _byOwner || key is "attention" or "unknown" or "inactive");
+    private void Toggle(string key) => _expanded[$"{_byOwner}:{key}"] = !Expanded(key);
+    private string GroupLabel(string key) => _byOwner ? key : L[$"Workspace:PulseGroups:{key}"];
+    private string JobUrl(JobDefinition job) => JobSchedulerUiUrls.JobDefinition(job.Id, Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery);
+    private RenderFragment AttentionFinding(SchedulerJobEvidence job) =>
+        @<MoRichFinding Template="@L["Workspace:JobAttentionFinding"].Value" Values="@([JobMark(job), ReasonText(job)])" />;
+    private RenderFragment JobMark(SchedulerJobEvidence job) =>
+        @<MoValueMark Role="@(job.Tone switch { "error" => MoVisualRole.Error, "warning" => MoVisualRole.Warning, _ => MoVisualRole.Neutral })" Href="@JobUrl(job.Definition)">@job.Definition.EffectiveConfiguration.JobName</MoValueMark>;
+    private RenderFragment ReasonText(SchedulerJobEvidence job) => @<text>@Reason(job)</text>;
+    private long Count(JobExecutionState state) => _analytics?.Trend.Sum(bucket => state switch { JobExecutionState.Succeeded => bucket.SucceededCount, JobExecutionState.Failed => bucket.FailedCount, JobExecutionState.Skipped => bucket.SkippedCount, _ => 0 }) ?? 0;
+    private string Reliability => Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed) > 0 ? (Count(JobExecutionState.Succeeded) / (double)(Count(JobExecutionState.Succeeded) + Count(JobExecutionState.Failed))).ToString("P1") : "—";
+    private IEnumerable<JobExecutionInstance> Active => _jobs.SelectMany(job => job.Records).Where(record => record.State is JobExecutionState.Running or JobExecutionState.Queued).DistinctBy(record => record.InstanceId);
+    private string Kind(JobExecutionInstance record) => record.State == JobExecutionState.Skipped ? "skip" : record.State == JobExecutionState.Running || SchedulerTimePresentation.GetExecutionDuration(record, _acceptedAt)?.TotalMinutes > _acceptedMinutes / 250d ? "bar" : "tick";
+    private string Reason(SchedulerJobEvidence job) => job.FailureStreak > 0 ? L[job.FailureStreakIsLowerBound ? "Architecture:AtLeastStreak" : "Workspace:FailureStreak", job.FailureStreak] : job.IsOverrun ? L["Workspace:OverrunSignal"] : job.IsSkipping ? L["Workspace:SkipSignal"] : job.IsIntermittent ? L["Workspace:Intermittent"] : !job.Definition.IsPresent ? L["Workspace:Standings:absent"] : job.Definition.IsDisabled ? L["Workspace:Standings:paused"] : !job.IsAssessed ? L["Architecture:UnknownReason"] : job.Definition.EffectiveConfiguration.Schedule?.CronExpression ?? L["Workspace:Standings:ondemand"];
+    private IEnumerable<DateTimeOffset> NextPlans(JobDefinition definition)
+    {
+        if (!SchedulerOptions.Value.AutonomousWork || !definition.IsPresent || definition.IsDisabled
+            || definition.EffectiveConfiguration.Schedule is not {} schedule
+            || !_cursors.TryGetValue(definition.Id, out var summary)
+            || summary.RecurringScheduleStatus != JobRecurringScheduleStatus.Scheduled
+            || summary.NextOccurrenceUtc is not {} next) return [];
+        // The persisted cursor authorizes the forecast. Cron math only extends that accepted schedule.
+        return new[] { next }.Concat(CronPolicyEditor.Evaluate(schedule.CronExpression, schedule.TimeZoneId,
+            schedule.StartTimeUtc, schedule.EndTimeUtc, next).Occurrences.Select(item => item.Utc)).Distinct();
+    }
+    private IEnumerable<IGrouping<DateTimeOffset, (JobDefinition Job, DateTimeOffset At)>> Arrivals => Definitions.Where(job => SchedulerCadence.Bucket(job, _acceptedAt) != "sub").SelectMany(job => NextPlans(job).Select(at => (Job: job, At: at))).OrderBy(item => item.At).GroupBy(item => item.At).Take(5);
+    private string Elapsed(JobExecutionInstance record) => SchedulerTimePresentation.GetExecutionDuration(record, _acceptedAt) is {} duration ? TimePresentation.FormatDuration(duration) : "—";
+    private IReadOnlyList<TimeSpan> Durations(JobExecutionInstance record) => _jobs.FirstOrDefault(job => job.Definition.Id == new JobId(record.Template.OwnerKey,record.Template.JobKey))?.Records.Where(item => item.IsTerminal).Select(item => SchedulerTimePresentation.GetExecutionDuration(item, _acceptedAt)).OfType<TimeSpan>().Order().ToArray() ?? [];
+    private TimeSpan? Quantile(JobExecutionInstance record, double quantile) { var values = Durations(record); return _sample?.IsTruncated != false || values.Count < 3 ? null : values[Math.Clamp((int)Math.Ceiling(values.Count * quantile)-1,0,values.Count-1)]; }
+    private string Progress(JobExecutionInstance record, TimeSpan? value = null)
+    {
+        var elapsed = SchedulerTimePresentation.GetExecutionDuration(record,_acceptedAt)?.TotalMilliseconds ?? 0;
+        var max = Math.Max(elapsed,Quantile(record,.95)?.TotalMilliseconds ?? 0)*1.2;
+        return (max > 0 ? (value?.TotalMilliseconds ?? elapsed)/max*100 : 0).ToString("0.##",CultureInfo.InvariantCulture)+"%";
+    }
+    private bool IsOverrun(JobExecutionInstance record) => _jobs.FirstOrDefault(job => job.Definition.Id == new JobId(record.Template.OwnerKey,record.Template.JobKey))?.IsOverrun == true;
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        var inspectors = _inspectors?.DisposeAsync() ?? ValueTask.CompletedTask;
+        var operations = _lifetime.RetireAsync(_loadGate.Dispose);
+        var failures = new List<Exception>();
+        foreach (var retirement in new[] { inspectors, operations })
+        {
+            try { await retirement; } catch (Exception exception) { failures.Add(exception); }
+        }
+        if (failures.Count > 0) throw new AggregateException("Scheduler pulse retirement failed.", failures);
+    }
+}

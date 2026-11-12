@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Monica's canonical Agent Skills catalog and release contracts."""
+"""Validate Monica's canonical Agent Skills, local-state policy, and release contracts."""
 
 from __future__ import annotations
 
@@ -46,6 +46,7 @@ FRONTMATTER_PATTERN = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---\r?\n", re.DOT
 TOP_LEVEL_YAML_KEY_PATTERN = re.compile(r"^([A-Za-z0-9_-]+):(?:\s|$)")
 SHA256_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_SCAN_CHUNK_SIZE = 64 * 1024
+LOCAL_AGENT_ROOTS = (".agents", ".claude")
 TEXT_SOURCE_SUFFIXES = {
     ".bat",
     ".cmd",
@@ -109,6 +110,57 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload
+
+
+def validate_local_agent_state(validation: Validation, root: Path) -> None:
+    """Require ignored agent roots and an index free of local agent state.
+
+    Inspect the index so staged removals pass and force-added or merge-restored
+    files fail, even when their bytes match the canonical skills. Inspect Git's
+    effective ignore rules so machine-local exclusions cannot hide a regression
+    in the repository's .gitignore. This gate requires a working Git checkout.
+    """
+
+    try:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--cached", "-z", "--", *LOCAL_AGENT_ROOTS],
+            check=True,
+            capture_output=True,
+        )
+        ignored = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "--no-index", "--verbose", "--non-matching", "-z", "--stdin"],
+            input="".join(f"{name}/\0" for name in LOCAL_AGENT_ROOTS).encode("utf-8"),
+            capture_output=True,
+        )
+        if ignored.returncode not in (0, 1):
+            ignored.check_returncode()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        validation.errors.append(f"Cannot verify local agent state in a Git checkout: {exc}")
+        return
+
+    tracked_paths = [item.decode("utf-8", errors="replace") for item in tracked.stdout.split(b"\0") if item]
+    if tracked_paths:
+        preview = ", ".join(tracked_paths[:8])
+        validation.errors.append(
+            f"Local agent state must not be tracked ({len(tracked_paths)} file(s)): {preview}. "
+            "Keep knowledge in skills/; use git rm -r --cached --ignore-unmatch -- .agents .claude "
+            "to retain local files, then regenerate with scripts/sync_agent_skills.py --write."
+        )
+
+    fields = ignored.stdout.decode("utf-8", errors="replace").split("\0")
+    rules = {
+        fields[index + 3]: (fields[index], fields[index + 2])
+        for index in range(0, len(fields) - 3, 4)
+    }
+    for name in LOCAL_AGENT_ROOTS:
+        source, pattern = rules.get(f"{name}/", ("", ""))
+        # A child glob such as .agents/* also matches the trailing-slash probe,
+        # but still permits exceptions below the root. Require the directory rule.
+        validation.check(
+            source == ".gitignore" and pattern in (f"{name}/", f"/{name}/"),
+            f".gitignore must ignore the entire {name}/ directory; "
+            "restore its whole-root rule (local/global exclusions do not count).",
+        )
 
 
 def repository_source_files(root: Path) -> list[Path]:
@@ -521,7 +573,7 @@ def validate_catalog(validation: Validation, catalog: dict[str, Any]) -> None:
         frontmatter_name, _ = parse_frontmatter(skill_file, validation)
         validation.check(frontmatter_name == skill_name, f"{skill_file}: name must match directory")
         parse_openai_yaml(skill_path / "agents" / "openai.yaml", skill_name, validation)
-        if skill_name.startswith("monica-infra-"):
+        if skill_name.startswith("monica-infra-") or skill_name == "monica-troubleshooting":
             validation.errors.extend(validate_entrypoint_budget(skill_file))
             validation.errors.extend(validate_reference_navigation(skill_path, REPOSITORY_ROOT))
 
@@ -674,6 +726,21 @@ def validate_catalog(validation: Validation, catalog: dict[str, Any]) -> None:
             all(rule.get("text") for rule in template.get("rules", [])),
             f"instruction template {template_name}: rule texts must be non-empty",
         )
+        contexts = [rule["context"] for rule in template.get("rules", []) if "context" in rule]
+        validation.check(
+            set(contexts) <= {"source-bindings", "issue-policy"} and len(contexts) == len(set(contexts)),
+            f"instruction template {template_name}: contexts must be supported and uniquely owned",
+        )
+        for rule in template.get("rules", []):
+            labels = rule.get("labels", {})
+            validation.check(
+                set(labels) == {"zh-CN", "en-US"} and all(
+                    label.get("title") and len(label["title"]) <= 80
+                    and label.get("description") and len(label["description"]) <= 180
+                    for label in labels.values()
+                ),
+                f"instruction template {template_name}: rule {rule['id']} requires concise zh-CN/en-US labels",
+            )
 
     bootstrap_path = catalog.get("prompts", {}).get("bootstrapAsset")
     bootstrap_schema_path = catalog.get("prompts", {}).get("bootstrapSchema")
@@ -761,6 +828,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     validation = Validation()
+    validate_local_agent_state(validation, REPOSITORY_ROOT)
     try:
         catalog = load_json(CATALOG_PATH)
         index = load_json(INDEX_PATH)

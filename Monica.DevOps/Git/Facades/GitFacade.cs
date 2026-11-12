@@ -21,75 +21,79 @@ public sealed class GitFacade(
     /// <summary>
     /// Gets all repository snapshots.
     /// </summary>
-    public async Task<Res<IReadOnlyList<GitRepositoryStatus>>> GetRepositoriesAsync()
+    public async Task<Result<IReadOnlyList<GitRepositoryStatus>>> GetRepositoriesAsync()
     {
         try
         {
-            return Res.Ok(await repositoryService.GetRepositoriesAsync());
+            return Result.Success(await repositoryService.GetRepositoriesAsync());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load Git repositories");
-            return Res.Fail($"Failed to load Git repositories: {ex.Message}");
+            return Result.Failure<IReadOnlyList<GitRepositoryStatus>>($"Failed to load Git repositories: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Gets a single repository snapshot.
     /// </summary>
-    public async Task<Res<GitRepositoryStatus>> GetRepositoryAsync(string repositoryId)
+    public async Task<Result<GitRepositoryStatus>> GetRepositoryAsync(string repositoryId)
     {
         try
         {
-            return Res.Ok(await repositoryService.GetRepositoryAsync(repositoryId));
+            return Result.Success(await repositoryService.GetRepositoryAsync(repositoryId));
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load Git repository {RepositoryId}", repositoryId);
-            return Res.Fail($"Failed to load Git repository: {ex.Message}");
+            return Result.Failure<GitRepositoryStatus>($"Failed to load Git repository: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Gets safe credential metadata.
     /// </summary>
-    public async Task<Res<IReadOnlyList<GitCredentialInfo>>> GetCredentialsAsync()
+    public async Task<Result<IReadOnlyList<GitCredentialInfo>>> GetCredentialsAsync()
     {
         try
         {
-            return Res.Ok(await repositoryService.GetCredentialsAsync());
+            return Result.Success(await repositoryService.GetCredentialsAsync());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load Git credentials");
-            return Res.Fail($"Failed to load Git credentials: {ex.Message}");
+            return Result.Failure<IReadOnlyList<GitCredentialInfo>>($"Failed to load Git credentials: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Gets registered credential resolver metadata.
     /// </summary>
-    public async Task<Res<IReadOnlyList<GitCredentialResolverInfo>>> GetCredentialResolversAsync()
+    public async Task<Result<IReadOnlyList<GitCredentialResolverInfo>>> GetCredentialResolversAsync()
     {
         try
         {
-            return Res.Ok(await repositoryService.GetCredentialResolversAsync());
+            return Result.Success(await repositoryService.GetCredentialResolversAsync());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load Git credential resolvers");
-            return Res.Fail($"Failed to load Git credential resolvers: {ex.Message}");
+            return Result.Failure<IReadOnlyList<GitCredentialResolverInfo>>($"Failed to load Git credential resolvers: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Synchronizes a repository.
     /// </summary>
-    public async Task<Res<GitSyncResult>> SyncRepositoryAsync(string repositoryId)
+    public async Task<Result<GitSyncResult>> SyncRepositoryAsync(string repositoryId)
     {
         if (!_option.IsSyncTriggerEnabled(GitSyncTrigger.Manual))
         {
-            return Res.Fail(ManualSyncDisabledMessage);
+            return Result.Failure<GitSyncResult>(ManualSyncDisabledMessage);
         }
 
         return await RunMutationAsync(
@@ -101,7 +105,7 @@ public sealed class GitFacade(
     /// <summary>
     /// Deletes a local repository working copy.
     /// </summary>
-    public async Task<Res<GitRepositoryDeleteResult>> DeleteRepositoryAsync(string repositoryId)
+    public async Task<Result<GitRepositoryDeleteResult>> DeleteRepositoryAsync(string repositoryId)
     {
         return await RunMutationAsync(
             () => repositoryService.DeleteRepositoryAsync(repositoryId),
@@ -112,11 +116,11 @@ public sealed class GitFacade(
     /// <summary>
     /// Synchronizes all repositories.
     /// </summary>
-    public async Task<Res<IReadOnlyList<GitSyncResult>>> SyncAllAsync()
+    public async Task<Result<IReadOnlyList<GitSyncResult>>> SyncAllAsync()
     {
         if (!_option.IsSyncTriggerEnabled(GitSyncTrigger.Manual))
         {
-            return Res.Fail(ManualSyncDisabledMessage);
+            return Result.Failure<IReadOnlyList<GitSyncResult>>(ManualSyncDisabledMessage);
         }
 
         return await RunMutationAsync(
@@ -125,19 +129,20 @@ public sealed class GitFacade(
             "Failed to synchronize all Git repositories");
     }
 
-    private async Task<Res<TResult>> RunMutationAsync<TResult>(
+    private async Task<Result<TResult>> RunMutationAsync<TResult>(
         Func<Task<TResult>> operation,
         Action<Exception> logError,
         string failureMessage)
     {
         try
         {
-            return Res.Ok(await operation());
+            return Result.Success(await operation());
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logError(ex);
-            return Res.Fail($"{failureMessage}: {ex.Message}");
+            return Result.Failure<TResult>($"{failureMessage}: {ex.Message}");
         }
     }
 }

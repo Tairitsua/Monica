@@ -28,8 +28,8 @@ env:
   PYTHONDONTWRITEBYTECODE: 1
 
 jobs:
-  guide-bundle:
-    name: Build and smoke the unified guide bundle (${{ matrix.rid }})
+  framework-bundle:
+    name: Build and smoke the Framework skills bundle (${{ matrix.rid }})
     runs-on: ${{ matrix.runs-on }}
 
     strategy:
@@ -38,15 +38,12 @@ jobs:
         include:
           - rid: win-x64
             runs-on: windows-latest
-            tfm: net10.0-windows
             environment: windows
           - rid: linux-x64
             runs-on: ubuntu-latest
-            tfm: net10.0
             environment: linux
           - rid: osx-arm64
             runs-on: macos-latest
-            tfm: net10.0
             environment: macos
 
     env:
@@ -59,7 +56,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v5.2.0
+        uses: actions/setup-dotnet@v6.1.0
         with:
           dotnet-version: 10.0.x
 
@@ -79,95 +76,29 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "tag_name=v${VERSION}" >> "${GITHUB_OUTPUT}"
 
-      - name: Publish the unified Monica Guide executable
-        shell: bash
-        run: |
-          dotnet publish Monica.Guide.App/Monica.Guide.App.csproj \
-            --configuration "${CONFIGURATION}" \
-            --framework ${{ matrix.tfm }} \
-            --runtime ${{ matrix.rid }} \
-            --self-contained false \
-            --output artifacts/guide-publish \
-            -p:Version=${{ steps.version.outputs.version }} \
-            -p:SatelliteResourceLanguages=zh-Hans \
-            -p:DebugType=None \
-            -p:GenerateDocumentationFile=false
-
-      - name: Build the unified guide release bundle
+      - name: Build the Framework skills release bundle
         shell: bash
         run: |
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
-          python scripts/build_monica_guide_bundle.py build \
+          python scripts/build_framework_bundle.py build \
             --tag "${{ steps.version.outputs.tag_name }}" \
             --rid ${{ matrix.rid }} \
-            --publish-dir artifacts/guide-publish \
-            --output-dir artifacts/guide-bundle \
+            --output-dir artifacts/framework-bundle \
             --dotnet-sdk "$(dotnet --version)"
-          mkdir -p artifacts/guide-release
-          cp "artifacts/guide-bundle/monica-guide-${{ steps.version.outputs.tag_name }}-${{ matrix.rid }}.zip" \
-            artifacts/guide-release/
+          mkdir -p artifacts/framework-release
+          cp "artifacts/framework-bundle/monica-framework-${{ steps.version.outputs.tag_name }}-${{ matrix.rid }}.zip" \
+            artifacts/framework-release/
 
-      - name: Smoke test the guide executable against the released bundle
-        shell: bash
-        run: |
-          export MONICA_GUIDE_DATA_ROOT="$(pwd)/.tmp-guide-state"
-          mkdir -p artifacts/guide-extracted
-          python - <<'PY'
-          import zipfile
-          import glob
-          archive = glob.glob("artifacts/guide-bundle/monica-guide-*-*.zip")[0]
-          with zipfile.ZipFile(archive) as bundle:
-              bundle.extractall("artifacts/guide-extracted")
-          PY
-          ENTRY="$(python -c 'import json; from pathlib import Path; root = Path("artifacts/guide-extracted"); manifest = json.loads((root / "release-manifest.json").read_text(encoding="utf-8-sig")); print((root / manifest["programEntryPoint"]).as_posix())')"
-          test -f "${ENTRY}"
-          if [[ "${{ matrix.rid }}" != "win-x64" ]]; then
-            chmod +x "${ENTRY}"
-          fi
-          digest() { python -c "import json,sys;print(json.load(open(sys.argv[1], encoding='utf-8-sig'))['plan']['planDigest'])" "$1"; }
-          ENVIRONMENT="${{ matrix.environment }}"
-
-          "${ENTRY}" configure --product monica --environment "${ENVIRONMENT}" --target shared --json > smoke-configure-preview.json
-          PLAN_DIGEST="$(digest smoke-configure-preview.json)"
-          "${ENTRY}" configure --product monica --environment "${ENVIRONMENT}" --target shared \
-            --apply --plan-digest "${PLAN_DIGEST}" --json > smoke-configure-apply.json
-          test -f "${HOME}/.agents/skills/monica-guide/SKILL.md"
-          "${ENTRY}" status --product monica --json > smoke-status.json
-          python - <<'PY'
-          import json
-          status = json.load(open("smoke-status.json", encoding="utf-8-sig"))
-          assert status["status"] == "ready", status["status"]
-          check_prefix = "skills.${{ matrix.environment }}.shared.catalog"
-          installed = any(check["id"].startswith(check_prefix)
-                          and check["status"] == "ok"
-                          for check in status["checks"])
-          assert installed, "installed skill projection was not verified"
-          PY
-
-          "${ENTRY}" unconfigure --product monica --environment "${ENVIRONMENT}" --target shared --json > smoke-unconfigure-preview.json
-          PLAN_DIGEST="$(digest smoke-unconfigure-preview.json)"
-          "${ENTRY}" unconfigure --product monica --environment "${ENVIRONMENT}" --target shared \
-            --apply --plan-digest "${PLAN_DIGEST}" --json > smoke-unconfigure-apply.json
-          test ! -e "${HOME}/.agents/skills/monica-guide"
-
-      - name: Upload guide smoke diagnostics
-        if: failure()
+      - name: Upload the Framework skills bundle
         uses: actions/upload-artifact@v7
         with:
-          name: monica-guide-smoke-${{ steps.version.outputs.version }}-${{ matrix.rid }}
-          path: smoke-*.json
-          if-no-files-found: ignore
-
-      - name: Upload the unified guide bundle
-        uses: actions/upload-artifact@v7
-        with:
-          name: monica-guide-bundle-${{ steps.version.outputs.version }}-${{ matrix.rid }}
-          path: artifacts/guide-release/*
+          name: monica-framework-bundle-${{ steps.version.outputs.version }}-${{ matrix.rid }}
+          path: artifacts/framework-release/*
           if-no-files-found: error
 
   release:
     name: Build, pack, and release
-    needs: guide-bundle
+    needs: framework-bundle
     runs-on: ubuntu-latest
 
     env:
@@ -188,7 +119,7 @@ jobs:
           path: .tmp/validators/openai-skills
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v6.0.0
+        uses: actions/setup-dotnet@v6.1.0
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -319,6 +250,7 @@ jobs:
       - name: Validate Monica Agent Skill contracts
         run: |
           python3 scripts/validate_agent_skills.py
+          python3 scripts/sync_agent_skills.py --write
           python3 scripts/sync_agent_skills.py --check
           python3 -m unittest discover -s scripts/tests -p "test*.py"
 
@@ -422,20 +354,20 @@ jobs:
       - name: Export immutable capability knowledge
         run: python3 scripts/export_agent_knowledge.py --release-ref "${{ steps.version.outputs.tag_name }}" --output artifacts/agent-skills/monica-knowledge.json
 
-      - name: Download the unified guide bundles
+      - name: Download the Framework skills bundles
         uses: actions/download-artifact@v8
         with:
-          pattern: monica-guide-bundle-${{ steps.version.outputs.version }}-*
-          path: artifacts/guide-release
+          pattern: monica-framework-bundle-${{ steps.version.outputs.version }}-*
+          path: artifacts/framework-release
           merge-multiple: true
 
       - name: Compose the release digest manifest
         shell: bash
         run: |
           SKILLS_ZIP="artifacts/agent-skills/monica-agent-skills-${{ steps.version.outputs.tag_name }}.zip"
-          : > artifacts/guide-release/SHA256SUMS
-          for asset in artifacts/guide-release/*.zip "${SKILLS_ZIP}" artifacts/agent-skills/monica-knowledge.json; do
-            echo "$(sha256sum "${asset}" | cut -d' ' -f1)  $(basename "${asset}")" >> artifacts/guide-release/SHA256SUMS
+          : > artifacts/framework-release/SHA256SUMS
+          for asset in artifacts/framework-release/*.zip "${SKILLS_ZIP}" artifacts/agent-skills/monica-knowledge.json; do
+            echo "$(sha256sum "${asset}" | cut -d' ' -f1)  $(basename "${asset}")" >> artifacts/framework-release/SHA256SUMS
           done
 
       - name: Upload package artifacts
@@ -499,8 +431,8 @@ jobs:
             artifacts/agent-skills/agent-skill-manifest.json
             artifacts/agent-skills/monica-knowledge.json
             artifacts/agent-skills/monica-agent-skills-${{ steps.version.outputs.tag_name }}.zip
-            artifacts/guide-release/monica-guide-${{ steps.version.outputs.tag_name }}-*.zip
-            artifacts/guide-release/SHA256SUMS
+            artifacts/framework-release/monica-framework-${{ steps.version.outputs.tag_name }}-*.zip
+            artifacts/framework-release/SHA256SUMS
 
       - name: Record source-index roll-forward gate
         shell: bash

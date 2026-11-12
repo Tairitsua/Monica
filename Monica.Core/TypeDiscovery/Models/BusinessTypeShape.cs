@@ -22,6 +22,7 @@ public sealed class BusinessTypeShape
     private IReadOnlyList<Type>? _interfaces;
     private Dictionary<(Type AttributeType, bool Inherit), IReadOnlyList<Attribute>>? _materializedAttributes;
     private IReadOnlyDictionary<Type, IReadOnlyList<OpenGenericInterfaceMatch>>? _openGenericInterfaces;
+    private Dictionary<Type, BusinessTypeShape>? _constructedGenericShapes;
 
     internal BusinessTypeShape(Type type)
     {
@@ -64,6 +65,38 @@ public sealed class BusinessTypeShape
     /// Gets whether the represented type has no unbound generic parameters.
     /// </summary>
     public bool IsClosedType => !Type.ContainsGenericParameters;
+
+    /// <summary>
+    /// Gets a cached structural shape for a closed construction of this generic type definition.
+    /// </summary>
+    /// <param name="typeArguments">The concrete arguments satisfying the generic definition's constraints.</param>
+    /// <returns>The shape owned by this definition for the constructed type.</returns>
+    /// <exception cref="InvalidOperationException">This shape does not represent a generic type definition.</exception>
+    /// <exception cref="ArgumentException">The arguments are invalid or leave unbound generic parameters.</exception>
+    /// <remarks>
+    /// Consumers may use this when a discovered contract definition is closed by another discovered type, such as
+    /// an event handler. This does not add the constructed type to other modules' discovery matches.
+    /// </remarks>
+    public BusinessTypeShape MakeGenericType(params Type[] typeArguments)
+    {
+        var constructedType = Type.MakeGenericType(typeArguments);
+        if (constructedType.ContainsGenericParameters)
+        {
+            throw new ArgumentException("A constructed business-type shape must be closed.", nameof(typeArguments));
+        }
+
+        lock (_factGate)
+        {
+            _constructedGenericShapes ??= [];
+            if (!_constructedGenericShapes.TryGetValue(constructedType, out var shape))
+            {
+                shape = new BusinessTypeShape(constructedType);
+                _constructedGenericShapes.Add(constructedType, shape);
+            }
+
+            return shape;
+        }
+    }
 
     /// <summary>
     /// Gets every interface implemented by the represented type, including inherited interfaces.

@@ -18,6 +18,11 @@ internal sealed class JobSchedulerHealthCheck(JobSchedulerRuntimeState runtimeSt
                 "JobScheduler scheduling and execution responsibilities are ready."));
         }
 
+        if (runtimeState.SchedulingReady && runtimeState.WorkerAdmissionPaused)
+        {
+            return Task.FromResult(HealthCheckResult.Degraded(runtimeState.WorkerMessage));
+        }
+
         var reasons = new[]
             {
                 runtimeState.SchedulingReady ? null : runtimeState.SchedulingMessage ?? "Scheduling has not initialized.",

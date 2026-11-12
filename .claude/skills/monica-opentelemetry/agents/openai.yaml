@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica OpenTelemetry"
-  short_description: "Monica metrics and OpenTelemetry patterns"
-  default_prompt: "Use $monica-opentelemetry to add OpenTelemetry-compatible metrics to a Monica module."

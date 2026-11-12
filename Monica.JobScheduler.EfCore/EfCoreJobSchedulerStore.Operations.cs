@@ -52,7 +52,14 @@ public sealed partial class EfCoreJobSchedulerStore
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .ToListAsync(token);
-            var definitions = entities.Select(ToDefinition).ToArray();
+            var ownerKeys = entities.Select(row => row.OwnerKey).Distinct().ToArray();
+            var observations = await dbContext.SchedulerOwners.AsNoTracking()
+                .Where(row => row.SchedulerScopeKey == schedulerScopeKey && ownerKeys.Contains(row.OwnerKey))
+                .ToDictionaryAsync(row => row.OwnerKey, row => row.LastObservedAtUtcTicks, token);
+            var definitions = entities.Select(row => ToDefinition(row) with
+            {
+                LastObservedAtUtc = FromTicks(observations.GetValueOrDefault(row.OwnerKey, row.LastObservedAtUtcTicks))
+            }).ToArray();
             if (definitions.Length == 0)
             {
                 return new QueryResult<JobOperationalSummary>([], totalCount);

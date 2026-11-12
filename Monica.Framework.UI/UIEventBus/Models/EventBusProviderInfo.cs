@@ -30,7 +30,8 @@ public class EventBusProviderInfo
     public bool IsDistributed { get; init; }
 
     /// <summary>
-    /// Implementation type name
+    /// Declared provider module type name, or unknown when registration metadata is ambiguous.
+    /// Reading this value never constructs the provider or establishes connection health.
     /// </summary>
     public string ImplementationType { get; init; } = "";
 

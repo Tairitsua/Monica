@@ -16,4 +16,7 @@ public static class EventBusExecutionPoints
     /// Represents one distributed event-handler delivery attempt.
     /// </summary>
     public static readonly ExecutionPoint DistributedHandler = new("eventbus.distributed-handler");
+
+    /// <summary>Represents one atomic distributed batch-handler delivery attempt.</summary>
+    public static readonly ExecutionPoint DistributedBatchHandler = new("eventbus.distributed-batch-handler");
 }

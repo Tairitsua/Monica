@@ -1,4 +1,0 @@
-interface:
-  display_name: "Microsoft Code Reference"
-  short_description: "Verify Microsoft API and SDK code samples"
-  default_prompt: "Use $microsoft-code-reference to verify Microsoft API signatures, SDK usage, and code samples from official documentation."

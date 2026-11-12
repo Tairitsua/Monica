@@ -54,6 +54,7 @@ public sealed record EventHandlerRegistration
         if (handlerType.ContainsGenericParameters) return [];
         var results = new List<EventHandlerRegistration>();
         var distributedEvents = new HashSet<Type>();
+        var batchEvents = new HashSet<Type>();
         var localEvents = new HashSet<Type>();
 
         foreach (var @interface in handlerType.GetInterfaces().Where(p => p.IsGenericType))
@@ -68,7 +69,15 @@ public sealed record EventHandlerRegistration
             {
                 localEvents.Add(eventType);
             }
+            else if (@interface.GetGenericTypeDefinition() == typeof(IDistributedBatchEventHandler<>))
+            {
+                batchEvents.Add(eventType);
+            }
         }
+
+        if (batchEvents.Overlaps(distributedEvents) || batchEvents.Overlaps(localEvents))
+            throw new InvalidOperationException($"Handler '{handlerType.FullName}' must choose one delivery contract per event: local, distributed single or distributed batch.");
+        distributedEvents.UnionWith(batchEvents);
 
         // Validate no overlap
         var overlap = distributedEvents.Intersect(localEvents).ToList();

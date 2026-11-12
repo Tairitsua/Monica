@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Core.Modularity.Extensions;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
@@ -16,6 +17,36 @@ namespace Test.Monica.EventBus.Services;
 
 public sealed class EventBusAutoDiscoveryLifecycleTests
 {
+    [Fact]
+    public async Task InactiveExternalRole_PreservesSameTypesLocalSubscription()
+    {
+        var state = new DiscoveryActivationState();
+        var builder = CreateBuilder();
+        builder.Services.AddSingleton(state);
+        builder.Services.AddSingleton<ITypeActivationPolicy, InactiveExternalRole>();
+        builder.Services.AddScoped<DualScopeRoleHandler>();
+        using var host = builder.Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        var subscriptions = host.Services.GetRequiredService<IEventSubscriptionRegistry>().GetAll()
+            .Where(subscription => subscription.HandlerType == typeof(DualScopeRoleHandler)).ToArray();
+        Assert.Equal(2, subscriptions.Length);
+        Assert.Equal(EventSubscriptionState.Active, subscriptions.Single(item => item.Scope == EventSubscriptionScope.Local).State);
+        Assert.Equal(EventSubscriptionState.Disabled, subscriptions.Single(item => item.Scope == EventSubscriptionScope.Distributed).State);
+        Assert.Equal(0, state.Constructions);
+        await PublishAsync(host, new RoleScopedEvent());
+        Assert.Equal(1, state.Deliveries);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    private sealed class InactiveExternalRole : ITypeActivationPolicy
+    {
+        public ActivationMode GetActivation(Type implementationType, TypeActivationKind kind, Type? registrationOwner = null)
+            => kind == TypeActivationKind.ExternalSubscription ? ActivationMode.Disabled : ActivationMode.Automatic;
+        public void EnsureCanExecuteRequest(Type requestType) { }
+        public string? GetWorkloadOwner(Type implementationType, Type? registrationOwner = null) => null;
+    }
+
     [Theory]
     [InlineData(true, true)]
     [InlineData(false, false)]
@@ -324,6 +355,25 @@ public sealed class EventBusAutoDiscoveryLifecycleTests
 }
 
 public sealed record LifecycleEvent;
+
+public sealed record RoleScopedEvent;
+public sealed record RoleExternalEvent;
+public sealed class DualScopeRoleHandler : ILocalEventHandler<RoleScopedEvent>, IDistributedEventHandler<RoleExternalEvent>
+{
+    private readonly DiscoveryActivationState _state;
+    public DualScopeRoleHandler(DiscoveryActivationState state)
+    {
+        _state = state;
+        state.Constructions++;
+    }
+    public Task HandleEventAsync(RoleScopedEvent eventData, CancellationToken cancellationToken)
+    {
+        _state.Deliveries++;
+        return Task.CompletedTask;
+    }
+    public Task HandleEventAsync(RoleExternalEvent eventData, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException("The inactive external role must not receive this event.");
+}
 
 public sealed record SecondaryLifecycleEvent;
 

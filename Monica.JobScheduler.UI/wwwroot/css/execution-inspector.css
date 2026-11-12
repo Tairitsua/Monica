@@ -1,0 +1,6 @@
+/* Native schedule-dialog portals sit outside component isolation. */
+.scheduler-schedule-backdrop { backdrop-filter: blur(2px); }
+.mud-overlay.scheduler-schedule-backdrop .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 55%, transparent); }
+.mud-dialog.scheduler-schedule-dialog { max-height: calc(100dvh - 32px); border: 0 !important; }
+.scheduler-schedule-dialog .mud-dialog-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.scheduler-schedule-dialog .mud-button-close .mud-icon-root { width: 16px; height: 16px; }

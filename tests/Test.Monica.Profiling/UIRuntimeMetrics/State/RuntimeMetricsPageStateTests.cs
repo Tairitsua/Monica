@@ -159,7 +159,7 @@ public sealed class RuntimeMetricsPageStateTests
         state.LoadError.Should().BeNull();
         // This read is test evidence: the page itself must not fall back to GetLatestPoint.
         var actual = facade.GetLatestPoint();
-        actual.Status.Should().Be(ResStatus.Ok);
+        actual.Status.Should().Be(ResultStatus.Ok);
         actual.Message.Should().BeNull();
         actual.Data.Should().NotBeNull();
     }
@@ -278,7 +278,7 @@ public sealed class RuntimeMetricsPageStateTests
         await using var state = CreateDecorated(scope, clock, control);
         AssertSuccess(await state.InitializeAsync());
         control.FailReads("Retained page read error.");
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.ServiceUnavailable);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.ServiceUnavailable);
         var error = state.LoadError;
         var capturedAt = state.SnapshotCapturedAt;
         control.ClearFailure();
@@ -289,7 +289,7 @@ public sealed class RuntimeMetricsPageStateTests
             await AwaitBounded(gate.Entered);
             state.IsLoading.Should().BeTrue();
             var busy = await state.RefreshAsync();
-            busy.Status.Should().Be(ResStatus.Conflict);
+            busy.Status.Should().Be(ResultStatus.Conflict);
             busy.Message.Should().BeEmpty();
             state.LoadError.Should().Be(error);
             state.SnapshotCapturedAt.Should().Be(capturedAt);
@@ -380,7 +380,7 @@ public sealed class RuntimeMetricsPageStateTests
         var notifications = 0;
         state.StateChanged += () => Interlocked.Increment(ref notifications);
         using var gate = control.HoldNextRead();
-        Task<Res>? read = periodicRead ? null : Task.Run(state.RefreshAsync, TestContext.Current.CancellationToken);
+        Task<Result>? read = periodicRead ? null : Task.Run(state.RefreshAsync, TestContext.Current.CancellationToken);
         Task<int>? tick = periodicRead ? Task.Run(clock.Tick, TestContext.Current.CancellationToken) : null;
         var notifiedBeforeRetirement = 0;
         try
@@ -392,7 +392,7 @@ public sealed class RuntimeMetricsPageStateTests
             firstDispose.IsCompleted.Should().BeFalse();
             secondDispose.Should().BeSameAs(firstDispose);
             var lateRead = await state.RefreshAsync();
-            lateRead.Status.Should().Be(ResStatus.Conflict);
+            lateRead.Status.Should().Be(ResultStatus.Conflict);
             lateRead.Message.Should().BeEmpty();
             var lateInitialize = state.InitializeAsync();
             var lateEnable = state.SetAutoRefreshAsync(true);
@@ -403,7 +403,7 @@ public sealed class RuntimeMetricsPageStateTests
             await AwaitBounded(firstDispose);
             await AwaitBounded(lateEnable);
             var initialized = await lateInitialize.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            initialized.Status.Should().Be(ResStatus.Conflict);
+            initialized.Status.Should().Be(ResultStatus.Conflict);
             initialized.Message.Should().BeEmpty();
         }
         finally
@@ -423,7 +423,7 @@ public sealed class RuntimeMetricsPageStateTests
         clock.ActiveTimers.Should().Be(0);
         clock.Tick().Should().Be(0);
         control.Reads.Should().Be(2);
-        if (read is not null) (await read).Status.Should().Be(ResStatus.Conflict);
+        if (read is not null) (await read).Status.Should().Be(ResultStatus.Conflict);
         if (tick is not null) (await tick).Should().Be(1);
         await NextRealPoint(facade, current);
         var actual = facade.GetTrend();
@@ -444,7 +444,7 @@ public sealed class RuntimeMetricsPageStateTests
 
         var result = await state.RefreshAsync();
 
-        result.Status.Should().Be(ResStatus.Conflict);
+        result.Status.Should().Be(ResultStatus.Conflict);
         result.Message.Should().BeEmpty();
         disposal.Should().NotBeNull();
         await AwaitBounded(disposal!);
@@ -538,15 +538,15 @@ public sealed class RuntimeMetricsPageStateTests
         finally { unsubscribe(); }
     }
 
-    private static void AssertSuccess(Res result)
+    private static void AssertSuccess(Result result)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeEmpty();
     }
 
-    private static void AssertGenuineSuccess(Res<RuntimeMetricsTrend> result)
+    private static void AssertGenuineSuccess(Result<RuntimeMetricsTrend> result)
     {
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Message.Should().BeNull();
         result.Data.Should().NotBeNull();
     }

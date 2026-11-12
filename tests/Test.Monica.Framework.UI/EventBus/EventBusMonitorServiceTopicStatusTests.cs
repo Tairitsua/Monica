@@ -37,7 +37,8 @@ public sealed class EventBusMonitorServiceTopicStatusTests
 
         var result = await monitor.GetAllSubscriptionsAsync();
 
-        result.IsFailed(out _, out var subscriptions).Should().BeFalse();
+        var subscriptions = result.Data;
+        result.IsFailure().Should().BeFalse();
         var vm = subscriptions!.Single(v => v.TopicName == "orders.shipped");
         vm.TopicRuntimeState.Should().Be(TopicSubscriptionRuntimeState.Recovering);
         vm.IsRuntimeStateDisplayed.Should().BeTrue();
@@ -68,7 +69,8 @@ public sealed class EventBusMonitorServiceTopicStatusTests
 
         var result = await monitor.GetAllSubscriptionsAsync();
 
-        result.IsFailed(out _, out var subscriptions).Should().BeFalse();
+        var subscriptions = result.Data;
+        result.IsFailure().Should().BeFalse();
         var vm = subscriptions!.Single(v => v.TopicName == "orders.shipped");
         vm.TopicRuntimeState.Should().Be(TopicSubscriptionRuntimeState.Healthy);
         vm.IsRuntimeStateDisplayed.Should().BeFalse();
@@ -93,7 +95,8 @@ public sealed class EventBusMonitorServiceTopicStatusTests
 
         var result = await monitor.GetAllSubscriptionsAsync();
 
-        result.IsFailed(out _, out var subscriptions).Should().BeFalse();
+        var subscriptions = result.Data;
+        result.IsFailure().Should().BeFalse();
         var vm = subscriptions!.Single(v => v.TopicName == "orders.shipped");
         vm.TopicStatus.Should().BeNull();
         vm.TopicRuntimeState.Should().BeNull();
@@ -122,7 +125,8 @@ public sealed class EventBusMonitorServiceTopicStatusTests
 
         var result = await monitor.GetStatisticsAsync();
 
-        result.IsFailed(out _, out var statistics).Should().BeFalse();
+        var statistics = result.Data;
+        result.IsFailure().Should().BeFalse();
         statistics!.ActiveSubscriptions.Should().Be(1);
         statistics.UnhealthySubscriptions.Should().Be(1);
         statistics.UnhealthyTopics.Should().Be(1);
@@ -140,7 +144,8 @@ public sealed class EventBusMonitorServiceTopicStatusTests
 
         var result = monitor.GetAllTopicStatuses();
 
-        result.IsFailed(out _, out var statuses).Should().BeFalse();
+        var statuses = result.Data;
+        result.IsFailure().Should().BeFalse();
         statuses.Should().ContainSingle()
             .Which.TopicName.Should().Be("orders");
     }

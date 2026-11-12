@@ -85,14 +85,14 @@ public class CommandHandlerTriggerRPLGen
         await _cancellationManager.CancelTokenAsync(RPL_GEN_TOKEN_KEY);
     }
     
-    public async Task<Res<ResponseTriggerRPLGen>> Handle(CommandTriggerRPLGen request, CancellationToken cancellationToken)
+    public async Task<Result<ResponseTriggerRPLGen>> Handle(CommandTriggerRPLGen request, CancellationToken cancellationToken)
     {
         if (!(await CanStartTriggerAsync()))
         {
             if (request.ForceCancel is true)
             {
                 await EndTriggerAsync();
-                return Res.Ok("已取消生成");
+                return Result.Success("已取消生成");
             }
             
             // 返回当前状态...
@@ -108,7 +108,7 @@ public class CommandHandlerTriggerRPLGen
             // 将分布式取消令牌传递给后台任务
             await _backgroundJobManager.EnqueueAsync(new JobRPLGenArgs { CancellationToken = distributedToken });
             
-            return new Res<ResponseTriggerRPLGen>(new ResponseTriggerRPLGen()
+            return new Result<ResponseTriggerRPLGen>(new ResponseTriggerRPLGen()
             {
                 CanGetStatus = true
             })

@@ -223,7 +223,8 @@ public sealed class SwaggerUiCompositionTests
             builder.AddLocalization(static options => options.DefaultCulture = "zh-CN");
             if (includeShell)
             {
-                builder.AddUIShell(static options =>
+                builder.AddUIShell();
+                builder.AddUI(static options =>
                 {
                     options.DefaultTheme = MonicaThemeKind.Grove;
                     options.DefaultDarkMode = true;

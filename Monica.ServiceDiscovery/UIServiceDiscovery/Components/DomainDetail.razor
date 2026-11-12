@@ -12,6 +12,10 @@
     @if (_domainDetail != null)
     {
         <MudStack Spacing="4">
+            @if (!_domainDetail.HasDependencyEvidence)
+            {
+                <MudAlert Severity="Severity.Info">@L["Atlas:Domains:Unavailable"]</MudAlert>
+            }
             <MudPaper Class="pa-4 domain-detail__section">
                 <div class="domain-detail__header-row">
                     <div class="domain-detail__header-main">
@@ -27,7 +31,7 @@
                                 <MoIcon Icon="@MoIcons.Building" Size="1.5rem" />
                             </MudAvatar>
                             <div class="domain-detail__copy">
-                                <MudText Typo="Typo.h5" Class="domain-detail__title">@(_domainDetail.Domain.DisplayName ?? _domainDetail.Domain.Name)</MudText>
+                                <MudText Typo="Typo.h5" Class="domain-detail__title">@(_domainDetail.Domain.DisplayName ?? _domainDetail.Domain.Id)</MudText>
                                 @if (!string.IsNullOrEmpty(_domainDetail.Domain.Description))
                                 {
                                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="domain-detail__description">@_domainDetail.Domain.Description</MudText>
@@ -55,7 +59,7 @@
                             <MudStack Spacing="2">
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="domain-detail__field-row">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@L["DomainDetail:Fields:Name"]</MudText>
-                                    <MudText Typo="Typo.body2">@_domainDetail.Domain.Name</MudText>
+                                    <MudText Typo="Typo.body2">@_domainDetail.Domain.Id</MudText>
                                 </MudStack>
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="domain-detail__field-row">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@L["DomainDetail:Fields:DisplayName"]</MudText>
@@ -67,7 +71,7 @@
                                 </MudStack>
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="domain-detail__field-row">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@L["DomainDetail:Fields:DependentServices"]</MudText>
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Text="@L["DomainDetail:Counts:Services", GetDependentServicesCount()]" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Text="@(_domainDetail.HasDependencyEvidence ? L["DomainDetail:Counts:Services", GetDependentServicesCount()].Value : L["Shared:Values:NotAvailable"].Value)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
                                 </MudStack>
                                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="domain-detail__field-row">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@L["DomainDetail:Fields:RunningServices"]</MudText>
@@ -123,7 +127,7 @@
                                             @if (!dependentServices.Any())
                                             {
                                                 <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
-                                                    @L["DomainDetail:States:NoDependentServices"]
+                                                    @L[_domainDetail.HasDependencyEvidence ? "DomainDetail:States:NoDependentServices" : "Atlas:Domains:Unavailable"]
                                                 </MudText>
                                             }
                                             else
@@ -186,13 +190,16 @@
         try
         {
             var domainsResult = await ServiceDiscoveryFacade.GetDomainsAsync();
-            if (!domainsResult.IsFailed(out _, out var domains))
+            var domains = domainsResult.Data;
+            if (!domainsResult.IsFailure())
             {
                 DomainColorResolver.AssignColors(domains ?? []);
             }
 
             var result = await ServiceDiscoveryFacade.GetDomainDetailAsync(DomainName);
-            if (result.IsFailed(out var error, out var domainDetail))
+            var error = result.WithoutData();
+            var domainDetail = result.Data;
+            if (result.IsFailure())
             {
                 Snackbar.Add(L["DomainDetail:Messages:LoadFailed", error.Message ?? L["Shared:Values:Unknown"].Value].Value, Severity.Error);
                 _domainDetail = null;
@@ -221,19 +228,19 @@
     }
 
     private string GetDomainAvatarClass()
-        => $"domain-avatar domain-avatar--{DomainColorResolver.GetDomainColorRole(_domainDetail?.Domain.Name)}";
+        => $"domain-avatar domain-avatar--{DomainColorResolver.GetDomainColorRole(_domainDetail?.Domain.Id)}";
 
     private int GetOwnedServicesCount()
     {
         return _domainDetail?.RelatedServices.Count(s =>
-            string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase)) ?? 0;
+            s.BelongsToDomain(DomainName)) ?? 0;
     }
 
     private int GetDependentServicesCount()
     {
         return _domainDetail?.RelatedServices.Count(s =>
-            !string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase) &&
-            s.DependentSubDomains?.Contains(DomainName, StringComparer.OrdinalIgnoreCase) == true) ?? 0;
+            !s.BelongsToDomain(DomainName) &&
+            _domainDetail.Dependencies.Any(dependency => dependency.IsOwnedBy(s))) ?? 0;
     }
 
     private int GetRunningServicesCount()
@@ -246,15 +253,15 @@
     private List<RegisteredServiceStatus> GetOwnedServices()
     {
         return _domainDetail?.RelatedServices
-            .Where(s => string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.BelongsToDomain(DomainName))
             .ToList() ?? [];
     }
 
     private List<RegisteredServiceStatus> GetDependentServices()
     {
         return _domainDetail?.RelatedServices
-            .Where(s => !string.Equals(s.DomainName, DomainName, StringComparison.OrdinalIgnoreCase) &&
-                       s.DependentSubDomains?.Contains(DomainName, StringComparer.OrdinalIgnoreCase) == true)
+            .Where(s => !s.BelongsToDomain(DomainName) &&
+                       _domainDetail.Dependencies.Any(dependency => dependency.IsOwnedBy(s)))
             .ToList() ?? [];
     }
 
@@ -274,10 +281,10 @@
                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="domain-service-card__text">
                             @L["DomainDetail:ServiceCard:Id", service.AppId]
                         </MudText>
-                        @if (!string.IsNullOrEmpty(service.DomainName))
+                        @if (service.GetDomainNames().Any())
                         {
                             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="domain-service-card__text">
-                                @L["DomainDetail:ServiceCard:Domain", service.DomainName]
+                                @L["DomainDetail:ServiceCard:Domain", string.Join(", ", service.GetDomainNames())]
                             </MudText>
                         }
                         @if (!string.IsNullOrEmpty(service.ProjectName))
@@ -287,16 +294,7 @@
                             </MudText>
                         }
                     </div>
-                    @if (service.DependentSubDomains?.Any() == true)
-                    {
-                        <div class="domain-service-card__dependencies">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L["DomainDetail:ServiceCard:DependentSubDomains"]</MudText>
-                            @foreach (var subDomain in service.DependentSubDomains)
-                            {
-                                <MudChip T="string" Size="Size.Small" Color="@(subDomain == DomainName ? Color.Warning : Color.Surface)" Text="@subDomain" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close" />
-                            }
-                        </div>
-                    }
+
                 </div>
                 <div class="domain-service-card__actions">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">

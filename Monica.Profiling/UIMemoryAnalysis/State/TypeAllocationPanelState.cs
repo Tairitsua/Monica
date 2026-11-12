@@ -39,11 +39,11 @@ public sealed record TypeAllocationActionResult(
     TypeAllocationOperation Operation,
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt,
-    ResStatus Status,
+    ResultStatus Status,
     string? Message)
 {
     /// <summary>Gets whether the action succeeded, irrespective of a follow-up read failure.</summary>
-    public bool IsSuccessful => Status is ResStatus.Ok or ResStatus.Created;
+    public bool IsSuccessful => Status is ResultStatus.Ok or ResultStatus.Created;
 }
 
 /// <summary>Freezes one type and the complete source totals from the view that opened its inspector.</summary>
@@ -129,8 +129,8 @@ public sealed class TypeAllocationPanelState(
     private readonly object _sync = new();
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly Func<Res<TypeAllocationSnapshot>> _getLive = typeAllocationFacade.GetCurrentSnapshot;
-    private readonly Func<Task<Res<TypeAllocationSnapshot>>> _captureHeap = typeAllocationFacade.TakeHeapSnapshotAsync;
+    private readonly Func<Result<TypeAllocationSnapshot>> _getLive = typeAllocationFacade.GetCurrentSnapshot;
+    private readonly Func<Task<Result<TypeAllocationSnapshot>>> _captureHeap = typeAllocationFacade.TakeHeapSnapshotAsync;
     private readonly Func<Action<TypeAllocationSnapshot>, Action> _subscribe = typeAllocationFacade.SubscribeToUpdates;
     private Action? _unsubscribe;
     private Task? _disposeTask;
@@ -151,8 +151,8 @@ public sealed class TypeAllocationPanelState(
     internal TypeAllocationPanelState(
         TypeAllocationFacade typeAllocationFacade,
         TimeProvider? timeProvider,
-        Func<Res<TypeAllocationSnapshot>> getLive,
-        Func<Task<Res<TypeAllocationSnapshot>>> captureHeap,
+        Func<Result<TypeAllocationSnapshot>> getLive,
+        Func<Task<Result<TypeAllocationSnapshot>>> captureHeap,
         Func<Action<TypeAllocationSnapshot>, Action> subscribe)
         : this(typeAllocationFacade, timeProvider)
     {
@@ -247,7 +247,7 @@ public sealed class TypeAllocationPanelState(
     }
 
     /// <summary>Subscribes once and reads actual provider state without automatically starting collection.</summary>
-    public Task<Res> InitializeAsync()
+    public Task<Result> InitializeAsync()
     {
         lock (_sync)
         {
@@ -258,7 +258,7 @@ public sealed class TypeAllocationPanelState(
     }
 
     /// <summary>Reads live evidence without replacing a selected heap census. Busy/retired calls return empty Conflict.</summary>
-    public Res RefreshData()
+    public Result RefreshData()
     {
         if (!TryAdmit()) return InactiveResult();
         try { NotifyStateChanged(); return IsRetired() ? InactiveResult() : ReadLive(); }
@@ -266,40 +266,40 @@ public sealed class TypeAllocationPanelState(
     }
 
     /// <summary>Starts the shared live provider in a supported compatibility mode, then reads its actual state.</summary>
-    public Res StartCollection() => RunAction(TypeAllocationOperation.Start, () =>
-        !CanStartCollection ? Res.Fail(string.Empty, ResStatus.ServiceUnavailable)
+    public Result StartCollection() => RunAction(TypeAllocationOperation.Start, () =>
+        !CanStartCollection ? Result.Failure(string.Empty, ResultStatus.ServiceUnavailable)
         : SelectedMode is not (AllocationSamplingMode.Low or AllocationSamplingMode.High)
-            ? Res.Fail(string.Empty, ResStatus.BadRequest)
+            ? Result.Failure(string.Empty, ResultStatus.BadRequest)
             : typeAllocationFacade.StartCollection(SelectedMode));
 
     /// <summary>Stops the shared live provider explicitly. Workspace retirement never calls this action.</summary>
-    public Res StopCollection() => RunAction(TypeAllocationOperation.Stop, typeAllocationFacade.StopCollection);
+    public Result StopCollection() => RunAction(TypeAllocationOperation.Stop, typeAllocationFacade.StopCollection);
 
     /// <summary>Resets only inactive live evidence. A separately retained heap census and current filters survive.</summary>
-    public Res ResetData() => RunAction(TypeAllocationOperation.Reset, () =>
-        typeAllocationFacade.IsCollecting ? Res.Fail(string.Empty, ResStatus.Forbidden) : typeAllocationFacade.ResetData());
+    public Result ResetData() => RunAction(TypeAllocationOperation.Reset, () =>
+        typeAllocationFacade.IsCollecting ? Result.Failure(string.Empty, ResultStatus.Forbidden) : typeAllocationFacade.ResetData());
 
     /// <summary>
     /// Captures a supported heap census and selects it on success. Live events continue into their separate cache.
     /// The provider has no cancellation token; retirement drains it and prevents late result publication.
     /// </summary>
-    public async Task<Res<TypeAllocationSnapshot>> TakeHeapSnapshotAsync()
+    public async Task<Result<TypeAllocationSnapshot>> TakeHeapSnapshotAsync()
     {
-        if (!TryAdmit(TypeAllocationOperation.HeapCapture)) return InactiveResult();
+        if (!TryAdmit(TypeAllocationOperation.HeapCapture)) return Result.FromFailure<TypeAllocationSnapshot>(InactiveResult());
         try
         {
             NotifyStateChanged();
-            if (IsRetired()) return InactiveResult();
-            Res<TypeAllocationSnapshot> result = CanTakeHeapSnapshot
+            if (IsRetired()) return Result.FromFailure<TypeAllocationSnapshot>(InactiveResult());
+            Result<TypeAllocationSnapshot> result = CanTakeHeapSnapshot
                 ? await _captureHeap().ConfigureAwait(false)
-                : Res.Fail(string.Empty, ResStatus.ServiceUnavailable);
+                : Result.Failure<TypeAllocationSnapshot>(string.Empty, ResultStatus.ServiceUnavailable);
             lock (_sync)
             {
-                if (_disposed) return InactiveResult();
+                if (_disposed) return Result.FromFailure<TypeAllocationSnapshot>(InactiveResult());
                 LastAction = new(TypeAllocationOperation.HeapCapture, _actionStartedAt, _timeProvider.GetUtcNow(), result.Status, result.Message);
-                if (result.IsOk())
+                if (result.IsSuccess())
                 {
-                    HeapSnapshot = Detach(result.Data!);
+                    HeapSnapshot = Detach(result.Data ?? throw new InvalidOperationException("The heap capture returned no data."));
                     HeapCapturedAt = _timeProvider.GetUtcNow();
                     _selectedSource = TypeAllocationDataSource.HeapSnapshot;
                     _page = 1;
@@ -381,7 +381,7 @@ public sealed class TypeAllocationPanelState(
         }
     }
 
-    private Res RunAction(TypeAllocationOperation operation, Func<Res> action)
+    private Result RunAction(TypeAllocationOperation operation, Func<Result> action)
     {
         if (!TryAdmit(operation)) return InactiveResult();
         try
@@ -400,21 +400,28 @@ public sealed class TypeAllocationPanelState(
         finally { FinishOperation(); }
     }
 
-    private Res ReadLive()
+    private Result ReadLive()
     {
         if (IsRetired()) return InactiveResult();
         var result = _getLive();
         lock (_sync)
         {
             if (_disposed) return InactiveResult();
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
             {
                 LoadError = error.Message ?? string.Empty;
                 return error;
             }
+            if (snapshot is null)
+            {
+                LoadError = "The type allocation snapshot was unavailable.";
+                return Result.Failure(LoadError);
+            }
             PublishLive(snapshot);
             LoadError = null;
-            return Res.Ok();
+            return Result.Success();
         }
     }
 
@@ -493,7 +500,7 @@ public sealed class TypeAllocationPanelState(
         lock (_sync) { if (!_disposed) StateChanged?.Invoke(); }
     }
 
-    private static Res InactiveResult() => Res.Fail(string.Empty, ResStatus.Conflict);
+    private static Result InactiveResult() => Result.Failure(string.Empty, ResultStatus.Conflict);
 
     private static TypeAllocationSnapshot Detach(TypeAllocationSnapshot snapshot) => new()
     {

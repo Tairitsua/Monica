@@ -5,6 +5,17 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationDefinitionSummary
 {
+    /// <summary>Gets an authority restriction that prevents this process from changing managed values.</summary>
+    public string? MutationReadOnlyReason { get; init; }
+
+    /// <summary>Gets whether values belong to deployment inputs or the Monica managed store.</summary>
+    public ConfigurationKind Kind { get; init; } = ConfigurationKind.Managed;
+
+    /// <summary>Gets why the definition's values cannot be changed through Monica.</summary>
+    public string? ReadOnlyReason => Kind == ConfigurationKind.Startup
+        ? "Startup configuration is deployment-owned. Change deployment inputs and restart the process."
+        : MutationReadOnlyReason;
+
     /// <summary>
     /// Gets the definition key.
     /// </summary>
@@ -84,5 +95,6 @@ public sealed record ConfigurationDefinitionSummary
     /// <summary>
     /// Gets whether operations that change configuration values are allowed.
     /// </summary>
-    public bool CanMutate => CanManage && LifecycleState == ConfigurationDefinitionLifecycleState.Active;
+    public bool CanMutate => Kind == ConfigurationKind.Managed && CanManage
+        && LifecycleState == ConfigurationDefinitionLifecycleState.Active && MutationReadOnlyReason is null;
 }

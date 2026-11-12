@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
     : ConfigurationProvider, IConfigurationValueShapeProvider
 {
     private readonly Lock _projectionLock = new();
+    private readonly ConfigurationChildKeyIndex _childKeys = new();
     private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedKeysByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long?> _loadedVersionsByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyCollection<string>> _projectedShapesByDefinitionKey = new(StringComparer.OrdinalIgnoreCase);
@@ -61,13 +63,8 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         {
             var projected = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             var shapes = new Dictionary<string, ConfigurationValueShape>(StringComparer.OrdinalIgnoreCase);
-            var definitions = definitionRegistry.GetAll();
-            var seeds = definitions
-                .Select(definition => new ConfigurationEffectiveValueSeed(
-                    definition,
-                    () => CreateValidatedSeed(definition, seedFactory)))
-                .ToArray();
-            var documents = await effectiveValueStore.EnsureCreatedAsync(seeds, cancellationToken);
+            var definitions = definitionRegistry.GetAll().Where(definition => definition.Kind == ConfigurationKind.Managed).ToArray();
+            var documents = await ReadProjectionValuesAsync(definitions, effectiveValueStore, seedFactory, cancellationToken);
 
             var projectedKeysByDefinitionKey = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
             var loadedVersionsByDefinitionKey = new Dictionary<string, long?>(StringComparer.OrdinalIgnoreCase);
@@ -148,6 +145,8 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         {
             return;
         }
+        if (definition!.Kind == ConfigurationKind.Startup)
+            throw new InvalidOperationException("Startup configuration is frozen and cannot be reloaded from the managed store.");
 
         var effectiveValueStore = accessor.ServiceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
         var seedFactory = accessor.ServiceProvider.GetRequiredService<ConfigurationEffectiveValueSeedFactory>();
@@ -158,13 +157,9 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         try
         {
             var resolvedDefinition = definition!;
-            var document = (await effectiveValueStore.EnsureCreatedAsync(
-                [new ConfigurationEffectiveValueSeed(
-                    resolvedDefinition,
-                    () => CreateValidatedSeed(resolvedDefinition, seedFactory))],
-                cancellationToken))[0];
+            var document = (await ReadProjectionValuesAsync([resolvedDefinition], effectiveValueStore, seedFactory, cancellationToken))[0];
             var loadedVersion = GetLoadedVersion(definitionKey);
-            if (loadedVersion is not null && document.Version <= loadedVersion)
+            if (loadedVersion is not null && document.Version is not null && document.Version <= loadedVersion)
             {
                 return;
             }
@@ -212,6 +207,12 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         }
     }
 
+    /// <inheritdoc />
+    public override IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath)
+    {
+        lock (_projectionLock) return _childKeys.GetChildKeys(Data, earlierKeys, parentPath);
+    }
+
     public bool TryGetShape(string path, out ConfigurationValueShape shape)
     {
         lock (_projectionLock) return _shapes.TryGetValue(path, out shape);
@@ -241,18 +242,47 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         }
     }
 
-    private string CreateValidatedSeed(ConfigurationDefinition definition, ConfigurationEffectiveValueSeedFactory seedFactory)
+    private async Task<IReadOnlyList<ProjectionValue>> ReadProjectionValuesAsync(
+        IReadOnlyList<ConfigurationDefinition> definitions, IConfigurationEffectiveValueStore store,
+        ConfigurationEffectiveValueSeedFactory seedFactory, CancellationToken cancellationToken)
+    {
+        if (accessor.ServiceProvider!.GetRequiredService<ConfigurationRuntimeContext>().AutonomousWork)
+        {
+            var documents = await store.EnsureCreatedAsync(definitions.Select(definition =>
+                new ConfigurationEffectiveValueSeed(definition, () => CreateValidatedSeed(definition, seedFactory))).ToArray(), cancellationToken);
+            return documents.Select(document => new ProjectionValue(document.Json, document.Version)).ToArray();
+        }
+
+        var existing = await store.GetManyAsync(definitions.Select(definition => definition.DefinitionKey).ToArray(), cancellationToken);
+        if (existing.Count != definitions.Count)
+            throw new InvalidOperationException("The effective-value store returned an incomplete document batch.");
+        return definitions.Select((definition, index) => existing[index] is { } document
+            ? new ProjectionValue(document.Json, document.Version)
+            : new ProjectionValue(CreateValidatedSeed(definition, seedFactory, requireValid: true), null)).ToArray();
+    }
+
+    private sealed record ProjectionValue(string Json, long? Version);
+
+    internal bool IsUnpersisted(string definitionKey)
+    {
+        lock (_projectionLock)
+            return _loadedVersionsByDefinitionKey.TryGetValue(definitionKey, out var version) && version is null;
+    }
+
+    private string CreateValidatedSeed(ConfigurationDefinition definition, ConfigurationEffectiveValueSeedFactory seedFactory,
+        bool requireValid = false)
     {
         var provider = accessor.ServiceProvider!;
         var json = seedFactory.CreateSeedJson(definition);
         var result = provider.GetRequiredService<ConfigurationValidationCoordinator>().ValidateCompleteValue(
             definition, json, ConfigurationValidationProfile.Seed);
-        if (result.Coverage == ConfigurationValidationCoverage.Failed)
+        if (result.Coverage == ConfigurationValidationCoverage.Failed
+            || requireValid && result.Coverage != ConfigurationValidationCoverage.Complete)
             throw new ConfigurationValidationExecutionException(definition.DefinitionKey, LogicalPath.Root, "seed-materialization");
         if (!result.IsValid)
         {
             var report = ConfigurationValidationReportFactory.Create(definition, result);
-            if (provider.GetRequiredService<ConfigurationValidationPolicy>().Behavior == ConfigurationRuntimeValidationBehavior.FailFast)
+            if (requireValid || provider.GetRequiredService<ConfigurationValidationPolicy>().Behavior == ConfigurationRuntimeValidationBehavior.FailFast)
                 throw new ConfigurationRuntimeValidationException(report);
             provider.GetRequiredService<ILogger<MonicaConfigurationProvider>>().LogWarning("{ConfigurationSeedDiagnostic}",
                 ConfigurationRuntimeValidationMessageFormatter.FormatDiagnosticReport(report));

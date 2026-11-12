@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Monica.Core.TypeDiscovery.Abstractions;
 
 namespace Monica.Framework.Seeder.Models.Internal;
 
@@ -14,4 +15,5 @@ internal sealed record SeederDescriptor(
     SeederPolicySource FailureBehaviorSource,
     int MaxAttempts,
     SeederPolicySource MaxAttemptsSource,
-    ImmutableArray<Type> Dependencies);
+    ImmutableArray<Type> Dependencies,
+    ActivationMode Activation = ActivationMode.Automatic);

@@ -1,0 +1,127 @@
+@using System.Globalization
+@using Monica.UI.Shared.Components.Visual
+@inject JobSchedulerFacade Facade
+@inject IJobSchedulerUiAccess Access
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+@implements IAsyncDisposable
+<section class="ledger-trajectory" aria-labelledby="ledger-trajectory-title">
+    <div class="ledger-trajectory__band">@FilterContent</div>
+    <div class="ledger-trajectory__decision">
+        <div>
+            <p id="ledger-trajectory-title">@L["Workspace:MatchingExecutions"]</p>
+            <div class="ledger-trajectory__value">@(_distribution is null ? "—" : MatchingCount.ToString("N0"))</div>
+        </div>
+        <p>
+            @if (_distribution is { } distribution)
+            {
+                <MoRichFinding Template="@L["Workspace:LedgerCountFinding"].Value"
+                                      Values="@([CountMark(MatchingCount, MoVisualRole.Primary),
+                                                  CountMark(distribution.StateTotals[JobExecutionState.Failed], MoVisualRole.Error),
+                                                  CountMark(distribution.StateTotals[JobExecutionState.Skipped], MoVisualRole.Warning)])" />
+            }
+            @if (Query.OwnerKey is not null) { <code>@Query.OwnerKey</code> }
+            @if (Query.JobKey is not null) { <code>@Query.JobKey</code> }
+        </p>
+    </div>
+    @if(_error is not null) { <div class="ledger-trajectory__error"><MudAlert Severity="Severity.Warning" Dense="true">@_error</MudAlert></div> }
+    @if(_distribution is {} capture)
+    {
+        <header><div><h2>@L["Workspace:TrajectoryTitle"]</h2><p>@L[capture.UsesCompletionTime ? "Workspace:CompletedDistribution" : "Workspace:RecordedDistribution"]</p></div><span>@L["Workspace:IndependentPeaks"]</span></header>
+        <div class="ledger-trajectory__lanes" @key="_marks">@foreach(var state in OutcomeStates)
+        {
+            var lane = Array.IndexOf(OutcomeStates, state);
+            var peak=capture.Buckets.Max(bucket => bucket.Counts[state]);
+            <div class="ledger-trajectory__lane" data-state="@state.ToString().ToLowerInvariant()" data-muted="@((Query.States is {Count:>0} && !Query.States.Contains(state)).ToString().ToLowerInvariant())"><span><i></i>@L[$"ExecutionStates:{state}"]<small>@L["Workspace:Peak",peak.ToString("N0")]</small></span><div class="ledger-trajectory__bars">@for(var i=0;i<capture.Buckets.Count;i++) { var index=i;var bucket=capture.Buckets[i];var count=bucket.Counts[state];<button type="button" @ref="_marks[lane * capture.Buckets.Count + index]" @onkeydown="@(e => MoveAsync(e, lane, index))" @onclick="@(() => OpenBucket(index))" style="@($"--bar-height:{(count == 0 ? 2 : Math.Max(4,count*34d/Math.Max(1,peak))).ToString("0.###",CultureInfo.InvariantCulture)}px")" data-empty="@((count == 0).ToString().ToLowerInvariant())" data-current="@((_selected == index).ToString().ToLowerInvariant())" data-selected="@((_brush is {} range && index >= range.First && index <= range.Last).ToString().ToLowerInvariant())" title="@BucketLabel(index)" aria-label="@BucketLabel(index)" @onmouseenter="@(() => _selected=index)" @onfocus="@(() => _selected=index)" @onpointerdown="@(() => _brushStart=index)" @onpointerup="@(() => CompleteBrush(index))"><i></i></button> }</div></div>
+        }
+        <div class="ledger-trajectory__active"><span>@L["Workspace:OtherStates"]</span><div>@foreach(var state in new[]{JobExecutionState.Running,JobExecutionState.Queued,JobExecutionState.Cancelled}) { <button type="button" data-state="@state.ToString().ToLowerInvariant()" @onclick="@(() => StateSelected.InvokeAsync(state))"><i></i>@L[$"ExecutionStates:{state}"] <b>@capture.StateTotals[state]</b></button> }</div></div>
+        <div class="ledger-trajectory__axis"><span></span><div>@foreach(var index in new[]{0,capture.Buckets.Count/4,capture.Buckets.Count/2,capture.Buckets.Count*3/4,capture.Buckets.Count-1}.Distinct()) { <time>@TimePresentation.FormatClock(capture.Buckets[index].StartTimeUtc)</time> }</div></div></div>
+        <div class="ledger-trajectory__readout"><span>@TimePresentation.FormatRange(capture.Buckets[_selected].StartTimeUtc,capture.Buckets[_selected].EndTimeUtc)</span>@foreach(var state in OutcomeStates) { <span data-state="@state.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{state}"] <b>@capture.Buckets[_selected].Counts[state]</b></span> }<small>@L["Workspace:ZoomHint"]</small></div>
+        @if(_brush is {} brush) { <div class="ledger-trajectory__selection"><span>@TimePresentation.FormatRange(capture.Buckets[brush.First].StartTimeUtc,capture.Buckets[brush.Last].EndTimeUtc)</span><a href="@RangeUrl(capture.Buckets[brush.First].StartTimeUtc,capture.Buckets[brush.Last].EndTimeUtc)">@L["Workspace:ZoomSelection"]</a><button type="button" @onclick="@(() => _brush=null)">@L["Common:Cancel"]</button></div> }
+        <div class="ledger-trajectory__states" role="group" aria-label="@L["Executions:Filters:States"]"><button type="button" aria-pressed="@((Query.States is not {Count:>0}).ToString().ToLowerInvariant())" @onclick="@(() => AllStatesSelected.InvokeAsync())">@L["Executions:Filters:AnyState"] <b>@capture.StateTotals.Values.Sum().ToString("N0")</b></button>@foreach(var state in StateOrder) { <button type="button" data-state="@state.ToString().ToLowerInvariant()" aria-pressed="@((Query.States?.Contains(state)==true).ToString().ToLowerInvariant())" @onclick="@(() => StateSelected.InvokeAsync(state))"><i></i>@L[$"ExecutionStates:{state}"] <b>@capture.StateTotals[state].ToString("N0")</b></button> }</div>
+        <details class="ledger-trajectory__data"><summary>@L["Workspace:BucketData"]</summary><div><table><thead><tr><th>@L["Workspace:Interval"]</th>@foreach(var state in StateOrder) { <th>@L[$"ExecutionStates:{state}"]</th> }</tr></thead><tbody>@foreach(var bucket in capture.Buckets) { <tr><td>@TimePresentation.FormatRange(bucket.StartTimeUtc,bucket.EndTimeUtc)</td>@foreach(var state in StateOrder) { <td>@bucket.Counts[state]</td> }</tr> }</tbody></table></div></details>
+    }
+</section>
+@code {
+    private RenderFragment CountMark(long value, MoVisualRole role) =>
+        @<MoValueMark Role="@(value == 0 ? MoVisualRole.Neutral : role)">@value.ToString("N0")</MoValueMark>;
+
+    /// <summary>Gets the accepted ledger query. Distribution facets preserve every filter except state selection.</summary>
+    [Parameter,EditorRequired] public JobExecutionQuery Query { get; set; } = null!;
+    /// <summary>Gets the accepted list observation used to bound open-ended reads.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    /// <summary>Gets the route-owned time and search controls.</summary>
+    [Parameter] public RenderFragment? FilterContent { get; set; }
+    /// <summary>Toggles one state without changing the query's identity or time scope.</summary>
+    [Parameter] public EventCallback<JobExecutionState> StateSelected { get; set; }
+    /// <summary>Clears only the state selection.</summary>
+    [Parameter] public EventCallback AllStatesSelected { get; set; }
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+    private static readonly JobExecutionState[] OutcomeStates=[JobExecutionState.Succeeded,JobExecutionState.Failed,JobExecutionState.Skipped];
+    private static readonly JobExecutionState[] StateOrder=[JobExecutionState.Succeeded,JobExecutionState.Failed,JobExecutionState.Skipped,JobExecutionState.Running,JobExecutionState.Queued,JobExecutionState.Cancelled];
+    private readonly SchedulerOperationLifetime _lifetime=new();
+    private JobExecutionQuery? _acceptedQuery;
+    private JobExecutionDistribution? _distribution;
+    private string? _error;
+    private int _version,_selected,_brushStart;
+    private bool _suppressClick;
+    private ElementReference[] _marks = [];
+    private (int First,int Last)? _brush;
+    private long MatchingCount => _distribution?.StateTotals.Where(pair => Query.States is not {Count:>0} || Query.States.Contains(pair.Key)).Sum(pair => pair.Value) ?? 0;
+    protected override async Task OnParametersSetAsync()
+    {
+        if(_lifetime.IsRetired || ReferenceEquals(Query,_acceptedQuery)) return;
+        _acceptedQuery=Query;var query=Query;var version=++_version;var captured=ObservedAtUtc;
+        _distribution = null; _error = null;
+        try { await _lifetime.RunAsync(async token => {
+            if(!await Access.IsAuthorizedAsync(token)) { _lifetime.TryApply(() => { if(version==_version) { _distribution=null;_error=L["Access:DeniedDescription"]; } });return; }
+            var completed=query.CompletedAfterUtc is not null || query.CompletedBeforeUtc is not null;
+            var bounded=completed ? query with {CompletedBeforeUtc=query.CompletedBeforeUtc ?? captured} : query with {CreatedBeforeUtc=query.CreatedBeforeUtc ?? captured};
+            var result=await Facade.GetExecutionDistributionAsync(bounded,48,token);
+            var error = result;
+            var distribution = result.Data;
+            if(result.IsFailure() || distribution is null) throw new InvalidOperationException(error.Message ?? "The execution distribution was unavailable.");
+            _lifetime.TryApply(() => { if(version==_version) { _distribution=distribution;if (_marks.Length != distribution.Buckets.Count * OutcomeStates.Length) _marks = new ElementReference[distribution.Buckets.Count * OutcomeStates.Length];_selected=distribution.Buckets.Count-1;_brush=null;_error=null; } });
+        }); }
+        catch(OperationCanceledException) when (_lifetime.IsRetired) { }
+        catch(Exception exception) { _lifetime.TryApply(() => { if(version==_version) _error=exception.Message; }); }
+    }
+    private string RangeUrl(DateTimeOffset start,DateTimeOffset end) => SchedulerRouteBuilder.Ledger(Query,start,end);
+    private string BucketUrl(int index) => _distribution is {} snapshot ? RangeUrl(snapshot.Buckets[index].StartTimeUtc,snapshot.Buckets[index].EndTimeUtc) : string.Empty;
+    private string BucketLabel(int index) => _distribution is {} snapshot ? L["Workspace:DistributionBucket",TimePresentation.FormatRange(snapshot.Buckets[index].StartTimeUtc,snapshot.Buckets[index].EndTimeUtc),snapshot.Buckets[index].Counts.Values.Sum()] : string.Empty;
+    private void CompleteBrush(int index)
+    {
+        _suppressClick = index != _brushStart;
+        if (_suppressClick) _brush = (Math.Min(index, _brushStart), Math.Max(index, _brushStart));
+    }
+    private void OpenBucket(int index)
+    {
+        if (_suppressClick) { _suppressClick = false; return; }
+        Navigation.NavigateTo(BucketUrl(index));
+    }
+    private async Task MoveAsync(KeyboardEventArgs args, int lane, int column)
+    {
+        if (_distribution is not {} capture) return;
+        var count = capture.Buckets.Count;
+        var target = args.Key switch
+        {
+            "ArrowLeft" => lane * count + Math.Max(0, column - 1),
+            "ArrowRight" => lane * count + Math.Min(count - 1, column + 1),
+            "ArrowUp" => Math.Max(0, lane - 1) * count + column,
+            "ArrowDown" => Math.Min(OutcomeStates.Length - 1, lane + 1) * count + column,
+            "Home" => lane * count,
+            "End" => (lane + 1) * count - 1,
+            _ => -1
+        };
+        if (target >= 0)
+        {
+            var next = target % count;
+            if (args.ShiftKey) _brush = (Math.Min(_brushStart, next), Math.Max(_brushStart, next));
+            else _brushStart = next;
+            _selected = next;
+            await _marks[target].FocusAsync(preventScroll: true);
+        }
+    }
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _lifetime.RetireAsync(() => ValueTask.CompletedTask);
+}

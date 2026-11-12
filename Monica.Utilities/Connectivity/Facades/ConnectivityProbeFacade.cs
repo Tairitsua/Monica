@@ -40,31 +40,31 @@ public sealed class ConnectivityProbeFacade
     /// <param name="request">Probe request describing the target and protocol kind.</param>
     /// <param name="cancellationToken">Cancellation token that aborts the probe.</param>
     /// <returns>A result envelope containing the probe result.</returns>
-    public async Task<Res<ConnectivityProbeResult>> ProbeAsync(
+    public async Task<Result<ConnectivityProbeResult>> ProbeAsync(
         ConnectivityProbeRequest request,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return Res.Ok(await _connectivityProbeService.ProbeAsync(request, cancellationToken));
+            return Result.Success(await _connectivityProbeService.ProbeAsync(request, cancellationToken));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute utilities connectivity probe for host {Host}.", request.Host);
-            return Res.Fail(
+            return Result.Failure<ConnectivityProbeResult>(
                 _localizer["ServiceMessages:ConnectivityProbeFailed", ex.GetMessageRecursively()].Value,
                 GetStatus(ex));
         }
     }
 
-    private static ResStatus GetStatus(Exception exception)
+    private static ResultStatus GetStatus(Exception exception)
     {
         return exception switch
         {
-            ArgumentException => ResStatus.BadRequest,
-            InvalidOperationException => ResStatus.BadRequest,
-            OperationCanceledException => ResStatus.BadRequest,
-            _ => ResStatus.InternalError
+            ArgumentException => ResultStatus.BadRequest,
+            InvalidOperationException => ResultStatus.BadRequest,
+            OperationCanceledException => ResultStatus.BadRequest,
+            _ => ResultStatus.InternalError
         };
     }
 }

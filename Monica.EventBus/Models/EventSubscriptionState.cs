@@ -23,5 +23,11 @@ public enum EventSubscriptionState
     /// <summary>
     /// EventSubscription has been disposed and cannot be reused.
     /// </summary>
-    Disposed = 3
+    Disposed = 3,
+
+    /// <summary>Locally eligible for explicit test delivery, but never attached to a transport.</summary>
+    Held = 4,
+
+    /// <summary>The owning role is not eligible in this process.</summary>
+    Disabled = 5
 }

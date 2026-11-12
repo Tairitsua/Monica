@@ -15,7 +15,7 @@
 .score-exact { margin: 12px 0 0; color: inherit; font-size: 12px; }
 .score-delta { margin: 8px 0 0; font-size: 13px; }
 .score-finding { margin: 24px 0 0; color: inherit; font-size: 13px; line-height: 1.85; }
-.score-finding ::deep .mo-vl-mark { padding: 0; border-radius: 0; background: none; color: inherit; font-weight: 600; white-space: normal; }
+.score-finding strong { font-weight: 600; }
 .score-finding .mo-vl-link { color: inherit; font-size: 12px; overflow-wrap: anywhere; text-decoration-color: color-mix(in srgb, var(--mud-palette-primary-text) 55%, transparent); }
 .score-finding .mo-vl-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .score-contributor { display: inline-flex; align-items: baseline; max-width: 100%; }

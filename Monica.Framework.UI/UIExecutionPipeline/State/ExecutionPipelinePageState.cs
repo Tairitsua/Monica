@@ -111,10 +111,12 @@ public sealed class ExecutionPipelinePageState(ExecutionPipelineCatalogFacade ca
         NotifyStateChanged();
 
         var result = await catalogFacade.GetSnapshotAsync();
-        if (result.IsFailed(out var error, out var snapshot))
+        var error = result.WithoutData();
+        var snapshot = result.Data;
+        if (result.IsFailure() || snapshot is null)
         {
             IsLoading = false;
-            LoadError = error;
+            LoadError = error.Message ?? "The execution pipeline snapshot was unavailable.";
             NotifyStateChanged();
             return false;
         }

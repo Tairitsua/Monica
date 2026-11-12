@@ -13,7 +13,7 @@ p { font-size: .8rem; color: color-mix(in srgb, var(--mud-palette-text-secondary
 .eventbus-registration-distribution > span[data-state="Inactive"] { background: var(--mud-palette-text-secondary); }
 .eventbus-registration-distribution > span[data-state="Pending"] { background: var(--mud-palette-warning); }
 .eventbus-registration-distribution > span[data-state="Disposed"] { background: var(--mud-palette-error); }
-.eventbus-registration-states { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 20px 0 24px; }
+.eventbus-registration-states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0 24px; }
 .eventbus-registration-states > div { --count-color: var(--mud-palette-text-secondary); display: grid; gap: 6px; }
 .eventbus-registration-states > div[data-state="Active"] { --count-color: var(--mud-palette-success); }
 .eventbus-registration-states > div[data-state="Pending"] { --count-color: var(--mud-palette-warning); }
@@ -69,3 +69,7 @@ code, time { font-family: var(--mo-font-family-mono); font-size: .74rem; line-he
     .eventbus-clipped-table ::deep .mud-table-pagination { padding: 6px 16px; }
     .eventbus-route-groups .eventbus-clipped-table ::deep td, .eventbus-route-groups .eventbus-clipped-table ::deep th { padding: 16px; }
 }
+
+.eventbus-registration-distribution > span[data-state="Held"] { background: var(--mud-palette-info); }
+.eventbus-registration-distribution > span[data-state="Disabled"] { background: var(--mud-palette-action-disabled); }
+.eventbus-registration-states > div[data-state="Held"] { --count-color: var(--mud-palette-info); }

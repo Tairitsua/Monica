@@ -87,7 +87,8 @@
                         if (definitions.ContainsKey(key)) continue;
                         var result = await Facade.GetDefinitionAsync(key);
                         token.ThrowIfCancellationRequested();
-                        if (!result.IsFailed(out _, out var detail)) definitions[key] = detail.Definition;
+                        var detail = result.Data;
+                        if (!result.IsFailure() && detail is not null) definitions[key] = detail.Definition;
                     }
 
                     // Schema age alone does not make a known ordinary path sensitive.

@@ -326,6 +326,27 @@ public class K8SResourceSummary
 
     public bool RestartSupported { get; init; }
 
+    /// <summary>
+    /// Gets the resolved backing workloads for a Service, or the workload itself for a workload row.
+    /// </summary>
+    public List<K8SWorkloadReference> RelatedWorkloads { get; init; } = [];
+
+    /// <summary>
+    /// Gets the Services resolved to this workload in the same namespace capture.
+    /// </summary>
+    public List<K8SServiceSummary> RelatedServices { get; init; } = [];
+
+    /// <summary>
+    /// Gets the captured Pods bound to the related workloads. An empty collection does not imply readiness.
+    /// </summary>
+    public List<K8SPodSummary> RelatedPods { get; init; } = [];
+
+    /// <summary>Gets whether the capture contains any Pods bound to this resource's workloads.</summary>
+    public bool HasPodEvidence => RelatedPods.Count > 0;
+
+    /// <summary>Gets the total observed container restarts across the related Pods.</summary>
+    public int RestartCount => RelatedPods.Sum(pod => pod.RestartCount);
+
     public string SelectorDisplay => Selector.Count == 0
         ? "-"
         : string.Join(", ", Selector.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).Select(pair => $"{pair.Key}={pair.Value}"));
@@ -350,6 +371,8 @@ public class K8SResourceSummary
             tokens.AddRange(Selector.Select(pair => $"{pair.Key} {pair.Value}"));
             tokens.AddRange(Ports.Select(port => port.DisplayText));
             tokens.AddRange(Images);
+            tokens.AddRange(RelatedWorkloads.Select(workload => workload.DisplayName));
+            tokens.AddRange(RelatedServices.Select(service => service.Name));
 
             return string.Join(" ", tokens.Where(token => !string.IsNullOrWhiteSpace(token)));
         }
@@ -541,6 +564,31 @@ public class K8SResourceListResult
     public List<K8SResourceSummary> Items { get; init; } = [];
 
     public DateTimeOffset FetchedAtUtc { get; init; }
+}
+
+/// <summary>
+/// Captures Services and supported workload kinds from one namespace read using one runtime configuration snapshot.
+/// Kubernetes objects are read sequentially; this is not an atomic Kubernetes API snapshot.
+/// </summary>
+public class K8SNamespaceInventoryResult
+{
+    /// <summary>Gets the exact namespace captured by this read.</summary>
+    public string Namespace { get; init; } = string.Empty;
+
+    /// <summary>Gets all captured Services, Deployments, StatefulSets and DaemonSets.</summary>
+    public List<K8SResourceSummary> Items { get; init; } = [];
+
+    /// <summary>Gets when every constituent read completed successfully.</summary>
+    public DateTimeOffset FetchedAtUtc { get; init; }
+
+    /// <summary>Projects one kind without performing another cluster read or changing capture time.</summary>
+    public K8SResourceListResult ForResourceType(K8SResourceType resourceType) => new()
+    {
+        Namespace = Namespace,
+        ResourceType = resourceType,
+        Items = Items.Where(item => item.ResourceType == resourceType).ToList(),
+        FetchedAtUtc = FetchedAtUtc
+    };
 }
 
 public class K8SRestartTarget

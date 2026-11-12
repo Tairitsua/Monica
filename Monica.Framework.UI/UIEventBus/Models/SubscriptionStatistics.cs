@@ -32,6 +32,12 @@ public class SubscriptionStatistics
     /// </summary>
     public int DisposedSubscriptions { get; set; }
 
+    /// <summary>Number of handlers held for explicit local delivery.</summary>
+    public int HeldSubscriptions { get; set; }
+
+    /// <summary>Number of handlers excluded by the startup policy.</summary>
+    public int DisabledSubscriptions { get; set; }
+
     /// <summary>
     /// Number of subscriptions registered as active whose underlying topic subscription is
     /// recovering or terminally failed, and therefore not actually receiving messages.

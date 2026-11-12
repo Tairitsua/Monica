@@ -1,0 +1,187 @@
+using AwesomeAssertions;
+using Monica.JobScheduler.Models.Execution;
+using Test.Monica.JobScheduler.Stores.Shared;
+using Xunit;
+
+namespace Test.Monica.JobScheduler.Stores;
+
+public sealed class JobExecutionDistributionStoreTests
+{
+    private static readonly DateTimeOffset START = new(2026, 10, 27, 0, 0, 0, TimeSpan.Zero);
+
+    [Theory]
+    [InlineData(false, false, 101L)]
+    [InlineData(false, true, 101L)]
+    [InlineData(true, false, 101L)]
+    [InlineData(true, true, 101L)]
+    [InlineData(false, false, 9_007_199_254_740_993L)]
+    [InlineData(false, true, 9_007_199_254_740_993L)]
+    [InlineData(true, false, 9_007_199_254_740_993L)]
+    [InlineData(true, true, 9_007_199_254_740_993L)]
+    public async Task GetExecutionDistributionAsync_WhenRecordsBorderBuckets_ShouldPreserveExactTickBoundaries(
+        bool useEfCore, bool completed, long bucketTicks)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        long[] offsets = [0, bucketTicks / 2 + 1, bucketTicks - 1, bucketTicks,
+            bucketTicks + bucketTicks / 2 + 1, 2 * bucketTicks - 1, 2 * bucketTicks, 3 * bucketTicks - 1];
+        foreach (var offset in offsets)
+        {
+            fixture.Time.Advance(START.AddTicks(offset) - fixture.Time.GetUtcNow());
+            if (completed)
+            {
+                await CompleteAsync(fixture, StoreFixture.OWNER_A, $"at-{offset}",
+                    JobAttemptOutcome.Succeeded, TimeSpan.Zero);
+            }
+            else
+            {
+                await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: $"at-{offset}");
+            }
+        }
+
+        var end = START.AddTicks(3 * bucketTicks);
+        var query = new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope,
+            CreatedAfterUtc = completed ? null : START,
+            CreatedBeforeUtc = completed ? null : end.AddTicks(-1),
+            CompletedAfterUtc = completed ? START : null,
+            CompletedBeforeUtc = completed ? end.AddTicks(-1) : null
+        };
+        var snapshot = await fixture.Store.GetExecutionDistributionAsync(query, 3, TestContext.Current.CancellationToken);
+        var state = completed ? JobExecutionState.Succeeded : JobExecutionState.Queued;
+
+        snapshot.Buckets.Select(bucket => bucket.Counts[state]).Should().Equal(3, 3, 2);
+        snapshot.StateTotals[state].Should().Be(offsets.Length);
+        snapshot.Buckets.Select(bucket => bucket.StartTimeUtc).Should()
+            .Equal(START, START.AddTicks(bucketTicks), START.AddTicks(2 * bucketTicks));
+        snapshot.EndTimeUtc.Should().Be(end);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueryExecutionsAsync_WhenCompletionBoundsCrossCreationWindow_ShouldFilterBeforeCountingAndPaging(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START.AddMinutes(-1));
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        await fixture.SyncAsync(StoreFixture.OWNER_B, StoreFixture.TriggeredDeclaration("jobs.match"));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "start", JobAttemptOutcome.Succeeded, TimeSpan.FromMinutes(1));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "inside", JobAttemptOutcome.Failed, TimeSpan.FromMilliseconds(123));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "end", JobAttemptOutcome.Succeeded, TimeSpan.FromMilliseconds(877));
+        await CompleteAsync(fixture, StoreFixture.OWNER_B, "other-owner", JobAttemptOutcome.Succeeded, TimeSpan.Zero);
+        await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: "queued");
+        var query = new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope,
+            OwnerKey = StoreFixture.OWNER_A,
+            JobKey = "jobs.match",
+            CompletedAfterUtc = START.ToOffset(TimeSpan.FromHours(8)),
+            CompletedBeforeUtc = START.AddSeconds(1).AddTicks(-1),
+            PageSize = 1,
+            SortField = JobExecutionSortField.CompletedAtUtc,
+            SortDescending = false
+        };
+        var first = await fixture.Store.QueryExecutionsAsync(query, TestContext.Current.CancellationToken);
+        first.TotalCount.Should().Be(2);
+        first.Items.Select(item => item.InstanceId).Should().Equal("start");
+        var second = await fixture.Store.QueryExecutionsAsync(query with { PageNumber = 2 }, TestContext.Current.CancellationToken);
+        second.TotalCount.Should().Be(2);
+        second.Items.Select(item => item.InstanceId).Should().Equal("inside");
+        var inclusiveEnd = await fixture.Store.QueryExecutionsAsync(query with { CompletedBeforeUtc = START.AddSeconds(1), PageSize = 10 }, TestContext.Current.CancellationToken);
+        inclusiveEnd.TotalCount.Should().Be(3);
+        var otherScope = await fixture.Store.QueryExecutionsAsync(query with { SchedulerScopeKey = "different-scope" }, TestContext.Current.CancellationToken);
+        otherScope.TotalCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetExecutionDistributionAsync_WhenFacetsAndPagesAreSelected_ShouldAggregateEveryMatchingStateInHalfOpenBuckets(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START.AddMinutes(-1));
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        await fixture.SyncAsync(StoreFixture.OWNER_B, StoreFixture.TriggeredDeclaration("jobs.match"));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "match-start", JobAttemptOutcome.Succeeded, TimeSpan.FromMinutes(1));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "match-middle", JobAttemptOutcome.Failed, TimeSpan.FromMinutes(2));
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "excluded-search", JobAttemptOutcome.Failed, TimeSpan.Zero);
+        await CompleteAsync(fixture, StoreFixture.OWNER_B, "match-owner-b", JobAttemptOutcome.Succeeded, TimeSpan.Zero);
+        await CompleteAsync(fixture, StoreFixture.OWNER_A, "match-last", JobAttemptOutcome.Succeeded, TimeSpan.FromMinutes(2));
+        await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: "match-queued");
+        var query = new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope,
+            OwnerKey = StoreFixture.OWNER_A,
+            JobKey = "jobs.match",
+            SearchText = "MATCH-",
+            CompletedAfterUtc = START,
+            CompletedBeforeUtc = START.AddMinutes(4).AddTicks(-1),
+            States = [JobExecutionState.Failed],
+            PageSize = 1,
+            PageNumber = 2
+        };
+        var snapshot = await fixture.Store.GetExecutionDistributionAsync(query, 4, TestContext.Current.CancellationToken);
+        snapshot.UsesCompletionTime.Should().BeTrue();
+        snapshot.StartTimeUtc.Should().Be(START);
+        snapshot.EndTimeUtc.Should().Be(START.AddMinutes(4));
+        snapshot.Buckets.Should().HaveCount(4);
+        snapshot.StateTotals[JobExecutionState.Succeeded].Should().Be(1);
+        snapshot.StateTotals[JobExecutionState.Failed].Should().Be(1);
+        snapshot.StateTotals[JobExecutionState.Queued].Should().Be(0);
+        snapshot.Buckets.Select(bucket => bucket.Counts[JobExecutionState.Succeeded]).Should().Equal(1, 0, 0, 0);
+        snapshot.Buckets.Select(bucket => bucket.Counts[JobExecutionState.Failed]).Should().Equal(0, 0, 1, 0);
+        var recorded = await fixture.Store.GetExecutionDistributionAsync(query with { CompletedAfterUtc = null, CompletedBeforeUtc = null, CreatedBeforeUtc = START.AddMinutes(5) }, 4, TestContext.Current.CancellationToken);
+        recorded.UsesCompletionTime.Should().BeFalse();
+        recorded.StateTotals.Values.Sum().Should().Be(4);
+        recorded.StateTotals[JobExecutionState.Queued].Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetExecutionDistributionAsync_WhenNoRowsMatch_ShouldKeepEmptyIntervalsAndRejectUnboundedBucketCounts(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START);
+        var query = new JobExecutionQuery { SchedulerScopeKey = fixture.Scope, CreatedAfterUtc = START, CreatedBeforeUtc = START.AddHours(1).AddTicks(-1) };
+        var snapshot = await fixture.Store.GetExecutionDistributionAsync(query, 6, TestContext.Current.CancellationToken);
+        snapshot.Buckets.Should().HaveCount(6);
+        snapshot.Buckets.Should().OnlyContain(bucket => bucket.Counts.Values.Sum() == 0);
+        snapshot.StateTotals.Should().HaveCount(Enum.GetValues<JobExecutionState>().Length);
+        Func<Task> invalid = () => fixture.Store.GetExecutionDistributionAsync(query, 201, TestContext.Current.CancellationToken);
+        await invalid.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetExecutionDistributionAsync_WhenAdjacentTicksStraddleWideBuckets_ShouldPreserveExactBoundaries(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, START);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.match"));
+        var width = TimeSpan.TicksPerDay * 366L * 40;
+        long[] offsets = [0, width - 1, width, 2 * width - 1, 2 * width, 3 * width - 1];
+        var previous = 0L;
+        foreach (var offset in offsets)
+        {
+            fixture.Time.Advance(TimeSpan.FromTicks(offset - previous));
+            await fixture.EnqueueTriggeredAsync(StoreFixture.OWNER_A, "jobs.match", instanceId: $"at-{offset}");
+            previous = offset;
+        }
+
+        var result = await fixture.Store.GetExecutionDistributionAsync(new JobExecutionQuery
+        {
+            SchedulerScopeKey = fixture.Scope, CreatedAfterUtc = START,
+            CreatedBeforeUtc = START.AddTicks(3 * width - 1)
+        }, 3, TestContext.Current.CancellationToken);
+        result.Buckets.Select(bucket => bucket.Counts[JobExecutionState.Queued]).Should().Equal(2, 2, 2);
+        result.StateTotals[JobExecutionState.Queued].Should().Be(6);
+    }
+
+    private static async Task CompleteAsync(StoreFixture fixture, string owner, string id, JobAttemptOutcome outcome, TimeSpan duration)
+    {
+        await fixture.EnqueueTriggeredAsync(owner, "jobs.match", instanceId: id);
+        var lease = (await fixture.ClaimAsync(owner, "distribution-worker", ["jobs.match"], leaseDuration: duration + TimeSpan.FromHours(1))).Single(item => item.Execution.InstanceId == id);
+        fixture.Time.Advance(duration);
+        await fixture.Store.CompleteAttemptAsync(new JobAttemptCompletion { LeaseKey = lease.LeaseKey, Outcome = outcome }, TestContext.Current.CancellationToken);
+    }
+}

@@ -34,10 +34,15 @@ internal static class ConfigurationRuntimeValidationMessageFormatter
             $"{nameof(ConfigurationRuntimeValidationBehavior.FailFast)} is configured.");
     }
 
+    internal static string FormatStartupReport(ConfigurationValidationReport report)
+        => FormatReport(report, "Monica Startup configuration validation failed:",
+            "Startup inputs must be valid before composition completes.", startup: true);
+
     private static string FormatReport(
         ConfigurationValidationReport report,
         string summaryPrefix,
-        string behaviorExplanation)
+        string behaviorExplanation,
+        bool startup = false)
     {
         var affectedDefinitionCount = report.Issues
             .Select(issue => issue.DefinitionKey)
@@ -49,7 +54,9 @@ internal static class ConfigurationRuntimeValidationMessageFormatter
             .Append(report.IssueCount)
             .Append(report.IssueCount == 1 ? " issue across " : " issues across ")
             .Append(affectedDefinitionCount)
-            .Append(affectedDefinitionCount == 1 ? " managed definition." : " managed definitions.");
+            .Append(startup
+                ? affectedDefinitionCount == 1 ? " Startup definition." : " Startup definitions."
+                : affectedDefinitionCount == 1 ? " managed definition." : " managed definitions.");
 
         builder.Append(' ').Append(behaviorExplanation);
 

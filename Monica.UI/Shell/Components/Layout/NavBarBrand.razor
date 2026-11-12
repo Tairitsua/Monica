@@ -15,15 +15,11 @@
         <div class="brand-text">
             <div class="brand-name" title="@Options.Value.GetAppName()">@Options.Value.GetAppName()</div>
             <div class="brand-version-container">
-                @if (!string.IsNullOrWhiteSpace(Options.Value.GetAppId()))
-                {
-                    <span class="brand-appid" title="@Options.Value.GetAppId()">@Options.Value.GetAppId()</span>
-                }
-                <span class="brand-version" title="@Options.Value.GetAppVersion()">@Options.Value.GetAppVersion()</span>
                 @if (Contextual)
                 {
                     <span class="brand-environment">@HostEnvironment.EnvironmentName</span>
                 }
+                <span class="brand-version" title="@Options.Value.GetAppVersion()">@Options.Value.GetAppVersion()</span>
             </div>
         </div>
     }
@@ -34,6 +30,6 @@
     [Parameter] public bool IconOnly { get; set; }
     /// <summary>Includes the mark beside host identity. Defaults to true.</summary>
     [Parameter] public bool ShowIcon { get; set; } = true;
-    /// <summary>Uses the spacious host identity with separate metadata lines in contextual navigation. Defaults to false.</summary>
+    /// <summary>Uses two compact identity lines with the host environment and version in contextual navigation. Defaults to false.</summary>
     [Parameter] public bool Contextual { get; set; }
 }

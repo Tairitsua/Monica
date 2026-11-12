@@ -48,9 +48,9 @@ public sealed class SchedulerRuntimePageStateTests
     {
         var boundary = new RuntimeBoundary
         {
-            Load = _ => Task.FromResult(new Res<JobSchedulerRuntimeOverview>
+            Load = _ => Task.FromResult(new Result<JobSchedulerRuntimeOverview>
             {
-                Status = nullSuccess ? ResStatus.Ok : ResStatus.BadRequest,
+                Status = nullSuccess ? ResultStatus.Ok : ResultStatus.BadRequest,
                 Message = null,
                 Data = null
             })
@@ -67,7 +67,7 @@ public sealed class SchedulerRuntimePageStateTests
         Assert.Empty(state.Workers);
         Assert.Equal(1, boundary.Registry.Calls);
 
-        boundary.Load = _ => Task.FromResult(Res.Ok(Snapshot()));
+        boundary.Load = _ => Task.FromResult(Result.Success(Snapshot()));
         await ObserveAsync(state.RefreshAsync());
         Assert.False(state.IsQueryFailed);
         Assert.True(state.HasLoadedSnapshot);
@@ -84,7 +84,7 @@ public sealed class SchedulerRuntimePageStateTests
         var prior = state.Overview;
         var coreAccepted = state.LastRefreshedUtc;
         boundary.Clock.UtcNow = InitialTime.AddMinutes(5);
-        boundary.Load = _ => Task.FromException<Res<JobSchedulerRuntimeOverview>>(new IOException("Core unavailable"));
+        boundary.Load = _ => Task.FromException<Result<JobSchedulerRuntimeOverview>>(new IOException("Core unavailable"));
         IReadOnlyList<JobSchedulerWorkerInstanceView> nextWorkers = [Worker("new-instance")];
         boundary.Registry.Load = _ => Task.FromResult(nextWorkers);
 
@@ -140,7 +140,7 @@ public sealed class SchedulerRuntimePageStateTests
         var registryAccepted = state.WorkerInsightObservedAtUtc;
         var next = Snapshot(InitialTime.AddHours(2));
         boundary.Clock.UtcNow = InitialTime.AddHours(2);
-        boundary.Load = _ => Task.FromResult(Res.Ok(next));
+        boundary.Load = _ => Task.FromResult(Result.Success(next));
         boundary.Registry.Load = _ => Task.FromException<IReadOnlyList<JobSchedulerWorkerInstanceView>>(
             new IOException("Registry unreachable"));
 
@@ -215,7 +215,7 @@ public sealed class SchedulerRuntimePageStateTests
     public async Task RefreshAsync_WhenLoadingSubscriberReenters_ShouldJoinReadsWithoutCircularNotificationWait()
     {
         var boundary = new RuntimeBoundary();
-        var result = Signal<Res<JobSchedulerRuntimeOverview>>();
+        var result = Signal<Result<JobSchedulerRuntimeOverview>>();
         boundary.Load = _ => result.Task;
         var state = boundary.Create();
         var joined = Signal<Task>();
@@ -233,7 +233,7 @@ public sealed class SchedulerRuntimePageStateTests
             var refresh = state.RefreshAsync();
             var reentry = await ObserveAsync(joined.Task);
             Assert.Equal(1, boundary.CoreCalls);
-            result.TrySetResult(Res.Ok(Snapshot()));
+            result.TrySetResult(Result.Success(Snapshot()));
             await ObserveAsync(Task.WhenAll(refresh, reentry));
             Assert.True(state.HasLoadedSnapshot);
             Assert.Equal(1, boundary.AuthorizationCalls);
@@ -241,7 +241,7 @@ public sealed class SchedulerRuntimePageStateTests
         }
         finally
         {
-            result.TrySetResult(Res.Ok(Snapshot()));
+            result.TrySetResult(Result.Success(Snapshot()));
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
     }
@@ -292,7 +292,7 @@ public sealed class SchedulerRuntimePageStateTests
     public async Task RefreshAsync_WhenJoinerReadCompletesBeforeLoadingPublication_ShouldKeepActualNotificationOwned()
     {
         var boundary = new RuntimeBoundary();
-        var read = Signal<Res<JobSchedulerRuntimeOverview>>();
+        var read = Signal<Result<JobSchedulerRuntimeOverview>>();
         var releaseNotification = Signal();
         boundary.Load = _ => read.Task;
         var state = boundary.Create();
@@ -302,7 +302,7 @@ public sealed class SchedulerRuntimePageStateTests
         Task retirement = Task.CompletedTask;
         try
         {
-            read.TrySetResult(Res.Ok(Snapshot()));
+            read.TrySetResult(Result.Success(Snapshot()));
             await ObserveAsync(joined);
             Assert.False(first.IsCompleted);
             retirement = state.DisposeAsync().AsTask();
@@ -313,7 +313,7 @@ public sealed class SchedulerRuntimePageStateTests
         }
         finally
         {
-            read.TrySetResult(Res.Ok(Snapshot()));
+            read.TrySetResult(Result.Success(Snapshot()));
             releaseNotification.TrySetResult();
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
@@ -398,7 +398,7 @@ public sealed class SchedulerRuntimePageStateTests
         var accepted = state.Overview;
         var coreAt = state.LastRefreshedUtc;
         var registryAt = state.WorkerInsightObservedAtUtc;
-        var core = Signal<Res<JobSchedulerRuntimeOverview>>();
+        var core = Signal<Result<JobSchedulerRuntimeOverview>>();
         var workers = Signal<IReadOnlyList<JobSchedulerWorkerInstanceView>>();
         if (registry) boundary.Registry.Load = _ => workers.Task;
         else boundary.Load = _ => core.Task;
@@ -410,7 +410,7 @@ public sealed class SchedulerRuntimePageStateTests
             Assert.False(retirement.IsCompleted);
             Assert.True((registry ? boundary.Registry.Token : boundary.CoreToken).IsCancellationRequested);
             boundary.Clock.UtcNow = InitialTime.AddHours(5);
-            core.TrySetResult(Res.Ok(Snapshot(boundary.Clock.UtcNow)));
+            core.TrySetResult(Result.Success(Snapshot(boundary.Clock.UtcNow)));
             workers.TrySetResult([Worker("late")]);
             await AssertCanceledAsync(refresh);
             await ObserveAsync(retirement);
@@ -424,7 +424,7 @@ public sealed class SchedulerRuntimePageStateTests
         }
         finally
         {
-            core.TrySetResult(Res.Ok(Snapshot()));
+            core.TrySetResult(Result.Success(Snapshot()));
             workers.TrySetResult([]);
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
@@ -435,7 +435,7 @@ public sealed class SchedulerRuntimePageStateTests
     {
         var boundary = new RuntimeBoundary
         {
-            Load = _ => Task.FromCanceled<Res<JobSchedulerRuntimeOverview>>(new CancellationToken(canceled: true))
+            Load = _ => Task.FromCanceled<Result<JobSchedulerRuntimeOverview>>(new CancellationToken(canceled: true))
         };
         await using var state = boundary.Create();
         await AssertCanceledAsync(state.RefreshAsync());
@@ -445,7 +445,7 @@ public sealed class SchedulerRuntimePageStateTests
         Assert.Null(state.Error);
         Assert.False(state.HasLoadedSnapshot);
         Assert.False(state.IsLoading);
-        boundary.Load = _ => Task.FromResult(Res.Ok(Snapshot()));
+        boundary.Load = _ => Task.FromResult(Result.Success(Snapshot()));
         await ObserveAsync(state.RefreshAsync());
         Assert.True(state.HasLoadedSnapshot);
     }
@@ -469,7 +469,7 @@ public sealed class SchedulerRuntimePageStateTests
     {
         var boundary = new RuntimeBoundary();
         var entered = Signal();
-        var pending = Signal<Res<JobSchedulerRuntimeOverview>>();
+        var pending = Signal<Result<JobSchedulerRuntimeOverview>>();
         var state = boundary.Create(interval: TimeSpan.FromSeconds(5));
         try
         {
@@ -482,7 +482,7 @@ public sealed class SchedulerRuntimePageStateTests
             await ObserveAsync(entered.Task);
             var joined = state.RefreshAsync();
             Assert.Equal(2, boundary.CoreCalls);
-            pending.TrySetResult(Res.Ok(Snapshot()));
+            pending.TrySetResult(Result.Success(Snapshot()));
             await ObserveAsync(joined);
             var retirement = state.DisposeAsync().AsTask();
             await ObserveAsync(retirement);
@@ -493,7 +493,7 @@ public sealed class SchedulerRuntimePageStateTests
         }
         finally
         {
-            pending.TrySetResult(Res.Ok(Snapshot()));
+            pending.TrySetResult(Result.Success(Snapshot()));
             await ObserveAsync(state.DisposeAsync().AsTask());
         }
     }
@@ -555,7 +555,7 @@ public sealed class SchedulerRuntimePageStateTests
                 reentrantRetirement = state.DisposeAsync().AsTask();
                 throw new IOException("Cancellation callback failed");
             });
-            return Task.FromResult(Res.Ok(Snapshot()));
+            return Task.FromResult(Result.Success(Snapshot()));
         };
         await ObserveAsync(state.InitializeAsync());
         var retirement = state.DisposeAsync().AsTask();
@@ -593,8 +593,10 @@ public sealed class SchedulerRuntimePageStateTests
         Configuration = new()
         {
             SchedulerScopeKey = " runtime/上海?scope=one ", OwnerKey = "owner", WorkerInstanceId = "worker",
-            RecurringJobDebugMode = false, CronTimeZoneId = "UTC", SchedulingPollInterval = TimeSpan.FromSeconds(1),
+            AutonomousWork = true, CronTimeZoneId = "UTC", SchedulingPollInterval = TimeSpan.FromSeconds(1),
             WorkerPollInterval = TimeSpan.FromSeconds(1), SnapshotSyncInterval = TimeSpan.FromSeconds(5),
+            CoordinatorLeaseDuration = TimeSpan.FromSeconds(30), MaxConcurrentStoreOperations = 8,
+            ReservedLeaseStoreOperations = 2, StoreOperationTimeout = TimeSpan.FromSeconds(5),
             ExecutionLeaseDuration = TimeSpan.FromSeconds(30), ExecutionLeaseRenewInterval = TimeSpan.FromSeconds(5),
             ExecutionRetryDelay = TimeSpan.FromSeconds(1), ExecutionCancellationGracePeriod = TimeSpan.FromSeconds(2),
             WorkerShutdownGracePeriod = TimeSpan.FromSeconds(3), MaxWorkerExecutionThreads = 4, MaxClaimBatchSize = 4,
@@ -617,8 +619,8 @@ public sealed class SchedulerRuntimePageStateTests
         internal ControlledTimeProvider Clock { get; } = new();
         internal RegistryProvider Registry { get; } = new();
         internal Func<CancellationToken, Task<bool>> Authorize { get; set; } = _ => Task.FromResult(true);
-        internal Func<CancellationToken, Task<Res<JobSchedulerRuntimeOverview>>> Load { get; set; } =
-            _ => Task.FromResult(Res.Ok(Snapshot()));
+        internal Func<CancellationToken, Task<Result<JobSchedulerRuntimeOverview>>> Load { get; set; } =
+            _ => Task.FromResult(Result.Success(Snapshot()));
         internal int AuthorizationCalls { get; private set; }
         internal int CoreCalls { get; private set; }
         internal CancellationToken AuthorizationToken { get; private set; }

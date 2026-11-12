@@ -1,0 +1,579 @@
+{
+  "Pages": {
+    "BuildingBlocks": {
+      "Title": "Building Blocks",
+      "Description": "Explore the host's discovered building blocks, architecture relationships, context completeness, and operational tools.",
+      "Overview": {
+        "Title": "Building block overview",
+        "Description": "Review catalog composition, context completeness, and building blocks that need attention."
+      },
+      "Catalog": {
+        "Title": "Building block catalog",
+        "Description": "Find discovered building blocks by identity, type, relationships, and diagnostics; inspect their full evidence."
+      },
+      "Graph": {
+        "Title": "Building block relationships",
+        "Description": "Trace directed dependencies, explore connected building blocks, and inspect the architecture graph."
+      },
+      "Events": {
+        "Title": "Domain event tools",
+        "Description": "Inspect event descriptors and prepare editable payloads for this host's distributed event bus."
+      },
+      "RequestFilters": {
+        "Title": "Request path controls",
+        "Description": "Review disabled request paths and manage the host's configured request filter."
+      },
+      "Enums": {
+        "Title": "Enum reference",
+        "Description": "Browse assembly and enum identities, value descriptions, and search matches."
+      }
+    }
+  },
+  "Page": {
+    "Header": {
+      "Title": "Building Blocks",
+      "Eyebrow": "Monica / Architecture Registry",
+      "Description": "Explore the host's discovered capabilities, architecture relationships, context completeness, and operational test tools."
+    },
+    "Tabs": {
+      "StatusOverview": "Overview",
+      "BuildingBlock": "Building block catalog",
+      "ArchitectureVisualization": "Relationships",
+      "DomainEventTester": "Domain events",
+      "RequestFilterManager": "Request paths",
+      "EnumInfo": "Enums"
+    }
+  },
+  "Workspace": {
+    "Context": "Architecture",
+    "NavigationLabel": "Building Blocks views"
+  },
+  "Shared": {
+    "Actions": {
+      "Refresh": "Refresh",
+      "Close": "Close",
+      "SelectAll": "Select all",
+      "Clear": "Clear",
+      "PreviousMatch": "Previous match",
+      "NextMatch": "Next match"
+    },
+    "Labels": {
+      "Unknown": "Unknown",
+      "NotDeclared": "Not declared",
+      "None": "None"
+    },
+    "Messages": {
+      "LoadFailed": "Load failed: {0}",
+      "LoadException": "Load exception: {0}"
+    },
+    "BuildingBlockKinds": {
+      "ApplicationRequestHandler": "Application Request Handler",
+      "CrudApplicationService": "CRUD Application Service",
+      "DomainService": "Domain Service",
+      "Repository": "Repository",
+      "DomainEvent": "Domain Event",
+      "DistributedEventHandler": "Distributed Event Handler",
+      "LocalEventHandler": "Local Event Handler",
+      "Seeder": "Seeder",
+      "RecurringJob": "Recurring Job",
+      "TriggeredJob": "Triggered Job",
+      "HostedService": "Hosted Service",
+      "HttpApi": "HTTP API",
+      "GrpcApi": "gRPC API",
+      "StateStore": "State Store",
+      "EventBus": "Event Bus",
+      "Actor": "Actor",
+      "Entity": "Entity",
+      "RequestDto": "Request DTO",
+      "Configuration": "Configuration"
+    },
+    "Counts": {
+      "Assembly": {
+        "Singular": "{0} assembly",
+        "Plural": "{0} assemblies"
+      },
+      "Enum": {
+        "Singular": "{0} enum",
+        "Plural": "{0} enums"
+      },
+      "EnumValue": {
+        "Singular": "{0} enum value",
+        "Plural": "{0} enum values"
+      },
+      "BuildingBlock": {
+        "Singular": "{0} building block",
+        "Plural": "{0} building blocks"
+      },
+      "Dependency": {
+        "Singular": "{0} dependency",
+        "Plural": "{0} dependencies"
+      },
+      "DependedBy": {
+        "Singular": "{0} dependent",
+        "Plural": "{0} dependents"
+      },
+      "Requirement": {
+        "Singular": "{0} requirement",
+        "Plural": "{0} requirements"
+      },
+      "Method": {
+        "Singular": "{0} method",
+        "Plural": "{0} methods"
+      },
+      "Error": {
+        "Singular": "{0} error",
+        "Plural": "{0} errors"
+      },
+      "Warning": {
+        "Singular": "{0} warning",
+        "Plural": "{0} warnings"
+      },
+      "Info": {
+        "Singular": "{0} info",
+        "Plural": "{0} infos"
+      },
+      "Match": {
+        "Singular": "{0} match",
+        "Plural": "{0} matches"
+      }
+    },
+    "AlertLevels": {
+      "Info": "Info",
+      "Warning": "Warning",
+      "Error": "Error"
+    },
+    "ConfigurationModes": {
+      "Offline": "Offline configuration",
+      "Online": "Online configuration",
+      "Unknown": "Unknown mode"
+    },
+    "ConfigurationUsageTypes": {
+      "Offline": "IOptions",
+      "OnlineSnapshot": "IOptionsSnapshot",
+      "OnlineMonitor": "IOptionsMonitor",
+      "Unknown": "Unknown usage"
+    },
+    "MethodModifiers": {
+      "Static": "Static",
+      "Virtual": "Virtual",
+      "Abstract": "Abstract",
+      "Async": "Async"
+    }
+  },
+  "DomainEventTester": {
+    "Header": {
+      "Title": "Domain Event Tester",
+      "Description": "Inspect a discovered event contract, edit its JSON draft, and publish through this host."
+    },
+    "Actions": {
+      "Refresh": "Refresh event list",
+      "Publish": "Publish event",
+      "Publishing": "Publishing..."
+    },
+    "Sections": {
+      "EventList": "Discovered events",
+      "EventTester": "Payload draft"
+    },
+    "Fields": {
+      "EventName": "Dispatch identity",
+      "EventContent": "Event content (JSON)",
+      "EventContentPlaceholder": "Enter the event JSON payload..."
+    },
+    "States": {
+      "Empty": "No domain events were discovered in this host.",
+      "NoSelection": "Select a discovered event to inspect its identity and prepare a payload."
+    },
+    "Messages": {
+      "SelectEventAndContent": "Select an event and provide its content.",
+      "PublishFailed": "Publish failed: {0}",
+      "PublishSucceeded": "Published successfully.",
+      "PublishException": "Publish exception: {0}"
+    },
+    "Desk": {
+      "Eyebrow": "EVENT CONTRACTS",
+      "DraftLabel": "EDITABLE PAYLOAD",
+      "DispatchHint": "Publishes through this host's distributed event bus.",
+      "DraftHint": "Selection generates a representative draft. Publishing sends the edited JSON."
+    }
+  },
+  "EnumInfoViewer": {
+    "Header": {
+      "Title": "Enum Information Viewer",
+      "Description": "Navigate the host's assembly, enum, and value catalog without losing technical context."
+    },
+    "Search": {
+      "Placeholder": "Search assemblies, enums, and values",
+      "Hint": "All keywords must match one assembly, enum, or value. Matches navigate the complete catalog."
+    },
+    "Panels": {
+      "Assemblies": "Assemblies",
+      "Enums": "Enums",
+      "Values": "Enum values"
+    },
+    "States": {
+      "Empty": "No enums were discovered in this host.",
+      "SelectAssembly": "Select an assembly to inspect its enums.",
+      "SelectEnum": "Select an enum to inspect its values."
+    },
+    "Summaries": {
+      "NotLoaded": "Data not loaded",
+      "SelectAssembly": "Displayed after selecting an assembly",
+      "SelectEnum": "Displayed after selecting an enum",
+      "StartSearch": "Enter keywords to start searching",
+      "MatchProgress": "{0} / {1} matches"
+    },
+    "Desk": {
+      "Eyebrow": "ENUM REFERENCE",
+      "SearchLabel": "Search the full enum catalog",
+      "StagesLabel": "Reference panels",
+      "PositionHint": "Position is enumeration order, not the numeric enum value.",
+      "Position": "Position",
+      "NavigationFailed": "Enum navigation is unavailable: {0}"
+    }
+  },
+  "BuildingBlockFilterPanel": {
+    "Fields": {
+      "SearchLabel": "Search building blocks",
+      "SearchHelper": "Search by name, full name, owner, tag, or description"
+    },
+    "Sections": {
+      "TypeFilter": "Building block kind filters"
+    },
+    "Formats": {
+      "TypeCount": "{0} · {1}"
+    },
+    "Switches": {
+      "OnlyDependencies": "Show only building blocks with dependencies",
+      "OnlyAlerts": "Show only building blocks with alerts"
+    },
+    "Actions": {
+      "ClearSearch": "Clear search"
+    }
+  },
+  "BuildingBlockLayoutPanel": {
+    "Sections": {
+      "LayoutType": "Layout type"
+    },
+    "Layouts": {
+      "Force": "Force",
+      "Hierarchy": "Hierarchy",
+      "Circular": "Circular",
+      "MultiCircular": "Multi-circular"
+    },
+    "Fields": {
+      "ForceDistance": "Node distance: {0}",
+      "ForceStrength": "Repulsion strength: {0}"
+    },
+    "Workspace": {
+      "DistanceLabel": "Force link distance",
+      "StrengthLabel": "Force charge strength"
+    }
+  },
+  "BuildingBlockMonitor": {
+    "Header": {
+      "Title": "Building block catalog",
+      "Description": "Find a discovered capability, read its full identity, and inspect its relationships.",
+      "Eyebrow": "Architecture registry"
+    },
+    "Columns": {
+      "Name": "Building block name",
+      "FullName": "Full name",
+      "Type": "Building block kind",
+      "Dependencies": "Dependencies",
+      "DependedBy": "Depended by",
+      "Actions": "Actions"
+    },
+    "States": {
+      "Empty": "No building block data is available. Click refresh to load the data.",
+      "NoMatches": "No building blocks match the current filters.",
+      "Retained": "The previously loaded catalog remains visible. Refresh did not replace it."
+    },
+    "Summary": {
+      "VisibleCount": "Showing {0} of {1} building blocks",
+      "SortHint": "Name and full name support multiple sorting.",
+      "SortBy": "Sort by"
+    },
+    "Sorting": {
+      "KeyAscending": "Full key: ascending",
+      "KeyDescending": "Full key: descending",
+      "KeyNone": "Sort by full key"
+    },
+    "Actions": {
+      "Reset": "Reset filters",
+      "Inspect": "Inspect {0}"
+    }
+  },
+  "BuildingBlockDetailDialog": {
+    "Title": "Architectural dossier",
+    "Fields": {
+      "Owner": "Owner",
+      "Dependencies": "Dependencies",
+      "DependedBy": "Depended by",
+      "Methods": "Methods",
+      "Alerts": "Alerts",
+      "ConstructorParameters": "Constructor parameters",
+      "DefinitionKey": "Definition key",
+      "ConfigurationMode": "Access mode"
+    },
+    "Sections": {
+      "Requirements": "Requirement traceability",
+      "RequirementsHint": "Links are resolved by the current application only when this detail is opened.",
+      "Tags": "Tags",
+      "Relationships": "Architecture relationships",
+      "Configuration": "Configuration behavior",
+      "TechnicalShape": "Technical shape",
+      "PublicMethods": "Public methods ({0})",
+      "Identity": "Building block",
+      "RelationshipsHint": "Follow full catalog identities to inspect outgoing dependencies and incoming dependents.",
+      "ConfigurationHint": "Definition metadata and discovered options access patterns. Configuration values are not loaded here.",
+      "TechnicalHint": "Discovered constructor and public method metadata. Opening this dossier does not execute the building block."
+    },
+    "Badges": {
+      "MetadataDeclared": "Metadata declared",
+      "MetadataMissing": "Metadata missing",
+      "Resolved": "Resolved",
+      "Unresolved": "Unresolved"
+    },
+    "States": {
+      "Loading": "Loading building-block details...",
+      "LoadFailed": "Unable to load building-block details: {0}",
+      "NoRequirements": "No requirement references have been declared for this building block.",
+      "NoDescription": "No description has been declared for this building block."
+    },
+    "Actions": {
+      "FocusInGraph": "Focus in graph"
+    }
+  },
+  "BuildingBlockDashboard": {
+    "Actions": {
+      "Retry": "Retry",
+      "Inspect": "Inspect {0}"
+    },
+    "Service": {
+      "Eyebrow": "Active service catalog",
+      "ProjectName": "Project: {0}",
+      "AppId": "Application ID: {0}",
+      "Domain": "Domain: {0}",
+      "Scope": "The current host's discovered catalog. Reloading this view does not rescan assemblies or execute building blocks."
+    },
+    "Metrics": {
+      "TotalBuildingBlocks": "Building blocks",
+      "Kinds": "Building block kinds"
+    },
+    "Sections": {
+      "Distribution": "Building block distribution",
+      "DistributionHint": "Discovered architecture categories in the current host.",
+      "Coverage": "Context coverage",
+      "CoverageHint": "Independent evidence dimensions across every discovered building block.",
+      "ArchitectureHealth": "Topology & diagnostics",
+      "ArchitectureHealthHint": "Topology and explicit discovery diagnostics for this host.",
+      "CoverageGaps": "Building blocks needing context",
+      "CoverageGapsHint": "Inspect missing context and declared diagnostics. These are catalog observations, not runtime health checks.",
+      "CoverageEyebrow": "Context completeness",
+      "WholeCatalog": "Whole catalog",
+      "AttentionEyebrow": "Context backlog"
+    },
+    "Coverage": {
+      "Metadata": "Metadata",
+      "Description": "Description",
+      "Ownership": "Ownership",
+      "Requirements": "Requirements",
+      "Ratio": "{0} of {1} building blocks"
+    },
+    "Health": {
+      "DependencyEdges": "Dependency edges",
+      "IsolatedBuildingBlocks": "Isolated building blocks",
+      "Errors": "Errors",
+      "Warnings": "Warnings",
+      "Information": "Information"
+    },
+    "Gaps": {
+      "Missing": "Missing {0}",
+      "Alerts": "{0} alerts",
+      "VisibleCount": "{0} of {1} backlog building blocks",
+      "PageRange": "{0}–{1} of {2}",
+      "PageSize": "Rows per page",
+      "FirstPage": "First page",
+      "PreviousPage": "Previous page",
+      "NextPage": "Next page",
+      "LastPage": "Last page",
+      "PageNumber": "{0} / {1}"
+    },
+    "States": {
+      "Loading": "Loading architecture status...",
+      "LoadFailedTitle": "Architecture status is unavailable",
+      "LoadFailed": "Unable to load the building-block dashboard: {0}",
+      "EmptyTitle": "No building blocks discovered",
+      "EmptyDescription": "The current host has no supported building-block types. Coverage has no data and is not treated as complete.",
+      "NoCoverageGaps": "Every discovered building block has complete context metadata and no catalog alerts.",
+      "Retained": "The previously loaded snapshot remains visible. Refresh did not replace it.",
+      "NoGapMatches": "No building blocks in the context backlog match these filters."
+    },
+    "Filters": {
+      "Search": "Search backlog",
+      "Placeholder": "Name, full name, owner, tag, or description",
+      "Type": "Building block kind",
+      "AllTypes": "All types",
+      "Missing": "Missing context",
+      "AllGaps": "Any context dimension",
+      "OnlyAlerts": "Only building blocks with alerts",
+      "Reset": "Reset filters"
+    }
+  },
+  "BuildingBlockVisualization": {
+    "Header": {
+      "Title": "Project Architecture Visualization",
+      "Description": "Explore building block topology interactively, then refine the graph by type, relationship, or alert state."
+    },
+    "Actions": {
+      "RefreshTooltip": "Refresh data",
+      "ResetViewTooltip": "Reset view",
+      "LayoutSettingsTooltip": "Layout settings",
+      "FilterSettingsTooltip": "Filter settings"
+    },
+    "States": {},
+    "Legend": {
+      "SimpleBuildingBlock": "Circle: simple building block",
+      "ComplexBuildingBlock": "Rectangle: complex building block"
+    },
+    "Messages": {
+      "CopiedToClipboard": "Copied to clipboard.",
+      "ShowingRelatedNodes": "Showing all nodes connected to {0}."
+    },
+    "ContextMenu": {
+      "Details": "View details",
+      "FocusNode": "Focus this node",
+      "FilterByType": "Filter by type",
+      "ClearRelatedFilter": "Clear related-node filter",
+      "ShowOtherRelatedNodes": "Show other related nodes",
+      "ShowRelatedNodes": "Show related nodes",
+      "ClearAllFilters": "Clear all filters",
+      "CopyFullName": "Copy full name"
+    },
+    "Graph": {
+      "NoMetadata": "No metadata",
+      "Tooltip": {
+        "Type": "Type: {0}",
+        "Dependencies": "Dependencies: {0}",
+        "DependedBy": "Depended by: {0}"
+      },
+      "Summary": {
+        "Dependencies": "Dependencies: {0}",
+        "DependedBy": "Depended by: {0}"
+      },
+      "MetadataLabels": {
+        "Tags": "Tags",
+        "Description": "Description",
+        "Owner": "Owner",
+        "RequirementCount": "Requirement count",
+        "DependencyCount": "Dependency count",
+        "MethodCount": "Method count"
+      }
+    },
+    "Workspace": {
+      "Eyebrow": "Dependency atlas",
+      "ConnectedScope": "Connected component",
+      "ConnectedScopeHint": "This scope follows dependencies in both directions and temporarily overrides the ordinary filters.",
+      "CanvasLabel": "Building block dependency graph",
+      "VisibleBuildingBlocks": "visible / {0} catalog building blocks",
+      "DirectedEdges": "directed dependencies",
+      "Fit": "Fit all visible building blocks",
+      "ZoomOut": "Zoom out",
+      "ZoomIn": "Zoom in",
+      "Loading": "Loading the host catalog…",
+      "LoadError": "The catalog could not be loaded",
+      "EmptyCatalog": "No building blocks discovered",
+      "EmptyCatalogHint": "This host has not registered any building blocks in its catalog.",
+      "NoMatches": "No building blocks in this scope",
+      "NoMatchesHint": "Adjust the filters or clear the current scope to explore the catalog.",
+      "CanvasHint": "Pan and zoom to explore. Select a node to inspect; right-click for scope actions. The ledgers below provide the same identities and directed relationships.",
+      "SelectedLabel": "Selected building block",
+      "OutsideScope": "This building block is outside the current visible scope. Its catalog evidence remains available.",
+      "Dependencies": "Depends on",
+      "Dependents": "Used by",
+      "Methods": "Methods",
+      "NoDependencies": "No outgoing dependencies recorded.",
+      "NoDependents": "No incoming dependents recorded.",
+      "SelectBuildingBlock": "Trace a building block",
+      "SelectBuildingBlockHint": "Select a graph node or a ledger row to read its identity, dependency direction, and available actions.",
+      "NativeEvidence": "Building blocks and relationships",
+      "NativeEyebrow": "Accessible evidence",
+      "NativeHint": "The same visible scope, with full CLR identities and native keyboard actions. Dependencies run from the consuming building block to the required building block.",
+      "HideEvidence": "Hide ledger",
+      "ShowEvidence": "Open ledger",
+      "BuildingBlocksTab": "Building blocks · {0}",
+      "RelationshipsTab": "Relationships · {0}",
+      "BuildingBlockColumn": "Building block",
+      "ActionsColumn": "Actions",
+      "SourceColumn": "Consuming building block",
+      "TargetColumn": "Required building block",
+      "DependencyDirection": "depends on",
+      "NoEvidence": "No records in this visible scope.",
+      "PageRange": "{0}–{1} of {2} records",
+      "PreviousPage": "Previous evidence page",
+      "NextPage": "Next evidence page"
+    }
+  },
+  "RequestFilterManager": {
+    "Header": {
+      "Title": "Request Filter Manager",
+      "Description": "Review this host's request-filter state and apply explicit changes to individual or batch paths."
+    },
+    "Actions": {
+      "RefreshState": "Refresh state",
+      "Disable": "Disable",
+      "Enable": "Enable",
+      "BatchDisable": "Batch disable",
+      "BatchEnable": "Batch enable",
+      "EnableAllUrls": "Enable all URLs"
+    },
+    "Fields": {
+      "UrlPath": "URL path",
+      "UrlPlaceholder": "Example: /api/test",
+      "BatchUrls": "Batch URLs (one per line)",
+      "BatchUrlsPlaceholder": "Example:\n/api/test1\n/api/test2\n/api/test3"
+    },
+    "Sections": {
+      "UrlManagement": "URL management",
+      "BatchManagement": "Batch management",
+      "DisabledUrls": "Currently disabled URLs"
+    },
+    "States": {
+      "EmptyDisabledUrls": "No paths are listed as disabled in this snapshot."
+    },
+    "Messages": {
+      "RequireUrl": "Enter a URL path.",
+      "RequireBatchUrls": "Enter the URL list to manage.",
+      "NoValidUrls": "No valid URLs were found.",
+      "OperationFailed": "Operation failed: {0}",
+      "OperationException": "Operation exception: {0}",
+      "DisableSucceeded": "URL disabled successfully.",
+      "EnableSucceeded": "URL enabled successfully.",
+      "BatchOperationFailed": "Batch operation failed: {0}",
+      "BatchOperationException": "Batch operation exception: {0}",
+      "BatchDisableSucceeded": "Disabled {0} URLs successfully.",
+      "BatchEnableSucceeded": "Enabled {0} URLs successfully.",
+      "EnableSingleFailed": "Failed to enable the URL: {0}",
+      "EnableSingleSucceeded": "URL {0} enabled successfully.",
+      "EnableSingleException": "Enable exception: {0}",
+      "EnableAllFailed": "Failed to enable all URLs: {0}",
+      "EnableAllSucceeded": "All URLs have been enabled successfully.",
+      "EnableAllException": "Enable all exception: {0}"
+    },
+    "Desk": {
+      "Eyebrow": "REQUEST PATH OPERATIONS",
+      "StateLabel": "HOST FILTER SNAPSHOT",
+      "Available": "Request-filter service registered",
+      "Unavailable": "Request-filter service unavailable",
+      "AvailabilityHint": "This snapshot lists paths disabled by the registered filter. Middleware attachment and access policies are separate.",
+      "UnavailableHint": "This host has no registered request-filter service. Path changes are unavailable.",
+      "EnablePath": "Enable path {0}",
+      "ControlsHint": "Trimmed paths are applied exactly; path casing is preserved.",
+      "ModeLabel": "Path input mode",
+      "SingleMode": "Single path",
+      "BatchMode": "Batch paths",
+      "BatchCount": "{0} input paths · one per line",
+      "Applying": "Applying path changes…"
+    }
+  }
+}

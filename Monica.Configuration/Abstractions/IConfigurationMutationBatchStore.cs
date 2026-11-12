@@ -12,6 +12,9 @@ namespace Monica.Configuration.Abstractions;
 /// </remarks>
 public interface IConfigurationMutationBatchStore
 {
+    /// <summary>Whether every item atomically checks its active-publication evidence before its value write.</summary>
+    bool SupportsPublishedDefinitionGuard => false;
+
     /// <summary>
     /// Persists one prepared mutation group.
     /// </summary>

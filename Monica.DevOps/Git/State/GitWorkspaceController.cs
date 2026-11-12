@@ -151,16 +151,19 @@ public sealed class GitWorkspaceController(GitFacade facade, IOptions<ModuleGitO
         {
             case GitCommandKind.SyncAll:
                 var all = await facade.SyncAllAsync();
-                return all.IsFailed(out var allError, out var results)
-                    ? new(scope, allError, [], null) : new(scope, null, results, null);
+                var results = all.Data;
+                return all.IsFailure() || results is null
+                    ? new(scope, all.Message ?? string.Empty, [], null) : new(scope, null, results, null);
             case GitCommandKind.DeleteLocal:
                 var deletion = await facade.DeleteRepositoryAsync(scope.Targets[0].Id);
-                return deletion.IsFailed(out var deleteError, out var deleted)
-                    ? new(scope, deleteError, [], null) : new(scope, null, [], deleted);
+                var deleted = deletion.Data;
+                return deletion.IsFailure() || deleted is null
+                    ? new(scope, deletion.Message ?? string.Empty, [], null) : new(scope, null, [], deleted);
             default:
                 var sync = await facade.SyncRepositoryAsync(scope.Targets[0].Id);
-                return sync.IsFailed(out var syncError, out var result)
-                    ? new(scope, syncError, [], null) : new(scope, null, [result], null);
+                var result = sync.Data;
+                return sync.IsFailure() || result is null
+                    ? new(scope, sync.Message ?? string.Empty, [], null) : new(scope, null, [result], null);
         }
     }
 
@@ -168,7 +171,8 @@ public sealed class GitWorkspaceController(GitFacade facade, IOptions<ModuleGitO
     {
         var repositories = await facade.GetRepositoriesAsync();
         if (IsRetired) return;
-        if (repositories.IsFailed(out var error, out var values)) RepositoryFailure = new(GitWorkspaceReadKind.Repositories, error);
+        var values = repositories.Data;
+        if (repositories.IsFailure() || values is null) RepositoryFailure = new(GitWorkspaceReadKind.Repositories, repositories.Message ?? string.Empty);
         else
         {
             Repositories = values.ToArray();
@@ -185,12 +189,14 @@ public sealed class GitWorkspaceController(GitFacade facade, IOptions<ModuleGitO
     {
         var credentials = await facade.GetCredentialsAsync();
         if (IsRetired) return;
-        if (credentials.IsFailed(out var credentialError, out var credentialValues))
-        { MetadataFailure = new(GitWorkspaceReadKind.Credentials, credentialError); Notify(); return; }
+        var credentialValues = credentials.Data;
+        if (credentials.IsFailure() || credentialValues is null)
+        { MetadataFailure = new(GitWorkspaceReadKind.Credentials, credentials.Message ?? string.Empty); Notify(); return; }
         var resolvers = await facade.GetCredentialResolversAsync();
         if (IsRetired) return;
-        if (resolvers.IsFailed(out var resolverError, out var resolverValues))
-        { MetadataFailure = new(GitWorkspaceReadKind.Resolvers, resolverError); Notify(); return; }
+        var resolverValues = resolvers.Data;
+        if (resolvers.IsFailure() || resolverValues is null)
+        { MetadataFailure = new(GitWorkspaceReadKind.Resolvers, resolvers.Message ?? string.Empty); Notify(); return; }
         Credentials = credentialValues.ToArray();
         Resolvers = resolverValues.ToArray();
         MetadataFailure = null;

@@ -17,5 +17,5 @@ public interface IRemoteResultEnvelope<TSelf> : IResultEnvelope
     /// <param name="status">The failure status.</param>
     /// <param name="message">The user-facing failure message.</param>
     /// <returns>A valid failure envelope of the concrete type.</returns>
-    static abstract TSelf CreateRemoteFailure(ResStatus status, string message);
+    static abstract TSelf CreateRemoteFailure(ResultStatus status, string message);
 }

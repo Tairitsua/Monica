@@ -174,7 +174,7 @@ public sealed record JobPolicyBatchUpdateItemResult
     /// Gets the structured failure status when this item failed. Conflict identifies an optimistic-concurrency miss,
     /// not-found identifies an unknown definition, and bad-request identifies invalid overrides.
     /// </summary>
-    public ResStatus? FailureStatus { get; init; }
+    public ResultStatus? FailureStatus { get; init; }
 
     /// <summary>
     /// Gets whether this item completed successfully.

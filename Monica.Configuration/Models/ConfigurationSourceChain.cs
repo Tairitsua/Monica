@@ -5,6 +5,15 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationSourceChain
 {
+    /// <summary>Gets whether current providers describe managed effective values or deployment candidates.</summary>
+    public ConfigurationKind Kind { get; init; } = ConfigurationKind.Managed;
+
+    /// <summary>Gets the frozen running Startup value and its candidate diagnostics, when applicable.</summary>
+    public ConfigurationEffectiveValue? StartupActualValue { get; init; }
+
+    /// <summary>Gets the original provider contributions captured before composition for a Startup definition.</summary>
+    public IReadOnlyList<ConfigurationSourceValue> StartupValues { get; init; } = [];
+
     /// <summary>
     /// Gets the owning configuration definition key.
     /// </summary>
@@ -31,6 +40,9 @@ public sealed record ConfigurationSourceChain
 /// </summary>
 public sealed record ConfigurationSourceValue
 {
+    /// <summary>Whether this contribution is a validated temporary seed with no persisted managed document.</summary>
+    public bool IsUnpersisted { get; init; }
+
     /// <summary>
     /// Gets the source descriptor.
     /// </summary>

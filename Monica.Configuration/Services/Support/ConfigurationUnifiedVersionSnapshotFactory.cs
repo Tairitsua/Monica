@@ -151,7 +151,7 @@ internal sealed class ConfigurationUnifiedVersionSnapshotFactory(
 
         var definitions = await definitionResolver.GetMergedDefinitionsAsync(cancellationToken);
         return definitions
-            .Where(definition => activeFilters.Any(filter => filter.ShouldInclude(definition)))
+            .Where(definition => definition.Kind == ConfigurationKind.Managed && activeFilters.Any(filter => filter.ShouldInclude(definition)))
             .OrderBy(definition => definition.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(definition => definition.DefinitionKey, StringComparer.OrdinalIgnoreCase)
             .ToArray();

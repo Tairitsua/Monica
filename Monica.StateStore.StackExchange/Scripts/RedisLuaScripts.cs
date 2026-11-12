@@ -3,167 +3,117 @@ using StackExchange.Redis;
 namespace Monica.StateStore.StackExchange.Scripts;
 
 /// <summary>
-/// Lua scripts for atomic Redis operations with version-based ETag.
-/// Data is stored in Hash format with fields: data, version
-/// ETag = version.ToString()
-/// Reference: Dapr components-contrib/state/redis/redis.go
+/// Atomic operations for state hashes containing JSON in <c>data</c> and an integer ETag in <c>version</c>.
+/// Positive TTL parameters are milliseconds; zero clears an existing expiry. Redis errors propagate to the caller.
 /// </summary>
 public static class RedisLuaScripts
 {
     /// <summary>
-    /// Get value with ETag (version-based) using Hash storage
-    /// @key = Redis key
-    /// Returns: {data, version_string} or {nil, '0'} if not exists
+    /// Reads JSON and its exact version string, or returns a null value and empty ETag for a missing key.
+    /// A hash with data but no version is invalid state and raises an error.
     /// </summary>
     public const string GetWithETag = """
         local data = redis.call('HGET', @key, 'data')
         if data == false then
-            return {false, '0'}
+            return {false, ''}
         end
         local version = redis.call('HGET', @key, 'version')
-        return {data, tostring(version or 0)}
+        if not version or version == '' then
+            return redis.error_reply('State hash is missing its version field')
+        end
+        return {data, version}
         """;
 
     /// <summary>
-    /// Save state with version increment using Hash storage (with TTL)
-    /// @key = Redis key
-    /// @data = JSON data to store
-    /// @etag = expected ETag ("0" to skip check, used for regular saves)
-    /// @ttl = TTL in seconds (0 or negative = no expiry)
-    /// Returns: new version as string
-    /// Reference: Dapr setDefaultQuery pattern
+    /// Saves JSON, increments the version, and applies the requested expiry atomically.
+    /// Foreign Redis types and invalid integer versions fail without deleting or replacing their contents.
     /// </summary>
     public const string SaveState = """
-        local currentEtag = redis.pcall('HGET', @key, 'version')
-        if type(currentEtag) == 'table' then
-            redis.call('DEL', @key)
-            currentEtag = false
-        end
-        if not currentEtag or currentEtag == '' or currentEtag == @etag or @etag == '0' then
-            redis.call('HSET', @key, 'data', @data)
-            local newVersion = redis.call('HINCRBY', @key, 'version', 1)
-            local ttlNum = tonumber(@ttl)
-            if ttlNum and ttlNum > 0 then
-                redis.call('EXPIRE', @key, ttlNum)
-            end
-            return tostring(newVersion)
+        redis.call('HINCRBY', @key, 'version', 1)
+        redis.call('HSET', @key, 'data', @data)
+        if tonumber(@ttl) > 0 then
+            redis.call('PEXPIRE', @key, @ttl)
         else
-            return error('ETag mismatch')
+            redis.call('PERSIST', @key)
         end
+        return redis.call('HGET', @key, 'version')
         """;
 
     /// <summary>
-    /// Compare-and-swap with strict ETag check using Hash storage (with TTL)
-    /// @key = Redis key
-    /// @etag = expected ETag (version string)
-    /// @data = new JSON data
-    /// @ttl = TTL in seconds (0 or negative = no expiry)
-    /// Returns: new version as string if successful, nil if ETag mismatch
+    /// Saves only when an existing hash has the exact expected ETag; a missing key returns null.
+    /// ETags are compared as strings so versions above Lua's exact numeric range remain usable.
     /// </summary>
     public const string CompareAndSwap = """
-        local currentEtag = redis.pcall('HGET', @key, 'version')
-        if type(currentEtag) == 'table' then
-            currentEtag = false
-        end
-        local currentVersion = currentEtag and tonumber(currentEtag) or 0
-        if tostring(currentVersion) ~= @etag then
+        local currentEtag = redis.call('HGET', @key, 'version')
+        if not currentEtag or currentEtag == '' or currentEtag ~= @etag then
             return nil
         end
+        redis.call('HINCRBY', @key, 'version', 1)
         redis.call('HSET', @key, 'data', @data)
-        local newVersion = redis.call('HINCRBY', @key, 'version', 1)
-        local ttlNum = tonumber(@ttl)
-        if ttlNum and ttlNum > 0 then
-            redis.call('EXPIRE', @key, ttlNum)
+        if tonumber(@ttl) > 0 then
+            redis.call('PEXPIRE', @key, @ttl)
+        else
+            redis.call('PERSIST', @key)
         end
-        return tostring(newVersion)
+        return redis.call('HGET', @key, 'version')
         """;
 
     /// <summary>
-    /// Delete with ETag verification using Hash storage
-    /// @key = Redis key
-    /// @etag = expected ETag (version string, "0" to skip check)
-    /// Returns: 1 if deleted, 0 if ETag mismatch
-    /// Reference: Dapr delDefaultQuery pattern
+    /// Deletes only when an existing hash has the exact expected ETag. No ETag is a wildcard.
+    /// Returns one when deleted and zero for missing state or a mismatch.
     /// </summary>
     public const string DeleteWithETag = """
-        local currentEtag = redis.pcall('HGET', @key, 'version')
-        if not currentEtag or type(currentEtag) == 'table' or currentEtag == '' then
-            if @etag == '0' or @etag == '' then
-                return 1
-            end
+        local currentEtag = redis.call('HGET', @key, 'version')
+        if not currentEtag or currentEtag == '' or currentEtag ~= @etag then
             return 0
         end
-        if currentEtag == @etag or @etag == '0' then
-            return redis.call('DEL', @key)
-        else
-            return 0
-        end
+        return redis.call('DEL', @key)
         """;
 
     /// <summary>
-    /// Save state only if key does not exist (atomic first-write) using Hash storage (with TTL)
-    /// @key = Redis key
-    /// @data = JSON data
-    /// @ttl = TTL in seconds (0 or negative = no expiry)
-    /// Returns: 1 if saved (new key), 0 if key already exists
+    /// Creates a version-one hash only when the physical Redis key is absent, and applies its expiry atomically.
+    /// Returns one when created and zero when any key already exists, including a JSON-null payload.
     /// </summary>
     public const string SaveIfNotExists = """
-        local exists = redis.call('EXISTS', @key)
-        if exists == 1 then
+        if redis.call('EXISTS', @key) == 1 then
             return 0
         end
         redis.call('HSET', @key, 'data', @data, 'version', 1)
-        local ttlNum = tonumber(@ttl)
-        if ttlNum and ttlNum > 0 then
-            redis.call('EXPIRE', @key, ttlNum)
+        if tonumber(@ttl) > 0 then
+            redis.call('PEXPIRE', @key, @ttl)
         end
         return 1
         """;
 
-    // Cached prepared scripts
-    private static LuaScript? _getWithETagScript;
-    private static LuaScript? _saveStateScript;
-    private static LuaScript? _compareAndSwapScript;
-    private static LuaScript? _deleteWithETagScript;
-    private static LuaScript? _saveIfNotExistsScript;
-
     /// <summary>
-    /// Gets the prepared GetWithETag Lua script
+    /// Reads the remaining milliseconds atomically: minus two means absent and minus one means permanent.
     /// </summary>
-    public static LuaScript GetGetWithETagScript()
-    {
-        return _getWithETagScript ??= LuaScript.Prepare(GetWithETag);
-    }
+    public const string KeyTtl = """
+        return redis.call('PTTL', @key)
+        """;
 
-    /// <summary>
-    /// Gets the prepared SaveState Lua script
-    /// </summary>
-    public static LuaScript GetSaveStateScript()
-    {
-        return _saveStateScript ??= LuaScript.Prepare(SaveState);
-    }
+    private static readonly LuaScript GetWithETagScript = LuaScript.Prepare(GetWithETag);
+    private static readonly LuaScript SaveStateScript = LuaScript.Prepare(SaveState);
+    private static readonly LuaScript CompareAndSwapScript = LuaScript.Prepare(CompareAndSwap);
+    private static readonly LuaScript DeleteWithETagScript = LuaScript.Prepare(DeleteWithETag);
+    private static readonly LuaScript SaveIfNotExistsScript = LuaScript.Prepare(SaveIfNotExists);
+    private static readonly LuaScript KeyTtlScript = LuaScript.Prepare(KeyTtl);
 
-    /// <summary>
-    /// Gets the prepared CompareAndSwap Lua script
-    /// </summary>
-    public static LuaScript GetCompareAndSwapScript()
-    {
-        return _compareAndSwapScript ??= LuaScript.Prepare(CompareAndSwap);
-    }
+    /// <summary>Gets the prepared state/ETag read script.</summary>
+    public static LuaScript GetGetWithETagScript() => GetWithETagScript;
 
-    /// <summary>
-    /// Gets the prepared DeleteWithETag Lua script
-    /// </summary>
-    public static LuaScript GetDeleteWithETagScript()
-    {
-        return _deleteWithETagScript ??= LuaScript.Prepare(DeleteWithETag);
-    }
+    /// <summary>Gets the prepared unconditional save script.</summary>
+    public static LuaScript GetSaveStateScript() => SaveStateScript;
 
-    /// <summary>
-    /// Gets the prepared SaveIfNotExists Lua script
-    /// </summary>
-    public static LuaScript GetSaveIfNotExistsScript()
-    {
-        return _saveIfNotExistsScript ??= LuaScript.Prepare(SaveIfNotExists);
-    }
+    /// <summary>Gets the prepared conditional save script.</summary>
+    public static LuaScript GetCompareAndSwapScript() => CompareAndSwapScript;
+
+    /// <summary>Gets the prepared conditional deletion script.</summary>
+    public static LuaScript GetDeleteWithETagScript() => DeleteWithETagScript;
+
+    /// <summary>Gets the prepared create-if-absent script.</summary>
+    public static LuaScript GetSaveIfNotExistsScript() => SaveIfNotExistsScript;
+
+    /// <summary>Gets the prepared TTL read script.</summary>
+    public static LuaScript GetKeyTtlScript() => KeyTtlScript;
 }

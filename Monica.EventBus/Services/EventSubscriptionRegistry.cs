@@ -1,6 +1,11 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.EventBus.Abstractions;
+using Monica.EventBus.Abstractions.Handlers;
+using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
 using Monica.EventBus.Models.Internal;
 
@@ -9,12 +14,16 @@ namespace Monica.EventBus.Services;
 /// <summary>
 /// Manages subscription lifecycle and provides queryable access to all subscriptions.
 /// </summary>
-public class EventSubscriptionRegistry(ILogger<EventSubscriptionRegistry> logger) : IEventSubscriptionRegistry
+public class EventSubscriptionRegistry(
+    ILogger<EventSubscriptionRegistry> logger,
+    ITypeActivationPolicy? activation = null,
+    MonicaApplication? application = null) : IEventSubscriptionRegistry
 {
     private readonly ConcurrentQueue<EventSubscriptionChange> _notificationQueue = new();
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<Guid, IObserver<EventSubscriptionChange>> _observers = new();
     private int _isDispatchingNotifications;
+    private readonly object _registrationLock = new();
 
     #region EventSubscription CRUD
 
@@ -25,11 +34,57 @@ public class EventSubscriptionRegistry(ILogger<EventSubscriptionRegistry> logger
         ArgumentNullException.ThrowIfNull(descriptor);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var subscription = new EventSubscription(descriptor);
- 
-        if (!_subscriptions.TryAdd(subscription.Id, subscription))
+        if (descriptor.Scope == EventSubscriptionScope.Distributed && descriptor.WorkloadOwner is null
+            && descriptor.HandlerFactory.GetHandlerType() is { } handlerType)
         {
-            throw new InvalidOperationException($"EventSubscription {subscription.Id} already exists");
+            descriptor = descriptor with
+            {
+                WorkloadOwner = handlerType.GetCustomAttributes(inherit: true)
+                    .OfType<EventSubscriptionOwnerAttribute>().FirstOrDefault()?.WorkloadOwner
+                    ?? activation?.GetWorkloadOwner(handlerType, descriptor.RegistrationOwner)
+            };
+        }
+        if (descriptor.WorkloadOwner is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(descriptor.WorkloadOwner, nameof(descriptor));
+        }
+
+        var handler = descriptor.HandlerFactory.GetHandlerType();
+        var mode = descriptor.Scope == EventSubscriptionScope.Local
+            ? ActivationMode.Automatic
+            : activation?.GetActivation(handler ?? typeof(EventSubscription),
+                TypeActivationKind.ExternalSubscription, descriptor.RegistrationOwner) ?? ActivationMode.Automatic;
+        var subscription = new EventSubscription(descriptor, mode);
+        application?.RecordActivation(new ResourceActivation
+        {
+            Key = $"EventBus:{descriptor.ServiceKey ?? "default"}:{descriptor.TopicName}:{descriptor.WorkloadOwner ?? "unowned"}:{handler?.FullName ?? subscription.Id.ToString()}",
+            ImplementationType = handler,
+            RegistrationOwner = descriptor.RegistrationOwner,
+            Kind = TypeActivationKind.ExternalSubscription,
+            Mode = mode,
+            Reason = mode switch
+            {
+                ActivationMode.Manual => "Held for explicit local test delivery; no transport subscription.",
+                ActivationMode.Disabled => "The subscription owner is not eligible in this process.",
+                _ => descriptor.Scope == EventSubscriptionScope.Local ? "Passive in-process subscription." : "Automatic subscription permitted."
+            }
+        });
+ 
+        lock (_registrationLock)
+        {
+            var isBatch = ((IEventSubscription)subscription).IsBatch;
+            if (isBatch && (typeof(IDistributedEventHandler<>).MakeGenericType(descriptor.EventType).IsAssignableFrom(handler)
+                || typeof(ILocalEventHandler<>).MakeGenericType(descriptor.EventType).IsAssignableFrom(handler)))
+                throw new InvalidOperationException("A batch handler cannot also implement a single-event contract for the same event.");
+            if (isBatch && descriptor.Scope != EventSubscriptionScope.Distributed)
+                throw new InvalidOperationException("Batch handlers require a distributed subscription.");
+            if (descriptor.Scope == EventSubscriptionScope.Distributed && _subscriptions.Values.Any(existing =>
+                    existing.Scope == descriptor.Scope && existing.ServiceKey == descriptor.ServiceKey
+                    && existing.TopicName == descriptor.TopicName && existing.WorkloadOwner == descriptor.WorkloadOwner
+                    && (isBatch || ((IEventSubscription)existing).IsBatch)))
+                throw new InvalidOperationException("A batch subscription must exclusively own its topic, bus and workload-owner group. Use a separate owner for another consumer.");
+            if (!_subscriptions.TryAdd(subscription.Id, subscription))
+                throw new InvalidOperationException($"EventSubscription {subscription.Id} already exists");
         }
 
         logger.LogDebug(
@@ -38,6 +93,13 @@ public class EventSubscriptionRegistry(ILogger<EventSubscriptionRegistry> logger
 
         try
         {
+            if (mode != ActivationMode.Automatic)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EnqueueNotification(EventSubscriptionChangeType.Added, subscription);
+                DrainNotifications();
+                return subscription;
+            }
             // Creation and activation form one committed mutation. Notifications are queued while
             // the subscription gate is held and dispatched only after it has been released.
             await subscription.ActivateAsync(

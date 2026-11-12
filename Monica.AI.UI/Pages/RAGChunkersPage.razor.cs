@@ -51,7 +51,9 @@ public partial class RAGChunkersPage : IAsyncDisposable
         StateHasChanged();
         var result = await ChunkerService.GetManagementStateAsync();
         if (_lifetime.Retired || generation != _stateGeneration) return;
-        if (result.IsFailed(out var error, out var state)) _loadError = error.Message ?? L["KnowledgeWorkbench:Chunking:LoadFailed"];
+        var error = result.WithoutData();
+        var state = result.Data;
+        if (result.IsFailure() || state is null) _loadError = error.Message ?? L["KnowledgeWorkbench:Chunking:LoadFailed"];
         else
         {
             _chunkers = state.Chunkers;
@@ -94,7 +96,9 @@ public partial class RAGChunkersPage : IAsyncDisposable
         var result = await ChunkerService.PreviewRoutingChangeAsync(route.Extension, target);
         if (!IsCurrent(route, version, target)) return;
         route.IsPreviewing = false;
-        if (result.IsFailed(out var error, out var preview)) route.Error = error.Message ?? L["KnowledgeWorkbench:Chunking:PreviewFailed"];
+        var error = result.WithoutData();
+        var preview = result.Data;
+        if (result.IsFailure() || preview is null) route.Error = error.Message ?? L["KnowledgeWorkbench:Chunking:PreviewFailed"];
         else if (string.Equals(preview.Extension, route.Extension, StringComparison.OrdinalIgnoreCase)
             && string.Equals(preview.TargetChunkerId, target, StringComparison.OrdinalIgnoreCase)) route.Preview = preview;
         else route.Error = L["KnowledgeWorkbench:Chunking:PreviewChanged"];
@@ -119,7 +123,9 @@ public partial class RAGChunkersPage : IAsyncDisposable
             if (!IsCurrent(route, version, target)) return;
             var result = await ChunkerService.ApplyRoutingChangeAsync(extension, target);
             if (_lifetime.Retired) return;
-            if (result.IsFailed(out var error, out var applied))
+            var error = result.WithoutData();
+            var applied = result.Data;
+            if (result.IsFailure() || applied is null)
             {
                 route.Error = error.Message ?? L["KnowledgeWorkbench:Chunking:ApplyFailed"];
                 Snackbar.Add(route.Error, Severity.Error);
@@ -201,7 +207,9 @@ public partial class RAGChunkersPage : IAsyncDisposable
         {
             var result = await ChunkerService.TestChunkerAsync(id, name, content);
             if (_lifetime.Retired || generation != _stateGeneration) return;
-            if (result.IsFailed(out var error, out var test)) _testError = error.Message ?? L["KnowledgeWorkbench:Chunking:TestFailed"];
+            var error = result.WithoutData();
+            var test = result.Data;
+            if (result.IsFailure()) _testError = error.Message ?? L["KnowledgeWorkbench:Chunking:TestFailed"];
             else _testResult = test;
         }
         finally { if (!_lifetime.Retired) _isTesting = false; }

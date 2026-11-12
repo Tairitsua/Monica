@@ -16,6 +16,9 @@
         .Where(static module => module.StartupWorkDurationMs > 0)
         .OrderByDescending(static module => module.StartupWorkDurationMs)
         .FirstOrDefault();
+    <MudAlert Severity="@(snapshot.Host.DebugMode ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Dense="true">
+        @(snapshot.Host.DebugMode ? L["Overview:DebugModeEnabled"] : L["Overview:DebugModeDisabled"])
+    </MudAlert>
     <section class="overview-score" aria-label="@L["Aria:SummaryMetrics"]">
         <div class="score-feature">
             <div class="score-lede">
@@ -31,9 +34,9 @@
                 }
                 <p class="mo-vl-lede score-finding">
                     @L["Overview:Score:Lede:OfWhich"]
-                    <MoValueMark Role="MoVisualRole.Primary">@L["Overview:Score:Mark:Composition", ModuleDiagnosticsDisplay.Duration(snapshot.Summary.TotalCompositionDurationMs)]</MoValueMark>
+                    <strong>@L["Overview:Score:Mark:Composition", ModuleDiagnosticsDisplay.Duration(snapshot.Summary.TotalCompositionDurationMs)]</strong>
                     <span>@L["Overview:Score:Lede:Joiner"]</span>
-                    <MoValueMark Role="MoVisualRole.Info">@L["Overview:Score:Mark:Work", ModuleDiagnosticsDisplay.Duration(startupWorkMs)]</MoValueMark>
+                    <strong>@L["Overview:Score:Mark:Work", ModuleDiagnosticsDisplay.Duration(startupWorkMs)]</strong>
                     @if (longestWorkModule is { } longest)
                     {
                         <span>@L["Overview:Score:Longest:Prefix"]</span>
@@ -58,6 +61,8 @@
         </div>
         <div class="score-facts"><MoFactGrid Facts="@Facts(snapshot)" /></div>
     </section>
+
+    <ModuleWorkbenchResourceActivations Session="@Session" />
 
     <div class="overview-evidence">
         <section class="mo-vl-panel ledger-panel" aria-labelledby="ledger-title">

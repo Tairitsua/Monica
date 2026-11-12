@@ -162,7 +162,9 @@
     protected override void OnInitialized()
     {
         var result = VectorStoreFacade.GetDiagnostics();
-        if (result.IsFailed(out var error, out var diagnostics))
+        var error = result.WithoutData();
+        var diagnostics = result.Data;
+        if (result.IsFailure())
         {
             _loadErrorMessage = error.Message ?? L["Common:Error"].Value;
             _diagnostics = null;
@@ -191,7 +193,9 @@
             await _lifetime.RunAsync(async token =>
             {
                 var result = await VectorStoreFacade.TestConnectionAsync(token);
-                if (result.IsFailed(out var error, out var testResult))
+                var error = result.WithoutData();
+                var testResult = result.Data;
+                if (result.IsFailure())
                 {
                     testResult = new VectorStoreConnectionTestResult
                     {

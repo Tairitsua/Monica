@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Monica.EntityFrameworkCore/Monica.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="../../Monica.Configuration.EfCore/Monica.Configuration.EfCore.csproj" />
+    <ProjectReference Include="../../Monica.JobScheduler.EfCore/Monica.JobScheduler.EfCore.csproj" />
+    <ProjectReference Include="../../Monica.EventBus.Kafka/Monica.EventBus.Kafka.csproj" />
+    <ProjectReference Include="../../Monica.Testing/Monica.Testing.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="DotNetCore.EntityFrameworkCore.GaussDB" />
+    <!-- Match the repository's patched dependency; the GaussDB provider's lower bound is vulnerable. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

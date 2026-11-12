@@ -1,4 +1,0 @@
-interface:
-  display_name: "Microsoft Skill Creator"
-  short_description: "Create Microsoft technology skills"
-  default_prompt: "Use $microsoft-skill-creator to create a new agent skill for a Microsoft technology using official Microsoft Learn sources."

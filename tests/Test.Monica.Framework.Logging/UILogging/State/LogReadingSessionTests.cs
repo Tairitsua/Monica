@@ -111,7 +111,7 @@ public sealed class LogReadingSessionTests
         replacement.Lines[0].AbsoluteLineNumber.Should().Be(1);
         replacement.TotalFileLineCount.Should().Be(1);
         original.Lines.Select(static line => line.Raw).Should().Equal("long original line one", "long original line two");
-        (await session.ReadContextAsync(request!, cancellationToken: TestContext.Current.CancellationToken)).Status.Should().NotBe(ResStatus.Ok);
+        (await session.ReadContextAsync(request!, cancellationToken: TestContext.Current.CancellationToken)).Status.Should().NotBe(ResultStatus.Ok);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class LogReadingSessionTests
 
         Value(await session.SwitchToFileAsync("second.log", 100, cancellationToken: TestContext.Current.CancellationToken));
 
-        (await session.ReadContextAsync(request!, cancellationToken: TestContext.Current.CancellationToken)).Status.Should().NotBe(ResStatus.Ok);
+        (await session.ReadContextAsync(request!, cancellationToken: TestContext.Current.CancellationToken)).Status.Should().NotBe(ResultStatus.Ok);
         session.GetSnapshot().Lines[0].Raw.Should().Be("second source");
         session.CreateLineRequest(0).Should().BeNull();
         session.CreateLineRequest(2).Should().BeNull();
@@ -376,7 +376,7 @@ public sealed class LogReadingSessionTests
         using (var exclusive = new FileStream(Path.Combine(factory.LogDirectory, "held.log"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             var failed = await session.RefreshAsync(cancellationToken: TestContext.Current.CancellationToken);
-            failed.Status.Should().NotBe(ResStatus.Ok);
+            failed.Status.Should().NotBe(ResultStatus.Ok);
             failed.Message.Should().NotBeNullOrEmpty();
             session.GetSnapshot().Error.Should().NotBeNullOrEmpty();
             session.GetSnapshot().Source.Should().Be(original.Source);
@@ -405,7 +405,7 @@ public sealed class LogReadingSessionTests
 
         var context = await session.ReadContextAsync(request!, 1, cancellationToken: TestContext.Current.CancellationToken);
 
-        context.Status.Should().NotBe(ResStatus.Ok);
+        context.Status.Should().NotBe(ResultStatus.Ok);
         context.Message.Should().NotBeNullOrEmpty();
         before.Lines[2].Raw.Should().Be("original target");
         request!.Raw.Should().Be("original target");
@@ -557,7 +557,7 @@ public sealed class LogReadingSessionTests
         await synchronize.Should().ThrowAsync<ObjectDisposedException>();
     }
 
-    private static ScreenLogSnapshot Value(Res<ScreenLogSnapshot> result) => result.ShouldSucceed()!;
+    private static ScreenLogSnapshot Value(Result<ScreenLogSnapshot> result) => result.ShouldSucceed()!;
 
     private static Task WriteAsync(LoggingUITestApplicationFactory factory, string relativePath, string content) =>
         File.WriteAllTextAsync(Path.Combine(factory.LogDirectory, relativePath), content, new UTF8Encoding(false), TestContext.Current.CancellationToken);

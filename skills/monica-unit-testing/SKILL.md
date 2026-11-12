@@ -1,6 +1,6 @@
 ---
 name: monica-unit-testing
-description: Create, migrate, or review Monica framework tests and shared testing infrastructure, including host-owned scenarios, raw ProjectUnit fixtures, Roslyn source-generator tests, result assertions, and isolation.
+description: Create, migrate, or review Monica framework tests and shared testing infrastructure, including host-owned scenarios, raw BuildingBlock fixtures, Roslyn source-generator tests, result assertions, and isolation.
 ---
 
 # Monica Unit Testing
@@ -12,7 +12,7 @@ Use `Monica.Testing` as the shared toolkit and keep runnable framework tests und
 1. Read `<project-root>/tests/README.md` for the current project layout and execution rules.
 2. Classify the test before choosing infrastructure:
    - Pure logic: construct the value or service directly.
-   - Raw ProjectUnit collaboration: use `ProjectUnitFixture<TUnit>` and accept its activation limits.
+   - Raw Building Block collaboration: use `BuildingBlockFixture<TBuildingBlock>` and accept its activation limits.
    - Module wiring, options, conventional registration, proxies, hosted lifecycle, or cross-scope behavior: create a full host with `MonicaTestApplicationFactory<TDiscoveryAnchor>`.
    - Blazor behavior contract: use bUnit in the runnable UI test project only when the user explicitly requests UI testing or UI test additions.
    - Roslyn source-generator semantics: build an in-memory `CSharpCompilation` and run the generator through `GeneratorDriver`.
@@ -42,9 +42,9 @@ Default seams retain real audit policy; replace TimeProvider/current-user/ID inp
 
 When a handler host has multiple write contexts, put `[ExecutionTransaction(ExecutionTransactionMode.Automatic, DbContextTypes = new[] { typeof(PrimaryDbContext), typeof(ParticipantDbContext) })]` on its concrete execution method and test the real receive pipeline. The selected primary context owns Inbox and Outbox rows; verify its final flush after later participants stage projections. Follow the persistence [transaction contract](../monica-infra-persistence/references/transactions.md) for selection and explicit execution features.
 
-## Raw ProjectUnit Fast Path
+## Raw Building Block Fast Path
 
-`ProjectUnitFixture<TUnit>` is an explicitly raw fast-path harness. It creates a small Microsoft DI container, activates the target, and initializes Monica's cached-service-provider accessor where applicable.
+`BuildingBlockFixture<TBuildingBlock>` is an explicitly raw fast-path harness. It creates a small Microsoft DI container, activates the target, and initializes Monica's cached-service-provider accessor where applicable.
 
 Use it only when all collaborators are deliberately supplied and the assertion does not depend on:
 
@@ -65,7 +65,7 @@ Test source generators with raw Roslyn inputs under a dedicated `tests/Test.Moni
 - Assert generator diagnostics, generated hint names and source, and the diagnostics of the updated output compilation.
 - Run the same driver again with identical inputs and assert byte-identical generated sources and diagnostics. This protects incremental determinism.
 - Verify generator execution does not create or mutate files. File export, package imports, and MSBuild target ordering belong in separate integration tests only when those build surfaces are intentionally under test.
-- For request-owned Web API generation, cover the public contract matrix: route, verb, binding, operation naming, cancellation, result shapes, published-RPC namespace selection, local-only HTTP exclusion, duplicate or invalid declarations, and same-compilation client/controller availability.
+- For request-owned Web API generation, cover the public contract matrix: route, verb, binding, operation naming, cancellation, result shapes, published-API namespace selection, local-only HTTP exclusion, duplicate or invalid declarations, and same-compilation client/controller availability.
 - When a published request uses a custom `IRemoteResultEnvelope<TSelf>`, test that `CreateRemoteFailure` returns a valid constructor-initialized envelope and that cancellation is propagated rather than projected as a failure result.
 
 ## Required Conventions
@@ -78,7 +78,7 @@ Test source generators with raw Roslyn inputs under a dedicated `tests/Test.Moni
 
 ## Monica-Specific Rules
 
-- Assert `Res<T>` explicitly. Facade tests cover `Status`, `Message`, and `Data`; successful `Res<string>` paths always verify `Data`.
+- Assert `Result<T>` explicitly. Facade tests cover `Status`, `Message`, and `Data`; successful string paths verify data and message separately. Cover Created as success, permitted null payloads, failure metadata forwarding, and meaningful failure reports. Use the Core runtime contracts and generator-project compilation probes for the [explicit result API](../monica-development/references/result-type-guide.md).
 - Test module behavior through registration extensions, dependencies, resulting options, or DI-visible registrations rather than static tables alone.
 - Replace external boundaries, not domain logic. Resolve application services, domain services, repositories, mappers, and options from the scenario host.
 - Avoid real network, uncontrolled persistence, sleeps, random inputs, and untracked machine state.

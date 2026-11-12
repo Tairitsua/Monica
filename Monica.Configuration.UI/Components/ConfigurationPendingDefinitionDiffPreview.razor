@@ -353,7 +353,9 @@ else
     private async Task<ConfigurationDefinition> LoadDefinitionAsync(string definitionKey)
     {
         var result = await Facade.GetDefinitionAsync(definitionKey);
-        if (result.IsFailed(out var error, out var detail))
+        var error = result;
+        var detail = result.Data;
+        if (result.IsFailure() || detail is null)
         {
             throw new InvalidOperationException($"{L["Common:Errors:LoadFailed"]}: {error.Message}");
         }
@@ -364,7 +366,9 @@ else
     private async Task<string> LoadOriginJsonAsync(string definitionKey)
     {
         var result = await Facade.GetEffectiveValueAsync(definitionKey, LogicalPath.Root, Visibility.ShowSensitiveValues);
-        if (result.IsFailed(out var error, out var value))
+        var error = result;
+        var value = result.Data;
+        if (result.IsFailure() || value is null)
         {
             throw new InvalidOperationException($"{L["Common:Errors:LoadFailed"]}: {error.Message}");
         }

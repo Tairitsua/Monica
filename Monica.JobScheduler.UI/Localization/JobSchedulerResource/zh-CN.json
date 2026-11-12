@@ -20,19 +20,19 @@
     }
   },
   "Workspace": {
-    "Eyebrow": "MONICA / 持久化调度",
+    "Eyebrow": "运维 · 任务调度",
     "TimeZone": "调度时区 · {0}",
     "Navigation": {
       "Overview": "总览",
-      "Catalog": "目录",
-      "Executions": "执行",
+      "Catalog": "作业目录",
+      "Executions": "执行账本",
       "Statistics": "统计分析",
       "Runtime": "运行时",
       "AriaLabel": "调度器工作区"
     },
     "Pages": {
       "Overview": {
-        "Title": "调度运行总览",
+        "Title": "调度总览",
         "Description": "查看持久化工作负载与执行结果，打开执行证据，了解记录背后的情况。"
       },
       "Catalog": {
@@ -40,11 +40,11 @@
         "Description": "查找所有者作用域内的作业定义，查看生效的触发规则与执行证据，并管理后续调度。"
       },
       "JobDetail": {
-        "Title": "作业运行档案",
+        "Title": "作业详情",
         "Description": "将单个不可变声明与生效策略、调度游标、工作节点兼容性和最近执行证据集中呈现。"
       },
       "Executions": {
-        "Title": "持久化执行账本",
+        "Title": "执行账本",
         "Description": "查找持久记录，检查已捕获设置与保留历史，并请求协作式取消。"
       },
       "Statistics": {
@@ -56,7 +56,251 @@
         "Description": "查看当前宿主的本地循环与生效配置、共享范围内有定义记录的所有者，以及可选的服务注册中心观测。"
       }
     },
-    "Scope": "配置的调度作用域 · {0}"
+    "Scope": "作用域 · {0}",
+    "CopyId": "复制实例 ID",
+    "OpenLedger": "在执行账本中打开",
+    "EditCron": "修改调度",
+    "RestoreCron": "恢复声明值",
+    "SaveCron": "保存调度计划",
+    "Views": {
+      "evidence": "执行证据",
+      "schedule": "调度计划",
+      "policy": "定义与策略"
+    },
+    "NextFive": "后续计划时点",
+    "PlanNotice": "计划按声明时区计算；暂停、调度边界与容量仍可能影响实际准入。",
+    "Next": "下次",
+    "Planned": "计划",
+    "Inventory": "作业定义",
+    "PublishedDefinitions": "个已发布定义",
+    "DefinitionBreakdown": "{0} 个周期作业 · {1} 个触发作业 · 另有 {2} 个未发布",
+    "OwnerCadence": "目录构成",
+    "CollapseMap": "收起构成图",
+    "ExpandMap": "展开构成图",
+    "Cadences": {
+      "sub": "亚分钟",
+      "1m": "1 分钟级",
+      "5m": "5 分钟级",
+      "30m": "30 分钟级",
+      "1h": "1 小时级",
+      "hours": "数小时级",
+      "1d": "每日",
+      "1mo": "低频 / 日历",
+      "demand": "按需"
+    },
+    "Standing": "状况",
+    "LatestFailed": "最近执行失败",
+    "AttentionJobs": "需关注的作业",
+    "FailureSignal": "失败信号",
+    "OverrunSignal": "超出样本基线",
+    "SkipSignal": "频繁跳过",
+    "CalmFinding": "当前已载窗口未发现所列关注信号。计划与保留历史并列展示，便于核对下一步。",
+    "Windows": {
+      "15": "15 分钟",
+      "60": "1 小时",
+      "360": "6 小时",
+      "1440": "24 小时"
+    },
+    "PulseTitle": "调度脉搏",
+    "PulseDescription": "风险来自当前窗口的已载执行；未来标记为前五个计划时点，不代表必然执行。",
+    "SampleTruncated": "该区间超过 2,000 条：图形与风险判断仅基于已载样本，较早记录仍可在执行账本中分页检索。",
+    "Now": "现在",
+    "CollapseJobs": "收起作业",
+    "ShowAllJobs": "显示全部 {0} 个作业",
+    "Captured": "采集于",
+    "AutoRefresh": "自动刷新",
+    "AutoPaused": "已暂停刷新",
+    "FailedCompletions": "完成失败",
+    "CohortNote": "此处按创建时间计数，包含仍在排队或执行的记录；与上方按完成时间统计的总体不同。",
+    "ClaimsAndFailures": "领取 / 失败",
+    "MatchingExecutions": "匹配的执行记录",
+    "RecordsUnit": "条记录",
+    "TrajectoryTitle": "执行轨迹",
+    "JobPausedFinding": "周期计划已暂停。现有执行保留原有配置；修改 Cron 不会自动恢复调度。",
+    "JobFinding": "最近的结果没有形成连续失败。目前可查看 {0} 条留存记录；更早的历史范围由保留策略决定。",
+    "BackToSource": "返回来源列表",
+    "CopyJobKey": "复制作业键",
+    "CopySuccess": "已复制到剪贴板",
+    "CopyFailure": "无法复制到剪贴板",
+    "IdCopied": "已复制实例 ID",
+    "AllJobs": "全部作业",
+    "ScopeChoices": "筛选项来自 {0} / {1} 个已保留定义；仍可直接访问精确范围链接。",
+    "SelectRow": "选择",
+    "LoopsReady": "调度循环与执行循环就绪",
+    "LoopsPending": "调度循环或执行循环未就绪",
+    "MapDescription": "按所有者 × 调度节奏展开",
+    "Standings": {
+      "all": "全部",
+      "attention": "需要处理",
+      "healthy": "未见异常",
+      "ondemand": "按需触发",
+      "paused": "已暂停",
+      "absent": "未发布",
+      "unknown": "证据不足"
+    },
+    "Sorts": {
+      "attention": "关注优先",
+      "name": "作业名称",
+      "owner": "所有者",
+      "next": "下次计划"
+    },
+    "SortLabel": "排序",
+    "CatalogSearch": "筛选名称、作业键或所有者",
+    "CatalogFailures": "{0} 个作业最近一次执行失败。",
+    "CatalogNever": "{0} 个触发作业尚未执行。",
+    "CatalogSlow": "其中 {0} 个每小时或更慢执行，且未配置重试。",
+    "CatalogTruncated": "当前展示前 2,000 个保留定义；筛选与计数基于此快照。",
+    "Matches": "{0} 个匹配",
+    "CatalogOwners": "{0} 个已发布定义来自 {1} 个所有者；",
+    "CatalogOwnerCount": "{0} 持有其中 {1} 个。",
+    "FailureShare": "占失败总数的 {0}。",
+    "OpenFailures": "查看失败执行",
+    "OpenRecords": "查看执行记录",
+    "RankingTitle": "失败集中在哪些作业",
+    "RankingDescription": "当前窗口内保留的完成记录。",
+    "RankFailures": "失败数",
+    "RankVolume": "执行量",
+    "RankingCount": "显示 {0} / {1} 个作业",
+    "PeakValue": "峰值 {0}",
+    "BucketOutcomes": "{0} 成功 · {1} 失败 · {2} 跳过",
+    "TrendHint": "每条泳道独立按峰值缩放。聚焦或悬停读取区间，点击查看记录。",
+    "PresentUnit": "已发布",
+    "Intermittent": "间歇失败",
+    "FailureStreak": "连续失败 {0} 次",
+    "JobAttentionFinding": "{0} {1}。",
+    "PulseWindow": "近 {0} 完成的执行 · 快照时正在处理的任务",
+    "DecidedReliability": "占已执行结果 {0}",
+    "FailureJobs": "涉及 {0} 个已排名作业",
+    "SkipFact": "已记录，未进入执行队列",
+    "LiveFact": "{0} 排队中 · {1} 个已观测工作者",
+    "GroupBy": "时间轴分组",
+    "ByStanding": "按状态",
+    "ByOwner": "按所有者",
+    "JobTimeline": "作业 · 已保留活动",
+    "MergedJobs": "{0} 个作业合并显示",
+    "BeforeWindow": "窗口之前",
+    "PulseSearch": "筛选作业名称、键或所有者",
+    "Last": "上次",
+    "PulseHint": "悬停或聚焦时间标记查看证据，点击打开执行详情。",
+    "RunningNow": "正在执行",
+    "RunningNowDescription": "已用时间与保留样本中位数、P95 对照。",
+    "LeaseUntil": "租约至 {0}",
+    "NoLive": "当前没有执行中或排队中的任务。",
+    "ArrivalBoard": "即将到来",
+    "ArrivalDescription": "从已持久化的下次计划延伸 Cron 预测；时间按宿主显示时区呈现，不代表一定执行。",
+    "SteadyJobs": "持续运行",
+    "DueIn": "{0} 后",
+    "NoArrivals": "当前范围没有启用的周期计划。",
+    "PulseGroups": {
+      "attention": "需要关注",
+      "healthy": "未见异常",
+      "ondemand": "按需触发",
+      "inactive": "已停用 / 未发布",
+      "unknown": "证据不足"
+    },
+    "ConsecutiveFailures": "连续失败",
+    "RetainedRecords": "保留的执行记录",
+    "AbsentFinding": "此定义当前未发布，仍可查看保留的执行证据。",
+    "StreakFinding": "最近的保留记录中连续失败 {0} 次，配置重试 {1} 次。下次计划时间：{2}。",
+    "RecentTrajectory": "最近执行轨迹",
+    "RecentTrajectoryDescription": "最近 {0} 次保留的执行 · 柱高表示执行耗时。",
+    "TrajectoryHint": "← → 移动 · Enter 查看详情",
+    "LatestEvidenceDescription": "此作业最新的一条持久化执行记录。",
+    "ActiveEvidenceDescription": "快照时排队中和执行中的记录。",
+    "FailureEvidenceDescription": "近 30 天完成的最近五次失败。",
+    "LatestFailureMessage": "最近一次保留的失败信息",
+    "TypicalDuration": "典型执行耗时",
+    "DurationSample": "近 30 天 {0} 次有耗时的完成记录",
+    "RetainedHistory": "保留历史",
+    "RetainedHistoryDescription": "当前持久化记录总数，保留策略作用于终态历史。",
+    "ServingHost": "当前服务宿主",
+    "LocallyReady": "本机就绪",
+    "RuntimePath": "本地调度与执行路径",
+    "MaterializeDescription": "持租约时推进所有者计划",
+    "DurableDescription": "共享队列与定义",
+    "ClaimDescription": "领取执行 · 续约租约",
+    "Poll": "轮询",
+    "ViewQueue": "查看作用域队列",
+    "Slots": "工作槽位已占用 {0} / {1}",
+    "PublicationsDescription": "当前调度范围内的持久化定义发布记录。",
+    "StalePublications": "{0} 个所有者的发布观测已陈旧",
+    "RecentPublications": "全部所有者的发布观测均为近期",
+    "SearchOwners": "搜索所有者…",
+    "PresentAbsent": "在场 / 缺席",
+    "RunningQueued": "执行中 / 排队中",
+    "PublicationCount": "显示 {0} / {1} 个所有者",
+    "PublicationAge": "观测年龄 · 阈值 {0}",
+    "PublicationFilters": {
+      "Title": "发布新鲜度",
+      "all": "全部",
+      "recent": "近期",
+      "stale": "陈旧"
+    },
+    "LedgerCountFinding": "当前筛选匹配 {0} 条保留记录。此时间范围内有 {1} 次失败、{2} 次跳过，可按状态进一步筛选。",
+    "CompletedDistribution": "按完成时间分布 · 各状态独立刻度，点击或拖选区间放大。",
+    "RecordedDistribution": "按记录时间分布 · 各状态独立刻度，点击或拖选区间放大。",
+    "IndependentPeaks": "独立刻度",
+    "OtherStates": "活动 / 其他",
+    "Peak": "峰值 {0}",
+    "ZoomHint": "点击区间放大",
+    "ZoomSelection": "放大选中区间",
+    "BucketData": "查看区间数据",
+    "Interval": "时间区间",
+    "DistributionBucket": "{0} · {1} 条记录 · 点击放大此区间",
+    "TimeBasis": "时间口径",
+    "RecordedTime": "记录时间",
+    "CompletedTime": "完成时间",
+    "LedgerRanges": {
+      "1h": "1 小时",
+      "24h": "24 小时",
+      "7d": "7 天",
+      "30d": "30 天",
+      "all": "全部时间"
+    },
+    "DurationDescription": "{0} 条有耗时的完成记录 · 保留的执行耗时",
+    "AnalyticsSummary": "此范围共完成 {0} 次，其中 {1} 次失败。",
+    "AnalyticsFailureFinding": "{0} 占失败总数的 {1}。",
+    "PerHour": "/ 小时",
+    "RunNow": "立即执行",
+    "PauseSchedule": "暂停调度",
+    "ResumeSchedule": "恢复调度",
+    "EditPolicy": "编辑运维策略",
+    "AttemptsUnit": "次",
+    "ActiveUnit": "个执行",
+    "JobActiveFinding": "当前有 {0} 个执行处于活动状态。可在下方查看运行耗时与租约；后续触发仍遵循当前计划与策略。",
+    "CronEditor": {
+      "Declared": "代码声明",
+      "Current": "当前生效",
+      "Expression": "Cron 表达式",
+      "Valid": "表达式有效",
+      "Five": "五段 · 分钟",
+      "Six": "六段 · 含秒",
+      "Syntax": "支持五段（分 时 日 月 周）或六段（秒 分 时 日 月 周）。",
+      "Presets": "常用计划",
+      "PresetNames": {
+        "0": "每 5 分钟",
+        "1": "每 30 分钟",
+        "2": "每小时",
+        "3": "每天 03:00",
+        "4": "工作日 09:00",
+        "5": "每月 1 日"
+      },
+      "InheritedHint": "当前使用代码声明；编辑表达式将创建运维覆盖。",
+      "OverrideHint": "保存后使用此 Cron 覆盖；恢复声明值可移除此覆盖。",
+      "Preview": "修改后的未来 5 次",
+      "PreviewDescription": "从当前时刻起按生效计划边界推演，保存前可核对。",
+      "ZoneHelp": "时区由调度器配置，所有计划均按此时区显示。",
+      "Paused": "当前调度已暂停。预览展示规则匹配的时点；保存不会恢复调度。",
+      "Absent": "此定义已不再发布。保存覆盖不会重新发布定义或启动执行。",
+      "Note": "保存只影响后续调度，已有执行与历史记录保持原样。并发容量不足时仍可能跳过计划时点。",
+      "Title": "修改调度计划"
+    },
+    "ElapsedDuration": "已运行",
+    "RunningDurationNote": "超时 {0} · 租约至 {1}",
+    "RecordedDurationNote": "从保留的开始时间到完成时间，可能包含重试等待。",
+    "ReadinessUnknown": "本机就绪状态暂不可用",
+    "LocalLoopsReady": "本机循环就绪",
+    "DefinitionObservationNote": "定义内容最近一次写入或确认的时间；所有者清单的最新确认请查看运行时。"
   },
   "Access": {
     "Checking": "正在检查调度权限…",
@@ -67,12 +311,10 @@
     "Loading": "加载中…",
     "Retry": "重试",
     "Refresh": "刷新",
-    "Search": "搜索",
     "Cancel": "取消",
     "Save": "保存策略",
     "Saving": "保存中…",
     "Submitting": "提交中…",
-    "Close": "关闭",
     "Keep": "保留执行",
     "NotAvailable": "暂无",
     "RunningDuration": "已运行 {0}",
@@ -138,24 +380,18 @@
       "AbsentDescription": "未出现在所有者最新快照中的作业",
       "CategoryCount": "{0} 类信号"
     },
-    "Analytics": {
-      "Title": "统计分析",
-      "Description": "在有界时间范围内分析吞吐量、执行结果趋势、耗时分位数与慢作业。",
-      "Action": "打开统计分析"
-    },
+    "Analytics": {},
     "Recent": {
       "Title": "最新账本记录",
       "Description": "最新持久化记录，包含跳过的计划记录。",
       "Empty": "当前快照中没有账本记录。",
       "AllRecords": "浏览执行账本"
     },
-    "RefreshFailed": "正在显示最近一次成功获取的快照。最新刷新失败：{0}",
-    "LastRefreshed": "最近刷新：{0}"
+    "RefreshFailed": "正在显示最近一次成功获取的快照。最新刷新失败：{0}"
   },
   "Catalog": {
     "PageTitle": "任务调度 · 作业目录",
     "Title": "作业定义",
-    "Count": "{0} 项匹配的作业定义",
     "Enabled": "已启用",
     "Disabled": "已禁用",
     "OnDemand": "按需触发",
@@ -163,62 +399,50 @@
     "AbsentViewNotice": "正在显示所有者已不再发布的作业定义，执行历史仍可用于审计。",
     "Filters": {
       "AriaLabel": "作业目录搜索与筛选",
-      "Search": "定义",
-      "SearchPlaceholder": "作业名称或键",
       "Owner": "所有者",
       "AnyOwner": "全部所有者",
       "Type": "作业类型",
       "AnyType": "全部类型",
-      "Policy": "生效策略",
       "AnyPolicy": "全部策略",
-      "PageSize": "每页行数",
-      "FacetScope": "计数来自已加载的发布快照",
-      "FacetUnavailable": "分类快照尚不可用"
+      "PageSize": "每页行数"
     },
     "Columns": {
-      "Definition": "定义",
+      "Definition": "作业 / 所有者",
       "Owner": "所有者",
       "Schedule": "调度",
-      "NextRun": "下次执行",
-      "LastRun": "上次执行",
+      "NextRun": "下次计划",
+      "LastRun": "最近一次执行",
       "Actions": "操作"
     },
     "Actions": {
-      "Run": "立即执行作业",
+      "Run": "执行",
       "Trigger": "通过活动作业定义执行",
-      "Policy": "编辑运维策略",
-      "Details": "打开作业详情",
-      "Pause": "暂停周期实例物化",
-      "Resume": "继续周期实例物化",
-      "PauseUnavailableDebug": "调试模式已抑制自动物化，无法再次快速暂停；仍可通过“立即执行作业”显式运行。",
-      "RunDuringDebug": "立即执行仍然可用，因为显式准入不会推进周期游标。",
+      "Pause": "暂停",
+      "Resume": "恢复",
+      "PauseUnavailableManual": "手动模式已抑制自动物化，无法再次快速暂停；仍可通过“立即执行作业”显式运行。",
+      "RunDuringManual": "立即执行仍然可用，因为显式准入不会推进周期游标。",
       "PauseSelected": "暂停所选",
       "ResumeSelected": "继续所选",
       "Reset": "重置筛选",
       "CopiedKey": "已复制作业键",
-      "CopyKeyFailed": "复制作业键失败",
-      "CopyKeyFor": "复制完整作业标识：{0}",
-      "RunFor": "立即执行 {0} · {1}",
-      "DetailsFor": "查看 {0} · {1}",
-      "PolicyFor": "{0}：{1} · {2}"
+      "CopyKeyFailed": "复制作业键失败"
     },
     "ScheduleStatus": {
       "Awaiting": "等待同步",
       "Exhausted": "调度已结束"
     },
     "Policy": {
-      "Enabled": "策略已启用",
       "Paused": "策略已暂停"
     },
     "Lifecycle": {
       "Automatic": "自动调度",
       "OperatorPaused": "已由策略暂停",
-      "DebugSuppressed": "仅手动执行",
-      "OperatorAndDebug": "策略暂停 · 调试模式",
+      "ManualSuppressed": "仅手动执行",
+      "OperatorAndManual": "策略暂停 · 手动模式",
       "AutomaticDescription": "周期实例自动物化已启用。",
       "OperatorPausedDescription": "运维策略阻止周期实例自动物化。",
-      "DebugSuppressedDescription": "调试模式抑制自动物化；仍可显式立即执行作业。",
-      "OperatorAndDebugDescription": "运维策略与调试模式都在抑制周期实例自动物化。",
+      "ManualSuppressedDescription": "手动模式抑制自动物化；仍可显式立即执行作业。",
+      "OperatorAndManualDescription": "运维策略与手动模式都在抑制周期实例自动物化。",
       "AwaitingDescription": "周期游标正在等待活动声明完成同步。",
       "ExhaustedDescription": "声明的调度边界内已没有可自动物化的执行时点。",
       "TriggeredEnabledDescription": "该触发作业已允许运维人员准入执行。",
@@ -245,14 +469,14 @@
       "ToolbarLabel": "所选周期作业操作",
       "Count": "已选择 {0} 个周期作业",
       "Description": "批量变更会保留每个作业独立的历史保留策略和乐观并发栅栏。",
-      "DebugPauseUnavailable": "所选作业中存在已处于调试手动模式的作业，因此不能对该选择执行快速暂停。",
+      "ManualPauseUnavailable": "所选作业中存在已处于手动模式的作业，因此不能对该选择执行快速暂停。",
       "Clear": "清除选择"
     },
     "Messages": {
       "Paused": "周期实例物化已暂停。",
       "Resumed": "周期实例物化将从下一个未来时点继续。",
-      "PauseUnavailableDebug": "调试模式已抑制自动物化；仍可立即执行作业。",
-      "ResumedDebugRemains": "运维暂停已解除；调试模式仍在抑制自动物化，立即执行仍然可用。",
+      "PauseUnavailableManual": "手动模式已抑制自动物化；仍可立即执行作业。",
+      "ResumedManualRemains": "运维暂停已解除；手动模式仍在抑制自动物化，立即执行仍然可用。",
       "UpdateFailed": "策略更新失败。",
       "RunFailed": "作业无法入队。",
       "Queued": "执行 {0} 已入队。"
@@ -263,11 +487,10 @@
       "ResumeTitle": "继续所选周期作业？",
       "PauseMessage": "暂停 {0} 个所选作业的新周期实例？现有排队及运行中的执行不受影响。",
       "ResumeMessage": "从下一个未来时点继续 {0} 个所选作业？暂停期间的执行时点不会补跑。",
-      "PauseUnavailableDebug": "所选作业中至少有一个仅由调试模式抑制且没有运维暂停，因此不能快速暂停。",
+      "PauseUnavailableManual": "所选作业中至少有一个仅由手动模式抑制且没有运维暂停，因此不能快速暂停。",
       "Result": "{0} 项策略更新成功，{1} 项失败。",
-      "ResultDebugRemains": "{0} 项运维暂停更新成功，{1} 项失败；已配置调试模式的作业仍会抑制自动物化。"
+      "ResultManualRemains": "{0} 项运维暂停更新成功，{1} 项失败；已配置手动模式的作业仍会抑制自动物化。"
     },
-    "RegistryEyebrow": "作业定义目录",
     "NoDefinitions": "已加载的发布快照中没有作业定义。",
     "QueryUnavailable": "暂时无法获取作业定义结果，请查看查询错误并刷新。",
     "AbsentDefinition": "已停止发布",
@@ -279,7 +502,6 @@
   },
   "Policy": {
     "Title": "运维策略工作台",
-    "ImmutableNotice": "作业键、作业类型、参数契约、所有者和已配置时区始终由代码声明管理。策略变更影响后续准入；已排队和运行中的执行保留其已捕获配置。",
     "InheritDefault": "继承默认值",
     "ForceEnabled": "强制启用",
     "ForceDisabled": "强制禁用",
@@ -287,48 +509,27 @@
     "MaxDaysHelp": "留空继承不限制保留时长。",
     "Saved": "运维策略已保存。",
     "UnsavedChanges": "存在未保存的运维变更",
-    "NoChanges": "没有策略变更",
+    "NoChanges": "尚未修改",
     "Provenance": {
       "Declared": "声明或调度器默认值",
       "Override": "运维覆盖值",
       "Effective": "生效值",
-      "Help": "每一行都分别展示不可变声明默认值、运维意图以及调度器将采用的实际行为。"
+      "Help": "每一行都分别展示不可变声明默认值、运维意图以及调度器将采用的实际行为。",
+      "Field": "字段"
     },
     "Sections": {
-      "General": "常规",
-      "GeneralHelp": "控制准入状态和面向运维人员的作业信息。",
-      "Schedule": "调度",
-      "ScheduleHelp": "在部署已配置的时区中编辑周期节奏和边界。",
-      "Execution": "执行",
-      "ExecutionHelp": "控制容量以及新准入执行捕获的重试和超时快照。",
-      "Retention": "保留",
-      "RetentionHelp": "按数量和时长限制终态执行历史。"
+      "Schedule": "调度"
     },
     "Fields": {
       "Enabled": "启用状态",
       "DisplayName": "显示名称",
       "Description": "描述",
-      "DescriptionMode": "描述意图",
       "MaxConcurrency": "最大并发数",
       "RetryCount": "重试次数",
       "ExecutionTimeout": "执行超时",
-      "Hours": "小时",
       "Minutes": "分钟",
-      "Seconds": "秒",
       "MaxRecords": "保留执行数量",
       "MaxDays": "保留时长（天）"
-    },
-    "Identity": {
-      "ArgumentContract": "参数契约",
-      "PolicyRevision": "策略修订",
-      "UpdatedAt": "策略更新时间",
-      "JobType": "作业类型",
-      "LastObserved": "所有者最近上报"
-    },
-    "DescriptionModes": {
-      "Inherit": "继承声明描述",
-      "Clear": "清空描述",
-      "Value": "使用运维描述"
     },
     "BoundaryModes": {
       "Inherit": "继承声明边界",
@@ -336,9 +537,7 @@
       "Value": "使用运维边界"
     },
     "Actions": {
-      "ResetField": "移除此覆盖值并继承默认值",
-      "ResetAll": "重置全部覆盖值",
-      "Override": "添加覆盖值"
+      "ResetField": "移除此覆盖值并继承默认值"
     },
     "Values": {
       "Enabled": "已启用",
@@ -348,10 +547,10 @@
       "Cleared": "已清空"
     },
     "Validation": {
-      "DisplayNameRequired": "请输入长度符合限制的显示名称，或重置该字段以继承声明值。",
-      "DescriptionRequired": "请输入长度符合限制的说明、选择清空，或继承声明值。",
       "Timeout": "请输入大于 0 且在支持范围内的执行超时。",
-      "NumericMinimum": "{0}不得小于{1}，或重置以继承默认值。"
+      "NumericMinimum": "{0}不得小于{1}，或重置以继承默认值。",
+      "Number": "请输入有效数值，或留空继承默认值。",
+      "WholeNumber": "请输入有效整数，或留空继承默认值。"
     },
     "Conflict": {
       "DraftsPreserved": "另一位运维人员更改了策略基线（{0} → {1}）。未保存的编辑会保留，未触及字段会采用最新策略；请检查后再重试。",
@@ -361,8 +560,7 @@
       "DiscardScheduleDraft": "丢弃调度草稿"
     },
     "Execution": {
-      "ProspectiveNotice": "最大并发数会立即约束新领取，但不会取消活动执行。重试和超时变更仅由新准入的执行捕获。",
-      "SubsecondPrecisionPreserved": "现有超时值包含亚秒精度；编辑整秒字段时将保留这些小数刻度。"
+      "ProspectiveNotice": "最大并发数会立即约束新领取，但不会取消活动执行。重试和超时变更仅由新准入的执行捕获。"
     },
     "Retention": {
       "ZeroUnlimited": "设为 0 可禁用按数量保留。"
@@ -465,8 +663,12 @@
           "WeekdaysNine": "每个工作日上午 09:00",
           "MonthlyFirst": "每月第一天零点"
         }
-      }
-    }
+      },
+      "BoundaryTimeHint": "可输入 HH:mm:ss；钟面选择会保留秒数。"
+    },
+    "InheritPlaceholder": "留空继承",
+    "ChangedCount": "{0} 项策略变更",
+    "ScopeNote": "此处管理启用状态、执行与保留策略。Cron 可在作业详情的调度计划中修改，保存此处不会覆盖调度计划。"
   },
   "JobDetail": {
     "PageTitle": "任务调度 · 作业详情",
@@ -475,19 +677,11 @@
     "RefreshFailed": "最近一次刷新失败：{0}",
     "ObservedAt": "运行证据观测时间：{0}",
     "Actions": {
-      "BackToCatalog": "返回作业目录",
-      "InspectSchedule": "查看计划与策略"
+      "BackToCatalog": "返回作业目录"
     },
     "Header": {
-      "EvidenceAriaLabel": "当前作业运行证据",
       "ActiveExecutions": "活动执行",
-      "QueuedExecutions": "排队中",
-      "RunningExecutions": "执行中",
-      "OwnerAbsent": "缺失",
-      "OwnerPresence": "声明存在状态",
-      "OwnerPresent": "存在",
-      "Eyebrow": "所有者作用域内的作业定义",
-      "LedgerScope": "此所有者与作业的已记录排队及运行中执行。"
+      "OwnerAbsent": "缺失"
     },
     "Activity": {
       "Eyebrow": "实时执行证据",
@@ -505,16 +699,10 @@
       "OpenDetails": "打开执行 {0} 的详情"
     },
     "Schedule": {
-      "Title": "周期调度",
-      "Description": "持久化游标依据当前生效的触发规则及边界推进；配置时区仍由代码定义。",
-      "NextOccurrence": "下次执行时点",
       "CronExpression": "Cron 表达式",
       "TimeZone": "调度时区",
-      "StartBoundary": "开始边界",
-      "EndBoundary": "结束边界",
       "TriggeredTitle": "按需准入",
       "TriggeredDescription": "该作业没有周期游标，运维人员需通过活动作业定义显式准入执行。",
-      "DebugManualOnly": "调试模式正在抑制自动周期实例；立即执行仍然可用，并且不会推进周期游标。",
       "StatusDescriptions": {
         "NotRecurring": "按需作业不使用周期游标。",
         "AwaitingSynchronization": "活动 owner 声明正在等待调度器创建持久化游标。",
@@ -524,15 +712,14 @@
       },
       "SuspensionDescriptions": {
         "OperatorPolicy": "运维策略已暂停周期实例自动物化。",
-        "DebugMode": "调试模式抑制周期实例自动物化，同时保留显式立即执行能力。",
-        "OperatorAndDebug": "运维策略与调试模式都在抑制自动物化；解除运维暂停后，调试抑制仍会生效。"
+        "ManualMode": "手动模式停止自动产生周期实例，显式任务在当前进程独立的内存存储中执行。",
+        "OperatorAndManual": "运维策略与手动模式都在抑制自动物化；解除运维暂停后，手动模式仍会生效。"
       },
       "NoNextOccurrence": "尚未记录下次计划触发"
     },
     "Contract": {
       "Title": "声明与策略契约",
       "Description": "代码声明字段保持不可变；运维策略独立存储，并通过乐观并发更新。",
-      "Immutable": "不可变声明",
       "Owner": "作业所有者",
       "ArgumentsKey": "参数契约",
       "MaxConcurrencyHelp": "限制并发工作节点租约；周期实例物化也将其作为排队与运行实例的重叠上限。",
@@ -547,7 +734,8 @@
       "JobKey": "作业键",
       "OwnerObserved": "所有者最近上报",
       "Presence": "声明存在状态",
-      "Present": "存在"
+      "Present": "存在",
+      "DefinitionObserved": "定义记录确认时间"
     },
     "LatestExecution": {
       "Title": "最近执行",
@@ -569,8 +757,7 @@
       "TerminalDispositions": "终态处置",
       "ExecutedCompletions": "已执行完成",
       "DurationSamples": "耗时样本",
-      "CohortNote": "结果卡片统计时间窗内创建的执行；可靠率与耗时统计时间窗内完成的执行。",
-      "LoadFailed": "无法刷新作业健康分析：{0}"
+      "CohortNote": "结果卡片统计时间窗内创建的执行；可靠率与耗时统计时间窗内完成的执行。"
     }
   },
   "RecurringScheduleStatuses": {
@@ -615,7 +802,6 @@
       "Last30Days": "最近 30 天"
     },
     "Metrics": {
-      "AriaLabel": "调度统计摘要",
       "Reliability": "成功占比",
       "Throughput": "每小时已执行完成数",
       "ScheduleFulfillment": "周期调度派发达成率",
@@ -626,25 +812,14 @@
     },
     "Trend": {
       "Title": "分段完成结果",
-      "Description": "按分段比较完成结果。折线连接计数，不表示速率。",
-      "LegendAriaLabel": "结果趋势图例",
-      "ViewAriaLabel": "结果趋势图展示方式",
-      "Bars": "柱状图",
-      "Lines": "折线图",
-      "Unit": "每个分段的完成数",
+      "Description": "按固定时间区间展示已保留的完成记录，各结果分别成行。",
       "HourBuckets": "每小时分段",
       "DayBuckets": "每 24 小时分段",
-      "NoCompletions": "此时间范围内没有完成结果。仍可在下方查看返回的分段数据。",
       "ViewData": "查看分段数据",
-      "DataAriaLabel": "每个返回分段的完成计数",
-      "Interval": "时间段",
-      "PartialBucket": "最后一个分段未满",
-      "ChartWindowLabel": "{0}；{1} → {2}；{3}"
+      "Interval": "时间段"
     },
     "Duration": {
       "Title": "记录耗时",
-      "Description": "从保留的开始时间到完成时间，可能包含重试等待；不代表 CPU 时间或各次尝试耗时之和。",
-      "Samples": "{0} 次可度量完成",
       "PercentilesAriaLabel": "执行耗时分位数",
       "Minimum": "最短",
       "Average": "平均",
@@ -659,42 +834,24 @@
       "Maximum": "最长"
     },
     "Rankings": {
-      "Volume": "完成结果集中度",
-      "VolumeDescription": "占此时间范围内全部完成结果的比例，包括跳过与取消记录。",
-      "Failures": "失败完成集中度",
-      "FailuresDescription": "占此时间范围内全部失败完成的比例；不显示没有失败的作业。",
-      "TopTen": "TOP 10",
-      "OpenJobWithMetric": "第 {0} 名：打开 {1}；{2}：{3}（{4}）",
       "VolumeEmpty": "该时间范围内没有完成的作业活动。",
-      "FailuresEmpty": "该时间范围内没有失败执行。",
-      "VolumePopulation": "此时间范围内有 {0} 个完成结果",
-      "FailurePopulation": "此时间范围内有 {0} 个失败完成结果"
+      "FailuresEmpty": "该时间范围内没有失败执行。"
     },
     "Slowest": {
       "Top": "每个作业的最长记录耗时 · TOP 10",
       "Description": "为每个精确的所有者与作业组合选取最长的可度量完成记录，可查看其保留的执行证据。",
       "Empty": "此时间范围内没有符合条件的可度量完成。",
-      "OpenDetails": "第 {0} 名：查看 {1} 的执行实例 {2}；{3}；完成于 {4}；记录耗时 {5}",
-      "Inspect": "查看记录"
+      "OpenDetails": "第 {0} 名：查看 {1} 的执行实例 {2}；{3}；完成于 {4}；记录耗时 {5}"
     },
     "Window": {
-      "Completed": "已完成结果",
-      "CompletedDescription": "此时间范围内记录的终态结果",
-      "Accepted": "已接受的分析时间范围",
-      "Requested": "请求的分析时间范围",
       "Bounds": "含开始时间 · 不含结束时间",
-      "Resolved": "成功 + 失败",
-      "Measured": "可度量完成",
-      "Observed": "观测时间",
       "Unavailable": "分析结果不可用",
       "UnavailableDescription": "此时间范围尚未成功加载结果，请重试读取。",
       "Retained": "显示最近一次成功加载的时间范围：{0}。其时间边界与观测时间保持不变。"
     },
-    "Summary": {
-      "Title": "完成结果摘要"
-    },
+    "Summary": {},
     "Cohort": {
-      "Title": "此时间范围内创建的执行",
+      "Title": "执行状态占比",
       "Description": "已接受时间范围内创建记录的当前状态；其统计对象与完成结果不同。",
       "Total": "{0} 条创建记录"
     }
@@ -702,8 +859,6 @@
   "Executions": {
     "PageTitle": "任务调度 · 执行账本",
     "Title": "执行账本",
-    "Count": "{0} 条匹配记录",
-    "LastRefreshed": "观测时间：{0}",
     "Empty": "没有符合当前筛选条件的持久化执行。",
     "Filters": {
       "AriaLabel": "执行搜索与筛选",
@@ -715,16 +870,9 @@
       "StartDate": "开始日期",
       "EndDate": "结束日期",
       "PageSize": "每页行数",
-      "InvalidRange": "结束日期不能早于开始日期。"
+      "InvalidRange": "时间范围无效，请检查起止时间。"
     },
-    "TimeRanges": {
-      "All": "全部时间",
-      "LastHour": "最近 1 小时",
-      "Last24Hours": "最近 24 小时",
-      "Last7Days": "最近 7 天",
-      "Last30Days": "最近 30 天",
-      "Custom": "自定义范围"
-    },
+    "TimeRanges": {},
     "Columns": {
       "Definition": "定义",
       "Instance": "实例",
@@ -734,9 +882,8 @@
       "Duration": "耗时",
       "Attempts": "执行 / 重试次数",
       "Worker": "租约所有者",
-      "Actions": "操作",
-      "StateAndRecorded": "状态与记录时间",
-      "AttemptEvidence": "尝试与租约证据"
+      "State": "状态",
+      "PlannedOrRecorded": "计划 / 记录时间"
     },
     "Actions": {
       "Details": "检查执行",
@@ -753,9 +900,9 @@
       "Failed": "无法持久化取消请求。",
       "Cancelled": "排队中的执行已取消。",
       "AlreadyTerminal": "该执行已经结束。",
-      "NotFound": "该执行已不存在。"
+      "NotFound": "该执行已不存在。",
+      "Pending": "取消请求已发出"
     },
-    "LedgerEyebrow": "持久执行记录",
     "SnapshotUnavailable": "执行记录暂不可用，请刷新后重试。",
     "SnapshotPending": "正在加载执行记录…",
     "Sort": {
@@ -770,11 +917,8 @@
     },
     "Evidence": {
       "Claims": "工作节点领取次数",
-      "ConsumedFailures": "已消耗重试的失败次数",
-      "NoCurrentWorker": "当前无工作节点租约"
+      "ConsumedFailures": "已消耗重试的失败次数"
     },
-    "RecordedTimeNotice": "包含所有创建的记录，包括跳过的计划。",
-    "AcceptedQuery": "保留快照的筛选条件：{0}",
     "QueryDescription": "{0} · {1} · {2} 至 {3} · 第 {4} 页",
     "AnyIdentifier": "所有标识",
     "RefreshFailed": "仍显示最近一次成功读取的快照，本次读取失败：{0}"
@@ -784,7 +928,6 @@
     "NotFound": "该执行已不存在。",
     "Job": "作业键",
     "Owner": "所有者",
-    "Origin": "准入方式",
     "Available": "可执行时间",
     "Worker": "执行节点",
     "Arguments": "序列化参数",
@@ -803,7 +946,7 @@
     "Created": "记录时间",
     "Started": "开始时间",
     "Completed": "完成时间",
-    "Duration": "最近尝试耗时",
+    "Duration": "记录耗时",
     "ScheduledOccurrence": "计划执行时点",
     "CancellationRequested": "请求取消时间",
     "Runtime": "领取与租约",
@@ -812,23 +955,18 @@
     "NoArguments": "没有捕获序列化参数。",
     "SkipReason": "跳过原因",
     "HistoryCount": "保留 {0} 条记录",
-    "HistoryDescription": "按时间顺序展示此执行仍保留的状态变更、取消与日志。",
     "EmptyHistory": "没有可用的保留历史记录。",
     "CancellationPending": "协作取消请求自 {0} 起等待处理。",
     "Copied": "诊断信息已复制到剪贴板。",
     "CopyFailed": "无法复制诊断信息。",
     "Actions": {
       "ViewCatalog": "打开作业详情",
-      "CopySnapshot": "复制快照",
-      "More": "更多执行操作"
-    },
-    "Tabs": {
-      "Evidence": "记录证据",
-      "History": "保留历史 · {0}"
+      "CopySnapshot": "复制快照"
     },
     "RefreshFailed": "仍显示最近一次成功检查的快照，刷新失败：{0}",
     "EvidenceScope": "领取、重试失败和租约恢复各自保留独立记录。",
-    "CapturedPolicyNotice": "这些设置在准入时捕获，后续定义或策略修改不会改变此执行。"
+    "CapturedPolicyNotice": "这些设置在准入时捕获，后续定义或策略修改不会改变此执行。",
+    "Diagnostics": "诊断工具"
   },
   "ExecutionHistoryKinds": {
     "StateTransition": "状态变更",
@@ -855,17 +993,17 @@
       "Milliseconds": "{0} 毫秒"
     },
     "Identity": {
-      "Title": "当前服务宿主",
+      "Title": "宿主身份与存储",
       "Description": "采集此运行时快照的宿主所报告的确切身份与存储。",
-      "DebugMode": "周期调试模式",
+      "ManualMode": "本地手动模式",
       "Scope": "调度范围",
-      "Owner": "宿主所有者标识",
+      "Owner": "当前作业归属",
       "WorkerInstanceId": "Worker 实例",
       "CronTimeZone": "Cron 时区",
-      "DebugModeHelp": "此宿主已停止自动物化周期执行记录。"
+      "ManualModeHelp": "此宿主仅执行显式请求的任务，定义、执行记录和重试均使用独立的本地内存存储。"
     },
     "Store": {
-      "Title": "存储",
+      "Title": "持久化存储",
       "Provider": "提供程序",
       "NoProvider": "无"
     },
@@ -878,7 +1016,7 @@
       "Group:History": "历史清理与保留",
       "SchedulingPollInterval": "调度轮询",
       "WorkerPollInterval": "Worker 轮询",
-      "SnapshotSyncInterval": "快照同步",
+      "SnapshotSyncInterval": "清单确认间隔",
       "ExecutionLeaseDuration": "执行租约",
       "ExecutionLeaseRenewInterval": "租约续约",
       "ExecutionRetryDelay": "重试延迟",
@@ -896,31 +1034,33 @@
       "MaxRetainedOrphanedExecutions": "孤立执行保留数",
       "Enabled": "已启用",
       "Disabled": "已停用",
-      "ExactInterval": "精确间隔"
+      "ExactInterval": "精确间隔",
+      "CoordinatorLeaseDuration": "协调者租约",
+      "MaxConcurrentStoreOperations": "存储操作并发上限",
+      "ReservedLeaseStoreOperations": "续租与收尾预留槽位",
+      "StoreOperationTimeout": "存储操作时间预算",
+      "Group": {
+        "Store": "存储操作预算"
+      }
     },
     "Plane": {
-      "Title": "本地循环",
-      "Description": "最近的本地循环证据。未就绪可能表示尚在初始化或最近一轮失败。",
       "Scheduling": "调度循环",
       "Worker": "执行循环",
       "Ready": "最近一轮就绪",
       "NotReady": "未就绪",
       "NoMessage": "未报告循环消息。",
-      "InFlight": "本机执行中数量 / 配置上限",
-      "LocalOnly": "本地循环证据不能说明其他副本是否就绪，也不能说明单个作业的执行结果。"
+      "InFlight": "本机执行中 / 配置上限",
+      "LocalOnly": "本机就绪不代表所有者进程在线，也不代表作业运行成功。",
+      "LastOwnerWork": "最近完成 owner 工作",
+      "LastRecoveryWork": "最近完成恢复扫描",
+      "LastCleanupWork": "最近完成清理扫描",
+      "WorkTimeHelp": "时间仅记录本机已完成的实际工作，包含空扫描。仅待机的轮次不会更新时间；健康待机副本可以没有工作时间。一次清理扫描可能只覆盖部分范围。"
     },
     "Owners": {
-      "Title": "持久化所有者观测",
+      "Title": "定义发布观测",
       "Description": "当前范围内有定义记录的所有者。最近定义观测超过 {0} 即视为陈旧；此观测并非进程心跳。",
       "Owner": "所有者",
-      "Liveness": "快照观测",
-      "Jobs": "定义",
-      "JobsHelp": "当前发布的定义数量与已保留但不再发布的定义数量。",
-      "JobsCounts": "在册 {0} · 缺席 {1}",
-      "Active": "执行记录",
-      "ActiveCounts": "排队 {0} · 执行 {1}",
-      "LastObserved": "最近观测",
-      "OpenCatalog": "在目录中打开 {0}",
+      "Liveness": "最近定义观测",
       "Empty": "当前范围内没有记录任何有定义记录的所有者。",
       "RecentObservation": "较新观测",
       "StaleObservation": "陈旧观测",
@@ -953,14 +1093,272 @@
       "NotLeader": "非服务主节点"
     },
     "Observation": {
-      "Title": "运行时观测",
-      "Captured": "运行时采集时间",
-      "Accepted": "读取接受时间",
-      "Cadence": "页面刷新节奏",
-      "Manual": "手动刷新",
       "Unavailable": "运行时证据暂不可用",
       "UnavailableDescription": "尚未接受有效的运行时快照。请重新读取以查看当前宿主；快照不可用不能说明调度器为空或健康。",
       "NoDiagnostic": "未提供诊断消息。"
+    },
+    "Coordinators": {
+      "Title": "持久化协调租约",
+      "Description": "记录 owner 调度与范围维护的持有者。有效期使用存储时钟判断；租约有效不能证明进程健康。此处不暴露隔离令牌。",
+      "Observed": "存储观察时间",
+      "Unavailable": "尚未观察协调租约归属。",
+      "Empty": "当前范围尚无协调租约记录。",
+      "Partition": "协调分区",
+      "Holder": "记录的持有者",
+      "Expiry": "租约到期",
+      "State": "采集时状态",
+      "Active": "租约有效",
+      "Expired": "租约已过期"
+    },
+    "Coordination": {
+      "Title": "谁在推进此作用域",
+      "Description": "所有者协调者推进各自的周期计划；维护协调者负责租约恢复与分批清理。Worker 可独立领取执行。",
+      "Filter": "协调租约筛选",
+      "Clear": "清除分区筛选",
+      "OwnerRole": "所有者调度",
+      "MaintenanceRole": "作用域维护",
+      "PreviousHolder": "历史持有者，当前无有效授权",
+      "Elapsed": "观测时已到期 {0}",
+      "Remaining": "观测时剩余 {0}",
+      "Collapse": "收起其他分区",
+      "ShowAll": "展开全部 {0} 个分区",
+      "LastWork": "本机最近完成的工作",
+      "CleanupNote": "一次清理记录代表一个受限批次；此接口未提供全作用域扫描是否完成。",
+      "NoWork": "尚无本机完成证据",
+      "Manual": "自动工作已停用",
+      "ManualTitle": "隔离的本地执行",
+      "ManualNote": "使用本地内存存储，不参与共享作用域的协调租约。自动计划与维护均停用。",
+      "MissingTitle": "协调租约观测不可用",
+      "MissingNote": "无法判断由哪个副本推进计划。循环就绪状态仍是本机独立证据。",
+      "ManualAdmission": "仅显式请求产生执行",
+      "ManualStore": "本地内存存储",
+      "ManualQueue": "本地定义与显式执行",
+      "DutiesTitle": "本机工作分工",
+      "ScheduleDuty": "周期计划",
+      "MaintenanceDuty": "恢复与清理",
+      "DutyStates": {
+        "active": "本机负责",
+        "standby": "其他副本负责",
+        "expired": "租约已到期",
+        "none": "本机不发布",
+        "unobserved": "尚未确认",
+        "manual": "已停用"
+      },
+      "OwnerDuty": {
+        "active": "负责 {1} 个所有者中的 {0} 个，将到期的周期任务放入执行队列。",
+        "standby": "周期计划由其他副本推进，本机当前待命。",
+        "expired": "{1} 个所有者中有 {0} 个租约已到期，当前观测没有本机有效租约。",
+        "none": "本机未发布作业定义，不承担周期计划的推进。",
+        "unobserved": "尚未取得协调租约观测，暂无法确认由谁推进周期计划。",
+        "manual": "自动计划已停用，仍可从作业目录发起立即执行。"
+      },
+      "MaintenanceDutyNote": {
+        "active": "本机负责恢复过期执行租约，并分批清理历史记录。",
+        "standby": "恢复与清理由其他副本负责，本机当前待命。",
+        "expired": "维护租约已到期，当前观测没有有效的维护持有者。",
+        "unobserved": "尚未取得维护租约观测，暂无法确认负责的副本。",
+        "manual": "租约恢复与历史清理已停用，执行记录存放在本地内存。"
+      },
+      "Publication": "定义清单",
+      "PublishedAt": "当前清单首次发布",
+      "ManifestHash": "清单指纹",
+      "Unavailable": "未提供",
+      "PublicationNote": "相同清单的后续确认只更新观测时间；首次发布时间与指纹保持不变。",
+      "OwnerKeys": "本机发布的逻辑所有者",
+      "FallbackOwner": "默认所有者",
+      "NotOwnerProcess": "逻辑所有者独立于服务进程标识；一个宿主可发布多个所有者。",
+      "ManualOwners": "隔离的本地存储内已发布的所有者；点名称查看本地作业。",
+      "StoreBudget": "存储操作预算",
+      "StoreBudgetNote": "配置约束本进程的存储操作；预留槽位保障续租与收尾，不代表当前空闲连接或实测吞吐量。",
+      "Filters": {
+        "all": "全部",
+        "local": "本机持有",
+        "remote": "其他副本持有",
+        "expired": "已到期"
+      },
+      "States": {
+        "active": "本机持有",
+        "standby": "其他副本持有",
+        "expired": "已到期"
+      },
+      "ObservationNote": "有效性按这次存储观测判断；页面停留时不倒计时。刷新获取新证据。",
+      "NoMatch": "没有匹配的协调分区"
+    },
+    "Finding": {
+      "Automatic": "最近一轮，调度循环 {0}、执行循环 {1}；本机发布 {2} 个作业定义。",
+      "Manual": "使用 {0}，执行循环 {1}；本机发布 {2} 个作业定义，仅接受显式执行。",
+      "Ready": "就绪",
+      "NotReady": "未就绪",
+      "Attention": "本机循环需检查",
+      "ManualNote": "执行只影响本地环境，自动周期计划与维护工作已停用。"
     }
+  },
+  "Architecture": {
+    "Unknown": "证据不足",
+    "UnknownReason": "样本未覆盖判定所需范围",
+    "EvidenceTitle": "部分作业的判定证据不足",
+    "EvidenceBody": "{0} 个在册作业暂不能完成异常判定；已确认的失败与进行中执行仍然保留。",
+    "InspectUnknown": "查看证据不足的作业",
+    "SampleLimited": "仅返回部分保留记录",
+    "SampleUnavailable": "未取得历史判定样本",
+    "SampleNote": "样本覆盖与历史保留完整性是两回事；没有检出异常不代表完整历史均成功。",
+    "HistoryTitle": "历史完整性未验证",
+    "HistoryNote": "统计仅包含当前保留的记录。未提供可验证的历史边界，空白区间不能视为没有执行。",
+    "Cursor": "持久化计划",
+    "Preview": "Cron 时点预览",
+    "PreviewNote": "以下时点由生效表达式与时间边界计算，尚未入队；协调者推进、暂停和容量限制会影响实际执行。",
+    "Schedule": {
+      "Scheduled": "已有计划",
+      "AwaitingSynchronization": "等待计划同步",
+      "Suspended": "自动调度暂停",
+      "Exhausted": "计划已耗尽",
+      "NotRecurring": "按需触发",
+      "Unpublished": "已停止发布"
+    },
+    "ScheduleHelp": {
+      "Scheduled": "来自当前持久化游标；到达时点后仍需协调者推进与容量检查。",
+      "AwaitingSynchronization": "定义已发布，尚未建立持久化计划游标。可检查此所有者的协调租约。",
+      "Suspended": "自动周期调度被暂停；显式执行仍可单独发起。",
+      "Exhausted": "在当前表达式与时间边界内没有后续时点。可检查调度规则。",
+      "NotRecurring": "通过显式触发创建执行。",
+      "Unpublished": "不再接收新执行，保留已有策略与历史。"
+    },
+    "OperatorPause": "操作策略",
+    "ManualPause": "本地手动模式",
+    "InspectCoordinator": "检查协调租约",
+    "StartBound": "开始边界",
+    "EndBound": "结束边界",
+    "Unbounded": "未设置",
+    "ManualNote": "当前为隔离的本地内存存储；自动计划、租约恢复与历史清理均不运行。显式执行只影响本地环境。",
+    "AtLeastStreak": "至少连续 {0} 次失败",
+    "UnknownNote": "部分作业的留存执行证据不足，暂不能判断运行状况。",
+    "BoundaryTitle": "计划时间边界",
+    "BoundaryHelp": "按调度时区填写。继承、移除与指定时间是三种不同的覆盖。",
+    "CursorNote": "当前状态与下次计划来自存储快照，Cron 预览另行计算。"
+  },
+  "Cleanup": {
+    "Title": "定义清理",
+    "Description": "核对过时定义，仅移除已通过全部检查的项目。",
+    "Preview": "预览清理",
+    "ManualTitle": "共享维护不可用",
+    "ManualBody": "请在连接共享调度存储的自主运行宿主上核对并清理定义。",
+    "ReadOnlyTitle": "只读访问",
+    "ReadOnlyBody": "您可以查看依据，当前权限不允许移除定义或停用所有者。",
+    "LoadFailed": "无法刷新依据，请重试。",
+    "StaleBody": "在成功刷新之前，维护操作不可用。",
+    "Scope": "清理范围",
+    "Owner": "所有者",
+    "AllOwners": "全部所有者",
+    "Search": "搜索作业、类型或所有者",
+    "Readiness": "移除条件",
+    "ReadyCount": "可移除的定义",
+    "DefinitionsUnit": "个",
+    "Coverage": "当前筛选范围内 {0} 个待核对定义 · 作用域保留 {1} 个定义",
+    "Finding": "{0} 个定义已无活动执行。{1} 个仍有排队，{2} 个仍在执行，{3} 个需要确认所有者。",
+    "SelectReady": "选择本页可移除项",
+    "MarksCoverage": "每个标记代表本页一个定义 · 显示 {0} / {1} 个匹配项",
+    "InspectNamed": "查看 {0} 的依据",
+    "SelectNamed": "选择 {0}",
+    "RetirementComplete": "所有者已停用",
+    "RemovalComplete": "清理完成",
+    "RetirementReceipt": "{0} 个定义现已停止发布。排队实例仍保留，需另行确认清理。",
+    "Receipt": "已移除 {0} 个定义 · 已取消 {1} 个排队实例 · 保留 {2} 条执行记录",
+    "SessionReceipt": "本页会话的最近操作结果",
+    "Inventory": "待核对定义",
+    "All": "全部",
+    "Selection": "已跨筛选选择 {0} 项 · 每次最多预览 {1} 项",
+    "ClearSelection": "清空选择",
+    "Identity": "作业 / 所有者",
+    "Declaration": "声明依据",
+    "Activity": "活动执行",
+    "History": "保留历史",
+    "NextStep": "下一步",
+    "LastObserved": "最后观察",
+    "AbsentSince": "停止发布",
+    "TerminalExecutions": "已结束的执行",
+    "Inspect": "核对",
+    "EmptyScope": "此作用域尚无定义",
+    "NoCandidates": "没有需要清理的定义",
+    "NoMatches": "没有匹配当前筛选的定义",
+    "EmptyBody": "可刷新依据或调整筛选。仅缺少近期观察记录不能据此移除定义。",
+    "RetentionNote": "清理保留执行模板与历史，现有执行历史保留策略仍然生效。",
+    "Loading": "正在加载依据…",
+    "EvidenceTitle": "定义依据",
+    "Checks": "移除前检查",
+    "CheckAbsent": "已不在所有者接受的发布清单中",
+    "CheckActivity": "{0} 个运行实例 · {1} 个未释放租约或槽位",
+    "Queued": "排队",
+    "Running": "运行",
+    "JobKey": "作业键",
+    "PolicyImpact": "策略影响",
+    "PolicyOverrides": "操作员覆盖策略将随此定义一并移除。",
+    "PolicyDefault": "没有操作员覆盖；保留的策略记录将一并移除。",
+    "Publication": "已接受的发布",
+    "Unknown": "未知",
+    "RetireTitle": "停用所有者",
+    "RetireHint": "若所有者已确定不再使用，请先停止所有发布部署，再核对停用操作。",
+    "RetireAction": "核对停用所有者",
+    "OpenDefinition": "打开作业详情",
+    "PreviewSummary": "已选 {0} 项 · {1} 项可移除 · {2} 项受保护且保持不变",
+    "WillRemove": "移除定义",
+    "CancelQueued": "同时取消已选停发定义的排队实例",
+    "CancelQueuedHelp": "仅处理已停止发布的定义。运行中的作业与待确认的所有者仍受保护，取消记录会保留。",
+    "ConsequenceBody": "可移除定义及其策略、调度游标将被删除。清理不会停止运行中的作业。执行依据仍按现有策略保留；改名后的新作业不会继承旧策略或历史。",
+    "CancellationLimit": "当前选择超过 {0} 个排队取消上限。请拆分选择，或先在执行账本取消排队实例。",
+    "Acknowledge": "我确认将移除可清理的定义及其策略。",
+    "Back": "返回",
+    "Rebuild": "重新生成预览",
+    "ConfirmRemoval": "移除 {0} 个定义",
+    "ConfirmRemovalSingle": "移除 1 个定义",
+    "Unavailable": "当前操作不可用。请检查权限并刷新页面后重试。",
+    "Changed": "核对后的依据已变化，未移除任何定义。请重新生成预览，核对新的受保护项。",
+    "Blocked": "当前发布状态、活动执行或事务上限阻止移除，未移除任何定义。",
+    "RetireBody": "停用后将永久阻止此所有者标识再次发布，并将其定义标记为停止发布。排队实例与历史仍保留。仅可停用已确定不再使用的所有者；不会自动恢复。",
+    "RetireDescription": "停用发布身份前，确认此所有者已被有意停止使用。",
+    "RetirementEffects": "停用影响",
+    "RetirePopulation": "此所有者保留 {0} 个定义、{1} 个排队实例和 {2} 个运行实例。",
+    "PublisherActive": "发布协调器仍处于活动状态。请先停止所有发布者。",
+    "RetirementBlocked": "无法停用此所有者：仍有活动执行、已被停用或缺少发布依据。",
+    "TypeOwner": "输入完整所有者名称",
+    "PublishersStopped": "我已停止所有发布此所有者的部署。",
+    "ConfirmRetirement": "停用所有者",
+    "States": {
+      "Ready": "可移除",
+      "Queued": "仍有排队",
+      "Running": "仍在执行",
+      "OwnerUnconfirmed": "待确认所有者",
+      "Published": "仍在发布",
+      "Missing": "定义已不存在"
+    },
+    "Reasons": {
+      "Ready": "已停止发布，无排队或运行实例",
+      "Queued": "先决定是否取消旧的排队实例",
+      "Running": "等待执行结束与租约回收",
+      "OwnerUnconfirmed": "缺少近期发布记录，不能据此认定删除",
+      "Published": "已接受的发布清单仍包含此作业",
+      "Missing": "此定义可能已经移除，仍可查看其执行账本"
+    },
+    "ResetFilters": "重置筛选",
+    "SelectPage": "选择本页全部定义",
+    "Unpublished": "已停止发布",
+    "NoActive": "无活动执行",
+    "PublicationEvidence": "发布证据",
+    "PublishedBoundary": "接受的发布仍包含此定义。缺少近期观测不能证明已被删除；请先确认所有者已停用，再决定是否退役。",
+    "AbsentBoundary": "此定义已从所有者接受的完整声明中移除，新增发与周期调度已停止。清理前仍需处理已入队的执行。",
+    "CheckQueueClear": "排队已清空",
+    "CheckRunningClear": "没有运行实例或未释放的执行租约",
+    "Passed": "通过",
+    "NeedsDecision": "需要决定",
+    "Protected": "受保护",
+    "ExactIdentity": "精确身份",
+    "CopyOwner": "复制所有者标识",
+    "DeclarationState": "声明状态",
+    "RenameNote": "改名后的作业是独立的新定义，不会从旧标识转移人工策略或执行历史。",
+    "HistoryKept": "执行历史保留",
+    "PreviewDescription": "确认前核对可移除定义、受保护的工作及保留证据。",
+    "ProtectedCount": "{0} 项受保护",
+    "RetainedCount": "保留 {0} 条执行记录",
+    "PolicyCount": "移除 {0} 项定义策略",
+    "CancelCount": "取消 {0} 个排队实例"
   }
 }

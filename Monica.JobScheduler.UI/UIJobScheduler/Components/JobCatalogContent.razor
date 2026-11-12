@@ -5,12 +5,16 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<JobSchedulerResource> L
+@inject NavigationManager Navigation
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.State
+@using Monica.JobScheduler.UI.UIJobScheduler.Executions.Support
 
 @implements IAsyncDisposable
 
     @if (_state is not null)
     {
         <SchedulerAccessBoundary AccessChecked="@_state.AccessChecked" IsAuthorized="@_state.IsAuthorized">
+            <SchedulerSnapshotActions CapturedAtUtc="@_state.ObservedAtUtc" IsLoading="@(_state.IsLoading || _state.IsMutating)" RefreshRequested="RefreshCatalogAsync" />
             <div class="catalog-page">
                 @if (_state.Error is not null)
                 {
@@ -22,13 +26,22 @@
                 }
                 @if (_state.PresentFilter == false)
                 {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Catalog:AbsentViewNotice"]</MudAlert>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Catalog:AbsentViewNotice"] <a href="/job-scheduler/cleanup">@L["Cleanup:Title"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></a></MudAlert>
+                }
+                @if (_state.HasLoadedFacets)
+                {
+                    <SchedulerCatalogComposition Definitions="@_state.Definitions" Tones="@_state.Evidence.ToDictionary(pair => pair.Key, pair => pair.Value.Tone)" Catalog="@_state.Catalog" Truncated="@_state.IsCatalogTruncated" Standing="@_state.Standing" Cadence="@_state.Cadence" ObservedAtUtc="@_state.ObservedAtUtc.GetValueOrDefault()" />
+                }
+                @if (_state.StandingCounts.GetValueOrDefault("unknown") > 0)
+                {
+                    <div class="catalog-evidence-notice"><MoIcon Icon="@MoIcons.Info" Size="17px" /><div><b>@L["Architecture:EvidenceTitle"]</b><p>@L["Architecture:EvidenceBody", _state.StandingCounts.GetValueOrDefault("unknown")]</p><a href="/job-scheduler/catalog?standing=unknown">@L["Architecture:InspectUnknown"] <MoIcon Icon="@MoIcons.ArrowRight" Size="13px" /></a></div></div>
                 }
                 <JobCatalogOperationalTable @ref="_catalogTable"
                                             ServerData="@_state.LoadTableAsync"
                                             SelectedJobIds="@_state.SelectedJobIds"
                                             TotalCount="@_state.TotalCount"
-                                            PageSize="@_state.PageSize"
+                                            PageSize="@_state.PageSize" StandingResolver="@_state.StandingOf"
+                                            StandingDetailResolver="@_state.StandingDetailOf" StandingToneResolver="@_state.StandingToneOf"
                                             PageSizeOptions="@_state.PageSizeOptions"
                                             IsMutating="@_state.IsMutating"
                                             IsQueryFailed="@(_state.Error is not null)"
@@ -37,7 +50,7 @@
                                             AllRecurringSelectionChanged="SetAllRecurringSelection"
                                             SelectionToggled="ToggleSelection"
                                             DisabledStateToggled="ToggleDisabledAsync"
-                                            RunRequested="RunJobAsync">
+                                            RunRequested="RunJobAsync" ExecutionSelected="OpenExecution">
                     <FilterContent>
                         <CatalogFilterBar SearchText="@_state.SearchText"
                                           SearchTextChanged="@(value => _state.SearchText = value)"
@@ -48,7 +61,7 @@
                                           JobTypeCounts="@_state.JobTypeCounts"
                                           HasFacetEvidence="@_state.HasLoadedFacets"
                                           JobTypeSelected="SelectJobTypeAsync"
-                                          SelectedDisabledState="@_state.SelectedDisabledState"
+                                          Standing="@_state.Standing" StandingCounts="@_state.StandingCounts" StandingSelected="SelectStandingAsync" Sort="@_state.CatalogSort" SortSelected="SelectSortAsync" Cadence="@_state.Cadence" SelectedDisabledState="@_state.SelectedDisabledState"
                                           DisabledStateSelected="SelectDisabledStateAsync"
                                           IsLoading="@(_state.IsLoading || _state.IsMutating)"
                                           SearchRequested="SearchAsync"
@@ -60,8 +73,8 @@
     }
 @code {
     /// <summary>
-    /// Gets or sets the optional presence deep-link filter. The catalog defaults to definitions their owners
-    /// currently publish; <c>?present=false</c> initially lists all job types whose owners no longer publish them,
+    /// Gets or sets the optional presence deep-link filter. The catalog includes published and retained definitions;
+    /// <c>?present=false</c> initially lists all job types whose owners no longer publish them,
     /// as linked from the overview attention panel.
     /// </summary>
     [Parameter]
@@ -73,6 +86,35 @@
     [Parameter]
     public string? Owner { get; set; }
 
+    /// <summary>Gets the initial route-held job type.</summary>
+    [Parameter] public string? InitialType { get; set; }
+    /// <summary>Gets the initial route-held effective disabled state.</summary>
+    [Parameter] public bool? InitialDisabled { get; set; }
+    /// <summary>Gets the initial route-held definition search.</summary>
+    [Parameter] public string? InitialSearch { get; set; }
+    /// <summary>Gets the route-owned exact execution selection; changing it preserves the current catalog state.</summary>
+    [Parameter] public string? InitialInstanceId { get; set; }
+
+    /// <summary>Gets route-held operational standing.</summary>
+    [Parameter] public string? InitialStanding { get; set; }
+    /// <summary>Gets route-held cadence.</summary>
+    [Parameter] public string? InitialCadence { get; set; }
+    /// <summary>Gets route-held inventory ordering.</summary>
+    [Parameter] public string? InitialSort { get; set; }
+    private (bool?, string?, string?, bool?, string?, string?, string?, string?) _filters;
+    private void ApplyRoute()
+    {
+        if (_state is not { } state) return;
+        state.ApplyInitialQuery(Present, Owner);
+        state.OwnerId = Owner;
+        state.SearchText = InitialSearch;
+        state.SelectedJobType = Enum.TryParse<JobType>(InitialType, true, out var type) && Enum.IsDefined(type) ? type : null;
+        state.SelectedDisabledState = InitialDisabled;
+        state.Standing = InitialStanding;
+        state.Cadence = InitialCadence;
+        state.CatalogSort = InitialSort ?? "attention";
+        _filters = (Present, Owner, InitialType, InitialDisabled, InitialSearch, InitialStanding, InitialCadence, InitialSort);
+    }
     private JobCatalogPageState? _state;
     private JobCatalogOperationalTable? _catalogTable;
     private readonly object _lifetimeGate = new();
@@ -80,6 +122,9 @@
     private volatile bool _disposed;
     private SchedulerDialogSession<CatalogBatchRequest>? _batchDialogs;
     private SchedulerDialogSession<CatalogTriggerRequest>? _triggerDialogs;
+    private ExecutionDialogSession? _inspectors;
+    private string? _requestedInstanceId;
+    private int _inspectorVersion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,7 +133,45 @@
         _state = PageStateFactory.Create(UiOptions.Value.DefaultPageSize);
         _state.Changed += OnStateChangedAsync;
         _state.ApplyInitialQuery(Present, Owner);
+        _state.SelectedJobType = Enum.TryParse<JobType>(InitialType, true, out var type) && Enum.IsDefined(type) ? type : null;
+        _state.SelectedDisabledState = InitialDisabled;
+        _state.SearchText = InitialSearch;
+        ApplyRoute();
         await _state.InitializeAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_disposed || _state is not { } state) return;
+        if (_filters != (Present, Owner, InitialType, InitialDisabled, InitialSearch, InitialStanding, InitialCadence, InitialSort))
+        {
+            ApplyRoute(); state.Search(); await ReloadFromFirstPageAsync();
+        }
+        if (_requestedInstanceId == InitialInstanceId) return;
+        var id = InitialInstanceId;
+        _requestedInstanceId = id;
+        var version = ++_inspectorVersion;
+        var previous = _inspectors;
+        _inspectors = null;
+        if (previous is not null) await previous.DisposeAsync();
+        if (_disposed || version != _inspectorVersion || string.IsNullOrWhiteSpace(id)) return;
+        var inspectors = new ExecutionDialogSession(exactId => ExecutionDetailDialogLauncher.OpenAsync(DialogService, L, exactId),
+            () => InspectorClosedAsync(id, version));
+        _inspectors = inspectors;
+        try
+        {
+            if (await state.ReauthorizeAsync() && !_disposed && version == _inspectorVersion) await inspectors.OpenAsync(id);
+        }
+        catch (OperationCanceledException) when (_disposed || state.IsDisposed) { }
+    }
+
+    private void OpenExecution(string id) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("instanceId", id));
+
+    private async Task InspectorClosedAsync(string id, int version)
+    {
+        if (_disposed || version != _inspectorVersion || _requestedInstanceId != id) return;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("instanceId", (string?)null), replace: true);
+        await ReloadTableAsync();
     }
 
     private Task OnStateChangedAsync() => _disposed ? Task.CompletedTask : InvokeAsync(() =>
@@ -102,9 +185,9 @@
             <div>
                 <p class="catalog-selection__title">@L["Catalog:Selection:Count", state.SelectedRecurringSummaries.Count]</p>
                 <p>@L["Catalog:Selection:Description"]</p>
-                @if (state.HasDebugOnlySuppressedSelection)
+                @if (state.HasManualOnlySuppressedSelection)
                 {
-                    <p class="catalog-selection__notice">@L["Catalog:Selection:DebugPauseUnavailable"]</p>
+                    <p class="catalog-selection__notice">@L["Catalog:Selection:ManualPauseUnavailable"]</p>
                 }
             </div>
         </div>
@@ -120,25 +203,45 @@
     private async Task SearchAsync()
     {
         _state?.Search();
+        if (_state is { } state)
+        {
+            var url = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+            {
+                ["owner"] = state.OwnerId, ["type"] = state.SelectedJobType?.ToString(), ["paused"] = state.SelectedDisabledState,
+                ["q"] = string.IsNullOrEmpty(state.SearchText) ? null : state.SearchText,
+                ["standing"] = state.Standing, ["cadence"] = state.Cadence, ["sort"] = state.CatalogSort == "attention" ? null : state.CatalogSort
+            });
+            if (url != Navigation.Uri) { Navigation.NavigateTo(url); return; }
+        }
         await ReloadFromFirstPageAsync();
+    }
+
+    private async Task RefreshCatalogAsync()
+    {
+        if (_state is not { } state || _disposed) return;
+        try { await state.RefreshCompositionAsync(); await ReloadTableAsync(); }
+        catch (OperationCanceledException) when (_disposed || state.IsDisposed) { }
     }
 
     private async Task ResetAsync()
     {
+        if (Navigation.ToAbsoluteUri(Navigation.Uri).Query.Length > 0) { Navigation.NavigateTo(JobCatalogPage.PAGE_URL); return; }
         _state?.Reset();
         await ReloadFromFirstPageAsync();
     }
 
+    private async Task SelectStandingAsync(string? standing) { if (_state is { } state) state.Standing = standing; await SearchAsync(); }
+    private async Task SelectSortAsync(string sort) { if (_state is { } state) state.CatalogSort = sort; await SearchAsync(); }
     private async Task SelectJobTypeAsync(JobType? jobType)
     {
         _state?.SelectJobType(jobType);
-        await ReloadFromFirstPageAsync();
+        await SearchAsync();
     }
 
     private async Task SelectDisabledStateAsync(bool? disabled)
     {
         _state?.SelectDisabledState(disabled);
-        await ReloadFromFirstPageAsync();
+        await SearchAsync();
     }
 
     private Task ReloadFromFirstPageAsync() =>
@@ -172,10 +275,10 @@
         try
         {
             var operatorPaused = JobSchedulerUiPresentation.IsOperatorPaused(summary);
-            var debugSuppressed = JobSchedulerUiPresentation.IsDebugSuppressed(summary);
-            if (!operatorPaused && debugSuppressed)
+            var manualSuppressed = JobSchedulerUiPresentation.IsManualSuppressed(summary);
+            if (!operatorPaused && manualSuppressed)
             {
-                Snackbar.Add(L["Catalog:Messages:PauseUnavailableDebug"], Severity.Info);
+                Snackbar.Add(L["Catalog:Messages:PauseUnavailableManual"], Severity.Info);
                 return;
             }
 
@@ -186,18 +289,19 @@
                 return;
             }
 
-            if (result.IsFailed(out var error))
+            var error = result;
+            if (result.IsFailure())
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
                 return;
             }
 
-            var message = !disabled && debugSuppressed
-                ? L["Catalog:Messages:ResumedDebugRemains"]
+            var message = !disabled && manualSuppressed
+                ? L["Catalog:Messages:ResumedManualRemains"]
                 : disabled
                     ? L["Catalog:Messages:Paused"]
                     : L["Catalog:Messages:Resumed"];
-            Snackbar.Add(message, !disabled && debugSuppressed ? Severity.Info : Severity.Success);
+            Snackbar.Add(message, !disabled && manualSuppressed ? Severity.Info : Severity.Success);
             await ReloadTableAsync();
         }
         catch (OperationCanceledException) when (_disposed || state.IsDisposed)
@@ -211,9 +315,9 @@
         if (state is null || _disposed || _batchDialogs is null) return;
         var selected = state.SelectedRecurringSummaries.ToArray();
         if (selected.Length == 0) return;
-        if (disabled && selected.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed))
+        if (disabled && selected.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed))
         {
-            Snackbar.Add(L["Catalog:Batch:PauseUnavailableDebug"], Severity.Info);
+            Snackbar.Add(L["Catalog:Batch:PauseUnavailableManual"], Severity.Info);
             return;
         }
         try { await _batchDialogs.OpenAsync(new(state, selected, disabled)); }
@@ -241,15 +345,17 @@
             // Apply exactly the targets that were named in the native confirmation, not a later selection.
             var result = await state.SetSelectedDisabledAsync(request.Disabled, request.Summaries);
             if (_disposed || _state != state) return;
-            if (result.IsFailed(out var error, out var batch))
+            var error = result.WithoutData();
+            var batch = result.Data;
+            if (result.IsFailure() || batch is null)
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:UpdateFailed"], Severity.Error);
                 return;
             }
-            var debugRemains = !request.Disabled && request.Summaries.Any(JobSchedulerUiPresentation.IsDebugSuppressed);
-            var severity = batch.FailedCount > 0 ? Severity.Warning : debugRemains ? Severity.Info : Severity.Success;
-            var message = debugRemains
-                ? L["Catalog:Batch:ResultDebugRemains", batch.SucceededCount, batch.FailedCount]
+            var manualRemains = !request.Disabled && request.Summaries.Any(JobSchedulerUiPresentation.IsManualSuppressed);
+            var severity = batch.FailedCount > 0 ? Severity.Warning : manualRemains ? Severity.Info : Severity.Success;
+            var message = manualRemains
+                ? L["Catalog:Batch:ResultManualRemains", batch.SucceededCount, batch.FailedCount]
                 : L["Catalog:Batch:Result", batch.SucceededCount, batch.FailedCount];
             Snackbar.Add(message, severity);
             await ReloadTableAsync();
@@ -279,7 +385,9 @@
                 return;
             }
 
-            if (result.IsFailed(out var error, out var execution))
+            var error = result.WithoutData();
+            var execution = result.Data;
+            if (result.IsFailure() || execution is null)
             {
                 Snackbar.Add(error.Message ?? L["Catalog:Messages:RunFailed"], Severity.Error);
                 return;
@@ -353,12 +461,13 @@
         }
         var batchRetirement = _batchDialogs?.DisposeAsync() ?? ValueTask.CompletedTask;
         var triggerRetirement = _triggerDialogs?.DisposeAsync() ?? ValueTask.CompletedTask;
-        _ = CompleteRetirementAsync(state, batchRetirement, triggerRetirement, completion);
+        var inspectorRetirement = _inspectors?.DisposeAsync() ?? ValueTask.CompletedTask;
+        _ = CompleteRetirementAsync(state, batchRetirement, triggerRetirement, inspectorRetirement, completion);
         return new(completion.Task);
     }
 
     private async Task CompleteRetirementAsync(JobCatalogPageState? state, ValueTask batches,
-        ValueTask triggers, TaskCompletionSource completion)
+        ValueTask triggers, ValueTask inspectors, TaskCompletionSource completion)
     {
         var failures = new List<Exception>();
         // Start state retirement before joining native results so admitted authorization and mutation can cancel.
@@ -366,6 +475,7 @@
         var stateRetirement = state?.DisposeAsync() ?? ValueTask.CompletedTask;
         try { await batches; } catch (Exception exception) { failures.Add(exception); }
         try { await triggers; } catch (Exception exception) { failures.Add(exception); }
+        try { await inspectors; } catch (Exception exception) { failures.Add(exception); }
         try { await stateRetirement; } catch (Exception exception) { failures.Add(exception); }
         if (failures.Count == 0) completion.TrySetResult();
         else completion.TrySetException(new AggregateException("Catalog page retirement failed.", failures));

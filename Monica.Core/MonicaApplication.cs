@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Monica.Core.Logging;
+using Monica.Core.Configuration;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.Core.Modularity.Services;
@@ -27,6 +29,13 @@ public sealed class MonicaApplication : IDisposable
     private TypeFinderOptions _typeFinderOptions = new();
     private ITypeDependencyOrderer? _typeDependencyOrderer;
     private ITypeFinder? _typeFinder;
+    private bool _typeActivationFrozen;
+    private MonicaCompositionState? _composition;
+    private bool _applicationInputsFrozen;
+    private bool _preparingApplication;
+    private string _debugModeSource = "Default";
+    private readonly Lock _activationGate = new();
+    private readonly Dictionary<string, ResourceActivation> _activationResources = new(StringComparer.Ordinal);
 
     internal MonicaApplication(MonicaStartupOrigin? startupOrigin = null)
     {
@@ -43,12 +52,177 @@ public sealed class MonicaApplication : IDisposable
     /// </summary>
     public IMonicaApplicationOptions Application => _applicationOptions;
 
+    /// <summary>Gets the frozen startup input and framework state owned by this host's composition.</summary>
+    public MonicaCompositionState Composition => _composition
+        ?? throw new InvalidOperationException("This application has not been attached to a host builder.");
+
+    internal bool CompositionHasMutatedHost => _composition?.HasMutatedHost == true;
+
+    internal void InitializeComposition(IHostApplicationBuilder builder)
+    {
+        if (_composition is not null) throw new InvalidOperationException("Composition inputs have already been initialized.");
+        _composition = new MonicaCompositionState(builder.Configuration);
+        var logger = CreateLogger<MonicaCompositionState>();
+        _composition.Initialize(builder, error => logger.LogWarning("{EnvironmentFileDiagnostic}", error));
+    }
+
+    /// <summary>Gets the immutable activation policy, or null before pre-seal application preparation.</summary>
+    public ITypeActivationPolicy? TypeActivation { get; private set; }
+
+    /// <summary>Gets a detached, key-ordered snapshot of native resource activation decisions for this host.</summary>
+    public IReadOnlyList<ResourceActivation> ActivationResources
+    {
+        get { lock (_activationGate) return Array.AsReadOnly(_activationResources.Values.OrderBy(resource => resource.Key, StringComparer.Ordinal).ToArray()); }
+    }
+
+    /// <summary>Records or updates one native resource's admission observation without constructing it.</summary>
+    /// <remarks>Modules own stable keys and safe reason text. Runtime prerequisite changes may update the same key; this does not execute or change the resource itself.</remarks>
+    public void RecordActivation(ResourceActivation resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource.Key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource.Reason);
+        lock (_activationGate) _activationResources[resource.Key] = resource;
+    }
+
+    /// <summary>Installs the activation policy during application preparation, before owned registrations run.</summary>
+    /// <remarks>The authority installs one policy; Core supplies a standalone default when absent. Replacing a frozen policy would invalidate resource ownership.</remarks>
+    public void SetTypeActivationPolicy(ITypeActivationPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        if (_typeActivationFrozen)
+            throw new InvalidOperationException("Business activation is frozen before application registration.");
+        if (TypeActivation is not null)
+            throw new InvalidOperationException("The business activation policy has already been installed.");
+        TypeActivation = policy;
+    }
+
+    internal void FreezeTypeActivation() => _typeActivationFrozen = true;
+
     /// <summary>
     /// Gets module-system defaults for this host.
     /// </summary>
     public IMonicaModuleSystemOptions ModuleSystem => _moduleSystemOptions;
 
     internal MonicaApplicationOptions ApplicationConfiguration => _applicationOptions;
+
+    /// <summary>Projects the selected deployment identity during the application authority's preparation callback.</summary>
+    /// <remarks>
+    /// The AppId must match the canonical startup identity. An explicitly configured AppName must agree with the
+    /// selected deployment entry. This method cannot be called by owned registrations or after preparation.
+    /// </remarks>
+    public void ProjectApplicationIdentity(string appId, string appName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appName);
+        if (!_preparingApplication)
+            throw new InvalidOperationException("Deployment identity can only be projected while preparing the application authority.");
+        ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
+        if (!string.Equals(Application.ResolveAppId(), appId, StringComparison.Ordinal))
+            throw new InvalidOperationException("The selected deployment AppId conflicts with the canonical application identity.");
+        if (MonicaApplicationOptions.Normalize(Application.AppName) is { } configuredName
+            && !string.Equals(configuredName, appName, StringComparison.Ordinal))
+            throw new InvalidOperationException("The selected deployment AppName conflicts with explicitly configured application identity.");
+        _applicationOptions.AppId = appId;
+        _applicationOptions.AppName = appName;
+    }
+
+    internal void ResolveApplicationInputs()
+    {
+        RejectRetiredStartupInput("Application:Deployments", "Deployment:Applications");
+        RejectRetiredStartupInput("Application:DeploymentScope", "Deployment:Scope");
+        _applicationOptions.AppId = ResolveStartupIdentity("Application:AppId", _applicationOptions.AppId);
+        _applicationOptions.DeploymentScope = ResolveStartupIdentity("Deployment:Scope", _applicationOptions.DeploymentScope);
+        var debugMode = ResolveDebugMode(Composition.StartupConfiguration);
+        _applicationOptions.ResolveDebugMode(debugMode.Value);
+        _debugModeSource = debugMode.Source;
+        var selected = Composition.StartupConfiguration.SelectCompleteSection("Application:AutonomousWork");
+        if (selected is not null)
+        {
+            var section = selected.GetSection("Application:AutonomousWork");
+            if (!selected.TryGetShape(section.Path, out var shape) || shape != ConfigurationValueShape.Scalar
+                || section.GetChildren().Any() || !bool.TryParse(section.Value, out var value))
+                throw new InvalidOperationException("'Application:AutonomousWork' must be a boolean startup value.");
+            if (_applicationOptions.ConfiguredAutonomousWork is { } configured && configured != value)
+                throw new InvalidOperationException("'Application:AutonomousWork' conflicts with explicitly configured execution policy.");
+            _applicationOptions.AutonomousWork = value;
+        }
+    }
+
+    private (bool Value, string Source) ResolveDebugMode(ConfigurationSnapshot snapshot)
+    {
+        const string DEBUG_MODE_PATH = "Application:DebugMode";
+        var configured = _applicationOptions.ConfiguredDebugMode;
+        var selected = snapshot.SelectCompleteSection(DEBUG_MODE_PATH);
+        if (selected is null) return (configured ?? false, configured.HasValue ? "Code" : "Default");
+        var section = selected.GetSection(DEBUG_MODE_PATH);
+        if (!selected.TryGetShape(DEBUG_MODE_PATH, out var shape) || shape != ConfigurationValueShape.Scalar
+            || section.GetChildren().Any() || !bool.TryParse(section.Value, out var value))
+            throw new InvalidOperationException("'Application:DebugMode' must be a boolean startup value.");
+        if (configured is { } explicitValue && explicitValue != value)
+            throw new InvalidOperationException("'Application:DebugMode' conflicts with explicitly configured diagnostic policy.");
+        return (value, selected.Origin.SourcePath ?? selected.Origin.ProviderType.Name);
+    }
+
+    /// <summary>Inspects the frozen debug policy and the current deployment candidate without changing the running host.</summary>
+    /// <remarks>Reads accepted configuration providers on demand. Candidate failures remain visible and never replace the actual value.</remarks>
+    /// <exception cref="InvalidOperationException">Application inputs have not been frozen.</exception>
+    public ApplicationDebugModeState GetDebugModeState()
+    {
+        if (!_applicationInputsFrozen) throw new InvalidOperationException("Application inputs have not been frozen.");
+        try
+        {
+            var candidate = ResolveDebugMode(ConfigurationSnapshot.Capture((Microsoft.Extensions.Configuration.IConfigurationRoot)Composition.LiveConfiguration));
+            return new(Application.DebugMode, _debugModeSource, candidate.Value, candidate.Source, null);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentException)
+        {
+            return new(Application.DebugMode, _debugModeSource, null, null,
+                "The Application:DebugMode deployment candidate is invalid or unavailable. Supply a boolean consistent with explicit code configuration.");
+        }
+    }
+
+    private void RejectRetiredStartupInput(string retiredPath, string currentPath)
+    {
+        if (Composition.StartupConfiguration.Contributions.Any(provider => provider.Contains(retiredPath)))
+            throw new InvalidOperationException($"'{retiredPath}' has been retired. Move this input to '{currentPath}'; legacy inputs are not merged or used as fallbacks.");
+    }
+
+    private string? ResolveStartupIdentity(string path, string? configured)
+    {
+        var selected = Composition.StartupConfiguration.SelectCompleteSection(path);
+        if (selected is null) return MonicaApplicationOptions.Normalize(configured);
+        var section = selected.GetSection(path);
+        if (!selected.TryGetShape(path, out var shape) || shape != ConfigurationValueShape.Scalar
+            || section.GetChildren().Any() || MonicaApplicationOptions.Normalize(section.Value) is not { } value)
+            throw new InvalidOperationException($"'{path}' must be a nonempty scalar startup value.");
+        if (MonicaApplicationOptions.Normalize(configured) is { } explicitValue
+            && !string.Equals(explicitValue, value, StringComparison.Ordinal))
+            throw new InvalidOperationException($"'{path}' conflicts with explicitly configured application identity.");
+        return value;
+    }
+
+    internal void PrepareApplication(Action prepare)
+    {
+        if (_preparingApplication || _applicationInputsFrozen)
+            throw new InvalidOperationException("Application preparation can run only once before inputs are frozen.");
+        _preparingApplication = true;
+        try { prepare(); }
+        finally { _preparingApplication = false; }
+    }
+
+    internal void FreezeApplicationInputs()
+    {
+        ResolveApplicationInputs();
+        _applicationOptions.Freeze();
+        _typeFinderOptions.Freeze();
+        TypeActivation ??= new StandaloneTypeActivationPolicy(_applicationOptions.AutonomousWork);
+        _typeActivationFrozen = true;
+        _applicationInputsFrozen = true;
+        if (_applicationOptions.DebugMode)
+            CreateLogger<MonicaApplication>().LogWarning(
+                "Application:DebugMode is enabled. Registered capabilities may expose stack traces, SQL and parameter values to clients. Authorization and autonomous work are unchanged.");
+    }
 
     internal MonicaModuleSystemOptions ModuleSystemConfiguration => _moduleSystemOptions;
 
@@ -95,6 +269,8 @@ public sealed class MonicaApplication : IDisposable
     /// <param name="configure">An optional callback that customizes discovery.</param>
     internal void ConfigureTypeDiscovery(Action<TypeFinderOptions>? configure = null)
     {
+        if (_applicationInputsFrozen)
+            throw new InvalidOperationException("Type discovery is frozen before owned registration begins.");
         var options = new TypeFinderOptions();
         configure?.Invoke(options);
         _typeFinderOptions = options;

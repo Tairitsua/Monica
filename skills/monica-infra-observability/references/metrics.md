@@ -1,4 +1,4 @@
-# Runtime metrics
+# Runtime and lease metrics
 
 Use Runtime Metrics to inspect the current process and its bounded local history. For exporting measurements or inspecting exact instrument/tag-set series, use [OpenTelemetry metrics](opentelemetry-metrics.md). These registrations have independent collection and retention; enabling the local Runtime Metrics page does not require OpenTelemetry.
 
@@ -28,7 +28,7 @@ builder.AddMonica(monica =>
 | `ModuleRuntimeMetricsOption.MaxHistoryPoints` | `300` | Maximum retained snapshot count; configure a non-negative value. This bounds points, not a guaranteed wall-clock window. |
 | `ModuleRuntimeMetricsUIOption.AutoRefreshIntervalMs` | `2000` | Interval for that page to read retained history. Zero or negative values require manual refresh. |
 
-The scoped `RuntimeMetricsFacade` exposes `GetTrend()`, `GetLatestPoint()`, and `SubscribeToUpdates(callback)`. Read their `Res<T>` status before consuming data. `GetTrend()` copies the currently retained point list and its capacity/sampling metadata without forcing a sample. It can succeed with an empty list before the first capture. `GetLatestPoint()` reads the separately cached latest sample and fails before any sample exists. A subscription receives captured points and returns an unsubscribe action; release the subscription with its consumer. These are local process APIs, not queries against an exporter or a metrics database.
+The scoped `RuntimeMetricsFacade` exposes `GetTrend()`, `GetLatestPoint()`, and `SubscribeToUpdates(callback)`. Read their `Result<T>` status before consuming data. `GetTrend()` copies the currently retained point list and its capacity/sampling metadata without forcing a sample. It can succeed with an empty list before the first capture. `GetLatestPoint()` reads the separately cached latest sample and fails before any sample exists. A subscription receives captured points and returns an unsubscribe action; release the subscription with its consumer. These are local process APIs, not queries against an exporter or a metrics database.
 
 The optional Web API is `GET /runtime-metrics/latest`, enabled through the host's Minimal API policy or the module's `EnableMinimalApi` override. The host default is `false`. This route returns the latest point through the facade envelope; it does not expose retained history. A generic host can collect and expose the facade without mapping this route. For a complete Web host, keep the normal `app.UseMonica()` and `app.MapMonica()` lifecycle.
 
@@ -56,6 +56,26 @@ Runtime Metrics also registers instruments on the `Monica.Profiling.Runtime` met
 
 Source ownership: `Monica.Profiling/Modules/ModuleRuntimeMetrics.cs`, `ModuleRuntimeMetricsUI.cs`, and `RuntimeMetrics/` establish registration, facade, sampling, and units. `UIRuntimeMetrics/State/` owns page view refresh and retained-read semantics; its non-rendering host tests live under `tests/Test.Monica.Profiling/UIRuntimeMetrics/`.
 
+## Coordinator lease metrics
+
+`LeaseCoordinator` emits the `Monica.Locker.Leases` meter through the optional host-owned `IMeterFactory`. Follow [shared coordinator leases](../../monica-infra-hosting/references/leases.md#coordinator-metrics) for factory registration, direct construction and lifecycle ownership. Monica OpenTelemetry's default `Monica.*` selection includes this meter; an SDK-only host can select `LeaseMetricNames.MeterName` from `Monica.Locker.Leases.Metrics`. Exporters and the in-process OpenTelemetry collector remain explicit host choices. The Runtime Metrics page does not collect these instruments.
+
+| Instrument | Type and unit | Tags | Meaning |
+| --- | --- | --- | --- |
+| `monica.locker.lease.operations` | `Counter<long>`, operations | `operation`, `result` | Completed coordinator waits on acquire, renew and release store calls. |
+| `monica.locker.lease.operation.duration` | `Histogram<double>`, seconds | `operation`, `result` | Time waiting on the submitted store operation, including waits ended by the local deadline. It excludes waiting to enter the coordinator and standby backoff. |
+| `monica.locker.lease.terms.ended` | `Counter<long>`, terms | `reason` | Locally supervised terms retired once, using the first retirement reason. |
+
+`operation` is `acquire`, `renew` or `release`. `result` is `success`, `contended` (an unavailable acquisition), `lost` (a rejected renewal or conditional release), `cancelled`, `timeout` or `failed`. A request that times out is counted when the coordinator stops waiting; an eventual reply adds no second result and cannot revive a retired term. Cached grants, local backoff, snapshots and calls made directly to a lease store do not emit coordinator operation measurements. A successful store reply does not prove that enough local validity remains to admit work or that any business mutation committed.
+
+`reason` is `expired`, `renewal_rejected`, `renewal_timeout`, `renewal_failed` or `stopped`. Normal coordinator shutdown uses `stopped`; exclude it when diagnosing ownership loss. Repeated retirement/disposal does not increment the counter again. Concurrent loss and shutdown record whichever retirement occurs first, so these observations are not an audit of every possible cause.
+
+Tags contain no scope, resource, holder, term, exception text or other instance-specific values. Measurements aggregate coordinators using the same host factory, including different roles and authorities; use explicit diagnostic snapshots or logs for a specific resource. These are coordinator-role measurements, not per-message Outbox delivery or job-execution claim counters, and they are never the source of truth for ownership, fencing or business state. Missing measurements do not prove an idle or healthy coordinator.
+
+Instrument-publication and measurement-listener exceptions are isolated from lease operations. Standard .NET metric callbacks still run synchronously: listeners must be fast and nonblocking. The module creates no background telemetry work, polls no store and retains no duplicate counter state.
+
+Behavior evidence: `tests/Test.Monica.Locker/Leases/LeaseCoordinatorMetricsTests.cs` covers shared and isolated host factories, contention, renewal loss/deadlines, late replies, one-time retirement and throwing observers.
+
 ## OpenTelemetry metrics
 
-Registration, exporters, local retained windows, exact series selection, histogram statistics and diagnostic copy formats are owned by [OpenTelemetry metrics](opentelemetry-metrics.md). For authoring module instruments rather than consuming them, use [OpenTelemetry development](../../monica-opentelemetry/SKILL.md).
+Registration, exporters, local retained windows, exact series selection, histogram statistics and diagnostic copy formats are owned by [OpenTelemetry metrics](opentelemetry-metrics.md). For authoring module instruments rather than consuming them, use OpenTelemetry development in `$monica-opentelemetry`.

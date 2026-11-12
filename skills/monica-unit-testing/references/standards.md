@@ -11,12 +11,12 @@
 | Behavior under test | Test boundary |
 |---|---|
 | Value objects, parsers, validators, deterministic support code | Direct construction |
-| One ProjectUnit with every collaborator supplied explicitly | Raw `ProjectUnitFixture<TUnit>` |
+| One Building Block with every collaborator supplied explicitly | Raw `BuildingBlockFixture<TBuildingBlock>` |
 | Module graph, options, DI registration, proxies, hosted lifecycle, or cross-scope behavior | `MonicaTestApplicationFactory<TDiscoveryAnchor>` scenario |
 | Blazor behavior contract, when UI testing is explicitly requested | bUnit in the UI test project |
 | Incremental source-generator input, diagnostic, or generated source | In-memory Roslyn `GeneratorDriver` |
 
-`ProjectUnitFixture<TUnit>` does not validate Monica composition. Do not add a separate `ApplicationServiceFixture`; application services use either the raw ProjectUnit fast path or a real scenario host according to the behavior being tested.
+`BuildingBlockFixture<TBuildingBlock>` does not validate Monica composition. Do not add a separate `ApplicationServiceFixture`; application services use either the raw Building Block fast path or a real scenario host according to the behavior being tested.
 
 ## Source-Generator Isolation
 
@@ -48,9 +48,11 @@
 
 ## Core Assertions
 
+Use `Monica.Testing.Time.ControllableTimeProvider` for deadline/renewal behavior shared across workers. `WaitForTimerAsync` waits for a scheduled absolute elapsed-time deadline before advancing; `Advance` delivers due timers in order, `AdvanceAfterPause` models delayed timer delivery, and `AdjustWallClock` changes wall time without changing monotonic elapsed time. Await explicit worker/store barriers as well as timers: advancing the clock does not drain asynchronous continuations. See `tests/Test.Monica.Locker/Leases/LeaseCoordinatorTests.cs` for independent renewal, late responses, clock movement, and shutdown cases. Keep provider concurrency claims in native integration tests rather than inferring them from this clock or SQLite.
+
 - Prefer public-surface assertions.
-- Assert `Res` and `Res<T>` status, message, and data explicitly.
-- Assert successful `Res<string>.Data` to catch the string-overload trap.
+- Assert `Result` and `Result<T>` status, message, and data explicitly.
+- Assert successful `Result<string>.Data` to catch the string-overload trap.
 - Test module composition through dependencies, options, registrations, or runtime snapshots.
 - Assert side effects through repositories, DbContexts, recording event buses, state stores, or other public boundaries.
 

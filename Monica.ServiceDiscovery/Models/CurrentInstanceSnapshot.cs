@@ -12,7 +12,8 @@ public sealed class CurrentInstanceSnapshot
 
     public DateTime? LeaderBecomeTime { get; init; }
 
-    public string? CurrentETag { get; init; }
+    /// <summary>Opaque local leadership acquisition ID, or null when not leader; this is not an ordered fence.</summary>
+    public string? CurrentTermId { get; init; }
 
     public LeaderState? ClusterLeaderState { get; init; }
 }

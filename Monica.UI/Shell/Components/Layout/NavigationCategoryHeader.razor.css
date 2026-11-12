@@ -1,0 +1,4 @@
+.category-heading { padding: 18px 16px 12px 8px; }
+.category-heading h2 { display: flex; align-items: baseline; gap: 8px; margin: 0; color: var(--mo-color-shell-frame-text); font: 600 17px/1.35 var(--mud-typography-default-family); letter-spacing: -.02em; }
+.category-count { color: var(--mo-color-shell-frame-muted); font: 500 11.5px var(--mo-font-family-mono); }
+.category-heading p { margin: 5px 0 0; color: var(--mo-color-shell-frame-muted); font-size: 12.5px; line-height: 1.55; }

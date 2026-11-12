@@ -21,5 +21,11 @@ public enum SeederStatus
     Blocked,
 
     /// <summary>The seeder was cancelled before or during execution.</summary>
-    Cancelled
+    Cancelled,
+
+    /// <summary>The seeder is available but awaits explicit admission or a held prerequisite.</summary>
+    Held,
+
+    /// <summary>The seeder belongs to another placement and cannot execute in this process.</summary>
+    Disabled
 }

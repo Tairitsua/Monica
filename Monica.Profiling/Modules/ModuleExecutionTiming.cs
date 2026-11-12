@@ -93,6 +93,9 @@ public class ModuleExecutionTiming : MonicaModule<ModuleExecutionTimingOption>, 
             services.AddSingleton<IExecutionTimingCoordinator>(sp => sp.GetRequiredService<BackgroundExecutionTimingCoordinator>());
             services.AddSingleton<IExecutionTimingQuery>(sp => sp.GetRequiredService<BackgroundExecutionTimingCoordinator>());
             services.AddHostedService(sp => sp.GetRequiredService<BackgroundExecutionTimingCoordinator>());
+        context.Composition.AdmitHostedLifecycle(
+            services.Last(descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)),
+            typeof(BackgroundExecutionTimingCoordinator));
         }
         else
         {

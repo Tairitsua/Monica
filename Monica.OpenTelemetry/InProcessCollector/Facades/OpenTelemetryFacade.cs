@@ -19,18 +19,18 @@ public sealed class OpenTelemetryFacade(
     /// <summary>
     /// Gets the latest bounded in-process metric snapshot for the current application instance.
     /// </summary>
-    public Task<Res<OpenTelemetrySnapshot>> GetSnapshotAsync()
+    public Task<Result<OpenTelemetrySnapshot>> GetSnapshotAsync()
     {
         try
         {
-            return Task.FromResult(Res.Ok(collector.GetSnapshot()));
+            return Task.FromResult(Result.Success(collector.GetSnapshot()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to read OpenTelemetry in-process metrics snapshot.");
-            return Task.FromResult<Res<OpenTelemetrySnapshot>>(Res.Fail(
+            return Task.FromResult<Result<OpenTelemetrySnapshot>>(Result.Failure<OpenTelemetrySnapshot>(
                 localizer["Snapshot:ReadFailed", ex.GetMessageRecursively()],
-                ResStatus.InternalError));
+                ResultStatus.InternalError));
         }
     }
 }

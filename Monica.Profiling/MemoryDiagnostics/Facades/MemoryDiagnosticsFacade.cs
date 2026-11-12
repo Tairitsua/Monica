@@ -35,43 +35,43 @@ public sealed class MemoryDiagnosticsFacade
         _createGcDump = createGcDump;
     }
 
-    public Res<MemorySnapshot> GetCurrentSnapshot()
+    public Result<MemorySnapshot> GetCurrentSnapshot()
     {
         try
         {
-            return Res.Ok(_memoryDiagnosticsService.CaptureSnapshot());
+            return Result.Success(_memoryDiagnosticsService.CaptureSnapshot());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to capture the current memory snapshot.");
-            return Res.Fail($"Failed to capture memory snapshot: {ex.GetMessageRecursively()}");
+            return Result.Failure<MemorySnapshot>($"Failed to capture memory snapshot: {ex.GetMessageRecursively()}");
         }
     }
 
-    public Res<GcDetails> GetGcDetails(GCKind kind = GCKind.Any)
+    public Result<GcDetails> GetGcDetails(GCKind kind = GCKind.Any)
     {
         try
         {
-            return Res.Ok(_memoryDiagnosticsService.CaptureGcDetails(kind));
+            return Result.Success(_memoryDiagnosticsService.CaptureGcDetails(kind));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to capture GC details.");
-            return Res.Fail($"Failed to capture GC details: {ex.GetMessageRecursively()}");
+            return Result.Failure<GcDetails>($"Failed to capture GC details: {ex.GetMessageRecursively()}");
         }
     }
 
-    public Res ForceGarbageCollection(int generation = -1, bool blocking = true, bool compacting = false)
+    public Result ForceGarbageCollection(int generation = -1, bool blocking = true, bool compacting = false)
     {
         try
         {
             _memoryDiagnosticsService.ForceGarbageCollection(generation, blocking, compacting);
-            return Res.Ok();
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to force garbage collection.");
-            return Res.Fail($"GC execution failed: {ex.GetMessageRecursively()}");
+            return Result.Failure($"GC execution failed: {ex.GetMessageRecursively()}");
         }
     }
 
@@ -89,16 +89,16 @@ public sealed class MemoryDiagnosticsFacade
     /// resolve against the host working directory; .gcdump is appended unless the extension is exactly .gcdump.
     /// </param>
     /// <returns>The verified absolute server path in Data on success, or a failed envelope without path data.</returns>
-    public async Task<Res<string>> TriggerGcDumpAsync(string? outputPath = null)
+    public async Task<Result<string>> TriggerGcDumpAsync(string? outputPath = null)
     {
         try
         {
-            return Res.Ok<string>(await _createGcDump(outputPath));
+            return Result.Success<string>(await _createGcDump(outputPath));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create GC dump.");
-            return Res.Fail($"Failed to create GC dump: {ex.GetMessageRecursively()}", ResStatus.BadRequest);
+            return Result.Failure<string>($"Failed to create GC dump: {ex.GetMessageRecursively()}", ResultStatus.BadRequest);
         }
     }
 }

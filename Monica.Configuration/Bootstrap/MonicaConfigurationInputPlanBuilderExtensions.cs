@@ -14,7 +14,7 @@ namespace Monica.Configuration.Bootstrap;
 public static class MonicaConfigurationInputPlanBuilderExtensions
 {
     /// <summary>
-    /// Selects the file-backed store bundle for read-only startup effective-options loading and runtime configuration.
+    /// Selects the file-backed store bundle for runtime managed configuration.
     /// </summary>
     /// <param name="builder">The input-plan declaration builder.</param>
     /// <param name="configure">Optional file-store configuration.</param>
@@ -60,11 +60,6 @@ public static class MonicaConfigurationInputPlanBuilderExtensions
                 services.Replace(ServiceDescriptor.Singleton<IConfigurationUnifiedVersionStore>(provider =>
                     provider.GetRequiredService<FileConfigurationStore>()));
             });
-        }
-
-        public IConfigurationEffectiveValueReader CreateStartupReader()
-        {
-            return CreateStore(rootDirectory);
         }
 
         private static FileConfigurationStore CreateStore(string rootDirectory) =>

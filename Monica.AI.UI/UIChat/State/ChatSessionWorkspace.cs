@@ -64,7 +64,9 @@ public sealed partial class ChatSessionWorkspace(ChatHistoryFacade historyFacade
         IsLoading = true;
         StateChanged?.Invoke();
         var catalogResult = await historyFacade.GetCatalogAsync(ct);
-        if (catalogResult.IsFailed(out var error, out var catalog))
+        var error = catalogResult.WithoutData();
+        var catalog = catalogResult.Data;
+        if (catalogResult.IsFailure() || catalog is null)
         {
             HasLoadFailure = true;
             RaiseWarning(ChatHistoryWorkspaceWarningKind.LoadFailed, error.Message);
@@ -140,7 +142,8 @@ public sealed partial class ChatSessionWorkspace(ChatHistoryFacade historyFacade
         if (saveResult.Data?.IsConflict == true)
         {
             var refreshed = await historyFacade.GetCatalogAsync(ct);
-            if (!refreshed.IsFailed(out _, out var catalog))
+            var catalog = refreshed.Data;
+            if (refreshed.IsSuccess() && catalog is not null)
             {
                 var stored = catalog.Sessions.FirstOrDefault(item => item.SessionId == session.SessionId);
                 if (stored is { ArchivedAt: null } && stored.Revision == session.PersistenceRevision
@@ -232,7 +235,9 @@ public sealed partial class ChatSessionWorkspace(ChatHistoryFacade historyFacade
         if (_loadedSessions.Values.Any(session => session.IsBusy))
             throw new InvalidOperationException("Stop generation before reloading conversation history.");
         var catalogResult = await historyFacade.GetCatalogAsync(ct);
-        if (catalogResult.IsFailed(out var error, out var catalog))
+        var error = catalogResult.WithoutData();
+        var catalog = catalogResult.Data;
+        if (catalogResult.IsFailure() || catalog is null)
         {
             HasLoadFailure = true;
             RaiseWarning(ChatHistoryWorkspaceWarningKind.LoadFailed, error.Message);
@@ -266,7 +271,9 @@ public sealed partial class ChatSessionWorkspace(ChatHistoryFacade historyFacade
         }
 
         var loadResult = await historyFacade.LoadSessionAsync(sessionId, ct);
-        if (loadResult.IsFailed(out var error, out var session))
+        var error = loadResult.WithoutData();
+        var session = loadResult.Data;
+        if (loadResult.IsFailure())
         {
             RaiseWarning(ChatHistoryWorkspaceWarningKind.LoadFailed, error.Message);
             return null;
@@ -294,11 +301,13 @@ public sealed partial class ChatSessionWorkspace(ChatHistoryFacade historyFacade
     }
 
     private bool TryApplyWriteResult(
-        Res<ChatHistoryWriteResult> result,
+        Result<ChatHistoryWriteResult> result,
         out ChatHistoryWriteResult? writeResult)
     {
         writeResult = null;
-        if (result.IsFailed(out var error, out var data))
+        var error = result.WithoutData();
+        var data = result.Data;
+        if (result.IsFailure() || data is null)
         {
             RaiseWarning(ChatHistoryWorkspaceWarningKind.StorageUnavailable, error.Message);
             return false;

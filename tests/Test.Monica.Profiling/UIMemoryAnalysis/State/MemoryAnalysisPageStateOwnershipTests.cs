@@ -24,7 +24,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         await using var state = Decorated(scope, clock, control);
         AssertSuccess(await state.InitializeAsync());
         control.Fail(MemoryReadStage.Trend, "Retained read error.");
-        (await state.RefreshAsync()).Status.Should().Be(ResStatus.ServiceUnavailable);
+        (await state.RefreshAsync()).Status.Should().Be(ResultStatus.ServiceUnavailable);
         control.ClearFailures();
         var error = state.LoadError;
         var snapshot = state.CurrentSnapshot;
@@ -149,7 +149,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         var notifications = 0;
         state.StateChanged += () => Interlocked.Increment(ref notifications);
         using var gate = control.HoldNextRead((MemoryReadStage)stageIndex);
-        Task<Res>? read = periodic ? null : Task.Run(state.RefreshAsync, TestContext.Current.CancellationToken);
+        Task<Result>? read = periodic ? null : Task.Run(state.RefreshAsync, TestContext.Current.CancellationToken);
         Task<int>? tick = periodic ? Task.Run(clock.Tick, TestContext.Current.CancellationToken) : null;
         var notifiedBeforeRetirement = 0;
         try
@@ -192,7 +192,7 @@ public sealed partial class MemoryAnalysisPageStateTests
         clock.ActiveTimers.Should().Be(0);
         clock.Tick().Should().Be(0);
         if (read is not null) AssertInactive(await read);
-        scope.Resolve<MemoryDiagnosticsFacade>().GetCurrentSnapshot().IsOk().Should().BeTrue();
+        scope.Resolve<MemoryDiagnosticsFacade>().GetCurrentSnapshot().IsSuccess().Should().BeTrue();
     }
 
     [Theory]
@@ -256,6 +256,6 @@ public sealed partial class MemoryAnalysisPageStateTests
         AssertSuccess(await diagnostics.RefreshAsync());
         diagnostics.SnapshotCapturedAt.Should().Be(clock.GetUtcNow());
         diagnostics.AutoRefresh.Should().BeFalse();
-        scope.Resolve<MemoryDiagnosticsFacade>().GetGcDetails().IsOk().Should().BeTrue();
+        scope.Resolve<MemoryDiagnosticsFacade>().GetGcDetails().IsSuccess().Should().BeTrue();
     }
 }

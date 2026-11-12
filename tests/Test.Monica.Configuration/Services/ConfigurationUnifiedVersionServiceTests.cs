@@ -13,6 +13,20 @@ namespace Test.Monica.Configuration.Services;
 
 public sealed class ConfigurationUnifiedVersionServiceTests
 {
+    [Fact]
+    public async Task DeleteVersionAsync_WhenManual_ShouldRejectBeforeMaintenanceWrite()
+    {
+        var store = Substitute.For<IConfigurationUnifiedVersionStore>();
+        // This boundary must reject before touching version contents or rollback collaborators.
+        var service = new ConfigurationUnifiedVersionService(store, null!, null!, new ConfigurationRuntimeSnapshotLock(),
+            new ConfigurationRuntimeContext { AutonomousWork = false });
+
+        var delete = () => service.DeleteVersionAsync(1, TestContext.Current.CancellationToken);
+
+        await delete.Should().ThrowAsync<ConfigurationValidationFailedException>().WithMessage("*read-only in Manual mode*");
+        store.ReceivedCalls().Should().BeEmpty();
+    }
+
     private const long TARGET_VERSION = 7;
 
     [Fact]
@@ -37,9 +51,9 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
         var result = await facade.RollbackUnifiedVersionAsync(CreateStaleRequest());
 
-        result.IsFailed(out var error, out _).Should().BeTrue();
-        error!.Status.Should().Be(ResStatus.Conflict);
-        error.Message.Should().Contain("reviewed configuration changed").And.Contain("new preview");
+        result.IsFailure().Should().BeTrue();
+        result.Status.Should().Be(ResultStatus.Conflict);
+        result.Message.Should().Contain("reviewed configuration changed").And.Contain("new preview");
         await applyService.DidNotReceive()
             .ApplyAsync(Arg.Any<ConfigurationMutationGroupApplyRequest>(), Arg.Any<CancellationToken>());
     }
@@ -79,29 +93,8 @@ public sealed class ConfigurationUnifiedVersionServiceTests
 
     private static ConfigurationFacade CreateFacade(IConfigurationUnifiedVersionService unifiedVersionService)
     {
-        return new ConfigurationFacade(
-            definitionResolver: null!,
-            definitionRegistry: null!,
-            definitionMaintenanceStore: null!,
-            definitionChangeImpactService: null!,
-            mutationGroupApplyService: null!,
-            historyService: null!,
-            mutationGroupService: null!,
-            rollbackService: null!,
-            unifiedVersionService: unifiedVersionService,
-            effectiveValueStore: null!,
-            historyStore: null!,
-            metadataStore: null!,
-            changeNotifiers: [],
-            storeStateTracker: null!,
-            effectiveStateReader: null!,
-            sourceInspector: null!,
-            sourceWriter: null!,
-            runtimeContext: null!,
-            runtimeValidationService: null!,
-            optionsValidationDiagnostics: Substitute.For<IConfigurationOptionsValidationDiagnostics>(),
-            candidateValidationService: null!,
-            runtimeReloadService: null!,
-            reloadBroadcastService: null!);
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IConfigurationUnifiedVersionService)).Returns(unifiedVersionService);
+        return new ConfigurationFacade(provider);
     }
 }

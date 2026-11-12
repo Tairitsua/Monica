@@ -1,3 +1,4 @@
+using Monica.Core.Configuration;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -69,6 +70,8 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             .DistinctBy(static definition => definition.DefinitionKey, StringComparer.OrdinalIgnoreCase).ToArray();
         var baselineBefore = CaptureRuntimeBaseline(providers, definitions);
         var evidence = new List<string> { baselineBefore, JsonSerializer.Serialize(request.Commands) };
+        foreach (var mutation in prepared.Where(mutation => mutation.PublishedDefinitionExpectation is not null))
+            evidence.Add(JsonSerializer.Serialize(mutation.PublishedDefinitionExpectation));
         var reports = new List<ConfigurationCandidateValidationReport>();
         var problems = new List<ConfigurationMutationValidationProblem>();
         var providerBaselines = new List<ProviderAdoptionBaseline>();

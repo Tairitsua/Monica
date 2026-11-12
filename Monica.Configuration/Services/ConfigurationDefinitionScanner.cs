@@ -29,6 +29,13 @@ internal sealed class ConfigurationDefinitionScanner(
             ?? throw new InvalidOperationException($"Type '{optionsType.FullName}' is not marked with {nameof(ConfigurationAttribute)}.");
 
         var definitionKey = attribute.DefinitionKey ?? optionsType.FullName ?? optionsType.Name;
+        if (!Enum.IsDefined(attribute.Kind))
+            throw new InvalidOperationException($"Configuration definition '{definitionKey}' has an unsupported ownership kind.");
+        if (attribute.Kind == ConfigurationKind.Startup && string.IsNullOrWhiteSpace(attribute.SectionPath))
+            throw new InvalidOperationException($"Startup configuration definition '{definitionKey}' requires an explicit section path.");
+        if (attribute.Kind == ConfigurationKind.Startup && attribute.ReloadBehavior is not
+            (ConfigurationReloadBehavior.Unknown or ConfigurationReloadBehavior.Inherit or ConfigurationReloadBehavior.RequiresRestart))
+            throw new InvalidOperationException($"Startup configuration definition '{definitionKey}' must require restart.");
         ConfigurationLocalDefinitionDescriptor.EnsureRootConstructible(optionsType, definitionKey);
         var sectionPath = ConfigurationSectionPathResolver.Resolve(optionsType, attribute, sectionPathConvention);
         var root = ScanNode(
@@ -41,9 +48,15 @@ internal sealed class ConfigurationDefinitionScanner(
         var reloadBehavior = attribute.ReloadBehavior == ConfigurationReloadBehavior.Inherit
             ? ConfigurationReloadBehavior.Unknown
             : attribute.ReloadBehavior;
+        if (attribute.Kind == ConfigurationKind.Startup)
+        {
+            reloadBehavior = ConfigurationReloadBehavior.RequiresRestart;
+            root = RequireStartupReload(root, definitionKey);
+        }
 
         return new ConfigurationDefinition
         {
+            Kind = attribute.Kind,
             DefinitionKey = definitionKey,
             SectionPath = sectionPath,
             DisplayName = attribute.DisplayName ?? optionsType.Name,
@@ -60,6 +73,21 @@ internal sealed class ConfigurationDefinitionScanner(
             Root = root,
             ValidationContract = ConfigurationLocalDefinitionDescriptor.CreateContract(optionsType, root),
             SchemaHash = hasher.ComputeHash(definitionKey, sectionPath, root)
+        };
+    }
+
+    private static ConfigurationNodeDefinition RequireStartupReload(ConfigurationNodeDefinition node, string definitionKey)
+    {
+        if (node.ReloadBehavior is ConfigurationReloadBehavior.OnlineReloadable or ConfigurationReloadBehavior.StaticAfterStartup)
+            throw new InvalidOperationException($"Startup configuration definition '{definitionKey}' has incompatible reload behavior at '{node.RelativePath}'.");
+        return node with
+        {
+            ReloadBehavior = ConfigurationReloadBehavior.RequiresRestart,
+            Children = node.Children.Select(child => RequireStartupReload(child, definitionKey)).ToArray(),
+            DictionaryTemplate = node.DictionaryTemplate is { } dictionary
+                ? dictionary with { ValueTemplate = RequireStartupReload(dictionary.ValueTemplate, definitionKey) } : null,
+            ListTemplate = node.ListTemplate is { } list
+                ? list with { ItemTemplate = RequireStartupReload(list.ItemTemplate, definitionKey) } : null
         };
     }
 

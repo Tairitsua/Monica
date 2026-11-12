@@ -1,0 +1,138 @@
+@using Monica.DevOps.K8S.Models
+@using Monica.DevOps.K8S.Support
+@using Monica.DevOps.Localization
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<K8SResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+
+<div class="k8s-overview">
+    <section class="k8s-health @K8SInventoryPresentation.AttentionRole(_attention).ToCssClass()" aria-label="@L["Redesign:Readiness"]">
+        <p class="k8s-eyebrow"><span class="k8s-state-dot @(_attention.Count > 0 ? "is-attention" : _ready > 0 ? "is-success" : "is-neutral")"></span>@L["Redesign:Readiness"]</p>
+        <div class="k8s-ready-value"><MoDisplayValue Value="@_ready.ToString()" Unit="@($"/{_workloads.Count}")" /><span>@L["Redesign:Ready"]</span></div>
+        @if (_workloads.Count == 0)
+        { <p class="k8s-finding">@L["Redesign:NoWorkloads"]</p> }
+        else if (_attention.Count > 0)
+        {
+            <p class="k8s-finding"><button class="k8s-inline-link" @onclick="() => OnAttentionSelected.InvokeAsync(true)">@L["Redesign:AttentionFinding", _attention.Count]</button>
+                @foreach (var row in _attention.Take(2))
+                { <button class="k8s-finding-target @K8SInventoryPresentation.HealthRole(row).ToCssClass()" @onclick="() => OnInspect.InvokeAsync(row)">@row.Name <span>@row.ReadyReplicas/@row.DesiredReplicas</span></button> }
+                <span>@L["Redesign:AffectedServices", _affectedServices]</span>
+            </p>
+        }
+        else
+        { <p class="k8s-finding">@L["Redesign:ReadyFinding", _ready, _stopped]</p> }
+        <div class="k8s-workload-matrix" role="group" aria-label="@L["Redesign:WorkloadMap"]">
+            @foreach (var row in _workloads.OrderByDescending(K8SInventoryPresentation.NeedsAttention).ThenBy(x => x.ResourceType).ThenBy(x => x.Name))
+            {
+                <button type="button" class="k8s-workload-dot @K8SInventoryPresentation.KindRole(row.ResourceType).ToCssClass() @(K8SInventoryPresentation.NeedsAttention(row) ? row.ReadyReplicas == 0 ? "needs-attention is-unavailable" : "needs-attention is-degraded" : row.DesiredReplicas == 0 ? "is-stopped" : null)"
+                        title="@($"{row.Kind}/{row.Name} · {row.ReadyReplicas}/{row.DesiredReplicas}")"
+                        aria-label="@L["Redesign:InspectWorkload", row.Kind, row.Name, row.ReadyReplicas, row.DesiredReplicas]" @onclick="() => OnInspect.InvokeAsync(row)"></button>
+            }
+        </div>
+        <div class="k8s-matrix-legend">
+            @foreach (var kind in _workloads.Select(x => x.ResourceType).Distinct().Order())
+            { <span class="@K8SInventoryPresentation.KindRole(kind).ToCssClass()"><i></i>@L[$"ResourceTypes:{kind.ToDisplayName()}"] @_workloads.Count(x => x.ResourceType == kind)</span> }
+            @if (_attention.Count > 0) { <button class="k8s-attention-legend" @onclick="() => OnAttentionSelected.InvokeAsync(true)"><i></i>@L["Redesign:Attention"] @_attention.Count</button> }
+        </div>
+        <p class="k8s-overview-help">@L["Redesign:MatrixHelp"]</p>
+    </section>
+    <div class="k8s-overview-side">
+        <section class="k8s-restart-waves">
+            <div class="k8s-section-heading"><h2>@L["Redesign:RestartHistory"]</h2><span>@L["Redesign:RestartSource"]</span></div>
+            @if (_waves.Count == 0) { <p class="k8s-overview-help">@L["Redesign:NoRestartEvidence"]</p> }
+            else
+            {
+                <ol class="k8s-wave-spine" aria-label="@L["Redesign:RestartHistory"]">
+                    @foreach (var wave in _waves.Take(_showAllWaves ? _waves.Count : 3))
+                    {
+                        <li @key="(wave.Start, wave.End)">
+                            <button type="button" class="k8s-wave @(wave.Count >= 5 ? "is-big" : null)"
+                                    aria-label="@WaveDescription(wave)" aria-pressed="@(IsWaveSelected(wave) ? "true" : "false")"
+                                    @onclick="() => OnRestartSelected.InvokeAsync((wave.Start, wave.End))">
+                                <span class="k8s-wave-node" aria-hidden="true"></span>
+                                <span class="k8s-wave-copy"><strong>@wave.Label</strong><span title="@wave.Names">@wave.Names</span></span>
+                                <span class="k8s-wave-comparison" aria-hidden="true">
+                                    <span class="k8s-wave-segments" style="width: @WaveWidth(wave)">
+                                        @foreach (var segment in wave.Segments)
+                                        { <i class="@K8SInventoryPresentation.KindRole(segment.Kind).ToCssClass()" style="flex-grow: @segment.Count"></i> }
+                                    </span>
+                                </span>
+                                <span class="k8s-wave-count">@wave.Count</span>
+                            </button>
+                        </li>
+                    }
+                </ol>
+                @if (_waves.Count > 3) { <button class="k8s-inline-link k8s-more-waves" @onclick="() => _showAllWaves = !_showAllWaves">@L[_showAllWaves ? "Redesign:FewerWaves" : "Redesign:MoreWaves", _waves.Count - 3]</button> }
+            }
+        </section>
+        <section class="k8s-exposure">
+            <div class="k8s-section-heading"><h2>@L["Redesign:Exposure"]</h2><span>@L["Redesign:NodePorts", _services.Count(x => x.Type == "NodePort"), _services.Sum(x => x.Ports.Count(p => p.NodePort.HasValue))]</span></div>
+            <div class="k8s-exposure-meter" aria-hidden="true">
+                @foreach (var category in Exposures)
+                { @if (Count(category) > 0) { <span class="exposure-@category.ToLowerInvariant()" style="flex-grow: @Count(category)"></span> } }
+            </div>
+            <div class="k8s-exposure-legend">
+                @foreach (var category in Exposures)
+                { @if (category == "Other" && Count(category) == 0) { continue; } <button class="exposure-@category.ToLowerInvariant()" @onclick="() => OnExposureSelected.InvokeAsync(category)"><i></i><span>@L[$"Redesign:{category}"]<b>@Count(category)</b><small>@L[$"Redesign:{category}Help"]</small></span></button> }
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets or sets one complete namespace inventory from a successful read.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<K8SResourceSummary> Items { get; set; } = [];
+    /// <summary>Opens the selected workload's current inspection evidence.</summary>
+    [Parameter] public EventCallback<K8SResourceSummary> OnInspect { get; set; }
+    /// <summary>Filters the inventory to resources requiring replica attention.</summary>
+    [Parameter] public EventCallback<bool> OnAttentionSelected { get; set; }
+    /// <summary>Filters the Service inventory by the selected exposure category.</summary>
+    [Parameter] public EventCallback<string> OnExposureSelected { get; set; }
+    /// <summary>Filters by the inclusive interval of one captured restart/start group.</summary>
+    [Parameter] public EventCallback<(DateTimeOffset Start, DateTimeOffset End)> OnRestartSelected { get; set; }
+    /// <summary>Gets or sets the parent's active inclusive restart/start filter, or null when cleared.</summary>
+    [Parameter] public (DateTimeOffset Start, DateTimeOffset End)? SelectedRestartWindow { get; set; }
+    private static readonly string[] Exposures = ["NodePort", "ClusterIP", "Headless", "Sidecar", "Other"];
+    private List<K8SResourceSummary> _workloads = [], _services = [], _attention = [];
+    private readonly List<RestartWave> _waves = [];
+    private int _ready, _stopped, _affectedServices;
+    private int _maximumWaveCount = 1;
+    private bool _showAllWaves;
+
+    private sealed record RestartWave(DateTimeOffset Start, DateTimeOffset End, string Label,
+        string Names, int Count, IReadOnlyList<RestartWaveSegment> Segments);
+    private sealed record RestartWaveSegment(K8SResourceType Kind, int Count);
+
+    protected override void OnParametersSet()
+    {
+        _workloads = Items.Where(x => x.ResourceType != K8SResourceType.Service).ToList();
+        _services = Items.Where(x => x.ResourceType == K8SResourceType.Service).ToList();
+        _attention = _workloads.Where(K8SInventoryPresentation.NeedsAttention).ToList();
+        _ready = _workloads.Count(x => x.DesiredReplicas > 0 && x.ReadyReplicas >= x.DesiredReplicas);
+        _stopped = _workloads.Count(x => x.DesiredReplicas == 0);
+        _affectedServices = _services.Count(K8SInventoryPresentation.NeedsAttention);
+        _waves.Clear();
+        var timed = _workloads.Where(x => x.LastRestartedAtUtc.HasValue).OrderByDescending(x => x.LastRestartedAtUtc).ToList();
+        for (var index = 0; index < timed.Count;)
+        {
+            var end = timed[index].LastRestartedAtUtc!.Value;
+            var group = timed.Skip(index).TakeWhile(x => end - x.LastRestartedAtUtc!.Value <= TimeSpan.FromMinutes(2)).ToList();
+            var start = group[^1].LastRestartedAtUtc!.Value;
+            var label = start == end ? UiTime.Format(end) : $"{UiTime.Format(start)} – {UiTime.Format(end)}";
+            var names = string.Join(", ", group.Take(3).Select(x => x.Name));
+            if (group.Count > 3) names = L["Redesign:WaveOthers", names, group.Count - 3];
+            var segments = group.GroupBy(x => x.ResourceType).OrderBy(x => x.Key)
+                .Select(x => new RestartWaveSegment(x.Key, x.Count())).ToArray();
+            _waves.Add(new(start, end, label, names, group.Count, segments));
+            index += group.Count;
+        }
+        _maximumWaveCount = _waves.Count == 0 ? 1 : _waves.Max(x => x.Count);
+    }
+    private int Count(string category) => _services.Count(x => K8SInventoryPresentation.Exposure(x) == category);
+    private bool IsWaveSelected(RestartWave wave) => SelectedRestartWindow is { } selected &&
+        selected.Start == wave.Start && selected.End == wave.End;
+    private string WaveWidth(RestartWave wave) =>
+        (100d * wave.Count / _maximumWaveCount).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    private string WaveDescription(RestartWave wave) => $"{wave.Label}; {wave.Names}; " +
+        string.Join("; ", wave.Segments.Select(segment => $"{L[$"ResourceTypes:{segment.Kind.ToDisplayName()}"]}: {segment.Count}"));
+}

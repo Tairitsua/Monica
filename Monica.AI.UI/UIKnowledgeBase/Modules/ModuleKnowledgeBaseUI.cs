@@ -46,9 +46,9 @@ public sealed class ModuleKnowledgeBaseUI : MonicaModule<ModuleKnowledgeBaseUIOp
         module.Require<ModuleRAG, ModuleRAGOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<AIResource>());
+        module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
         {
-            option.EnableMarkdown = true;
             option.ConfigureNavigation(static registry =>
                 registry.RegisterLocalizedPage<KnowledgeBaseManagePage, AIResource>(
                     KnowledgeBaseManagePage.PAGE_URL,

@@ -15,6 +15,33 @@ public sealed class JobSchedulerAnalyticsStoreTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task GetExecutionAnalyticsAsync_WhenCompletionsBorderBuckets_ShouldKeepLateRecordsInTheirContainingInterval(bool useEfCore)
+    {
+        await using var fixture = await StoreFixture.CreateAsync(useEfCore, RANGE_START);
+        await fixture.SyncAsync(StoreFixture.OWNER_A, StoreFixture.TriggeredDeclaration("jobs.alpha"));
+        var width = TimeSpan.TicksPerHour;
+        long[] offsets = [0, width / 2 + 1, width - 1, width, 2 * width - 1];
+        foreach (var offset in offsets)
+        {
+            fixture.Time.Advance(RANGE_START.AddTicks(offset) - fixture.Time.GetUtcNow());
+            await RunAndCompleteAsync(fixture, StoreFixture.OWNER_A, "jobs.alpha", $"at-{offset}",
+                JobAttemptOutcome.Succeeded, TimeSpan.Zero);
+        }
+
+        var snapshot = await fixture.Store.GetExecutionAnalyticsAsync(fixture.Scope, new JobExecutionAnalyticsQuery
+        {
+            StartTimeUtc = RANGE_START,
+            EndTimeUtc = RANGE_START.AddHours(2)
+        }, TestContext.Current.CancellationToken);
+
+        snapshot.Trend.Select(bucket => bucket.SucceededCount).Should().Equal(3, 2);
+        snapshot.Trend.Sum(bucket => bucket.ExecutedTerminalCount).Should().Be(offsets.Length);
+        snapshot.CompletedTerminalCount.Should().Be(offsets.Length);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task GetExecutionAnalyticsAsync_WhenLongestRecordsTie_ShouldChooseOneExactJobWinnerBeforeLimiting(bool useEfCore)
     {
         await using var fixture = await StoreFixture.CreateAsync(useEfCore, RANGE_START);

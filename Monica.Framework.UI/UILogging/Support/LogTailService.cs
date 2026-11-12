@@ -71,17 +71,17 @@ public sealed class LogTailService(
     }
 
     /// <summary>Reads the latest requested complete lines and adopts a fresh cursor after success.</summary>
-    public Task<Res<LogReadResult>> ReadLatestLinesAsync(int lineCount, CancellationToken cancellationToken = default)
+    public Task<Result<LogReadResult>> ReadLatestLinesAsync(int lineCount, CancellationToken cancellationToken = default)
         => ReadAsync(Math.Max(1, lineCount), latest: true, cancellationToken);
 
     /// <summary>
     /// Polls appended complete lines once, retaining at most the effective raw retention limit from a burst.
     /// Counts and absolute numbering still include all complete lines. Replacement returns the initial window.
     /// </summary>
-    public Task<Res<LogReadResult>> ReadNextAsync(CancellationToken cancellationToken = default)
+    public Task<Result<LogReadResult>> ReadNextAsync(CancellationToken cancellationToken = default)
         => ReadAsync(Math.Clamp(uiOptions.Value.DefaultFetchLines, 1, Math.Max(1, uiOptions.Value.MaxDisplayLines)), latest: false, cancellationToken);
 
-    private async Task<Res<LogReadResult>> ReadAsync(int lineLimit, bool latest, CancellationToken token)
+    private async Task<Result<LogReadResult>> ReadAsync(int lineLimit, bool latest, CancellationToken token)
     {
         await _readGate.WaitAsync(token).ConfigureAwait(false);
         try
@@ -95,7 +95,7 @@ public sealed class LogTailService(
                 var absent = Cursor.Empty(before.Exists ? Guid.NewGuid().ToString("N") : before.Generation) with { Initialized = true };
                 token.ThrowIfCancellationRequested();
                 lock (_sync) _cursor = absent;
-                return Result([], 1, absent, before.Exists);
+                return Result.Success(CreateReadResult([], 1, absent, before.Exists));
             }
 
             await using var stream = OpenRead(path);
@@ -137,19 +137,19 @@ public sealed class LogTailService(
             var after = new Cursor(generation, true, true, length, lineCount, pending.ToArray(), creation, prefix, anchor);
             token.ThrowIfCancellationRequested();
             lock (_sync) _cursor = after;
-            return Result(Array.AsReadOnly(queue.ToArray()), Math.Max(1, lineCount - queue.Count + 1), after, changed || !before.Initialized);
+            return Result.Success(CreateReadResult(Array.AsReadOnly(queue.ToArray()), Math.Max(1, lineCount - queue.Count + 1), after, changed || !before.Initialized));
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to read log file {FilePath}.", LogFilePath);
-            return $"Failed to read log file: {ex.Message}";
+            return Result.Failure<LogReadResult>($"Failed to read log file: {ex.Message}");
         }
         finally { _readGate.Release(); }
     }
 
     /// <summary>Reads earlier complete physical lines without moving this cursor or changing its source generation.</summary>
-    public async Task<Res<LogReadResult>> ReadLinesBeforeAsync(long beforeLineNumber, int lineCount, CancellationToken cancellationToken = default)
+    public async Task<Result<LogReadResult>> ReadLinesBeforeAsync(long beforeLineNumber, int lineCount, CancellationToken cancellationToken = default)
     {
         await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -157,10 +157,10 @@ public sealed class LogTailService(
             cancellationToken.ThrowIfCancellationRequested();
             var start = Math.Max(1, beforeLineNumber - Math.Max(1, lineCount));
             var lines = await ReadRangeAsync(LogFilePath, start, beforeLineNumber - 1, cancellationToken).ConfigureAwait(false);
-            return new LogReadResult(lines, start) { Generation = Generation, FileExists = File.Exists(LogFilePath), TotalLineCount = TotalFileLineCount, ReadAt = DateTimeOffset.UtcNow };
+            return Result.Success(new LogReadResult(lines, start) { Generation = Generation, FileExists = File.Exists(LogFilePath), TotalLineCount = TotalFileLineCount, ReadAt = DateTimeOffset.UtcNow });
         }
         catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { return $"Failed to read earlier log lines: {ex.Message}"; }
+        catch (Exception ex) { return Result.Failure<LogReadResult>($"Failed to read earlier log lines: {ex.Message}"); }
         finally { _readGate.Release(); }
     }
 
@@ -170,7 +170,9 @@ public sealed class LogTailService(
         while (true)
         {
             var result = await ReadNextAsync(cancellationToken).ConfigureAwait(false);
-            if (result.IsFailed(out var error, out var batch)) throw new IOException(error.Message);
+            var error = result.WithoutData();
+            var batch = result.Data;
+            if (result.IsFailure()) throw new IOException(error.Message);
             foreach (var line in batch.Lines) yield return line;
             await Task.Delay(_pollingInterval, cancellationToken).ConfigureAwait(false);
         }
@@ -242,7 +244,7 @@ public sealed class LogTailService(
         return options.PollingInterval < TimeSpan.FromMilliseconds(1) ? TimeSpan.FromMilliseconds(1) : options.PollingInterval;
     }
 
-    private static LogReadResult Result(IReadOnlyList<string> lines, long start, Cursor cursor, bool reset)
+    private static LogReadResult CreateReadResult(IReadOnlyList<string> lines, long start, Cursor cursor, bool reset)
         => new(lines, start) { Generation = cursor.Generation, FileExists = cursor.Exists, TotalLineCount = cursor.LineCount, SourceReset = reset, ReadAt = DateTimeOffset.UtcNow };
 
     private static FileStream OpenRead(string path) => new(path, new FileStreamOptions

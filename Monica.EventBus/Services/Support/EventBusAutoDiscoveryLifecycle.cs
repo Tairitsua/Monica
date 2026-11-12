@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 
@@ -13,7 +14,8 @@ internal sealed class EventBusAutoDiscoveryLifecycle(
     EventBusAutoDiscovery autoDiscovery,
     IEventSubscriptionRegistry subscriptionRegistry,
     IServiceScopeFactory serviceScopeFactory,
-    IServiceProviderIsService? registeredServices = null)
+    IServiceProviderIsService? registeredServices = null,
+    ITypeActivationPolicy? activation = null)
     : IHostedLifecycleService, IDisposable, IAsyncDisposable
 {
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
@@ -33,7 +35,7 @@ internal sealed class EventBusAutoDiscoveryLifecycle(
                     "EventBus auto-discovery cannot be started more than once for the same host.");
             }
 
-            var descriptors = autoDiscovery.BuildDescriptors(serviceScopeFactory, registeredServices);
+            var descriptors = autoDiscovery.BuildDescriptors(serviceScopeFactory, registeredServices, activation);
             if (descriptors.Count == 0)
             {
                 _started = true;

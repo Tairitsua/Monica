@@ -16,15 +16,15 @@ public sealed class ServiceDiscoveryDomainColorResolver
 
     private const string DefaultColorRole = "default";
     private readonly object _syncRoot = new();
-    private readonly Dictionary<string, string> _domainColors = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _domainColors = new(StringComparer.Ordinal);
 
     public IReadOnlyDictionary<string, string> AssignColors(IEnumerable<DomainInfo> domains)
     {
         var domainNames = domains
-            .Select(domain => domain.Name)
+            .Select(domain => domain.Id)
             .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         lock (_syncRoot)
@@ -37,7 +37,7 @@ public sealed class ServiceDiscoveryDomainColorResolver
                 }
             }
 
-            return new Dictionary<string, string>(_domainColors, StringComparer.OrdinalIgnoreCase);
+            return new Dictionary<string, string>(_domainColors, StringComparer.Ordinal);
         }
     }
 

@@ -4,12 +4,14 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Tool.Extensions;
 using Monica.Tool.Helpers;
 using Monica.WebApi.Annotations;
 using Monica.WebApi.AutoControllers.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions.Internal;
 using Monica.WebApi.AutoControllers.Models;
+using MvcApplicationModel = Microsoft.AspNetCore.Mvc.ApplicationModels.ApplicationModel;
 
 namespace Monica.WebApi.AutoControllers.Services.Support;
 
@@ -20,11 +22,13 @@ namespace Monica.WebApi.AutoControllers.Services.Support;
 /// <param name="httpMethodResolver">Resolves host-specific action-name and HTTP method conventions.</param>
 /// <param name="logger">The logger instance.</param>
 /// <param name="options">Auto CRUD controller configuration.</param>
+/// <param name="applicationModel">Optional validated ownership used to expand the domain route token.</param>
 public class CrudControllerServiceConvention(
     IConventionalRouteBuilder conventionalRouteBuilder,
     IConventionalHttpMethodResolver httpMethodResolver,
     ILogger<CrudControllerServiceConvention> logger,
-    IOptions<CrudControllerOption> options)
+    IOptions<CrudControllerOption> options,
+    IApplicationModel? applicationModel = null)
     : IServiceConvention
 {
 
@@ -33,11 +37,11 @@ public class CrudControllerServiceConvention(
 
     protected IConventionalRouteBuilder ConventionalRouteBuilder { get; } = conventionalRouteBuilder;
 
-    public void Apply(ApplicationModel application)
+    public void Apply(MvcApplicationModel application)
     {
         ApplyForControllers(application);
     }
-    protected virtual void ApplyForControllers(ApplicationModel application)
+    protected virtual void ApplyForControllers(MvcApplicationModel application)
     {
         foreach (var controller in GetControllers(application))
         {
@@ -54,7 +58,7 @@ public class CrudControllerServiceConvention(
     }
 
 
-    protected virtual IList<ControllerModel> GetControllers(ApplicationModel application)
+    protected virtual IList<ControllerModel> GetControllers(MvcApplicationModel application)
     {
         return application.Controllers;
     }
@@ -208,6 +212,15 @@ public class CrudControllerServiceConvention(
 
         // Configure the route prefix for the endpoint.
         var rootPath = controllerRouteAttribute == null ? options.Value.RoutePath : "";
+        if (rootPath.Contains("{domain}", StringComparison.Ordinal))
+        {
+            var assembly = controller.ControllerType.Assembly;
+            var domain = applicationModel?.FindRole(assembly)?.DomainId
+                ?? applicationModel?.Domains.Values.SingleOrDefault(candidate => candidate.AssemblyName == assembly.GetName().Name)?.Id;
+            if (domain is null)
+                throw new InvalidOperationException($"CRUD route '{{domain}}' requires a declared application domain or role for controller '{controller.ControllerType.FullName}'.");
+            rootPath = rootPath.Replace("{domain}", domain, StringComparison.Ordinal);
+        }
 
         foreach (var action in controller.Actions)
         {

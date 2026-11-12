@@ -12,8 +12,8 @@ internal sealed class RuntimeMetricsReadControl(RuntimeMetricsFacade facade)
 {
     private readonly object _sync = new();
     private RuntimeMetricsReadGate? _nextGate;
-    private Res<RuntimeMetricsTrend>? _failure;
-    private Res<RuntimeMetricsTrend>? _pinnedResult;
+    private Result<RuntimeMetricsTrend>? _failure;
+    private Result<RuntimeMetricsTrend>? _pinnedResult;
     private bool _pinResults;
     private int _active;
 
@@ -34,11 +34,11 @@ internal sealed class RuntimeMetricsReadControl(RuntimeMetricsFacade facade)
         }
     }
 
-    public Res<RuntimeMetricsTrend> FailReads(string message, ResStatus status = ResStatus.ServiceUnavailable)
+    public Result<RuntimeMetricsTrend> FailReads(string message, ResultStatus status = ResultStatus.ServiceUnavailable)
     {
         lock (_sync)
         {
-            return _failure = new Res<RuntimeMetricsTrend>(message, status);
+            return _failure = Result.Failure<RuntimeMetricsTrend>(message, status);
         }
     }
 
@@ -62,10 +62,10 @@ internal sealed class RuntimeMetricsReadControl(RuntimeMetricsFacade facade)
         }
     }
 
-    public Res<RuntimeMetricsTrend> Read()
+    public Result<RuntimeMetricsTrend> Read()
     {
         RuntimeMetricsReadGate? gate;
-        Res<RuntimeMetricsTrend>? failure;
+        Result<RuntimeMetricsTrend>? failure;
         lock (_sync)
         {
             Reads++;
@@ -82,7 +82,7 @@ internal sealed class RuntimeMetricsReadControl(RuntimeMetricsFacade facade)
             lock (_sync)
             {
                 LastGenuineTrend = genuine.Data;
-                if (_pinResults && genuine.IsOk())
+                if (_pinResults && genuine.IsSuccess())
                 {
                     _pinnedResult ??= genuine;
                 }

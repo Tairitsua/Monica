@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica UI Audit"
-  short_description: "Audit Monica UI precision and runtime safety"
-  default_prompt: "Use $monica-ui-audit to inspect Monica Blazor UI for runtime safety, full-width operational layouts, interaction feedback, proportionate motion, prototype fidelity, local fonts, and responsive containment."

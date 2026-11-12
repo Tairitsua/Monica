@@ -175,11 +175,14 @@
     private async Task LoadWarehousesAsync()
     {
         // ❌ Calls UIService wrapper instead of Facade directly
-        if ((await InventoryService.GetWarehousesAsync()).IsFailed(out var error, out var whs))
+        var result = await InventoryService.GetWarehousesAsync();
+        if (result.IsFailure())
         {
-            Snackbar.Add($"Error: {error.Message}", Severity.Error);
+            Snackbar.Add($"Error: {result.Message}", Severity.Error);
             return;
         }
+        var whs = result.Data
+            ?? throw new InvalidOperationException("A warehouse read must include a collection.");
         _warehouses = whs.ToList();
     }
 
@@ -204,13 +207,16 @@
     private async Task LoadItemQueueAsync()
     {
         if (_selectedWarehouse is null) return;
-        if ((await InventoryService.GetItemQueueAsync(_selectedWarehouse.Id)).IsFailed(out var error, out var queue))
+        var result = await InventoryService.GetItemQueueAsync(_selectedWarehouse.Id);
+        if (result.IsFailure())
         {
-            Snackbar.Add($"Error: {error.Message}", Severity.Error);
+            Snackbar.Add($"Error: {result.Message}", Severity.Error);
             _itemQueue.Clear();
         }
         else
         {
+            var queue = result.Data
+                ?? throw new InvalidOperationException("A queue read must include a collection.");
             _itemQueue = queue.ToList();
         }
     }
@@ -226,9 +232,9 @@
         {
             var result = await InventoryService.StartBatchProcessingAsync(
                 _selectedWarehouse.Id, _parallelCount);
-            if (result.IsFailed(out var error))
+            if (result.IsFailure())
             {
-                Snackbar.Add($"Error: {error.Message}", Severity.Error);
+                Snackbar.Add($"Error: {result.Message}", Severity.Error);
             }
             else
             {
@@ -248,9 +254,9 @@
     {
         if (_selectedWarehouse is null) return;
         var result = await InventoryService.CancelBatchProcessingAsync(_selectedWarehouse.Id);
-        if (result.IsFailed(out var error))
+        if (result.IsFailure())
         {
-            Snackbar.Add($"Error: {error.Message}", Severity.Error);
+            Snackbar.Add($"Error: {result.Message}", Severity.Error);
             return;
         }
         _batchInFlightWarehouseId = null;
@@ -267,9 +273,9 @@
         try
         {
             var result = await InventoryService.ProcessItemAsync(_selectedWarehouse.Id, item.Id);
-            if (result.IsFailed(out var error))
+            if (result.IsFailure())
             {
-                Snackbar.Add($"Error: {error.Message}", Severity.Error);
+                Snackbar.Add($"Error: {result.Message}", Severity.Error);
             }
         }
         finally
@@ -290,9 +296,10 @@
             yesText: "Delete", cancelText: "Cancel");
         if (confirmed != true) return;
 
-        if ((await InventoryService.RemoveItemAsync(_selectedWarehouse.Id, item.Id)).IsFailed(out var error))
+        var result = await InventoryService.RemoveItemAsync(_selectedWarehouse.Id, item.Id);
+        if (result.IsFailure())
         {
-            Snackbar.Add($"Error: {error.Message}", Severity.Error);
+            Snackbar.Add($"Error: {result.Message}", Severity.Error);
         }
         else
         {
@@ -320,9 +327,10 @@
             yesText: "Delete", cancelText: "Cancel");
         if (confirmed != true) return;
 
-        if ((await InventoryService.DeleteWarehouseAsync(_selectedWarehouse.Id)).IsFailed(out var error))
+        var result = await InventoryService.DeleteWarehouseAsync(_selectedWarehouse.Id);
+        if (result.IsFailure())
         {
-            Snackbar.Add($"Error: {error.Message}", Severity.Error);
+            Snackbar.Add($"Error: {result.Message}", Severity.Error);
         }
         else
         {

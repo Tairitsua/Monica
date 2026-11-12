@@ -27,7 +27,7 @@ public sealed class ConfigurationSourcesPageStateTests
     [Fact]
     public async Task Refresh_WhenNewestReadFails_ShouldRetainPendingEvidenceThenInvalidateItAndAllowRecovery()
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationSourceInventory>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationSourceInventory>>>();
         var calls = 0;
         var clock = new FixedTimeProvider(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         await using var state = new ConfigurationSourcesPageState(() => (++calls) switch
@@ -46,7 +46,7 @@ public sealed class ConfigurationSourcesPageStateTests
         Assert.True(state.HasAcceptedEvidence);
         Assert.Same(accepted, state.SourceInventories.Value);
         Assert.Equal(observed, state.SourceInventories.ObservedAtUtc);
-        pending.SetResult(Res.Fail("inventory unavailable"));
+        pending.SetResult(Result.Failure<IReadOnlyList<ConfigurationSourceInventory>>("inventory unavailable"));
         await ObserveAsync(refresh);
 
         Assert.False(state.Loading);
@@ -73,17 +73,17 @@ public sealed class ConfigurationSourcesPageStateTests
     [InlineData(true, true)]
     public async Task Refresh_WhenOlderReadCompletesLate_ShouldPreserveNewestEvidenceOrError(bool olderFails, bool newerFails)
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationSourceInventory>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationSourceInventory>>>();
         var calls = 0;
         await using var state = new ConfigurationSourcesPageState(
             () => ++calls == 1 ? pending.Task
-                : Task.FromResult<Res<IReadOnlyList<ConfigurationSourceInventory>>>(
-                    newerFails ? Res.Fail("new failure") : Inventories(Inventory("new"))),
+                : Task.FromResult<Result<IReadOnlyList<ConfigurationSourceInventory>>>(
+                    newerFails ? Result.Failure<IReadOnlyList<ConfigurationSourceInventory>>("new failure") : Inventories(Inventory("new"))),
             "unavailable");
         var older = state.LoadAsync();
         await ObserveAsync(state.LoadAsync());
 
-        pending.SetResult(olderFails ? Res.Fail("old failure") : Inventories(Inventory("old")));
+        pending.SetResult(olderFails ? Result.Failure<IReadOnlyList<ConfigurationSourceInventory>>("old failure") : Inventories(Inventory("old")));
         await ObserveAsync(older);
 
         Assert.False(state.Loading);
@@ -111,7 +111,7 @@ public sealed class ConfigurationSourcesPageStateTests
         };
         var inventories = new List<ConfigurationSourceInventory> { Inventory("accepted") with { Items = items } };
         await using var state = new ConfigurationSourcesPageState(
-            () => Task.FromResult(Res.Ok<IReadOnlyList<ConfigurationSourceInventory>>(inventories)), "unavailable");
+            () => Task.FromResult(Result.Success<IReadOnlyList<ConfigurationSourceInventory>>(inventories)), "unavailable");
 
         await ObserveAsync(state.LoadAsync());
         items.Clear();
@@ -126,7 +126,7 @@ public sealed class ConfigurationSourcesPageStateTests
     [Fact]
     public async Task Dispose_ShouldDrainActualTokenlessReadAndRejectNewReadsWithoutAdoptingLateEvidence()
     {
-        var pending = NewCompletion<Res<IReadOnlyList<ConfigurationSourceInventory>>>();
+        var pending = NewCompletion<Result<IReadOnlyList<ConfigurationSourceInventory>>>();
         var calls = 0;
         var state = new ConfigurationSourcesPageState(() => { calls++; return pending.Task; }, "unavailable");
         var load = state.LoadAsync();
@@ -154,8 +154,8 @@ public sealed class ConfigurationSourcesPageStateTests
         Source = new() { SourceKey = key, DisplayName = key, ProviderType = "ReviewProvider" }
     };
 
-    private static Res<IReadOnlyList<ConfigurationSourceInventory>> Inventories(params ConfigurationSourceInventory[] values)
-        => Res.Ok<IReadOnlyList<ConfigurationSourceInventory>>(values);
+    private static Result<IReadOnlyList<ConfigurationSourceInventory>> Inventories(params ConfigurationSourceInventory[] values)
+        => Result.Success<IReadOnlyList<ConfigurationSourceInventory>>(values);
 
     private static TaskCompletionSource<T> NewCompletion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static Task ObserveAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);

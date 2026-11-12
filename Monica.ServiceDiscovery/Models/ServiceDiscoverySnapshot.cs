@@ -12,8 +12,9 @@ public static class ServiceDiscoverySnapshot
         AppId = source.AppId,
         AppName = source.AppName,
         DomainName = source.DomainName,
+        DomainNames = source.DomainNames.ToList(),
+        RoleIds = source.RoleIds.ToList(),
         ProjectName = source.ProjectName,
-        DependentSubDomains = source.DependentSubDomains?.ToList(),
         Instances = source.Instances.ToDictionary(pair => pair.Key, pair => Copy(pair.Value), source.Instances.Comparer),
         EvictedInstances = source.EvictedInstances.Select(item => new EvictedInstanceInfo
         {
@@ -30,10 +31,10 @@ public static class ServiceDiscoverySnapshot
     {
         AppId = source.AppId, InstanceId = source.InstanceId, AppName = source.AppName,
         ProjectName = source.ProjectName, DomainName = source.DomainName,
+        DomainNames = source.DomainNames.ToList(), RoleIds = source.RoleIds.ToList(),
         Status = source.Status, IsLeader = source.IsLeader, BuildTime = source.BuildTime,
         AssemblyVersion = source.AssemblyVersion, ReleaseVersion = source.ReleaseVersion,
         RegistrationTime = source.RegistrationTime, LastHeartbeatTime = source.LastHeartbeatTime,
-        DependentSubDomains = source.DependentSubDomains?.ToList(),
         Metadata = new Dictionary<string, string>(source.Metadata, source.Metadata.Comparer)
     };
 }

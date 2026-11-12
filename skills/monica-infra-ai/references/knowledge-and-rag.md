@@ -30,16 +30,18 @@ monica.AddAI().AddOpenAIProvider(options =>
 
 The application workflow is:
 
-1. Create a base with `KnowledgeBaseFacade.CreateAsync(id, name, description)` and check the `Res` result. Import selected Markdown documents with `KnowledgeDocumentFacade.ImportMarkdownDocumentsAsync(...)` after configuring a Markdown document group, or use `UploadDocumentAsync(...)` for source text. Uploads and imports add pending inventory; they do not index vectors.
+1. Create a base with `KnowledgeBaseFacade.CreateAsync(id, name, description)` and check the `Result` result. Import selected Markdown documents with `KnowledgeDocumentFacade.ImportMarkdownDocumentsAsync(...)` after configuring a Markdown document group, or use `UploadDocumentAsync(...)` for source text. Uploads and imports add pending inventory; they do not index vectors.
 2. Select an available embedding provider/model for that base with `EmbeddingModelFacade.GetEmbeddingModelsAsync()` and `SetKnowledgeBaseEmbeddingModelAsync(kbId, providerId, modelName)`. The binding belongs to the knowledge base. Changing it with the default `clearIndex: true` clears existing index state and requires reindexing.
-3. Read document IDs from `KnowledgeDocumentFacade.GetDocumentInventoryAsync(kbId)`. Use `RAGIndexingFacade.IndexDocumentAsync(kbId, documentId)` for one queued document or `StartBatchAsync(kbId)` for a tracked batch. `QueueDocumentForReindexAsync` and `QueueKnowledgeBaseForReindexAsync` reset existing work when content or indexing policy changes. Inspect each returned `Res`; a pending or failed document is not searchable merely because it appears in inventory.
-4. Query with scoped `RAGSearchFacade.SearchAsync(query, knowledgeBaseIds, topK, ct: cancellationToken)`. It returns `Res<IReadOnlyList<TextSearchResult>>`; the default `topK` is 5. Pass only the bases the caller may search. `RAGIndexingFacade.GetDocumentChunksAsync(...)` helps inspect source/chunk correspondence when results look wrong.
+3. Read document IDs from `KnowledgeDocumentFacade.GetDocumentInventoryAsync(kbId)`. Use `RAGIndexingFacade.IndexDocumentAsync(kbId, documentId)` for one queued document or `StartBatchAsync(kbId)` for a tracked batch. `QueueDocumentForReindexAsync` and `QueueKnowledgeBaseForReindexAsync` reset existing work when content or indexing policy changes. Inspect each returned `Result`; a pending or failed document is not searchable merely because it appears in inventory.
+4. Query with scoped `RAGSearchFacade.SearchAsync(query, knowledgeBaseIds, topK, ct: cancellationToken)`. It returns `Result<IReadOnlyList<TextSearchResult>>`; the default `topK` is 5. Pass only the bases the caller may search. `RAGIndexingFacade.GetDocumentChunksAsync(...)` helps inspect source/chunk correspondence when results look wrong.
 
 ```csharp
 var search = await ragSearch.SearchAsync(
     "How are orders approved?", ["orders"], ct: cancellationToken);
-if (search.IsFailed(out var error, out var hits))
-    throw new InvalidOperationException(error.Message);
+if (search.IsFailure())
+    throw new InvalidOperationException(search.Message);
+var hits = search.Data
+    ?? throw new InvalidOperationException("A successful search must include its result collection.");
 foreach (var hit in hits)
     Console.WriteLine(hit);
 ```
@@ -62,7 +64,7 @@ An admitted indexing batch is owned by the host coordinator. Leaving its page st
 
 When reopening a running batch, the first vector validation may describe only the documents already indexed. The page's existing poller takes a final inventory receipt after the batch settles and refreshes vector evidence once for that still-current generation. Do not treat an earlier successful validation as the completed batch's count, or add another polling loop for this refresh.
 
-`AddKnowledgeBaseUI()` contributes `ModuleShellUIOption.EnableMarkdown = true` because its source previews render recorded Markdown through the shell's native Markdown services. `AddRAGUI()` requires that UI module transitively, so chunk previews receive the same services. Registering the backend `AddMarkdown()` document catalog alone does not register `IMudMarkdownThemeService`.
+`AddKnowledgeBaseUI()` contributes `ModuleUIOption.EnableMarkdown = true` because its source previews render recorded Markdown through the shared UI foundation's Markdown services. `AddRAGUI()` requires that UI module transitively, so chunk previews receive the same services. Registering the backend `AddMarkdown()` document catalog alone does not register `IMudMarkdownThemeService`.
 
 `AddKnowledgeBaseUI()` supplies inventory pages but also requires `ModuleRAG`; `AddRAGUI()` adds indexing/search pages and depends on knowledge-base UI. Both UI paths therefore need a vector-store selection even when the immediate page is inventory. `AddKnowledgeBase()` alone is the vector-free inventory path. UI registrations do not choose the provider, embedding model, or persistence medium. Use `$monica-infra-ui` for shell and page access. To let a chat turn's knowledge tools consider selected bases, pass an `AIChatRuntimeContext` containing `KnowledgeBaseChatRuntimeContextKeys.KnowledgeSelection` and a `KnowledgeBaseSelection(ids)` to `ChatFacade.CreateSessionAsync(...)`, or call `UpdateRuntimeContext(...)` before the next turn. The AI UI builds this context from its selected base IDs. Document inventory alone does not make a chat turn retrieve from it.
 

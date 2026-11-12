@@ -36,3 +36,5 @@
     .runtime-observation dl { flex-basis: 100%; gap: 12px 20px; }
     .runtime-page__unavailable { padding: 20px 16px; }
 }
+.runtime-page__identity { min-width: 0; border: 1px solid var(--mud-palette-lines-default); border-radius: 10px; background: var(--mud-palette-surface); overflow: hidden; }
+.runtime-page__identity summary { padding: 16px 24px; color: var(--mud-palette-text-secondary); font-size: 12px; cursor: pointer; }

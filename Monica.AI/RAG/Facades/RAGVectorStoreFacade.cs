@@ -23,17 +23,17 @@ public sealed class RAGVectorStoreFacade
     public const string CAN_FORCE_REMOVE_RAG_SUPPORT_METADATA_KEY = "canForceRemoveRagSupport";
 
     /// <summary>Validates representative vector records for a knowledge base.</summary>
-    public async Task<Res<KnowledgeBaseVectorValidationResult>> ValidateAsync(string knowledgeBaseId)
+    public async Task<Result<KnowledgeBaseVectorValidationResult>> ValidateAsync(string knowledgeBaseId)
         => await ExecuteAsync(
             () => service.ValidateAsync(knowledgeBaseId),
             $"validate vectors for '{knowledgeBaseId}'");
 
     /// <summary>Returns vector-store diagnostics.</summary>
-    public Res<VectorStoreDiagnosticInfo> GetDiagnostics()
+    public Result<VectorStoreDiagnosticInfo> GetDiagnostics()
     {
         try
         {
-            return Res.Ok(service.GetDiagnostics());
+            return Result.Success(service.GetDiagnostics());
         }
         catch (Exception ex)
         {
@@ -42,16 +42,16 @@ public sealed class RAGVectorStoreFacade
     }
 
     /// <summary>Tests vector-store connectivity.</summary>
-    public async Task<Res<VectorStoreConnectionTestResult>> TestConnectionAsync(CancellationToken ct = default)
+    public async Task<Result<VectorStoreConnectionTestResult>> TestConnectionAsync(CancellationToken ct = default)
     {
         try
         {
-            return Res.Ok(await service.TestConnectionAsync(ct));
+            return Result.Success(await service.TestConnectionAsync(ct));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Vector-store connectivity test failed.");
-            return Res.Ok(new VectorStoreConnectionTestResult
+            return Result.Success(new VectorStoreConnectionTestResult
             {
                 Succeeded = false,
                 ProbeCollectionName = string.Empty,
@@ -61,45 +61,45 @@ public sealed class RAGVectorStoreFacade
     }
 
     /// <summary>Returns vector collection existence status.</summary>
-    public async Task<Res<KnowledgeBaseVectorCollectionStatus>> GetCollectionStatusAsync(string knowledgeBaseId)
+    public async Task<Result<KnowledgeBaseVectorCollectionStatus>> GetCollectionStatusAsync(string knowledgeBaseId)
         => await ExecuteAsync(
             () => service.GetCollectionStatusAsync(knowledgeBaseId),
             $"load vector collection status for '{knowledgeBaseId}'");
 
     /// <summary>Clears and resets a vector collection.</summary>
-    public async Task<Res<KnowledgeBaseVectorCollectionOverwriteResult>> OverwriteCollectionAsync(
+    public async Task<Result<KnowledgeBaseVectorCollectionOverwriteResult>> OverwriteCollectionAsync(
         string knowledgeBaseId)
         => await ExecuteAsync(
             () => service.OverwriteCollectionAsync(knowledgeBaseId),
             $"overwrite vector collection for '{knowledgeBaseId}'");
 
     /// <summary>Removes RAG support while preserving source documents.</summary>
-    public async Task<Res<KnowledgeBaseRagSupportRemovalResult>> RemoveSupportAsync(
+    public async Task<Result<KnowledgeBaseRagSupportRemovalResult>> RemoveSupportAsync(
         string knowledgeBaseId,
         bool forceLocalMetadataRemoval = false)
     {
         try
         {
-            return Res.Ok(await service.RemoveSupportAsync(knowledgeBaseId, forceLocalMetadataRemoval));
+            return Result.Success(await service.RemoveSupportAsync(knowledgeBaseId, forceLocalMetadataRemoval));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to remove RAG support from '{KnowledgeBaseId}'.", knowledgeBaseId);
             if (RAGFailureTranslator.IsVectorStoreFailure(ex))
             {
-                return Res.Fail(RAGFailureTranslator.DescribeRagSupportRemoval(ex))
+                return Result.Failure<KnowledgeBaseRagSupportRemovalResult>(RAGFailureTranslator.DescribeRagSupportRemoval(ex))
                     .AppendMetadata(CAN_FORCE_REMOVE_RAG_SUPPORT_METADATA_KEY, true);
             }
 
-            return Res.Fail(ex.GetMessageRecursively());
+            return Result.Failure<KnowledgeBaseRagSupportRemovalResult>(ex.GetMessageRecursively());
         }
     }
 
-    private async Task<Res<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
+    private async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> action, string operation)
     {
         try
         {
-            return Res.Ok(await action());
+            return Result.Success(await action());
         }
         catch (Exception ex)
         {
@@ -107,9 +107,9 @@ public sealed class RAGVectorStoreFacade
         }
     }
 
-    private Res<T> Failure<T>(Exception exception, string operation)
+    private Result<T> Failure<T>(Exception exception, string operation)
     {
         logger.LogError(exception, "Failed to {Operation}.", operation);
-        return Res.Fail($"Failed to {operation}: {exception.GetMessageRecursively()}");
+        return Result.Failure<T>($"Failed to {operation}: {exception.GetMessageRecursively()}");
     }
 }

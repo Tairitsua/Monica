@@ -6,6 +6,29 @@ namespace Test.Monica.Generators.AutoController;
 
 public sealed class GeneratorContractValidationTests
 {
+    [Fact]
+    public void Run_WhenPublishedEnvelopeIsNullable_ShouldReportInvalidEnvelopeInsteadOfGeneratingClient()
+    {
+        const string source = """
+            using Monica.Core.Mediator;
+            using Monica.Core.Results;
+            using Monica.Application.Annotations;
+
+            namespace Scenario.PublishedLanguages.DomainOrdering.Requests;
+
+            /// <summary>Uses a nullable envelope rather than a nullable payload.</summary>
+            [ApiEndpoint(ApiHttpMethod.Get, "orders")]
+            public sealed record QueryOrders : IRequest<Result<string>?>, IQueryRequest;
+            """;
+
+        var run = GeneratorTestHarness.Run(source, new ApiClientSourceGenerator());
+
+        var diagnostic = Assert.Single(run.RunResult.Diagnostics, item => item.Id == "AC1017");
+        diagnostic.GetMessage().Should().Contain("Result<").And.Contain(">?").And.Contain("non-nullable");
+        run.GeneratedSources.Should().NotContainKey("IOrderingQueryApi.g.cs");
+        run.OutputErrors.Should().BeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(InvalidContractScenarios))]
     public void Run_WhenContractBoundaryIsInvalid_ShouldReportSpecificDiagnostic(
@@ -15,7 +38,7 @@ public sealed class GeneratorContractValidationTests
         var run = GeneratorTestHarness.Run(
             source,
             new HttpApiControllerSourceGenerator(),
-            new RpcClientSourceGenerator());
+            new ApiClientSourceGenerator());
 
         run.RunResult.Diagnostics.Select(static diagnostic => diagnostic.Id)
             .Should().Contain(expectedDiagnosticId);
@@ -26,16 +49,30 @@ public sealed class GeneratorContractValidationTests
         { NestedPublishedRequestNamespace, "AC1005" },
         { InvalidRoutePrefix, "AC1004" },
         { PublishedEnvelopeWithoutRemoteFactory, "AC1017" },
-        { ReadOnlyPocoRouteProperty, "AC1018" }
+        { ReadOnlyPocoRouteProperty, "AC1018" },
+        { InvalidMethodSuffix, "AC1016" }
     };
+
+    private const string InvalidMethodSuffix = """
+        using Monica.Application.Abstractions;
+        using Monica.Application.Annotations;
+
+        namespace Scenario.PublishedLanguages.DomainOrdering.Requests;
+
+        /// <summary>Uses a type suffix that cannot become a method name.</summary>
+        [ApiEndpoint(ApiHttpMethod.Get, "orders")]
+        public sealed record Query123Orders : IQuery<string>;
+        """;
 
     private const string NestedPublishedRequestNamespace = """
         using System;
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -43,12 +80,12 @@ public sealed class GeneratorContractValidationTests
         {
             /// <summary>Attempts to publish a request below the strict Requests namespace.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-            public sealed record QueryInternalOrders : IResultRequest<string>;
+            public sealed record QueryInternalOrders : IQuery<string>;
 
             public sealed class QueryHandlerInternalOrders
-                : ApplicationService<QueryInternalOrders, string>
+                : ApplicationRequestHandler<QueryInternalOrders, Result<string>>
             {
-                public override Task<Res<string>> Handle(
+                public override Task<Result<string>> Handle(
                     QueryInternalOrders request,
                     CancellationToken cancellationToken) => throw new NotImplementedException();
             }
@@ -60,19 +97,21 @@ public sealed class GeneratorContractValidationTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1?debug=true", DomainName = "Ordering")]
 
         /// <summary>Uses an invalid route prefix.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-        public sealed record QueryInvalidPrefix : IResultRequest<string>;
+        public sealed record QueryInvalidPrefix : IQuery<string>;
 
         public sealed class QueryHandlerInvalidPrefix
-            : ApplicationService<QueryInvalidPrefix, string>
+            : ApplicationRequestHandler<QueryInvalidPrefix, Result<string>>
         {
-            public override Task<Res<string>> Handle(
+            public override Task<Result<string>> Handle(
                 QueryInvalidPrefix request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }
@@ -84,6 +123,7 @@ public sealed class GeneratorContractValidationTests
         using Monica.Core.Results;
         using Monica.Core.Results.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
@@ -92,7 +132,7 @@ public sealed class GeneratorContractValidationTests
             public sealed record CustomEnvelope(string Data) : IResultEnvelope
             {
                 public string? Message { get; set; }
-                public ResStatus Status { get; set; }
+                public ResultStatus Status { get; set; }
                 public ExpandoObject? Metadata { get; set; }
             }
         }
@@ -101,7 +141,7 @@ public sealed class GeneratorContractValidationTests
         {
             /// <summary>Uses a custom envelope without a remote failure factory.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "orders")]
-            public sealed record QueryOrders : IRequest<global::Scenario.Results.CustomEnvelope>;
+            public sealed record QueryOrders : IRequest<global::Scenario.Results.CustomEnvelope>, global::Monica.Core.Mediator.IQueryRequest;
         }
         """;
 
@@ -110,14 +150,16 @@ public sealed class GeneratorContractValidationTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
+        using Monica.Application.Abstractions;
         using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
+        using Monica.Application.Annotations;
 
         [assembly: WebApiGenerationConfig("api/v1", DomainName = "Ordering")]
 
         /// <summary>Exposes a route property that model binding cannot update.</summary>
         [ApiEndpoint(ApiHttpMethod.Get, "orders/{Id}")]
-        public sealed class QueryReadOnlyOrder : IResultRequest<string>
+        public sealed class QueryReadOnlyOrder : IQuery<string>
         {
             public QueryReadOnlyOrder(long value)
             {
@@ -128,9 +170,9 @@ public sealed class GeneratorContractValidationTests
         }
 
         public sealed class QueryHandlerReadOnlyOrder
-            : ApplicationService<QueryReadOnlyOrder, string>
+            : ApplicationRequestHandler<QueryReadOnlyOrder, Result<string>>
         {
-            public override Task<Res<string>> Handle(
+            public override Task<Result<string>> Handle(
                 QueryReadOnlyOrder request,
                 CancellationToken cancellationToken) => throw new NotImplementedException();
         }

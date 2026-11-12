@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 namespace Monica.Framework.Seeder.Models;
 
 /// <summary>
-/// Provides an immutable point-in-time view of the host's complete seeder run.
+/// Provides an immutable view of the latest batch and every seeder's current-process outcome.
 /// </summary>
 public sealed record SeederStateSnapshot
 {
@@ -13,10 +13,10 @@ public sealed record SeederStateSnapshot
     /// <summary>Gets the current lifecycle state of the complete run.</summary>
     public required SeederRunStatus Status { get; init; }
 
-    /// <summary>Gets when DAG scheduling began after application startup, or <see langword="null"/> beforehand.</summary>
+    /// <summary>Gets when the latest automatic or explicit batch began, or <see langword="null"/> before startup.</summary>
     public DateTimeOffset? StartedAtUtc { get; init; }
 
-    /// <summary>Gets when every seeder reached a terminal state, or <see langword="null"/> while work remains.</summary>
+    /// <summary>Gets when the latest batch finished, or <see langword="null"/> while it is active. Held work remains unsatisfied.</summary>
     public DateTimeOffset? CompletedAtUtc { get; init; }
 
     /// <summary>Gets the elapsed run duration at snapshot capture time, or <see langword="null"/> before scheduling begins.</summary>
@@ -49,11 +49,18 @@ public sealed record SeederStateSnapshot
     /// <summary>Gets the number of cancelled seeders.</summary>
     public int CancelledCount => Count(SeederStatus.Cancelled);
 
+    /// <summary>Gets the number of seeders awaiting explicit execution or an unmet prerequisite.</summary>
+    public int HeldCount => Count(SeederStatus.Held);
+
+    /// <summary>Gets the number of discovered seeders unavailable in this placement.</summary>
+    public int DisabledCount => Count(SeederStatus.Disabled);
+
     /// <summary>Gets the number of seeders in a terminal state.</summary>
     public int CompletedCount => SucceededCount + FailedCount + BlockedCount + CancelledCount;
 
     /// <summary>Gets the number of required seeders that have not succeeded.</summary>
     public int RequiredUnsuccessfulCount => Seeders.Count(static seeder =>
+        seeder.ParticipatesInReadiness &&
         seeder.Criticality == SeederCriticality.Required && seeder.Status != SeederStatus.Succeeded);
 
     /// <summary>Gets the number of optional seeders that ended unsuccessfully.</summary>
@@ -66,7 +73,9 @@ public sealed record SeederStateSnapshot
     {
         get
         {
-            if (Status is SeederRunStatus.Aborting or SeederRunStatus.Aborted || RequiredUnsuccessfulCount > 0)
+            if (Status is SeederRunStatus.Aborting or SeederRunStatus.Aborted || RequiredUnsuccessfulCount > 0 ||
+                Seeders.Any(static seeder => seeder.FailureBehavior == SeederFailureBehavior.FailFast &&
+                    seeder.Status == SeederStatus.Failed))
             {
                 return SeederReadinessStatus.Unhealthy;
             }
@@ -77,11 +86,11 @@ public sealed record SeederStateSnapshot
         }
     }
 
-    /// <summary>Gets whether the scheduler has reached a terminal run state.</summary>
+    /// <summary>Gets whether startup or the latest batch finished. This does not imply that held seeders succeeded.</summary>
     public bool IsCompleted => Status is SeederRunStatus.Succeeded or
         SeederRunStatus.CompletedWithFailures or
         SeederRunStatus.Aborted or
-        SeederRunStatus.Cancelled;
+        SeederRunStatus.Cancelled or SeederRunStatus.Held;
 
     private int Count(SeederStatus status) => Seeders.Count(seeder => seeder.Status == status);
 }

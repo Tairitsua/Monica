@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Monica.Repository.Entity.Abstractions;
+using RepositoryEntity = Monica.Repository.Entity.Abstractions.Entity<long>;
 
 namespace Monica.Repository.EntityInterfaces;
 
@@ -10,7 +12,7 @@ namespace Monica.Repository.EntityInterfaces;
 /// This is an example for documentation purposes only. This file doesn't need to be included in
 /// your project. Instead, implement IHasEntitySelfConfig directly in your entity classes.
 /// </remarks>
-public class ExampleEntity : MoEntity<long>, IHasEntitySelfConfig<ExampleEntity>
+public class ExampleEntity : RepositoryEntity, IHasEntitySelfConfig<ExampleEntity>
 {
     /// <summary>
     /// The entity's name
@@ -90,4 +92,4 @@ public enum EntityStatus
     /// Archived status
     /// </summary>
     Archived
-} 
+}

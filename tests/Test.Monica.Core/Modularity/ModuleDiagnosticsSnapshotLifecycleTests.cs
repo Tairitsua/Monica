@@ -44,8 +44,8 @@ public sealed class ModuleDiagnosticsSnapshotLifecycleTests
             var firstResult = facade.GetSnapshot();
             var secondResult = facade.GetSnapshot();
 
-            firstResult.Status.Should().Be(ResStatus.Ok);
-            secondResult.Status.Should().Be(ResStatus.Ok);
+            firstResult.Status.Should().Be(ResultStatus.Ok);
+            secondResult.Status.Should().Be(ResultStatus.Ok);
             firstResult.Data.Should().NotBeNull();
             secondResult.Data.Should().NotBeNull();
             var first = firstResult.Data!;
@@ -65,8 +65,8 @@ public sealed class ModuleDiagnosticsSnapshotLifecycleTests
             var terminalResult = facade.GetSnapshot();
             var repeatedResult = facade.GetSnapshot();
 
-            terminalResult.Status.Should().Be(ResStatus.Ok);
-            repeatedResult.Status.Should().Be(ResStatus.Ok);
+            terminalResult.Status.Should().Be(ResultStatus.Ok);
+            repeatedResult.Status.Should().Be(ResultStatus.Ok);
             terminalResult.Data.Should().NotBeNull();
             var terminal = terminalResult.Data!;
             terminal.IsFinal.Should().BeTrue();

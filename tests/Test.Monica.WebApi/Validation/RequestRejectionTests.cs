@@ -20,7 +20,7 @@ using Monica.Testing.Hosting;
 using Swashbuckle.AspNetCore.Swagger;
 using Xunit;
 
-namespace Test.Monica.WebApi.Validation;
+namespace Test.Monica.Application.Validation;
 
 public sealed class RequestRejectionTests
 {
@@ -148,7 +148,7 @@ public sealed class RequestRejectionTests
                     endpoints.MapPost("/ingress/minimal", (MinimalRequest request, ExecutionCounts counts) =>
                     {
                         counts.Actions++;
-                        return Res.Ok().GetResponse();
+                        return Result.Success().GetResponse();
                     }).WithMonicaEndpoint();
                     endpoints.MapPost("/unrelated", (MinimalRequest request) => Microsoft.AspNetCore.Http.Results.Ok());
                 }));
@@ -168,7 +168,7 @@ public sealed class CapturedException : IExceptionResponseMapper
 {
     public Exception? Exception { get; private set; }
     public bool TryMap(HttpContext? context, Exception exception, CancellationToken cancellationToken,
-        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Res? response)
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Result? response)
     {
         Exception = exception;
         response = null;
@@ -199,26 +199,26 @@ public sealed record BodyRequest(DateTime When);
 public sealed class IngressApiController(ExecutionCounts counts) : ControllerBase
 {
     [HttpPost("body")]
-    public Res Body([FromBody] BodyRequest request) { counts.Actions++; return Res.Ok(); }
+    public Result Body([FromBody] BodyRequest request) { counts.Actions++; return Result.Success(); }
 }
 
 [Route("ingress/crud")]
 public sealed class IngressCrudController(ExecutionCounts counts) : ControllerBase
 {
     [HttpPost("body")]
-    public Res Body([FromBody] BodyRequest request) => Success();
+    public Result Body([FromBody] BodyRequest request) => Success();
     [HttpPost("form")]
-    public Res Form([FromForm] int count) => Success();
+    public Result Form([FromForm] int count) => Success();
     [HttpGet("query")]
-    public Res Query([FromQuery] int count) => Success();
+    public Result Query([FromQuery] int count) => Success();
     [HttpGet("header")]
-    public Res Header([FromHeader(Name = "X-Count")] int count) => Success();
+    public Result Header([FromHeader(Name = "X-Count")] int count) => Success();
     [HttpGet("route/{id}")]
-    public Res RouteValue([FromRoute] int id) => Success();
+    public Result RouteValue([FromRoute] int id) => Success();
     [HttpGet("optional")]
-    public Res Optional([FromQuery] int? count) => Success();
+    public Result Optional([FromQuery] int? count) => Success();
     [HttpGet("created")]
-    public Res<string?> CreatedValue() => new("", ResStatus.Created);
+    public Result<string?> CreatedValue() => Result.Created<string?>(null).WithMessage("");
 
-    private Res Success() { counts.Actions++; return Res.Ok(); }
+    private Result Success() { counts.Actions++; return Result.Success(); }
 }

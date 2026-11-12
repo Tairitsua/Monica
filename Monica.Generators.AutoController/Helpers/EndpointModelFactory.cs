@@ -13,8 +13,14 @@ namespace Monica.Generators.AutoController.Helpers;
 
 internal static class EndpointModelFactory
 {
+    public static bool IsPublishedRequest(INamedTypeSymbol request) => ResolveNamespace(request).IsValidPublishedNamespace;
+
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAMESPACE = "Monica.Core.Results.Abstractions";
     private const string REMOTE_RESULT_ENVELOPE_INTERFACE_NAME = "IRemoteResultEnvelope`1";
+
+    private static readonly SymbolDisplayFormat NullableTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
+        .WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+                                  SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     private static readonly Regex SummaryPattern = new(
         "<summary>(?<content>.*?)</summary>",
@@ -54,11 +60,7 @@ internal static class EndpointModelFactory
         var configResult = GeneratorConfigurationReader.Read(request.ContainingAssembly);
         if (configResult.Missing)
         {
-            return Failure(
-                DiagnosticDescriptors.MissingConfiguration,
-                location,
-                request.ContainingAssembly.Name,
-                requestDisplayName);
+            configResult = GeneratorConfigReadResult.Valid(new GeneratorConfig("api/v1", null, 0, null, null));
         }
 
         if (configResult.Error is not null || configResult.Config is null)
@@ -73,15 +75,19 @@ internal static class EndpointModelFactory
         var config = configResult.Config;
         var domain = namespaceInfo.IsValidPublishedNamespace
             ? namespaceInfo.Domain
-            : config.DomainName;
+            : config.DomainName ?? ApplicationHostModelReader.GetDeclaredRoleDomain(request.ContainingAssembly);
         if (string.IsNullOrWhiteSpace(domain))
         {
             return Failure(
                 DiagnosticDescriptors.InvalidConfiguration,
                 location,
                 request.ContainingAssembly.Name,
-                "DomainName is required for service-local endpoint requests.");
+                "Service-local endpoint requests require a declaring ApplicationRole domain or an explicit DomainName.");
         }
+
+        if (!SyntaxFacts.IsValidIdentifier(domain))
+            return Failure(DiagnosticDescriptors.InvalidConfiguration, location, request.ContainingAssembly.Name,
+                $"Inferred domain '{domain}' must be a valid C# identifier; supply an explicit DomainName for the HTTP contract.");
 
         if (namespaceInfo.IsValidPublishedNamespace &&
             !string.IsNullOrWhiteSpace(config.DomainName) &&
@@ -112,12 +118,16 @@ internal static class EndpointModelFactory
                 resultContractCount);
         }
 
+        var isQuery = HasRequestMarker(request, "IQueryRequest");
+        var isCommand = HasRequestMarker(request, "ICommandRequest");
+        if (isQuery == isCommand || isQuery != (requestKind == "Query"))
+            return Failure(DiagnosticDescriptors.InvalidRequestIntent, location, requestDisplayName);
+
         if (!TryReadEndpointAttribute(
                 endpointAttribute,
                 out var method,
                 out var route,
-                out var binding,
-                out var operationName))
+                out var binding))
         {
             return Failure(
                 DiagnosticDescriptors.InvalidRoute,
@@ -143,9 +153,7 @@ internal static class EndpointModelFactory
             return new AnalysisSnapshot<EndpointModel>(null, routeDiagnostics);
         }
 
-        var resolvedOperationName = string.IsNullOrWhiteSpace(operationName)
-            ? request.Name.Substring(requestKind.Length)
-            : operationName!;
+        var resolvedOperationName = request.Name.Substring(requestKind.Length);
         if (!SyntaxFacts.IsValidIdentifier(resolvedOperationName))
         {
             return Failure(
@@ -180,7 +188,7 @@ internal static class EndpointModelFactory
                 DiagnosticDescriptors.InvalidPublishedResultEnvelope,
                 location,
                 requestDisplayName,
-                resultSymbol.ToDisplayString());
+                resultSymbol.ToDisplayString(NullableTypeFormat));
         }
 
         var validateSummary = SymbolEqualityComparer.Default.Equals(request.ContainingAssembly, currentAssembly);
@@ -197,6 +205,7 @@ internal static class EndpointModelFactory
         return new AnalysisSnapshot<EndpointModel>(new EndpointModel(
             requestDisplayName,
             request.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            resultSymbol.ToDisplayString(NullableTypeFormat),
             resultSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             domain!,
             namespaceInfo.ContractNamespaceRoot ?? request.ContainingNamespace.ToDisplayString(),
@@ -326,19 +335,21 @@ internal static class EndpointModelFactory
         return null;
     }
 
+    private static bool HasRequestMarker(INamedTypeSymbol request, string marker)
+        => request.AllInterfaces.Any(contract => contract.Name == marker
+            && contract.ContainingNamespace.ToDisplayString() == "Monica.Core.Mediator");
+
     private static bool TryReadEndpointAttribute(
         AttributeData attribute,
         out string? method,
         out string? route,
-        out int binding,
-        out string? operationName)
+        out int binding)
     {
         method = null;
         route = attribute.ConstructorArguments.Length > 1
             ? attribute.ConstructorArguments[1].Value as string
             : null;
         binding = GeneratorConstants.BINDING_AUTO;
-        operationName = null;
 
         if (attribute.ConstructorArguments.Length != 2 ||
             attribute.ConstructorArguments[0].Value is not int methodValue)
@@ -358,14 +369,9 @@ internal static class EndpointModelFactory
 
         foreach (var namedArgument in attribute.NamedArguments)
         {
-            switch (namedArgument.Key)
+            if (namedArgument.Key == "Binding" && namedArgument.Value.Value is int bindingValue)
             {
-                case "Binding" when namedArgument.Value.Value is int bindingValue:
-                    binding = bindingValue;
-                    break;
-                case "OperationName":
-                    operationName = namedArgument.Value.Value as string;
-                    break;
+                binding = bindingValue;
             }
         }
 
@@ -544,7 +550,8 @@ internal static class EndpointModelFactory
 
     private static bool IsConcreteRemoteResultEnvelope(ITypeSymbol result)
     {
-        return result is INamedTypeSymbol
+        return result.NullableAnnotation != NullableAnnotation.Annotated &&
+               result is INamedTypeSymbol
                {
                    TypeKind: TypeKind.Class,
                    IsAbstract: false,

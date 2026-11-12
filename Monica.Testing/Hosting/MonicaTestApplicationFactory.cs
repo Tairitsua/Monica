@@ -11,7 +11,7 @@ namespace Monica.Testing.Hosting;
 /// Composes a complete, host-owned Monica application for each test scenario.
 /// </summary>
 /// <typeparam name="TDiscoveryAnchor">
-/// A type from the assembly that contains the scenario's discoverable Monica ProjectUnits.
+/// A type from the assembly that contains the scenario's discoverable Monica building blocks.
 /// </typeparam>
 /// <remarks>
 /// The factory is an immutable composition recipe and can be shared by test classes. Each call to

@@ -2,11 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
 using Monica.Core.Execution;
+using Monica.Core.Modularity.Annotations;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
 
 namespace Monica.Configuration.EventBus.Services;
 
+[ExcludeFromBusinessTypeDiscovery]
 internal sealed class ConfigurationReloadEventHandler(IConfigurationReloadSignalReceiver receiver)
     : IDistributedEventHandler<ConfigurationReloadSignal>
 {

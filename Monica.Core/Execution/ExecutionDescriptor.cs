@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Data;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Monica.Core.Mediator;
 using Monica.Tool.Extensions;
 
 namespace Monica.Core.Execution;
@@ -72,6 +74,9 @@ public sealed class ExecutionDescriptor
         ContractType = contractType;
         EntryMethod = entryMethod;
         InputType = inputType;
+        IsReadOnly = typeof(IQueryRequest).IsAssignableFrom(inputType);
+        if (IsReadOnly && typeof(ICommandRequest).IsAssignableFrom(inputType))
+            throw new InvalidOperationException($"Request '{inputType.FullName}' cannot be both a Query and a Command.");
         ResultType = resultType;
         IsBusinessOperation = isBusinessOperation;
         var transaction = entryMethod?.GetCustomAttribute<ExecutionTransactionAttribute>(inherit: true);
@@ -83,6 +88,14 @@ public sealed class ExecutionDescriptor
 
         if (transaction is not null)
         {
+            if (!Enum.IsDefined(transaction.IsolationLevel))
+                throw new ArgumentOutOfRangeException(nameof(transaction.IsolationLevel));
+            if (transaction.IsolationLevel != IsolationLevel.Unspecified)
+            {
+                if (TransactionMode != ExecutionTransactionMode.Automatic)
+                    throw new InvalidOperationException("An isolation requirement requires an automatic transaction.");
+                TransactionIsolationLevel = transaction.IsolationLevel;
+            }
             ArgumentNullException.ThrowIfNull(transaction.DbContextTypes);
             if (transaction.DbContextTypes.Length > 0)
             {
@@ -214,6 +227,9 @@ public sealed class ExecutionDescriptor
     /// </summary>
     public Type InputType { get; }
 
+    /// <summary>Gets whether the input declares read-only Query semantics, independently of its transaction mode.</summary>
+    public bool IsReadOnly { get; }
+
     /// <summary>
     /// Gets the pipeline result type.
     /// </summary>
@@ -234,6 +250,9 @@ public sealed class ExecutionDescriptor
     /// default selection. The persistence module validates these types and owns their transaction participation.
     /// </summary>
     public IReadOnlyList<Type>? TransactionDbContextTypes { get; }
+
+    /// <summary>Gets the method's required isolation, or null when it uses the provider default.</summary>
+    public IsolationLevel? TransactionIsolationLevel { get; }
 
     private static ExecutionDescriptor GetOrAdd(Type componentType, DescriptorKey key)
     {

@@ -9,7 +9,7 @@ internal sealed class OpenTelemetryReadControl(OpenTelemetryFacade facade)
 {
     private readonly object _sync = new();
     private OpenTelemetryReadGate? _next;
-    private Res<OpenTelemetrySnapshot>? _failure;
+    private Result<OpenTelemetrySnapshot>? _failure;
     public int Reads { get; private set; }
     public OpenTelemetrySnapshot? LastGenuineSnapshot { get; private set; }
 
@@ -22,12 +22,12 @@ internal sealed class OpenTelemetryReadControl(OpenTelemetryFacade facade)
         }
     }
 
-    public void Fail(string? message) { lock (_sync) _failure = message is null ? null : new(message, ResStatus.ServiceUnavailable); }
+    public void Fail(string? message) { lock (_sync) _failure = message is null ? null : Result.Failure<OpenTelemetrySnapshot>(message, ResultStatus.ServiceUnavailable); }
 
-    public async Task<Res<OpenTelemetrySnapshot>> ReadAsync()
+    public async Task<Result<OpenTelemetrySnapshot>> ReadAsync()
     {
         OpenTelemetryReadGate? gate;
-        Res<OpenTelemetrySnapshot>? failure;
+        Result<OpenTelemetrySnapshot>? failure;
         lock (_sync) { Reads++; gate = _next; _next = null; failure = _failure; }
         var genuine = await facade.GetSnapshotAsync();
         LastGenuineSnapshot = genuine.Data;

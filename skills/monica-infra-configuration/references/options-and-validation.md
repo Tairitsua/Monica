@@ -1,4 +1,16 @@
-# Managed options and validation
+# Configuration ownership and validation
+
+Core's scalar `Application:DebugMode` follows the [shared debug policy](../../monica-infra-hosting/references/debug-mode.md). It is not a Managed definition. The Configuration facade and Diagnostics page project its actual value, source, deployment candidate and restart status without binding a second runtime object or accessing a store. Managed definitions overlapping that key are rejected.
+
+`ConfigurationKind.Managed` is the default and retains store-backed binding, operator changes, and ordinary Microsoft options lifetimes. Select `ConfigurationKind.Startup` explicitly for deployment-owned construction inputs. Both use the same definition schema, binder, portable constraints, pure object rules, and sensitivity annotations; ownership changes lifecycle and permitted operations, not the validation language.
+
+Startup owners require an explicit section path and use `RequiresRestart` throughout their schema. Do not declare `OnlineReloadable` or `StaticAfterStartup` node overrides. The early `GetStartupOptions<T>()` read and all later default-name options APIs share one validated frozen object. All discovered Startup definitions are validated before composition finishes; invalid values always fail, regardless of managed diagnostic policy. Configure/PostConfigure, named options, options validators, change tokens, and custom options services are unsupported. Put cross-field rules in `IValidatableObject`; keep resource-dependent enablement prerequisites in their owner. See [startup inputs](bootstrap-and-stores.md) for composition and source capture.
+
+Startup has no managed effective document, publication, mutation, history creation, unified-version capture, or parameter transfer. Its operator UI shows frozen actual values and provenance alongside the current deployment candidate, validation failures, and restart status. The runtime compares unmasked normalized values; a sensitive value change still requires restart even though both displayed values are redacted. An invalid or unavailable candidate never replaces the actual object. Startup actual validation is cached from composition; current candidate validation is separate.
+
+If a local key changes from Managed to Startup, current reads ignore its old managed document and metadata. Publication does not rewrite or retire that key's historical metadata; no new Startup document is seeded. Historical managed audit records and version snapshots remain visible in global audit views. Current Startup history/detail operations cannot treat them as authority, and attempts to apply or roll back a currently Startup target fail. No migration silently deletes history or converts stored values into deployment inputs.
+
+## Managed options
 
 Register `AddConfiguration(plan)` using an [input plan and store](bootstrap-and-stores.md), then declare a concrete options owner with `[Configuration]`. The module discovers annotated types in the host's configured type-discovery scope and registers Microsoft options binding and validation for the default options name.
 
@@ -12,7 +24,7 @@ using Monica.Configuration.Models;
 
 [Configuration("Orders", DefinitionKey = "orders",
     ReloadBehavior = ConfigurationReloadBehavior.RequiresRestart)]
-public sealed class OrdersOptions : IValidatableObject
+public sealed class OptionsOrders : IValidatableObject
 {
     [ConfigurationKeyName("minimum"), Range(1, 1000)]
     public int MinimumBatchSize { get; set; } = 10;
@@ -40,7 +52,7 @@ Use pure, synchronous `IValidatableObject` rules for relationships within the de
 
 Portable constraints support the exact standard `Required`, `Range`, `RegularExpression`, `MaxLength`, `MinLength`, and `StringLength` attributes, plus enum allowed values. Unsupported or custom `ValidationAttribute` types are rejected during scanning; implement a pure object rule instead. When materialization succeeds, portable failures and independent object-rule failures can both be reported. Structural or conversion failures must not run rules against a partially converted object.
 
-Binding uses configuration aliases and provider order, not JSON serializer property names. It preserves missing values, explicit nulls, empty containers, constructor defaults, and ordinary provider array-index precedence. Empty or null higher-priority containers can clear a lower contribution. Validation uses the same materializer as production managed options; [bootstrap snapshots](bootstrap-and-stores.md) share this binding behavior but have a separate validation boundary.
+Binding uses configuration aliases and provider order, not JSON serializer property names. It preserves missing values, explicit nulls, empty containers, constructor defaults, and ordinary provider array-index precedence. Empty or null higher-priority containers can clear a lower contribution. Validation uses the same materializer as production managed options; [frozen Startup options](bootstrap-and-stores.md) share this binding behavior and always require successful complete validation before composition finishes.
 
 `[OptionSetting]` adds stable node identity, sensitivity, editor hints, and reload behavior. Sensitive code diagnostics suppress user rule messages whenever the owning object has a sensitive subtree or an associated path is sensitive. Code and execution diagnostics do not expose candidate values. Keep ordinary rule messages value-free as well.
 
@@ -61,22 +73,25 @@ Read coverage and scope before interpreting a report:
 
 `ConfigurationDefinition.ValidationContract` publishes `Capability` (`Unknown`, `PortableOnly`, or `ObjectCode`) and a validation `Revision` independent of the structural `SchemaHash`. Portable-only revisions derive from stable schema content, so an unchanged options assembly rebuild does not create a metadata revision. Object-code revisions include executable assembly identities to invalidate reviewed operations after code changes. Publication summaries identify validation capability/revision changes explicitly, and metadata-only history exposes the actual schema JSON diff. Local discovery owns executable types. Published `ClrTypeName` metadata never authorizes loading code. A published PortableOnly contract can be complete only with an affirmative revision and complete portable shape. Without a local descriptor, ObjectCode or Unknown metadata remains SchemaOnly and cannot authorize a complete write or rollback. Metadata that impersonates a local descriptor with a mismatched origin, schema, section, or executable contract causes a contract fault. There is no owner-validation transport. Legacy metadata defaults to Unknown with no revision.
 
-## Startup and actual options policy
+## Managed activation and actual options policy
 
 `ModuleConfigurationOption.RuntimeValidationBehavior` defaults to `DiagnosticOnly`:
 
 | Boundary | DiagnosticOnly | FailFast |
 | --- | --- | --- |
-| First seed has ordinary schema/code failures | Persist the faithfully materialized seed and report a warning. | Reject before creating the effective-value document. |
+| Automatic first seed has ordinary schema/code failures | Persist the faithfully materialized seed and report a warning. | Reject before creating the effective-value document. |
+| Manual document is missing | Require complete valid local defaults/inputs; keep the result temporary with no stored version. Reject invalid or incomplete validation. | Same: no persistence and no weaker temporary-value contract. |
 | Existing effective values are invalid | Report the failure; do not rewrite the document or version during startup. | Reject startup; leave the existing document and version untouched. |
 | An actual default-options instance is invalid after Configure/PostConfigure | Record the invalid attempt and allow resolution. | Record the attempt and throw `OptionsValidationException`. |
 | Binding, contract, or validation execution faults | Fatal. | Fatal. |
 
 `ConfigurationValidationExecutionException` identifies the owner, safe logical path, kind, and fixed stage. It discards user exception messages and causes, including exceptions raised while enumerating validation results. It is fatal under both policies. Actual-options diagnostics record a Failed attempt before rethrowing. Facade operations return safe failures; do not parse exception text to recover a report. Duplicate resolved section paths also fail by default; select Warning only for intentional overlap.
 
+Manual mode does not weaken whole-object mutation validation. Current published section/schema/validation identity and an existing document are prerequisites for a complete reviewed edit; local schema or object-code revision drift remains read-only until the deployed owner publishes it. See [Manual managed values](runtime-changes.md#manual-managed-values) for store guards and preview requirements.
+
 ## Distinguish source reports from observed attempts
 
-`IConfigurationRuntimeValidationService.GetReport()` and `ConfigurationFacade.GetRuntimeValidationReportAsync()` validate the current effective source stack. Source reports are cached until the root reload revision or successful Monica projection changes. A source report does not include consumer Configure/PostConfigure changes and does not create options.
+For Managed definitions, `IConfigurationRuntimeValidationService.GetReport()` and `ConfigurationFacade.GetRuntimeValidationReportAsync()` validate the current effective source stack. Source reports are cached until the root reload revision or successful Monica projection changes. A source report does not include consumer Configure/PostConfigure changes and does not create options. For Startup definitions the same aggregate includes the validated frozen actual report; candidate reports are exposed by read-only definition state and source chains.
 
 `IConfigurationOptionsValidationDiagnostics.GetLatestReport(definitionKey)` and facade `GetOptionsValidationReportAsync(definitionKey)` return the latest observed default-options attempt, or null when none has been observed. `GetReports()` / `GetOptionsValidationReportsAsync()` list the latest attempt per observed local owner. Reads never resolve options to manufacture an observation. The bounded observer retains one immutable report per discovered owner, with `AttemptId`, `AttemptedAt`, revision, coverage, and safe issues; it retains neither the options object nor source JSON. Named options other than the default are not observed by this managed validator.
 
@@ -97,7 +112,7 @@ using Microsoft.Extensions.Options;
 using Monica.Configuration.Abstractions;
 
 public sealed class OrdersStartupGate(
-    IOptions<OrdersOptions> options,
+    IOptions<OptionsOrders> options,
     IConfigurationOptionsInstanceValidationService validation)
 {
     public void EnsureValid()
@@ -107,7 +122,7 @@ public sealed class OrdersStartupGate(
         {
             throw new OptionsValidationException(
                 Options.DefaultName,
-                typeof(OrdersOptions),
+                typeof(OptionsOrders),
                 report.Issues.Select(issue => issue.Problem));
         }
     }
@@ -127,6 +142,7 @@ Behavioral checks:
 - `tests/Test.Monica.Configuration/Services/Support/ConfigurationObjectValidationWalkerTests.cs`: aliases, multiple members, nested ownership, sensitive diagnostics, faults, and remote authority.
 - `tests/Test.Monica.Configuration/Binding/ConfigurationObjectMaterializerTests.cs`: shape and provider precedence.
 - `tests/Test.Monica.Configuration/Modules/ManagedConfigurationObjectValidationTests.cs`: root-owner construction rejection before persistence, first seed, actual PostConfigure, policies, cached options, and reload.
+- `tests/Test.Monica.Configuration/Modules/ManualConfigurationTests.cs`: missing-document complete validation under DiagnosticOnly and guarded aggregate edits without automatic publication.
 - Its `ValidateSuppliedInstance_WhenItDiffersFromSourceAndPostConfigure_ShouldReportWithoutPolicyOrCreationSideEffects` and `ValidateSuppliedInstance_WhenItsClrTypeHasNoLocalOwner_ShouldRejectWithoutExecutingPublishedCode` checks cover explicit instance validation under both policies, observer/source preservation, and refusal of unavailable local authority.
 - `tests/Test.Monica.Configuration/Services/ConfigurationRuntimeValidationServiceCacheTests.cs`: source cache.
 

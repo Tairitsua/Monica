@@ -107,7 +107,7 @@ public class CrudApiDescriptionProvider(IModelMetadataProvider modelMetadataProv
             if (finalBaseType.GenericTypeArguments.Length == 8 && apiDescription.SupportedResponseTypes.FirstOrDefault() is {StatusCode: 200} responseType)
             {
                 var getListOutputDto = finalBaseType.GenericTypeArguments[2];
-                responseType.Type = typeof(Res<>).MakeGenericType(getListOutputDto);
+                responseType.Type = typeof(Result<>).MakeGenericType(getListOutputDto);
                 responseType.ModelMetadata = modelMetadataProvider.GetMetadataForType(responseType.Type);
 
             }

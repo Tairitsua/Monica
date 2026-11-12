@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.EventBus.Abstractions;
-using Monica.EventBus.Annotations;
 using Monica.EventBus.Kafka.Abstractions;
 using Monica.EventBus.Kafka.Services.Support;
 using Monica.EventBus.Models;
@@ -21,6 +20,7 @@ namespace Monica.EventBus.Kafka.Providers.ConfluentKafka;
 internal sealed class KafkaEventBusSubscriptionHostedService(
     IEventSubscriptionRegistry subscriptionManager,
     IEventReceiveDispatcher dispatcher,
+    EventMessageRetryPolicy retryPolicy,
     ITopicSubscriptionStatusStore topicStatusStore,
     IObservableInstanceRegistry observableManager,
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
@@ -50,21 +50,25 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     /// <inheritdoc />
     protected override EventBusProviderKind ProviderKind => EventBusProviderKind.Kafka;
 
-    protected override Task CreateExternalSubscriptionForTopicAsync(string topicName, Type eventType, CancellationToken cancellationToken)
+    protected override bool GroupSubscriptionsByWorkloadOwner => true;
+
+    protected override bool SupportsBatchReceiving => true;
+
+    protected override Task CreateExternalSubscriptionForTopicAsync(SubscriptionGroup group, Type eventType, CancellationToken cancellationToken)
     {
-        var consumer = new TopicConsumer(topicName, eventType, cancellationToken, ConsumeAsync);
+        var consumer = new TopicConsumer(group.TopicName, cancellationToken, ConsumeAsync, group.WorkloadOwner);
         if (!_consumers.TryAddAndStart(consumer))
         {
             return consumer.StopAsync();
         }
 
-        RecordState($"Started Kafka consumer for topic {topicName}", HostedServiceState.Running);
+        RecordState($"Started Kafka consumer for topic {group.TopicName}, owner {group.WorkloadOwner ?? "<unowned>"}", HostedServiceState.Running);
         return Task.CompletedTask;
     }
 
-    protected override async Task RemoveExternalSubscriptionForTopicAsync(string topicName, CancellationToken cancellationToken)
+    protected override async Task RemoveExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken)
     {
-        var consumer = _consumers.Remove(topicName);
+        var consumer = _consumers.Remove(group.TopicName, group.WorkloadOwner);
         if (consumer is null)
         {
             return;
@@ -87,9 +91,25 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     private async Task ConsumeAsync(TopicConsumer topicConsumer)
     {
+        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
         try
         {
-            await ConsumeTopicAsync(topicConsumer);
+            while (!topicConsumer.CancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await ConsumeTopicAsync(topicConsumer);
+                    return;
+                }
+                catch (KafkaConsumerRestartRequiredException ex)
+                {
+                    // Discard an unsafe client without acknowledging a later offset. A fresh member
+                    // resumes from the broker's last committed position, including after rebalances.
+                    ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Recovering,
+                        "Kafka consumer ownership or position changed; recreating the consumer", ex);
+                    await Task.Delay(options.Value.ConsumerErrorBackoff, topicConsumer.CancellationToken);
+                }
+            }
         }
         catch (OperationCanceledException) when (topicConsumer.CancellationToken.IsCancellationRequested)
         {
@@ -97,8 +117,8 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         }
         catch (Exception ex)
         {
-            TopicStatusStore.ReportState(
-                ServiceKey, topicConsumer.TopicName, ProviderKind, TopicSubscriptionRuntimeState.Failed,
+            ReportSubscriptionState(
+                group, TopicSubscriptionRuntimeState.Failed,
                 $"Kafka consumer loop terminated for topic {topicConsumer.TopicName}; " +
                 "the topic will not receive messages until the application restarts it",
                 ex);
@@ -110,61 +130,111 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     private async Task ConsumeTopicAsync(TopicConsumer topicConsumer)
     {
         var cancellationToken = topicConsumer.CancellationToken;
+        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
         var cluster = clusterConfigProvider.GetDirectEventBusCluster();
-        var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey);
-        using var consumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
-        consumer.Subscribe(topicConsumer.TopicName);
-
-        // The consumer proves health only by delivering its first message; assignment events are
-        // not observable through the Confluent consumer API used here.
+        var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey, topicConsumer.WorkloadOwner);
         var hasProvenHealthy = false;
+        var assignmentVersion = 0;
+        using var consumer = new ConsumerBuilder<string, string>(consumerConfig)
+            .SetPartitionsAssignedHandler((_, partitions) =>
+            {
+                assignmentVersion++;
+                hasProvenHealthy = true;
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Healthy,
+                    $"Kafka group '{consumerConfig.GroupId}' assigned {partitions.Count} partition(s)");
+            })
+            .SetPartitionsRevokedHandler((_, _) =>
+            {
+                assignmentVersion++;
+                hasProvenHealthy = false;
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Subscribing,
+                    $"Kafka group '{consumerConfig.GroupId}' is rebalancing");
+            })
+            .SetPartitionsLostHandler((_, _) =>
+            {
+                assignmentVersion++;
+                hasProvenHealthy = false;
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Recovering,
+                    $"Kafka group '{consumerConfig.GroupId}' lost partition ownership");
+            })
+            .Build();
+        consumer.Subscribe(topicConsumer.TopicName);
+        ConsumeResult<string, string>? pending = null;
+        var batchSubscription = SubscriptionManager.GetAll().SingleOrDefault(subscription => subscription.IsBatch
+            && subscription.Scope == EventSubscriptionScope.Distributed && subscription.ServiceKey == ServiceKey
+            && subscription.TopicName == topicConsumer.TopicName && subscription.WorkloadOwner == topicConsumer.WorkloadOwner
+            && subscription.State == EventSubscriptionState.Active);
 
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                var result = consumer.Consume(cancellationToken);
+                var result = pending ?? consumer.Consume(cancellationToken);
+                pending = null;
                 if (result?.Message is null)
                 {
                     continue;
                 }
-                if (result.Message.Value is null)
+                if (batchSubscription is not null)
                 {
-                    RewindOrThrow(() => consumer.Seek(result.TopicPartitionOffset),
-                        new EventMessageDeserializationException(
-                            $"Kafka message on topic '{topicConsumer.TopicName}' has a null body."));
-                    throw new EventMessageDeserializationException(
-                        $"Kafka message on topic '{topicConsumer.TopicName}' has a null body.");
+                    try
+                    {
+                        var batch = KafkaEventBatchReceiver.Collect(consumer, result, options.Value.ReceiveBatch,
+                            () => assignmentVersion, cancellationToken);
+                        pending = batch.Pending;
+                        foreach (var partition in batch.PartitionGroups)
+                        {
+                            await KafkaEventBatchReceiver.DeliverAsync(partition,
+                                records => Dispatcher.DispatchBatchAsync(
+                                    records.Select(record => CreateReceivedMessage(record, ServiceKey)).ToArray(), batchSubscription.Id, cancellationToken),
+                                (record, count) =>
+                                {
+                                    consumer.Commit(record);
+                                    for (var index = 0; index < count; index++)
+                                        TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                                }, retryPolicy, cancellationToken);
+                        }
+                    }
+                    catch (KafkaEventBatchReceiver.KafkaBatchProcessingException) { throw; }
+                    catch (KafkaConsumerRestartRequiredException) { throw; }
+                    catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Collection may have read ahead. Recreate instead of advancing past any retained record.
+                        throw new KafkaConsumerRestartRequiredException("Kafka batch collection failed before acknowledgment.", failure);
+                    }
+                    continue;
                 }
-
-                string? Header(string name)
-                {
-                    var value = result.Message.Headers?.LastOrDefault(header => header.Key == name);
-                    return value is null ? null : Encoding.UTF8.GetString(value.GetValueBytes());
-                }
-                var metadata = new EventDeliveryMetadata(
-                    Header("monica-message-id"),
-                    Header("monica-source"),
-                    Header("monica-event-name") ?? EventNameAttribute.GetNameOrDefault(topicConsumer.EventType),
-                    topicConsumer.TopicName,
-                    ServiceKey,
-                    Header("traceparent"),
-                    Header("tracestate"));
-                await CommitAfterHandlingAsync(
+                var processed = await CommitAfterHandlingAsync(
                     () => HandleExternalMessageAsync(
-                        new EventMessage(metadata, EventSubscriptionScope.Distributed,
-                            Encoding.UTF8.GetBytes(result.Message.Value)),
-                        cancellationToken),
+                        CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner),
                     () => consumer.Commit(result),
-                    () => consumer.Seek(result.TopicPartitionOffset));
+                    () => consumer.Seek(result.TopicPartitionOffset),
+                    failure =>
+                    {
+                        var idBytes = result.Message.Headers?.LastOrDefault(header => header.Key == "monica-message-id")?.GetValueBytes();
+                        var messageId = idBytes is null ? null : Encoding.UTF8.GetString(idBytes);
+                        TopicStatusStore.ReportError(ServiceKey, topicConsumer.TopicName,
+                            $"Retry budget exhausted for Kafka message {messageId} at {result.TopicPartitionOffset}",
+                            failure);
+                        RecordState($"Kafka message retry budget exhausted for topic {topicConsumer.TopicName}",
+                            HostedServiceState.Degraded, failure);
+                        Logger.LogError(failure,
+                            "Retry budget exhausted for Kafka message {MessageId} at {TopicPartitionOffset}; skipping delivery " +
+                            "(ServiceKey: {ServiceKey})",
+                            messageId, result.TopicPartitionOffset, ServiceKey ?? "default");
+                    },
+                    retryPolicy, cancellationToken);
 
-                TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                if (processed)
+                {
+                    TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
+                }
 
                 if (!hasProvenHealthy)
                 {
                     hasProvenHealthy = true;
-                    TopicStatusStore.ReportState(
-                        ServiceKey, topicConsumer.TopicName, ProviderKind, TopicSubscriptionRuntimeState.Healthy,
+                    ReportSubscriptionState(
+                        group, TopicSubscriptionRuntimeState.Healthy,
                         $"Kafka consumer is delivering messages for topic {topicConsumer.TopicName}");
                 }
             }
@@ -172,15 +242,29 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             {
                 break;
             }
-            catch (KafkaRewindFailedException)
+            catch (KafkaConsumerRestartRequiredException)
             {
                 // After a failed seek, this consumer cannot safely commit any later offset.
                 throw;
             }
+            catch (KafkaEventBatchReceiver.KafkaBatchProcessingException)
+            {
+                // Exhaustion is terminal for this topic/owner; an operator can repair and restart it.
+                throw;
+            }
+            catch (KafkaException ex) when (IsOwnershipLoss(ex))
+            {
+                throw new KafkaConsumerRestartRequiredException("Kafka consumer lost partition ownership.", ex);
+            }
+            catch (KafkaException ex) when (ex.Error.IsFatal)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                TopicStatusStore.ReportState(
-                    ServiceKey, topicConsumer.TopicName, ProviderKind, TopicSubscriptionRuntimeState.Recovering,
+                hasProvenHealthy = false;
+                ReportSubscriptionState(
+                    group, TopicSubscriptionRuntimeState.Recovering,
                     $"Kafka consumer failed for topic {topicConsumer.TopicName}; retrying after backoff",
                     ex);
 
@@ -200,24 +284,103 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         // coordinator. Consumer.Dispose uses NO_CONSUMER_CLOSE instead.
     }
 
-    internal static async Task CommitAfterHandlingAsync(
-        Func<Task> handle, Action commit, Action rewind)
+    internal static async Task<bool> CommitAfterHandlingAsync(
+        Func<Task> handle, Action commit, Action rewind, Action<Exception> reject,
+        EventMessageRetryPolicy retryPolicy,
+        CancellationToken cancellationToken = default)
     {
+        var processed = true;
         try
         {
-            await handle();
-            commit();
+            try
+            {
+                await retryPolicy.ExecuteAsync(handle, cancellationToken);
+            }
+            catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+            {
+                // End exhausted processing only after the last attempt's transaction and scope unwind.
+                cancellationToken.ThrowIfCancellationRequested();
+                reject(failure);
+                processed = false;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller disposes this consumer without advancing its broker position.
+            throw;
         }
         catch (Exception failure)
         {
-            // Broker offsets advance only after the complete handler operation commits.
-            // Rewind so a failed delivery retains the same identity on this consumer.
+            // Failure to record the terminal disposition must retain the same delivery identity.
             RewindOrThrow(rewind, failure);
             throw;
         }
+
+        try
+        {
+            commit();
+        }
+        catch (KafkaException ex) when (IsOwnershipLoss(ex))
+        {
+            // A rebalance may have transferred the partition after processing. Seeking it is
+            // invalid; the new owner retries the original record from its committed position.
+            throw new KafkaConsumerRestartRequiredException("Kafka partition ownership changed before acknowledgment.", ex);
+        }
+        catch (Exception failure)
+        {
+            RewindOrThrow(rewind, failure);
+            throw;
+        }
+
+        return processed;
     }
 
-    private static void RewindOrThrow(Action rewind, Exception? originalFailure)
+    internal static EventMessage CreateReceivedMessage(ConsumeResult<string, string> result, string? serviceKey)
+    {
+        string? Header(string name)
+        {
+            var value = result.Message?.Headers?.LastOrDefault(header => header.Key == name)?.GetValueBytes();
+            return value is null ? null : Encoding.UTF8.GetString(value);
+        }
+
+        string RequiredHeader(string name)
+        {
+            var value = Header(name);
+            return !string.IsNullOrWhiteSpace(value) ? value
+                : throw new KafkaNativeEnvelopeException(
+                    $"Kafka message on topic '{result.Topic}' lacks required native EventBus header '{name}'. " +
+                    "Dapr CloudEvents must be drained before switching providers.");
+        }
+
+        var metadata = new EventDeliveryMetadata(
+            RequiredHeader("monica-message-id"), RequiredHeader("monica-source"), RequiredHeader("monica-event-name"),
+            result.Topic, serviceKey, Header("traceparent"), Header("tracestate"));
+        if (result.Message?.Value is null)
+        {
+            throw new EventMessageDeserializationException($"Kafka message on topic '{result.Topic}' has a null body.");
+        }
+
+        metadata = metadata with { TransportKey = result.Message.Key };
+        return new EventMessage(metadata, EventSubscriptionScope.Distributed, Encoding.UTF8.GetBytes(result.Message.Value));
+    }
+
+    // A protocol mismatch consumes the same finite budget as any other processing failure.
+    internal sealed class KafkaNativeEnvelopeException(string message) : Exception(message)
+    {
+    }
+
+    private static bool IsOwnershipLoss(KafkaException exception)
+        => IsOwnershipLoss(exception.Error.Code)
+            || exception is TopicPartitionOffsetException partitionFailure
+                && partitionFailure.Results.Any(result => IsOwnershipLoss(result.Error.Code));
+
+    private static bool IsOwnershipLoss(ErrorCode code)
+        => code is ErrorCode.Local_State or ErrorCode.Local_AssignmentLost or ErrorCode.Local_MaxPollExceeded
+            or ErrorCode.IllegalGeneration or ErrorCode.UnknownMemberId or ErrorCode.RebalanceInProgress;
+
+    private static void RewindOrThrow(Action rewind, Exception originalFailure)
     {
         try
         {
@@ -225,13 +388,13 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         }
         catch (Exception seekFailure)
         {
-            throw new KafkaRewindFailedException(
-                "Kafka failed to rewind an unacknowledged message; the consumer must stop.",
-                originalFailure is null ? seekFailure : new AggregateException(originalFailure, seekFailure));
+            throw new KafkaConsumerRestartRequiredException(
+                "Kafka failed to rewind an unacknowledged message; the consumer must restart from its committed position.",
+                new AggregateException(originalFailure, seekFailure));
         }
     }
 
-    private sealed class KafkaRewindFailedException(string message, Exception innerException)
+    internal sealed class KafkaConsumerRestartRequiredException(string message, Exception innerException)
         : Exception(message, innerException)
     {
     }
@@ -242,14 +405,15 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     internal sealed class TopicConsumerRegistry
     {
         private readonly object _lifecycleLock = new();
-        private readonly Dictionary<string, TopicConsumer> _consumers = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string TopicName, string? WorkloadOwner), TopicConsumer> _consumers = new();
         private bool _isAccepting = true;
 
         internal bool TryAddAndStart(TopicConsumer consumer)
         {
             lock (_lifecycleLock)
             {
-                if (!_isAccepting || !_consumers.TryAdd(consumer.TopicName, consumer))
+                var key = (consumer.TopicName, consumer.WorkloadOwner);
+                if (!_isAccepting || !_consumers.TryAdd(key, consumer))
                 {
                     return false;
                 }
@@ -259,16 +423,16 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     return true;
                 }
 
-                _consumers.Remove(consumer.TopicName);
+                _consumers.Remove(key);
                 return false;
             }
         }
 
-        internal TopicConsumer? Remove(string topicName)
+        internal TopicConsumer? Remove(string topicName, string? workloadOwner = null)
         {
             lock (_lifecycleLock)
             {
-                return _consumers.Remove(topicName, out var consumer)
+                return _consumers.Remove((topicName, workloadOwner), out var consumer)
                     ? consumer
                     : null;
             }
@@ -306,12 +470,12 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
         internal TopicConsumer(
             string topicName,
-            Type eventType,
             CancellationToken cancellationToken,
-            Func<TopicConsumer, Task> consumeAsync)
+            Func<TopicConsumer, Task> consumeAsync,
+            string? workloadOwner = null)
         {
             TopicName = topicName;
-            EventType = eventType;
+            WorkloadOwner = workloadOwner;
             _consumeAsync = consumeAsync;
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             CancellationToken = _cancellationTokenSource.Token;
@@ -319,7 +483,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
         public string TopicName { get; }
 
-        public Type EventType { get; }
+        public string? WorkloadOwner { get; }
 
         public CancellationToken CancellationToken { get; }
 

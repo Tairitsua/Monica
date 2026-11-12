@@ -13,11 +13,13 @@ namespace Monica.Core.Modularity.Models.Internal;
 /// <param name="applicationBuilder">The application builder.</param>
 /// <param name="hostApplicationBuilder">The host application builder.</param>
 /// <param name="registration">The current module registration.</param>
+/// <param name="registrationOwner">The application declaration captured by this contribution, or null for module-wide callbacks.</param>
 internal sealed class ModuleConfigurationContext(
     IServiceCollection? services,
     IApplicationBuilder? applicationBuilder,
     IHostApplicationBuilder? hostApplicationBuilder,
-    ModuleRegistrationState registration)
+    ModuleRegistrationState registration,
+    Type? registrationOwner = null)
 {
     /// <summary>
     /// The service collection.
@@ -38,6 +40,8 @@ internal sealed class ModuleConfigurationContext(
     /// Gets the current module registration.
     /// </summary>
     internal ModuleRegistrationState Registration { get; } = registration;
+
+    internal Type? RegistrationOwner { get; } = registrationOwner;
 }
 
 /// <summary>
@@ -49,4 +53,5 @@ internal sealed record ModuleConfigurationRequest(
     int Order,
     long Ordinal,
     Action<ModuleConfigurationContext> Configure,
-    ModuleWebStage? WebStage = null);
+    ModuleWebStage? WebStage = null,
+    Type? RegistrationOwner = null);

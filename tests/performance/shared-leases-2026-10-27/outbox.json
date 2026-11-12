@@ -1,0 +1,58 @@
+{
+  "capturedAtUtc": "2026-10-27T15:54:57.3618143+00:00",
+  "poolLimit": 3,
+  "retainedRows": 12000,
+  "expiredRows": 4000,
+  "payloadBytes": 512,
+  "cleanupBatchSize": 1000,
+  "results": [
+    {
+      "scenario": "original-cleanup",
+      "replicas": 1,
+      "elapsedMs": 52.9035,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 0
+    },
+    {
+      "scenario": "coordinated-cleanup",
+      "replicas": 1,
+      "elapsedMs": 62.6422,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 8
+    },
+    {
+      "scenario": "original-cleanup",
+      "replicas": 4,
+      "elapsedMs": 19.3478,
+      "deleted": 4000,
+      "deleteStatements": 8,
+      "leaseReads": 0
+    },
+    {
+      "scenario": "coordinated-cleanup",
+      "replicas": 4,
+      "elapsedMs": 35.3124,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 14
+    },
+    {
+      "scenario": "original-cleanup",
+      "replicas": 16,
+      "elapsedMs": 24.0488,
+      "deleted": 4000,
+      "deleteStatements": 20,
+      "leaseReads": 0
+    },
+    {
+      "scenario": "coordinated-cleanup",
+      "replicas": 16,
+      "elapsedMs": 109.1453,
+      "deleted": 4000,
+      "deleteStatements": 5,
+      "leaseReads": 42
+    }
+  ]
+}

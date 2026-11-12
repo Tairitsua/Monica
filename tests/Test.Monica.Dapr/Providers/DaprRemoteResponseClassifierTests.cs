@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Monica.Core.Results;
 using Monica.Dapr.Providers;
-using Monica.WebApi.RpcClient.Models;
+using Monica.Invocation.Models;
 using Xunit;
 
 namespace Test.Monica.Dapr.Providers;
@@ -16,7 +16,7 @@ public sealed class DaprRemoteResponseClassifierTests
         var classifier = new DaprRemoteResponseClassifier();
         Assert.Equal("dapr", classifier.Transport);
         Assert.True(classifier.TryClassify(new RemoteResponseContext(HttpStatusCode.InternalServerError, json.RootElement), out var failure));
-        Assert.Equal(ResStatus.ServiceUnavailable, failure!.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, failure!.Status);
         Assert.Equal("dependency.unavailable", failure.Code);
         Assert.DoesNotContain("secret", JsonSerializer.Serialize(failure));
     }

@@ -1,0 +1,73 @@
+@using System.Globalization
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+
+<section class="state-share" aria-labelledby="@_headingId">
+    <header><div><h2 id="@_headingId">@L["Analytics:Cohort:Title"]</h2><p>@L["Analytics:Cohort:Description"]</p></div><span class="state-share__count">@L["Analytics:Cohort:Total", Total.ToString("N0")]</span></header>
+    <div class="state-share__body">
+        <figure><div class="state-share__ring"><svg viewBox="0 0 240 240" aria-label="@L["Overview:Queue:AriaLabel"]">
+            @if (Total == 0) { <circle cx="120" cy="120" r="88" class="state-share__empty" /> }
+            @foreach (var arc in Arcs)
+            {
+                <a href="@Destination(arc.State)" class="state-share__segment @(Reading is not null && Reading != arc.State ? "is-muted" : null)" data-state="@StateName(arc.State)"
+                   aria-label="@Label(arc.State)" @onmouseenter="@(() => _hovered = arc.State)" @onmouseleave="@(() => _hovered = null)" @onfocus="@(() => _focused = arc.State)" @onblur="@(() => _focused = null)">
+                    <path d="@Sector(arc.From, arc.To, Active == arc.State)" fill-rule="evenodd" /><title>@Label(arc.State)</title>
+                </a>
+            }
+        </svg><div class="state-share__center" data-state="@StateName(Active)" aria-live="polite" aria-atomic="true">
+            @if (Total > 0) { <span><i></i>@L[$"ExecutionStates:{Active}"]</span><strong>@Count(Active).ToString("N0")</strong><small>@Share(Count(Active))</small> }
+            else { <strong>—</strong><small>@L["Overview:Queue:Total"]</small> }
+        </div></div><figcaption>@L["Overview:Queue:HoverHint"]</figcaption></figure>
+        <div class="state-share__legend">@foreach (var state in States)
+        {
+            <a class="state-share__state @(Total > 0 && Active == state ? "is-selected" : null)" data-state="@StateName(state)" href="@Destination(state)" aria-label="@Label(state)"
+               @onmouseenter="@(() => _hovered = state)" @onmouseleave="@(() => _hovered = null)" @onfocus="@(() => _focused = state)" @onblur="@(() => _focused = null)">
+                <span><i></i>@L[$"ExecutionStates:{state}"]</span><b>@Count(state).ToString("N0")</b><small>@Share(Count(state))</small><MoIcon Icon="@MoIcons.ChevronRight" Size=".8rem" />
+            </a>
+        }</div>
+    </div>
+    <footer><span>@TimePresentation.FormatRange(Snapshot.StartTimeUtc, Snapshot.EndTimeUtc)</span><p>@L["Workspace:CohortNote"]</p></footer>
+</section>
+
+@code {
+    /// <summary>Gets the accepted analytics creation cohort; it intentionally differs from the completion population.</summary>
+    [Parameter, EditorRequired] public JobExecutionAnalyticsSnapshot Snapshot { get; set; } = null!;
+    private readonly string _headingId = $"state-share-{Guid.NewGuid():N}";
+    private static readonly JobExecutionState[] States = Enum.GetValues<JobExecutionState>();
+    private JobExecutionState? _hovered, _focused;
+    private JobExecutionState? Reading => _hovered ?? _focused;
+    private long Total => States.Sum(Count);
+    private long Count(JobExecutionState state) => Snapshot.StateTotals.GetValueOrDefault(state);
+    private JobExecutionState Active => Reading ?? States.MaxBy(Count);
+    private static string StateName(JobExecutionState state) => state.ToString().ToLowerInvariant();
+    private string Share(long count) => Total == 0 ? "—" : count > 0 && count * 100d / Total < .1 ? "<0.1%" : (count * 100d / Total).ToString("N1") + "%";
+    private string Label(JobExecutionState state) => $"{L[$"ExecutionStates:{state}"]} · {Count(state):N0} · {Share(Count(state))}";
+    private string Destination(JobExecutionState state) => $"/job-scheduler/executions?states={state}&from={Uri.EscapeDataString(Snapshot.StartTimeUtc.ToString("O", CultureInfo.InvariantCulture))}&to={Uri.EscapeDataString(Snapshot.EndTimeUtc.ToString("O", CultureInfo.InvariantCulture))}"
+        + (Snapshot.OwnerKey is { } owner ? $"&owner={Uri.EscapeDataString(owner)}" : "")
+        + (Snapshot.JobKey is { } job ? $"&job={Uri.EscapeDataString(job)}" : "");
+    private IEnumerable<(JobExecutionState State, double From, double To)> Arcs
+    {
+        get
+        {
+            double offset = 0;
+            foreach (var state in States)
+            {
+                var count = Count(state);
+                if (count <= 0) continue;
+                var from = offset / Total * Math.PI * 2 - Math.PI / 2;
+                offset += count;
+                yield return (state, from, offset / Total * Math.PI * 2 - Math.PI / 2);
+            }
+        }
+    }
+    private static string Point(double angle, double radius) => FormattableString.Invariant($"{120 + Math.Cos(angle) * radius:0.####},{120 + Math.Sin(angle) * radius:0.####}");
+    private static string Sector(double from, double to, bool selected)
+    {
+        var outer = selected ? 109 : 104;
+        const int inner = 72;
+        if (to - from > Math.PI * 2 - .00001)
+            return $"M120,{120 - outer} A{outer},{outer} 0 1 1 120,{120 + outer} A{outer},{outer} 0 1 1 120,{120 - outer} M120,{120 - inner} A{inner},{inner} 0 1 0 120,{120 + inner} A{inner},{inner} 0 1 0 120,{120 - inner} Z";
+        var large = to - from > Math.PI ? 1 : 0;
+        return $"M{Point(from, outer)} A{outer},{outer} 0 {large} 1 {Point(to, outer)} L{Point(to, inner)} A{inner},{inner} 0 {large} 0 {Point(from, inner)} Z";
+    }
+}

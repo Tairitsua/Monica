@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageDescription>Minio provider for Monica blob storage with host-owned connections and explicit object naming.</PackageDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monica.BlobStorage\Monica.BlobStorage.csproj" />
+    <PackageReference Include="Minio" Version="7.0.0" />
+  </ItemGroup>
+</Project>

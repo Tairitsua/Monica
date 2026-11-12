@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.Core.Execution;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
@@ -34,6 +35,34 @@ namespace Test.Monica.Dapr.Services;
 
 public sealed class DaprEventBusSubscriptionHostedServiceTests
 {
+    [Fact]
+    public async Task Subscription_WhenBatchHandlerSelected_ShouldReportUnsupportedBeforeAttachingToDapr()
+    {
+        using var fixture = await CreateFixtureAsync((_, _) => Task.CompletedTask);
+        await fixture.AddSubscriptionAsync("test.batch", batch: true);
+        var status = fixture.TopicStatusStore.Get(null, "test.batch");
+        Assert.NotNull(status);
+        Assert.Equal(TopicSubscriptionRuntimeState.Failed, status.State);
+        Assert.Contains("does not support distributed batch receiving", status.LastErrorMessage);
+        Assert.False(fixture.Client.HasSubscriptionForTopic("test.batch"));
+    }
+
+    private sealed class UnsupportedBatchHandler : IDistributedBatchEventHandler<TestEvent>
+    {
+        public Task HandleBatchAsync(IReadOnlyList<TestEvent> events, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Unsupported batch handler must not run.");
+    }
+
+    [Fact]
+    public async Task Subscription_WhenBatchOwnerSharesExistingDaprTopic_ShouldStopItsSingleCallback()
+    {
+        using var fixture = await CreateFixtureAsync((_, _) => Task.CompletedTask);
+        await fixture.AddSubscriptionAsync("test.progress", batch: true, owner: "batch-owner");
+        Assert.Equal(TopicSubscriptionRuntimeState.Failed, fixture.TopicStatusStore.Get(null, "test.progress")!.State);
+        Assert.Equal(1, fixture.Client.SubscriptionCount);
+        Assert.Equal(1, fixture.Client.DisposedSubscriptionCount);
+    }
+
     [Fact]
     public void CreateMetadata_PreservesNativeIdentitySourceAndTrace()
     {
@@ -339,6 +368,15 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
     }
 
     [Fact]
+    public void MessageHandlingTimeout_WhenOutsideTimerRange_ShouldRejectConfigurationBeforeDelivery()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ModuleDaprEventBusOption
+            { MessageHandlingTimeout = TimeSpan.FromMilliseconds(-2) });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ModuleDaprEventBusOption
+            { MessageHandlingTimeout = TimeSpan.FromDays(60) });
+    }
+
+    [Fact]
     public async Task MessageHandler_WhenDispatchSucceeds_ReturnsSuccess()
     {
         var received = new List<TestEvent>();
@@ -368,6 +406,95 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         Assert.Equal(TopicResponseAction.Drop, action);
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 2)]
+    [InlineData(3, 4)]
+    public async Task MessageHandler_WhenRetriesAreConfigured_ShouldDropAfterExactAttemptCount(int retries, int expectedAttempts)
+    {
+        var attempts = 0;
+        using var fixture = await CreateFixtureAsync((_, _) =>
+        {
+            attempts++;
+            return Task.FromException(new TimeoutException("Dependency timed out."));
+        }, retryCount: retries);
+
+        var action = await fixture.HandleAsync("{\"value\":\"failed\"}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(TopicResponseAction.Drop, action);
+        Assert.Equal(expectedAttempts, attempts);
+    }
+
+    [Fact]
+    public async Task MessageHandler_WhenRetrySucceeds_ShouldDisposeFailedScopeAndDeserializeAgain()
+    {
+        TestFixture? fixture = null;
+        TestEvent? firstEvent = null;
+        var attempts = 0;
+        using (fixture = await CreateFixtureAsync((message, _) =>
+        {
+            if (++attempts == 1)
+            {
+                firstEvent = message;
+                return Task.FromException(new BusinessException("Temporary rejection."));
+            }
+
+            Assert.True(fixture!.HandlerDisposed.IsCompleted);
+            Assert.NotSame(firstEvent, message);
+            return Task.CompletedTask;
+        }))
+        {
+            var action = await fixture.HandleAsync("{\"value\":\"ready\"}", TestContext.Current.CancellationToken);
+            Assert.Equal(TopicResponseAction.Success, action);
+            Assert.Equal(2, attempts);
+        }
+    }
+
+    [Fact]
+    public async Task MessageHandler_WhenAttemptsTimeOut_ShouldUseFreshDeadlinesAndDrop()
+    {
+        var tokens = new List<CancellationToken>();
+        using var fixture = await CreateFixtureAsync((_, token) =>
+        {
+            Assert.False(token.IsCancellationRequested);
+            tokens.Add(token);
+            return Task.Delay(Timeout.InfiniteTimeSpan, token);
+        }, configureOptions: options => options.MessageHandlingTimeout = TimeSpan.FromMilliseconds(50));
+
+        var action = await fixture.HandleAsync("{\"value\":\"slow\"}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(TopicResponseAction.Drop, action);
+        Assert.Equal(2, tokens.Count);
+        Assert.NotEqual(tokens[0], tokens[1]);
+        Assert.All(tokens, token => Assert.True(token.IsCancellationRequested));
+        Assert.Equal(Timeout.InfiniteTimeSpan, fixture.Client.Options.MessageHandlingPolicy.TimeoutDuration);
+    }
+
+    [Fact]
+    public async Task MessageHandler_WhenHandlerIgnoresDeadline_ShouldBoundRetriesAndRetainRunningScopes()
+    {
+        var completions = new List<TaskCompletionSource>();
+        using var fixture = await CreateFixtureAsync((_, _) =>
+        {
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            completions.Add(completion);
+            return completion.Task;
+        }, configureOptions: options => options.MessageHandlingTimeout = TimeSpan.FromMilliseconds(50));
+
+        try
+        {
+            var action = await fixture.HandleAsync("{\"value\":\"slow\"}", TestContext.Current.CancellationToken);
+            Assert.Equal(TopicResponseAction.Drop, action);
+            Assert.Equal(2, completions.Count);
+            Assert.False(fixture.HandlerDisposed.IsCompleted);
+        }
+        finally
+        {
+            foreach (var completion in completions) completion.TrySetResult();
+            await fixture.HandlerDisposed.WaitAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
     [Fact]
     public async Task MessageHandler_WhenJsonDeserializesToNull_ReturnsDrop()
     {
@@ -380,8 +507,70 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         Assert.Equal(TopicResponseAction.Drop, action);
     }
 
+    [Theory]
+    [InlineData(null, "test.progress", null)]
+    [InlineData(".dead-letter", "test.progress", "test.progress.dead-letter")]
+    [InlineData(".dead-letter", "test.progress.dead-letter", null)]
+    public async Task MessageHandler_WhenBusinessRejected_ShouldDropAndAllowNextDelivery(
+        string? suffix, string topicName, string? expectedDeadLetterTopic)
+    {
+        var failure = new BusinessException("Required matching time is missing.");
+        var handledValues = new List<string>();
+        using var fixture = await CreateFixtureAsync(
+            (message, _) =>
+            {
+                handledValues.Add(message.Value);
+                return message.Value == "rejected" ? Task.FromException(failure) : Task.CompletedTask;
+            },
+            configureOptions: options => options.DeadLetterTopicSuffix = suffix,
+            topicName: topicName);
+
+        var rejected = await fixture.HandleAsync("{\"value\":\"rejected\"}", TestContext.Current.CancellationToken);
+        var accepted = await fixture.HandleAsync("{\"value\":\"accepted\"}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(TopicResponseAction.Drop, rejected);
+        Assert.Equal(TopicResponseAction.Success, accepted);
+        Assert.Equal(expectedDeadLetterTopic, fixture.Client.Options.DeadLetterTopic);
+        Assert.Equal(["rejected", "rejected", "accepted"], handledValues);
+        var status = fixture.TopicStatusStore.Get(null, topicName)!;
+        Assert.Equal(1, status.MessageErrorCount);
+        Assert.Equal(1, status.ProcessedMessages);
+        Assert.Contains(failure.Message, status.LastErrorException);
+        Assert.Contains(fixture.Logger.Entries, entry => entry.Level == LogLevel.Error
+            && ReferenceEquals(entry.Exception, failure)
+            && entry.Message.Contains("returning Drop", StringComparison.Ordinal)
+            && entry.Message.Contains("message-1", StringComparison.Ordinal)
+            && entry.Message.Contains(topicName, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("{not-json")]
+    [InlineData("null")]
+    public async Task MessageHandler_WhenMalformedWithDeadLetterTopic_ShouldDropWithoutInvokingHandler(string json)
+    {
+        using var fixture = await CreateFixtureAsync(
+            (_, _) => throw new InvalidOperationException("Malformed messages must not invoke a handler."),
+            configureOptions: options => options.DeadLetterTopicSuffix = ".dead-letter");
+
+        var action = await fixture.HandleAsync(json, TestContext.Current.CancellationToken);
+
+        Assert.Equal(TopicResponseAction.Drop, action);
+        Assert.Equal("test.progress.dead-letter", fixture.Client.Options.DeadLetterTopic);
+    }
+
     [Fact]
-    public async Task MessageHandler_WhenEventHandlerFails_ReturnsRetry()
+    public async Task MessageHandler_WhenBusinessFailureIsWrappedInUnexpectedFailure_ShouldDropAfterRetries()
+    {
+        using var fixture = await CreateFixtureAsync((_, _) => Task.FromException(
+            new InvalidOperationException("Operation failed.", new BusinessException("Rejected."))));
+
+        var action = await fixture.HandleAsync("{\"value\":\"retry\"}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(TopicResponseAction.Drop, action);
+    }
+
+    [Fact]
+    public async Task MessageHandler_WhenEventHandlerFails_ShouldDropAfterRetries()
     {
         using var fixture = await CreateFixtureAsync(
             (_, _) => Task.FromException(new InvalidOperationException("SignalR unavailable.")));
@@ -390,11 +579,11 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             "{\"value\":\"retry\"}",
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(TopicResponseAction.Retry, action);
+        Assert.Equal(TopicResponseAction.Drop, action);
     }
 
     [Fact]
-    public async Task MessageHandler_WhenEventHandlerIsCancelled_ReturnsRetry()
+    public async Task MessageHandler_WhenEventHandlerIsCancelled_ShouldDropAfterRetries()
     {
         using var fixture = await CreateFixtureAsync(
             (_, _) => Task.FromCanceled(new CancellationToken(canceled: true)));
@@ -403,11 +592,11 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             "{\"value\":\"retry\"}",
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(TopicResponseAction.Retry, action);
+        Assert.Equal(TopicResponseAction.Drop, action);
     }
 
     [Fact]
-    public async Task MessageHandler_PropagatesDeadlineCancellationToTheEventHandler()
+    public async Task MessageHandler_WhenStreamStops_ShouldCancelHandlerWithoutDropping()
     {
         var receivedToken = new TaskCompletionSource<CancellationToken>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -423,13 +612,13 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         cancellation.Cancel();
         var action = await handlingTask.WaitAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(cancellation.Token, handlerToken);
+        Assert.True(handlerToken.IsCancellationRequested);
         Assert.Equal(TopicResponseAction.Retry, action);
         await fixture.HandlerDisposed.WaitAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task MessageHandler_WhenNonCooperativeHandlerExceedsDeadline_ReturnsRetryWithoutDisposingItsScope()
+    public async Task MessageHandler_WhenStreamStopsWithNonCooperativeHandler_ShouldRetainItsScope()
     {
         var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -454,7 +643,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
     }
 
     [Fact]
-    public async Task MessageHandler_ObservesFailureFromHandlerThatFaultsAfterDeadline()
+    public async Task MessageHandler_WhenHandlerFaultsAfterStreamStops_ShouldObserveItsFailure()
     {
         var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handlerCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -567,7 +756,9 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
     private static async Task<TestFixture> CreateFixtureAsync(
         Func<TestEvent, CancellationToken, Task> handler,
         int initialSubscriptionFailures = 0,
-        Action<ModuleDaprEventBusOption>? configureOptions = null)
+        Action<ModuleDaprEventBusOption>? configureOptions = null,
+        string topicName = "test.progress",
+        int retryCount = 1)
     {
         var registry = new EventSubscriptionRegistry(NullLogger<EventSubscriptionRegistry>.Instance);
         var serviceProvider = new ServiceCollection()
@@ -596,6 +787,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             topicStatusStore,
             Substitute.For<IHostApplicationLifetime>(),
             dispatcher,
+            new EventMessageRetryPolicy(Options.Create(new ModuleEventBusOption { MessageRetryCount = retryCount })),
             new ObservableInstanceRegistry(Options.Create(new ModuleObservableInstanceOption())),
             healthCoordinator,
             Options.Create(eventBusOptions),
@@ -609,7 +801,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         var subscription = await registry.SubscribeAsync(new EventSubscriptionDescriptor
         {
             EventType = typeof(TestEvent),
-            TopicName = "test.progress",
+            TopicName = topicName,
             HandlerFactory = new DelegateHandlerFactory(
                 handler,
                 serviceProvider.GetRequiredService<IServiceScopeFactory>(),
@@ -625,7 +817,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         await WaitUntilAsync(
             () => client.HasSubscription,
             TestContext.Current.CancellationToken);
-        return new TestFixture(serviceProvider, service, registry, client, logger, handlerDisposed.Task, topicStatusStore);
+        return new TestFixture(serviceProvider, service, registry, client, logger, handlerDisposed.Task, topicStatusStore, topicName);
     }
 
     private static DaprEventBusSubscriptionHostedService CreateUnstartedService(
@@ -647,6 +839,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             new TopicSubscriptionStatusStore(),
             Substitute.For<IHostApplicationLifetime>(),
             dispatcher,
+            new EventMessageRetryPolicy(Options.Create(new ModuleEventBusOption())),
             new ObservableInstanceRegistry(Options.Create(new ModuleObservableInstanceOption())),
             healthCoordinator,
             Options.Create(new ModuleDaprEventBusOption()),
@@ -672,7 +865,8 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
         CapturingDaprPublishSubscribeClient client,
         TestLogger<DaprEventBusSubscriptionHostedService> logger,
         Task handlerDisposed,
-        TopicSubscriptionStatusStore topicStatusStore) : IDisposable
+        TopicSubscriptionStatusStore topicStatusStore,
+        string topicName) : IDisposable
     {
         public TopicSubscriptionStatusStore TopicStatusStore { get; } = topicStatusStore;
 
@@ -692,7 +886,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
                 nameof(TestEvent),
                 "1.0",
                 "application/json",
-                "test.progress",
+                topicName,
                 "pubsub")
             {
                 Data = Encoding.UTF8.GetBytes(json)
@@ -710,13 +904,15 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             return service.StopAsync(cancellationToken);
         }
 
-        public async Task<IEventSubscription> AddSubscriptionAsync(string topicName)
+        public async Task<IEventSubscription> AddSubscriptionAsync(string topicName, bool batch = false, string? owner = null)
         {
             var subscription = await registry.SubscribeAsync(new EventSubscriptionDescriptor
             {
                 EventType = typeof(TestEvent),
                 TopicName = topicName,
-                HandlerFactory = new DelegateHandlerFactory(
+                WorkloadOwner = owner,
+                HandlerFactory = batch ? new IocEventHandlerFactory(
+                    serviceProvider.GetRequiredService<IServiceScopeFactory>(), typeof(UnsupportedBatchHandler)) : new DelegateHandlerFactory(
                     (_, _) => Task.CompletedTask,
                     serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                     () => { }),
@@ -908,6 +1104,8 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
 
         public ConcurrentQueue<TimeSpan> RecoveryDelays { get; } = new();
 
+        public ConcurrentQueue<(LogLevel Level, Exception? Exception, string Message)> Entries { get; } = new();
+
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull
         {
@@ -927,6 +1125,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             Func<TState, Exception?, string> formatter)
         {
             var message = formatter(state, exception);
+            Entries.Enqueue((logLevel, exception, message));
             if (state is IEnumerable<KeyValuePair<string, object?>> properties)
             {
                 var delay = properties.FirstOrDefault(property => property.Key == "Delay").Value;
@@ -938,7 +1137,7 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
 
             if (exception is not null
                 && message.Contains(
-                    "faulted after the callback returned Retry",
+                    "faulted after its attempt ended",
                     StringComparison.Ordinal))
             {
                 _lateFailureObserved.TrySetResult(exception);

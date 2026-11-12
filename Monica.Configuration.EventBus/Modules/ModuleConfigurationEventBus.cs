@@ -6,6 +6,8 @@ using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.EventBus.Abstractions;
+using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.TypeDiscovery.Models;
 using Monica.Modules;
 
 namespace Monica.Configuration.EventBus.Modules;
@@ -20,7 +22,17 @@ public sealed class ModuleConfigurationEventBus : MonicaModule<ModuleConfigurati
     {
         var services = context.Services;
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigurationChangeNotifier, ConfigurationEventBusChangeNotifier>());
-        services.AddHostedService<ConfigurationEventBusSubscriptionHostedService>();
+        if (Application.Application.AutonomousWork)
+            services.AddHostedService<ConfigurationEventBusSubscriptionHostedService>();
+        Application.RecordActivation(new ResourceActivation
+        {
+            Key = "configuration:eventbus-subscription",
+            ImplementationType = typeof(ConfigurationEventBusSubscriptionHostedService),
+            Kind = TypeActivationKind.ExternalSubscription,
+            Mode = Application.Application.AutonomousWork ? ActivationMode.Automatic : ActivationMode.Manual,
+            Reason = Application.Application.AutonomousWork ? "Configuration reload notifications are subscribed automatically."
+                : "Automatic configuration reload subscriptions are disabled; explicit edits may publish invalidation metadata."
+        });
     }
 
     /// <inheritdoc />

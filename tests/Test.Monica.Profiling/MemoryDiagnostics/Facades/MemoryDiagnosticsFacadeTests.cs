@@ -38,12 +38,12 @@ public sealed class MemoryDiagnosticsFacadeTests
 
         var direct = await facade.TriggerGcDumpAsync(explicitPath);
 
-        direct.Status.Should().Be(ResStatus.Ok);
+        direct.Status.Should().Be(ResultStatus.Ok);
         direct.Data.Should().Be(explicitPath);
         direct.Message.Should().BeNullOrEmpty();
         await using var state = scope.Resolve<MemoryAnalysisPageStateFactory>().Create(autoRefresh: false);
         var pageResult = await state.CreateGcDumpAsync();
-        pageResult.Status.Should().Be(ResStatus.Ok);
+        pageResult.Status.Should().Be(ResultStatus.Ok);
         pageResult.Data.Should().Be(defaultPath);
         var action = state.LastAction!;
         action.IsSuccessful.Should().BeTrue();
@@ -54,7 +54,7 @@ public sealed class MemoryDiagnosticsFacadeTests
 
         failCreation = true;
         var failure = await facade.TriggerGcDumpAsync(explicitPath);
-        failure.Status.Should().Be(ResStatus.BadRequest);
+        failure.Status.Should().Be(ResultStatus.BadRequest);
         failure.Data.Should().BeNull();
         failure.Message.Should().Contain("Controlled dump creation failed.");
     }

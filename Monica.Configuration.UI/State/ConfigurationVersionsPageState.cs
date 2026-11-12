@@ -17,8 +17,8 @@ namespace Monica.Configuration.UI.State;
 /// </remarks>
 internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
 {
-    private readonly Func<Task<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>> _loadVersions;
-    private readonly Func<long, long, Task<Res<ConfigurationUnifiedVersionComparison>>> _compareVersions;
+    private readonly Func<Task<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>> _loadVersions;
+    private readonly Func<long, long, Task<Result<ConfigurationUnifiedVersionComparison>>> _compareVersions;
     private readonly Action<string> _reportError;
     private readonly IStringLocalizer<ConfigurationUIResource> _localizer;
     private readonly string _loadFailedText;
@@ -35,8 +35,8 @@ internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
             message => snackbar.Add(message, Severity.Error), localizer) { }
 
     internal ConfigurationVersionsPageState(
-        Func<Task<Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>> loadVersions,
-        Func<long, long, Task<Res<ConfigurationUnifiedVersionComparison>>> compareVersions,
+        Func<Task<Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>>>> loadVersions,
+        Func<long, long, Task<Result<ConfigurationUnifiedVersionComparison>>> compareVersions,
         Action<string> reportError, IStringLocalizer<ConfigurationUIResource> localizer)
     {
         _loadVersions = loadVersions;
@@ -104,9 +104,10 @@ internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
             ErrorText = null;
             _comparisonCache.Clear();
         });
-        Res<IReadOnlyList<ConfigurationUnifiedVersionSummary>> result;
+        Result<IReadOnlyList<ConfigurationUnifiedVersionSummary>> result;
         try { result = await _loadVersions(); }
-        catch (Exception exception) { result = Res.Fail(exception.Message); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception) { result = Result.Failure<IReadOnlyList<ConfigurationUnifiedVersionSummary>>(exception.Message); }
 
         string? failure = null;
         long? origin = null;
@@ -116,9 +117,11 @@ internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
         {
             if (requestId != _loadRequestId) return;
             Loading = false;
-            if (result.IsFailed(out var error, out var versions))
+            var error = result;
+            var versions = result.Data;
+            if (result.IsFailure() || versions is null)
             {
-                failure = ErrorText = error.Message ?? _loadFailedText;
+                failure = ErrorText = string.IsNullOrWhiteSpace(error.Message) ? _loadFailedText : error.Message;
                 _versions = [];
                 HasLoadedVersions = false;
                 ResetSelection();
@@ -205,17 +208,20 @@ internal sealed class ConfigurationVersionsPageState : IAsyncDisposable
         ReportFailure(failure);
         if (!needsLoad) return;
 
-        Res<ConfigurationUnifiedVersionComparison> result;
+        Result<ConfigurationUnifiedVersionComparison> result;
         try { result = await _compareVersions(originVersion, targetVersion); }
-        catch (Exception exception) { result = Res.Fail(exception.Message); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception) { result = Result.Failure<ConfigurationUnifiedVersionComparison>(exception.Message); }
         failure = null;
         _lifetime.TryApply(() =>
         {
             if (requestId != _comparisonRequestId) return;
             ComparisonLoading = false;
-            if (result.IsFailed(out var error, out var comparison))
+            var error = result;
+            var comparison = result.Data;
+            if (result.IsFailure() || comparison is null)
             {
-                failure = ComparisonError = error.Message ?? _loadFailedText;
+                failure = ComparisonError = string.IsNullOrWhiteSpace(error.Message) ? _loadFailedText : error.Message;
                 return;
             }
             _comparisonCache[key] = comparison;

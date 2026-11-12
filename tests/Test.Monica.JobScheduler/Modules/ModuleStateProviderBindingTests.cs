@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
+using Monica.Locker.Leases;
 using Monica.StateStore.Abstractions;
 using Monica.StateStore.Cancellation.Abstractions;
 using Monica.StateStore.Cancellation.Services;
@@ -55,10 +56,13 @@ public sealed class ModuleStateProviderBindingTests
         builder.AddMonica(monica =>
         {
             monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
-            monica.AddStateStore().AddKeyedCommonStateStore(externalKey);
+            monica.AddStateStore().AddKeyedCommonStateStore(externalKey)
+                .ConfigureServices(context => context.Services.AddKeyedSingleton<IExclusiveLeaseStore>(externalKey,
+                    new InMemoryLeaseStore(TimeProvider.System)));
             monica.AddServiceDiscovery()
                 .AsRegistry()
-                .UseExternalKeyedStorage(externalKey);
+                .UseExternalKeyedStorage(externalKey)
+                .UseLeaderLeaseStore(externalKey, "test-discovery");
         });
 
         await using var host = builder.Build();

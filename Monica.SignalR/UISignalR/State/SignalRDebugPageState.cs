@@ -227,7 +227,8 @@ public sealed class SignalRDebugPageState(
             {
                 return false;
             }
-            if (result.IsFailed(out _, out var hubInfos) || hubInfos is null)
+            var hubInfos = result.Data;
+            if (result.IsFailure() || hubInfos is null)
             {
                 HubsLoadFailed = true;
                 return false;
@@ -274,7 +275,8 @@ public sealed class SignalRDebugPageState(
             {
                 return false;
             }
-            if (result.IsFailed(out _, out var users) || users is null)
+            var users = result.Data;
+            if (result.IsFailure() || users is null)
             {
                 ConnectedUsersLoadFailed = true;
                 return false;
@@ -314,7 +316,8 @@ public sealed class SignalRDebugPageState(
             {
                 return false;
             }
-            if (result.IsFailed(out _, out var snapshot) || snapshot is null)
+            var snapshot = result.Data;
+            if (result.IsFailure() || snapshot is null)
             {
                 SendDiagnosticsLoadFailed = true;
                 return false;

@@ -6,10 +6,10 @@ internal static class DiagnosticDescriptors
 {
     private const string CATEGORY = "RequestOwnedWebApi";
 
-    public static readonly DiagnosticDescriptor MissingEndpoint = Create(
-        "AC1001",
-        "Application request has no endpoint contract",
-        "ApplicationService request '{0}' must declare [ApiEndpoint].");
+    public static readonly DiagnosticDescriptor InvalidRequestIntent = Create(
+        "AC1028",
+        "Endpoint request intent is missing or inconsistent",
+        "Endpoint request '{0}' must declare exactly one Query or Command contract matching its name. Use IQuery<T>/ICommand<T>/ICommand, or IQueryRequest/ICommandRequest with a custom IRequest<TResult>.");
 
     public static readonly DiagnosticDescriptor LegacyHandlerAttribute = Create(
         "AC1002",
@@ -49,12 +49,12 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor DuplicateRoute = Create(
         "AC1009",
         "Duplicate endpoint route",
-        "HTTP {0} route '{1}' is declared by multiple ApplicationService requests: {2}.");
+        "HTTP {0} route '{1}' is declared by multiple ApplicationRequestHandler requests: {2}.");
 
     public static readonly DiagnosticDescriptor DuplicateOperation = Create(
         "AC1010",
-        "Duplicate RPC operation",
-        "RPC operation '{0}' is declared more than once in domain '{1}' {2} API: {3}.");
+        "Duplicate API operation",
+        "API operation '{0}' is declared more than once in domain '{1}' {2} API: {3}.");
 
     public static readonly DiagnosticDescriptor InvalidRoute = Create(
         "AC1011",
@@ -69,7 +69,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor UnsupportedPublishedBinding = Create(
         "AC1013",
         "Published endpoint binding is not supported",
-        "Published RPC request '{0}' cannot use {1} binding. Move transport-specific endpoints beside their handlers as local HTTP contracts.");
+        "Published API request '{0}' cannot use {1} binding. Move transport-specific endpoints beside their handlers as local HTTP contracts.");
 
     public static readonly DiagnosticDescriptor MissingSummary = Create(
         "AC1014",
@@ -79,27 +79,67 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor UnsupportedPublishedResult = Create(
         "AC1015",
         "Published endpoint result is not supported",
-        "Published RPC request '{0}' returns raw object. Move download or transport-specific endpoints beside their handlers as local HTTP contracts.");
+        "Published API request '{0}' returns raw object. Move download or transport-specific endpoints beside their handlers as local HTTP contracts.");
 
     public static readonly DiagnosticDescriptor InvalidOperationName = Create(
         "AC1016",
-        "Invalid RPC operation name",
-        "Endpoint request '{0}' resolves to invalid RPC operation name '{1}'. Use a valid C# identifier in OperationName.");
+        "Invalid API operation name",
+        "Endpoint request '{0}' resolves to invalid API operation name '{1}'. Rename the request so the suffix after Command or Query is a valid C# identifier.");
 
     public static readonly DiagnosticDescriptor InvalidPublishedResultEnvelope = Create(
         "AC1017",
         "Published endpoint result envelope is invalid",
-        "Published RPC request '{0}' returns '{1}', which must be a concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
+        "Published API request '{0}' returns '{1}', which must be a non-nullable, concrete reference type implementing IRemoteResultEnvelope<TSelf> for its own type.");
 
     public static readonly DiagnosticDescriptor UnbindableRouteProperty = Create(
         "AC1018",
         "Route property cannot receive the route value",
         "Route placeholder '{{{0}}}' matches property '{1}' on request '{2}', but the property must expose a public setter/init accessor or belong to the request record constructor.");
 
+    public static readonly DiagnosticDescriptor InvalidReceiverOwnership = Create(
+        "AC1020",
+        "Invalid receiver ownership",
+        "Selected handler assembly '{0}' contains no concrete ApplicationRequestHandler with an ApiEndpoint request. Select an implementation assembly, not a protocol assembly.");
+
     public static readonly DiagnosticDescriptor GenerationFailure = Create(
         "AC1099",
         "Request-owned API generation failed",
         "Request-owned API generation failed: {0}");
+
+    public static readonly DiagnosticDescriptor InvalidApplicationDeclaration = Create(
+        "AC1021",
+        "Invalid application declaration",
+        "Application ownership declaration for assembly '{0}' is invalid: {1}");
+
+    public static readonly DiagnosticDescriptor DuplicateApplicationHandler = Create(
+        "AC1022",
+        "Application request has multiple handlers",
+        "Application request '{0}' has multiple handler implementations: {1}.");
+
+    public static readonly DiagnosticDescriptor MissingApplicationOwnership = Create(
+        "AC1023",
+        "Application handler has no role owner",
+        "Published application handler '{0}' must belong to an assembly declaring ApplicationRole.");
+
+    public static readonly DiagnosticDescriptor UndefinedApplicationDomain = Create(
+        "AC1024",
+        "Application role refers to an undefined domain",
+        "Application role '{0}' declares domain '{1}', but no referenced assembly declares that ApplicationDomain.");
+
+    public static readonly DiagnosticDescriptor ConflictingExecutionRole = Create(
+        "AC1025",
+        "Application operation requires a different role",
+        "Application request '{0}' requires role '{1}', but its handler belongs to role '{2}'.");
+
+    public static readonly DiagnosticDescriptor MissingApplicationOperation = Create(
+        "AC1026",
+        "Application API operation has no owned handler",
+        "Published application request '{0}' belongs to a generated API but has no handler in a declared role assembly.");
+
+    public static readonly DiagnosticDescriptor InvalidApplicationCatalog = Create(
+        "AC1027",
+        "Invalid application ownership catalog",
+        "Application catalog is invalid: {0}");
 
     public static readonly DiagnosticDescriptor DeleteQueryBindingUnfit = Create(
         "AC1019",

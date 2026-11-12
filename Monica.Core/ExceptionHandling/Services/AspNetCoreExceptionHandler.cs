@@ -28,7 +28,7 @@ public class AspNetCoreExceptionHandler(IExceptionHandlerService handler) : IExc
 
     protected async ValueTask<bool> WriteResponseAsync(
         HttpContext httpContext,
-        Res response,
+        Result response,
         Exception originalException,
         CancellationToken cancellationToken)
     {
@@ -58,9 +58,9 @@ public class AspNetCoreExceptionHandler(IExceptionHandlerService handler) : IExc
             httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             httpContext.Response.ContentType = "application/json; charset=utf-8";
 
-            var fallbackResponse = Res.Fail(
+            var fallbackResponse = Result.Failure(
                 "An unexpected server error occurred.",
-                ResStatus.InternalError).SetError(new ResultError(ResultErrorCodes.UnexpectedError, ResultTraceId.Capture(httpContext)));
+                ResultStatus.InternalError).SetError(new ResultError(ResultErrorCodes.UnexpectedError, ResultTraceId.Capture(httpContext)));
 
             var fallback = JsonSerializer.Serialize(fallbackResponse, serializerOptions);
 

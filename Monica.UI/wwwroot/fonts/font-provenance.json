@@ -6,7 +6,7 @@
     "fonttools": "4.64.0",
     "brotli": "1.1.0"
   },
-  "scope": "Four shared active families. Other runtime fonts and legacy files are unchanged.",
+  "scope": "Shared runtime families with provenance recorded during adoption; other legacy files are unchanged.",
   "recipe": "TTFont(recalcTimestamp=False); WOFF2 full conversion; Playfair identity rename only; retain source timestamps, outlines, cmap, variation data, metrics and license records.",
   "fonts": [
     {
@@ -192,6 +192,24 @@
         "copyright_license_records_unchanged": true,
         "reserved_name_removed_from_identity_records": false
       }
+    },
+    {
+      "family": "Geist",
+      "file": "Geist-Variable.woff2",
+      "css_aliases": [
+        "MoPrecision"
+      ],
+      "source": {
+        "origin": "Accepted Precision v3 prototype",
+        "source_path": ".ui-design/precision-v3/assets/fonts/Geist-Variable.woff2",
+        "sha256": "28258d0621216948416a859d32487ab6ad1c9effa0d08795698e70be3c917630",
+        "bytes": 56800
+      },
+      "license": {
+        "file": "licenses/Geist-OFL.txt"
+      },
+      "conversion": "Vendored unchanged from the accepted prototype; complete variable WOFF2.",
+      "css_stretch": "normal"
     }
   ]
 }

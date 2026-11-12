@@ -8,8 +8,8 @@ namespace Monica.Core.ExceptionHandling.Exceptions;
 /// Use this to separate the message shown to end users from the technical detail used for diagnostics.
 /// </summary>
 /// <remarks>
-/// <para><see cref="DisplayMessage"/> is written to <c>Res.Message</c> for UI display.</para>
-/// <para><see cref="TechnicalDetail"/> is written to <c>Res.Metadata["detail"]</c> for diagnostics.</para>
+/// <para><see cref="DisplayMessage"/> is written to <c>Result.Message</c> for UI display.</para>
+/// <para><see cref="TechnicalDetail"/> is written to <c>Result.Metadata["detail"]</c> for diagnostics.</para>
 /// </remarks>
 public abstract class DisplayMessageException : Exception
 {
@@ -25,9 +25,9 @@ public abstract class DisplayMessageException : Exception
 
     /// <summary>
     /// Gets the result status returned to the client.
-    /// Derived types can override the default <see cref="ResStatus.BadRequest"/>.
+    /// Derived types can override the default <see cref="ResultStatus.BadRequest"/>.
     /// </summary>
-    public virtual ResStatus ResultStatus => ResStatus.BadRequest;
+    public virtual ResultStatus ResultStatus => ResultStatus.BadRequest;
 
     /// <summary>
     /// Initializes a new exception with a user-facing message and optional technical detail.

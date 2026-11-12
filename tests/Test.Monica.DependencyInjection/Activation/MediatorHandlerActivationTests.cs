@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Monica.Core.Mediator;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
+using Monica.Application.Abstractions;
 using Monica.WebApi.Abstractions;
 using Xunit;
 
@@ -14,7 +15,7 @@ public sealed class MediatorHandlerActivationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Send_WhenApplicationServiceUsesMapper_ShouldUseMonicaActivation(
+    public async Task Send_WhenApplicationRequestHandlerUsesMapper_ShouldUseMonicaActivation(
         bool registerMediatorFirst)
     {
         var builder = Host.CreateApplicationBuilder();
@@ -49,7 +50,7 @@ public sealed class MediatorHandlerActivationTests
 
     private sealed record MappingRequest(string Value) : IRequest<string>;
 
-    private sealed class MappingHandler : CustomApplicationService<MappingRequest, string>
+    private sealed class MappingHandler : ApplicationRequestHandler<MappingRequest, string>
     {
         public override Task<string> Handle(
             MappingRequest request,

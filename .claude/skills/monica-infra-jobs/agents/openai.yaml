@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Jobs"
-  short_description: "Job scheduling and startup seeders"
-  default_prompt: "Use $monica-infra-jobs to add a Monica background job or startup seeder."

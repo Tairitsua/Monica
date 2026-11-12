@@ -15,7 +15,7 @@ internal enum MemoryReadStage { Snapshot, GcDetails, Trend }
 internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memoryFacade, RuntimeMetricsFacade runtimeFacade)
 {
     private readonly object _sync = new();
-    private readonly Dictionary<MemoryReadStage, Res> _failures = [];
+    private readonly Dictionary<MemoryReadStage, Result> _failures = [];
     private readonly Dictionary<MemoryReadStage, MemoryBoundaryGate> _gates = [];
     private MemoryBoundaryGate? _actionGate;
     private int _activeReads;
@@ -28,14 +28,14 @@ internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memo
     public int GcActions { get; private set; }
     public int DumpActions { get; private set; }
     public int? RequestedGeneration { get; private set; }
-    public Res GcResult { get; set; } = Res.Ok();
-    public Res<string> DumpResult { get; set; } = Res.Ok<string>("server/provider-result.gcdump");
+    public Result GcResult { get; set; } = Result.Success();
+    public Result<string> DumpResult { get; set; } = Result.Success<string>("server/provider-result.gcdump");
 
-    public Res Fail(MemoryReadStage stage, string? message, ResStatus status = ResStatus.ServiceUnavailable)
+    public Result Fail(MemoryReadStage stage, string? message, ResultStatus status = ResultStatus.ServiceUnavailable)
     {
         lock (_sync)
         {
-            return _failures[stage] = new Res { Message = message, Status = status };
+            return _failures[stage] = new Result { Message = message, Status = status };
         }
     }
 
@@ -63,28 +63,28 @@ internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memo
         }
     }
 
-    public Res<MemorySnapshot> ReadSnapshot() => Read(MemoryReadStage.Snapshot, () =>
+    public Result<MemorySnapshot> ReadSnapshot() => Read(MemoryReadStage.Snapshot, () =>
     {
         var genuine = memoryFacade.GetCurrentSnapshot();
         LastGenuineSnapshot = genuine.Data;
         return genuine;
     });
 
-    public Res<GcDetails> ReadGcDetails() => Read(MemoryReadStage.GcDetails, () =>
+    public Result<GcDetails> ReadGcDetails() => Read(MemoryReadStage.GcDetails, () =>
     {
         var genuine = memoryFacade.GetGcDetails();
         LastGenuineGcDetails = genuine.Data;
         return genuine;
     });
 
-    public Res<RuntimeMetricsTrend> ReadTrend() => Read(MemoryReadStage.Trend, () =>
+    public Result<RuntimeMetricsTrend> ReadTrend() => Read(MemoryReadStage.Trend, () =>
     {
         var genuine = runtimeFacade.GetTrend();
         LastGenuineTrend = genuine.Data;
         return genuine;
     });
 
-    public Res ForceGarbageCollection(int generation)
+    public Result ForceGarbageCollection(int generation)
     {
         MemoryBoundaryGate? gate;
         lock (_sync)
@@ -97,7 +97,7 @@ internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memo
         return GcResult;
     }
 
-    public async Task<Res<string>> CreateGcDumpAsync()
+    public async Task<Result<string>> CreateGcDumpAsync()
     {
         MemoryBoundaryGate? gate;
         lock (_sync)
@@ -116,10 +116,10 @@ internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memo
         return gate;
     }
 
-    private Res<T> Read<T>(MemoryReadStage stage, Func<Res<T>> query)
+    private Result<T> Read<T>(MemoryReadStage stage, Func<Result<T>> query)
     {
         MemoryBoundaryGate? gate;
-        Res? failure;
+        Result? failure;
         lock (_sync)
         {
             ReadOrder.Add(stage);
@@ -132,7 +132,7 @@ internal sealed class MemoryAnalysisBoundaryControl(MemoryDiagnosticsFacade memo
         {
             var genuine = query();
             gate?.WaitForRelease();
-            return failure is null ? genuine : new Res<T> { Status = failure.Status, Message = failure.Message, Metadata = failure.Metadata };
+            return failure is null ? genuine : new Result<T> { Status = failure.Status, Message = failure.Message, Metadata = failure.Metadata };
         }
         finally
         {

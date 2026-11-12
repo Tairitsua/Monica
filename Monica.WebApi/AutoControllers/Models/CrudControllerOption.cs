@@ -8,6 +8,11 @@ public class CrudControllerOption
     /// <summary>
     /// Route prefix used for auto-generated CRUD endpoints.
     /// </summary>
+    /// <remarks>
+    /// Defaults to <c>api/v1/[controller]</c>. With AddApplicationModel, <c>{domain}</c> expands to each
+    /// concrete controller's owning domain. For example, <c>api/v1/{domain}</c> yields a distinct prefix per
+    /// domain in a complete application host. An explicit controller Route attribute overrides this prefix.
+    /// </remarks>
     public string RoutePath { get; set; } = "api/v1/[controller]";
     /// <summary>
     /// Class-name suffix stripped from a CRUD application service when deriving its controller (route) name.
@@ -16,7 +21,7 @@ public class CrudControllerOption
     /// This is purely a route-naming aid: a service such as <c>AircraftAppService</c> becomes the controller
     /// <c>Aircraft</c> and the route segment <c>aircraft</c>. It does not gate controller registration (that is decided
     /// by the <c>ICrudApplicationService</c> marker interface) and is not a naming-convention rule; name-convention
-    /// enforcement lives in the project-unit system (<c>Monica.ProjectUnits</c>). If a service name does not end with this
+    /// enforcement lives in the building-block system (<c>Monica.BuildingBlocks</c>). If a service name does not end with this
     /// suffix, the name is simply left unchanged.
     /// </remarks>
     public string CrudControllerPostfix { get; set; } = "CrudService";

@@ -1,222 +1,56 @@
 @using System.Globalization
-@using Monica.JobScheduler.UI.Localization
-
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
-
-@{
-    var series = TrendSeries;
-    var scale = CreateScale();
-}
-
-<section class="analytics-trend" aria-labelledby="@_headingId">
-    <header class="analytics-trend__heading">
-        <div>
-            <h2 id="@_headingId">@L["Analytics:Trend:Title"]</h2>
-            <p>@L["Analytics:Trend:Description"]</p>
-            <p class="analytics-trend__bucket-kind">@BucketKind</p>
-            @if (Snapshot.Trend.LastOrDefault() is { } lastBucket && IsPartial(lastBucket))
-            {
-                <span class="analytics-trend__partial">@L["Analytics:Trend:PartialBucket"]</span>
-            }
-        </div>
-        <div class="analytics-trend__modes" role="group" aria-label="@L["Analytics:Trend:ViewAriaLabel"]">
-            <MudButton Variant="Variant.Text" Size="Size.Small" Class="@GetModeClass(ChartMode.Bars)"
-                       StartIcon="@MoIcons.ChartColumn" aria-pressed="@IsPressed(ChartMode.Bars)"
-                       OnClick="@(() => _mode = ChartMode.Bars)">@L["Analytics:Trend:Bars"]</MudButton>
-            <MudButton Variant="Variant.Text" Size="Size.Small" Class="@GetModeClass(ChartMode.Lines)"
-                       StartIcon="@MoIcons.ChartLine" aria-pressed="@IsPressed(ChartMode.Lines)"
-                       OnClick="@(() => _mode = ChartMode.Lines)">@L["Analytics:Trend:Lines"]</MudButton>
-        </div>
-    </header>
-
-    <dl class="analytics-trend__legend" aria-label="@L["Analytics:Trend:LegendAriaLabel"]">
-        @foreach (var item in series)
+<section class="an-trend" aria-labelledby="an-trend-title">
+    <header class="an-sectionhead"><div><h2 id="an-trend-title">@L["Analytics:Trend:Title"]</h2><p>@L["Analytics:Trend:Description"]</p></div><span>@L[Snapshot.BucketSize == JobExecutionAnalyticsBucketSize.Hour ? "Analytics:Trend:HourBuckets" : "Analytics:Trend:DayBuckets"]</span></header>
+    <div class="an-lanes" @key="_marks">@foreach(var state in States)
+    {
+        var lane = Array.IndexOf(States, state);
+        var peak=Snapshot.Trend.Select(bucket=>Count(bucket,state)).DefaultIfEmpty(0).Max();
+        <div class="an-lane" data-state="@state"><div class="an-lane-name"><span><i></i>@L[$"ExecutionStates:{state}"]</span><small>@L["Workspace:PeakValue",peak]</small></div><div class="an-bars" style="@($"--buckets:{Math.Max(1,Snapshot.Trend.Count)}")">@for(var index=0;index<Snapshot.Trend.Count;index++)
         {
-            <div data-state="@item.State">
-                <dt><span class="analytics-trend__mark" aria-hidden="true"></span>@item.Label</dt>
-                <dd>@Snapshot.Trend.Sum(item.GetValue).ToString("N0", CultureInfo.CurrentCulture)</dd>
-            </div>
-        }
-    </dl>
-
-    @if (Snapshot.CompletedTerminalCount == 0)
-    {
-        <div class="analytics-trend__empty">
-            <MoIcon Icon="@MoIcons.ChartColumn" Size="1.5rem" />
-            <p>@L["Analytics:Trend:NoCompletions"]</p>
-        </div>
-    }
-    else
-    {
-        <div class="analytics-trend__plot" role="img"
-             aria-label="@L["Analytics:Trend:ChartWindowLabel", L["Analytics:Trend:Unit"], TimePresentation.FormatTimestamp(Snapshot.StartTimeUtc), TimePresentation.FormatTimestamp(Snapshot.EndTimeUtc), BucketKind]">
-            <span class="analytics-trend__unit">@L["Analytics:Trend:Unit"]</span>
-            <div class="analytics-trend__graph">
-                <div class="analytics-trend__y-axis" aria-hidden="true">
-                    <span class="analytics-trend__scale-measure">@FormatTick(scale.Maximum)</span>
-                    @foreach (var tick in scale.Ticks)
-                    {
-                        <span class="analytics-trend__y-tick" style="@GetTickPosition(tick, scale.Maximum)">@FormatTick(tick)</span>
-                    }
-                </div>
-                <div class="analytics-trend__drawing" aria-hidden="true">
-                    <svg class="analytics-trend__svg" viewBox="0 0 1000 240" preserveAspectRatio="none" focusable="false">
-                        @foreach (var tick in scale.Ticks)
-                        {
-                            <line class="analytics-trend__grid" x1="0" x2="1000" y1="@GetY(tick, scale.Maximum)" y2="@GetY(tick, scale.Maximum)" />
-                        }
-                        @if (_mode == ChartMode.Bars)
-                        {
-                            @for (var bucketIndex = 0; bucketIndex < Snapshot.Trend.Count; bucketIndex++)
-                            {
-                                var bucket = Snapshot.Trend[bucketIndex];
-                                @for (var seriesIndex = 0; seriesIndex < series.Count; seriesIndex++)
-                                {
-                                    var item = series[seriesIndex];
-                                    var value = item.GetValue(bucket);
-                                    <rect class="analytics-trend__bar" data-state="@item.State"
-                                          x="@GetBarX(bucketIndex, seriesIndex)" y="@GetY(value, scale.Maximum)"
-                                          width="@SvgNumber(GetBarWidth())" height="@SvgNumber(value / scale.Maximum * PLOT_HEIGHT)" rx="1">
-                                        <title>@GetBucketTitle(bucket, item)</title>
-                                    </rect>
-                                }
-                            }
-                        }
-                        else
-                        {
-                            @foreach (var item in series)
-                            {
-                                <polyline class="analytics-trend__line" data-state="@item.State" points="@GetPoints(item, scale.Maximum)" />
-                                @for (var bucketIndex = 0; bucketIndex < Snapshot.Trend.Count; bucketIndex++)
-                                {
-                                    var bucket = Snapshot.Trend[bucketIndex];
-                                    <circle class="analytics-trend__point" data-state="@item.State"
-                                            cx="@SvgNumber(GetPointX(bucketIndex))" cy="@GetY(item.GetValue(bucket), scale.Maximum)" r="3">
-                                        <title>@GetBucketTitle(bucket, item)</title>
-                                    </circle>
-                                }
-                            }
-                        }
-                    </svg>
-                    <div class="analytics-trend__x-axis">
-                        @foreach (var label in GetAxisLabels())
-                        {
-                            <time class="@label.CssClass" style="@label.Position"
-                                  datetime="@Snapshot.Trend[label.Index].StartTimeUtc.ToString("O")"
-                                  title="@TimePresentation.FormatTimestamp(Snapshot.Trend[label.Index].StartTimeUtc)">
-                                @TimePresentation.FormatBucketLabel(Snapshot.Trend[label.Index].StartTimeUtc, Snapshot.BucketSize)
-                            </time>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-
-    <div class="analytics-trend__data">
-        <MudExpansionPanels Elevation="0" Dense="true">
-            <MudExpansionPanel Text="@L["Analytics:Trend:ViewData"]" Icon="@MoIcons.ChevronDown">
-                <p class="analytics-trend__bounds">@L["Analytics:Window:Bounds"]</p>
-                <div class="analytics-trend__table" role="region" aria-label="@L["Analytics:Trend:DataAriaLabel"]">
-                    <MudTable T="JobExecutionAnalyticsBucket" Items="@Snapshot.Trend" Dense="true" Hover="true"
-                              Breakpoint="Breakpoint.None" Elevation="0">
-                        <ColGroup><col class="analytics-trend__interval-column" /><col /><col /><col /><col /></ColGroup>
-                        <HeaderContent>
-                            <MudTh>@L["Analytics:Trend:Interval"]</MudTh>
-                            @foreach (var item in series)
-                            {
-                                <MudTh>@item.Label</MudTh>
-                            }
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="@L["Analytics:Trend:Interval"]" Class="analytics-trend__interval-cell">
-                                <div class="analytics-trend__interval" data-start="@context.StartTimeUtc.ToString("O")" data-end="@context.EndTimeUtc.ToString("O")">
-                                    <span class="analytics-trend__range">@TimePresentation.FormatRange(context.StartTimeUtc, context.EndTimeUtc)</span>
-                                    @if (IsPartial(context))
-                                    {
-                                        <span class="analytics-trend__partial">@L["Analytics:Trend:PartialBucket"]</span>
-                                    }
-                                </div>
-                            </MudTd>
-                            @foreach (var item in series)
-                            {
-                                <MudTd DataLabel="@item.Label"><span class="analytics-trend__table-count" data-state="@item.State">@item.GetValue(context).ToString("N0", CultureInfo.CurrentCulture)</span></MudTd>
-                            }
-                        </RowTemplate>
-                        <NoRecordsContent><div class="analytics-trend__empty"><p>@L["Analytics:Trend:NoCompletions"]</p></div></NoRecordsContent>
-                    </MudTable>
-                </div>
-            </MudExpansionPanel>
-        </MudExpansionPanels>
-    </div>
+            var column=index;var bucket=Snapshot.Trend[column];var value=Count(bucket,state);
+            <a @ref="_marks[lane * Snapshot.Trend.Count + column]" @onkeydown="@(e => MoveAsync(e, lane, column))" class="an-bar @(column==Selected ? "is-selected" : null) @(value==0 ? "is-zero" : null)" href="@Ledger(bucket,state)" title="@Label(bucket,state)" aria-label="@Label(bucket,state)" @onfocus="@(()=>_selected=column)" @onmouseenter="@(()=>_hover=column)" @onmouseleave="@(()=>_hover=null)"><i style="@($"height:{(peak==0 ? 0 : Math.Max(value>0 ? 5 : 0,value*100d/peak)).ToString("0.###",CultureInfo.InvariantCulture)}%")"></i></a>
+        }</div></div>
+    }<div class="an-axis"><span>@ShortTime(Snapshot.StartTimeUtc)</span><span>@ShortTime(Snapshot.StartTimeUtc+(Snapshot.EndTimeUtc-Snapshot.StartTimeUtc)/2)</span><span>@ShortTime(Snapshot.EndTimeUtc)</span></div></div>
+    @if(Current is {} current) { <div class="an-readout" aria-live="polite"><time>@TimePresentation.FormatRange(current.StartTimeUtc,current.EndTimeUtc)</time><span>@L["Workspace:BucketOutcomes",current.SucceededCount,current.FailedCount,current.SkippedCount]</span><a href="@Ledger(current,null)">@L["Workspace:OpenRecords"] <MoIcon Icon="@MoIcons.ArrowRight" Size=".875rem" /></a></div> }
+    <p class="an-chart-foot">@L["Workspace:TrendHint"]</p>
+    <details class="an-data"><summary>@L["Analytics:Trend:ViewData"]</summary><div class="an-bucket-table"><table><thead><tr><th>@L["Analytics:Trend:Interval"]</th>@foreach(var state in States.Append(JobExecutionState.Cancelled)) { <th>@L[$"ExecutionStates:{state}"]</th> }</tr></thead><tbody>@foreach(var bucket in Snapshot.Trend) { <tr><td>@TimePresentation.FormatRange(bucket.StartTimeUtc,bucket.EndTimeUtc)</td>@foreach(var state in States.Append(JobExecutionState.Cancelled)) { <td>@Count(bucket,state)</td> }</tr> }</tbody></table></div></details>
 </section>
-
 @code {
-    private const double PLOT_WIDTH = 1000;
-    private const double PLOT_HEIGHT = 240;
-    private readonly string _headingId = $"analytics-trend-{Guid.NewGuid():N}";
-    private ChartMode _mode;
-
-    /// <summary>Gets the accepted snapshot whose completion intervals and counts are presented without reaggregation.</summary>
-    /// <remarks>Display mode and disclosure are local presentation state; the parent owns every data read and lifetime.</remarks>
-    [Parameter, EditorRequired]
-    public JobExecutionAnalyticsSnapshot Snapshot { get; set; } = null!;
-
-    private string BucketKind => Snapshot.BucketSize == JobExecutionAnalyticsBucketSize.Hour
-        ? L["Analytics:Trend:HourBuckets"]
-        : L["Analytics:Trend:DayBuckets"];
-    private IReadOnlyList<CompletionSeries> TrendSeries =>
-    [
-        new("succeeded", L["ExecutionStates:Succeeded"], static bucket => bucket.SucceededCount),
-        new("failed", L["ExecutionStates:Failed"], static bucket => bucket.FailedCount),
-        new("skipped", L["ExecutionStates:Skipped"], static bucket => bucket.SkippedCount),
-        new("cancelled", L["ExecutionStates:Cancelled"], static bucket => bucket.CancelledCount)
-    ];
-
-    private ChartScale CreateScale()
+    /// <summary>Gets fixed completion buckets from one accepted analytics query.</summary>
+    [Parameter,EditorRequired] public JobExecutionAnalyticsSnapshot Snapshot { get; set; } = null!;
+    /// <summary>Gets the exact owner carried into every interval drilldown.</summary>
+    [Parameter] public string? Owner { get; set; }
+    /// <summary>Gets the exact job carried into every interval drilldown.</summary>
+    [Parameter] public string? Job { get; set; }
+    private static readonly JobExecutionState[] States=[JobExecutionState.Succeeded,JobExecutionState.Failed,JobExecutionState.Skipped];
+    private int? _selected,_hover;
+    private ElementReference[] _marks = [];
+    protected override void OnParametersSet()
     {
-        var maximum = Snapshot.Trend.Count == 0 ? 0 : Snapshot.Trend.Max(static bucket => Math.Max(Math.Max(bucket.SucceededCount, bucket.FailedCount), Math.Max(bucket.SkippedCount, bucket.CancelledCount)));
-        if (maximum == 0) return new(1, [0]);
-        var targetStep = Math.Max(1, maximum / 4D);
-        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(targetStep)));
-        var fraction = targetStep / magnitude;
-        var step = (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * magnitude;
-        var intervals = (int)Math.Ceiling(maximum / step);
-        return new(intervals * step, Enumerable.Range(0, intervals + 1).Select(index => index * step).ToArray());
+        if (_marks.Length != States.Length * Snapshot.Trend.Count)
+            _marks = new ElementReference[States.Length * Snapshot.Trend.Count];
     }
-
-    private double GetPointX(int index) => (index + .5) * PLOT_WIDTH / Math.Max(1, Snapshot.Trend.Count);
-    private double GetBarWidth() => Math.Min(14, PLOT_WIDTH / Math.Max(1, Snapshot.Trend.Count) / 5);
-    private string GetBarX(int bucketIndex, int seriesIndex) => SvgNumber(GetPointX(bucketIndex) + (seriesIndex - 2) * GetBarWidth());
-    private static string GetY(double value, double maximum) => SvgNumber(PLOT_HEIGHT * (1 - value / maximum));
-    private string GetPoints(CompletionSeries series, double maximum) => string.Join(" ", Snapshot.Trend.Select((bucket, index) => $"{SvgNumber(GetPointX(index))},{GetY(series.GetValue(bucket), maximum)}"));
-    private static string SvgNumber(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
-    private static string FormatTick(double value) => value.ToString("N0", CultureInfo.CurrentCulture);
-    private static string GetTickPosition(double tick, double maximum) => $"bottom: {SvgNumber(tick / maximum * 100)}%;";
-    private string GetModeClass(ChartMode mode) => _mode == mode ? "analytics-trend__mode is-selected" : "analytics-trend__mode";
-    private string IsPressed(ChartMode mode) => _mode == mode ? "true" : "false";
-    private bool IsPartial(JobExecutionAnalyticsBucket bucket) => bucket.EndTimeUtc == Snapshot.EndTimeUtc
-        && bucket.EndTimeUtc - bucket.StartTimeUtc < (Snapshot.BucketSize == JobExecutionAnalyticsBucketSize.Hour ? TimeSpan.FromHours(1) : TimeSpan.FromDays(1));
-    private string GetBucketTitle(JobExecutionAnalyticsBucket bucket, CompletionSeries series) => $"{series.Label}: {series.GetValue(bucket).ToString("N0", CultureInfo.CurrentCulture)} · {TimePresentation.FormatRange(bucket.StartTimeUtc, bucket.EndTimeUtc)}";
-
-    private IEnumerable<AxisLabel> GetAxisLabels()
+    private async Task MoveAsync(KeyboardEventArgs args, int lane, int column)
     {
         var count = Snapshot.Trend.Count;
-        if (count == 0) yield break;
-        var compactIndices = new HashSet<int> { 0, count / 2, count - 1 };
-        var wideIndices = new HashSet<int> { 0, count - 1 };
-        var interval = Math.Max(1, (int)Math.Ceiling(count / 5D));
-        for (var index = interval; index < count - 1; index += interval) wideIndices.Add(index);
-        foreach (var index in wideIndices.Union(compactIndices).Order())
+        var target = args.Key switch
         {
-            var cssClass = $"analytics-trend__x-tick{(compactIndices.Contains(index) ? " is-compact" : string.Empty)}{(!wideIndices.Contains(index) ? " is-compact-only" : string.Empty)}{(index == 0 ? " is-first" : index == count - 1 ? " is-last" : string.Empty)}";
-            yield return new(index, cssClass, $"left: {SvgNumber(GetPointX(index) / PLOT_WIDTH * 100)}%;");
-        }
+            "ArrowLeft" => lane * count + Math.Max(0, column - 1),
+            "ArrowRight" => lane * count + Math.Min(count - 1, column + 1),
+            "ArrowUp" => Math.Max(0, lane - 1) * count + column,
+            "ArrowDown" => Math.Min(States.Length - 1, lane + 1) * count + column,
+            "Home" => lane * count,
+            "End" => (lane + 1) * count - 1,
+            _ => -1
+        };
+        if (target >= 0) { _hover = null; _selected = target % count; await _marks[target].FocusAsync(preventScroll: true); }
     }
-
-    private enum ChartMode { Bars, Lines }
-    private sealed record CompletionSeries(string State, string Label, Func<JobExecutionAnalyticsBucket, long> GetValue);
-    private sealed record ChartScale(double Maximum, IReadOnlyList<double> Ticks);
-    private sealed record AxisLabel(int Index, string CssClass, string Position);
+    private int Selected=>Math.Clamp(_hover??_selected??Snapshot.Trend.Count-1,0,Math.Max(0,Snapshot.Trend.Count-1));
+    private JobExecutionAnalyticsBucket? Current=>Snapshot.Trend.ElementAtOrDefault(Selected);
+    private static long Count(JobExecutionAnalyticsBucket b,JobExecutionState state)=>state switch { JobExecutionState.Succeeded=>b.SucceededCount,JobExecutionState.Failed=>b.FailedCount,JobExecutionState.Skipped=>b.SkippedCount,_=>b.CancelledCount };
+    private string Label(JobExecutionAnalyticsBucket b,JobExecutionState state)=>$"{L[$"ExecutionStates:{state}"]}: {Count(b,state)} · {TimePresentation.FormatRange(b.StartTimeUtc,b.EndTimeUtc)}";
+    private string ShortTime(DateTimeOffset at)=>TimePresentation.FormatChartTimestamp(at);
+    private string Ledger(JobExecutionAnalyticsBucket b,JobExecutionState? state)=>SchedulerRouteBuilder.Ledger(new JobExecutionQuery { SchedulerScopeKey=string.Empty,OwnerKey=Owner,JobKey=Job,States=state is {} value ? new[]{value}:null,CompletedAfterUtc=b.StartTimeUtc,CompletedBeforeUtc=b.EndTimeUtc.AddTicks(-1) },b.StartTimeUtc,b.EndTimeUtc);
 }

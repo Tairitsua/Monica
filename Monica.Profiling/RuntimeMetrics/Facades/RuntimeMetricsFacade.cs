@@ -22,29 +22,29 @@ public sealed class RuntimeMetricsFacade
         _logger = logger;
     }
 
-    public Res<RuntimeMetricsPoint> GetLatestPoint()
+    public Result<RuntimeMetricsPoint> GetLatestPoint()
     {
         try
         {
-            return Res.Ok(_runtimeMetricsService.GetLatestPoint());
+            return Result.Success(_runtimeMetricsService.GetLatestPoint());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load the latest runtime metrics point.");
-            return Res.Fail($"Failed to load runtime metrics: {ex.GetMessageRecursively()}");
+            return Result.Failure<RuntimeMetricsPoint>($"Failed to load runtime metrics: {ex.GetMessageRecursively()}");
         }
     }
 
-    public Res<RuntimeMetricsTrend> GetTrend()
+    public Result<RuntimeMetricsTrend> GetTrend()
     {
         try
         {
-            return Res.Ok(_runtimeMetricsService.GetTrend());
+            return Result.Success(_runtimeMetricsService.GetTrend());
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load runtime metrics trend data.");
-            return Res.Fail($"Failed to load runtime metrics trend: {ex.GetMessageRecursively()}");
+            return Result.Failure<RuntimeMetricsTrend>($"Failed to load runtime metrics trend: {ex.GetMessageRecursively()}");
         }
     }
 

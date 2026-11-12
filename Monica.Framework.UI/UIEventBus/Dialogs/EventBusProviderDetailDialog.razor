@@ -221,7 +221,8 @@
             if (facade is null) { _optionDiagnosticsFailed = true; return; }
             var result = facade.GetModuleOptions(target.ModuleKey, target.ProfileSelector);
             if (!CanAdopt(version, identity)) return;
-            if (result.IsFailed(out _, out var diagnostics)) { _optionDiagnosticsFailed = true; return; }
+            var diagnostics = result.Data;
+            if (result.IsFailure()) { _optionDiagnosticsFailed = true; return; }
             _optionDiagnostics = diagnostics;
         }
         catch (Exception error)

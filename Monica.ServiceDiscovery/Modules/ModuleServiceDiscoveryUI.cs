@@ -33,6 +33,7 @@ public class ModuleServiceDiscoveryUI : MonicaModule<ModuleServiceDiscoveryUIOpt
     public override void Describe(ModuleDescriptor module)
     {
         module.Require<ModuleServiceDiscovery, ModuleServiceDiscoveryOption>();
+        module.Require<ModuleServiceEndpointDiscoveryUI, ModuleServiceEndpointDiscoveryUIOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<ServiceDiscoveryResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

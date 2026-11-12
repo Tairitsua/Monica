@@ -98,7 +98,9 @@ internal sealed class DaprTopicSubscription(
             try
             {
                 var subscriptionOptions = new DaprSubscriptionOptions(
-                    new MessageHandlingPolicy(options.MessageHandlingTimeout, TopicResponseAction.Retry))
+                    // Monica applies a fresh deadline to each bounded processing attempt. The SDK
+                    // token is reserved for stream shutdown so retries never inherit an expired deadline.
+                    new MessageHandlingPolicy(Timeout.InfiniteTimeSpan, TopicResponseAction.Retry))
                 {
                     DeadLetterTopic = deadLetterTopic,
                     MaximumCleanupTimeout = options.MaximumCleanupTimeout,

@@ -123,7 +123,9 @@ public sealed class EventBusWorkbenchState(
 
             var subscriptionResult = await monitorService.GetAllSubscriptionsAsync();
             cancellationToken.ThrowIfCancellationRequested();
-            if (subscriptionResult.IsFailed(out var subscriptionError, out var subscriptions))
+            var subscriptionError = subscriptionResult.WithoutData();
+            var subscriptions = subscriptionResult.Data;
+            if (subscriptionResult.IsFailure())
             {
                 RecordRefreshFailure(subscriptionError, cancellationToken);
                 return;
@@ -131,7 +133,9 @@ public sealed class EventBusWorkbenchState(
 
             var providerResult = providerDiscoveryService.GetRegisteredProviders();
             cancellationToken.ThrowIfCancellationRequested();
-            if (providerResult.IsFailed(out var providerError, out var providers))
+            var providerError = providerResult.WithoutData();
+            var providers = providerResult.Data;
+            if (providerResult.IsFailure())
             {
                 RecordRefreshFailure(providerError, cancellationToken);
                 return;
@@ -139,7 +143,9 @@ public sealed class EventBusWorkbenchState(
 
             var topicResult = monitorService.GetAllTopicStatuses();
             cancellationToken.ThrowIfCancellationRequested();
-            if (topicResult.IsFailed(out var topicError, out var topicStatuses))
+            var topicError = topicResult.WithoutData();
+            var topicStatuses = topicResult.Data;
+            if (topicResult.IsFailure())
             {
                 RecordRefreshFailure(topicError, cancellationToken);
                 return;
@@ -303,6 +309,7 @@ public sealed class EventBusWorkbenchState(
             ActionIsStatic = subscription.ActionIsStatic,
             Scope = subscription.Scope,
             State = subscription.State,
+            Activation = subscription.Activation,
             TopicStatus = subscription.TopicStatus is { } status ? CloneTopicStatus(status) : null,
             CreatedAt = subscription.CreatedAt,
             ActivatedAt = subscription.ActivatedAt,
@@ -315,7 +322,7 @@ public sealed class EventBusWorkbenchState(
     private static TopicSubscriptionStatus CloneTopicStatus(TopicSubscriptionStatus status) =>
         status with { RecentErrors = status.RecentErrors.ToImmutableArray() };
 
-    private void RecordRefreshFailure(Res error, CancellationToken cancellationToken)
+    private void RecordRefreshFailure(Result error, CancellationToken cancellationToken)
     {
         lock (_stateLock)
         {
@@ -358,6 +365,8 @@ public sealed class EventBusWorkbenchState(
             InactiveSubscriptions = subscriptions.Count(subscription => subscription.State == EventSubscriptionState.Inactive),
             PendingSubscriptions = subscriptions.Count(subscription => subscription.State == EventSubscriptionState.Pending),
             DisposedSubscriptions = subscriptions.Count(subscription => subscription.State == EventSubscriptionState.Disposed),
+            HeldSubscriptions = subscriptions.Count(subscription => subscription.State == EventSubscriptionState.Held),
+            DisabledSubscriptions = subscriptions.Count(subscription => subscription.State == EventSubscriptionState.Disabled),
             UnhealthySubscriptions = subscriptions.Count(subscription => subscription.IsUnhealthy),
             UnhealthyTopics = topicStatuses.Count(status => status.State is TopicSubscriptionRuntimeState.Recovering or TopicSubscriptionRuntimeState.Failed),
             LocalSubscriptions = subscriptions.Count(subscription => subscription.Scope == EventSubscriptionScope.Local),

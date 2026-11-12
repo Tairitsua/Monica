@@ -36,7 +36,7 @@ public class StateStoreUIService(
 
     #region Provider Discovery
 
-    public Res<List<StateStoreProviderInfo>> GetRegisteredProviders()
+    public Result<List<StateStoreProviderInfo>> GetRegisteredProviders()
     {
         try
         {
@@ -65,7 +65,7 @@ public class StateStoreUIService(
                 }
             }
 
-            return Res.Ok(providers
+            return Result.Success(providers
                 .OrderByDescending(provider => provider.IsDefaultStateStore)
                 .ThenBy(provider => provider.ServiceKey ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ToList());
@@ -73,11 +73,11 @@ public class StateStoreUIService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get registered state store providers.");
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:ProviderList", ex));
+            return Result.Failure<List<StateStoreProviderInfo>>(BuildDetailedErrorMessage("Service:Errors:ProviderList", ex));
         }
     }
 
-    public Res<IStateStore> GetProvider(string? serviceKey)
+    public Result<IStateStore> GetProvider(string? serviceKey)
     {
         try
         {
@@ -87,15 +87,15 @@ public class StateStoreUIService(
 
             if (provider == null)
             {
-                return Res.Fail(localizer["Service:Errors:ProviderNotFound", serviceKey ?? localizer["Service:Labels:DefaultProvider"]]);
+                return Result.Failure<IStateStore>(localizer["Service:Errors:ProviderNotFound", serviceKey ?? localizer["Service:Labels:DefaultProvider"]]);
             }
 
-            return Res.Ok(provider);
+            return Result.Success(provider);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get state store provider: {ServiceKey}", serviceKey);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:ProviderLoad", ex));
+            return Result.Failure<IStateStore>(BuildDetailedErrorMessage("Service:Errors:ProviderLoad", ex));
         }
     }
 
@@ -176,7 +176,7 @@ public class StateStoreUIService(
 
     #region Key Operations
 
-    public async Task<Res<KeyScanResult>> ScanKeysAsync(
+    public async Task<Result<KeyScanResult>> ScanKeysAsync(
         string? serviceKey,
         string pattern = "*",
         int limit = 100,
@@ -189,12 +189,14 @@ public class StateStoreUIService(
             SearchMode = EStateStoreKeySearchMode.PatternScan
         }, cancellationToken);
 
-        if (browseResult.IsFailed(out var error, out var data))
+        if (browseResult.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<KeyScanResult>(browseResult);
         }
 
-        return Res.Ok(new KeyScanResult
+        var data = browseResult.Data
+            ?? throw new InvalidOperationException("The state store key browse result was missing its data.");
+        return Result.Success(new KeyScanResult
         {
             Keys = data.Items.Select(item => item.Key).ToList(),
             TotalCount = data.TotalCount,
@@ -202,87 +204,99 @@ public class StateStoreUIService(
         });
     }
 
-    public async Task<Res<StateStoreKeyBrowseResult>> SearchKeysAsync(
+    public async Task<Result<StateStoreKeyBrowseResult>> SearchKeysAsync(
         string? serviceKey,
         StateStoreKeyBrowseRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<StateStoreKeyBrowseResult>(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             var (providerType, _, _) = GetProviderMetadata(provider);
             var browserApi = GetBrowserApi(providerType, provider);
-            return Res.Ok(await browserApi.BrowseAsync(provider, request, cancellationToken));
+            return Result.Success(await browserApi.BrowseAsync(provider, request, cancellationToken));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to search keys for query: {Query}", request.Query);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeySearch", ex));
+            return Result.Failure<StateStoreKeyBrowseResult>(BuildDetailedErrorMessage("Service:Errors:KeySearch", ex));
         }
     }
 
-    public async Task<Res<StateStoreKeyInfo>> GetKeyAsync(
+    public async Task<Result<StateStoreKeyInfo>> GetKeyAsync(
         string? serviceKey,
         string key,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<StateStoreKeyInfo>(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             var (providerType, _, _) = GetProviderMetadata(provider);
             var browserApi = GetBrowserApi(providerType, provider);
-            return Res.Ok(await browserApi.LoadKeyAsync(provider, key, cancellationToken));
+            return Result.Success(await browserApi.LoadKeyAsync(provider, key, cancellationToken));
         }
         catch (KeyNotFoundException)
         {
-            return Res.Fail(localizer["Service:Errors:KeyNotFound", key]);
+            return Result.Failure<StateStoreKeyInfo>(localizer["Service:Errors:KeyNotFound", key]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load state store key: {Key}", key);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeyLoad", ex));
+            return Result.Failure<StateStoreKeyInfo>(BuildDetailedErrorMessage("Service:Errors:KeyLoad", ex));
         }
     }
 
-    public async Task<Res<bool>> KeyExistsAsync(
+    public async Task<Result<bool>> KeyExistsAsync(
         string? serviceKey,
         string key,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return Res.Fail(error);
+            return Result.FromFailure<bool>(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
-            return Res.Ok(await provider.ExistAsync(key, cancellationToken));
+            return Result.Success(await provider.ExistAsync(key, cancellationToken));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to check whether key exists: {Key}", key);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeyCheck", ex));
+            return Result.Failure<bool>(BuildDetailedErrorMessage("Service:Errors:KeyCheck", ex));
         }
     }
 
-    public async Task<Res> SaveKeyAsync(
+    public async Task<Result> SaveKeyAsync(
         string? serviceKey,
         StateStoreKeyUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return error;
+            return Result.FromFailure(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             var value = ParseRequestValue(request);
@@ -298,7 +312,7 @@ public class StateStoreUIService(
 
                 if (!success)
                 {
-                    return Res.Fail(localizer["Service:Errors:ETagMismatch"]);
+                    return Result.Failure(localizer["Service:Errors:ETagMismatch"]);
                 }
             }
             else
@@ -306,25 +320,28 @@ public class StateStoreUIService(
                 await provider.SaveStateAsync(request.Key, value, cancellationToken, request.TTL);
             }
 
-            return Res.Ok(localizer["Service:Success:KeySaved"]);
+            return Result.Success().WithMessage(localizer["Service:Success:KeySaved"]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save state store key: {Key}", request.Key);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeySave", ex));
+            return Result.Failure(BuildDetailedErrorMessage("Service:Errors:KeySave", ex));
         }
     }
 
-    public async Task<Res<StateStoreKeyInfo>> CreateKeyAsync(
+    public async Task<Result<StateStoreKeyInfo>> CreateKeyAsync(
         string? serviceKey,
         StateStoreKeyUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return error;
+            return Result.FromFailure<StateStoreKeyInfo>(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             var value = ParseRequestValue(request);
@@ -336,16 +353,17 @@ public class StateStoreUIService(
 
             if (!created)
             {
-                return Res.Fail(localizer["Service:Errors:KeyExists"]);
+                return Result.Failure<StateStoreKeyInfo>(localizer["Service:Errors:KeyExists"]);
             }
 
             var createdKey = await GetKeyAsync(serviceKey, request.Key, cancellationToken);
-            if (createdKey.IsOk(out var loadedKey))
+            var loadedKey = createdKey.Data;
+            if (createdKey.IsSuccess() && loadedKey is not null)
             {
-                return Res.Ok(loadedKey);
+                return Result.Success(loadedKey);
             }
 
-            return Res.Ok(new StateStoreKeyInfo
+            return Result.Success(new StateStoreKeyInfo
             {
                 Key = request.Key,
                 RawValue = request.Value,
@@ -356,21 +374,24 @@ public class StateStoreUIService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create state store key: {Key}", request.Key);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeyCreate", ex));
+            return Result.Failure<StateStoreKeyInfo>(BuildDetailedErrorMessage("Service:Errors:KeyCreate", ex));
         }
     }
 
-    public async Task<Res> DeleteKeyAsync(
+    public async Task<Result> DeleteKeyAsync(
         string? serviceKey,
         string key,
         string? etag = null,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return error;
+            return Result.FromFailure(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             if (!string.IsNullOrEmpty(etag))
@@ -378,7 +399,7 @@ public class StateStoreUIService(
                 var success = await provider.TryDeleteStateWithETagAsync(key, etag, cancellationToken);
                 if (!success)
                 {
-                    return Res.Fail(localizer["Service:Errors:ETagMismatch"]);
+                    return Result.Failure(localizer["Service:Errors:ETagMismatch"]);
                 }
             }
             else
@@ -386,34 +407,37 @@ public class StateStoreUIService(
                 await provider.DeleteStateAsync(key, cancellationToken);
             }
 
-            return Res.Ok(localizer["Service:Success:KeyDeleted"]);
+            return Result.Success().WithMessage(localizer["Service:Success:KeyDeleted"]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to delete state store key: {Key}", key);
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeyDelete", ex));
+            return Result.Failure(BuildDetailedErrorMessage("Service:Errors:KeyDelete", ex));
         }
     }
 
-    public async Task<Res> DeleteKeysAsync(
+    public async Task<Result> DeleteKeysAsync(
         string? serviceKey,
         IReadOnlyList<string> keys,
         CancellationToken cancellationToken = default)
     {
-        if (GetProvider(serviceKey).IsFailed(out var error, out var provider))
+        var providerResult = GetProvider(serviceKey);
+        if (providerResult.IsFailure())
         {
-            return error;
+            return Result.FromFailure(providerResult);
         }
 
+        var provider = providerResult.Data
+            ?? throw new InvalidOperationException("The state store provider was missing from a successful result.");
         try
         {
             await provider.DeleteBulkStateAsync(keys, cancellationToken);
-            return Res.Ok(localizer["Service:Success:KeysDeleted", keys.Count]);
+            return Result.Success().WithMessage(localizer["Service:Success:KeysDeleted", keys.Count]);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to delete state store keys in bulk.");
-            return Res.Fail(BuildDetailedErrorMessage("Service:Errors:KeysDelete", ex));
+            return Result.Failure(BuildDetailedErrorMessage("Service:Errors:KeysDelete", ex));
         }
     }
 

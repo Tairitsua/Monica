@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Hosting"
-  short_description: "Host composition and runtime services"
-  default_prompt: "Use $monica-infra-hosting to compose this Monica host and diagnose its runtime services."

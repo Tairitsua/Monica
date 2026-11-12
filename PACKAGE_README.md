@@ -2,14 +2,14 @@
 
 **Architecture agents can follow. Systems humans can inspect.**
 
-Monica is an agent-governed application architecture for observable .NET backends. Its packages provide host-scoped module composition, typed DDD ProjectUnits, infrastructure adapters, operational dashboards, and runtime diagnostics.
+Monica is an agent-governed application architecture for observable .NET backends. Its packages provide host-scoped module composition, typed DDD Building Blocks, infrastructure adapters, operational dashboards, and runtime diagnostics.
 
 ## Install
 
 Install only the capabilities the host uses:
 
 ```bash
-dotnet add package Monica.ProjectUnits --prerelease
+dotnet add package Monica.BuildingBlocks --prerelease
 dotnet add package Monica.JobScheduler --prerelease
 dotnet add package Monica.JobScheduler.UI --prerelease
 ```
@@ -30,7 +30,8 @@ builder.AddMonica(monica =>
         options.AppId = "orders";
     });
 
-    monica.AddProjectUnits();
+    monica.AddEventBus().UseNoOpDistributedEventBus();
+    monica.AddBuildingBlocks();
 
     monica.AddJobScheduler()
         .UseSchedulerScope("orders")
@@ -55,7 +56,7 @@ Hosts that call `monica.AddModuleSystem()` receive an immutable, revisioned diag
 
 ## Maturity tiers
 
-- **Stable:** Core, ProjectUnits, WebApi, Configuration, Repository, JobScheduler, OpenTelemetry, and UI runtime inspection.
+- **Stable:** Core, BuildingBlocks, WebApi, Configuration, Repository, JobScheduler, OpenTelemetry, and UI runtime inspection.
 - **Integrations:** optional EF Core, Kafka, Redis/StackExchange, Dapr, SignalR, and other provider adapters.
 - **Labs:** fast-moving AI/RAG/MCP, DataChannel, DevOps and profiling, Office, and Experimental capabilities.
 

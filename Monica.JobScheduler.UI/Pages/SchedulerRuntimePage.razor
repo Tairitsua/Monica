@@ -38,34 +38,18 @@
             else
             {
                 <SchedulerAccessBoundary AccessChecked="@state.AccessChecked" IsAuthorized="@state.IsAuthorized">
-                    <section class="runtime-observation" aria-label="@L["Runtime:Observation:Title"]" aria-busy="@(state.IsLoading ? "true" : "false")">
-                        <dl>
-                            <div>
-                                <dt>@L["Runtime:Observation:Captured"]</dt>
-                                <dd><time datetime="@state.Overview?.CapturedAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(state.Overview?.CapturedAtUtc)</time></dd>
-                            </div>
-                            <div>
-                                <dt>@L["Runtime:Observation:Accepted"]</dt>
-                                <dd><time datetime="@state.LastRefreshedUtc?.ToString("O")">@TimePresentation.FormatTimestamp(state.LastRefreshedUtc)</time></dd>
-                            </div>
-                            <div>
-                                <dt>@L["Runtime:Observation:Cadence"]</dt>
-                                <dd>@(UiOptions.Value.AutoRefreshInterval > TimeSpan.Zero ? SchedulerRuntimePresentation.FormatInterval(UiOptions.Value.AutoRefreshInterval, L) : L["Runtime:Observation:Manual"])</dd>
-                            </div>
-                        </dl>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@state.IsLoading" OnClick="RefreshAsync">@L["Common:Refresh"]</MudButton>
-                    </section>
+                    <SchedulerSnapshotActions CapturedAtUtc="@state.Overview?.CapturedAtUtc" IsLoading="@state.IsLoading" RefreshRequested="RefreshAsync" />
+
                     @if (state.IsLoading)
                     {
                         <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="@L["Common:Loading"]" />
                     }
                     @if (state.Overview is { } overview)
                     {
-                        <div class="runtime-page__host-grid">
-                            <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
-                            <SchedulerRuntimeIdentityCard Overview="@overview" />
-                        </div>
+                        <SchedulerRuntimeLocalPlaneCard Overview="@overview" />
+                        <SchedulerCoordinationPanel Overview="@overview" />
                         <SchedulerOwnerInsightTable Overview="@overview" />
+                        <SchedulerRuntimeConfigurationPanel Overview="@overview" />
                     }
                     else if (state.IsQueryFailed && !state.IsLoading)
                     {
@@ -84,10 +68,7 @@
                                                      WorkerInsightError="@state.WorkerInsightError"
                                                      WorkerInsightObservedAtUtc="@state.WorkerInsightObservedAtUtc" />
                     }
-                    @if (state.Overview is { } configurationSnapshot)
-                    {
-                        <SchedulerRuntimeConfigurationPanel Overview="@configurationSnapshot" />
-                    }
+
                 </SchedulerAccessBoundary>
             }
         </div>
@@ -95,6 +76,14 @@
 </SchedulerWorkspace>
 
 @code {
+    /// <summary>Gets the owner search preserved in the runtime route.</summary>
+    [SupplyParameterFromQuery(Name="q")] public string? Search { get; set; }
+    /// <summary>Gets the publication-freshness filter preserved in the runtime route.</summary>
+    [SupplyParameterFromQuery(Name="freshness")] public string? Freshness { get; set; }
+    /// <summary>Gets the logical owner used to focus the coordination evidence table.</summary>
+    [SupplyParameterFromQuery(Name="coordinator")] public string? Coordinator { get; set; }
+    /// <summary>Gets the coordination relation filter, evaluated at the accepted store observation.</summary>
+    [SupplyParameterFromQuery(Name="lease")] public string? Lease { get; set; }
     /// <summary>Gets the route for serving-host runtime and separately sourced registry observations.</summary>
     public const string PAGE_URL = "/job-scheduler/runtime";
 
@@ -105,7 +94,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var state = PageStateFactory.Create(UiOptions.Value.AutoRefreshInterval);
+        var state = PageStateFactory.Create(TimeSpan.Zero);
         _state = state;
         state.Changed += OnStateChangedAsync;
         try { await _lifetime.RunAsync(_ => state.InitializeAsync()); }

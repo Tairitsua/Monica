@@ -30,7 +30,7 @@ The environment detector, command runner and session service are host singletons
 
 The target band identifies the selected session and its exact directory. During execution the captured starting directory belongs to the current command; the session directory and a previous result's directory are separate evidence. Session and host details distinguish the host default directory from the application base directory, shell executable and arguments, OS description, architecture and runtime identifier. A runtime identifier is not a loaded .NET patch version.
 
-History and Session & host are contextual views of the same task rather than another route or nested tab rail. History shows the latest twelve retained command strings in reverse order. Reuse copies a command into the shared visit draft and never executes it; duplicate strings remain separate retained entries. No per-history timestamps, outcomes or durations are stored.
+History and Session & host are contextual views of the same task rather than another route or nested tab rail. Wide layouts use an inline context panel; narrow layouts use [MoSideSheet](visual-components.md#modal-evidence-side-sheets) for native modal focus, dismissal and viewport placement. Both render the same captured context; command reuse and visit retirement remain with the terminal owner. History shows the latest twelve retained command strings in reverse order. Reuse copies a command into the shared visit draft and never executes it; duplicate strings remain separate retained entries. No per-history timestamps, outcomes or durations are stored.
 
 Output follows new lines until the reader scrolls upward. Latest or scrolling back to the end resumes following. Appends and layout changes preserve that choice; the page does not infer user intent from every scroll event. Browser input can arrive after the browser has already moved the scroll position, so upward intent must still pause a scrollable transcript when the delivered position is already at the top.
 
@@ -52,7 +52,7 @@ Clear removes retained output, latest result and failed-attempt evidence while p
 
 ## Admission, cancellation and lifetime
 
-`TerminalFacade.StartCommandAsync(owner, sessionId, request)` returns `Res<TerminalCommandAcceptance>`. Its command ID and detached session capture prove admission only. A fast command may already have completed in that capture; a later process-start failure is visible in `LastExecutionFailure`. The page observes immutable snapshots through a single serial loop, including while idle so another same-owner tab's active command can become visible.
+`TerminalFacade.StartCommandAsync(owner, sessionId, request)` returns `Result<TerminalCommandAcceptance>`. Its command ID and detached session capture prove admission only. A fast command may already have completed in that capture; a later process-start failure is visible in `LastExecutionFailure`. The page observes immutable snapshots through a single serial loop, including while idle so another same-owner tab's active command can become visible.
 
 Leaving the route retires the visit without canceling the host-owned command or waiting for its duration. Returning reads actual running state and can request cancellation. A visit requests command-field focus only for a command it admitted, with the matching session and eligible draft generation; reentry or another visit's completion does not take focus.
 
@@ -66,7 +66,7 @@ The singleton service retains active producers after a direct caller closes a ru
 
 Read/list/create APIs now return detached `TerminalSessionSnapshot` evidence instead of the former mutable live `TerminalSession`. Environment reads return `TerminalEnvironmentSnapshot`. Collections and output-line records are immutable; retaining or copying a snapshot cannot mutate server identity, working directory, transcript or results. Use service operations for changes.
 
-The cancel API now requires `expectedCommandId` and returns `Res<TerminalSessionSnapshot>` at the facade. Capture `session.ActiveCommand.CommandId` before awaiting any confirmation or rendering work. Service callers replace synchronous close with `CloseSessionAsync` and await its removal/request receipt.
+The cancel API now requires `expectedCommandId` and returns `Result<TerminalSessionSnapshot>` at the facade. Capture `session.ActiveCommand.CommandId` before awaiting any confirmation or rendering work. Service callers replace synchronous close with `CloseSessionAsync` and await its removal/request receipt.
 
 `ExecuteCommandAsync` retains its direct await-to-completion API over the same producer as Start. Its caller token explicitly cancels execution; do not pass a route-lifetime token when continued execution is intended. Its optional output observer is invoked serially and awaited. Synchronous and late observer faults remain observable after process/output cleanup; callbacks must not await their own command completion. The service stores immutable results separately from the returned mutable direct-completion DTO, so subsequent caller mutation cannot change retained evidence.
 

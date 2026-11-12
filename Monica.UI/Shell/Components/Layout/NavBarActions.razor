@@ -33,6 +33,7 @@
     }
     @if (HasUserActions)
     {
+        <span class="user-divider" aria-hidden="true"></span>
         <MudMenu AnchorOrigin="Origin.BottomRight"
                  TransformOrigin="Origin.TopRight"
                  ListClass="mo-appbar-menu-list"
@@ -40,8 +41,8 @@
             <ActivatorContent Context="menu">
                 <MudButton Variant="Variant.Text"
                            Class="user-button"
-                           StartIcon="@MoIcons.UserCircle"
                            OnClick="@(() => menu.ToggleAsync())">
+                    <span class="user-avatar" aria-hidden="true">@UserInitials</span>
                     <span class="user-name">@UserContext.UserName</span>
                 </MudButton>
             </ActivatorContent>
@@ -73,14 +74,18 @@
     }
     else
     {
+        <span class="user-divider" aria-hidden="true"></span>
         <div class="user-identity" aria-label="@UserContext.UserName">
-            <MoIcon Icon="@MoIcons.UserCircle" Size="24px" />
+            <span class="user-avatar" aria-hidden="true">@UserInitials</span>
             <span class="user-name">@UserContext.UserName</span>
         </div>
     }
 </div>
 
 @code {
+    private string UserInitials => string.Concat((UserContext.UserName ?? string.Empty)
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => part[0])).ToUpperInvariant();
+
     private bool HasUserActions =>
         Options.Value.UserProfileAction is not null ||
         Options.Value.UserSettingsAction is not null ||

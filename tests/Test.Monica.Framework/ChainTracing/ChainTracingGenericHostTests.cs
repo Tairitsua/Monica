@@ -33,17 +33,17 @@ public sealed class ChainTracingGenericHostTests
     }
 
     [Fact]
-    public void AddMonica_WhenRpcTracingIsSelected_ShouldRejectGenericHostWithFeatureReason()
+    public void AddMonica_WhenActorInvocationTracingIsSelected_ShouldRejectGenericHostWithFeatureReason()
     {
         var builder = Host.CreateApplicationBuilder();
 
         Action compose = () => builder.AddMonica(monica =>
         {
             monica.ConfigureTypeDiscovery(static options => options.ExcludeDefault());
-            monica.AddChainTracing().UseRpcTracing();
+            monica.AddChainTracing().UseActorInvocationTracing();
         });
 
         compose.Should().Throw<ModuleRegistrationException>()
-            .WithMessage("*RPC chain-tracing middleware must run in an ASP.NET Core request pipeline.*");
+            .WithMessage("*Actor invocation tracing middleware must run in an ASP.NET Core request pipeline.*");
     }
 }

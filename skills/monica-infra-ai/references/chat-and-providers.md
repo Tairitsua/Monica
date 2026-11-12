@@ -1,12 +1,12 @@
 # Chat, providers, and history
 
-Tool arguments/results, request options and parameter schemas use the shared [JSON viewer](../../monica-infra-ui/references/json.md). Non-JSON tool output remains encoded plain text; copy retains the original evidence.
+Tool arguments/results, request options and parameter schemas use the shared JSON viewer in `$monica-infra-ui` (`references/json.md`). Non-JSON tool output remains encoded plain text; copy retains the original evidence.
 
-Chat session, archive and execution receipts use the shell's [Clock-based page time display](../../monica-infra-ui/references/time-display.md). Persisted conversation instants remain unchanged.
+Chat session, archive and execution receipts use the shell's Clock-based page time display in `$monica-infra-ui` (`references/time-display.md`). Persisted conversation instants remain unchanged.
 
 Register `AddAI()` for code-driven chat, then add a real provider with `AddOpenAIProvider(...)`, `AddAnthropicProvider(...)`, or `AddProvider<TProvider>(...)`. `AddFakeProvider(...)` supports development. `AddAIUI()` adds chat and management pages plus knowledge-base inventory, skill, MCP, localization, and shell dependencies, but does not choose provider credentials, models, or deployment storage and identity. Its pages are an application interface; code callers use `ChatFacade` and the other facades directly. Register modules inside one `builder.AddMonica(...)` callback; a Web host completes Monica with `app.UseMonica()` and `app.MapMonica()`.
 
-The packaged chat page fills the shell's available content height and owns its internal scrolling. Layout follows the actual available parent and chat-content sizes, including short heights, in both Sidebar and Topbar layouts. History uses a 272px persistent drawer at a wide owner and a temporary drawer bounded by `min(304px, calc(100% - 48px))` at a compact owner. Temporary history starts closed, closes after successful conversation selection or creation, and keeps its backdrop inside the content region, leaving application navigation available. The wide drawer retains its open preference across size changes. When embedding or customizing chat, provide a bounded parent height with `min-height: 0`; keep the drawer page-relative with `MudDrawerContainer` and `Fixed="false"`, and keep its overlay local. Derive interaction breakpoints from usable owner space rather than the browser viewport, and preserve the temporary drawer's focus and dismissal lifecycle. The containment contract is implemented by `Monica.AI.UI/Pages/ChatPage.razor`, its isolated stylesheet and layout observer; shell hosting belongs to [UI shell and access](../../monica-infra-ui/references/shell-and-access.md).
+The packaged chat page fills the shell's available content height and owns its internal scrolling. Layout follows the actual available parent and chat-content sizes, including short heights, in both Sidebar and Topbar layouts. History uses a 272px persistent drawer at a wide owner and a temporary drawer bounded by `min(304px, calc(100% - 48px))` at a compact owner. Temporary history starts closed, closes after successful conversation selection or creation, and keeps its backdrop inside the content region, leaving application navigation available. The wide drawer retains its open preference across size changes. When embedding or customizing chat, provide a bounded parent height with `min-height: 0`; keep the drawer page-relative with `MudDrawerContainer` and `Fixed="false"`, and keep its overlay local. Derive interaction breakpoints from usable owner space rather than the browser viewport, and preserve the temporary drawer's focus and dismissal lifecycle. The containment contract is implemented by `Monica.AI.UI/Pages/ChatPage.razor`, its isolated stylesheet and layout observer; shell hosting belongs to UI shell and access in `$monica-infra-ui` (`references/shell-and-access.md`).
 
 ```csharp
 builder.AddMonica(monica =>
@@ -42,19 +42,23 @@ The provider-wide `SystemPrompt` is a host default. Editing instructions in an e
 
 Keep the Microsoft.Extensions.AI OpenAI adapter compatible with the OpenAI SDK: adapter 10.10.1 targets OpenAI 2.14.0. Adapter 10.10.0 references a Responses MCP approval type renamed in SDK 2.14.0 and can fail with `TypeLoadException`; upgrading only the SDK is insufficient. The production provider construction regression test covers both Chat and Responses API surfaces.
 
-Resolve scoped `ChatFacade` from the caller's DI scope. Create a session, then consume the ordered `Res<ChatStreamEvent>` stream. Text arrives as `ChatTextDeltaEvent`; tool, reasoning, context, and completion events have separate types. A `ChatCompletedEvent` with `AwaitingApproval` means the run has paused: present the request and call `ContinueApprovalAsync(...)` with the decision, or `CancelAsync(...)`. `EditMessageAsync`, `RetryMessageAsync`, `UpdateSettings`, and `UpdateRuntimeContext` apply to subsequent execution, not a turn already in flight. Dispose the session when its owner is done.
+Resolve scoped `ChatFacade` from the caller's DI scope. Create a session, then consume the ordered `Result<ChatStreamEvent>` stream. Text arrives as `ChatTextDeltaEvent`; tool, reasoning, context, and completion events have separate types. A `ChatCompletedEvent` with `AwaitingApproval` means the run has paused: present the request and call `ContinueApprovalAsync(...)` with the decision, or `CancelAsync(...)`. `EditMessageAsync`, `RetryMessageAsync`, `UpdateSettings`, and `UpdateRuntimeContext` apply to subsequent execution, not a turn already in flight. Dispose the session when its owner is done.
 
 ```csharp
 var created = await chat.CreateSessionAsync(ct: cancellationToken);
-if (created.IsFailed(out var createError, out var session))
-    throw new InvalidOperationException(createError.Message);
+if (created.IsFailure())
+    throw new InvalidOperationException(created.Message);
+var session = created.Data
+    ?? throw new InvalidOperationException("A successful session creation must return the session.");
 
 await using (session)
 {
     await foreach (var next in chat.SendMessageStreamingAsync(session, "Summarize the order", cancellationToken))
     {
-        if (next.IsFailed(out var streamError, out var update))
-            throw new InvalidOperationException(streamError.Message);
+        if (next.IsFailure())
+            throw new InvalidOperationException(next.Message);
+        var update = next.Data
+            ?? throw new InvalidOperationException("A successful stream item must include an event.");
         if (update is ChatTextDeltaEvent delta)
             Console.Write(delta.Text);
     }

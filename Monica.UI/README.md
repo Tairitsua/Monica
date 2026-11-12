@@ -68,7 +68,7 @@ app.UseMonica();
 app.MapMonica();
 ```
 
-`ModuleShellUI` 会在非 Production 环境的 builder 阶段加载 Razor 类库静态资源，并在 `app.UseMonica()` 阶段通过 `MapStaticAssets()` 映射资源端点。
+`ModuleUIHost` 会在非 Production 环境的 builder 阶段加载 Razor 类库静态资源，并在 `app.UseMonica()` 阶段通过 `MapStaticAssets()` 映射资源端点。宿主没有 `.razor` 文件时，须在宿主项目中设置 `<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>`，以包含 Blazor 启动脚本。业务 UI 可直接使用 `AddUIHost()`，按需添加 Shell；完整配置见 [Application Hosting](../skills/monica-infra-ui/references/application-hosting.md)。
 
 #### 静态资源访问路径
 - **wwwroot文件夹中的资源**：`/_content/Monica.UI/[相对路径]`

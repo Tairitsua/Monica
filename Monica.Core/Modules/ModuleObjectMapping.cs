@@ -118,13 +118,14 @@ public class ModuleObjectMapping : MonicaModule<ModuleObjectMappingOption>, IWeb
             endpoints.MapGet("/mapper/status", async (HttpContext context, ObjectMappingFacade facade) =>
             {
                 var result = await facade.GetStatusAsync();
-                if (result.IsFailed(out var error, out var data))
+                if (result.IsFailure())
                 {
                     context.Response.StatusCode = 500;
-                    await context.Response.WriteAsJsonAsync(new { error });
+                    await context.Response.WriteAsJsonAsync(new { error = result.WithoutData() });
                     return;
                 }
 
+                var data = result.Data ?? throw new InvalidOperationException("Object mapping status returned no data.");
                 var res = new
                 {
                     count = data.Count,

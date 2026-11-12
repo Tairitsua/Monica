@@ -97,6 +97,39 @@ public sealed class EventBusKafkaPageStateTests
     }
 
     [Fact]
+    public async Task UpsertClusterAsync_WhenOnlyRedactedCredentialsChange_ShouldInvalidatePriorSuccessfulProbe()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var repository = new InMemoryKafkaConsoleRepository();
+        var cluster = new KafkaClusterConfig
+        {
+            ClusterId = "primary", DisplayName = "Primary", BootstrapServers = "broker.invalid:9092",
+            SecurityProtocol = "SaslSsl", SaslMechanism = "Plain",
+            SaslUsername = "original-user", SaslPassword = "original-secret", UpdatedAt = DateTimeOffset.MinValue
+        };
+        await using var fixture = new StateFixture(repository, cluster);
+        await fixture.State.InitializeAsync(token);
+        var previous = fixture.State.SelectedCluster!;
+        previous.IsReachable = true;
+        previous.HasTopicInventory = true;
+        previous.HasConsumerGroupInventory = true;
+        var edit = previous.Config.Clone();
+        edit.SaslPassword = "replacement-secret";
+
+        var saved = await fixture.State.UpsertClusterAsync(edit, token);
+
+        saved.Should().BeTrue();
+        fixture.State.SelectedCluster!.IsReachable.Should().BeFalse();
+        fixture.State.SelectedCluster.HasTopicInventory.Should().BeFalse();
+        fixture.State.SelectedCluster.HasConsumerGroupInventory.Should().BeFalse();
+        fixture.State.SelectedCluster.Config.UpdatedAt.Should().NotBe(previous.Config.UpdatedAt);
+        fixture.State.SelectedCluster.Config.SaslUsername.Should().BeNull();
+        fixture.State.SelectedCluster.Config.SaslPassword.Should().BeNull();
+        fixture.State.CanAdminSelectedCluster.Should().BeFalse();
+        (await repository.GetClusterAsync("primary", token))!.SaslPassword.Should().Be("replacement-secret");
+    }
+
+    [Fact]
     public async Task Initialize_WhenConfigurationReadIgnoresCancellation_ShouldDrainWithoutPublishingItsLateEvidence()
     {
         var repository = new DeferredRepository();

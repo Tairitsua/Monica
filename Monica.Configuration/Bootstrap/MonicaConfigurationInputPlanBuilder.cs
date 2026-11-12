@@ -21,9 +21,9 @@ public sealed class MonicaConfigurationInputPlanBuilder
     }
 
     /// <summary>
-    /// Selects the single store composition shared by startup loading and runtime registration.
+    /// Selects the single store composition for runtime managed configuration.
     /// </summary>
-    /// <param name="storeComposition">The paired store composition.</param>
+    /// <param name="storeComposition">The runtime store composition.</param>
     /// <returns>This declaration builder.</returns>
     public MonicaConfigurationInputPlanBuilder UseConfigurationStore(
         IMonicaConfigurationStoreComposition storeComposition)
@@ -43,7 +43,7 @@ public sealed class MonicaConfigurationInputPlanBuilder
     }
 
     /// <summary>
-    /// Selects the section-path convention shared by startup scanning and runtime Configuration options.
+    /// Selects the section-path convention for Managed definitions without explicit section paths.
     /// </summary>
     /// <param name="convention">The convention to use for types without explicit section paths.</param>
     /// <returns>This declaration builder.</returns>
@@ -96,8 +96,7 @@ public sealed class MonicaConfigurationInputPlanBuilder
     /// <param name="path">The JSON file path resolved from the host content root.</param>
     /// <param name="optional">Whether the file may be absent.</param>
     /// <param name="reloadOnChange">
-    /// Whether the runtime Microsoft configuration provider watches the file for changes. Short-lived bootstrap and
-    /// startup-snapshot providers never watch managed JSON files.
+    /// Whether the runtime Microsoft configuration provider watches the file for changes.
     /// </param>
     /// <param name="configure">Optional operator-facing source metadata configuration.</param>
     /// <returns>This declaration builder.</returns>

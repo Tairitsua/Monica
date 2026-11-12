@@ -28,18 +28,19 @@ internal sealed class MarkdownGroupSwitcherState(MarkdownFacade facade, List<Mar
                 _lifetime.TryApply(() => ErrorMessage = null);
                 var refresh = await facade.RefreshAllAsync();
                 token.ThrowIfCancellationRequested();
-                if (refresh.IsFailed(out var refreshError))
+                if (refresh.IsFailure())
                 {
-                    _lifetime.TryApply(() => ErrorMessage = refreshError);
+                    _lifetime.TryApply(() => ErrorMessage = refresh.Message ?? string.Empty);
                     return;
                 }
 
                 var response = await facade.GetAllDocumentGroupsAsync();
                 token.ThrowIfCancellationRequested();
-                if (response.IsFailed(out var error, out var refreshedGroups))
-                    _lifetime.TryApply(() => ErrorMessage = error);
+                if (response.IsFailure())
+                    _lifetime.TryApply(() => ErrorMessage = response.Message ?? string.Empty);
                 else
-                    _lifetime.TryApply(() => Groups = refreshedGroups);
+                    _lifetime.TryApply(() => Groups = response.Data
+                        ?? throw new InvalidOperationException("The document group read returned no data."));
             }
             finally { Interlocked.Exchange(ref _refreshing, 0); }
         });

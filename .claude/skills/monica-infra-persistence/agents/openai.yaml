@@ -1,4 +1,0 @@
-interface:
-  display_name: "Monica Infrastructure Persistence"
-  short_description: "Repository, transactions, outbox, and inbox"
-  default_prompt: "Use $monica-infra-persistence to integrate a transactional Monica repository operation."

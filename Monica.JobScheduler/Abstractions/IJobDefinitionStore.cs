@@ -14,13 +14,18 @@ namespace Monica.JobScheduler.Abstractions;
 /// </remarks>
 public interface IJobDefinitionStore
 {
+    /// <summary>Gets the currently accepted owner manifest hash, or null before first publication.</summary>
+    Task<string?> GetOwnerManifestHashAsync(string schedulerScopeKey, string ownerKey,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Atomically synchronizes one owner's complete declaration snapshot.
     /// </summary>
     /// <remarks>
     /// Present declarations are upserted without overwriting operator policy. Definitions of the same owner missing
     /// from the snapshot are marked absent. Repeating an identical snapshot is idempotent and only refreshes the
-    /// observation timestamps. Concurrent replicas of one owner may synchronize simultaneously.
+    /// owner observation row, without rewriting definitions or gates. A different manifest requires the exact
+    /// accepted previous hash after incompatible writers have been stopped; operator policy remains independent.
     /// </remarks>
     Task<JobDefinitionSyncResult> SyncOwnerSnapshotAsync(
         JobOwnerSnapshot snapshot,

@@ -10,6 +10,7 @@ using Monica.JobScheduler.Models.Operations;
 using Monica.JobScheduler.Providers;
 using Monica.JobScheduler.Services.Support;
 using Monica.Modules;
+using Monica.Locker.Leases;
 using Test.Monica.JobScheduler.Stores.Shared;
 using Xunit;
 using Xunit.Sdk;
@@ -34,7 +35,7 @@ public sealed class JobSchedulerFacadeTests
             JobKey = "jobs.beta",
             JobArgs = "{\"v\":1}"
         }, TestContext.Current.CancellationToken);
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data!.State.Should().Be(JobExecutionState.Queued);
         result.Data.Template.JobKey.Should().Be("jobs.beta");
         result.Data.Template.OwnerKey.Should().Be(StoreFixture.OWNER_A);
@@ -44,7 +45,7 @@ public sealed class JobSchedulerFacadeTests
             OwnerKey = StoreFixture.OWNER_A,
             JobKey = "jobs.missing"
         }, TestContext.Current.CancellationToken);
-        missing.Status.Should().NotBe(ResStatus.Ok);
+        missing.Status.Should().NotBe(ResultStatus.Ok);
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides(),
                 ExpectedConcurrencyStamp = "00000000000000000000000000000000"
             }, TestContext.Current.CancellationToken);
-        conflict.Status.Should().Be(ResStatus.Conflict);
+        conflict.Status.Should().Be(ResultStatus.Conflict);
 
         var notFound = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -73,7 +74,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides(),
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        notFound.Status.Should().Be(ResStatus.NotFound);
+        notFound.Status.Should().Be(ResultStatus.NotFound);
 
         var invalid = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -83,7 +84,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides { MaxConcurrencyOverride = 0 },
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        invalid.Status.Should().Be(ResStatus.BadRequest);
+        invalid.Status.Should().Be(ResultStatus.BadRequest);
 
         var ok = await harness.Facade.UpdatePolicyAsync(
             StoreFixture.OWNER_A,
@@ -93,7 +94,7 @@ public sealed class JobSchedulerFacadeTests
                 Overrides = new JobPolicyOverrides { MaxConcurrencyOverride = 3 },
                 ExpectedConcurrencyStamp = definition.Data.Policy.ConcurrencyStamp
             }, TestContext.Current.CancellationToken);
-        ok.Status.Should().Be(ResStatus.Ok);
+        ok.Status.Should().Be(ResultStatus.Ok);
 
         var batch = await harness.Facade.UpdatePoliciesAsync(new JobPolicyBatchUpdateRequest
         {
@@ -117,8 +118,8 @@ public sealed class JobSchedulerFacadeTests
         }, TestContext.Current.CancellationToken);
         batch.Data!.SucceededCount.Should().Be(0);
         batch.Data.FailedCount.Should().Be(2);
-        batch.Data.Items[0].FailureStatus.Should().Be(ResStatus.Conflict);
-        batch.Data.Items[1].FailureStatus.Should().Be(ResStatus.NotFound);
+        batch.Data.Items[0].FailureStatus.Should().Be(ResultStatus.Conflict);
+        batch.Data.Items[1].FailureStatus.Should().Be(ResultStatus.NotFound);
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class JobSchedulerFacadeTests
         }, TestContext.Current.CancellationToken);
 
         var overview = await harness.Facade.GetOverviewAsync(TestContext.Current.CancellationToken);
-        overview.Status.Should().Be(ResStatus.Ok);
+        overview.Status.Should().Be(ResultStatus.Ok);
         overview.Data!.Definitions.Should().HaveCount(2);
         overview.Data.ExecutionStateCounts[JobExecutionState.Queued].Should().Be(1);
         overview.Data.RecentExecutions.Should().ContainSingle();
@@ -185,15 +186,20 @@ public sealed class JobSchedulerFacadeTests
         harness.RuntimeState.SetScheduling(true, "Scheduling is active.");
         harness.RuntimeState.SetWorker(true, "Worker is active.");
         harness.RuntimeState.SetInFlightExecutions(2);
+        harness.RuntimeState.RecordOwnerSchedulingWork(NOW);
+        harness.RuntimeState.RecordLeaseRecoveryWork(NOW.AddSeconds(-1));
+        await harness.Store.CoordinatorLeases.TryAcquireAsync(
+            new LeaseResource(StoreFixture.SCOPE, "jobscheduler:maintenance"), "diagnostic-holder", TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         var result = await harness.Facade.GetRuntimeOverviewAsync(TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         var overview = result.Data!;
         overview.Store.Kind.Should().Be("InMemory");
         overview.Store.Provider.Should().BeNull();
         overview.Configuration.SchedulerScopeKey.Should().Be(StoreFixture.SCOPE);
         overview.Configuration.OwnerKey.Should().Be(StoreFixture.OWNER_A);
+        overview.Configuration.OwnerKeys.Should().Equal(StoreFixture.OWNER_A);
         overview.Configuration.SnapshotSyncInterval.Should().Be(new ModuleJobSchedulerOption().SnapshotSyncInterval);
         overview.OwnerOnlineThreshold.Should().Be(
             new ModuleJobSchedulerOption().SnapshotSyncInterval * 3,
@@ -202,6 +208,13 @@ public sealed class JobSchedulerFacadeTests
         overview.LocalPlane.SchedulingMessage.Should().Be("Scheduling is active.");
         overview.LocalPlane.WorkerReady.Should().BeTrue();
         overview.LocalPlane.InFlightExecutions.Should().Be(2);
+        overview.LocalPlane.LastOwnerSchedulingWorkAtUtc.Should().Be(NOW);
+        overview.LocalPlane.LastLeaseRecoveryWorkAtUtc.Should().Be(NOW.AddSeconds(-1));
+        overview.LocalPlane.LastHistoryCleanupWorkAtUtc.Should().BeNull();
+        overview.Configuration.MaxConcurrentStoreOperations.Should().Be(8);
+        overview.Configuration.ReservedLeaseStoreOperations.Should().Be(2);
+        overview.Configuration.StoreOperationTimeout.Should().Be(TimeSpan.FromSeconds(5));
+        overview.Coordination!.Coordinators.Should().ContainSingle().Which.WorkerInstanceId.Should().Be("diagnostic-holder");
         var owner = overview.Owners.Should().ContainSingle().Subject;
         owner.OwnerKey.Should().Be(StoreFixture.OWNER_A);
         owner.PresentCount.Should().Be(1);

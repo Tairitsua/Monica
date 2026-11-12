@@ -74,6 +74,8 @@
     }
     else
     {
+        <SetupDirectory Setups="capture.Setups" IsBusy="@(_pendingChannels.Count > 0 || State.IsRefreshing)"
+                        OnStart="StartSetupAsync" OnStop="StopSetupAsync" OnRestart="RestartSetupAsync" />
         <section class="datachannel-evidence-strip datachannel-evidence-strip--initialization" aria-label="@L["Workbench:SummaryLabel"]">
             <div>
                 <span>@L["Workbench:Registered"]</span>

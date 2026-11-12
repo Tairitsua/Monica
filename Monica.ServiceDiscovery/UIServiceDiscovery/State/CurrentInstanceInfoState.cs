@@ -21,7 +21,7 @@ public sealed class CurrentInstanceInfoState(ServiceDiscoveryFacade serviceDisco
     /// Reads host and provider evidence without discarding a previous successful capture on failure.
     /// The owner must serialize calls and drain this operation before retiring its cancellation source.
     /// </summary>
-    public async Task<Res<CurrentInstanceSnapshot>> RefreshAsync(
+    public async Task<Result<CurrentInstanceSnapshot>> RefreshAsync(
         bool showLoading = true, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -30,10 +30,17 @@ public sealed class CurrentInstanceInfoState(ServiceDiscoveryFacade serviceDisco
         {
             var result = await serviceDiscoveryFacade.CaptureCurrentInstanceAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var snapshot))
+            var error = result.WithoutData();
+            var snapshot = result.Data;
+            if (result.IsFailure())
             {
                 ErrorMessage = error.Message;
                 return result;
+            }
+            if (snapshot is null)
+            {
+                ErrorMessage = "The current instance snapshot was unavailable.";
+                return Result.Failure<CurrentInstanceSnapshot>(ErrorMessage);
             }
 
             Snapshot = new CurrentInstanceSnapshot
@@ -43,7 +50,7 @@ public sealed class CurrentInstanceInfoState(ServiceDiscoveryFacade serviceDisco
                 CurrentLeaderStatus = snapshot.CurrentLeaderStatus,
                 IsLeader = snapshot.IsLeader,
                 LeaderBecomeTime = snapshot.LeaderBecomeTime,
-                CurrentETag = snapshot.CurrentETag,
+                CurrentTermId = snapshot.CurrentTermId,
                 ClusterLeaderState = snapshot.ClusterLeaderState is { } leader
                     ? new LeaderState { AppId = leader.AppId, InstanceId = leader.InstanceId, BecomeLeaderTime = leader.BecomeLeaderTime }
                     : null

@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
+using Monica.Configuration.Projection;
 using Monica.Configuration.Serialization;
 using Monica.Configuration.Services.Support;
 
@@ -10,16 +12,20 @@ namespace Monica.Configuration.Services;
 /// <summary>
 /// Reads display-safe effective configuration state while sharing one persisted document across a definition snapshot.
 /// </summary>
-/// <param name="effectiveValueStore">The authoritative effective-value document store.</param>
+/// <param name="serviceProvider">Resolves the effective-value store only when a managed definition is read.</param>
 /// <param name="seedFactory">The factory for persisted and runtime fallback JSON values.</param>
 /// <param name="documentEditor">The logical-path reader for effective-value documents.</param>
 /// <param name="sourceInspector">The runtime configuration source inspector.</param>
 public sealed class ConfigurationEffectiveStateReader(
-    IConfigurationEffectiveValueStore effectiveValueStore,
+    IServiceProvider serviceProvider,
     ConfigurationEffectiveValueSeedFactory seedFactory,
     ConfigurationEffectiveValueDocumentEditor documentEditor,
     IConfigurationSourceInspector sourceInspector)
 {
+    private IConfigurationEffectiveValueStore EffectiveValueStore => serviceProvider.GetRequiredService<IConfigurationEffectiveValueStore>();
+    private bool IsManual => serviceProvider.GetService<ConfigurationRuntimeContext>()?.AutonomousWork == false;
+    private bool IsUnpersisted(ConfigurationDefinition definition) => IsManual
+        && serviceProvider.GetService<MonicaConfigurationProviderAccessor>()?.Provider?.IsUnpersisted(definition.DefinitionKey) == true;
     /// <summary>
     /// Reads one display-safe effective value.
     /// </summary>
@@ -34,7 +40,10 @@ public sealed class ConfigurationEffectiveStateReader(
         CancellationToken cancellationToken,
         bool includeSensitive = false)
     {
-        var document = await effectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
+        if (definition.Kind == ConfigurationKind.Startup)
+            return sourceInspector.GetSourceChain(definition, logicalPath, includeSensitive).StartupActualValue
+                ?? throw new InvalidOperationException("Startup configuration diagnostics are unavailable.");
+        var document = await EffectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
         var targetNode = ConfigurationSchemaNavigator.ResolveNode(definition.Root, logicalPath);
         var snapshotJson = CreateSnapshotJson(definition, document);
         var storedValue = documentEditor.ReadValue(definition, snapshotJson, logicalPath);
@@ -64,7 +73,8 @@ public sealed class ConfigurationEffectiveStateReader(
         CancellationToken cancellationToken,
         bool includeSensitive = false)
     {
-        var document = await effectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
+        if (definition.Kind == ConfigurationKind.Startup) return ReadStartupDefinition(definition, includeSensitive);
+        var document = await EffectiveValueStore.GetAsync(definition.DefinitionKey, cancellationToken);
         return MaterializeDefinition(definition, document, includeSensitive);
     }
 
@@ -85,22 +95,38 @@ public sealed class ConfigurationEffectiveStateReader(
             return [];
         }
 
-        var documents = await effectiveValueStore.GetManyAsync(
-            definitions.Select(static definition => definition.DefinitionKey).ToArray(),
-            cancellationToken);
-        if (documents.Count != definitions.Count)
+        var managed = definitions.Where(definition => definition.Kind == ConfigurationKind.Managed).ToArray();
+        IReadOnlyList<ConfigurationEffectiveValueDocument?> documents = managed.Length == 0 ? []
+            : await EffectiveValueStore.GetManyAsync(managed.Select(static definition => definition.DefinitionKey).ToArray(), cancellationToken);
+        if (documents.Count != managed.Length)
         {
             throw new InvalidOperationException(
                 "The effective-value store returned a different number of documents than requested definitions.");
         }
 
         var states = new ConfigurationDefinitionState[definitions.Count];
+        var managedIndex = 0;
         for (var index = 0; index < definitions.Count; index++)
         {
-            states[index] = MaterializeDefinition(definitions[index], documents[index], includeSensitive);
+            states[index] = definitions[index].Kind == ConfigurationKind.Startup
+                ? ReadStartupDefinition(definitions[index], includeSensitive)
+                : MaterializeDefinition(definitions[index], documents[managedIndex++], includeSensitive);
         }
 
         return states;
+    }
+
+    private ConfigurationDefinitionState ReadStartupDefinition(ConfigurationDefinition definition, bool includeSensitive)
+    {
+        var paths = EnumerateNodes(definition.Root).Select(node => node.RelativePath).ToArray();
+        var chains = sourceInspector.GetSourceChains(definition, paths, includeSensitive);
+        return new ConfigurationDefinitionState
+        {
+            Definition = definition,
+            StartupCandidate = chains[0].StartupActualValue?.StartupCandidate,
+            EffectiveValues = chains.Skip(1).Select(chain => chain.StartupActualValue
+                ?? throw new InvalidOperationException("Startup configuration diagnostics are unavailable.")).ToArray()
+        };
     }
 
     private ConfigurationDefinitionState MaterializeDefinition(
@@ -133,7 +159,8 @@ public sealed class ConfigurationEffectiveStateReader(
         return new ConfigurationDefinitionState
         {
             Definition = definition,
-            EffectiveValueVersion = document?.Version,
+            IsUnpersisted = IsUnpersisted(definition),
+            EffectiveValueVersion = IsUnpersisted(definition) ? null : document?.Version,
             EffectiveValues = values
         };
     }
@@ -172,7 +199,8 @@ public sealed class ConfigurationEffectiveStateReader(
                     ? null
                     : runtimeSourceValue.DisplayValue,
                 IsSensitive = isSensitive || runtimeSourceValue.IsSensitive,
-                Version = runtimeSourceValue.Source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
+                IsUnpersisted = runtimeSourceValue.IsUnpersisted,
+                Version = !runtimeSourceValue.IsUnpersisted && runtimeSourceValue.Source.Kind == ConfigurationSourceKind.MonicaEffectiveStore
                     ? document?.Version
                     : null,
                 EffectiveSource = runtimeSourceValue.Source
@@ -186,7 +214,8 @@ public sealed class ConfigurationEffectiveStateReader(
             ConfigurationPath = configurationPath,
             DisplayValue = isSensitive && !includeSensitive ? null : ToDisplayValue(snapshotStoredValue, targetNode),
             IsSensitive = isSensitive,
-            Version = document?.Version,
+            IsUnpersisted = IsUnpersisted(definition),
+            Version = IsUnpersisted(definition) ? null : document?.Version,
             EffectiveSource = definition.Origin == ConfigurationDefinitionOrigin.PublishedMetadata
                               && targetNode?.NodeKind == ConfigurationNodeKind.Scalar
                 ? BuildEffectiveStoreSource()
@@ -235,12 +264,12 @@ public sealed class ConfigurationEffectiveStateReader(
     {
         return new ConfigurationSourceDescriptor
         {
-            SourceKey = effectiveValueStore.Descriptor.StoreKey,
-            DisplayName = effectiveValueStore.Descriptor.DisplayName,
-            ProviderType = effectiveValueStore.Descriptor.Kind.ToString(),
+            SourceKey = EffectiveValueStore.Descriptor.StoreKey,
+            DisplayName = EffectiveValueStore.Descriptor.DisplayName,
+            ProviderType = EffectiveValueStore.Descriptor.Kind.ToString(),
             Kind = ConfigurationSourceKind.MonicaEffectiveStore,
             IsManagedByMonica = true,
-            IsWritable = effectiveValueStore.Descriptor.IsWritable
+            IsWritable = EffectiveValueStore.Descriptor.IsWritable
         };
     }
 
@@ -256,7 +285,7 @@ public sealed class ConfigurationEffectiveStateReader(
         return string.Join(':', parts);
     }
 
-    private static string? ToDisplayValue(ConfigurationStoredValue? storedValue, ConfigurationNodeDefinition? node)
+    internal static string? ToDisplayValue(ConfigurationStoredValue? storedValue, ConfigurationNodeDefinition? node)
     {
         if (storedValue is null)
         {
@@ -310,7 +339,7 @@ public sealed class ConfigurationEffectiveStateReader(
         }
     }
 
-    private static bool ContainsSensitiveValue(ConfigurationNodeDefinition node)
+    internal static bool ContainsSensitiveValue(ConfigurationNodeDefinition node)
     {
         if (node.IsSensitive || node.Children.Any(ContainsSensitiveValue))
         {

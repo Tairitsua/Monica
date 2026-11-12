@@ -17,7 +17,7 @@
     <ProjectReference Include="..\Monica.StateStore.UI\Monica.StateStore.UI.csproj" />
     <ProjectReference Include="..\Monica.UI\Monica.UI.csproj" />
     <ProjectReference Include="..\Monica.Logging\Monica.Logging.csproj" />
-    <ProjectReference Include="..\Monica.ProjectUnits\Monica.ProjectUnits.csproj" />
+    <ProjectReference Include="..\Monica.BuildingBlocks\Monica.BuildingBlocks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

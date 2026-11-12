@@ -1,0 +1,13 @@
+@attribute [Route(PAGE_URL)]
+
+@inject IStringLocalizer<BuildingBlocksResource> L
+
+<PageTitle>@L["Pages:BuildingBlocks:Catalog:Title"]</PageTitle>
+
+<BuildingBlocksWorkspace ActiveRoute="@PAGE_URL">
+    <BuildingBlockMonitor />
+</BuildingBlocksWorkspace>
+
+@code {
+    public const string PAGE_URL = "/building-blocks/catalog";
+}

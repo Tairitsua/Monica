@@ -46,7 +46,7 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAutoModel, ModuleAutoModelOption>();
+        module.Require<ModuleModelQuery, ModuleModelQueryOption>();
         module.Require<ModuleControllers, ModuleControllersOption>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
     }
@@ -69,7 +69,6 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
         services.TryAddSingleton<IConventionalHttpMethodResolver, ConventionalHttpMethodResolver>();
         // Mediated GET endpoints reach the write-transaction decision through the mediator, not MVC;
         // the convention classifies them from the request's own endpoint binding.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadOnlyRequestConvention, ApiEndpointReadOnlyConvention>());
         services.AddTransient<IServiceConvention, CrudControllerServiceConvention>();
         services.AddTransient<IApiDescriptionProvider, CrudApiDescriptionProvider>();
         services.AddTransient<IApiDescriptionProvider, RequestEndpointApiDescriptionProvider>();
@@ -118,7 +117,7 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
         var mvcBuilder = context.Services.AddControllers();
         var applicationPartTypes = _applicationPartCatalog.GetApplicationPartTypes();
         // Service-based MVC activation must also work when AutoControllers is registered directly.
-        // Keep an existing ProjectUnit or host registration when one supplies a richer activation policy.
+        // Keep an existing Building Blocks or host registration when one supplies a richer activation policy.
         foreach (var controllerType in applicationPartTypes)
             context.Services.TryAddTransient(controllerType);
 

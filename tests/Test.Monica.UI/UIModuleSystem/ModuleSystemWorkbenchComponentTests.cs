@@ -63,7 +63,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
                 ModuleSystemWorkbenchTestData.Calls(snapshot: () =>
                 {
                     facadeCalls++;
-                    return Res.Ok(ModuleSystemWorkbenchTestData.Snapshot());
+                    return Result.Success(ModuleSystemWorkbenchTestData.Snapshot());
                 })));
         });
 
@@ -138,7 +138,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
 
         await using var failed = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
         var request = failed.BeginSnapshotRequest(isInitial: true);
-        failed.CompleteSnapshotRequest(request, Res.Fail("offline"));
+        failed.CompleteSnapshotRequest(request, Result.Failure<ModuleDiagnosticsSnapshot>("offline"));
         var error = context.Render<ModuleWorkbenchLoadState>(parameters => parameters
             .Add(component => component.Session, failed));
 
@@ -153,7 +153,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
         await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls());
         await session.InitializeAsync();
         var request = session.BeginSnapshotRequest(isInitial: false);
-        session.CompleteSnapshotRequest(request, Res.Fail("offline"));
+        session.CompleteSnapshotRequest(request, Result.Failure<ModuleDiagnosticsSnapshot>("offline"));
 
         var cut = context.Render<ModuleWorkbenchHeader>(parameters => parameters
             .Add(component => component.Session, session));
@@ -224,7 +224,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
             inventory: () =>
             {
                 inventoryCalls++;
-                return Res.Ok(ModuleSystemWorkbenchTestData.Inventory());
+                return Result.Success(ModuleSystemWorkbenchTestData.Inventory());
             }));
         await session.InitializeAsync();
 
@@ -484,7 +484,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
         using var culture = new CultureScope(cultureName);
         await using var context = new ModuleSystemWorkbenchUiTestContext(localizer);
         await using var session = new ModuleSystemWorkbenchSession(ModuleSystemWorkbenchTestData.Calls(
-            snapshot: () => Res.Ok(ModuleSystemWorkbenchTestData.Snapshot(findings: [finding]))));
+            snapshot: () => Result.Success(ModuleSystemWorkbenchTestData.Snapshot(findings: [finding]))));
         await session.InitializeAsync();
 
         var cut = context.Render<ModuleWorkbenchOverview>(parameters => parameters
@@ -501,7 +501,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
         await using var context = new ModuleSystemWorkbenchUiTestContext();
         var snapshot = ModuleSystemWorkbenchTestData.Snapshot(applicationStartupDurationMs: null);
         await using var session = new ModuleSystemWorkbenchSession(
-            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Res.Ok(snapshot)));
+            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Result.Success(snapshot)));
         await session.InitializeAsync();
 
         var cut = context.Render<ModuleWorkbenchOverview>(parameters => parameters
@@ -540,7 +540,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
         var snapshot = ModuleSystemWorkbenchTestData.Snapshot(
             applicationStartupDurationMs: currentStartupDurationMs);
         await using var session = new ModuleSystemWorkbenchSession(
-            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Res.Ok(snapshot)));
+            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Result.Success(snapshot)));
         await session.InitializeAsync();
         await ImportBaselineAsync(
             session,
@@ -601,7 +601,7 @@ public sealed class ModuleSystemWorkbenchComponentTests
         };
         await using var context = new ModuleSystemWorkbenchUiTestContext();
         await using var session = new ModuleSystemWorkbenchSession(
-            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Res.Ok(snapshot)));
+            ModuleSystemWorkbenchTestData.Calls(snapshot: () => Result.Success(snapshot)));
         await session.InitializeAsync();
 
         var ribbon = context.Render<ModuleWorkbenchCriticalPathRibbon>(parameters => parameters

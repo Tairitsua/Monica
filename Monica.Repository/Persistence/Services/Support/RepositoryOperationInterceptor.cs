@@ -1,11 +1,16 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Monica.Core.Execution;
 
 namespace Monica.Repository.Persistence.Services.Support;
 
 internal interface IRepositoryContextLifetime
 {
+    Type RegistrationType { get; }
+    IServiceProvider Services { get; }
     void ValidateDatabaseAccess();
+    void PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes);
+    void MarkDatabaseFailure(ExecutionTransactionFailure failure);
 }
 
 /// <summary>
@@ -56,4 +61,26 @@ internal sealed class RepositoryOperationInterceptor : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
         CancellationToken cancellationToken = default)
         => ValueTask.FromResult(ScalarExecuting(command, eventData, result));
+
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
+        => (eventData.Context as IRepositoryContextLifetime)?.MarkDatabaseFailure(
+            ExecutionTransactionFailure.FromException("DatabaseCommand", eventData.Exception) with { CommandId = eventData.CommandId });
+
+    public override Task CommandFailedAsync(DbCommand command, CommandErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        CommandFailed(command, eventData);
+        return Task.CompletedTask;
+    }
+
+    public override void CommandCanceled(DbCommand command, CommandEndEventData eventData)
+        => (eventData.Context as IRepositoryContextLifetime)?.MarkDatabaseFailure(
+            new("DatabaseCommand", "The database command was cancelled.") { CommandId = eventData.CommandId });
+
+    public override Task CommandCanceledAsync(DbCommand command, CommandEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        CommandCanceled(command, eventData);
+        return Task.CompletedTask;
+    }
 }

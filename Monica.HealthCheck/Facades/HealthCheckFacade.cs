@@ -28,13 +28,13 @@ public sealed class HealthCheckFacade
     /// <param name="scope">The registration scope to execute.</param>
     /// <param name="cancellationToken">Cancels health-check execution.</param>
     /// <returns>A successful result containing the current snapshot, or a failure result when execution cannot complete.</returns>
-    public async Task<Res<HealthCheckSnapshot>> GetSnapshotAsync(
+    public async Task<Result<HealthCheckSnapshot>> GetSnapshotAsync(
         HealthCheckScope scope = HealthCheckScope.All,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _snapshotService.GetSnapshotAsync(scope, cancellationToken);
+            return Result.Success(await _snapshotService.GetSnapshotAsync(scope, cancellationToken));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -43,7 +43,7 @@ public sealed class HealthCheckFacade
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute health checks for scope {Scope}", scope);
-            return Res.Fail($"Failed to execute health checks: {ex.GetMessageRecursively()}");
+            return Result.Failure<HealthCheckSnapshot>($"Failed to execute health checks: {ex.GetMessageRecursively()}");
         }
     }
 }

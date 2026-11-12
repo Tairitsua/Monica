@@ -43,8 +43,6 @@ public class ModuleEventBusUI : MonicaModule<ModuleEventBusUIOption>, IWebHostRe
     public override void Describe(ModuleDescriptor module)
     {
         module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.RequireDependencyFeature<ModuleEventBus, ModuleEventBusOption>(
-            ModuleEventBus.DISTRIBUTED_PROVIDER_FEATURE);
         module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {

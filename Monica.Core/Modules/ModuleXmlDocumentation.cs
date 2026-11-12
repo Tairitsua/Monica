@@ -62,7 +62,7 @@ public class ModuleXmlDocumentation : MonicaModule<ModuleXmlDocumentationOption>
                 try
                 {
                     var cachedDocs = xmlService.GetCachedDocuments();
-                    return Res.Ok(cachedDocs.Select(doc => new
+                    return Result.Success(cachedDocs.Select(doc => new
                     {
                         doc.AssemblyName,
                         doc.XmlFilePath,
@@ -70,9 +70,10 @@ public class ModuleXmlDocumentation : MonicaModule<ModuleXmlDocumentationOption>
                         HasDocument = doc.Document != null
                     })).GetResponse();
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    return Res.Fail($"Failed to get the XML documentation cache: {ex.Message}").GetResponse();
+                    return Result.Failure($"Failed to get the XML documentation cache: {ex.Message}").GetResponse();
                 }
             })
             .WithName("GetXmlDocumentationCache")
@@ -86,11 +87,12 @@ public class ModuleXmlDocumentation : MonicaModule<ModuleXmlDocumentationOption>
                 try
                 {
                     xmlService.ClearCache();
-                    return Res.Ok("The XML documentation cache was cleared.").GetResponse();
+                    return Result.Success().WithMessage("The XML documentation cache was cleared.").GetResponse();
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    return Res.Fail($"Failed to clear the XML documentation cache: {ex.Message}").GetResponse();
+                    return Result.Failure($"Failed to clear the XML documentation cache: {ex.Message}").GetResponse();
                 }
             })
             .WithName("ClearXmlDocumentationCache")

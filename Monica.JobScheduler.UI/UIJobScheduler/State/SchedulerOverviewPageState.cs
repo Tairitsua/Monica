@@ -30,7 +30,7 @@ internal sealed class SchedulerOverviewPageStateFactory(
 /// </remarks>
 public sealed class SchedulerOverviewPageState : IAsyncDisposable
 {
-    private readonly Func<CancellationToken, Task<Res<JobSchedulerOverview>>> _loadOverview;
+    private readonly Func<CancellationToken, Task<Result<JobSchedulerOverview>>> _loadOverview;
     private readonly Func<CancellationToken, Task<bool>> _authorize;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _refreshInterval;
@@ -45,7 +45,7 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
     private bool _retired;
 
     internal SchedulerOverviewPageState(
-        Func<CancellationToken, Task<Res<JobSchedulerOverview>>> loadOverview,
+        Func<CancellationToken, Task<Result<JobSchedulerOverview>>> loadOverview,
         Func<CancellationToken, Task<bool>> authorize,
         TimeProvider timeProvider,
         TimeSpan refreshInterval)
@@ -54,6 +54,7 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
         _authorize = authorize;
         _timeProvider = timeProvider;
         _refreshInterval = refreshInterval;
+        AutoRefreshEnabled = refreshInterval > TimeSpan.Zero;
         _lifetimeToken = _lifetimeCancellation.Token;
     }
 
@@ -70,6 +71,19 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
     /// Gets the latest bounded scheduler overview.
     /// </summary>
     public JobSchedulerOverview? Overview { get; private set; }
+
+    /// <summary>Gets whether future timer ticks may admit a refresh. An already admitted read is allowed to finish.</summary>
+    public bool AutoRefreshEnabled { get; private set; } = true;
+
+    /// <summary>Pauses or resumes timer-triggered refreshes without changing the accepted snapshot or timer ownership.</summary>
+    public void SetAutoRefreshEnabled(bool enabled)
+    {
+        lock (_admissionGate)
+        {
+            ObjectDisposedException.ThrowIf(_retired, this);
+            AutoRefreshEnabled = enabled && _refreshInterval > TimeSpan.Zero;
+        }
+    }
 
     /// <summary>
     /// Gets whether the first access check completed.
@@ -203,7 +217,9 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
 
             var result = await _loadOverview(_lifetimeToken);
             _lifetimeToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var overview))
+            var error = result.WithoutData();
+            var overview = result.Data;
+            if (result.IsFailure())
             {
                 lock (_admissionGate)
                 {
@@ -301,7 +317,9 @@ public sealed class SchedulerOverviewPageState : IAsyncDisposable
             _lifetimeToken.ThrowIfCancellationRequested();
             while (await timer.WaitForNextTickAsync(_lifetimeToken))
             {
-                await RefreshAsync();
+                bool enabled;
+                lock (_admissionGate) enabled = AutoRefreshEnabled;
+                if (enabled) await RefreshAsync();
             }
         }
         catch (OperationCanceledException) when (_lifetimeToken.IsCancellationRequested)

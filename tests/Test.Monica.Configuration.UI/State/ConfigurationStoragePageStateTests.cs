@@ -10,7 +10,7 @@ public sealed class ConfigurationStoragePageStateTests
     public async Task Load_WhenOverviewFails_ShouldAcceptEmptyOperationEvidenceIndependently()
     {
         await using var state = new ConfigurationStoragePageState(
-            () => Task.FromException<Res<ConfigurationStorageOverview>>(new InvalidOperationException("overview unavailable")),
+            () => Task.FromException<Result<ConfigurationStorageOverview>>(new InvalidOperationException("overview unavailable")),
             () => Task.FromResult(States()), "unavailable");
 
         await ObserveAsync(state.LoadAsync());
@@ -29,8 +29,8 @@ public sealed class ConfigurationStoragePageStateTests
     public async Task Load_WhenOperationsFail_ShouldAcceptStorageCapabilitiesIndependently()
     {
         await using var state = new ConfigurationStoragePageState(
-            () => Task.FromResult(Res.Ok(Overview("available"))),
-            () => Task.FromResult<Res<IReadOnlyList<ConfigurationStoreState>>>(Res.Fail("operations unavailable")),
+            () => Task.FromResult(Result.Success(Overview("available"))),
+            () => Task.FromResult<Result<IReadOnlyList<ConfigurationStoreState>>>(Result.Failure<IReadOnlyList<ConfigurationStoreState>>("operations unavailable")),
             "unavailable");
 
         await ObserveAsync(state.LoadAsync());
@@ -49,13 +49,13 @@ public sealed class ConfigurationStoragePageStateTests
     [Fact]
     public async Task Refresh_ShouldRetainAcceptedEvidenceUntilEachNewestOutcomeIsAccepted()
     {
-        var pendingOverview = NewCompletion<Res<ConfigurationStorageOverview>>();
-        var pendingStates = NewCompletion<Res<IReadOnlyList<ConfigurationStoreState>>>();
+        var pendingOverview = NewCompletion<Result<ConfigurationStorageOverview>>();
+        var pendingStates = NewCompletion<Result<IReadOnlyList<ConfigurationStoreState>>>();
         var overviewCalls = 0;
         var stateCalls = 0;
         var clock = new FixedTimeProvider(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         await using var state = new ConfigurationStoragePageState(
-            () => ++overviewCalls == 1 ? Task.FromResult(Res.Ok(Overview("original"))) : pendingOverview.Task,
+            () => ++overviewCalls == 1 ? Task.FromResult(Result.Success(Overview("original"))) : pendingOverview.Task,
             () => ++stateCalls == 1 ? Task.FromResult(States(new ConfigurationStoreState { StoreKey = "original" })) : pendingStates.Task,
             "unavailable", clock);
         await ObserveAsync(state.LoadAsync());
@@ -69,7 +69,7 @@ public sealed class ConfigurationStoragePageStateTests
         Assert.Same(states, state.StoreStates.Value);
         Assert.Equal(observed, state.Overview.ObservedAtUtc);
         clock.UtcNow = clock.UtcNow.AddMinutes(1);
-        pendingOverview.SetResult(Res.Fail("new overview failed"));
+        pendingOverview.SetResult(Result.Failure<ConfigurationStorageOverview>("new overview failed"));
         pendingStates.SetResult(States());
         await ObserveAsync(refresh);
 
@@ -87,14 +87,14 @@ public sealed class ConfigurationStoragePageStateTests
     [InlineData(true)]
     public async Task Refresh_WhenOlderReadCompletesLate_ShouldNotReplaceNewerEvidenceOrError(bool olderFails)
     {
-        var pending = NewCompletion<Res<ConfigurationStorageOverview>>();
+        var pending = NewCompletion<Result<ConfigurationStorageOverview>>();
         var calls = 0;
         await using var state = new ConfigurationStoragePageState(
-            () => ++calls == 1 ? pending.Task : Task.FromResult(Res.Ok(Overview("new"))),
+            () => ++calls == 1 ? pending.Task : Task.FromResult(Result.Success(Overview("new"))),
             () => Task.FromResult(States()), "unavailable");
         var older = state.LoadAsync();
         await ObserveAsync(state.LoadAsync());
-        pending.SetResult(olderFails ? Res.Fail("old failure") : Res.Ok(Overview("old")));
+        pending.SetResult(olderFails ? Result.Failure<ConfigurationStorageOverview>("old failure") : Result.Success(Overview("old")));
         await ObserveAsync(older);
 
         Assert.Equal("new", Assert.IsType<ConfigurationStorageOverview>(state.Overview.Value).EffectiveValueStore.StoreKey);
@@ -114,9 +114,9 @@ public sealed class ConfigurationStoragePageStateTests
             if (++overviewCalls == 1)
             {
                 nestedRefresh = state!.LoadAsync();
-                return Task.FromResult(Res.Ok(Overview("old")));
+                return Task.FromResult(Result.Success(Overview("old")));
             }
-            return Task.FromResult(Res.Ok(Overview("new")));
+            return Task.FromResult(Result.Success(Overview("new")));
         }, () => Task.FromResult(States(new ConfigurationStoreState { StoreKey = ++stateCalls == 1 ? "new" : "old" })), "unavailable");
         await using var owner = state;
 
@@ -132,8 +132,8 @@ public sealed class ConfigurationStoragePageStateTests
     public async Task Load_ShouldCopyMutableOperationCollectionsBeforeAcceptingThem()
     {
         var states = new List<ConfigurationStoreState> { new() { StoreKey = "accepted" } };
-        await using var state = new ConfigurationStoragePageState(() => Task.FromResult(Res.Ok(Overview("accepted"))),
-            () => Task.FromResult(Res.Ok<IReadOnlyList<ConfigurationStoreState>>(states)), "unavailable");
+        await using var state = new ConfigurationStoragePageState(() => Task.FromResult(Result.Success(Overview("accepted"))),
+            () => Task.FromResult(Result.Success<IReadOnlyList<ConfigurationStoreState>>(states)), "unavailable");
         await ObserveAsync(state.LoadAsync());
 
         states.Clear();
@@ -145,8 +145,8 @@ public sealed class ConfigurationStoragePageStateTests
     [Fact]
     public async Task Dispose_ShouldJoinActualTokenlessReadsAndShareCompletionWithoutAdoptingLateResults()
     {
-        var overview = NewCompletion<Res<ConfigurationStorageOverview>>();
-        var states = NewCompletion<Res<IReadOnlyList<ConfigurationStoreState>>>();
+        var overview = NewCompletion<Result<ConfigurationStorageOverview>>();
+        var states = NewCompletion<Result<IReadOnlyList<ConfigurationStoreState>>>();
         var calls = 0;
         var state = new ConfigurationStoragePageState(() => { calls++; return overview.Task; },
             () => states.Task, "unavailable");
@@ -155,9 +155,9 @@ public sealed class ConfigurationStoragePageStateTests
         var repeated = state.DisposeAsync().AsTask();
         Assert.Same(first, repeated);
         Assert.False(first.IsCompleted);
-        overview.SetResult(Res.Ok(Overview("late")));
+        overview.SetResult(Result.Success(Overview("late")));
         Assert.False(first.IsCompleted);
-        states.SetResult(Res.Fail("late failure"));
+        states.SetResult(Result.Failure<IReadOnlyList<ConfigurationStoreState>>("late failure"));
         await ObserveAsync(load);
         await ObserveAsync(first);
 
@@ -174,7 +174,7 @@ public sealed class ConfigurationStoragePageStateTests
         return new() { EffectiveValueStore = descriptor, HistoryStore = descriptor, MetadataStore = descriptor };
     }
 
-    private static Res<IReadOnlyList<ConfigurationStoreState>> States(params ConfigurationStoreState[] values) => Res.Ok<IReadOnlyList<ConfigurationStoreState>>(values);
+    private static Result<IReadOnlyList<ConfigurationStoreState>> States(params ConfigurationStoreState[] values) => Result.Success<IReadOnlyList<ConfigurationStoreState>>(values);
     private static TaskCompletionSource<T> NewCompletion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static Task ObserveAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

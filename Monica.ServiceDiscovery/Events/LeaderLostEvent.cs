@@ -1,3 +1,5 @@
+using Monica.Locker.Leases;
+
 namespace Monica.ServiceDiscovery.Events;
 
 /// <summary>
@@ -28,7 +30,10 @@ public enum LeaderLostReason
     /// <summary>
     /// Leader Key has expired or been deleted
     /// </summary>
-    LeaderKeyExpired
+    LeaderKeyExpired,
+
+    /// <summary>A coordinated service's local work attempt failed; the shared leadership term remains active.</summary>
+    WorkFailed
 }
 
 /// <summary>
@@ -36,6 +41,8 @@ public enum LeaderLostReason
 /// </summary>
 public class LeaderLostEvent
 {
+    /// <summary>The ended acquisition; delayed observers must not cancel a later term.</summary>
+    public required LeaseIdentity Identity { get; init; }
     /// <summary>
     /// Application identifier that lost leadership.
     /// </summary>

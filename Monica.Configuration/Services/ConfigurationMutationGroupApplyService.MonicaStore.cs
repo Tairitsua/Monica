@@ -25,8 +25,10 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             {
                 var document = await effectiveValueStore.GetAsync(
                     mutation.Definition.DefinitionKey,
-                    cancellationToken)
-                    ?? new ConfigurationEffectiveValueDocument
+                    cancellationToken);
+                if (document is null && mutation.PublishedDefinitionExpectation is not null)
+                    throw new ConfigurationConcurrencyConflictException("The existing managed document disappeared before persistence.");
+                document ??= new ConfigurationEffectiveValueDocument
                     {
                         DefinitionKey = mutation.Definition.DefinitionKey,
                         Json = seedFactory.CreateSeedJson(mutation.Definition),
@@ -40,7 +42,8 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                         $"Expected version {target.ExpectedVersion} for '{mutation.Definition.DefinitionKey}', but current version is {document.Version}.");
                 }
 
-                state = new DefinitionMutationState(mutation.Definition, document, target.ExpectedVersion);
+                state = new DefinitionMutationState(mutation.Definition, document, target.ExpectedVersion,
+                    mutation.PublishedDefinitionExpectation);
                 states.Add(mutation.Definition.DefinitionKey, state);
                 orderedStates.Add(state);
             }
@@ -132,6 +135,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                         Definition = state.Definition,
                         Json = state.Json,
                         ExpectedVersion = state.Version,
+                        PublishedDefinitionExpectation = state.PublishedDefinitionExpectation,
                         Context = context
                     }
                 }).ToArray()
@@ -142,8 +146,11 @@ internal sealed partial class ConfigurationMutationGroupApplyService
     private sealed class DefinitionMutationState(
         ConfigurationDefinition definition,
         ConfigurationEffectiveValueDocument document,
-        long? stagedExpectedVersion)
+        long? stagedExpectedVersion,
+        ConfigurationPublishedDefinitionExpectation? publishedDefinitionExpectation)
     {
+        public ConfigurationPublishedDefinitionExpectation? PublishedDefinitionExpectation { get; } = publishedDefinitionExpectation;
+
         public ConfigurationDefinition Definition { get; } = definition;
 
         public string Json { get; private set; } = document.Json;

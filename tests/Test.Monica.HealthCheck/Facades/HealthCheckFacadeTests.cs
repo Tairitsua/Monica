@@ -40,7 +40,7 @@ public sealed class HealthCheckFacadeTests
             HealthCheckScope.Readiness,
             TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(ResStatus.Ok);
+        result.Status.Should().Be(ResultStatus.Ok);
         result.Data.Should().NotBeNull();
         result.Data!.Scope.Should().Be(HealthCheckScope.Readiness);
         result.Data.Status.Should().Be(HealthCheckState.Degraded);

@@ -50,6 +50,53 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal event Func<Task>? Changed;
 
     internal IReadOnlyList<JobOperationalSummary> Summaries { get; private set; } = [];
+    internal IReadOnlyList<JobDefinition> Definitions { get; private set; } = [];
+    internal IReadOnlyList<JobOperationalSummary> Catalog { get; private set; } = [];
+    internal IReadOnlyDictionary<JobId, SchedulerJobEvidence> Evidence { get; private set; } = new Dictionary<JobId, SchedulerJobEvidence>();
+    internal string? Standing { get; set; }
+    internal string? Cadence { get; set; }
+    internal string CatalogSort { get; set; } = "attention";
+    internal bool IsCatalogTruncated { get; private set; }
+    internal IReadOnlyDictionary<string, int> StandingCounts => new[] { "all", "attention", "unknown", "healthy", "ondemand", "paused", "absent" }
+        .ToDictionary(key => key, key => Catalog.Count(row => Matches(row, exceptStanding: true) && (key == "all" || StandingOf(row) == key)));
+    internal string StandingOf(JobOperationalSummary row) => !row.Definition.IsPresent ? "absent" : row.Definition.IsDisabled ? "paused"
+        : Evidence.GetValueOrDefault(row.Definition.Id)?.NeedsAttention == true || row.LatestExecution?.State == JobExecutionState.Failed ? "attention"
+        : Evidence.GetValueOrDefault(row.Definition.Id)?.IsAssessed != true ? "unknown"
+        : row.Definition.Declaration.JobType == JobType.Triggered ? "ondemand" : "healthy";
+    internal string StandingToneOf(JobOperationalSummary row) => Evidence.GetValueOrDefault(row.Definition.Id)?.Tone ?? "neutral";
+    internal string? StandingDetailOf(JobOperationalSummary row)
+    {
+        if (!row.Definition.IsPresent || row.Definition.IsDisabled) return null;
+        var evidence = Evidence.GetValueOrDefault(row.Definition.Id);
+        if (evidence?.FailureStreak > 0) return _localizer[evidence.FailureStreakIsLowerBound ? "Architecture:AtLeastStreak" : "Workspace:FailureStreak", evidence.FailureStreak];
+        if (evidence?.IsOverrun == true) return _localizer["Workspace:OverrunSignal"];
+        if (evidence?.IsSkipping == true) return _localizer["Workspace:SkipSignal"];
+        if (evidence?.IsIntermittent == true) return _localizer["Workspace:Intermittent"];
+        return evidence?.IsAssessed != true ? _localizer["Architecture:UnknownReason"].Value : null;
+    }
+    private bool Matches(JobOperationalSummary row, bool exceptStanding = false) => Matches(row,
+        new JobDefinitionQuery
+        {
+            OwnerKey = OwnerId,
+            IsPresent = PresentFilter,
+            JobType = SelectedJobType,
+            IsDisabled = SelectedDisabledState,
+            SearchText = SearchText
+        }, Standing, Cadence, exceptStanding);
+
+    private bool Matches(JobOperationalSummary row, JobDefinitionQuery query, string? standing, string? cadence, bool exceptStanding = false)
+    {
+        var definition = row.Definition;
+        return (query.OwnerKey is null || definition.OwnerKey == query.OwnerKey)
+            && (query.IsPresent is null || definition.IsPresent == query.IsPresent)
+            && (query.JobType is null || definition.Declaration.JobType == query.JobType)
+            && (query.IsDisabled is null || definition.IsDisabled == query.IsDisabled)
+            && (exceptStanding || standing is null || standing == "all" || StandingOf(row) == standing)
+            && (cadence is null || SchedulerCadence.Bucket(definition, ObservedAtUtc ?? DateTimeOffset.UtcNow) == cadence)
+            && (string.IsNullOrWhiteSpace(query.SearchText) || new[] { definition.EffectiveConfiguration.JobName, definition.Declaration.JobKey, definition.OwnerKey }
+                .Any(value => value.Contains(query.SearchText, StringComparison.CurrentCultureIgnoreCase)));
+    }
+    internal DateTimeOffset? ObservedAtUtc { get; private set; }
     internal IReadOnlyList<KeyValuePair<string, int>> OwnerFacets { get; private set; } = [];
     internal IReadOnlyDictionary<JobType, int> JobTypeCounts { get; private set; } =
         new Dictionary<JobType, int>();
@@ -62,15 +109,15 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal string? SearchText { get; set; }
     internal string? OwnerId { get; set; }
 
-    /// <summary>Gets or sets the selected job type. A null value includes all types; ordinary entry defaults to recurring jobs.</summary>
-    internal JobType? SelectedJobType { get; set; } = JobType.Recurring;
+    /// <summary>Gets or sets the selected job type. Ordinary entry includes recurring and triggered definitions.</summary>
+    internal JobType? SelectedJobType { get; set; }
     internal bool? SelectedDisabledState { get; set; }
 
     /// <summary>
-    /// Gets the presence scope applied to every catalog query. Defaults to definitions their owners currently
-    /// publish; the overview attention panel deep-links an absent-only audit view through the page query parameter.
+    /// Gets the optional presence scope applied to every catalog query. Ordinary entry includes both published
+    /// and retained unpublished definitions; explicit true or false selects one population.
     /// </summary>
-    internal bool? PresentFilter { get; private set; } = true;
+    internal bool? PresentFilter { get; private set; }
 
     internal bool AccessChecked { get; private set; }
     internal bool IsAuthorized { get; private set; }
@@ -90,20 +137,27 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     internal JobDefinitionSortField SortField { get; private set; } = JobDefinitionSortField.JobName;
     internal bool SortDescending { get; private set; }
     internal bool HasSelection => _selectedJobIds.Count > 0;
-    internal bool HasDebugOnlySuppressedSelection =>
-        SelectedRecurringSummaries.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed);
+    internal bool HasManualOnlySuppressedSelection =>
+        SelectedRecurringSummaries.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed);
     internal bool IsDisposed => _lifetime.IsRetired;
 
+    internal Task RefreshCompositionAsync() => _lifetime.RunAsync(async token =>
+    {
+        if ((await EnsureAuthorizedAsync(token)).IsAuthorized) await LoadFacetsAsync(token);
+        await NotifyChangedAsync();
+    });
+
     /// <summary>
-    /// Applies the page's deep-link filters before the first load. Omitted values keep the present-only recurring
-    /// default and the unfiltered owner scope. An absent-only entry includes all job types.
+    /// Applies the page's exact deep-link filters before the first load. Omitted values include every retained
+    /// definition and job type. Explicit presence and owner filters narrow that population.
     /// </summary>
     internal void ApplyInitialQuery(bool? present, string? owner)
     {
+        PresentFilter = present;
         if (present is { } value)
         {
             PresentFilter = value;
-            SelectedJobType = value ? JobType.Recurring : null;
+            SelectedJobType = null;
         }
 
         if (!string.IsNullOrWhiteSpace(owner))
@@ -159,7 +213,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     {
         SearchText = null;
         OwnerId = null;
-        SelectedJobType = PresentFilter == false ? null : JobType.Recurring;
+        SelectedJobType = null;
         SelectedDisabledState = null;
         _selectedJobIds.Clear();
     }
@@ -215,11 +269,14 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                 PageSize = PageSize
             };
         });
+        var standing = Standing;
+        var cadence = Cadence;
+        var sort = CatalogSort;
         return _lifetime.RunAsync(async lifetimeToken =>
         {
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 lifetimeToken, requestCancellation);
-            var result = await LoadAsync(query!, version, linkedCancellation.Token);
+            var result = await LoadAsync(query!, standing, cadence, sort, version, linkedCancellation.Token);
             linkedCancellation.Token.ThrowIfCancellationRequested();
             return result;
         });
@@ -263,6 +320,8 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
 
         var updatedDefinition = items[index].Definition with { Policy = policy };
+        Catalog = Catalog.Select(row => row.Definition.Id == jobId ? row with { Definition = updatedDefinition } : row).ToArray();
+        Evidence = Evidence.ToDictionary(pair => pair.Key, pair => pair.Key == jobId ? pair.Value with { Definition = updatedDefinition } : pair.Value);
         var isRecurring = updatedDefinition.Declaration.JobType == JobType.Recurring;
         var suspensionReasons = isRecurring
             ? JobSchedulerUiPresentation.SetOperatorPolicySuspension(
@@ -281,12 +340,13 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             NextOccurrenceUtc = isRecurring ? null : items[index].NextOccurrenceUtc
         };
         Summaries = items;
+        Definitions = Definitions.Select(definition => definition.Id == jobId ? definition with { Policy = policy } : definition).ToArray();
     }
 
-    internal Task<Res<JobPolicy>> SetDisabledAsync(JobOperationalSummary summary, bool disabled) =>
+    internal Task<Result<JobPolicy>> SetDisabledAsync(JobOperationalSummary summary, bool disabled) =>
         _lifetime.RunAsync(token => SetDisabledCoreAsync(summary, disabled, token));
 
-    private async Task<Res<JobPolicy>> SetDisabledCoreAsync(
+    private async Task<Result<JobPolicy>> SetDisabledCoreAsync(
         JobOperationalSummary summary, bool disabled, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -297,9 +357,9 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
-            if (disabled && JobSchedulerUiPresentation.IsDebugOnlySuppressed(summary))
-                return Res.Fail(_localizer["Catalog:Messages:PauseUnavailableDebug"]);
+                return Result.Failure<JobPolicy>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+            if (disabled && JobSchedulerUiPresentation.IsManualOnlySuppressed(summary))
+                return Result.Failure<JobPolicy>(_localizer["Catalog:Messages:PauseUnavailableManual"]);
 
             var definition = summary.Definition;
             var result = await _facade.UpdatePolicyAsync(
@@ -311,8 +371,11 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                     ExpectedConcurrencyStamp = definition.Policy.ConcurrencyStamp
                 }, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var policy))
+            if (result.IsSuccess())
+            {
+                var policy = result.Data ?? throw new InvalidOperationException("The policy update returned no data.");
                 _lifetime.TryApply(() => ApplyPolicy(definition.Id, policy));
+            }
             return result;
         }
         finally
@@ -325,10 +388,10 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
     }
 
-    internal Task<Res<JobExecutionInstance>> RunRecurringNowAsync(JobOperationalSummary summary) =>
+    internal Task<Result<JobExecutionInstance>> RunRecurringNowAsync(JobOperationalSummary summary) =>
         _lifetime.RunAsync(token => RunRecurringNowCoreAsync(summary, token));
 
-    private async Task<Res<JobExecutionInstance>> RunRecurringNowCoreAsync(
+    private async Task<Result<JobExecutionInstance>> RunRecurringNowCoreAsync(
         JobOperationalSummary summary, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -339,7 +402,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+                return Result.Failure<JobExecutionInstance>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
             var definition = summary.Definition;
             var result = await _facade.RunRecurringNowAsync(new JobRecurringRunNowRequest
             {
@@ -359,12 +422,12 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         }
     }
 
-    internal Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(bool disabled) =>
+    internal Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(bool disabled) =>
         SetSelectedDisabledAsync(disabled, SelectedRecurringSummaries);
 
     /// <summary>Mutates only the exact identities and policy revisions accepted by the confirmation dialog.</summary>
     /// <remarks>Selection changes after confirmation or during authorization cannot retarget the admitted batch.</remarks>
-    internal Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(
+    internal Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledAsync(
         bool disabled, IReadOnlyList<JobOperationalSummary> confirmedSelection)
     {
         ArgumentNullException.ThrowIfNull(confirmedSelection);
@@ -372,7 +435,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         return _lifetime.RunAsync(token => SetSelectedDisabledCoreAsync(disabled, selected, token));
     }
 
-    private async Task<Res<JobPolicyBatchUpdateResult>> SetSelectedDisabledCoreAsync(
+    private async Task<Result<JobPolicyBatchUpdateResult>> SetSelectedDisabledCoreAsync(
         bool disabled, IReadOnlyList<JobOperationalSummary> selected, CancellationToken cancellationToken)
     {
         await _mutationGate.WaitAsync(cancellationToken);
@@ -383,12 +446,12 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             await NotifyChangedAsync();
             var access = await EnsureAuthorizedAsync(cancellationToken);
             if (!access.IsAuthorized)
-                return Res.Fail(access.Error ?? _localizer["Access:DeniedDescription"].Value);
-            if (selected.Count == 0) return _localizer["Catalog:Batch:Empty"].Value;
+                return Result.Failure<JobPolicyBatchUpdateResult>(access.Error ?? _localizer["Access:DeniedDescription"].Value);
+            if (selected.Count == 0) return Result.Failure<JobPolicyBatchUpdateResult>(_localizer["Catalog:Batch:Empty"].Value);
             if (selected.Any(static summary => summary.Definition.Declaration.JobType != JobType.Recurring))
                 throw new ArgumentException("A catalog policy batch accepts only confirmed recurring definitions.", nameof(selected));
-            if (disabled && selected.Any(JobSchedulerUiPresentation.IsDebugOnlySuppressed))
-                return _localizer["Catalog:Batch:PauseUnavailableDebug"].Value;
+            if (disabled && selected.Any(JobSchedulerUiPresentation.IsManualOnlySuppressed))
+                return Result.Failure<JobPolicyBatchUpdateResult>(_localizer["Catalog:Batch:PauseUnavailableManual"].Value);
 
             var result = await _facade.UpdatePoliciesAsync(new JobPolicyBatchUpdateRequest
             {
@@ -401,8 +464,9 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
                 }).ToArray()
             }, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.IsFailed(out _, out var batch))
+            if (result.IsSuccess())
             {
+                var batch = result.Data ?? throw new InvalidOperationException("The policy batch update returned no data.");
                 _lifetime.TryApply(() =>
                 {
                     foreach (var item in batch.Items.Where(static item => item.IsSucceeded))
@@ -439,7 +503,7 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     }
 
     private async Task<TableData<JobOperationalSummary>> LoadAsync(
-        JobDefinitionQuery query, int version, CancellationToken cancellationToken)
+        JobDefinitionQuery query, string? standing, string? cadence, string sort, int version, CancellationToken cancellationToken)
     {
         await _loadGate.WaitAsync(cancellationToken);
         try
@@ -451,20 +515,19 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
             {
                 return new() { Items = [], TotalItems = 0 };
             }
-            var result = await _facade.QueryOperationalSummariesAsync(query, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result.IsFailed(out var error, out var page))
+            await LoadFacetsAsync(cancellationToken);
+            if (FacetsError is not null) throw new InvalidOperationException(FacetsError);
+            var candidates = Catalog.Where(row => Matches(row, query, standing, cadence));
+            var ordered = sort switch
             {
-                _lifetime.TryApply(() =>
-                {
-                    if (version != _loadVersion) return;
-                    Summaries = [];
-                    TotalCount = 0;
-                    _selectedJobIds.Clear();
-                    Error = error.Message;
-                });
-                return new() { Items = [], TotalItems = 0 };
-            }
+                "name" => candidates.OrderBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
+                "owner" => candidates.OrderBy(row => row.Definition.OwnerKey, StringComparer.Ordinal).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture),
+                "next" => candidates.OrderBy(row => row.NextOccurrenceUtc ?? DateTimeOffset.MaxValue),
+                _ => candidates.OrderBy(row => Array.IndexOf(new[] { "attention", "unknown", "healthy", "ondemand", "paused", "absent" }, StandingOf(row))).ThenByDescending(row => Evidence.GetValueOrDefault(row.Definition.Id)?.FailureStreak ?? 0).ThenBy(row => row.Definition.EffectiveConfiguration.JobName, StringComparer.CurrentCulture)
+            };
+            var matches = ordered.ToArray();
+            var page = new QueryResult<JobOperationalSummary>(matches.Skip((query.PageNumber - 1) * query.PageSize).Take(query.PageSize).ToList(), matches.Length);
+            cancellationToken.ThrowIfCancellationRequested();
             _lifetime.TryApply(() =>
             {
                 if (version != _loadVersion) return;
@@ -502,13 +565,38 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
     {
         var result = await _facade.GetOverviewAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (result.IsFailed(out var error, out var overview))
+        var error = result.WithoutData();
+        var overview = result.Data;
+        if (result.IsFailure() || overview is null)
         {
-            _lifetime.TryApply(() => FacetsError = error.Message);
+            _lifetime.TryApply(() => FacetsError = error.Message ?? "The scheduler overview was unavailable.");
             return;
         }
 
-        var scopedDefinitions = overview.Definitions
+        var catalog = new List<JobOperationalSummary>();
+        var total = 0;
+        for (var pageNumber = 1; pageNumber <= 10; pageNumber++)
+        {
+            var response = await _facade.QueryOperationalSummariesAsync(new JobDefinitionQuery { PageNumber = pageNumber, PageSize = 200 }, cancellationToken);
+            var catalogError = response.WithoutData();
+            var page = response.Data;
+            if (response.IsFailure() || page is null) { _lifetime.TryApply(() => FacetsError = catalogError.Message ?? "The job catalog was unavailable."); return; }
+            catalog.AddRange(page.Items); total = page.TotalCount;
+            if (catalog.Count >= total || page.Items.Count == 0) break;
+        }
+        SchedulerExecutionSample? sample = null;
+        try
+        {
+            sample = await SchedulerExecutionSample.LoadAsync(_facade, new JobExecutionQuery
+            { SchedulerScopeKey = string.Empty, CreatedAfterUtc = overview.CapturedAtUtc.AddHours(-1), CreatedBeforeUtc = overview.CapturedAtUtc }, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A failed historical sample does not erase independently accepted definitions or latest executions.
+        }
+        var records = (sample?.Records ?? []).Concat(catalog.Select(row => row.LatestExecution).OfType<JobExecutionInstance>()).DistinctBy(record => record.InstanceId).ToLookup(record => new JobId(record.Template.OwnerKey, record.Template.JobKey));
+        var evidence = catalog.ToDictionary(row => row.Definition.Id, row => SchedulerJobEvidence.Create(row.Definition, records[row.Definition.Id], overview.CapturedAtUtc, sample is { IsTruncated: false }));
+        var scopedDefinitions = catalog.Select(row => row.Definition)
             .Where(definition => PresentFilter is null || definition.IsPresent == PresentFilter)
             .ToArray();
         var ownerFacets = scopedDefinitions
@@ -522,6 +610,11 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         _lifetime.TryApply(() =>
         {
             OwnerFacets = ownerFacets;
+            Catalog = catalog;
+            Evidence = evidence;
+            IsCatalogTruncated = catalog.Count < total;
+            Definitions = catalog.Select(row => row.Definition).ToArray();
+            ObservedAtUtc = overview.CapturedAtUtc;
             JobTypeCounts = jobTypeCounts;
             HasLoadedFacets = true;
             FacetsError = null;
@@ -536,6 +629,10 @@ internal sealed class JobCatalogPageState : IAsyncDisposable
         Error = null;
         _selectedJobIds.Clear();
         OwnerFacets = [];
+        Definitions = [];
+        Catalog = [];
+        Evidence = new Dictionary<JobId, SchedulerJobEvidence>();
+        ObservedAtUtc = null;
         JobTypeCounts = new Dictionary<JobType, int>();
         HasLoadedFacets = false;
         FacetsError = null;

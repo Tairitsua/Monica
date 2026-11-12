@@ -1,0 +1,112 @@
+@using Monica.UI.Shared.Components.Dialogs
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation Clock
+
+<MoSideSheet Open="Open" OpenChanged="OpenChanged" Width="560px">
+    <TitleContent>
+        <div class="cleanup-sheet-heading @DefinitionCleanupPresentation.Role(Item?.State ?? JobDefinitionCleanupState.Missing).ToCssClass()">
+            <span class="cleanup-role-tile"><MoIcon Icon="@MoIcons.ListChecks" Size="16px" /></span>
+            <div>
+                <p>@L["Cleanup:EvidenceTitle"]</p>
+                <h2>@(Item?.Definition?.Declaration.JobName ?? (Item is null ? L["Cleanup:Loading"].Value : Label(Item.State)))</h2>
+                @if (Item is { } heading) { <span class="cleanup-status cleanup-status--pill">@Label(heading.State)</span> }
+            </div>
+        </div>
+    </TitleContent>
+    <ChildContent>
+        @if (Item is { } item)
+        {
+            <div class="cleanup-sheet">
+                @if (item.Definition is not null && item.ManifestHash is not null)
+                {
+                    <MoSemanticCallout Severity="@(item.Definition.IsPresent ? MoVisualRole.Warning : MoVisualRole.Info)" Title="@L["Cleanup:PublicationEvidence"]">@L[item.Definition.IsPresent ? "Cleanup:PublishedBoundary" : "Cleanup:AbsentBoundary"]</MoSemanticCallout>
+                    <section>
+                        <h3>@L["Cleanup:Checks"]</h3>
+                        <ol class="cleanup-checks">
+                            @Check(L["Cleanup:CheckAbsent"], !item.Definition.IsPresent, false)
+                            @Check(L["Cleanup:CheckQueueClear"], item.QueuedCount == 0, true)
+                            @Check(L["Cleanup:CheckRunningClear"], item.RunningCount == 0 && item.ActiveLeaseCount == 0, false)
+                        </ol>
+                    </section>
+                    <dl class="cleanup-work-facts">
+                        <div><dt>@L["Cleanup:Queued"]</dt><dd>@item.QueuedCount</dd></div>
+                        <div><dt>@L["Cleanup:Running"]</dt><dd>@item.RunningCount</dd></div>
+                        <div><dt>@L["Cleanup:TerminalExecutions"]</dt><dd>@item.HistoryCount</dd></div>
+                    </dl>
+                    @if (item.RunningCount > 0 || item.ActiveLeaseCount > 0) { <p class="cleanup-note">@L["Cleanup:CheckActivity", item.RunningCount, item.ActiveLeaseCount]</p> }
+                }
+                else
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@Label(item.State)">@DefinitionCleanupPresentation.Reason(L, item.State)</MoSemanticCallout>
+                }
+                <section>
+                    <h3>@L["Cleanup:ExactIdentity"]</h3>
+                    <dl class="cleanup-details">
+                        <div><dt>@L["Cleanup:Owner"]</dt><dd><code>@item.Id.OwnerKey</code><SchedulerCopyButton Value="@item.Id.OwnerKey" Label="@L["Cleanup:CopyOwner"]" /></dd></div>
+                        <div><dt>@L["Cleanup:JobKey"]</dt><dd><code>@item.Id.JobKey</code><SchedulerCopyButton Value="@item.Id.JobKey" /></dd></div>
+                        @if (item.Definition is { } definition)
+                        {
+                            <div><dt>@L["Cleanup:DeclarationState"]</dt><dd>@DefinitionCleanupPresentation.Declaration(L, item)</dd></div>
+                            <div><dt>@L[definition.IsPresent ? "Cleanup:LastObserved" : "Cleanup:AbsentSince"]</dt><dd>@Timestamp(item)</dd></div>
+                            <div><dt>@L["Cleanup:PolicyImpact"]</dt><dd>@L[definition.Policy.Overrides.HasAnyOverride ? "Cleanup:PolicyOverrides" : "Cleanup:PolicyDefault"]</dd></div>
+                        }
+                    </dl>
+                </section>
+                @if (item.ManifestHash is not null)
+                {
+                    <details><summary>@L["Cleanup:Publication"]</summary><code>@item.ManifestHash</code><p>@Clock.FormatTimestamp(item.ManifestPublishedAtUtc)</p></details>
+                }
+                <div class="cleanup-related">
+                    <MudButton Variant="Variant.Outlined" Href="@Ledger(item.Id)" StartIcon="@MoIcons.Receipt">@L["Workspace:OpenLedger"]</MudButton>
+                    @if (item.Definition is not null) { <MudButton Href="@($"/job-scheduler/jobs/{Uri.EscapeDataString(item.Id.OwnerKey)}/{Uri.EscapeDataString(item.Id.JobKey)}")" EndIcon="@MoIcons.ArrowRight">@L["Cleanup:OpenDefinition"]</MudButton> }
+                </div>
+                <p class="cleanup-note">@L["Cleanup:RenameNote"]</p>
+                @if (item.State == JobDefinitionCleanupState.OwnerUnconfirmed) { <p class="cleanup-note">@L["Cleanup:RetireHint"]</p> }
+            </div>
+        }
+        else { <p>@L["Cleanup:Loading"]</p> }
+    </ChildContent>
+    <FooterContent>
+        @if (Item is { } item)
+        {
+            <div class="cleanup-sheet-actions">
+                @if (item.State == JobDefinitionCleanupState.OwnerUnconfirmed)
+                {
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.ShieldCheck" Disabled="@(!CanMaintain || item.ManifestHash is null)" OnClick="@(() => RetirementRequested.InvokeAsync(item.Id.OwnerKey))">@L["Cleanup:RetireAction"]</MudButton>
+                }
+                else
+                {
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.ListChecks" Disabled="@(!CanMaintain || !item.CanRemove(true))" OnClick="@(() => PreviewRequested.InvokeAsync(item.Id))">@L["Cleanup:Preview"]</MudButton>
+                }
+                <span><MoIcon Icon="@MoIcons.Archive" Size="14px" />@L["Cleanup:HistoryKept"]</span>
+            </div>
+        }
+    </FooterContent>
+</MoSideSheet>
+
+@code {
+    /// <summary>Gets whether the route-selected evidence sheet is open.</summary>
+    [Parameter] public bool Open { get; set; }
+    /// <summary>Returns native dismissal to the route owner.</summary>
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    /// <summary>Gets the current authoritative assessment, or null while it loads.</summary>
+    [Parameter] public JobDefinitionCleanupItem? Item { get; set; }
+    /// <summary>Gets whether fresh evidence and current authorization permit a decision.</summary>
+    [Parameter] public bool CanMaintain { get; set; }
+    /// <summary>Requests a preview for the inspected identity without replacing page selection.</summary>
+    [Parameter] public EventCallback<JobId> PreviewRequested { get; set; }
+    /// <summary>Requests the separate owner-retirement decision.</summary>
+    [Parameter] public EventCallback<string> RetirementRequested { get; set; }
+
+    private string Label(JobDefinitionCleanupState state) => DefinitionCleanupPresentation.Label(L, state);
+    private string Timestamp(JobDefinitionCleanupItem item) =>
+        (item.Definition?.IsPresent == true ? item.Definition.LastObservedAtUtc : item.Definition?.AbsentSinceUtc) is { } instant
+            ? Clock.FormatTimestamp(instant) : L["Cleanup:Unknown"];
+    private static string Ledger(JobId id) => SchedulerRouteBuilder.Ledger(new()
+        { SchedulerScopeKey = string.Empty, OwnerKey = id.OwnerKey, JobKey = id.JobKey });
+    private RenderFragment Check(string label, bool passed, bool decision) => @<li class="@((passed ? MoVisualRole.Success : MoVisualRole.Warning).ToCssClass())">
+        <span class="cleanup-role-tile"><MoIcon Icon="@(passed ? MoIcons.Check : MoIcons.Hourglass)" Size="16px" /></span>
+        <span>@label</span><span class="cleanup-status">@L[passed ? "Cleanup:Passed" : decision ? "Cleanup:NeedsDecision" : "Cleanup:Protected"]</span>
+    </li>;
+}

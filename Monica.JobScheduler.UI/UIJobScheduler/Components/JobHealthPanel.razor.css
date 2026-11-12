@@ -18,11 +18,11 @@
 .job-health__score ::deep .mud-progress-linear-bar { background-color: var(--score-ink); }
 .job-health__outcomes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; min-width: 0; }
 .job-health__outcomes > article { --state-tone: var(--mud-palette-text-secondary); --state-ink: color-mix(in srgb, var(--state-tone) 25%, var(--mud-palette-text-primary)); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px 8px; min-width: 0; padding: 16px; border: 1px solid color-mix(in srgb, var(--state-tone) 30%, var(--mud-palette-lines-default)); border-radius: var(--mud-default-borderradius); background: color-mix(in srgb, var(--state-tone) 6%, var(--mud-palette-surface)); }
-.job-health__outcomes > article[data-state="queued"] { --state-tone: var(--mud-palette-info); }
-.job-health__outcomes > article[data-state="running"] { --state-tone: var(--mud-palette-primary); }
+.job-health__outcomes > article[data-state="queued"] { --state-tone: var(--mud-palette-text-secondary); }
+.job-health__outcomes > article[data-state="running"] { --state-tone: var(--mud-palette-info); }
 .job-health__outcomes > article[data-state="succeeded"] { --state-tone: var(--mud-palette-success); }
 .job-health__outcomes > article[data-state="failed"] { --state-tone: var(--mud-palette-error); }
-.job-health__outcomes > article[data-state="cancelled"] { --state-tone: var(--mud-palette-secondary); }
+.job-health__outcomes > article[data-state="cancelled"] { --state-tone: var(--mud-palette-text-secondary); }
 .job-health__outcomes > article[data-state="skipped"] { --state-tone: var(--mud-palette-warning); }
 .job-health__outcome-icon { grid-row: 1 / span 2; color: var(--state-ink); }
 .job-health__outcomes article > span:not(.job-health__outcome-icon) { color: var(--health-muted); font-size: .78rem; overflow-wrap: anywhere; line-height: 1.4; }

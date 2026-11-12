@@ -8,6 +8,9 @@ namespace Monica.JobScheduler.Models.Execution;
 /// </summary>
 public sealed record ExpiredLeaseRecoveryRequest
 {
+    /// <summary>Gets the automatic scope maintenance grant, when invoked by a hosted coordinator.</summary>
+    public JobCoordinatorLeaseKey? CoordinatorLease { get; init; }
+
     /// <summary>
     /// Gets the scheduler scope to repair.
     /// </summary>

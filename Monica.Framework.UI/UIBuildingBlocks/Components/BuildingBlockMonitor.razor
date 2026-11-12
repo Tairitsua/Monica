@@ -1,0 +1,277 @@
+@using Monica.UI.Shared.Components.States
+@using Monica.BuildingBlocks.Facades
+@using Monica.Core.Results
+@using Monica.BuildingBlocks.Models
+@inject BuildingBlocksFacade BuildingBlocksFacade
+@inject IStringLocalizer<BuildingBlocksResource> L
+@implements IDisposable
+
+<section class="bb-catalog">
+    <header class="bb-catalog__header">
+        <div>
+            <span class="bb-catalog__eyebrow">@L["BuildingBlockMonitor:Header:Eyebrow"]</span>
+            <h1>@L["BuildingBlockMonitor:Header:Title"]</h1>
+            <p>@L["BuildingBlockMonitor:Header:Description"]</p>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadBuildingBlocksAsync"
+                   StartIcon="@MoIcons.Refresh" Disabled="@_loading">
+            @L["Shared:Actions:Refresh"]
+        </MudButton>
+    </header>
+    <div class="bb-catalog__surface">
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        @if (_loadError is not null)
+        {
+            <div class="bb-catalog__error" role="status">
+                <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error" Variant="Variant.Text">@_loadError</MudAlert>
+                @if (_loaded)
+                {
+                    <p>@L["BuildingBlockMonitor:States:Retained"]</p>
+                }
+            </div>
+        }
+        @if (_loaded && _buildingBlocks.Count != 0)
+        {
+            <div class="bb-catalog__workspace">
+                <aside class="bb-catalog__filters" aria-label="@L["BuildingBlockFilterPanel:Sections:TypeFilter"]">
+                    <BuildingBlockFilterPanel @ref="_filterPanel" BuildingBlocks="_buildingBlocks"
+                                            @bind-FilterText="_filterText"
+                                            @bind-SelectedKinds="_selectedKinds"
+                                            @bind-ShowOnlyWithDependencies="_showOnlyWithDependencies"
+                                            @bind-ShowOnlyWithAlerts="_showOnlyWithAlerts"
+                                            OnFiltersChanged="ApplyFilters" />
+                </aside>
+                <div class="bb-catalog__results">
+                    <div class="bb-catalog__result-heading">
+                        <span class="bb-catalog__count">@L["BuildingBlockMonitor:Summary:VisibleCount", _filteredBuildingBlocks.Count, _buildingBlocks.Count]</span>
+                        <div class="bb-catalog__result-actions">
+                            @if (_filteredBuildingBlocks.Count == 0)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="true"
+                                           StartIcon="@MoIcons.SortAlphabetical"
+                                           aria-label="@L["BuildingBlockMonitor:Sorting:KeyNone"]" aria-pressed="false">
+                                    @L["BuildingBlockMonitor:Sorting:KeyNone"]
+                                </MudButton>
+                            }
+                            @if (HasActiveFilters)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ResetFiltersAsync">@L["BuildingBlockMonitor:Actions:Reset"]</MudButton>
+                            }
+                        </div>
+                    </div>
+                    @if (_filteredBuildingBlocks.Count != 0)
+                    {
+                        <div class="bb-catalog__grid">
+                            <MudDataGrid DragIndicatorIcon="@MoIcons.GripVertical" SortIcon="@MoIcons.ArrowUp" FilterIconEmpty="@MoIcons.Filter" FilterIconFilled="@MoIcons.Filter" FilterIconClear="@MoIcons.FilterOff" ColumnOptionsIcon="@MoIcons.MoreVertical" T="BuildingBlockSummary" @ref="_grid" Items="@_filteredBuildingBlocks"
+                                         SortMode="SortMode.Multiple" ShowColumnOptions="false" Breakpoint="Breakpoint.None"
+                                         Dense="true" Hover="true" ReadOnly="true" RowsPerPage="@DefaultPageSize">
+                                <ToolBarContent>
+                                    <div class="bb-catalog__sort-controls">
+                                        <p class="bb-catalog__sort-hint">@L["BuildingBlockMonitor:Summary:SortHint"] <span>@L["BuildingBlockMonitor:Summary:SortBy"]</span></p>
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="CycleKeySortAsync" Disabled="@_loading"
+                                                   StartIcon="@MoIcons.SortAlphabetical" aria-label="@KeySortLabel"
+                                                   aria-pressed="@(_grid?.SortDefinitions.ContainsKey(nameof(BuildingBlockSummary.Key)) == true ? "true" : "false")">
+                                            @KeySortLabel
+                                        </MudButton>
+                                    </div>
+                                </ToolBarContent>
+                                <Columns>
+                                    <PropertyColumn T="BuildingBlockSummary" TProperty="string" Property="x => x.Title"
+                                                    Title="@L["BuildingBlockMonitor:Columns:Name"]" Sortable="true"
+                                                    HeaderClass="bb-catalog__name-column" CellClass="bb-catalog__name-column">
+                                        <CellTemplate>
+                                            <div class="bb-catalog__building-block-name" data-building-block-key="@context.Item.Key">
+                                                <strong>@context.Item.Title</strong>
+                                                <code><BuildingBlockIdentityText Value="@context.Item.Key" /></code>
+                                                @if (!string.IsNullOrWhiteSpace(context.Item.Description))
+                                                {
+                                                    <span>@context.Item.Description</span>
+                                                }
+                                            </div>
+                                        </CellTemplate>
+                                    </PropertyColumn>
+                                    <PropertyColumn T="BuildingBlockSummary" TProperty="string" Property="x => x.Key"
+                                                    Title="@L["BuildingBlockMonitor:Columns:FullName"]" Sortable="true" Hidden="true"
+                                                    HeaderClass="bb-catalog__key-column" CellClass="bb-catalog__key-column">
+                                        <CellTemplate><code>@context.Item.Key</code></CellTemplate>
+                                    </PropertyColumn>
+                                    <TemplateColumn Title="@L["BuildingBlockMonitor:Columns:Type"]" Sortable="false"
+                                                    HeaderClass="bb-catalog__type-column" CellClass="bb-catalog__type-column">
+                                        <CellTemplate>
+                                            <span class="bb-catalog__type">@L.GetBuildingBlockKindText(context.Item.Kind)</span>
+                                        </CellTemplate>
+                                    </TemplateColumn>
+                                    <TemplateColumn Title="@L["BuildingBlockMonitor:Columns:Dependencies"]" Sortable="false"
+                                                    HeaderClass="bb-catalog__count-column" CellClass="bb-catalog__count-column">
+                                        <CellTemplate><span class="bb-catalog__number">@context.Item.Dependencies.Count</span></CellTemplate>
+                                    </TemplateColumn>
+                                    <TemplateColumn Title="@L["BuildingBlockMonitor:Columns:DependedBy"]" Sortable="false"
+                                                    HeaderClass="bb-catalog__count-column" CellClass="bb-catalog__count-column">
+                                        <CellTemplate><span class="bb-catalog__number">@context.Item.DependedByCount</span></CellTemplate>
+                                    </TemplateColumn>
+                                    <TemplateColumn Title="@L["BuildingBlockMonitor:Columns:Actions"]" Sortable="false"
+                                                    HeaderClass="bb-catalog__actions-column" CellClass="bb-catalog__actions-column">
+                                        <CellTemplate>
+                                            <MudIconButton Size="Size.Small" Icon="@MoIcons.ArrowRight"
+                                                           Color="Color.Primary" aria-label="@L["BuildingBlockMonitor:Actions:Inspect", context.Item.Title]"
+                                                           OnClick="@(() => ViewDetails(context.Item))" />
+                                        </CellTemplate>
+                                    </TemplateColumn>
+                                </Columns>
+                                <PagerContent><MudDataGridPager T="BuildingBlockSummary" PageSizeOptions="@PageSizeOptions" /></PagerContent>
+                            </MudDataGrid>
+                        </div>
+                    }
+                    else
+                    {
+                        <MoContentState role="status">
+                            <MoIcon Icon="@MoIcons.SearchOff" Size="1.5rem" />
+                            <p>@L["BuildingBlockMonitor:States:NoMatches"]</p>
+                            <MudButton Variant="Variant.Text" OnClick="ResetFiltersAsync">@L["BuildingBlockMonitor:Actions:Reset"]</MudButton>
+                        </MoContentState>
+                    }
+                </div>
+            </div>
+        }
+        else if (_loaded)
+        {
+            <MoContentState role="status"><MoIcon Icon="@MoIcons.Package" Size="1.5rem" /><p>@L["BuildingBlockMonitor:States:Empty"]</p></MoContentState>
+        }
+    </div>
+</section>
+
+<BuildingBlockDetailDialog @bind-Visible="_detailDialogVisible" SelectedBuildingBlock="_selectedUnit" />
+
+@code {
+    private const int DefaultPageSize = 50;
+    private static readonly int[] PageSizeOptions = [25, 50, 100, 200];
+    private List<BuildingBlockSummary> _buildingBlocks = [];
+    private List<BuildingBlockSummary> _filteredBuildingBlocks = [];
+    private string _filterText = string.Empty;
+    private IReadOnlyCollection<BuildingBlockKind> _selectedKinds = new HashSet<BuildingBlockKind>();
+    private bool _showOnlyWithDependencies;
+    private bool _showOnlyWithAlerts;
+    private bool _loading;
+    private bool _loaded;
+    private bool _disposed;
+    private int _loadVersion;
+    private string? _loadError;
+    private bool _detailDialogVisible;
+    private BuildingBlockSummary? _selectedUnit;
+    private BuildingBlockFilterPanel? _filterPanel;
+    private MudDataGrid<BuildingBlockSummary>? _grid;
+
+    private bool HasActiveFilters => !string.IsNullOrEmpty(_filterText) || _showOnlyWithDependencies || _showOnlyWithAlerts
+                                    || !_selectedKinds.ToHashSet().SetEquals(AvailableKinds());
+
+    private string KeySortLabel => _grid?.SortDefinitions.TryGetValue(nameof(BuildingBlockSummary.Key), out var sort) == true
+        ? L[sort.Descending ? "BuildingBlockMonitor:Sorting:KeyDescending" : "BuildingBlockMonitor:Sorting:KeyAscending"]
+        : L["BuildingBlockMonitor:Sorting:KeyNone"];
+
+    private async Task CycleKeySortAsync()
+    {
+        if (_disposed || _grid is null) return;
+        if (!_grid.SortDefinitions.TryGetValue(nameof(BuildingBlockSummary.Key), out var sort))
+            await _grid.ExtendSortAsync(nameof(BuildingBlockSummary.Key), SortDirection.Ascending, static unit => unit.Key);
+        else if (!sort.Descending)
+            await _grid.ExtendSortAsync(nameof(BuildingBlockSummary.Key), SortDirection.Descending, static unit => unit.Key);
+        else
+            await _grid.RemoveSortAsync(nameof(BuildingBlockSummary.Key));
+    }
+
+    protected override Task OnInitializedAsync() => LoadBuildingBlocksAsync();
+
+    private async Task LoadBuildingBlocksAsync()
+    {
+        if (_disposed || _loading) return;
+        var version = ++_loadVersion;
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var result = await BuildingBlocksFacade.GetAllAsync();
+            if (_disposed || version != _loadVersion) return;
+            var error = result.WithoutData();
+            var data = result.Data;
+            if (result.IsFailure())
+            {
+                _loadError = L["Shared:Messages:LoadFailed", error];
+                return;
+            }
+            var selectedAll = !_loaded || _selectedKinds.ToHashSet().SetEquals(AvailableKinds());
+            _buildingBlocks = data ?? [];
+            var available = AvailableKinds();
+            _selectedKinds = selectedAll ? available : _selectedKinds.Where(available.Contains).ToHashSet();
+            _loaded = true;
+            ReapplyFilters(resetPage: false);
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed && version == _loadVersion) _loadError = L["Shared:Messages:LoadException", exception.Message];
+        }
+        finally
+        {
+            if (!_disposed && version == _loadVersion) _loading = false;
+        }
+    }
+
+    private HashSet<BuildingBlockKind> AvailableKinds() => _buildingBlocks.Select(static unit => unit.Kind)
+        .Where(static type => type != BuildingBlockKind.None).ToHashSet();
+
+    private async Task ResetFiltersAsync()
+    {
+        if (_disposed) return;
+        if (_filterPanel is not null) await _filterPanel.ClearQueryAsync();
+        if (_disposed) return;
+        _filterText = string.Empty;
+        _selectedKinds = AvailableKinds();
+        _showOnlyWithDependencies = false;
+        _showOnlyWithAlerts = false;
+        ApplyFilters();
+    }
+
+    private void ViewDetails(BuildingBlockSummary unit)
+    {
+        if (_disposed) return;
+        _selectedUnit = unit;
+        _detailDialogVisible = true;
+    }
+
+    private void ApplyFilters()
+    {
+        ReapplyFilters(resetPage: true);
+    }
+
+    private void ReapplyFilters(bool resetPage)
+    {
+        if (_disposed) return;
+        _filteredBuildingBlocks = _buildingBlocks.Where(MatchesFilters).ToList();
+        if (resetPage) _grid?.NavigateTo(Page.First);
+        if (_filteredBuildingBlocks.Count == 0) _grid = null;
+    }
+
+    private bool MatchesFilters(BuildingBlockSummary unit)
+    {
+        var matchesText = string.IsNullOrWhiteSpace(_filterText)
+                          || unit.Title.Contains(_filterText, StringComparison.OrdinalIgnoreCase)
+                          || unit.Key.Contains(_filterText, StringComparison.OrdinalIgnoreCase)
+                          || (!string.IsNullOrWhiteSpace(unit.Owner) && unit.Owner.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+                          || unit.Tags.Any(tag => tag.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+                          || (!string.IsNullOrWhiteSpace(unit.Description) && unit.Description.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+        var matchesType = _selectedKinds.Contains(unit.Kind);
+        var matchesDependencies = !_showOnlyWithDependencies || unit.Dependencies.Count != 0 || unit.DependedByCount != 0;
+        var matchesAlerts = !_showOnlyWithAlerts || unit.Alerts.Count != 0;
+        return matchesText && matchesType && matchesDependencies && matchesAlerts;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_loadVersion;
+        _grid = null;
+        _filterPanel = null;
+    }
+}

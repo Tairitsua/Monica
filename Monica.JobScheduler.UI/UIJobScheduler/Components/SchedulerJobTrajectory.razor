@@ -1,0 +1,47 @@
+@using System.Globalization
+@inject IStringLocalizer<JobSchedulerResource> L
+@inject SchedulerTimePresentation TimePresentation
+<section class="job-trajectory" aria-labelledby="job-trajectory-title">
+    <header><div><h3 id="job-trajectory-title">@L["Workspace:RecentTrajectory"]</h3><p>@L["Workspace:RecentTrajectoryDescription",Recent.Items.Count]</p></div><a href="@LedgerUrl">@L["Workspace:OpenLedger"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></a></header>
+    @if (Recent.Error is {} error) { <MudAlert Severity="Severity.Warning" Dense="true">@error</MudAlert> }
+    @if (_records.Length > 0)
+    {
+        <div class="job-trajectory__plot" @key="_marks" role="group" aria-label="@L["Workspace:RecentTrajectory"]"><div class="job-trajectory__median" style="@($"bottom:{Height(Median)}%")"><span>P50 @TimePresentation.FormatDuration(Median)</span></div>
+            @for(var i=0;i<_records.Length;i++) { var index=i;var record=_records[i];<button @ref="_marks[index]" type="button" data-state="@record.State.ToString().ToLowerInvariant()" style="@($"--height:{Height(SchedulerTimePresentation.GetExecutionDuration(record,ObservedAtUtc))}%")" title="@Label(record)" aria-label="@Label(record)" @onmouseenter="@(() => _selected=index)" @onfocus="@(() => _selected=index)" @onkeydown="@(e => MoveAsync(e,index))" @onclick="@(() => ExecutionSelected.InvokeAsync(record.InstanceId))"><i></i></button> }
+        </div>
+        <div class="job-trajectory__axis"><span>@TimePresentation.FormatListTimestamp(_records[0].CreatedAtUtc,ObservedAtUtc)</span><span>@TimePresentation.FormatListTimestamp(_records[^1].CreatedAtUtc,ObservedAtUtc)</span></div>
+        <div class="job-trajectory__readout">@if(_records.ElementAtOrDefault(_selected) is {} selected) { <span class="job-trajectory__state" data-state="@selected.State.ToString().ToLowerInvariant()"><i></i>@L[$"ExecutionStates:{selected.State}"]</span><span>@TimePresentation.FormatTimestamp(selected.CreatedAtUtc)</span><strong>@TimePresentation.FormatExecutionDuration(selected,ObservedAtUtc)</strong><small>@L["Workspace:TrajectoryHint"]</small> }</div>
+    }
+    else { <p class="job-trajectory__empty">@L["Catalog:History:NeverRun"]</p> }
+</section>
+@code {
+    /// <summary>Gets the bounded newest execution slice and its independent retained total.</summary>
+    [Parameter,EditorRequired] public JobExecutionActivitySlice Recent { get; set; } = JobExecutionActivitySlice.Empty;
+    /// <summary>Gets the accepted snapshot time used for running durations.</summary>
+    [Parameter] public DateTimeOffset ObservedAtUtc { get; set; }
+    /// <summary>Gets the owner-scoped ledger destination.</summary>
+    [Parameter,EditorRequired] public string LedgerUrl { get; set; } = string.Empty;
+    /// <summary>Opens the selected exact execution using the page's dialog owner.</summary>
+    [Parameter] public EventCallback<string> ExecutionSelected { get; set; }
+    private JobExecutionInstance[] _records=[];
+    private ElementReference[] _marks=[];
+    private int _selected = -1;
+    private TimeSpan? Median { get; set; }
+    private double _scale=1;
+    protected override void OnParametersSet()
+    {
+        _records=Recent.Items.OrderBy(record => record.CreatedAtUtc).ThenBy(record => record.InstanceId,StringComparer.Ordinal).ToArray();
+        if(_marks.Length != _records.Length) _marks=new ElementReference[_records.Length];
+        _selected=_selected < 0 ? Math.Max(0,_records.Length-1) : Math.Clamp(_selected,0,Math.Max(0,_records.Length-1));
+        var durations=_records.Where(record => record.IsTerminal).Select(record => SchedulerTimePresentation.GetExecutionDuration(record,ObservedAtUtc)).OfType<TimeSpan>().Order().ToArray();
+        Median=durations.Length > 0 ? durations[(durations.Length-1)/2] : null;
+        _scale=Math.Max(1,_records.Select(record => SchedulerTimePresentation.GetExecutionDuration(record,ObservedAtUtc)?.TotalMilliseconds ?? 0).DefaultIfEmpty(1).Max())*1.1;
+    }
+    private string Height(TimeSpan? duration) => Math.Clamp((duration?.TotalMilliseconds ?? 0)/_scale*100,3,100).ToString("0.##",CultureInfo.InvariantCulture);
+    private string Label(JobExecutionInstance record) => $"{L[$"ExecutionStates:{record.State}"]} · {TimePresentation.FormatTimestamp(record.CreatedAtUtc)} · {TimePresentation.FormatExecutionDuration(record,ObservedAtUtc)}";
+    private async Task MoveAsync(KeyboardEventArgs e,int index)
+    {
+        var target=e.Key switch { "ArrowLeft" => Math.Max(0,index-1),"ArrowRight" => Math.Min(_marks.Length-1,index+1),"Home" => 0,"End" => _marks.Length-1,_ => -1 };
+        if(target >= 0) { _selected=target;await _marks[target].FocusAsync(preventScroll:true); }
+    }
+}

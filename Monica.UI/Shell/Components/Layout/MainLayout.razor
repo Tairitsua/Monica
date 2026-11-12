@@ -1,18 +1,9 @@
-@using Microsoft.Extensions.Options
-@using Monica.Modules
 @using Monica.UI.Shell.State
 @using Monica.UI.Shell.Support
 @inherits LayoutComponentBase
-@inject IOptions<ModuleShellUIOption> Options
 @inject ThemeState ThemeService
 @inject ShellState Shell
-@inject IStringLocalizer<SharedResource> L
 @implements IAsyncDisposable
-
-<ThemeProviderHost>
-    <MudPopoverProvider />
-    <MudDialogProvider />
-    <MudSnackbarProvider />
 
     <div class="mo-layout" data-theme="@ThemeService.GetThemeDataAttribute()"
          data-layout="@(Shell.Layout == Monica.UI.Shell.Models.ShellNavigationLayout.Sidebar ? "sidebar" : "topbar")"
@@ -24,21 +15,7 @@
             </main>
         </div>
     </div>
-</ThemeProviderHost>
 
-<div id="blazor-error-ui" data-nosnippet role="alert">
-    <div class="blazor-error-ui__content">
-        <span class="blazor-error-ui__icon" aria-hidden="true">
-            <MoIcon Icon="@MoIcons.Error" />
-        </span>
-        <div class="blazor-error-ui__copy">
-            <p class="blazor-error-ui__message">@L["Layout:Error"]</p>
-            <p>@L["Layout:ErrorRecovery"]</p>
-        </div>
-        <a href="." class="reload">@L["Layout:Reload"]</a>
-        <button type="button" class="dismiss" aria-label="@L["Layout:DismissError"]"><span aria-hidden="true">×</span></button>
-    </div>
-</div>
 
 @code {
     private readonly ComponentRenderTracker _renderTracker = new();

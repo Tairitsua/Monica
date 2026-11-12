@@ -41,7 +41,6 @@ public class EvictedInstanceInfo
             IsLeader = IsLeader,
             // Other properties use defaults to minimize memory
             Metadata = new Dictionary<string, string>(),
-            DependentSubDomains = new List<string>()
         };
     }
 }

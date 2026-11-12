@@ -34,7 +34,7 @@
     <PackageTags>monica;dotnet;aspnetcore;blazor;mudblazor;ddd;ai-agent;jobscheduler;modular;recurringjob</PackageTags>
 
     <!-- Package Release Notes -->
-    <PackageReleaseNotes>Monica 1.0 release candidate 15 delivers redesigned operational workbenches, reusable JSON viewing and editing, owner-local job scheduling, configuration revision and sensitive-value controls, cross-platform Monica Guide bundles, and shared ProjectUnit source-analysis snapshots.</PackageReleaseNotes>
+    <PackageReleaseNotes>Monica 1.0 release candidate 15 delivers redesigned operational workbenches, reusable JSON viewing and editing, owner-local job scheduling, configuration revision and sensitive-value controls, cross-platform Monica Guide bundles, and shared BuildingBlock source-analysis snapshots.</PackageReleaseNotes>
 
     <!-- Symbol Packages -->
     <IncludeSymbols>true</IncludeSymbols>

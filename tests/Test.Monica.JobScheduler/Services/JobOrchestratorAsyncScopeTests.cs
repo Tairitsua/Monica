@@ -115,6 +115,7 @@ public sealed class JobOrchestratorAsyncScopeTests
         };
         return new JobExecutionLease
         {
+            GrantedAtUtc = DateTimeOffset.UtcNow,
             Execution = new JobExecutionInstance
             {
                 InstanceId = "execution-1",

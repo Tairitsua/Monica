@@ -31,6 +31,7 @@ RegistrationLocation = Tuple[str, int, str]
 EXCLUDED_RELATIVE_DIRECTORIES = {
     '.evidence',
     '.git',
+    '.pending',
     '.tmp',
     '.vs',
     'artifacts',

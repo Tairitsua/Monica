@@ -67,7 +67,8 @@
             // The parent keys this component by session and attachment, so streaming rerenders retain this read.
             var result = await AttachmentFacade.ReadAsync(SessionId, Attachment.Id, _lifetime.Token);
             if (_disposed) return;
-            if (!result.IsFailed(out _, out var data) && data.Reference.Kind == ChatAttachmentKind.Image)
+            var data = result.Data;
+            if (result.IsSuccess() && data is not null && data.Reference.Kind == ChatAttachmentKind.Image)
                 _source = $"data:{data.Reference.MediaType};base64,{Convert.ToBase64String(data.Data)}";
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }

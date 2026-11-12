@@ -8,9 +8,22 @@ public sealed class JobSchedulerRuntimeState
 {
     private int _schedulingReady;
     private int _workerReady;
+    private int _workerAdmissionPaused;
     private int _inFlightExecutions;
     private string? _schedulingMessage;
     private string? _workerMessage;
+    private long _lastOwnerSchedulingWorkUtcTicks;
+    private long _lastLeaseRecoveryWorkUtcTicks;
+    private long _lastHistoryCleanupWorkUtcTicks;
+
+    /// <summary>Gets the last successful local owner pass, excluding standby-only cycles.</summary>
+    public DateTimeOffset? LastOwnerSchedulingWorkAtUtc => ReadTimestamp(ref _lastOwnerSchedulingWorkUtcTicks);
+
+    /// <summary>Gets the last successful local lease-recovery pass, including an empty pass.</summary>
+    public DateTimeOffset? LastLeaseRecoveryWorkAtUtc => ReadTimestamp(ref _lastLeaseRecoveryWorkUtcTicks);
+
+    /// <summary>Gets the last successful local bounded cleanup pass, including an empty pass.</summary>
+    public DateTimeOffset? LastHistoryCleanupWorkAtUtc => ReadTimestamp(ref _lastHistoryCleanupWorkUtcTicks);
 
     /// <summary>
     /// Gets whether the local scheduling plane's last cycle succeeded. Stays <see langword="false"/> until the
@@ -23,6 +36,9 @@ public sealed class JobSchedulerRuntimeState
     /// first completed cycle.
     /// </summary>
     public bool WorkerReady => Volatile.Read(ref _workerReady) != 0;
+
+    /// <summary>Gets whether claims are temporarily paused for bounded store cleanup or recovery backoff.</summary>
+    public bool WorkerAdmissionPaused => Volatile.Read(ref _workerAdmissionPaused) != 0;
 
     /// <summary>Gets the scheduling plane's latest readiness message, when one was recorded.</summary>
     public string? SchedulingMessage => Volatile.Read(ref _schedulingMessage);
@@ -38,10 +54,30 @@ public sealed class JobSchedulerRuntimeState
     internal bool SetScheduling(bool ready, string message) =>
         SetState(ref _schedulingReady, ref _schedulingMessage, ready, message);
 
-    internal bool SetWorker(bool ready, string message) =>
-        SetState(ref _workerReady, ref _workerMessage, ready, message);
+    internal bool SetWorker(bool ready, string message)
+    {
+        if (ready) SetWorkerAdmissionPaused(false);
+        return SetState(ref _workerReady, ref _workerMessage, ready, message);
+    }
+
+    internal void SetWorkerAdmissionPaused(bool paused) => Volatile.Write(ref _workerAdmissionPaused, paused ? 1 : 0);
 
     internal void SetInFlightExecutions(int count) => Volatile.Write(ref _inFlightExecutions, count);
+
+    internal void RecordOwnerSchedulingWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastOwnerSchedulingWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    internal void RecordLeaseRecoveryWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastLeaseRecoveryWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    internal void RecordHistoryCleanupWork(DateTimeOffset completedAtUtc) =>
+        Interlocked.Exchange(ref _lastHistoryCleanupWorkUtcTicks, completedAtUtc.UtcTicks);
+
+    private static DateTimeOffset? ReadTimestamp(ref long ticks)
+    {
+        var value = Interlocked.Read(ref ticks);
+        return value == 0 ? null : new DateTimeOffset(value, TimeSpan.Zero);
+    }
 
     private static bool SetState(ref int state, ref string? currentMessage, bool ready, string message)
     {

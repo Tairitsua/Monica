@@ -4,7 +4,7 @@ Use these projects as structural references:
 
 - `Monica.Testing`
   - Host-owned scenario factory and application lifetime
-  - Raw ProjectUnit fast-path fixture
+  - Raw Building Block fast-path fixture
   - Result assertions, database helpers, and deterministic boundary doubles
 - `tests/Test.Monica.Core`
   - Pure module-system and result tests
@@ -15,7 +15,7 @@ Use these projects as structural references:
 - `tests/Test.Monica.JobScheduler.UI`
   - bUnit component and page-shell tests
 - `tests/Test.Monica.Generators.AutoController`
-  - Raw Roslyn `GeneratorDriver` coverage for request-owned controller and RPC-client generation
+  - Raw Roslyn `GeneratorDriver` coverage for request-owned controller and API-client generation
   - Same-compilation binding, diagnostics, incremental determinism, and no-file-write assertions
 
 ## Recommended First Targets
@@ -44,5 +44,5 @@ For source generators:
 ## Reuse Guidance
 
 - Put genuinely cross-project infrastructure in `Monica.Testing`; keep scenario data and service-specific doubles local.
-- Copy only the structure of a relevant sample. Choose direct, raw ProjectUnit, full-host, or bUnit boundaries independently for each behavior.
+- Copy only the structure of a relevant sample. Choose direct, raw Building Block, full-host, or bUnit boundaries independently for each behavior.
 - Use the `monica-application-unit-testing` skill for business-service project layout and scenario-host templates.

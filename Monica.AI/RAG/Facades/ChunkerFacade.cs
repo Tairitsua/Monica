@@ -22,28 +22,28 @@ public sealed class ChunkerFacade
         this.logger = logger;
     }
 
-    public async Task<Res<ChunkerManagementState>> GetManagementStateAsync()
+    public async Task<Result<ChunkerManagementState>> GetManagementStateAsync()
     {
         try
         {
             var state = await chunkingService.GetManagementStateAsync();
-            return Res.Ok(state);
+            return Result.Success(state);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load chunker management state.");
-            return Res.Fail($"Failed to load chunker configuration: {ex.GetMessageRecursively()}");
+            return Result.Failure<ChunkerManagementState>($"Failed to load chunker configuration: {ex.GetMessageRecursively()}");
         }
     }
 
-    public async Task<Res<ChunkerRoutingChangePreview>> PreviewRoutingChangeAsync(
+    public async Task<Result<ChunkerRoutingChangePreview>> PreviewRoutingChangeAsync(
         string extension,
         string targetChunkerId)
     {
         try
         {
             var preview = await chunkingService.PreviewRoutingChangeAsync(extension, targetChunkerId);
-            return Res.Ok(preview);
+            return Result.Success(preview);
         }
         catch (Exception ex)
         {
@@ -52,18 +52,18 @@ public sealed class ChunkerFacade
                 "Failed to preview chunker routing change for extension '{Extension}' to '{ChunkerId}'.",
                 extension,
                 targetChunkerId);
-            return Res.Fail($"Failed to preview routing change: {ex.GetMessageRecursively()}");
+            return Result.Failure<ChunkerRoutingChangePreview>($"Failed to preview routing change: {ex.GetMessageRecursively()}");
         }
     }
 
-    public async Task<Res<ChunkerRoutingApplyResult>> ApplyRoutingChangeAsync(
+    public async Task<Result<ChunkerRoutingApplyResult>> ApplyRoutingChangeAsync(
         string extension,
         string targetChunkerId)
     {
         try
         {
             var result = await chunkingService.ApplyRoutingChangeAsync(extension, targetChunkerId);
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (Exception ex)
         {
@@ -72,11 +72,11 @@ public sealed class ChunkerFacade
                 "Failed to apply chunker routing change for extension '{Extension}' to '{ChunkerId}'.",
                 extension,
                 targetChunkerId);
-            return Res.Fail($"Failed to apply routing change: {ex.GetMessageRecursively()}");
+            return Result.Failure<ChunkerRoutingApplyResult>($"Failed to apply routing change: {ex.GetMessageRecursively()}");
         }
     }
 
-    public async Task<Res<ChunkerTestResult>> TestChunkerAsync(
+    public async Task<Result<ChunkerTestResult>> TestChunkerAsync(
         string chunkerId,
         string documentName,
         string content)
@@ -84,12 +84,12 @@ public sealed class ChunkerFacade
         try
         {
             var result = await chunkingService.TestAsync(chunkerId, documentName, content);
-            return Res.Ok(result);
+            return Result.Success(result);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to test chunker '{ChunkerId}'.", chunkerId);
-            return Res.Fail($"Failed to test chunker: {ex.GetMessageRecursively()}");
+            return Result.Failure<ChunkerTestResult>($"Failed to test chunker: {ex.GetMessageRecursively()}");
         }
     }
 }

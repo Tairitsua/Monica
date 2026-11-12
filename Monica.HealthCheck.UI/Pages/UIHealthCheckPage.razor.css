@@ -1,7 +1,5 @@
 .health-page { width: 100%; min-width: 0; min-height: 100%; padding: clamp(24px, 2.3vw, 36px); font-family: var(--mud-typography-default-family); }
-.health-page ::deep .health-drawer-container { width: 100%; min-width: 0; padding: 0; background: transparent; }
-/* A closed fixed drawer must not extend the routed page's scroll width. */
-.health-page ::deep .mud-drawer.mud-drawer-pos-right.mud-drawer--closed { display: none; }
+.health-page .health-workspace { width: 100%; min-width: 0; padding: 0; background: transparent; }
 .health-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--mud-palette-divider); }
 .health-page-heading { min-width: 0; }
 .health-page-eyebrow { display: block; margin-bottom: 12px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mud-palette-primary); }

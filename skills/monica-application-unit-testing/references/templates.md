@@ -1,16 +1,18 @@
 # Sociable Application Test Templates
 
-These examples use UserService.API. Keep the runnable project name equal to Test. plus the exact production project stem.
+These examples belong to `Test.Roles.User`: they protect `Roles.User` behavior while loading its `Domains.User` core and selected production Host composition. The execution host does not change the test owner; see [project ownership and naming](project-naming.md).
 
 ## Project Factory
 
+UserHostComposition is an application-owned composition method extracted from the production Host, not a Monica module per feature. It registers the real UserDbContext, domain participation and any application model required by the scenario. Include the actual role, core, Protocol, lightweight catalog where used, and actual local Host manifest assemblies in TypeDiscoveryAssemblies when composition spans them; the anchor alone supplies only its own assembly.
+
 ```csharp
-public sealed class UserServiceTestApplicationFactory
+public sealed class UserRoleTestApplicationFactory
     : MonicaTestApplicationFactory<CommandHandlerGrantPermission>
 {
     protected override void ConfigureMonica(IMonicaBuilder monica)
     {
-        monica.AddUserService(); // Registers the real UserDbContext and operation participation.
+        UserHostComposition.Configure(monica); // Reuses the product-owned native host registrations.
     }
 
     protected override void ConfigureServices(IServiceCollection services)
@@ -26,10 +28,10 @@ The factory is a stateless recipe. CreateAsync builds a new complete host; Creat
 ## Command and Repository Scenario
 
 ```csharp
-public sealed class CommandHandlerGrantPermissionTests(UserServiceTestApplicationFactory factory)
-    : IClassFixture<UserServiceTestApplicationFactory>
+public sealed class CommandHandlerGrantPermissionTests(UserRoleTestApplicationFactory factory)
+    : IClassFixture<UserRoleTestApplicationFactory>
 {
-    private readonly UserServiceTestApplicationFactory _factory = factory;
+    private readonly UserRoleTestApplicationFactory _factory = factory;
 
     [Fact]
     public async Task Handle_WhenUnitExists_ShouldPersistPermission()
@@ -86,7 +88,7 @@ IncludeSoftDeleted disables only Monica's soft-delete filter. Do not bypass tena
 
 ## Read-Only and Mediator Scenarios
 
-Arrange in a seed scope first. Then a direct read can resolve IOrganUnitQueries in a fresh application.CreateScope(token). To exercise the mediator adapter, resolve IMediator in that scope and Send a GET-bound query request (read-only by convention).
+Arrange in a seed scope first. Then a direct read can resolve IOrganUnitQueries in a fresh application.CreateScope(token). To exercise the mediator adapter, resolve IMediator in that scope and Send an IQuery<T> request. Its marker avoids a new transaction by default while preserving participation in an existing Shared transaction.
 
 ## Durable Notification Scenario
 
@@ -116,6 +118,6 @@ The event type must carry `[Outbox]` and stable `[EventName]` metadata. When tes
 
 Assert application.ModuleSnapshots for module registration. Resolve scoped repositories inside application.CreateScope; do not resolve them from the root Services provider.
 
-## Raw ProjectUnit Fast Path
+## Raw Building Block Fast Path
 
-Use ProjectUnitFixture<TUnit>.Builder().WithSubstitute<TCollaborator>(out var collaborator).Build() only for explicit collaboration. It does not validate transactions or production composition. Entity invariants can use ordinary constructors without a host.
+Use BuildingBlockFixture<TBuildingBlock>.Builder().WithSubstitute<TCollaborator>(out var collaborator).Build() only for explicit collaboration. It does not validate transactions or production composition. Entity invariants can use ordinary constructors without a host.

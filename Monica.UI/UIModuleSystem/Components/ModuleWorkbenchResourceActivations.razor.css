@@ -1,0 +1,11 @@
+.resource-activations { margin-top: 24px; min-width: 0; }
+.resource-heading { gap: 16px; flex-wrap: wrap; }
+.resource-body { padding: 0 20px 20px; min-width: 0; }
+.resource-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.resource-count, .resource-empty { color: var(--mud-palette-text-secondary); font-size: .875rem; }
+.resource-empty { margin: 0; padding: 16px 0; }
+.resource-identity { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.resource-identity span { color: var(--mud-palette-text-secondary); font-size: .75rem; }
+.resource-value { overflow-wrap: anywhere; }
+.resource-body ::deep .mud-table-cell { vertical-align: top; }
+.resource-body ::deep .mud-table-pagination-toolbar { flex-wrap: wrap; height: auto; min-height: 56px; }

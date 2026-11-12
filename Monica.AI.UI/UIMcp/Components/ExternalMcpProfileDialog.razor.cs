@@ -81,7 +81,9 @@ public partial class ExternalMcpProfileDialog
             if (_lifetime.IsRetired || cancellationToken.IsCancellationRequested) return;
             _testedProfile = profile;
             if (!ProfilesMatch(profile, CreateProfile())) return;
-            if (result.IsFailed(out var error, out var connectivity)) _error = SafeDiagnostic(error.Message, profile);
+            var error = result.WithoutData();
+            var connectivity = result.Data;
+            if (result.IsFailure()) _error = SafeDiagnostic(error.Message, profile);
             else { _lastTestResult = connectivity; _testedProfile = profile; }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }

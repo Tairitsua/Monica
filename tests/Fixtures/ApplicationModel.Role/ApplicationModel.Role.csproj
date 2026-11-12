@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ApplicationModel.Domain/ApplicationModel.Domain.csproj" />
+    <ProjectReference Include="../../../Monica.DependencyInjection/Monica.DependencyInjection.csproj" />
+  </ItemGroup>
+</Project>

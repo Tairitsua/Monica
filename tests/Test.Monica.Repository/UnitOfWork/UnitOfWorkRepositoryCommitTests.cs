@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monica.Core.Execution;
 using Microsoft.AspNetCore.Mvc;
 using Monica.Core.Execution.Mvc;
 using Monica.Core.Results;
@@ -16,17 +17,23 @@ public sealed class UnitOfWorkRepositoryCommitTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(ResStatus.Created, true, false)]
-    [InlineData(ResStatus.Ok, true, true)]
-    [InlineData(ResStatus.Conflict, false, false)]
-    [InlineData(ResStatus.BadRequest, false, true)]
-    public async Task MvcOutcome_WhenReturned_ShouldHonorEnvelopeStatus(ResStatus status, bool committed, bool json)
+    [InlineData(ResultStatus.Created, true, false)]
+    [InlineData(ResultStatus.Ok, true, true)]
+    [InlineData(ResultStatus.Conflict, false, false)]
+    [InlineData(ResultStatus.BadRequest, false, true)]
+    public async Task MvcOutcome_WhenReturned_ShouldHonorEnvelopeStatus(ResultStatus status, bool committed, bool json)
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         await app.ExecuteAsync(scope =>
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "mvc" });
-            IActionResult result = json ? new JsonResult(new Res("outcome", status)) : new ObjectResult(new Res("outcome", status));
+            var envelope = (status switch
+            {
+                ResultStatus.Created => Result.Created(),
+                ResultStatus.Ok => Result.Success(),
+                _ => Result.Failure("outcome", status)
+            }).WithMessage("outcome");
+            IActionResult result = json ? new JsonResult(envelope) : new ObjectResult(envelope);
             return Task.FromResult(MvcActionExecutionResult.ShortCircuit(result));
         }, cancellationToken: Token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
@@ -66,9 +73,9 @@ public sealed class UnitOfWorkRepositoryCommitTests
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "failure result" });
             await scope.Resolve<IUnitOfWorkManager>().Current!.FlushAsync(Token);
-            return Res.Fail("declined");
+            return Result.Failure("declined");
         }, cancellationToken: Token);
-        Assert.Equal(ResStatus.BadRequest, result.Status);
+        Assert.Equal(ResultStatus.BadRequest, result.Status);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
             Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
     }
@@ -77,7 +84,7 @@ public sealed class UnitOfWorkRepositoryCommitTests
     public async Task RunAsync_WhenNestedFailureIsCaught_ShouldPreventCommit()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(async scope =>
+        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
         {
             var manager = scope.Resolve<IUnitOfWorkManager>();
             try
@@ -91,6 +98,7 @@ public sealed class UnitOfWorkRepositoryCommitTests
             }
             catch (ApplicationException) { }
         }, cancellationToken: Token));
+        Assert.Equal("nested failure", Assert.IsType<ApplicationException>(rollback.InnerException).Message);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
             Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
     }
@@ -109,11 +117,27 @@ public sealed class UnitOfWorkRepositoryCommitTests
         if (fail) await Assert.ThrowsAsync<ApplicationException>(operation);
         else await operation();
         Assert.Null(manager.Current);
+        Assert.Throws<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().ValidateDatabaseAccess());
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(() => Task.CompletedTask, cancellationToken: Token));
         scope.Resolve<TestRepositoryDbContext>().Add(new SoftDeleteAuditRow { Title = "stale" });
         await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().SaveChangesAsync(Token));
         await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<TestRepositoryDbContext>().SoftDeleteRows
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Title, "stale SQL"), Token));
+    }
+
+    [Fact]
+    public async Task ValidateDatabaseAccess_WhenOperationIsRollbackOnly_ShouldRejectNativeAccess()
+    {
+        await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
+        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(scope =>
+        {
+            var db = scope.Resolve<TestRepositoryDbContext>();
+            db.ValidateDatabaseAccess();
+            scope.Resolve<IUnitOfWorkManager>().Current!.MarkRollbackOnly();
+            var rejected = Assert.Throws<TransactionRollbackOnlyException>(db.ValidateDatabaseAccess);
+            Assert.Equal("Explicit", rejected.FirstFailure.Source);
+            return Task.CompletedTask;
+        }, cancellationToken: Token));
     }
 
     [Fact]

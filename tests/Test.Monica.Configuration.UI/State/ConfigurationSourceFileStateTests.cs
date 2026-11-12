@@ -13,15 +13,15 @@ public sealed class ConfigurationSourceFileStateTests
     {
         const string originalKey = "  source:/区域?revision=1&value=%25  ";
         const string newKey = "source:/区域?revision=2&value=%25";
-        var older = NewCompletion<Res<ConfigurationSourceFileView>>();
-        var newer = NewCompletion<Res<ConfigurationSourceFileView>>();
+        var older = NewCompletion<Result<ConfigurationSourceFileView>>();
+        var newer = NewCompletion<Result<ConfigurationSourceFileView>>();
         var calls = new List<string>();
         await using var state = new ConfigurationSourceFileState(key =>
         {
             calls.Add(key);
             return calls.Count switch
             {
-                1 => Task.FromResult(Res.Ok(View(key, "{\"original\":true}"))),
+                1 => Task.FromResult(Result.Success(View(key, "{\"original\":true}"))),
                 2 => older.Task,
                 _ => newer.Task
             };
@@ -34,12 +34,12 @@ public sealed class ConfigurationSourceFileStateTests
         Assert.False(state.Read.HasLoaded);
         Assert.Null(state.Read.Value);
         Assert.Null(state.Read.ObservedAtUtc);
-        older.SetResult(olderFails ? Res.Fail("old unavailable") : Res.Ok(View(originalKey, "{\"old\":true}")));
+        older.SetResult(olderFails ? Result.Failure<ConfigurationSourceFileView>("old unavailable") : Result.Success(View(originalKey, "{\"old\":true}")));
         await ObserveAsync(oldRefresh);
         Assert.Null(state.Read.Value);
         Assert.Null(state.Read.Error);
         Assert.True(state.Read.Loading);
-        newer.SetResult(Res.Ok(View(newKey, "{}")));
+        newer.SetResult(Result.Success(View(newKey, "{}")));
         await ObserveAsync(newRead);
 
         Assert.Equal(new[] { originalKey, originalKey, newKey }, calls);
@@ -55,10 +55,10 @@ public sealed class ConfigurationSourceFileStateTests
     [InlineData("empty-object")]
     public async Task SameSourceRefresh_ShouldRetainAcceptedFileUntilNewestOutcome(string outcome)
     {
-        var pending = NewCompletion<Res<ConfigurationSourceFileView>>();
+        var pending = NewCompletion<Result<ConfigurationSourceFileView>>();
         var calls = 0;
         await using var state = new ConfigurationSourceFileState(key => ++calls == 1
-            ? Task.FromResult(Res.Ok(View(key, "{\"accepted\":true}"))) : pending.Task, "unavailable");
+            ? Task.FromResult(Result.Success(View(key, "{\"accepted\":true}"))) : pending.Task, "unavailable");
         await ObserveAsync(state.LoadAsync("exact-key"));
         var accepted = state.Read.Value;
         var observed = state.Read.ObservedAtUtc;
@@ -68,9 +68,9 @@ public sealed class ConfigurationSourceFileStateTests
         Assert.True(state.Read.HasLoaded);
         pending.SetResult(outcome switch
         {
-            "failure" => Res.Fail("file unavailable"),
-            "missing" => Res.Ok<ConfigurationSourceFileView>(null!),
-            _ => Res.Ok(View("exact-key", "{}"))
+            "failure" => Result.Failure<ConfigurationSourceFileView>("file unavailable"),
+            "missing" => new Result<ConfigurationSourceFileView> { Status = ResultStatus.Ok, Data = null },
+            _ => Result.Success(View("exact-key", "{}"))
         });
         await ObserveAsync(refresh);
 
@@ -92,14 +92,14 @@ public sealed class ConfigurationSourceFileStateTests
     [Fact]
     public async Task Dispose_ShouldJoinActualReadAndRejectLaterRequestsWithoutLateAdoption()
     {
-        var pending = NewCompletion<Res<ConfigurationSourceFileView>>();
+        var pending = NewCompletion<Result<ConfigurationSourceFileView>>();
         var calls = 0;
         var state = new ConfigurationSourceFileState(_ => { calls++; return pending.Task; }, "unavailable");
         var load = state.LoadAsync("exact");
         var disposal = state.DisposeAsync().AsTask();
         Assert.Same(disposal, state.DisposeAsync().AsTask());
         Assert.False(disposal.IsCompleted);
-        pending.SetResult(Res.Ok(View("exact", "{}")));
+        pending.SetResult(Result.Success(View("exact", "{}")));
         await ObserveAsync(load);
         await ObserveAsync(disposal);
 

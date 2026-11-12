@@ -1,7 +1,0 @@
-interface:
-  display_name: "Monica Ecosystem Repository Development"
-  short_description: "Build Monica packages and provider images"
-  default_prompt: "Use $monica-third-party-module-development to create a standards-compliant Monica repository with NuGet packages and optional provider images."
-  icon_small: "./assets/monica-compatibility-mark.png"
-  icon_large: "./assets/monica-compatibility-mark.svg"
-  brand_color: "#10B981"

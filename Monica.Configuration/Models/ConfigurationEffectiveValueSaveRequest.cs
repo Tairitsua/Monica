@@ -5,6 +5,10 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationEffectiveValueSaveRequest
 {
+    /// <summary>Gets optional active-publication evidence that must be checked atomically with an existing-document write.</summary>
+    /// <remarks>A store that cannot enforce this guard must reject the request; it must never ignore it.</remarks>
+    public ConfigurationPublishedDefinitionExpectation? PublishedDefinitionExpectation { get; init; }
+
     /// <summary>
     /// Gets the configuration definition being saved.
     /// </summary>

@@ -33,6 +33,8 @@ builder.AddMonica(monica =>
 
 With the class above in the discovery scope, the registration maps `/mcp/operations`. Without a discovered enabled `McpServer<TSelf>` selecting HTTP, registering the module alone publishes no server. For stdio, the host uses its hosted-service transport instead of Web endpoint mapping. A skill-backed MCP server is controlled by the skill's `McpServerDefinition` and its separate persisted exposure setting. HTTP endpoints are materialized at startup, so the management result's restart requirement must remain visible after a toggle. Saving the preference does not verify that an endpoint is currently active. This preference is separate from in-process skill enablement and from exposing MCP tools to Monica agents.
 
+With `Application:AutonomousWork=false`, the native stdio server remains admitted as an input transport, just as HTTP remains available. This does not start product background work: explicit MCP calls still execute their normal tool behavior and can have real external effects.
+
 For a remote server, call `AddMcpClient(name, description, endpoint, ...)` on the MCP registration with an absolute HTTP(S) endpoint. That catalog entry can expose remote tools to agents without hosting a local MCP server.
 
 ```csharp

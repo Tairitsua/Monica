@@ -13,6 +13,9 @@ internal interface IJobSchedulerUiAccess
     /// Determines whether the current circuit may use the JobScheduler operational workspace.
     /// </summary>
     Task<bool> IsAuthorizedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Rechecks view access and any stricter policy for definition removal and owner retirement.</summary>
+    Task<bool> IsDefinitionMaintenanceAuthorizedAsync(CancellationToken cancellationToken = default);
 }
 
 internal sealed class JobSchedulerUiAccess(
@@ -22,4 +25,10 @@ internal sealed class JobSchedulerUiAccess(
     /// <inheritdoc />
     public Task<bool> IsAuthorizedAsync(CancellationToken cancellationToken = default) =>
         evaluator.IsAuthorizedAsync(options.Value.AuthorizationPolicyOverride, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<bool> IsDefinitionMaintenanceAuthorizedAsync(CancellationToken cancellationToken = default) =>
+        await IsAuthorizedAsync(cancellationToken)
+        && (string.IsNullOrWhiteSpace(options.Value.DefinitionMaintenanceAuthorizationPolicy)
+            || await evaluator.IsAuthorizedAsync(options.Value.DefinitionMaintenanceAuthorizationPolicy, cancellationToken));
 }

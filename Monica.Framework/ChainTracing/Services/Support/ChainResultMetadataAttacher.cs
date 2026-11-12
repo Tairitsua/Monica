@@ -1,7 +1,7 @@
 using System.Dynamic;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
+using Monica.Core;
 using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.ExceptionHandling.Models;
 using Monica.Core.ExceptionHandling.Services;
@@ -9,7 +9,6 @@ using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Models;
-using Monica.Modules;
 
 namespace Monica.Framework.ChainTracing.Services.Support;
 
@@ -19,7 +18,7 @@ namespace Monica.Framework.ChainTracing.Services.Support;
 /// the same correlation members.
 /// </summary>
 public sealed class ChainResultMetadataAttacher(
-    IOptions<ModuleResultEnvelopeOption> envelopeOptions,
+    IMonicaApplicationOptions applicationOptions,
     IJsonSerializerOptionsProvider? serializer = null,
     IEnumerable<IRemoteExceptionDiagnosticsExtractor>? extractors = null)
 {
@@ -39,7 +38,7 @@ public sealed class ChainResultMetadataAttacher(
 
         chain.MarkComplete();
         var traceId = ResultTraceId.Capture(httpContext);
-        if (!envelopeOptions.Value.ExposeDiagnosticDetails || chain.Root is null)
+        if (!applicationOptions.DebugMode || chain.Root is null)
         {
             response.SetMetadata(ResultMetadataKeys.TraceId, traceId);
             return;

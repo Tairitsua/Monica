@@ -1,7 +1,6 @@
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
-using Monica.WebApi.Validation;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -13,16 +12,15 @@ public class ModuleWebApi : MonicaModule<ModuleWebApiOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
+        module.Require<ModuleApplication, ModuleApplicationOption>();
         module.Require<ModuleAutoControllers, ModuleAutoControllersOption>();
-        module.Require<ModuleAutoModel, ModuleAutoModelOption>();
+        module.Require<ModuleModelQuery, ModuleModelQueryOption>();
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
         module.Require<ModuleSwagger, ModuleSwaggerOption>();
         module.Require<ModuleAuthentication, ModuleAuthenticationOption>();
         module.Require<ModuleMediator, ModuleMediatorOption>();
         module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
         module.Require<ModuleRepository, ModuleRepositoryOption>();
-        module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>(
-            options => options.AddExceptionMapper<ValidationExceptionMapper>());
     }
 }
 

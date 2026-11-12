@@ -19,11 +19,11 @@ internal sealed class RequestRejectionFactory(IJsonSerializerOptionsProvider jso
     private const int MAX_PATH_LENGTH = 256;
     private const int MAX_MESSAGE_LENGTH = 256;
 
-    public RequestRejection FromModelState(ActionContext context, ResStatus status = ResStatus.BadRequest)
+    public RequestRejection FromModelState(ActionContext context, ResultStatus status = ResultStatus.BadRequest)
     {
         var entries = context.ModelState.Where(pair => pair.Value is { Errors.Count: > 0 }).ToArray();
         if (entries.Any(pair => pair.Value!.Errors.Any(error => error.Exception is UnsupportedContentTypeException)))
-            status = ResStatus.UnsupportedMediaType;
+            status = ResultStatus.UnsupportedMediaType;
 
         var bodyParameters = context.ActionDescriptor.Parameters
             .Where(parameter => parameter.BindingInfo?.BindingSource == BindingSource.Body)
@@ -39,9 +39,9 @@ internal sealed class RequestRejectionFactory(IJsonSerializerOptionsProvider jso
     {
         var status = exception.StatusCode switch
         {
-            StatusCodes.Status413PayloadTooLarge => ResStatus.PayloadTooLarge,
-            StatusCodes.Status415UnsupportedMediaType => ResStatus.UnsupportedMediaType,
-            _ => ResStatus.BadRequest
+            StatusCodes.Status413PayloadTooLarge => ResultStatus.PayloadTooLarge,
+            StatusCodes.Status415UnsupportedMediaType => ResultStatus.UnsupportedMediaType,
+            _ => ResultStatus.BadRequest
         };
         var fields = exception.InnerException is JsonException jsonException
             ? new[] { new ResultFieldError(NormalizePath(jsonException.Path ?? ""), "invalid_format", "Enter a valid value.") }
@@ -55,16 +55,16 @@ internal sealed class RequestRejectionFactory(IJsonSerializerOptionsProvider jso
                 .Select(member => new ResultFieldError(NormalizePath(member), "invalid",
                     Limit(string.IsNullOrWhiteSpace(error.ErrorMessage) ? "The value did not pass validation." : error.ErrorMessage, MAX_MESSAGE_LENGTH))))
             .Take(MAX_FIELDS).ToArray();
-        return Create(context, ResStatus.BadRequest, ResultErrorCodes.ValidationFailed, fields);
+        return Create(context, ResultStatus.BadRequest, ResultErrorCodes.ValidationFailed, fields);
     }
 
-    private RequestRejection Create(HttpContext? context, ResStatus status, string code, ResultFieldError[] fields)
+    private RequestRejection Create(HttpContext? context, ResultStatus status, string code, ResultFieldError[] fields)
     {
         var error = new ResultError(code, ResultTraceId.Capture(context), fields: fields);
         var message = status switch
         {
-            ResStatus.PayloadTooLarge => "The request payload is too large.",
-            ResStatus.UnsupportedMediaType => "The request content type is not supported.",
+            ResultStatus.PayloadTooLarge => "The request payload is too large.",
+            ResultStatus.UnsupportedMediaType => "The request content type is not supported.",
             _ => messages.GetMessage(error)
         };
         return new RequestRejection(status, message, error);

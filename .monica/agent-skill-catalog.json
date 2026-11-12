@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/agent-skill-catalog.schema.json",
   "schemaVersion": 2,
-  "catalogVersion": "2.1.0",
+  "catalogVersion": "2.2.0",
   "skills": {
     "monica-guide": {
       "path": "skills/monica-guide",
@@ -12,13 +12,39 @@
         "monica-application",
         "monica-framework",
         "monica-docs-authoring",
-        "monica-contribution"
+        "monica-contribution",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [],
         "recommended": [
           "monica-contribution"
         ],
+        "conditional": [],
+        "external": []
+      }
+    },
+    "monica-troubleshooting": {
+      "path": "skills/monica-troubleshooting",
+      "role": "router",
+      "ownership": "monica",
+      "managed": true,
+      "routes": [
+        "monica-guide",
+        "monica-infra-hosting",
+        "monica-infra-persistence",
+        "monica-infra-messaging",
+        "monica-infra-configuration",
+        "monica-infra-jobs",
+        "monica-infra-web",
+        "monica-infra-observability",
+        "monica-infra-ai",
+        "monica-infra-ui",
+        "monica-docs-authoring"
+      ],
+      "dependencies": {
+        "required": [],
+        "recommended": [],
         "conditional": [],
         "external": []
       }
@@ -48,7 +74,7 @@
         "monica-guide",
         "monica-application-microservice",
         "monica-application-modular-monolith",
-        "monica-application-project-unit-development",
+        "monica-application-building-block-development",
         "monica-application-unit-testing",
         "monica-infra-persistence",
         "monica-infra-messaging",
@@ -58,7 +84,10 @@
         "monica-infra-observability",
         "monica-infra-ai",
         "monica-infra-web",
-        "monica-infra-ui"
+        "monica-infra-ui",
+        "monica-application-ui",
+        "monica-application-ui-development",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [
@@ -69,8 +98,7 @@
           "monica-infra-configuration",
           "monica-infra-observability",
           "monica-infra-ai",
-          "monica-infra-web",
-          "monica-infra-ui"
+          "monica-infra-web"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -91,9 +119,8 @@
           {
             "capability": "ui",
             "skills": [
-              "monica-ui-development",
-              "monica-ui-localization",
-              "monica-ui-audit"
+              "monica-application-ui",
+              "monica-application-ui-development"
             ]
           }
         ],
@@ -108,7 +135,7 @@
       "dependencies": {
         "required": [
           "monica-application",
-          "monica-application-project-unit-development"
+          "monica-application-building-block-development"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -125,7 +152,7 @@
       "dependencies": {
         "required": [
           "monica-application",
-          "monica-application-project-unit-development"
+          "monica-application-building-block-development"
         ],
         "recommended": [
           "monica-application-unit-testing"
@@ -134,8 +161,8 @@
         "external": []
       }
     },
-    "monica-application-project-unit-development": {
-      "path": "skills/monica-application-project-unit-development",
+    "monica-application-building-block-development": {
+      "path": "skills/monica-application-building-block-development",
       "role": "capability",
       "ownership": "monica",
       "managed": true,
@@ -174,6 +201,7 @@
       "managed": true,
       "routes": [
         "monica-guide",
+        "monica-coding-standards",
         "monica-architecture",
         "monica-development",
         "monica-third-party-module-development",
@@ -194,10 +222,12 @@
         "monica-infra-observability",
         "monica-infra-ai",
         "monica-infra-web",
-        "monica-infra-ui"
+        "monica-infra-ui",
+        "monica-troubleshooting"
       ],
       "dependencies": {
         "required": [
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-unit-testing"
@@ -247,13 +277,27 @@
         "external": []
       }
     },
+    "monica-coding-standards": {
+      "path": "skills/monica-coding-standards",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [],
+        "recommended": [],
+        "conditional": [],
+        "external": []
+      }
+    },
     "monica-architecture": {
       "path": "skills/monica-architecture",
       "role": "capability",
       "ownership": "monica",
       "managed": true,
       "dependencies": {
-        "required": [],
+        "required": [
+          "monica-coding-standards"
+        ],
         "recommended": [
           "monica-development"
         ],
@@ -415,11 +459,10 @@
       "ownership": "monica",
       "managed": true,
       "dependencies": {
-        "required": [
-          "monica-architecture",
-          "monica-development"
-        ],
+        "required": [],
         "recommended": [
+          "monica-architecture",
+          "monica-development",
           "monica-ui-localization",
           "monica-ui-audit"
         ],
@@ -479,17 +522,26 @@
           "dependency-injection",
           "dynamic-proxy",
           "hosted-service",
+          "locker",
           "service-discovery",
           "state-store"
         ],
         "sourcePaths": [
           "Monica.Core",
+          "Monica.ApplicationModel",
           "Monica.DependencyInjection",
+          "Monica.Locker",
+          "Monica.Locker.EfCore",
+          "Monica.Locker.Redis",
+          "Monica.Locker.UI",
           "Monica.ServiceDiscovery",
           "Monica.StateStore",
           "Monica.StateStore.StackExchange",
           "Monica.StateStore.UI",
-          "Monica.Dapr/Modules/ModuleDaprStateStore.cs"
+          "Monica.Dapr/Modules/ModuleDaprStateStore.cs",
+          "Monica.Dapr/Modules/ModuleDaprLocker.cs",
+          "Monica.Dapr/Services/DaprLockProvider.cs",
+          "Monica.Dapr/Services/DaprLockHandle.cs"
         ]
       }
     },
@@ -508,11 +560,15 @@
         "title": "Persistence and transactions",
         "modules": [
           "repository",
-          "unit-of-work"
+          "unit-of-work",
+          "blob-storage"
         ],
         "sourcePaths": [
           "Monica.Repository",
-          "Monica.Repository.UI"
+          "Monica.EntityFrameworkCore",
+          "Monica.Repository.UI",
+          "Monica.BlobStorage",
+          "Monica.BlobStorage.Minio"
         ]
       }
     },
@@ -538,6 +594,7 @@
           "Monica.EventBus",
           "Monica.EventBus.Kafka",
           "Monica.DataChannel",
+          "Monica.DataChannel.Dapr",
           "Monica.SignalR",
           "Monica.Framework.UI/UIEventBus",
           "Monica.Framework.UI/Modules/ModuleEventBusUI.cs",
@@ -547,9 +604,8 @@
           "Monica.Framework.UI/Pages/UIEventBusChangesPage.razor",
           "Monica.Framework.UI/Pages/UIEventBusTestToolsPage.razor",
           "Monica.Dapr/Modules/ModuleDaprEventBus.cs",
-          "Monica.WebApi/RpcClient",
-          "Monica.WebApi/Modules/ModuleRpcClient.cs",
-          "Monica.WebApi/Annotations/RpcClientGenerationTargets.cs"
+          "Monica.Invocation",
+          "Monica.WebApi/Annotations/ApiClientGenerationTargets.cs"
         ]
       }
     },
@@ -687,21 +743,23 @@
           "authority",
           "auto-controllers",
           "auto-model",
+          "model-query",
           "web-api",
-          "project-units",
+          "building-blocks",
           "execution-pipeline"
         ],
         "sourcePaths": [
           "Monica.WebApi",
-          "Monica.AutoModel",
+          "Monica.ModelQuery",
           "Monica.Authority",
-          "Monica.ProjectUnits",
+          "Monica.BuildingBlocks",
           "Monica.Core/Execution",
           "Monica.Core/Modules/ModuleExecutionPipeline.cs",
           "Monica.Framework.UI/UIExecutionPipeline",
-          "Monica.Framework.UI/UIProjectUnits",
+          "Monica.Framework.UI/UIBuildingBlocks",
           "Monica.Framework.UI/Modules/ModuleExecutionPipelineUI.cs",
-          "Monica.Framework.UI/Modules/ModuleProjectUnitsUI.cs"
+          "Monica.Framework.UI/Modules/ModuleBuildingBlocksUI.cs",
+          "Monica.Application"
         ]
       }
     },
@@ -744,17 +802,45 @@
           "Monica.Framework.UI/UIMapper",
           "Monica.Framework.UI/Modules/ModuleMapperUI.cs",
           "Monica.Framework.UI/Localization/MapperResource",
-          "Monica.Framework.UI/wwwroot/UIMapper"
+          "Monica.Framework.UI/wwwroot/UIMapper",
+          "Monica.Application.UI"
         ]
+      }
+    },
+    "monica-application-ui": {
+      "path": "skills/monica-application-ui",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [
+          "monica-application",
+          "monica-infra-ui"
+        ],
+        "recommended": [],
+        "conditional": [],
+        "external": []
+      }
+    },
+    "monica-application-ui-development": {
+      "path": "skills/monica-application-ui-development",
+      "role": "capability",
+      "ownership": "monica",
+      "managed": true,
+      "dependencies": {
+        "required": [
+          "monica-application-ui",
+          "monica-ui-development",
+          "monica-ui-localization",
+          "monica-ui-audit"
+        ],
+        "recommended": [],
+        "conditional": [],
+        "external": []
       }
     }
   },
   "externalSkills": {
-    "code-simplifier": {
-      "ownership": "external",
-      "managed": false,
-      "purpose": "Optional behavior-preserving cleanup after implementation."
-    },
     "github": {
       "ownership": "external",
       "managed": false,
@@ -778,12 +864,13 @@
   },
   "profiles": {
     "application": {
-      "description": "Build a Monica-based application without modifying the framework.",
+      "description": "Build a Monica application with the unified domain/role architecture; optionally include business UI.",
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-application",
-          "monica-application-project-unit-development",
+          "monica-application-building-block-development",
           "monica-infra-hosting",
           "monica-infra-persistence",
           "monica-infra-messaging",
@@ -791,8 +878,7 @@
           "monica-infra-configuration",
           "monica-infra-observability",
           "monica-infra-ai",
-          "monica-infra-web",
-          "monica-infra-ui"
+          "monica-infra-web"
         ],
         "recommended": [
           "monica-application-unit-testing",
@@ -814,9 +900,8 @@
           {
             "capability": "ui",
             "skills": [
-              "monica-ui-development",
-              "monica-ui-localization",
-              "monica-ui-audit"
+              "monica-application-ui",
+              "monica-application-ui-development"
             ]
           }
         ]
@@ -838,7 +923,9 @@
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-third-party-module-development",
@@ -900,7 +987,9 @@
       "skills": {
         "required": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
+          "monica-coding-standards",
           "monica-architecture",
           "monica-development",
           "monica-opentelemetry",
@@ -1038,14 +1127,10 @@
     "monica-business-modular-monolith": {
       "canonical": "monica-application-modular-monolith",
       "diagnostic": "Retired skill name; install or invoke $monica-application-modular-monolith."
-    },
-    "monica-project-unit-development": {
-      "canonical": "monica-application-project-unit-development",
-      "diagnostic": "Retired skill name; install or invoke $monica-application-project-unit-development."
     }
   },
   "managedInstructions": {
-    "version": 4,
+    "version": 7,
     "markers": {
       "start": "<!-- monica-guide:managed:start -->",
       "end": "<!-- monica-guide:managed:end -->"
@@ -1054,78 +1139,301 @@
       "application": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-application"
         ],
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-application-routing",
-            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and ProjectUnit references."
+            "text": "Before designing, implementing, refactoring, or reviewing a Monica application, load $monica-application and the repository-designated project application specification skill, then read the affected architecture and BuildingBlock references. For business UI also load monica-application-ui; the same project specification owns presentation and backend.",
+            "labels": {
+              "en-US": {
+                "title": "Application development",
+                "description": "Load the shared application rules and project specification."
+              },
+              "zh-CN": {
+                "title": "应用研发规范",
+                "description": "开发前加载共享应用规范与项目规范。"
+              }
+            }
           },
           {
             "id": "monica-application-specification-evolution",
-            "text": "Compose existing ProjectUnits and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope."
+            "text": "Compose existing Building Blocks and documented capabilities within their approved contracts. Use monica-application's specification evolution rules only for a concrete architectural gap or rule change that composition cannot resolve; identify that gap before requesting a scoped human decision. Reuse existing explicit approval within its agreed scope.",
+            "labels": {
+              "en-US": {
+                "title": "Confirm architecture changes",
+                "description": "Reuse existing capabilities; confirm changes to architectural rules."
+              },
+              "zh-CN": {
+                "title": "确认架构变更",
+                "description": "优先组合现有能力；变更架构规则时再确认。"
+              }
+            }
           },
           {
             "id": "reconcile-project-application-specification",
-            "text": "Reconcile impacted project application specification facts and rules with the implementation in the same change. Keep rule rationale with the rule and use Git/history or existing project decision evidence."
+            "text": "Reconcile impacted project application specification facts and rules with the implementation in the same change. Keep rule rationale with the rule and use Git/history or existing project decision evidence.",
+            "labels": {
+              "en-US": {
+                "title": "Keep project specs current",
+                "description": "Update affected project rules alongside implementation."
+              },
+              "zh-CN": {
+                "title": "同步项目规范",
+                "description": "实现变化时，一并维护受影响的项目规范。"
+              }
+            }
           }
         ]
       },
       "extension-author": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-third-party-module-development"
         ],
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-framework-extension",
-            "text": "Use $monica-framework and $monica-third-party-module-development for extension implementation."
+            "text": "Use $monica-framework and $monica-third-party-module-development for extension implementation.",
+            "labels": {
+              "en-US": {
+                "title": "Extension development",
+                "description": "Use the framework and third-party module development skills."
+              },
+              "zh-CN": {
+                "title": "扩展模块研发",
+                "description": "使用框架与第三方模块研发技能。"
+              }
+            }
           },
           {
             "id": "immutable-nuget-packages",
-            "text": "Keep generated extension projects on immutable Monica NuGet packages; never replace them with local Monica project references."
+            "text": "Keep generated extension projects on immutable Monica NuGet packages; never replace them with local Monica project references.",
+            "labels": {
+              "en-US": {
+                "title": "Pinned package dependencies",
+                "description": "Keep extension projects on immutable Monica NuGet versions."
+              },
+              "zh-CN": {
+                "title": "固定包依赖",
+                "description": "扩展项目使用不可变的 Monica NuGet 版本。"
+              }
+            }
           }
         ]
       },
       "framework-contributor": {
         "skills": [
           "monica-guide",
+          "monica-troubleshooting",
           "monica-framework",
           "monica-unit-testing"
         ],
         "rules": [
           {
             "id": "monica-guide-routing",
-            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics."
+            "text": "Use $monica-guide for Monica toolbox help, setup, configuration, source lookup, updates, and diagnostics.",
+            "labels": {
+              "en-US": {
+                "title": "Toolbox guidance",
+                "description": "Use Guide for setup, skills and diagnostics."
+              },
+              "zh-CN": {
+                "title": "工具箱指引",
+                "description": "通过 Guide 处理安装、技能与诊断。"
+              }
+            }
+          },
+          {
+            "id": "monica-troubleshooting-routing",
+            "text": "For runtime failures, missing routes, inactive UI, or failed infrastructure operations, use $monica-troubleshooting and the selected owning infra reference. Guide doctor diagnoses toolbox and installation state.",
+            "labels": {
+              "en-US": {
+                "title": "Runtime troubleshooting",
+                "description": "Load the troubleshooting skill when a runtime capability fails."
+              },
+              "zh-CN": {
+                "title": "运行问题排查",
+                "description": "运行功能异常时，先加载排查技能。"
+              }
+            }
           },
           {
             "id": "resolve-pinned-source",
-            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission."
+            "text": "Before guessing, cloning, or using a moving branch when Monica source is needed, run $monica-guide source resolve for that repository; a returned binding is a lookup path, not write permission.",
+            "labels": {
+              "en-US": {
+                "title": "Source lookup guidance",
+                "description": "Resolve verified Monica source and include bound locations as read-only references."
+              },
+              "zh-CN": {
+                "title": "源码定位指引",
+                "description": "解析 Monica 源码，并将绑定位置作为只读参考写入指令。"
+              }
+            },
+            "context": "source-bindings"
+          },
+          {
+            "id": "issue-reporting-policy",
+            "text": "Before preparing an upstream issue, read $monica-guide issue status and follow the issue reporting policy below.",
+            "context": "issue-policy",
+            "labels": {
+              "en-US": {
+                "title": "Issue reporting policy",
+                "description": "Include this computer's policy for preparing issue reports."
+              },
+              "zh-CN": {
+                "title": "Issue 上报策略",
+                "description": "将本机准备 Issue 的权限策略写入指令。"
+              }
+            }
           },
           {
             "id": "monica-framework-routing",
-            "text": "Use $monica-framework to route framework implementation and $monica-unit-testing for framework tests."
+            "text": "Use $monica-framework to route framework implementation and $monica-unit-testing for framework tests.",
+            "labels": {
+              "en-US": {
+                "title": "Framework development",
+                "description": "Use framework development and testing skills."
+              },
+              "zh-CN": {
+                "title": "框架研发指引",
+                "description": "使用框架研发与测试技能。"
+              }
+            }
           },
           {
             "id": "canonical-knowledge",
-            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical task reference and any affected read-when routes in the same change; follow monica-docs-authoring for topic boundaries and regenerate agent and website projections. Explain a no-impact decision when no knowledge change is needed."
+            "text": "When public behavior, examples, or reusable guidance changes, update the owning canonical task reference and any affected read-when routes in the same change; follow monica-docs-authoring for topic boundaries and regenerate agent and website projections. Explain a no-impact decision when no knowledge change is needed.",
+            "labels": {
+              "en-US": {
+                "title": "Maintain canonical guidance",
+                "description": "Keep owning references and their projections aligned with changes."
+              },
+              "zh-CN": {
+                "title": "维护框架指引",
+                "description": "更新能力时，同步所属参考文档与生成投影。"
+              }
+            }
           }
         ]
       }
@@ -1137,10 +1445,11 @@
   },
   "distribution": {
     "repository": "Tairitsua/Monica",
-    "installer": {
-      "assetNameTemplate": "monica-guide-v{version}-{rid}.zip",
+    "productBundle": {
+      "assetNameTemplate": "monica-framework-v{version}-{rid}.zip",
       "sha256SumsAsset": "SHA256SUMS"
     },
-    "immutableSkillUrlTemplate": "https://github.com/Tairitsua/Monica/tree/{tag}/skills/{skill}"
+    "immutableSkillUrlTemplate": "https://github.com/Tairitsua/Monica/tree/{tag}/skills/{skill}",
+    "clientDownloadUrl": "https://monica.dpdns.org/downloads"
   }
 }

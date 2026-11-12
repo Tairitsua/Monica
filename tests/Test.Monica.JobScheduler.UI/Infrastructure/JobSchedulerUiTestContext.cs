@@ -139,6 +139,7 @@ public sealed class JobSchedulerUiTestContext : BunitContext
 
     internal sealed class TestJobSchedulerUiAccess(bool isAuthorized) : IJobSchedulerUiAccess
     {
+        public Task<bool> IsDefinitionMaintenanceAuthorizedAsync(CancellationToken cancellationToken = default) => IsAuthorizedAsync(cancellationToken);
         private TaskCompletionSource<bool>? _authorizationGate;
         private TaskCompletionSource<bool>? _authorizationStarted;
 

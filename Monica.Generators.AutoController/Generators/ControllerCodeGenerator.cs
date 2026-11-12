@@ -98,28 +98,34 @@ internal static class ControllerCodeGenerator
         builder.AppendLine("{");
         foreach (var candidate in candidateList)
         {
-            AppendAction(builder, candidate.Endpoint);
+            AppendAction(builder, candidate.Endpoint, candidate.ApplicationReceiver);
         }
 
         builder.AppendLine("}");
         return builder.ToString();
     }
 
-    private static void AppendAction(StringBuilder builder, EndpointModel endpoint)
+    private static void AppendAction(StringBuilder builder, EndpointModel endpoint, bool applicationReceiver)
     {
         foreach (var line in endpoint.DocumentationComment.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
         {
             builder.Append("    ").AppendLine(line);
         }
 
+        if (applicationReceiver)
+        {
+            builder.Append("    [global::Monica.ApplicationModel.Annotations.ApplicationApiReceiver(typeof(")
+                .Append(endpoint.RequestTypeName).AppendLine("))]");
+        }
+
         builder.Append("    [Http").Append(endpoint.HttpMethod).Append("(\"")
             .Append(EscapeString(endpoint.RelativeRoute)).AppendLine("\")]");
-        builder.Append("    [ProducesResponseType(typeof(").Append(endpoint.ResultTypeName)
+        builder.Append("    [ProducesResponseType(typeof(").Append(endpoint.ResultRuntimeTypeName)
             .AppendLine("), (int)HttpStatusCode.OK)]");
         builder.Append("    public async global::System.Threading.Tasks.Task<object> ")
             .Append(endpoint.OperationName).AppendLine("(");
         builder.Append("        [global::Monica.WebApi.AutoControllers.ModelBinding.ApiEndpointRequestAttribute(")
-            .Append("global::Monica.WebApi.Annotations.ApiRequestBinding.")
+            .Append("global::Monica.Application.Annotations.ApiRequestBinding.")
             .Append(endpoint.Binding)
             .Append(")] ")
             .Append(endpoint.RequestTypeName).AppendLine(" request,");

@@ -6,10 +6,16 @@
 <SchedulerWorkspace Title="@L["Workspace:Pages:Catalog:Title"]"
                     Description="@L["Workspace:Pages:Catalog:Description"]"
                     ActivePanelIndex="1">
-    <JobCatalogContent @key="(Present, Owner)" Present="@Present" Owner="@Owner" />
+    <JobCatalogContent Present="@Present" Owner="@Owner" InitialType="@Type" InitialDisabled="@Disabled" InitialSearch="@Search" InitialStanding="@Standing" InitialCadence="@Cadence" InitialSort="@Sort" InitialInstanceId="@InstanceId" />
 </SchedulerWorkspace>
 
 @code {
+    /// <summary>Gets the route-held operational standing, cadence and inventory ordering.</summary>
+    [SupplyParameterFromQuery(Name = "standing")] public string? Standing { get; set; }
+    /// <summary>Gets the schedule cadence filter selected in the composition map.</summary>
+    [SupplyParameterFromQuery(Name = "cadence")] public string? Cadence { get; set; }
+    /// <summary>Gets attention, name, owner or next-occurrence ordering.</summary>
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
     public const string PAGE_URL = "/job-scheduler/catalog";
 
     /// <summary>
@@ -25,4 +31,13 @@
     /// </summary>
     [SupplyParameterFromQuery(Name = "owner")]
     public string? Owner { get; set; }
+
+    /// <summary>Gets the route-held recurring or triggered type selection.</summary>
+    [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    /// <summary>Gets the route-held effective disabled-policy filter.</summary>
+    [SupplyParameterFromQuery(Name = "paused")] public bool? Disabled { get; set; }
+    /// <summary>Gets the route-held definition name or key search.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    /// <summary>Gets the route-owned execution drawer selection without replacing the catalog's filters or batch selection.</summary>
+    [SupplyParameterFromQuery(Name = "instanceId")] public string? InstanceId { get; set; }
 }

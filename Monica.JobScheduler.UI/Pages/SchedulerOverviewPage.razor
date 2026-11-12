@@ -9,6 +9,7 @@
 @inject IOptions<ModuleJobSchedulerUIOption> UiOptions
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
+@inject NavigationManager Navigation
 
 @implements IAsyncDisposable
 
@@ -39,19 +40,7 @@
                 }
                 else if (_state.Overview is { } overview)
                 {
-                    <header class="overview-page__snapshot">
-                        <div class="overview-page__snapshot-time">
-                            <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" aria-hidden="true" />
-                            <time datetime="@((_state.LastRefreshedUtc ?? overview.CapturedAtUtc).ToString("O"))">
-                                @L["Overview:LastRefreshed", TimePresentation.FormatTimestamp(_state.LastRefreshedUtc ?? overview.CapturedAtUtc)]
-                            </time>
-                        </div>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                   StartIcon="@MoIcons.Refresh"
-                                   Disabled="@_state.IsLoading" OnClick="RefreshAsync">
-                            @L["Common:Refresh"]
-                        </MudButton>
-                    </header>
+                    <SchedulerSnapshotActions CapturedAtUtc="@(_state.LastRefreshedUtc ?? overview.CapturedAtUtc)" IsLoading="@_state.IsLoading" RefreshRequested="RefreshAsync" AutoRefreshEnabled="@(UiOptions.Value.AutoRefreshInterval > TimeSpan.Zero ? _state.AutoRefreshEnabled : (bool?)null)" AutoRefreshChanged="SetAutoRefresh" />
 
                     @if (_state.Error is not null)
                     {
@@ -60,36 +49,10 @@
                         </MudAlert>
                     }
 
-                    <SchedulerWorkloadSummary Overview="@overview" />
+                    <SchedulerPulse Definitions="@overview.Definitions" CapturedAtUtc="@overview.CapturedAtUtc" StateCounts="@overview.ExecutionStateCounts" RefreshVersion="@_manualRefreshVersion"
+                                    WindowMinutes="@WindowMinutes" WindowChanged="SetWindow" Search="@Search" SearchChanged="SetSearch" />
 
-                    <div class="overview-page__review">
-                        <SchedulerAttentionPanel Overview="@overview" />
-                        <ExecutionStateFlow Counts="@overview.ExecutionStateCounts" />
-                    </div>
 
-                    <RecentExecutionsPanel Executions="@overview.RecentExecutions"
-                                           IsRefreshing="@_state.IsLoading"
-                                           OnRefresh="RefreshAsync" />
-
-                    <aside class="overview-page__insight" aria-labelledby="overview-insight-title">
-                        <span class="overview-page__insight-icon" aria-hidden="true">
-                            <MoIcon Icon="@MoIcons.ChartTrend" Size="1.5rem" />
-                        </span>
-                        <div>
-                            <MudText id="overview-insight-title" Typo="Typo.h6" HtmlTag="h2">
-                                @L["Overview:Analytics:Title"]
-                            </MudText>
-                            <MudText Typo="Typo.body2">
-                                @L["Overview:Analytics:Description"]
-                            </MudText>
-                        </div>
-                        <MudButton Href="@SchedulerStatisticsPage.PAGE_URL"
-                                   Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   EndIcon="@MoIcons.ArrowRight">
-                            @L["Overview:Analytics:Action"]
-                        </MudButton>
-                    </aside>
                 }
             </div>
         </SchedulerAccessBoundary>
@@ -101,8 +64,18 @@
 
     private SchedulerOverviewPageState? _state;
     private volatile bool _disposed;
+    private int _manualRefreshVersion;
     private readonly object _lifetimeGate = new();
     private TaskCompletionSource? _retirement;
+
+    /// <summary>Gets the route-held diagnostic window (15m, 1h, 6h).</summary>
+    [SupplyParameterFromQuery(Name = "window")] public string? Window { get; set; }
+    /// <summary>Gets the route-held pulse name, key or owner filter.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    private int WindowMinutes => Window switch { "15m" => 15, "6h" => 360, "24h" => 1440, _ => 60 };
+    private void SetWindow(int minutes) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("window", minutes == 15 ? "15m" : minutes == 360 ? "6h" : minutes == 1440 ? "24h" : "1h"));
+    private void SetSearch(string value) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("q", string.IsNullOrEmpty(value) ? null : value), replace: true);
+    private void SetAutoRefresh(bool enabled) { if (_state is { } state && !_disposed) state.SetAutoRefreshEnabled(enabled); }
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,15 +89,16 @@
         if (!_disposed) StateHasChanged();
     });
 
-    private Task RefreshAsync()
+    private async Task RefreshAsync()
     {
         SchedulerOverviewPageState? state;
         lock (_lifetimeGate)
         {
-            if (_disposed) return Task.CompletedTask;
+            if (_disposed) return;
             state = _state;
         }
-        return state?.RefreshAsync() ?? Task.CompletedTask;
+        if (state is not null) await state.RefreshAsync();
+        if (!_disposed) _manualRefreshVersion++;
     }
 
     public ValueTask DisposeAsync()

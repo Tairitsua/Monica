@@ -9,13 +9,13 @@ namespace Monica.Configuration.UI.State;
 internal sealed class ConfigurationSourceFileState : IAsyncDisposable
 {
     private readonly ConfigurationOperationLifetime _lifetime;
-    private readonly Func<string, Task<Res<ConfigurationSourceFileView>>> _load;
+    private readonly Func<string, Task<Result<ConfigurationSourceFileView>>> _load;
 
     internal ConfigurationSourceFileState(ConfigurationFacade facade, string unavailableText,
         ConfigurationOperationLifetime lifetime, bool showSensitiveValues = false)
         : this(key => facade.GetSourceFileViewAsync(key, showSensitiveValues), unavailableText, lifetime) { }
 
-    internal ConfigurationSourceFileState(Func<string, Task<Res<ConfigurationSourceFileView>>> load,
+    internal ConfigurationSourceFileState(Func<string, Task<Result<ConfigurationSourceFileView>>> load,
         string unavailableText, ConfigurationOperationLifetime? lifetime = null)
     {
         _load = load;

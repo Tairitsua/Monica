@@ -152,7 +152,7 @@ public sealed class ProviderOptionDiagnosticsTests
     public async Task EventBus_provider_dialog_WhenOperationalDebugModeIsEnabled_ShouldBypassProductionPolicy()
     {
         var shellOptions = new ModuleShellUIOption();
-        shellOptions.OperationalPageAccess.DebugMode = true;
+        shellOptions.OperationalPageAccess.BypassAuthorization = true;
         await using var context = CreateContext(Environments.Production, shellOptions);
         var surface = context.Render<MudBlazor.MudDialogProvider>();
         _ = context.Render<EventBusProviderDetailDialog>(parameters => parameters

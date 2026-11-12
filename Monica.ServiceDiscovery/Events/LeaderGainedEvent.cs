@@ -1,3 +1,5 @@
+using Monica.Locker.Leases;
+
 namespace Monica.ServiceDiscovery.Events;
 
 /// <summary>
@@ -5,6 +7,8 @@ namespace Monica.ServiceDiscovery.Events;
 /// </summary>
 public class LeaderGainedEvent
 {
+    /// <summary>The unique acquisition and its permanent cancellation signal.</summary>
+    public required LeaseContext Lease { get; init; }
     /// <summary>
     /// Application identifier that owns leadership.
     /// </summary>

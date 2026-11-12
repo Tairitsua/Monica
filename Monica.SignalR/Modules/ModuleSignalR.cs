@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.ApplicationModel.Abstractions;
 using Monica.Authority.Identity.Abstractions;
 using Monica.Core;
 using Monica.Core.JsonSerialization.Extensions;
@@ -63,6 +64,12 @@ public class ModuleSignalR : MonicaModule<ModuleSignalROption>, IWebHostRequired
     {
         var services = context.Services;
         var wireOptions = services.GetMonicaJsonSerializerOptions();
+        var debugMode = context.Application.Application.DebugMode;
+        services.AddOptions<HubOptions>()
+            .Configure(options => options.EnableDetailedErrors = debugMode)
+            .Validate(options => options.EnableDetailedErrors == debugMode,
+                "SignalR EnableDetailedErrors must match the frozen Application:DebugMode policy.")
+            .ValidateOnStart();
 
         services.AddOptions<JsonHubProtocolOptions>()
             .Configure(options => options.PayloadSerializerOptions.CopyFrom(wireOptions))
@@ -144,6 +151,7 @@ public static class ModuleSignalRRegistrationExtensions
     /// <remarks>
     /// JSON protocol contributions are applied in registration order after Monica's canonical wire contract. Monica
     /// seals the payload serializer options once, after every registered contribution has run.
+    /// Detailed errors are owned by Application:DebugMode. A conflicting HubOptions callback fails options validation.
     /// </remarks>
     public static ModuleRegistration<ModuleSignalR, ModuleSignalROption> AddSignalR<TIHubOperator, THubOperator, TContract, TUser>(this ModuleRegistration<ModuleSignalR, ModuleSignalROption> module,
         Action<HubOptions>? configure = null,
@@ -162,7 +170,6 @@ public static class ModuleSignalRRegistrationExtensions
 
             var signalRBuilder = context.Services.AddSignalR(options =>
             {
-                options.EnableDetailedErrors = true;
                 configure?.Invoke(options);
             });
 
@@ -177,13 +184,32 @@ public static class ModuleSignalRRegistrationExtensions
     /// <summary>
     /// Configures SignalR Swagger generation.
     /// </summary>
+    /// <param name="module">The SignalR registration being configured.</param>
+    /// <param name="signalROption">Configures the package's scanned assemblies and documentation options.</param>
+    /// <returns>The same SignalR registration for fluent chaining.</returns>
+    /// <remarks>
+    /// With ApplicationModel, concrete hubs use native Swagger role routing and exclude disabled endpoints.
+    /// Explicit hub document names and recognized groups remain overrides, subject to the host's inclusion predicate.
+    /// A null hub selector uses native ownership; an explicit empty array retains the package's all-documents override.
+    /// Package-wide document selection narrows the candidate documents; it does not override role ownership.
+    /// Standalone hosts and package-only interface descriptions retain the package's document selection behavior.
+    /// </remarks>
     public static ModuleRegistration<ModuleSignalR, ModuleSignalROption> AddSignalRSwagger(this ModuleRegistration<ModuleSignalR, ModuleSignalROption> module, Action<SignalRSwaggerGenOptions> signalROption)
     {
         module.ConfigureServices(context =>
         {
             context.Services.ConfigureSwaggerGen(o =>
             {
-                o.AddSignalRSwaggerGen(signalROption);
+                o.AddSignalRSwaggerGen(options =>
+                {
+                    signalROption(options);
+                    if (context.Application.TypeActivation is IApplicationModel)
+                    {
+                        options.AddOperationFilter(new SignalRSwaggerDocumentRoutingFilter(
+                            context.Application.TypeActivation,
+                            (documentName, description) => o.SwaggerGeneratorOptions.DocInclusionPredicate(documentName, description)));
+                    }
+                });
             });
         });
         return module;
@@ -198,6 +224,16 @@ public static class ModuleSignalRRegistrationExtensions
         module.Configure(options =>
         {
             options.HubRegistrations.Add(new SignalRHubRegistration(typeof(THub), pattern));
+        });
+        module.ConfigureServices(context =>
+        {
+            // Register the native typed-options setup so all global hub settings are inherited.
+            context.Services.AddSignalR().AddHubOptions<THub>(options =>
+                options.EnableDetailedErrors = context.Application.Application.DebugMode);
+            context.Services.AddOptions<HubOptions<THub>>()
+                .Validate(options => options.EnableDetailedErrors == context.Application.Application.DebugMode,
+                    "Hub EnableDetailedErrors must match the frozen Application:DebugMode policy.")
+                .ValidateOnStart();
         });
 
         module.ConfigureEndpoints(context =>

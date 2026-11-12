@@ -1,0 +1,12 @@
+.building-block-graph-layout-panel { container: building-block-graph-layout / inline-size; align-items: center; background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: 6px; display: flex; flex-wrap: wrap; gap: 20px 28px; min-width: 0; padding: 16px 20px; }
+.building-block-graph-layout-choice, .building-block-graph-force-setting { display: grid; gap: 8px; min-width: 0; }
+.building-block-graph-layout-choice > span, .building-block-graph-force-setting > span { color: var(--building-blocks-muted-ink, color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary))); font-size: 11px; line-height: 1.5; }
+.building-block-graph-layout-choice > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.building-block-graph-layout-choice button { background: transparent; border: 1px solid var(--mud-palette-divider); border-radius: 5px; color: var(--mud-palette-text-primary); cursor: pointer; font: inherit; font-size: 12px; min-height: 36px; padding: 7px 12px; }
+.building-block-graph-layout-choice button[aria-pressed="true"] { background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--mud-palette-surface)); border-color: color-mix(in srgb, var(--mud-palette-primary) 28%, var(--mud-palette-divider)); color: var(--building-blocks-accent-ink, color-mix(in srgb, var(--mud-palette-primary) 80%, var(--mud-palette-text-primary))); }
+.building-block-graph-layout-choice button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.building-block-graph-force-setting { flex: 1 1 180px; max-width: 300px; }
+.building-block-graph-force-setting ::deep .mud-slider { margin: 0; }
+@container building-block-graph-layout (max-width: 500px) {
+    .building-block-graph-layout-choice, .building-block-graph-force-setting { flex-basis: 100%; max-width: none; }
+}

@@ -166,12 +166,13 @@
         _state.BeginLoad();
         StateHasChanged();
 
-        if ((await DiagnosticsFacade.GetSnapshotAsync()).IsFailed(out var error, out var snapshot))
+        var result = await DiagnosticsFacade.GetSnapshotAsync();
+        if (result.IsFailure() || result.Data is not { } snapshot)
         {
             if (!_disposed)
             {
-                _state.FailLoad(error);
-                Snackbar.Add(L["Page:Messages:RefreshFailed", error], Severity.Error);
+                _state.FailLoad(result.Message ?? string.Empty);
+                Snackbar.Add(L["Page:Messages:RefreshFailed", result.Message ?? string.Empty], Severity.Error);
             }
             return;
         }

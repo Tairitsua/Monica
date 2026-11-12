@@ -5,10 +5,10 @@ namespace Monica.Locker.Providers.Medallion;
 
 internal sealed class MedallionLockHandle(IDistributedSynchronizationHandle handle) : IDistributedLockHandle
 {
-    public IDistributedSynchronizationHandle Handle { get; } = handle;
+    public CancellationToken HandleLostToken => handle.HandleLostToken;
 
     public ValueTask DisposeAsync()
     {
-        return Handle.DisposeAsync();
+        return handle.DisposeAsync();
     }
 }

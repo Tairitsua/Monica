@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Monica.Core;
 using Monica.Core.ExceptionHandling.Abstractions;
 using Monica.Core.Execution;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
-using Monica.Core.Results.Abstractions;
 using Monica.Framework.ChainTracing.Abstractions;
 using Monica.Framework.ChainTracing.Providers.AspNetCore;
 using Monica.Framework.ChainTracing.Providers.Execution;
 using Monica.Framework.ChainTracing.Providers.EntityFrameworkCore;
-using Monica.Framework.ChainTracing.Providers.Rpc;
+using Monica.Framework.ChainTracing.Providers.Actor;
 using Monica.Framework.ChainTracing.Services;
 using Monica.Framework.ChainTracing.Services.Support;
 
@@ -41,7 +41,8 @@ public class ModuleChainTracing : MonicaModule<ModuleChainTracingOption>, IWebMo
     public override void ConfigureServices(ModuleContext<ModuleChainTracingOption> context)
     {
         var services = context.Services;
-        services.AddSingleton<IChainTracing, AsyncLocalChainTracingService>();
+        services.AddSingleton<AsyncLocalChainTracingService>();
+        services.AddSingleton<IChainTracing>(provider => provider.GetRequiredService<AsyncLocalChainTracingService>());
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -56,7 +57,9 @@ public class ModuleChainTracing : MonicaModule<ModuleChainTracingOption>, IWebMo
 public static class ModuleChainTracingRegistrationExtensions
 {
     /// <summary>
-    /// Traces business operations executed through Monica's execution pipeline.
+    /// Traces all business operations executed through Monica's execution pipeline, including Task-based
+    /// event handlers and jobs. An execution creates and completes its own chain when none is inherited.
+    /// This integration does not persist background chains or attach HTTP response metadata.
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseExecutionTracing(
         this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
@@ -65,9 +68,7 @@ public static class ModuleChainTracingRegistrationExtensions
             .AddBehavior(
                 typeof(ChainTracingExecutionBehavior<,>),
                 ExecutionBehaviorOrder.Diagnostics,
-                static descriptor =>
-                    descriptor.IsBusinessOperation
-                    && typeof(IResultEnvelope).IsAssignableFrom(descriptor.ResultType));
+                static descriptor => descriptor.IsBusinessOperation);
         return module;
     }
 
@@ -84,7 +85,7 @@ public static class ModuleChainTracingRegistrationExtensions
 
     /// <summary>
     /// Completes controller tracing and attaches a public trace identifier to result envelopes. Hosts that
-    /// enable <see cref="ModuleResultEnvelopeOption.ExposeDiagnosticDetails"/> also expose the call chain
+    /// enable <see cref="Monica.Core.IMonicaApplicationOptions.DebugMode"/> also expose the call chain
     /// and a shared exception catalog. The same policy applies to exception-built responses.
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> AttachControllerTraceMetadata(
@@ -104,27 +105,37 @@ public static class ModuleChainTracingRegistrationExtensions
     }
 
     /// <summary>
-    /// Enables EF Core command tracing support.
+    /// Automatically attaches host-owned connection, command, and reader tracing to standard EF Core
+    /// DbContext options composition, including factories and pools. An active business chain is required.
+    /// Third-party or manually built options use the UseChainTracing options extension. Repeated selection
+    /// is idempotent. No connection, transaction, retry, or result-consumption behavior is changed.
     /// </summary>
-    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseDatabaseTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
+    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseEntityFrameworkCoreTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
-        module.ConfigureServices(context => { context.Services.TryAddScoped<ChainTracingDbCommandInterceptor>(); });
+        module.ConfigureServices(context =>
+        {
+            context.Services.TryAddSingleton<DatabaseTraceRecorder>();
+            context.Services.TryAddSingleton<ChainTracingDbConnectionInterceptor>();
+            context.Services.TryAddSingleton<ChainTracingDbCommandInterceptor>();
+            context.Services.TryAddEnumerable(ServiceDescriptor.Singleton(
+                typeof(IDbContextOptionsConfiguration<>), typeof(ChainTracingDbContextOptionsConfiguration<>)));
+        });
         return module;
     }
 
     /// <summary>
     /// Enables actor invocation tracing without buffering or rewriting response bodies.
     /// </summary>
-    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseRpcTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
+    public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseActorInvocationTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
         module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
-        module.RequireWebHost("RPC chain-tracing middleware must run in an ASP.NET Core request pipeline.");
+        module.RequireWebHost("Actor invocation tracing middleware must run in an ASP.NET Core request pipeline.");
         module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
 
-        module.ConfigureServices(context => { context.Services.TryAddTransient<RpcChainTracingMiddleware>(); });
+        module.ConfigureServices(context => { context.Services.TryAddTransient<ActorInvocationTracingMiddleware>(); });
         module.ConfigureApplicationBuilder(
-            context => { context.ApplicationBuilder.UseMiddleware<RpcChainTracingMiddleware>(); },
+            context => { context.ApplicationBuilder.UseMiddleware<ActorInvocationTracingMiddleware>(); },
             ModuleWebStage.AfterRouting);
 
         return module;

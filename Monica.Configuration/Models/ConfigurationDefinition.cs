@@ -5,6 +5,9 @@ namespace Monica.Configuration.Models;
 /// </summary>
 public sealed record ConfigurationDefinition
 {
+    /// <summary>Gets value ownership. Startup definitions remain local and are never persisted or mutated.</summary>
+    public ConfigurationKind Kind { get; init; } = ConfigurationKind.Managed;
+
     /// <summary>
     /// Gets the stable globally unique definition key.
     /// </summary>

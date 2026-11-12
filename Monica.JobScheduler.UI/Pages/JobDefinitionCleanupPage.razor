@@ -1,0 +1,24 @@
+@attribute [Route(PAGE_URL)]
+@inject IStringLocalizer<JobSchedulerResource> L
+
+<PageTitle>@L["Cleanup:Title"]</PageTitle>
+<SchedulerWorkspace Title="@L["Cleanup:Title"]" Description="@L["Cleanup:Description"]" ActivePanelIndex="5">
+    <JobDefinitionCleanupContent Owner="@Owner" Search="@Search" State="@State" Page="@Page" InspectOwner="@InspectOwner" InspectJob="@InspectJob" />
+</SchedulerWorkspace>
+
+@code {
+    /// <summary>Gets the shared-scope definition maintenance route.</summary>
+    public const string PAGE_URL = "/job-scheduler/cleanup";
+    /// <summary>Gets the exact owner filter.</summary>
+    [SupplyParameterFromQuery(Name = "owner")] public string? Owner { get; set; }
+    /// <summary>Gets the definition search.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    /// <summary>Gets the readiness filter.</summary>
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+    /// <summary>Gets the one-based inventory page.</summary>
+    [SupplyParameterFromQuery(Name = "page")] public int? Page { get; set; }
+    /// <summary>Gets the exact inspected owner without concatenating opaque identities.</summary>
+    [SupplyParameterFromQuery(Name = "inspectOwner")] public string? InspectOwner { get; set; }
+    /// <summary>Gets the exact inspected job key.</summary>
+    [SupplyParameterFromQuery(Name = "inspectJob")] public string? InspectJob { get; set; }
+}

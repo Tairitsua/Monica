@@ -9,34 +9,34 @@ namespace Test.Monica.Core.Results;
 public sealed class ResultErrorTests
 {
     [Theory]
-    [InlineData(ResStatus.Ok)]
-    [InlineData(ResStatus.Created)]
-    public void Success_WhenDataIsNull_ShouldRemainSuccessWithoutPromisingPayload(ResStatus status)
+    [InlineData(ResultStatus.Ok)]
+    [InlineData(ResultStatus.Created)]
+    public void Success_WhenDataIsNull_ShouldRemainSuccessWithoutPromisingPayload(ResultStatus status)
     {
-        var result = new Res<string?>("", status);
-        Assert.True(result.IsOk(out var data));
-        Assert.Null(data);
-        Assert.False(result.IsFailed(out _));
+        var result = new Result<string?> { Status = status };
+        Assert.True(result.IsSuccess());
+        Assert.Null(result.Data);
+        Assert.False(result.IsFailure());
     }
 
     [Theory]
-    [InlineData(ResStatus.BadRequest)]
-    [InlineData(ResStatus.Unauthorized)]
-    [InlineData(ResStatus.Conflict)]
-    [InlineData(ResStatus.TooManyRequests)]
-    [InlineData(ResStatus.BadGateway)]
-    [InlineData(ResStatus.ServiceUnavailable)]
-    [InlineData(ResStatus.GatewayTimeout)]
-    public void Projection_WhenStatusIsSupported_ShouldMapOneToOneToItsHttpStatus(ResStatus status)
+    [InlineData(ResultStatus.BadRequest)]
+    [InlineData(ResultStatus.Unauthorized)]
+    [InlineData(ResultStatus.Conflict)]
+    [InlineData(ResultStatus.TooManyRequests)]
+    [InlineData(ResultStatus.BadGateway)]
+    [InlineData(ResultStatus.ServiceUnavailable)]
+    [InlineData(ResultStatus.GatewayTimeout)]
+    public void Projection_WhenStatusIsSupported_ShouldMapOneToOneToItsHttpStatus(ResultStatus status)
     {
-        Assert.Equal((int)status, ResultHttpProjection.GetStatusCode(new Res("", status)));
+        Assert.Equal((int)status, ResultHttpProjection.GetStatusCode(new Result { Status = status }));
     }
 
     [Fact]
     public void Projection_WhenStatusIsOutsideTheWhitelist_ShouldRejectItAsAContractDefect()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            ResultHttpProjection.GetStatusCode(new Res("", (ResStatus)460)));
+            ResultHttpProjection.GetStatusCode(new Result { Status = (ResultStatus)460 }));
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class ResultErrorTests
     public void Presentation_WhenMetadataContainsDiagnostics_ShouldRetainOnlyPublicMembersAndTypedError()
     {
         var error = new ResultError("domain.conflict", "trace-123");
-        var result = Res.Fail("Domain message").SetError(error)
+        var result = Result.Failure("Domain message").SetError(error)
             .SetMetadata("request", "secret").SetMetadata("exception2", "secret")
             .SetMetadata("chain_error", "secret").SetMetadata("detail", "secret")
             .SetMetadata("availableActions", new[] { "cancel" });
@@ -69,7 +69,7 @@ public sealed class ResultErrorTests
     {
         var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         using var document = JsonDocument.Parse("""{"code":"domain.failed","traceId":"origin","stackTrace":"secret"}""");
-        var result = Res.Fail("Safe failure").SetMetadata("error", document.RootElement.Clone());
+        var result = Result.Failure("Safe failure").SetMetadata("error", document.RootElement.Clone());
         result.PrepareForPresentation(json, new DefaultResultErrorMessageProvider(), "local");
         Assert.DoesNotContain("secret", JsonSerializer.Serialize(result, json));
         Assert.True(result.TryGetError(json, out var error));
@@ -79,7 +79,7 @@ public sealed class ResultErrorTests
     [Fact]
     public void Presentation_WhenLegacyErrorProducerRemains_ShouldRejectMixedContract()
     {
-        var result = Res.Fail("failure").SetMetadata("error", new { stackTrace = "secret" });
+        var result = Result.Failure("failure").SetMetadata("error", new { stackTrace = "secret" });
         Assert.Throws<InvalidOperationException>(() => result.PrepareForPresentation(
             new JsonSerializerOptions(), new DefaultResultErrorMessageProvider(), "trace"));
     }

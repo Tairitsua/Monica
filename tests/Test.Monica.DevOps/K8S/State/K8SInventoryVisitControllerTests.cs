@@ -10,6 +10,55 @@ public sealed class K8SInventoryVisitControllerTests
     private static K8SNavigationState Context() => new() { Namespace = "alpha", ResourceType = K8SResourceType.Deployment, HasContext = true };
 
     [Fact]
+    public async Task ChangeContext_WhenOnlyKindChanges_ShouldProjectSameNamespaceCaptureWithoutReadingAgain()
+    {
+        var fixture = new K8SStateFixture();
+        await using var visit = new K8SInventoryVisitController(fixture.Facade, Context(), () => Task.CompletedTask);
+        await visit.InitializeAsync();
+        var capture = visit.NamespaceCapture!;
+        var row = visit.Capture!.Items[0];
+        visit.SetSelected([row]);
+        var commandCount = fixture.Provider.Commands.Count;
+
+        await visit.ChangeContextAsync("alpha", K8SResourceType.Service);
+
+        Assert.Same(capture, visit.NamespaceCapture);
+        Assert.Equal(capture.FetchedAtUtc, visit.Capture!.FetchedAtUtc);
+        Assert.Empty(visit.Capture.Items);
+        Assert.Equal(0, visit.SelectedCount);
+        Assert.True(visit.ContextMatchesNamespaceCapture);
+        Assert.True(visit.ContextMatchesCapture);
+        Assert.Equal(commandCount, fixture.Provider.Commands.Count);
+
+        await visit.ChangeContextAsync("alpha", K8SResourceType.Deployment);
+
+        Assert.Same(row, visit.Capture!.Items[0]);
+        Assert.Equal(commandCount, fixture.Provider.Commands.Count);
+    }
+
+    [Fact]
+    public async Task RefreshList_WhenLaterNamespaceReadFails_ShouldRetainWholeCaptureAndSelectedEvidence()
+    {
+        var fixture = new K8SStateFixture();
+        await using var visit = new K8SInventoryVisitController(fixture.Facade, Context(), () => Task.CompletedTask);
+        await visit.InitializeAsync();
+        var namespaceCapture = visit.NamespaceCapture;
+        var capture = visit.Capture;
+        var selected = capture!.Items[0];
+        visit.SetSelected([selected]);
+        fixture.Provider.Handler = (arguments, _) => arguments.StartsWith("get pod ", StringComparison.Ordinal)
+            ? Task.FromException<string>(new IOException("Pod evidence failed."))
+            : Task.FromResult(fixture.Provider.DefaultOutput(arguments));
+
+        await visit.RefreshListAsync();
+
+        Assert.Same(namespaceCapture, visit.NamespaceCapture);
+        Assert.Same(capture, visit.Capture);
+        Assert.Same(selected, Assert.Single(visit.SelectedRows));
+        Assert.NotNull(visit.ReadFailure);
+    }
+
+    [Fact]
     public async Task RefreshList_WhenReadFails_ShouldRetainOriginalCaptureAndSelection()
     {
         var fixture = new K8SStateFixture();
@@ -201,6 +250,7 @@ public sealed class K8SInventoryVisitControllerTests
         await Task.WhenAll(reading, first);
 
         Assert.Null(visit.Capture);
+        Assert.Null(visit.NamespaceCapture);
         Assert.Equal(publicationAtRetirement, published);
         Assert.False(visit.IsInitialized);
     }

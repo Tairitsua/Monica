@@ -34,7 +34,11 @@ public class EfRepository<TDbContext, TEntity>(TDbContext context)
     /// <inheritdoc />
     public virtual void Add(TEntity entity) => DbContext.Set<TEntity>().Add(entity);
     /// <inheritdoc />
+    public virtual void AddRange(IEnumerable<TEntity> entities) => DbContext.Set<TEntity>().AddRange(entities);
+    /// <inheritdoc />
     public virtual void Remove(TEntity entity) => DbContext.Set<TEntity>().Remove(entity);
+    /// <inheritdoc />
+    public virtual void RemoveRange(IEnumerable<TEntity> entities) => DbContext.Set<TEntity>().RemoveRange(entities);
 }
 
 /// <summary>Tracked single-key aggregate loading without detached update/attach semantics.</summary>

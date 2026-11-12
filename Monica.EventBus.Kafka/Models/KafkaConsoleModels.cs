@@ -42,7 +42,8 @@ public sealed class KafkaIntegrationSnapshot
 public sealed class KafkaClusterSummary
 {
     /// <summary>
-    /// Cluster configuration.
+    /// Cluster configuration with SASL username and password removed for presentation.
+    /// Empty credentials on an edit preserve the stored values; broker operations resolve private configuration.
     /// </summary>
     public KafkaClusterConfig Config { get; set; } = new();
 

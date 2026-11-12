@@ -225,9 +225,12 @@
         {
             var result = await StatusService.GetStatusAsync();
             if (_retired) return;
-            if (result.IsFailed(out var error, out var response))
+            var response = result.Data;
+            if (result.IsFailure() || response is null)
             {
-                RecordFailure(error.Message ?? string.Empty);
+                RecordFailure(string.IsNullOrWhiteSpace(result.Message)
+                    ? L["Page:States:FirstFailedDescription"].Value
+                    : result.Message);
                 return;
             }
             _read = MapperRegistryRead.Capture(++_readSequence, response);

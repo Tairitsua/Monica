@@ -37,7 +37,7 @@
     }
     else if (_session is not null)
     {
-        <MudDrawerContainer Class="workbench-drawer-container">
+        <div class="workbench-content">
             <ModuleWorkbenchHeader Session="@_session"
                                    RefreshRequested="@Refresh"
                                    ExportRequested="@ExportAsync"
@@ -111,7 +111,7 @@
                                          ModuleSelected="@SelectModule"
                                          NavigateToDependencies="@OpenSelectedDependencies" />
             <ModuleWorkbenchHelpDrawer Session="@_session" OpenChanged="@OnHelpOpenChanged" />
-        </MudDrawerContainer>
+        </div>
     }
 </div>
 
@@ -203,6 +203,8 @@
         if (_session is not null)
         {
             await _session.RefreshAsync();
+            if (!_disposed && !_session.IsAccessDenied)
+                await _session.RefreshResourceActivationsAsync();
         }
     }
 
@@ -296,7 +298,8 @@
             return;
         }
 
-        if (result.IsFailed(out _, out var export))
+        var export = result.Data;
+        if (result.IsFailure() || export is null)
         {
             Snackbar.Add(L["Export:Failed"], Severity.Error);
             return;

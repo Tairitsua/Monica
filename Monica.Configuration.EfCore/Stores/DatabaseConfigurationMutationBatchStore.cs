@@ -11,6 +11,8 @@ namespace Monica.Configuration.EfCore.Stores;
 internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatabase database)
     : IConfigurationMutationBatchStore
 {
+    public bool SupportsPublishedDefinitionGuard => true;
+
     public async Task<ConfigurationMutationBatchCommitResult> CommitAsync(
         ConfigurationMutationBatchCommitRequest request,
         CancellationToken cancellationToken)
@@ -45,6 +47,9 @@ internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatab
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (request.Items.Any(item => item.SaveRequest.PublishedDefinitionExpectation is not null))
+            await ConfigurationDatabaseLock.AcquireAsync(dbContext,
+                ConfigurationStoreLockEntity.DefinitionPublicationLockKey, cancellationToken);
         await ConfigurationDatabaseLock.AcquireAsync(
             dbContext,
             ConfigurationStoreLockEntity.MutationGroupsLockKey,
@@ -58,6 +63,9 @@ internal sealed class DatabaseConfigurationMutationBatchStore(ConfigurationDatab
         }
 
         var entities = await LoadEffectiveValuesAsync(dbContext, request, trackChanges: true, cancellationToken);
+        foreach (var item in request.Items)
+            await ConfigurationPublishedWriteGuard.ValidateAsync(dbContext, item.SaveRequest,
+                entities.GetValueOrDefault(item.SaveRequest.Definition.DefinitionKey), cancellationToken);
         foreach (var item in request.Items)
         {
             ApplyMutation(dbContext, entities, item);

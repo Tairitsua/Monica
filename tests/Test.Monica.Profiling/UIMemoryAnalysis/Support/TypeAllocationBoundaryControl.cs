@@ -15,10 +15,10 @@ internal sealed class TypeAllocationBoundaryControl(TypeAllocationFacade facade)
     private MemoryBoundaryGate? _heapGate;
     private MemoryBoundaryGate? _readGate;
 
-    public Res<TypeAllocationSnapshot>? LiveResult { get; set; }
-    public Res<TypeAllocationSnapshot> HeapResult { get; set; } = new()
+    public Result<TypeAllocationSnapshot>? LiveResult { get; set; }
+    public Result<TypeAllocationSnapshot> HeapResult { get; set; } = new()
     {
-        Status = ResStatus.ServiceUnavailable,
+        Status = ResultStatus.ServiceUnavailable,
         Message = "No structural heap result was supplied."
     };
     public TypeAllocationSnapshot? LastGenuineLiveSnapshot { get; private set; }
@@ -28,7 +28,7 @@ internal sealed class TypeAllocationBoundaryControl(TypeAllocationFacade facade)
     public int SubscriptionCount { get; private set; }
     public int UnsubscriptionCount { get; private set; }
 
-    public Res<TypeAllocationSnapshot> ReadLive()
+    public Result<TypeAllocationSnapshot> ReadLive()
     {
         MemoryBoundaryGate? gate;
         lock (_sync)
@@ -43,10 +43,10 @@ internal sealed class TypeAllocationBoundaryControl(TypeAllocationFacade facade)
         return LiveResult ?? genuine;
     }
 
-    public async Task<Res<TypeAllocationSnapshot>> CaptureHeapAsync()
+    public async Task<Result<TypeAllocationSnapshot>> CaptureHeapAsync()
     {
         MemoryBoundaryGate? gate;
-        Res<TypeAllocationSnapshot> result;
+        Result<TypeAllocationSnapshot> result;
         lock (_sync)
         {
             HeapCaptureCount++;
