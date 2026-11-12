@@ -35,8 +35,9 @@ public sealed class JobSchedulingHostedServiceShutdownTests
         await using var host = await new ShutdownFactory(schedulerStore, externalBoundary, time)
             .CreateAsync(cancellationToken: token);
         var service = host.Services.GetRequiredService<JobSchedulingHostedService>();
-        await service.RecoverAsync(token);
-        await service.CleanupHistoryAsync(token);
+        var runtime = host.Services.GetRequiredService<JobSchedulerRuntimeState>();
+        // Host startup schedules the background task; wait for its own first cycles before testing shutdown.
+        await WaitFor.UntilAsync(_ => Task.FromResult(runtime.SchedulingReady), cancellationToken: token);
         Assert.NotEmpty((await schedulerStore.CoordinatorLeases.GetSnapshotAsync(SCOPE, "jobscheduler:", token)).Leases);
         Assert.Single((await external.GetSnapshotAsync(SCOPE, "jobscheduler:history:", token)).Leases);
 
