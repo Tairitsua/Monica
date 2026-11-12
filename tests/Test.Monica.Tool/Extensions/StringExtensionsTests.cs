@@ -28,11 +28,16 @@ public sealed class StringExtensionsTests
         Assert.Equal(string.Empty, result);
     }
 
-    [Fact]
-    public void FromLocalToUtc_WhenChinaLocalTimeCrossesDateBoundary_ShouldWrapToPreviousUtcDay()
+    [Theory]
+    [InlineData(0, 13, 14)]
+    [InlineData(5, 13, 14)]
+    [InlineData(23, 13, 14)]
+    public void FromLocalToUtc_WhenGivenLocalTime_ShouldApplyTheLocalBaseOffset(int hour, int minute, int second)
     {
-        var result = new TimeOnly(5, 13, 14).FromLocalToUtc();
+        var local = new DateTimeOffset(2000, 1, 1, hour, minute, second, TimeZoneInfo.Local.BaseUtcOffset);
 
-        Assert.Equal(new TimeOnly(21, 13, 14), result);
+        var result = TimeOnly.FromDateTime(local.DateTime).FromLocalToUtc();
+
+        Assert.Equal(TimeOnly.FromDateTime(local.UtcDateTime), result);
     }
 }
