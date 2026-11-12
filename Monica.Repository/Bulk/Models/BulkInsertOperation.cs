@@ -28,7 +28,7 @@ public sealed class BulkInsertOperation<TRow> where TRow : class
     public void Execute(CancellationToken cancellationToken = default)
         => BulkWriter.ExecuteAsync(_context, _rows, _audit, false, cancellationToken).GetAwaiter().GetResult();
 
-    /// <summary>Executes asynchronously. Execution failures mark the owning transaction rollback-only, even if caught.</summary>
+    /// <summary>Executes asynchronously. Failures propagate; catching them does not automatically request rollback.</summary>
     public Task ExecuteAsync(CancellationToken cancellationToken = default)
         => BulkWriter.ExecuteAsync(_context, _rows, _audit, true, cancellationToken);
 }

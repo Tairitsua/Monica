@@ -19,9 +19,9 @@ public sealed class UnitOfWorkRepositoryCommitTests
     [Theory]
     [InlineData(ResultStatus.Created, true, false)]
     [InlineData(ResultStatus.Ok, true, true)]
-    [InlineData(ResultStatus.Conflict, false, false)]
-    [InlineData(ResultStatus.BadRequest, false, true)]
-    public async Task MvcOutcome_WhenReturned_ShouldHonorEnvelopeStatus(ResultStatus status, bool committed, bool json)
+    [InlineData(ResultStatus.Conflict, true, false)]
+    [InlineData(ResultStatus.BadRequest, true, true)]
+    public async Task MvcOutcome_WhenReturned_ShouldCommitRegardlessOfEnvelopeStatus(ResultStatus status, bool committed, bool json)
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         await app.ExecuteAsync(scope =>
@@ -65,26 +65,31 @@ public sealed class UnitOfWorkRepositoryCommitTests
         }, Token);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_WhenResultFails_ShouldRollBack()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_WhenResultFails_ShouldCommitStagedAndFlushedWrites(bool flush)
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         var result = await app.ExecuteAsync(async scope =>
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "failure result" });
-            await scope.Resolve<IUnitOfWorkManager>().Current!.FlushAsync(Token);
+            if (flush) await scope.Resolve<IUnitOfWorkManager>().Current!.FlushAsync(Token);
             return Result.Failure("declined");
         }, cancellationToken: Token);
         Assert.Equal(ResultStatus.BadRequest, result.Status);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
-            Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
+        {
+            Assert.Single(await db.SoftDeleteRows.ToListAsync(ct));
+            Assert.Single(await db.Set<OutboxMessage>().ToListAsync(ct));
+        }, Token);
     }
 
     [Fact]
-    public async Task RunAsync_WhenNestedFailureIsCaught_ShouldPreventCommit()
+    public async Task RunAsync_WhenNestedFailureIsCaught_ShouldCommit()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        await app.ExecuteAsync(async scope =>
         {
             var manager = scope.Resolve<IUnitOfWorkManager>();
             try
@@ -97,10 +102,36 @@ public sealed class UnitOfWorkRepositoryCommitTests
                 }, cancellationToken: Token);
             }
             catch (ApplicationException) { }
-        }, cancellationToken: Token));
-        Assert.Equal("nested failure", Assert.IsType<ApplicationException>(rollback.InnerException).Message);
+            Assert.Null(manager.Current!.FirstFailure);
+        }, cancellationToken: Token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
-            Assert.Equal(0, await db.SoftDeleteRows.CountAsync(ct)), Token);
+            Assert.Single(await db.SoftDeleteRows.ToListAsync(ct)), Token);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenNestedWorkCatchesAbort_ShouldRejectBeforeReturningItsResult()
+    {
+        await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
+        var afterChild = false;
+        var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        {
+            var manager = scope.Resolve<IUnitOfWorkManager>();
+            scope.Resolve<IRepository<SoftDeleteAuditRow>>().Add(new() { Title = "aborted child" });
+            await manager.Current!.FlushAsync(Token);
+            await manager.RunAsync(() =>
+            {
+                Assert.Throws<TransactionRollbackOnlyException>(() => manager.Current.Abort(new("RequiredChild", "Cannot continue.")));
+                return Task.FromResult(Result.Failure("handled abort"));
+            }, cancellationToken: Token);
+            afterChild = true;
+        }, cancellationToken: Token));
+        Assert.False(afterChild);
+        Assert.Equal("RequiredChild", rejected.FirstFailure.Source);
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            Assert.Empty(await db.SoftDeleteRows.ToListAsync(ct));
+            Assert.Empty(await db.Set<OutboxMessage>().ToListAsync(ct));
+        }, Token);
     }
 
     [Theory]
@@ -133,7 +164,7 @@ public sealed class UnitOfWorkRepositoryCommitTests
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             db.ValidateDatabaseAccess();
-            scope.Resolve<IUnitOfWorkManager>().Current!.MarkRollbackOnly();
+            Assert.Throws<TransactionRollbackOnlyException>(() => scope.Resolve<IUnitOfWorkManager>().Current!.Abort());
             var rejected = Assert.Throws<TransactionRollbackOnlyException>(db.ValidateDatabaseAccess);
             Assert.Equal("Explicit", rejected.FirstFailure.Source);
             return Task.CompletedTask;

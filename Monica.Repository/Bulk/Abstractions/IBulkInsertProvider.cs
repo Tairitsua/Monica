@@ -6,7 +6,7 @@ namespace Monica.Repository.Bulk.Abstractions;
 /// <remarks>
 /// Implementations are singleton, thread-safe across independent contexts, and must borrow the supplied
 /// connection and transaction. They must not save, commit, attach rows, traverse graphs, or generate events.
-/// A failed attempt propagates its original exception; the shared writer owns rollback-only propagation.
+/// A failed attempt propagates its original exception. A caller that catches it owns recovery or explicit abort.
 /// </remarks>
 public interface IBulkInsertProvider
 {

@@ -13,7 +13,7 @@ namespace Monica.Repository.UnitOfWork.Models;
 /// <param name="IsReadOnly">
 /// Declares a Query boundary. A read-only root may own a consistency transaction but does not automatically
 /// drain domain events or save changes. A nested Query still joins the caller's physical transaction;
-/// handled business rejections do not mark it rollback-only. This is a contract, not SQL write detection.
+/// failure handling is identical for queries and commands. This is a contract, not SQL write detection.
 /// </param>
 public sealed record UnitOfWorkScopeOptions(
     IReadOnlyList<Type>? DbContextTypes = null,

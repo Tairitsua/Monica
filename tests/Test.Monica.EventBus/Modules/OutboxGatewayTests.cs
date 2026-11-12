@@ -71,7 +71,6 @@ public sealed class OutboxGatewayTests
 
         received.Should().HaveCount(2);
         sink.Messages.Should().BeEmpty();
-        sink.RollbackOnly.Should().BeFalse();
     }
 
     [Fact]
@@ -85,7 +84,6 @@ public sealed class OutboxGatewayTests
             bus.PublishAsync<BaseEvent>(new DurableEvent(), cancellationToken: TestContext.Current.CancellationToken));
 
         sink.Messages.Should().BeEmpty();
-        sink.RollbackOnly.Should().BeTrue();
 
         using var batchHost = BuildHost(out var batchSink);
         using var batchScope = batchHost.Services.CreateScope();
@@ -96,7 +94,6 @@ public sealed class OutboxGatewayTests
                 cancellationToken: TestContext.Current.CancellationToken));
 
         batchSink.Messages.Should().BeEmpty();
-        batchSink.RollbackOnly.Should().BeTrue();
     }
 
     [Fact]
@@ -109,12 +106,11 @@ public sealed class OutboxGatewayTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             bus.PublishAsync(new DurableEvent(), cancellationToken: TestContext.Current.CancellationToken));
         sink.Messages.Should().BeEmpty();
-        sink.RollbackOnly.Should().BeTrue();
         host.Services.GetRequiredService<NoOpDistributedEventBus>().Should().NotBeNull();
     }
 
     [Fact]
-    public async Task MarkedSerializationFailure_MakesOperationRollbackOnlyWhenCaught()
+    public async Task Gateway_WhenSerializationFailureIsCaught_ShouldAllowAnotherPublication()
     {
         using var host = BuildHost(out var sink);
         using var scope = host.Services.CreateScope();
@@ -123,11 +119,10 @@ public sealed class OutboxGatewayTests
         await Assert.ThrowsAnyAsync<Exception>(() => bus.PublishAsync(new ThrowingEvent(),
             cancellationToken: TestContext.Current.CancellationToken));
 
-        sink.RollbackOnly.Should().BeTrue();
         sink.Messages.Should().BeEmpty();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => bus.PublishAsync(new DurableEvent(),
-            cancellationToken: TestContext.Current.CancellationToken));
+        await bus.PublishAsync(new DurableEvent(), cancellationToken: TestContext.Current.CancellationToken);
+        sink.Messages.Should().ContainSingle();
     }
 
     [Fact]
@@ -189,27 +184,11 @@ public sealed class OutboxGatewayTests
     {
         public List<EventMessage> Messages { get; } = [];
 
-        public bool RollbackOnly { get; private set; }
-
         public ValueTask StageAsync(Func<IReadOnlyList<EventMessage>> prepare, CancellationToken cancellationToken)
         {
-            if (RollbackOnly)
-            {
-                throw new InvalidOperationException("The operation is rollback-only.");
-            }
-
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var messages = prepare();
-                Messages.AddRange(messages);
-                return ValueTask.CompletedTask;
-            }
-            catch
-            {
-                RollbackOnly = true;
-                throw;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            Messages.AddRange(prepare());
+            return ValueTask.CompletedTask;
         }
     }
 }

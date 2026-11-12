@@ -51,9 +51,9 @@ public sealed record ExecutionTransactionFailure(string Source, string Reason)
     }
 
     /// <summary>Snapshots a failed result's status and message without retaining its payload or metadata.</summary>
-    /// <remarks>Call only after the execution outcome policy determines that rollback is required.</remarks>
+    /// <remarks>Use when the application explicitly chooses to abort because of a returned business failure.</remarks>
     public static ExecutionTransactionFailure FromResult<T>(string source, T result)
         => result is IResultEnvelope envelope
             ? new(source, envelope.Message ?? "The operation returned a failed result.") { ResultStatus = envelope.Status }
-            : new(source, "The execution outcome explicitly requires rollback.");
+            : new(source, "The caller explicitly requested rollback for the returned outcome.");
 }

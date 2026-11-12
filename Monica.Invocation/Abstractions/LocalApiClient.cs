@@ -24,6 +24,5 @@ public abstract class LocalApiClient(ICachedServiceProvider serviceProvider) : A
     protected Task<TResult> InvokeAsync<TResult>(IRequest<TResult> request, CancellationToken cancellationToken = default)
         where TResult : class, IRemoteResultEnvelope<TResult>
         => ApiTransactionPolicy.ExecuteAsync(CachedServiceProvider, Transaction,
-            () => CachedServiceProvider.GetRequiredService<ILocalApiInvoker>().InvokeAsync(request, cancellationToken, Transaction),
-            isReadOnly: request is IQueryRequest, operation: request?.GetType().FullName);
+            () => CachedServiceProvider.GetRequiredService<ILocalApiInvoker>().InvokeAsync(request, cancellationToken, Transaction));
 }

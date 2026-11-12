@@ -158,7 +158,7 @@ public sealed class RepositorySaveTransactionTests
         var observer = new SaveObserver();
         var failure = new ApplicationException(failOutbox ? "outbox save failed" : "business save callback failed");
         await using var app = await new RepositoryScenarioFactory(interceptor: observer).CreateAsync(cancellationToken: Token);
-        var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(async scope =>
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             observer.Reset();
@@ -172,9 +172,10 @@ public sealed class RepositorySaveTransactionTests
                 observer.Saved = _ => throw failure;
             db.Add(new GeneratedKeyRow { Title = "must roll back" });
             Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => SaveAsync(db, useAsync)));
+            Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
             Assert.True(db.Database.AutoSavepointsEnabled);
             Assert.True(db.ChangeTracker.AutoDetectChangesEnabled);
-            var retry = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => SaveAsync(db, useAsync));
+            var retry = await Assert.ThrowsAsync<InvalidOperationException>(() => SaveAsync(db, useAsync));
             Assert.Same(failure, retry.InnerException);
         }, cancellationToken: Token));
 
@@ -196,7 +197,7 @@ public sealed class RepositorySaveTransactionTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task SaveChanges_WhenCallbackMarksRollbackOnly_ShouldThrowBeforeReturning(bool useAsync, bool empty)
+    public async Task SaveChanges_WhenCallbackCatchesAbort_ShouldRejectCompletion(bool useAsync, bool empty)
     {
         var observer = new SaveObserver();
         var failure = new ExecutionTransactionFailure("SaveCallback", "The save callback rejected the operation.");
@@ -211,8 +212,7 @@ public sealed class RepositorySaveTransactionTests
             observer.Saving = _ => saves++;
             observer.Saved = _ =>
             {
-                operation.MarkRollbackOnly(failure);
-                firstFailure = operation.FirstFailure;
+                firstFailure = Assert.Throws<TransactionRollbackOnlyException>(() => operation.Abort(failure)).FirstFailure;
             };
             if (!empty)
             {
@@ -245,7 +245,7 @@ public sealed class RepositorySaveTransactionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task SaveChanges_WhenOutboxSaveCallbackMarksRollbackOnly_ShouldThrowBeforeReturning(bool useAsync)
+    public async Task SaveChanges_WhenOutboxSaveCallbackAborts_ShouldThrowBeforeReturning(bool useAsync)
     {
         var observer = new SaveObserver();
         var failure = new ExecutionTransactionFailure("SaveCallback", "The Outbox save callback rejected the operation.");
@@ -262,8 +262,8 @@ public sealed class RepositorySaveTransactionTests
                 saves++;
                 if (context.ChangeTracker.Entries<OutboxMessage>().Any())
                 {
-                    operation.MarkRollbackOnly(failure);
-                    firstFailure = operation.FirstFailure;
+                    try { operation.Abort(failure); }
+                    finally { firstFailure = operation.FirstFailure; }
                 }
             };
             db.Add(new HardDeleteRow { Title = "must roll back" });
@@ -290,7 +290,7 @@ public sealed class RepositorySaveTransactionTests
     }
 
     [Fact]
-    public async Task RunAsync_WhenFinalSaveMarksRollbackOnly_ShouldRejectCommit()
+    public async Task RunAsync_WhenFinalSaveAborts_ShouldRejectCommit()
     {
         var observer = new SaveObserver();
         await using var app = await new RepositoryScenarioFactory(interceptor: observer).CreateAsync(cancellationToken: Token);
@@ -299,7 +299,7 @@ public sealed class RepositorySaveTransactionTests
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             observer.Reset();
-            observer.Saved = _ => scope.Resolve<IUnitOfWorkManager>().Current!.MarkRollbackOnly(failure);
+            observer.Saved = _ => scope.Resolve<IUnitOfWorkManager>().Current!.Abort(failure);
             db.Add(new HardDeleteRow { Title = "late rejection" });
             return Task.CompletedTask;
         }, cancellationToken: Token));
@@ -343,11 +343,12 @@ public sealed class RepositorySaveTransactionTests
         await using var app = await new RepositoryScenarioFactory(interceptor: observer).CreateAsync(cancellationToken: Token);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(async scope =>
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             observer.Reset();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => db.SaveChangesAsync(cancellation.Token));
+            Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
             Assert.True(db.Database.AutoSavepointsEnabled);
             Assert.True(db.ChangeTracker.AutoDetectChangesEnabled);
         }, cancellationToken: Token));

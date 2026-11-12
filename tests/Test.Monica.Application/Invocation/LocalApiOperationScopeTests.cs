@@ -63,7 +63,7 @@ public sealed class LocalApiOperationScopeTests
             Assert.False(caller.Resolve<IExecutionTransaction>().IsOperationActive);
         });
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) =>
-            Assert.Equal(failSecond ? 1 : 2, await db.Entries.CountAsync(ct)), token);
+            Assert.Equal(2, await db.Entries.CountAsync(ct)), token);
     }
 
     [Theory]
@@ -161,13 +161,13 @@ public sealed class LocalApiOperationScopeTests
         }, new UnitOfWorkScopeOptions([]), token);
         Assert.Equal(failParent ? ResultStatus.BadRequest : ResultStatus.Ok, result.Status);
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) =>
-            Assert.Equal(failParent ? 0 : 1, await db.Entries.CountAsync(ct)), token);
+            Assert.Equal(1, await db.Entries.CountAsync(ct)), token);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Shared_WhenCallFailsBeforeDatabaseEnlistment_ShouldKeepLogicalUnitOfWorkRollbackOnly(bool application)
+    public async Task Shared_WhenCallFailsBeforeDatabaseEnlistment_ShouldRemainHealthyWhenCaught(bool application)
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new OperationScopeFactory(application).CreateAsync(cancellationToken: token);
@@ -175,18 +175,17 @@ public sealed class LocalApiOperationScopeTests
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         await cancellation.CancelAsync();
         var boundary = caller.Resolve<IExecutionTransaction>();
-        var failure = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => caller.Resolve<IUnitOfWorkManager>()
+        await caller.Resolve<IUnitOfWorkManager>()
             .RunAsync(async () =>
             {
-                var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller.Resolve<ITestingCommandApi>()
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller.Resolve<ITestingCommandApi>()
                     .TransactionChild(new(), cancellation.Token));
-                Assert.Same(canceled, boundary.FirstFailure!.Exception);
+                Assert.Null(boundary.FirstFailure);
                 Assert.True(boundary.IsOperationActive);
                 Assert.False(boundary.IsActive);
                 Assert.Same(caller.ServiceProvider,
                     app.Services.GetRequiredService<ExecutionScopeContext>().GetActiveUnitOfWorkServices());
-            }, new UnitOfWorkScopeOptions([]), token));
-        Assert.Equal("ApiInvocation", failure.FirstFailure.Source);
+            }, new UnitOfWorkScopeOptions([]), token);
         Assert.Equal(0, app.Services.GetRequiredService<TransactionLedger>().ChildCalls);
     }
 

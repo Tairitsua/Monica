@@ -270,16 +270,14 @@ public sealed class SharedTransactionTests
         using var host = CreateHost(connection, connection);
         await using var operation = host.Services.CreateAsyncScope();
         var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(() =>
+        await manager.RunAsync(() =>
         {
             operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().ValidateDatabaseAccess();
             var nonParticipant = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
-            var original = Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
-            Assert.Same(original, manager.Current!.FirstFailure!.Exception);
+            Assert.Throws<InvalidOperationException>(nonParticipant.ValidateDatabaseAccess);
+            Assert.Null(manager.Current!.FirstFailure);
             return Task.CompletedTask;
-        }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token));
-        Assert.Equal("Participation", rollback.FirstFailure.Source);
-        Assert.Equal(typeof(SecondDbContext).FullName, rollback.FirstFailure.DbContextType);
+        }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]), token);
     }
 
     [Fact]
@@ -296,7 +294,7 @@ public sealed class SharedTransactionTests
             var primary = operation.ServiceProvider.GetRequiredService<TestRepositoryDbContext>();
             var secondary = operation.ServiceProvider.GetRequiredService<SecondDbContext>();
             var manager = operation.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-            var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RunAsync(async () =>
             {
                 primary.Add(new HardDeleteRow { Title = "must roll back" });
                 await primary.SaveChangesAsync(token);
@@ -304,8 +302,7 @@ public sealed class SharedTransactionTests
                 await Assert.ThrowsAsync<InvalidOperationException>(() => secondary.SaveChangesAsync(token));
                 Assert.True(secondary.Database.AutoSavepointsEnabled);
             }, new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext), typeof(SecondDbContext)]), token));
-            Assert.Equal("Participation", rejected.FirstFailure.Source);
-            Assert.Equal(typeof(SecondDbContext).FullName, rejected.FirstFailure.DbContextType);
+            Assert.Contains("must be a selected participant", rejected.Message);
         }
         await using var verify = host.Services.CreateAsyncScope();
         Assert.Empty(await verify.ServiceProvider.GetRequiredService<TestRepositoryDbContext>().HardDeleteRows.ToListAsync(token));

@@ -41,7 +41,7 @@ public sealed class ChainTracingExecutionBehavior<TInput, TResult>(IChainTracing
             var result = await next();
             if (result is not IResultEnvelope response)
             {
-                if (result is IExecutionOutcome { ShouldRollback: true }) scope.EndWithFailure("Failed");
+                if (result is IExecutionOutcome { IsFailure: true }) scope.EndWithFailure("Failed");
                 else scope.EndWithSuccess("Success");
                 return result;
             }

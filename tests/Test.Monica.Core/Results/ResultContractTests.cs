@@ -79,13 +79,11 @@ public sealed class ResultContractTests
     [InlineData(ResultStatus.Unknown)]
     [InlineData((ResultStatus)299)]
     [InlineData((ResultStatus)460)]
-    public void Classification_WhenStatusIsInvalid_ShouldRejectBothPredicatesAndRequireRollback(ResultStatus status)
+    public void Classification_WhenStatusIsInvalid_ShouldRejectBothPredicates(ResultStatus status)
     {
         var result = new Result { Status = status };
         Assert.Throws<InvalidOperationException>(() => result.IsSuccess());
         Assert.Throws<InvalidOperationException>(() => result.IsFailure());
-        Assert.True(ExecutionOutcomePolicy.RequiresRollback(result));
-        Assert.True(ExecutionOutcomePolicy.RequiresRollback(result, isReadOnly: true));
     }
 
     [Theory]

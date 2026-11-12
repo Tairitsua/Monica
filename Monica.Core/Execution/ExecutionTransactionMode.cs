@@ -13,7 +13,8 @@ public enum ExecutionTransactionMode
 
     /// <summary>
     /// Allows the registered unit-of-work behavior to wrap the complete execution boundary, save its changes,
-    /// and commit on success. Failures roll back the operation.
+    /// and commit on normal completion regardless of a returned business result. An explicit abort or an
+    /// exception escaping the owning boundary rolls back the operation.
     /// </summary>
     Automatic
 }

@@ -30,10 +30,10 @@ public sealed class MvcActionExecutionResult : IExecutionOutcome
     /// </summary>
     public ActionExecutedContext? ExecutedContext { get; }
 
-    /// <summary>Reports returned failures, including handled action exceptions, to the transaction boundary.</summary>
-    public bool ShouldRollback => ExecutedContext?.Exception is not null
-        || Result is ObjectResult { Value: IResultEnvelope envelope } && ExecutionOutcomePolicy.RequiresRollback(envelope)
-        || Result is JsonResult { Value: IResultEnvelope jsonEnvelope } && ExecutionOutcomePolicy.RequiresRollback(jsonEnvelope)
+    /// <summary>Reports returned failures, including handled action exceptions, for diagnostics only.</summary>
+    public bool IsFailure => ExecutedContext?.Exception is not null
+        || Result is ObjectResult { Value: IResultEnvelope envelope } && envelope.Status is not (ResultStatus.Ok or ResultStatus.Created)
+        || Result is JsonResult { Value: IResultEnvelope jsonEnvelope } && jsonEnvelope.Status is not (ResultStatus.Ok or ResultStatus.Created)
         || Result is IStatusCodeActionResult { StatusCode: >= 400 };
 
     /// <summary>

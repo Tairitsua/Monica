@@ -8,6 +8,7 @@ using Monica.Modules;
 using Monica.Repository.Bulk.Abstractions;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Outbox.Models;
+using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Testing.Doubles;
 using Monica.Testing.Hosting;
 using Test.Monica.Repository.Hosting;
@@ -171,7 +172,7 @@ public sealed class BulkWriterTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public async Task Execute_WhenFailureOrCancellationIsCaughtAfterNativeIO_ShouldRemainRollbackOnly(bool failOutbox, bool cancel)
+    public async Task Execute_WhenFailureIsHandledByAborting_ShouldRollBackNativeAndTrackedWrites(bool failOutbox, bool cancel)
     {
         await using var app = await Factory(nativeOutbox: true).CreateAsync(cancellationToken: Token);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
@@ -192,7 +193,11 @@ public sealed class BulkWriterTests
                 else await scope.Resolve<IBulkWriter>().Insert(db,
                     new[] { new HardDeleteRow { Id = 200, Title = "native" } }).ExecuteAsync(cancellation.Token);
             }
-            catch (Exception exception) when (exception == original || exception is OperationCanceledException) { }
+            catch (Exception exception) when (exception == original || exception is OperationCanceledException)
+            {
+                Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
+                scope.Resolve<IUnitOfWorkManager>().Current!.Abort(ExecutionTransactionFailure.FromException("RequiredBulkWrite", exception));
+            }
         }, cancellationToken: Token));
         if (cancel) Assert.IsAssignableFrom<OperationCanceledException>(failure.InnerException);
         else Assert.Same(original, failure.InnerException);
@@ -200,16 +205,44 @@ public sealed class BulkWriterTests
     }
 
     [Fact]
-    public async Task Execute_WhenAuditFails_ShouldMarkRollbackOnlyBeforeNativeIO()
+    public async Task Execute_WhenAuditFailureIsCaught_ShouldNotRequestRollbackOrPerformNativeIO()
     {
         await using var app = await Factory().CreateAsync(seams => seams.With<IAuditPropertySetter>(new FailingAudit()), Token);
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        await app.ExecuteAsync(async scope =>
         {
             await Assert.ThrowsAsync<ApplicationException>(() => scope.Resolve<IBulkWriter>()
                 .Insert(scope.Resolve<TestRepositoryDbContext>(), new[] { new HardDeleteRow { Id = 200 } })
                 .WithAuditProperties().ExecuteAsync(Token));
-        }, cancellationToken: Token));
+            Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
+        }, cancellationToken: Token);
         Assert.Empty(app.Services.GetRequiredService<SqliteNativeInsertProvider>().InsertedTypes);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Execute_WhenNativeFailureIsCaughtWithoutAbort_ShouldCommitEarlierWrites(bool cancel)
+    {
+        await using var app = await Factory().CreateAsync(cancellationToken: Token);
+        using var cancellation = new CancellationTokenSource();
+        var original = new ApplicationException("failure after native insert");
+        app.Services.GetRequiredService<SqliteNativeInsertProvider>().AfterInsert = _ =>
+        {
+            if (cancel) cancellation.Cancel();
+            else throw original;
+        };
+        await app.ExecuteAsync(async scope =>
+        {
+            try
+            {
+                await scope.Resolve<IBulkWriter>().Insert(scope.Resolve<TestRepositoryDbContext>(),
+                    new[] { new HardDeleteRow { Id = 201, Title = "accepted partial work" } }).ExecuteAsync(cancellation.Token);
+            }
+            catch (Exception exception) when (exception == original || exception is OperationCanceledException) { }
+            Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
+        }, cancellationToken: Token);
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+            Assert.Equal("accepted partial work", (await db.HardDeleteRows.SingleAsync(ct)).Title), Token);
     }
 
     private static Task AssertNoRowsAsync(MonicaTestApplication app, bool outbox = false)

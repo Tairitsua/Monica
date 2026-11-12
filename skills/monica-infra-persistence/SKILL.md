@@ -14,7 +14,7 @@ Repositories and UnitOfWork cover a local database operation; use transactional-
 | Place infrastructure tables and per-context history across relational providers | [Infrastructure table layout](references/infrastructure-table-layout.md) |
 | Place migration projects, consolidate databases, or define schema/history ownership | `$monica-application` (`references/05-database-migrations.md`) |
 | Inspect registered contexts, provider sessions, migration history, or migration updates | [Repository diagnostics](references/repository-diagnostics.md) |
-| Set Shared/Independent boundaries, compose one database, select participants, or understand rollback | [Transactions](references/transactions.md) |
+| Choose explicit rollback for business failures, Shared/Independent boundaries, or database participants | [Transactions](references/transactions.md) |
 | Store binary objects or select a Minio provider | [Blob storage](references/blob-storage.md) |
 | Choose before-commit effects or committed delivery; configure outbox, batch inbox, and projections | [Transactional events](references/transactional-events.md) |
 | Diagnose a failed or slow save, transaction, or delivery | [Troubleshooting](references/troubleshooting.md) |

@@ -32,7 +32,7 @@ public sealed class TransactionBoundaryTests
     [Theory]
     [InlineData(false, false, 2)]
     [InlineData(true, false, 0)]
-    [InlineData(false, true, 0)]
+    [InlineData(false, true, 2)]
     public async Task Shared_WhenNestedContextsUseOneConnection_ShouldCommitOrRollbackTogether(bool failParent, bool failChild, int rows)
     {
         var token = TestContext.Current.CancellationToken;
@@ -40,7 +40,7 @@ public sealed class TransactionBoundaryTests
         await using var caller = app.CreateScope(token);
         var result = await caller.Resolve<ITestingCommandApi>().Coordinate(new(FailParent: failParent, FailChild: failChild), token);
         Assert.Equal(rows == 0 ? ResultStatus.InternalError : ResultStatus.Ok, result.Status);
-        if (rows > 0)
+        if (rows > 0 && !failChild)
         {
             Assert.Equal(result.Data!.ScopeId, result.Data.ChildScopeId);
             Assert.Equal(result.Data.ScopeId, result.Data.GrandchildScopeId);
@@ -85,7 +85,7 @@ public sealed class TransactionBoundaryTests
     }
 
     [Fact]
-    public async Task Independent_WhenChildFailsAndIsHandled_ShouldAllowParentCommit()
+    public async Task Independent_WhenChildReturnsFailure_ShouldCommitChildAndParent()
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory(sharedConnection: false).CreateAsync(cancellationToken: token);
@@ -93,7 +93,7 @@ public sealed class TransactionBoundaryTests
         var result = await caller.Resolve<ITestingCommandApi>().Coordinate(new(Independent: true, FailChild: true), token);
         Assert.Equal(ResultStatus.Ok, result.Status);
         Assert.True(app.Services.GetRequiredService<TransactionLedger>().ParentRestored);
-        await AssertRowsAsync(app, 1, 0);
+        await AssertRowsAsync(app, 1, 1);
     }
 
     [Theory]
@@ -242,7 +242,7 @@ public sealed class CommandHandlerCoordinate(TransactionPrimaryContext db, Trans
             catch (NotSupportedException) { ledger.OriginalRejected = true; }
         }
         if (request.FailParent) throw new InvalidOperationException("Parent failed after its child.");
-        // Deliberately handle a child's failed result to prove rollback-only versus independent behavior.
+        // A returned child failure leaves its writes eligible for commit in either transaction mode.
         return Result.Success(new TransactionReceipt(scope.Id, child.Data?.ScopeId ?? Guid.Empty,
             child.Data?.GrandchildScopeId ?? Guid.Empty, child.Data?.User));
     }

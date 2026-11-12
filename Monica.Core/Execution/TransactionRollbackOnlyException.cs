@@ -3,7 +3,7 @@ namespace Monica.Core.Execution;
 /// <summary>Rejects further work on a failed transaction while preserving the failure that caused rollback.</summary>
 /// <remarks>
 /// The original exception is the inner exception, so existing exception diagnostics retain its original stack.
-/// A failed result has no inner exception; its status and message remain available in <see cref="FirstFailure"/>.
+/// An explicit abort based on a failed result has no inner exception; its status and message remain in <see cref="FirstFailure"/>.
 /// </remarks>
 public sealed class TransactionRollbackOnlyException(Guid transactionId, string rejectedOperation, ExecutionTransactionFailure firstFailure)
     : InvalidOperationException(

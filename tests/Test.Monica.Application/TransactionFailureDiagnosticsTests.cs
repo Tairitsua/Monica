@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Monica.Core.ExceptionHandling.Models;
@@ -18,11 +17,8 @@ namespace Test.Monica.Application;
 
 public sealed class TransactionFailureDiagnosticsTests
 {
-    [Theory]
-    [InlineData(QueryFault.Exception)]
-    [InlineData(QueryFault.Cancellation)]
-    [InlineData(QueryFault.CaughtSql)]
-    public async Task SharedQuery_WhenFaultIsCaught_ShouldPreserveFirstCauseThroughOutboxSaveFlushAndCommit(QueryFault fault)
+    [Fact]
+    public async Task Abort_WhenCaughtQueryExceptionIsSupplied_ShouldPreserveCauseAndRejectFurtherWork()
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
@@ -35,55 +31,46 @@ public sealed class TransactionFailureDiagnosticsTests
             var db = scope.Resolve<TransactionPrimaryContext>();
             db.Entries.Add(new OperationEntry { Name = "must roll back" });
             await manager.Current!.FlushAsync(token);
-            var invoke = () => scope.Resolve<ITestingQueryApi>().ReadTransaction(new(Fault: fault), token);
-            Exception? original = null;
-            if (fault == QueryFault.CaughtSql)
-                Assert.Equal(ResultStatus.BadRequest, (await invoke()).Status);
-            else if (fault == QueryFault.Cancellation)
-                original = await Assert.ThrowsAnyAsync<OperationCanceledException>(invoke);
-            else
-                original = await Assert.ThrowsAsync<InvalidOperationException>(invoke);
+            var original = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<ITestingQueryApi>()
+                .ReadTransaction(new(Fault: QueryFault.Exception), token));
+            Assert.Null(manager.Current.FirstFailure);
 
+            var aborted = Assert.Throws<TransactionRollbackOnlyException>(() => manager.Current.Abort(
+                ExecutionTransactionFailure.FromException("RequiredQuery", original)));
             first = Assert.IsType<ExecutionTransactionFailure>(manager.Current.FirstFailure);
-            Assert.Contains(nameof(QueryHandlerReadTransaction), first.Operation);
-            Assert.False(string.IsNullOrWhiteSpace(first.OperationKey));
-            Assert.NotNull(first.InvocationId);
+            Assert.Same(original, first.Exception);
+            Assert.Same(original, aborted.InnerException);
             Assert.Equal(activity.TraceId.ToString(), first.TraceId);
             Assert.NotNull(first.SpanId);
             Assert.NotEqual(default, first.OccurredAt);
-            if (fault == QueryFault.CaughtSql)
-            {
-                Assert.IsAssignableFrom<DbException>(first.Exception);
-                Assert.Equal("DatabaseCommand", first.Source);
-                Assert.Equal(typeof(TransactionPrimaryContext).FullName, first.DbContextType);
-                Assert.NotNull(first.CommandId);
-            }
-            else Assert.Same(original, first.Exception);
 
-            // A later explicit mark or failed action must never replace the first evidence.
-            manager.Current.MarkRollbackOnly(new("Later", "Do not overwrite the query failure."));
+            var later = Assert.Throws<TransactionRollbackOnlyException>(() => manager.Current.Abort(new("Later", "Do not replace the cause.")));
             var outbox = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => scope.Resolve<IDistributedEventBus>()
                 .PublishAsync(new TransactionCompleted(), cancellationToken: token));
             var save = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => db.SaveChangesAsync(token));
             var flush = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.Current.FlushAsync(token));
-            foreach (var rejected in new[] { outbox, save, flush })
+            var nestedRan = false;
+            var nested = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(() =>
+            {
+                nestedRan = true;
+                return Task.CompletedTask;
+            }, cancellationToken: token));
+            Assert.False(nestedRan);
+            foreach (var rejected in new[] { aborted, later, outbox, save, flush, nested })
             {
                 Assert.Same(first, rejected.FirstFailure);
-                Assert.Same(first.Exception, rejected.InnerException);
+                Assert.Same(original, rejected.InnerException);
                 Assert.Equal(manager.Current.Id, rejected.TransactionId);
-                Assert.Contains(first.Reason, rejected.Message);
             }
 
             var diagnostics = new ExceptionDiagnosticDocument();
             ExceptionDiagnosticProjection.Capture(diagnostics, outbox);
             ExceptionDiagnosticProjection.Capture(diagnostics, flush);
-            Assert.True(diagnostics.Contains(first.Exception!));
-            var cause = Assert.Single(diagnostics.Exceptions, entry => entry.Type == first.Exception!.GetType().FullName);
-            Assert.NotEmpty(cause.StackTrace);
+            Assert.True(diagnostics.Contains(original));
+            var cause = Assert.Single(diagnostics.Exceptions, entry => entry.Type == original.GetType().FullName);
             Assert.Contains(cause.StackTrace, frame => frame.Contains(nameof(QueryHandlerReadTransaction), StringComparison.Ordinal));
         }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token));
         Assert.Same(first, committed.FirstFailure);
-        Assert.Same(first!.Exception, committed.InnerException);
         await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) =>
         {
             Assert.Empty(await db.Entries.ToListAsync(ct));
@@ -94,27 +81,35 @@ public sealed class TransactionFailureDiagnosticsTests
     }
 
     [Fact]
-    public async Task SharedQuery_WhenFailureIsReturned_ShouldSnapshotStatusAndMessageWithoutInventingException()
+    public async Task Abort_WhenBusinessFailureIsSupplied_ShouldStopImmediatelyAndSnapshotItsReason()
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var scope = app.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+        var afterAbort = false;
+        var result = Result.Failure("Required child declined.", ResultStatus.Conflict);
+        var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
         {
-            var result = await scope.Resolve<ITestingQueryApi>().ReadTransaction(new(ResultStatus.ServiceUnavailable), token);
-            var first = Assert.IsType<ExecutionTransactionFailure>(manager.Current!.FirstFailure);
-            result.Message = "changed after the failure";
-            result.Status = ResultStatus.Ok;
-            var outbox = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => scope.Resolve<IDistributedEventBus>()
-                .PublishAsync(new TransactionCompleted(), cancellationToken: token));
-            Assert.Same(first, outbox.FirstFailure);
-            Assert.Equal(ResultStatus.ServiceUnavailable, first.ResultStatus);
-            Assert.Equal("Query rejected.", first.Reason);
-            Assert.Null(outbox.InnerException);
-            Assert.Contains("ServiceUnavailable", outbox.Message);
-            Assert.Contains(nameof(QueryHandlerReadTransaction), outbox.Message);
+            scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "must roll back" });
+            await manager.Current!.FlushAsync(token);
+            await AbortRequiredChildAsync();
+            afterAbort = true;
         }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token));
+        result.Message = "changed after abort";
+        result.Status = ResultStatus.Ok;
+        Assert.False(afterAbort);
+        Assert.Null(rejected.InnerException);
+        Assert.Equal(ResultStatus.Conflict, rejected.FirstFailure.ResultStatus);
+        Assert.Equal("Required child declined.", rejected.FirstFailure.Reason);
+        Assert.Equal("RequiredChild", rejected.FirstFailure.Operation);
+        await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Empty(await db.Entries.ToListAsync(ct)), token);
+
+        Task AbortRequiredChildAsync()
+        {
+            manager.Current!.Abort(ExecutionTransactionFailure.FromResult("Business", result) with { Operation = "RequiredChild" });
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]

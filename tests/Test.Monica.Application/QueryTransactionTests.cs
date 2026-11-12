@@ -84,33 +84,34 @@ public sealed class QueryTransactionTests
     [InlineData(ResultStatus.ServiceUnavailable)]
     [InlineData(ResultStatus.GatewayTimeout)]
     [InlineData(ResultStatus.Unknown)]
-    public async Task SharedQuery_WhenExecutionFailureIsHandled_ShouldStillRollbackParent(ResultStatus rejection)
+    public async Task SharedQuery_WhenFailureResultIsHandled_ShouldCommitParent(ResultStatus rejection)
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var scope = app.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+        await manager.RunAsync(async () =>
         {
             scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "must roll back" });
             await manager.Current!.FlushAsync(token);
             var result = await scope.Resolve<ITestingQueryApi>().ReadTransaction(new(rejection), token);
             Assert.Equal(rejection, result.Status);
-        }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token));
-        await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Empty(await db.Entries.ToListAsync(ct)), token);
+            Assert.Null(manager.Current!.FirstFailure);
+        }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token);
+        await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Single(await db.Entries.ToListAsync(ct)), token);
     }
 
     [Theory]
     [InlineData(QueryFault.Exception)]
     [InlineData(QueryFault.Cancellation)]
     [InlineData(QueryFault.CaughtSql)]
-    public async Task SharedQuery_WhenFaultIsCaught_ShouldNotRecoverFailedTransaction(QueryFault fault)
+    public async Task SharedQuery_WhenFaultIsCaught_ShouldCommitParent(QueryFault fault)
     {
         var token = TestContext.Current.CancellationToken;
         await using var app = await new TransactionFactory().CreateAsync(cancellationToken: token);
         await using var scope = app.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+        await manager.RunAsync(async () =>
         {
             scope.Resolve<TransactionPrimaryContext>().Entries.Add(new OperationEntry { Name = "must roll back" });
             await manager.Current!.FlushAsync(token);
@@ -121,8 +122,9 @@ public sealed class QueryTransactionTests
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(invoke);
             else
                 await Assert.ThrowsAsync<InvalidOperationException>(invoke);
-        }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token));
-        await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Empty(await db.Entries.ToListAsync(ct)), token);
+            Assert.Null(manager.Current!.FirstFailure);
+        }, new UnitOfWorkScopeOptions([typeof(TransactionPrimaryContext)]), token);
+        await app.VerifyAsync<TransactionPrimaryContext>(async (db, ct) => Assert.Single(await db.Entries.ToListAsync(ct)), token);
     }
 
     [Fact]
@@ -149,7 +151,7 @@ public sealed class QueryHandlerReadTransaction(TransactionPrimaryContext db)
         if (request.Fault == QueryFault.CaughtSql)
         {
             try { await db.Database.SqlQueryRaw<int>("SELECT Value FROM MissingQueryTable").ToListAsync(cancellationToken); }
-            catch (DbException) { return Result.Failure<QueryTransactionReceipt>("A provider error must not become a recoverable business rejection."); }
+            catch (DbException) { return Result.Failure<QueryTransactionReceipt>("The application handled the query failure."); }
         }
         if (request.Rejection is { } rejection)
             return rejection == ResultStatus.Unknown

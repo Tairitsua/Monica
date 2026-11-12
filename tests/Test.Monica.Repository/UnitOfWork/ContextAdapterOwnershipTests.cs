@@ -69,17 +69,17 @@ public sealed class ContextAdapterOwnershipTests
         var owner = scope.ServiceProvider.GetRequiredService<OwnerContext>();
         await using var physical = CreatePhysical(scope.ServiceProvider, shareConnection ? connection : other, owner);
         var manager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+        await manager.RunAsync(async () =>
         {
-            owner.Rows.Add(new GeneratedKeyRow { Title = "must roll back" });
+            owner.Rows.Add(new GeneratedKeyRow { Title = "handled participant rejection" });
             await manager.Current!.FlushAsync(TestContext.Current.CancellationToken);
             await Assert.ThrowsAsync<NotSupportedException>(() => physical.Rows.CountAsync(TestContext.Current.CancellationToken));
             physical.Add(new GeneratedKeyRow { Title = "rejected" });
-            var rejected = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => physical.SaveChangesAsync(TestContext.Current.CancellationToken));
-            Assert.IsType<NotSupportedException>(rejected.InnerException);
-        }, cancellationToken: TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<NotSupportedException>(() => physical.SaveChangesAsync(TestContext.Current.CancellationToken));
+            Assert.Null(manager.Current!.FirstFailure);
+        }, cancellationToken: TestContext.Current.CancellationToken);
         await using var verification = host.Services.CreateAsyncScope();
-        Assert.Empty(await verification.ServiceProvider.GetRequiredService<OwnerContext>().Rows
+        Assert.Single(await verification.ServiceProvider.GetRequiredService<OwnerContext>().Rows
             .ToListAsync(TestContext.Current.CancellationToken));
     }
 

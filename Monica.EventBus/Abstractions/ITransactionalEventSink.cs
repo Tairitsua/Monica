@@ -7,8 +7,8 @@ public interface ITransactionalEventSink
 {
     /// <summary>
     /// Validates operation ownership, invokes synchronous preparation once, and stages the complete
-    /// captured batch without committing. A preparation or staging failure makes the operation
-    /// rollback-only, even when the caller catches the exception.
+    /// captured batch without committing. Exceptions propagate; a caller that handles them must
+    /// explicitly abort if partially staged work must not commit.
     /// </summary>
     ValueTask StageAsync(Func<IReadOnlyList<EventMessage>> prepare, CancellationToken cancellationToken);
 }

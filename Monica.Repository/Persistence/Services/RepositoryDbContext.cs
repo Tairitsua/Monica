@@ -57,7 +57,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
     protected ModuleRepositoryOption Options => CachedServiceProvider.GetRequiredService<IOptions<ModuleRepositoryOption>>().Value;
 
-    private bool _saveFailed;
+    private Exception? _saveFailure;
     private bool _saving;
     Type IRepositoryContextLifetime.RegistrationType => typeof(TDbContext);
     IServiceProvider IRepositoryContextLifetime.Services => CachedServiceProvider.UnderlyingProvider;
@@ -309,10 +309,10 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     /// <remarks>
     /// SaveChanges(false) is deliberately unsupported: accepting business changes between two internal flushes
     /// is necessary for generated-key outbox capture. Use a transaction and a fresh context when retrying.
-    /// Managed saves omit automatic savepoints because any failure requires the whole operation to roll back.
+    /// Managed saves omit automatic savepoints; a failed save can leave incomplete business/Outbox capture.
     /// Save callbacks must throw when they cannot continue. Their original exception is propagated unchanged.
-    /// If a callback only marks the operation rollback-only, the save rejects completion after the EF flush
-    /// instead of returning success. Catching either failure does not make the operation committable.
+    /// An explicit abort throws immediately. Caught exceptions do not request rollback, but a failed context
+    /// remains unusable; its next save, including the owner's final flush, rejects reuse.
     /// Other saves retain EF's transaction and savepoint behavior. This method never commits a caller-owned transaction
     /// or starts an additional transaction merely because Outbox is configured.
     /// </remarks>
@@ -325,7 +325,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
 
     void IOutboxStoreContext.StagePreparedMessage(EventMessage message)
     {
-        if (_saveFailed) throw new InvalidOperationException("This context's save failed. Retry in a fresh operation scope.");
+        if (_saveFailure is not null) throw new InvalidOperationException("This context's save failed. Retry in a fresh operation scope.", _saveFailure);
         if (OutboxOptions is null) throw new InvalidOperationException("The selected transaction owner must enable AddOutbox.");
         var captured = OutboxMessage.Capture(message, CachedServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System);
         if (OutboxOptions.SharedStoreKey is not null)
@@ -336,7 +336,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
     private bool ValidateSave()
     {
         CachedServiceProvider.GetService<UnitOfWorkManager>()?.ThrowIfRollbackOnly("access the database");
-        if (_saveFailed) throw new InvalidOperationException("This context's save failed. Dispose it and retry in a fresh scope.");
+        if (_saveFailure is not null) throw new InvalidOperationException("This context's save failed. Dispose it and retry in a fresh scope.", _saveFailure);
         if (_saving) throw new InvalidOperationException("Recursive or concurrent saves are not supported.");
         if (this is IRepositoryContextAdapter { TransactionOwner: { } owner }
             && owner.Database.CurrentTransaction is { } transaction
@@ -375,13 +375,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         ArgumentNullException.ThrowIfNull(affectedEntityTypes);
         ArgumentNullException.ThrowIfNull(write);
         PrepareNativeWrite(affectedEntityTypes);
-        try { return await write(cancellationToken); }
-        catch (Exception exception)
-        {
-            ((IRepositoryContextLifetime)this).MarkDatabaseFailure(
-                ExecutionTransactionFailure.FromException("SnapshotBulkWrite", exception));
-            throw;
-        }
+        return await write(cancellationToken);
     }
 
     void IRepositoryContextLifetime.PrepareNativeWrite(IReadOnlyCollection<Type> affectedEntityTypes)
@@ -416,10 +410,6 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             ?? throw new ArgumentException("Unknown snapshot dataset.", nameof(datasetKey));
         return CachedServiceProvider.GetRequiredService<SnapshotTransaction>().HasChanges(this, registration.SourceId, dataset);
     }
-
-    void IRepositoryContextLifetime.MarkDatabaseFailure(ExecutionTransactionFailure failure)
-        => CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
-            failure with { DbContextType = GetType().FullName });
 
     private async Task<int> SaveCoreAsync(bool useAsync, bool acceptAll, CancellationToken token)
     {
@@ -488,9 +478,7 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         }
         catch (Exception exception)
         {
-            _saveFailed = true;
-            CachedServiceProvider.GetService<IUnitOfWorkManager>()?.Current?.MarkRollbackOnly(
-                ExecutionTransactionFailure.FromException("SaveChanges", exception) with { DbContextType = GetType().FullName });
+            _saveFailure = exception;
             throw;
         }
         finally

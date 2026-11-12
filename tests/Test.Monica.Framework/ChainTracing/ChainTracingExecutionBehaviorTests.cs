@@ -87,7 +87,7 @@ public sealed class ChainTracingExecutionBehaviorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenOutcomeRequestsRollback_ShouldCompleteFailedTrace()
+    public async Task ExecuteAsync_WhenOutcomeReportsFailure_ShouldCompleteFailedTrace()
     {
         var tracing = new TrackingChainTracing();
         var behavior = new ChainTracingExecutionBehavior<string, FailedOutcome>(tracing);
@@ -236,7 +236,7 @@ public sealed class ChainTracingExecutionBehaviorTests
 
     private sealed class FailedOutcome : IExecutionOutcome
     {
-        public bool ShouldRollback => true;
+        public bool IsFailure => true;
     }
 
     private sealed class RemoteComponent : IApplicationApi

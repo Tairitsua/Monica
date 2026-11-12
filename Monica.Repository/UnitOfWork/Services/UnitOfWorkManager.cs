@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore.Storage;
 using Monica.Repository.Outbox.Services;
 using Monica.Repository.Inbox.Services;
@@ -7,8 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Monica.Core.Execution;
-using Monica.Core.Results;
-using Monica.Core.Results.Abstractions;
 using Monica.Modules;
 using Monica.Repository.Persistence.Models;
 using Monica.Repository.Persistence.Abstractions;
@@ -61,16 +60,12 @@ public sealed class UnitOfWorkManager(
         using var scope = services.GetRequiredService<ExecutionScopeContext>().Enter(services);
         if (_active)
         {
-            try
-            {
-                if (options is not null) await JoinAsync(options, cancellationToken);
-                var nestedResult = await work();
-                cancellationToken.ThrowIfCancellationRequested();
-                if (ExecutionOutcomePolicy.RequiresRollback(nestedResult, options?.IsReadOnly == true))
-                    MarkRollbackOnly(ExecutionTransactionFailure.FromResult("Execution", nestedResult));
-                return nestedResult;
-            }
-            catch (Exception exception) { MarkRollbackOnly(ExecutionTransactionFailure.FromException("Execution", exception)); throw; }
+            ThrowIfRollbackOnly("execute nested work");
+            if (options is not null) await JoinAsync(options, cancellationToken);
+            var nestedResult = await work();
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfRollbackOnly("complete nested work");
+            return nestedResult;
         }
 
         var domainEvents = services.GetRequiredService<DomainEventQueue>();
@@ -81,12 +76,6 @@ public sealed class UnitOfWorkManager(
             _active = true;
             var result = await work();
             cancellationToken.ThrowIfCancellationRequested();
-            if (ExecutionOutcomePolicy.RequiresRollback(result, _options.IsReadOnly))
-            {
-                MarkRollbackOnly(ExecutionTransactionFailure.FromResult("Execution", result));
-                await RollbackAsync();
-                return result;
-            }
             ThrowIfRollbackOnly("commit");
             if (!_options.IsReadOnly)
             {
@@ -102,7 +91,7 @@ public sealed class UnitOfWorkManager(
         catch (Exception operationException)
         {
             failure = operationException;
-            MarkRollbackOnly(ExecutionTransactionFailure.FromException("Execution", operationException));
+            RecordFailure(ExecutionTransactionFailure.FromException("Execution", operationException));
             try { await RollbackAsync(); }
             catch (Exception rollbackException) { operationException.Data[ROLLBACK_EXCEPTION_DATA_KEY] = rollbackException; }
             throw;
@@ -131,23 +120,27 @@ public sealed class UnitOfWorkManager(
         EnsureUsable();
         ThrowIfRollbackOnly("flush changes");
         if (!_active) throw new InvalidOperationException("An active, healthy operation is required to flush.");
-        try
-        {
-            var affected = 0;
-            foreach (var context in _contexts) affected += await context.SaveChangesAsync(cancellationToken);
-            // A later participant can stage a projection on the primary after its first save.
-            if (_contexts.Count > 1 && _contexts[0] is IOutboxStoreContext { HasPendingOutboxMessages: true })
-                affected += await _contexts[0].SaveChangesAsync(cancellationToken);
-            return affected;
-        }
-        catch (Exception exception) { MarkRollbackOnly(ExecutionTransactionFailure.FromException("Flush", exception)); throw; }
+        var affected = 0;
+        foreach (var context in _contexts) affected += await context.SaveChangesAsync(cancellationToken);
+        // A later participant can stage a projection on the primary after its first save.
+        if (_contexts.Count > 1 && _contexts[0] is IOutboxStoreContext { HasPendingOutboxMessages: true })
+            affected += await _contexts[0].SaveChangesAsync(cancellationToken);
+        return affected;
     }
 
     /// <inheritdoc />
-    public void MarkRollbackOnly(ExecutionTransactionFailure? failure = null)
+    [DoesNotReturn]
+    public void Abort(ExecutionTransactionFailure? failure = null)
+    {
+        EnsureUsable();
+        if (!_active) throw new InvalidOperationException("An active operation is required to abort.");
+        RecordFailure(failure ?? new("Explicit", "The caller explicitly requested rollback."));
+        throw new TransactionRollbackOnlyException(Id, "continue execution", FirstFailure!);
+    }
+
+    private void RecordFailure(ExecutionTransactionFailure failure)
     {
         if (FirstFailure is not null) return;
-        failure ??= new("Explicit", "The caller explicitly requested rollback.");
         var execution = services.GetRequiredService<ExecutionScopeContext>();
         var operation = execution.Operation;
         // A caller naming a different operation must not inherit the parent's invocation identity.
@@ -219,11 +212,9 @@ public sealed class UnitOfWorkManager(
             || context.Database.CurrentTransaction is not { } current
             || !ReferenceEquals(current.GetDbTransaction(), _transaction.GetDbTransaction()))
         {
-            var exception = new InvalidOperationException($"DbContext '{context.GetType().FullName}' (transaction owner '{owner.GetType().FullName}') " +
+            throw new InvalidOperationException($"DbContext '{context.GetType().FullName}' (transaction owner '{owner.GetType().FullName}') " +
                 $"must be a selected participant using active transaction '{Id}'. Participants: {string.Join(", ", _contexts.Select(x => x.GetType().FullName))}. " +
                 "Select the executing domain's context and share its connection, or call through WithTransaction(ApiTransaction.Independent).");
-            MarkRollbackOnly(ExecutionTransactionFailure.FromException("Participation", exception) with { DbContextType = context.GetType().FullName });
-            throw exception;
         }
         return true;
     }

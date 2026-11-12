@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
-using Monica.Core.Execution;
 using Monica.Repository.Bulk.Abstractions;
 using Monica.Repository.Bulk.Models;
 using Monica.Repository.Entity.Abstractions;
@@ -35,29 +34,20 @@ internal sealed class BulkWriter : IBulkWriter
         var rows = input.ToArray();
         ValidateRows(context, rows);
         lifetime.PrepareNativeWrite([typeof(TRow)]);
-        try
+        if (audit)
         {
-            if (audit)
+            var setter = lifetime.Services.GetRequiredService<IAuditPropertySetter>();
+            foreach (var row in rows)
             {
-                var setter = lifetime.Services.GetRequiredService<IAuditPropertySetter>();
-                foreach (var row in rows)
-                {
-                    token.ThrowIfCancellationRequested();
-                    setter.SetCreationProperties(row);
-                }
+                token.ThrowIfCancellationRequested();
+                setter.SetCreationProperties(row);
             }
-            // Audit can fill a previously missing generated/default-valued property. Validate the final row shape.
-            provider.ValidateInsert(context, rows);
-            if (useAsync) await provider.InsertAsync(context, rows, token);
-            else provider.Insert(context, rows, token);
-            token.ThrowIfCancellationRequested();
         }
-        catch (Exception exception)
-        {
-            lifetime.MarkDatabaseFailure(ExecutionTransactionFailure.FromException("BulkInsert", exception)
-                with { DbContextType = context.GetType().FullName });
-            throw;
-        }
+        // Audit can fill a previously missing generated/default-valued property. Validate the final row shape.
+        provider.ValidateInsert(context, rows);
+        if (useAsync) await provider.InsertAsync(context, rows, token);
+        else provider.Insert(context, rows, token);
+        token.ThrowIfCancellationRequested();
     }
 
     private static void ValidateRows<TRow>(DbContext context, IReadOnlyList<TRow> rows) where TRow : class

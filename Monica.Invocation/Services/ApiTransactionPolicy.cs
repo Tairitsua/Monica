@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Monica.Core.Execution;
-using Monica.Core.Results;
-using Monica.Core.Results.Abstractions;
 using Monica.Invocation.Models;
 
 namespace Monica.Invocation.Services;
@@ -14,23 +12,15 @@ internal static class ApiTransactionPolicy
     }
 
     public static async Task<T> ExecuteAsync<T>(IServiceProvider services, ApiTransaction transaction, Func<Task<T>> invoke,
-        bool remote = false, bool isReadOnly = false, string? operation = null)
+        bool remote = false)
     {
         Validate(transaction);
         var boundary = GetActiveUnitOfWork(services, transaction);
-        try
-        {
-            if (remote) EnsureRemoteAllowed(services, transaction);
-            var result = await invoke();
-            if (ExecutionOutcomePolicy.RequiresRollback(result, isReadOnly))
-                boundary?.MarkRollbackOnly(ExecutionTransactionFailure.FromResult("ApiInvocation", result) with { Operation = operation });
-            return result;
-        }
-        catch (Exception exception)
-        {
-            boundary?.MarkRollbackOnly(ExecutionTransactionFailure.FromException("ApiInvocation", exception) with { Operation = operation });
-            throw;
-        }
+        if (boundary?.FirstFailure is not null) boundary.Abort();
+        if (remote) EnsureRemoteAllowed(services, transaction);
+        var result = await invoke();
+        if (boundary?.FirstFailure is not null) boundary.Abort();
+        return result;
     }
 
     public static void EnsureRemoteAllowed(IServiceProvider services, ApiTransaction transaction)

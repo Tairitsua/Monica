@@ -62,7 +62,7 @@ Omit `WithAuditProperties()` when rows already contain their final fields. It re
 
 Every nonempty insert requires a live managed transaction. The writer borrows the supplied context and transaction, reports its row type to snapshot version tracking, and never saves or commits for the caller. Provider selection uses the context's owning scope and registered generic context type, including physical adapters. A logical sharding coordinator is rejected: select a physical route whose connection and transaction match its owner, then execute sequentially. Additional effects from triggers require the named operation's complete snapshot dependency declaration; the writer cannot infer them.
 
-Empty input is a no-op after cancellation validation. Duplicate client-assigned primary keys, pending mutations of the same mapped type, and conflicts with tracked keys are rejected. The provider rejects unsupported database/mapping shapes before I/O. No failure falls back to EF staging. Audit or provider execution failures, including cancellation after native work begins, leave the operation rollback-only even if caught; retry the whole operation in a fresh scope when permitted.
+Empty input is a no-op after cancellation validation. Duplicate client-assigned primary keys, pending mutations of the same mapped type, and conflicts with tracked keys are rejected. The provider rejects unsupported database/mapping shapes before I/O. No failure falls back to EF staging. Audit and provider exceptions propagate without implicitly requesting rollback. A caller that catches one owns the decision to recover or explicitly abort; native writes completed before the exception remain eligible for commit. See [business outcomes and explicit abort](transactions.md#business-outcomes-and-explicit-abort).
 
 Generated values are not hydrated into caller-owned rows. Allocate client keys before routing and follow the provider's rules for generated/default columns and value converters. Input collections and rows remain caller-owned and must not be mutated concurrently. The provider extension point must be safe across independent contexts, validate without I/O, and use the supplied connection and transaction without replacing, committing, saving, or attaching them.
 
@@ -75,9 +75,10 @@ Provider APIs that bypass EF command interceptors, such as binary COPY, must cal
 the checks for failed saves, terminal or rollback-only operations, selected transaction participants,
 and physical adapters sharing their transaction owner's connection and transaction. Validation
 does not access the database, start or commit a transaction, or apply save policies. The technical
-adapter still supplies provider prerequisites and calls `IUnitOfWorkManager.Current?.MarkRollbackOnly()`
-when execution fails, so catching a provider error cannot allow the operation to commit.
-The shared `IBulkWriter` already owns these responsibilities for its insert operations.
+adapter still supplies provider prerequisites and propagates failures. A consumer that catches a provider
+error must deliberately recover valid state or call `IUnitOfWorkManager.Current!.Abort(...)`; catching
+alone does not request rollback or repair a damaged physical transaction. The shared `IBulkWriter`
+already performs access validation for its insert operations.
 
 ## Inspect repository registrations
 

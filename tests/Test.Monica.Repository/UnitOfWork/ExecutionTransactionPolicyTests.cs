@@ -31,12 +31,13 @@ public sealed class ExecutionTransactionPolicyTests
                 await scope.Resolve<IMediator>().Send(new RequiredIsolation(), token));
             return;
         }
-        await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
+        await scope.Resolve<IUnitOfWorkManager>().RunAsync(async () =>
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<IUnitOfWorkManager>().RunAsync(
                 () => throw new Xunit.Sdk.XunitException("An incompatible nested transaction must not execute."),
                 new UnitOfWorkScopeOptions(IsolationLevel: System.Data.IsolationLevel.RepeatableRead), token));
-        }, new UnitOfWorkScopeOptions(IsolationLevel: System.Data.IsolationLevel.Serializable), token));
+            Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
+        }, new UnitOfWorkScopeOptions(IsolationLevel: System.Data.IsolationLevel.Serializable), token);
     }
 
     private sealed record RequiredIsolation : IRequest<System.Data.IsolationLevel>;

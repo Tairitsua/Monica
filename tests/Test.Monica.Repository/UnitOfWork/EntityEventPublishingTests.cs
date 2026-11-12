@@ -140,43 +140,37 @@ public sealed class EntityEventPublishingTests
     }
 
     [Fact]
-    public async Task Publish_WhenSerializationFailsAndCallerCatches_ShouldRollBackTheOperation()
+    public async Task Publish_WhenSerializationFailsAndCallerCatches_ShouldCommitOtherWork()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        Exception? original = null;
-        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        await app.ExecuteAsync(async scope =>
         {
-            scope.Resolve<TestRepositoryDbContext>().HardDeleteRows.Add(new HardDeleteRow { Title = "must roll back" });
-            original = await Assert.ThrowsAnyAsync<Exception>(() => scope.Resolve<IDistributedEventBus>()
+            scope.Resolve<TestRepositoryDbContext>().HardDeleteRows.Add(new HardDeleteRow { Title = "handled publication failure" });
+            await Assert.ThrowsAnyAsync<Exception>(() => scope.Resolve<IDistributedEventBus>()
                 .PublishAsync(new UnserializableNotice(() => { }), cancellationToken: Token));
-        }, cancellationToken: Token));
-        Assert.Same(original, rollback.InnerException);
-        Assert.Equal("Outbox", rollback.FirstFailure.Source);
+        }, cancellationToken: Token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
         {
-            Assert.Empty(await db.HardDeleteRows.ToListAsync(ct));
+            Assert.Single(await db.HardDeleteRows.ToListAsync(ct));
             Assert.Empty(await db.Set<OutboxMessage>().ToListAsync(ct));
         }, Token);
     }
 
     [Fact]
-    public async Task Publish_WhenCanceledAndCallerCatches_ShouldRollBackTheOperation()
+    public async Task Publish_WhenCanceledAndCallerCatches_ShouldCommitOtherWork()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         using var canceled = new CancellationTokenSource();
         await canceled.CancelAsync();
-        Exception? original = null;
-        var rollback = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => app.ExecuteAsync(async scope =>
+        await app.ExecuteAsync(async scope =>
         {
-            scope.Resolve<TestRepositoryDbContext>().HardDeleteRows.Add(new HardDeleteRow { Title = "must roll back" });
-            original = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scope.Resolve<IDistributedEventBus>()
+            scope.Resolve<TestRepositoryDbContext>().HardDeleteRows.Add(new HardDeleteRow { Title = "handled publication failure" });
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scope.Resolve<IDistributedEventBus>()
                 .PublishAsync(new IntegrationNotice("canceled"), cancellationToken: canceled.Token));
-        }, cancellationToken: Token));
-        Assert.Same(original, rollback.InnerException);
-        Assert.Equal("Outbox", rollback.FirstFailure.Source);
+        }, cancellationToken: Token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
         {
-            Assert.Empty(await db.HardDeleteRows.ToListAsync(ct));
+            Assert.Single(await db.HardDeleteRows.ToListAsync(ct));
             Assert.Empty(await db.Set<OutboxMessage>().ToListAsync(ct));
         }, Token);
     }

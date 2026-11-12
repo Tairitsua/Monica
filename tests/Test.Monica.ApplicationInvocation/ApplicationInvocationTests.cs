@@ -74,20 +74,17 @@ public sealed class ApplicationInvocationTests
             host.Services.GetRequiredService<AuthorityChoice>().Destination = new ApplicationInvocationDestination("remote", "primary");
         await using var scope = host.CreateScope(token);
         var manager = scope.Resolve<IUnitOfWorkManager>();
-        var exception = await Assert.ThrowsAsync<TransactionRollbackOnlyException>(() => manager.RunAsync(async () =>
+        await manager.RunAsync(async () =>
         {
-            scope.Resolve<OrderingContext>().Orders.Add(new StoredOrder { Name = "must roll back" });
+            scope.Resolve<OrderingContext>().Orders.Add(new StoredOrder { Name = "handled routing rejection" });
             var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Resolve<IApplicationApiInvoker>()
                 .InvokeAsync(new CommandConstrained(9), RequiredEndpoint, token));
             Assert.Contains("Independent", rejected.Message);
-            Assert.Same(rejected, manager.Current!.FirstFailure!.Exception);
-        }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token));
-        Assert.Contains("rollback-only", exception.Message);
-        Assert.Equal(typeof(CommandConstrained).FullName, exception.FirstFailure.Operation);
-        Assert.Equal("ApiInvocation", exception.FirstFailure.Source);
+            Assert.Null(manager.Current!.FirstFailure);
+        }, new UnitOfWorkScopeOptions([typeof(OrderingContext)]), token);
         Assert.Empty(host.Services.GetRequiredService<RecordingTransport>().Calls);
         Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().ConstrainedCalls);
-        await host.VerifyAsync<OrderingContext>(async (db, ct) => Assert.Empty(await db.Orders.ToListAsync(ct)), token);
+        await host.VerifyAsync<OrderingContext>(async (db, ct) => Assert.Single(await db.Orders.ToListAsync(ct)), token);
     }
 
     [Theory]
