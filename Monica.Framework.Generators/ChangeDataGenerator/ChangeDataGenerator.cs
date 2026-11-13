@@ -4,16 +4,16 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace Monica.Framework.Generators.ChangeItemGenerator;
+namespace Monica.Framework.Generators.ChangeDataGenerator;
 
 /// <summary>
 /// Change-item data source generator.
 /// Automatically generates the change-item data class and Apply method for each tracked entity.
 /// </summary>
 [Generator]
-public class ChangeItemDataGenerator : IIncrementalGenerator
+public class ChangeDataGenerator : IIncrementalGenerator
 {
-    private const string GenerateChangeItemDataAttributeName = "Monica.Framework.ChangeTracking.Annotations.GenerateChangeItemDataAttribute";
+    private const string GenerateChangeItemDataAttributeName = "Monica.Framework.ChangeTracking.Annotations.GenerateChangeDataAttribute";
     private const string ChangeTrackedEntityInterfaceName = "Monica.Framework.ChangeTracking.Abstractions.IChangeTrackedEntity";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -169,7 +169,7 @@ public class ChangeItemDataGenerator : IIncrementalGenerator
             entityInfo.IncludeDebugInfo);
 
         // Add generated source files
-        var fileName = $"{entityInfo.CustomClassName ?? $"{entitySymbol.Name}ChangeItemDataGen"}.g.cs";
+        var fileName = $"{entityInfo.CustomClassName ?? $"{entitySymbol.Name}ChangeDataGen"}.g.cs";
         context.AddSource(fileName, generatedCode);
     }
 

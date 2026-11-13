@@ -4,7 +4,7 @@ namespace Monica.Framework.ChangeTracking.Annotations;
 /// Used to configure the property behavior when ChangeItemData is generated
 /// </summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-public sealed class ChangeItemPropertyAttribute : Attribute
+public sealed class ChangeEntryPropertyAttribute : Attribute
 {
     /// <summary>
     /// Whether to ignore this attribute and not generate it in ChangeItemData

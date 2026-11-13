@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
-namespace Monica.Framework.Generators.ChangeItemGenerator;
+namespace Monica.Framework.Generators.ChangeDataGenerator;
 
 /// <summary>
 /// Entity analyzer, used to analyze entity classes and their properties
@@ -15,7 +15,7 @@ internal class EntityAnalyzer(Compilation compilation, CancellationToken cancell
     private static readonly string[] IgnoredPropertyNames = ["Id", "ExtraProperties", "ConcurrencyStamp"];
 
     private readonly INamedTypeSymbol? _ownedAttributeSymbol = compilation.GetTypeByMetadataName("Microsoft.EntityFrameworkCore.OwnedAttribute");
-    private readonly INamedTypeSymbol? _changeItemPropertyAttributeSymbol = compilation.GetTypeByMetadataName("Monica.Framework.ChangeTracking.Annotations.ChangeItemPropertyAttribute");
+    private readonly INamedTypeSymbol? _changeItemPropertyAttributeSymbol = compilation.GetTypeByMetadataName("Monica.Framework.ChangeTracking.Annotations.ChangeEntryPropertyAttribute");
     private readonly INamedTypeSymbol? _notMappedAttributeSymbol = compilation.GetTypeByMetadataName("System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute");
     private readonly INamedTypeSymbol? _jsonIgnoreAttributeSymbol = compilation.GetTypeByMetadataName("System.Text.Json.Serialization.JsonIgnoreAttribute");
     private readonly INamedTypeSymbol? _dateTimeSymbol = compilation.GetTypeByMetadataName("System.DateTime");

@@ -8,7 +8,7 @@ using Monica.Tool.Extensions;
 namespace Monica.Framework.ChangeTracking.Models;
 
 
-public interface IChangeItem
+public interface IChangeEntry
 {
     static readonly JsonSerializerOptions ALTER_ITEM_SERIALIZER_OPTIONS = new()
     {
@@ -17,7 +17,7 @@ public interface IChangeItem
     };
 }
 
-public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : IChangeItem where TChangeItemData : class, IChangeItemData<TTargetEntity>, new() where TTargetEntity : class, IChangeTrackedEntity where TEnumAlterSource:Enum
+public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : IChangeEntry where TChangeItemData : class, IChangeData<TTargetEntity>, new() where TTargetEntity : class, IChangeTrackedEntity where TEnumAlterSource:Enum
 {
     private const string EmptyValuePlaceholder = "[空值]";
 
@@ -27,9 +27,15 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     public string Id { get; set; }
 
 
-    #region 变更项
+    #region Change data
 
-    public string DataJson { get; set; } = null!;
+    private string _dataJson = "{}";
+    /// <summary>The serialized accepted change; replacing it invalidates the parsed data.</summary>
+    public string DataJson
+    {
+        get => _dataJson;
+        set { _dataJson = value; _data = null; }
+    }
     private TChangeItemData? _data;
 
 
@@ -37,7 +43,8 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     [JsonIgnore]
     public TChangeItemData Data
     {
-        get => _data ??= JsonSerializer.Deserialize<TChangeItemData>(DataJson, IChangeItem.ALTER_ITEM_SERIALIZER_OPTIONS)!;
+        get => _data ??= JsonSerializer.Deserialize<TChangeItemData>(DataJson, IChangeEntry.ALTER_ITEM_SERIALIZER_OPTIONS)
+            ?? throw new InvalidOperationException("The accepted change data is null.");
         set
         {
             _data = value;
@@ -50,16 +57,20 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     /// </summary>
     public void RefreshDataJson()
     {
-        DataJson = JsonSerializer.Serialize(_data, IChangeItem.ALTER_ITEM_SERIALIZER_OPTIONS);
+        if (_data is not null) _dataJson = JsonSerializer.Serialize(_data, IChangeEntry.ALTER_ITEM_SERIALIZER_OPTIONS);
     }
 
     #endregion
 
-    #region 回滚操作
+    #region Rollback
     /// <summary>
     /// Target rollback ID
     /// </summary>
     public List<string>? TargetRollbackIds { get; set; }
+
+    /// <summary>Whether this entry rolls back a nonempty set of accepted changes.</summary>
+    [NotMapped, JsonIgnore]
+    public bool IsRollback => TargetRollbackIds is { Count: > 0 };
 
     /// <summary>
     /// Whether it has been rolled back (invalidation flag)
@@ -101,6 +112,17 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     [JsonIgnore]
     public DateTime OrderTime => (ActualEffectTime ?? AlterTime).AddMicroseconds(OffsetAdjust);
 
+    /// <summary>Preserves the exact ordering time when a transport rounds display timestamps.</summary>
+    /// <remarks>Set once when accepting an entry. Null derives the time from the original timestamp and adjustment.</remarks>
+    public long? SortTimeTicks { get; set; }
+
+    /// <summary>Frozen legacy document position, or null for new entries ordered by stable identity.</summary>
+    public long? HistoricalOrder { get; set; }
+
+    /// <summary>The complete business ordering key; independent of database commit order.</summary>
+    [NotMapped, JsonIgnore]
+    public ChangeOrderKey OrderKey => new(SortTimeTicks ?? OrderTime.Ticks, HistoricalOrder, Id);
+
     /// <summary>
     /// Fine-tune modification time to solve extreme situations such as duplication of change operation time
     /// </summary>
@@ -127,10 +149,11 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     /// <summary>
     /// Change related operation source group ID, which can be used to roll back by affected group
     /// </summary>
-    public List<string>? RelatedSourceId { get; set; }
+    [JsonPropertyName("RelatedSourceId")]
+    public List<string>? RelatedSourceIds { get; set; }
     #endregion
 
-    public ChangeItem(string id, TEnumAlterSource source, DateTime alterTime, TChangeItemData data, string? sourceId, string? sourceInfo = null)
+    public ChangeEntry(string id, TEnumAlterSource source, DateTime alterTime, TChangeItemData data, string? sourceId, string? sourceInfo = null)
     {
         Id = id;
         Source = source;
@@ -141,13 +164,13 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
         SourceInfo = sourceInfo;
     }
 
-    public ChangeItem(string id, TEnumAlterSource source, DateTime alterTime, List<string> targetRollbackIds, string? sourceId, string? sourceInfo = null)
+    public ChangeEntry(string id, TEnumAlterSource source, DateTime alterTime, List<string> targetRollbackIds, string? sourceId, string? sourceInfo = null)
         : this(id, source, alterTime, new TChangeItemData(), sourceId, sourceInfo)
     {
         TargetRollbackIds = targetRollbackIds;
     }
 
-    protected ChangeItem()
+    protected ChangeEntry()
     {
         Id = "";
     }
@@ -157,7 +180,7 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     /// </summary>
     public TTargetEntity ApplyAlter(TTargetEntity entity)
     {
-        if (IsInvalid || TargetRollbackIds is not null) return entity;
+        if (IsInvalid || IsRollback) return entity;
         Data.Apply(entity);
         return entity;
     }
@@ -170,7 +193,7 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     public List<ChangeRecord> GetChangesFromPreviousStatus(TTargetEntity previousStatus)
     {
         var list = new List<ChangeRecord>();
-        if (TargetRollbackIds is not null)
+        if (IsRollback)
         {
             list.AddIfNotNull(new ChangeRecord()
             {
@@ -275,7 +298,7 @@ public class ChangeItem<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICha
     public override string ToString()
     {
         string data;
-        if (TargetRollbackIds is not null)
+        if (IsRollback)
         {
             data = $"回滚修改{TargetRollbackIds.StringJoin(",")}";
         }

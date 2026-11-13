@@ -59,7 +59,7 @@ public sealed class ChangeChainLookupTests
     }
 
     private sealed class TestAlterItem
-        : ChangeItem<TestEntity, TestChangeItemData, TestAlterSource>
+        : ChangeEntry<TestEntity, TestChangeItemData, TestAlterSource>
     {
         public TestAlterItem()
         {
@@ -71,7 +71,7 @@ public sealed class ChangeChainLookupTests
         }
     }
 
-    private sealed class TestChangeItemData : IChangeItemData<TestEntity>
+    private sealed class TestChangeItemData : IChangeData<TestEntity>
     {
         public string? Value { get; set; }
 

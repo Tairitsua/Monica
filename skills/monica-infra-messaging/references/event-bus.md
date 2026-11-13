@@ -10,6 +10,8 @@ Composition may expose a concrete closed generic handler, such as `services.AddS
 
 EventBus execution defaults to an automatic UnitOfWork when that behavior is registered. Put any `ExecutionTransactionAttribute` override or context selection on the concrete `HandleEventAsync` method, following the persistence [transaction contract](../../monica-infra-persistence/references/transactions.md).
 
+For an application-owned retry in a new execution scope, `EventDeliveryExecutionFeature` carries the original incoming metadata to Inbox without changing transport acknowledgment or `IEventDeliveryContext`. Preserve the original source, message ID, and consumer; follow the [fresh-scope Inbox contract](../../monica-infra-persistence/references/transactional-events.md#inbox-and-timestamp-behavior).
+
 For example, a discovered handler for `OrderApproved` uses the exact event type named by the publisher:
 
 ```csharp

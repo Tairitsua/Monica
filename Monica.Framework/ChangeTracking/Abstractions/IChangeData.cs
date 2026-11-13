@@ -1,6 +1,6 @@
 namespace Monica.Framework.ChangeTracking.Abstractions;
 
-public interface IChangeItemData<in TEntity> where TEntity : class, IChangeTrackedEntity
+public interface IChangeData<in TEntity> where TEntity : class, IChangeTrackedEntity
 {
     /// <summary>
     /// Apply current changes
@@ -22,7 +22,7 @@ public interface IChangeItemData<in TEntity> where TEntity : class, IChangeTrack
 public class PropertyChange
 {
     /// <summary>
-    /// Change display name. The Title of ChangeItemPropertyAttribute is used first; otherwise PropertyName is used.
+    /// Change display name. The Title of ChangeEntryPropertyAttribute is used first; otherwise PropertyName is used.
     /// </summary>
     public required string DisplayName { get; set; }
     /// <summary>

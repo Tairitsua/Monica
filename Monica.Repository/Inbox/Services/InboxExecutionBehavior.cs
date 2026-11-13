@@ -41,7 +41,8 @@ public sealed class InboxExecutionBehavior<TInput, TResult>(
             return batch.Metadata.Count == 0 ? (TResult)(object)ExecutionUnit.Value : await next();
         }
 
-        var metadata = delivery.Current;
+        var metadata = context.Features.TryGet<EventDeliveryExecutionFeature>(out var forwarded)
+            ? forwarded.Metadata : delivery.Current;
         if (metadata is null || string.IsNullOrWhiteSpace(metadata.MessageId) || string.IsNullOrWhiteSpace(metadata.Source))
             throw new InvalidOperationException($"Inbox handler '{descriptor.ComponentType}' requires stable incoming source and message identity.");
         var db = unitOfWork.RequireInboxOwner();

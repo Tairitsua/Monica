@@ -4,7 +4,7 @@ namespace Monica.Framework.ChangeTracking.Annotations;
 /// Marking entity classes requires generating the corresponding ChangeItemData class and Apply method
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-public sealed class GenerateChangeItemDataAttribute : Attribute
+public sealed class GenerateChangeDataAttribute : Attribute
 {
     /// <summary>
     /// The namespace of the generated ChangeItemData class. If not specified, the namespace of the entity class is used.

@@ -9,7 +9,7 @@ namespace Monica.Framework.ChangeTracking.Models;
 /// <param name="CurrentValue"></param>
 /// <param name="RelatedAlterItem"></param>
 public record PropertyHistory<TAlterItem>(object? BeforeValue, object? CurrentValue, TAlterItem? RelatedAlterItem)
-    where TAlterItem : IChangeItem
+    where TAlterItem : IChangeEntry
 {
     /// <summary>
     /// is the initial value

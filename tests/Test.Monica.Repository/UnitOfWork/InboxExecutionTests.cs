@@ -13,12 +13,55 @@ using Monica.Testing.Hosting;
 using Test.Monica.Repository.Hosting;
 using Test.Monica.Repository.Persistence;
 using Xunit;
+using Monica.Core.Execution;
+using Monica.EventBus;
+using Monica.Repository.UnitOfWork.Models;
 
 namespace Test.Monica.Repository.UnitOfWork;
 
 public sealed class InboxExecutionTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task ForwardedIdentity_ShouldKeepReceiptAtomicAcrossFreshApplicationScopes()
+    {
+        await using var app = await new RepositoryScenarioFactory(inbox: true).CreateAsync(cancellationToken: Token);
+        var message = await PrepareAsync(app);
+        var descriptor = ExecutionDescriptor.ForMethod<InboxNotice, ExecutionUnit>(EventBusExecutionPoints.DistributedHandler,
+            typeof(FirstInboxHandler), typeof(FirstInboxHandler).GetMethod(nameof(FirstInboxHandler.HandleEventAsync)),
+            true, ExecutionTransactionMode.Automatic);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await using var scope = app.CreateScope(Token);
+            Assert.Null(scope.Resolve<IEventDeliveryContext>().Current);
+            var handler = scope.Resolve<FirstInboxHandler>();
+            var db = scope.Resolve<TestRepositoryDbContext>();
+            var features = new ExecutionFeatureCollection();
+            features.Set(new UnitOfWorkScopeOptions([typeof(TestRepositoryDbContext)]));
+            features.Set(new EventDeliveryExecutionFeature(message.Metadata));
+            var currentAttempt = attempt;
+            Task Execute() => scope.Resolve<IExecutionPipeline>().ExecuteAsync(descriptor, new InboxNotice("forwarded"), handler,
+                async () =>
+                {
+                    await handler.HandleEventAsync(new InboxNotice("forwarded"), Token);
+                    if (currentAttempt == 0)
+                    {
+                        await db.SaveChangesAsync(Token);
+                        throw new InvalidOperationException("Roll back the first attempt.");
+                    }
+                }, Token, features);
+            if (attempt == 0) await Assert.ThrowsAsync<InvalidOperationException>(Execute);
+            else await Execute();
+        }
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            Assert.Single(await db.HardDeleteRows.ToListAsync(ct));
+            var receipt = Assert.Single(await db.Set<InboxReceipt>().ToListAsync(ct));
+            Assert.Equal(message.Metadata.MessageId, receipt.MessageId);
+            Assert.Equal(message.Metadata.Source, receipt.Source);
+        }, Token);
+    }
 
     [Fact]
     public async Task ManualTestDelivery_PreservesInboxDeduplicationAndSelectedConsumerBoundary()
