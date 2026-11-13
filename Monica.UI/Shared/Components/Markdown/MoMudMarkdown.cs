@@ -21,8 +21,8 @@ public class MoMudMarkdown : MudMarkdown
     [Parameter]
     public bool EnableMermaid { get; set; } = true;
 
-    /// <summary>Host-owned flowchart aliases and accessible labels.</summary>
-    [Parameter] public IReadOnlyDictionary<string, string>? MermaidNodes { get; set; }
+    /// <summary>Host-owned flowchart aliases, accessible labels and trusted kind icons.</summary>
+    [Parameter] public IReadOnlyDictionary<string, MoMermaidNode>? MermaidNodes { get; set; }
 
     /// <summary>Activates a host-owned diagram node without evaluating authored JavaScript.</summary>
     [Parameter] public EventCallback<string> MermaidNodeActivated { get; set; }
@@ -164,6 +164,22 @@ public class MoMudMarkdown : MudMarkdown
 
     protected override void RenderCodeBlock(in RenderTreeBuilder builder, ref int elementIndex, in CodeBlock code, in string? info)
     {
+        if (EnableMermaid && string.Equals(info?.Trim(), "mermaid-tabs", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.OpenComponent<MoMarkdownMermaidViews>(0);
+            builder.AddComponentParameter(1, nameof(MoMarkdownMermaidViews.Definition), CreateCodeBlockText(code));
+            builder.AddComponentParameter(2, nameof(MoMarkdownMermaidViews.Nodes), MermaidNodes);
+            builder.AddComponentParameter(3, nameof(MoMarkdownMermaidViews.NodeActivated), MermaidNodeActivated);
+            builder.AddComponentParameter(4, nameof(MoMarkdownMermaidViews.MarkdownPipeline), MarkdownPipeline);
+            builder.AddComponentParameter(5, nameof(MoMarkdownMermaidViews.Props), Props);
+            builder.AddComponentParameter(6, nameof(MoMarkdownMermaidViews.Styling), Styling);
+            builder.AddComponentParameter(7, nameof(MoMarkdownMermaidViews.LinkTemplate), LinkTemplate);
+            builder.AddComponentParameter(8, nameof(MoMarkdownMermaidViews.EnableCodeCopy), EnableCodeCopy);
+            builder.CloseComponent();
+            elementIndex += 2;
+            return;
+        }
+
         if (EnableMermaid && string.Equals(info?.Trim(), "mermaid", StringComparison.OrdinalIgnoreCase))
         {
             builder.OpenComponent<MoMarkdownMermaidBlock>(0);

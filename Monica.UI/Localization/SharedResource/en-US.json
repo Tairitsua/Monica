@@ -209,6 +209,18 @@
     "CopyFailed": "Could not copy. Select the code and copy it manually.",
     "Mermaid": {
       "Rendering": "Rendering diagram…",
+      "Legend": "Diagram legend",
+      "Roles": {
+        "persistent": "Persistent state",
+        "process": "Processing",
+        "external": "External participant"
+      },
+      "Views": {
+        "Label": "Diagram views",
+        "StructureError": "Start each view with a plain ## title, followed by a Mermaid diagram and optional explanation.",
+        "DiagramError": "Each view must contain exactly one nonempty Mermaid code block immediately after its title.",
+        "DuplicateTitle": "Give each diagram view a unique title."
+      },
       "Open": "Open diagram in immersive reader",
       "Expand": "Expand",
       "Title": "Diagram reader",

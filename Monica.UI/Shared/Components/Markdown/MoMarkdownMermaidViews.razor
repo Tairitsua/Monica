@@ -1,0 +1,67 @@
+@using Markdig
+@inject IStringLocalizer<SharedResource> L
+
+<section class="mo-mermaid-views" aria-label="@L["Markdown:Mermaid:Views:Label"]">
+    @if (_parsed.Error != MoMermaidViewError.None)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">@ErrorMessage</MudAlert>
+    }
+    else
+    {
+        <MudTabs ActivePanelIndex="_activeIndex" ActivePanelIndexChanged="SelectView" KeepPanelsAlive="false"
+                 Elevation="0" Rounded="false" MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+            @foreach (var view in _parsed.Views)
+            {
+                <MudTabPanel @key="view" Text="@view.Title">
+                    <MoMarkdownMermaidBlock Definition="@view.Definition" Title="@view.Title" Nodes="Nodes" NodeActivated="NodeActivated" />
+                    @if (!string.IsNullOrWhiteSpace(view.Description))
+                    {
+                        <div class="mo-mermaid-view__description">
+                            <MoMudMarkdown Value="@view.Description" MarkdownPipeline="MarkdownPipeline" Props="Props" Styling="Styling"
+                                           EnableCodeCopy="EnableCodeCopy" LinkTemplate="LinkTemplate" EnableMermaid="false" />
+                        </div>
+                    }
+                </MudTabPanel>
+            }
+        </MudTabs>
+    }
+</section>
+
+@code {
+    /// <summary>Named Markdown views: each ## heading precedes one Mermaid fence and optional explanatory Markdown.</summary>
+    [Parameter, EditorRequired] public string Definition { get; set; } = string.Empty;
+    /// <summary>Trusted node presentation shared across views; each diagram uses only its own aliases.</summary>
+    [Parameter] public IReadOnlyDictionary<string, MoMermaidNode>? Nodes { get; set; }
+    /// <summary>Host-owned node navigation, shared with the inline and immersive diagrams.</summary>
+    [Parameter] public EventCallback<string> NodeActivated { get; set; }
+    /// <summary>Inherits the embedding reader's parser policy, including its raw HTML policy.</summary>
+    [Parameter] public MarkdownPipeline? MarkdownPipeline { get; set; }
+    /// <summary>Inherits link and asset resolution from the embedding reader.</summary>
+    [Parameter] public MudMarkdownProps? Props { get; set; }
+    /// <summary>Inherits the embedding reader's Markdown typography.</summary>
+    [Parameter] public MudMarkdownStyling? Styling { get; set; }
+    /// <summary>Inherits the embedding reader's trusted reference-link template.</summary>
+    [Parameter] public Func<MoMarkdownLink, RenderFragment?>? LinkTemplate { get; set; }
+    /// <summary>Enables path copying in view descriptions. Defaults to true.</summary>
+    [Parameter] public bool EnableCodeCopy { get; set; } = true;
+
+    private string? _lastDefinition;
+    private int _activeIndex;
+    private MoMermaidViewParseResult _parsed = new([], MoMermaidViewError.None);
+    private string ErrorMessage => _parsed.Error switch
+    {
+        MoMermaidViewError.Diagram => L["Markdown:Mermaid:Views:DiagramError"],
+        MoMermaidViewError.DuplicateTitle => L["Markdown:Mermaid:Views:DuplicateTitle"],
+        _ => L["Markdown:Mermaid:Views:StructureError"]
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (_lastDefinition == Definition) return;
+        _lastDefinition = Definition;
+        _parsed = MoMermaidViewParser.Parse(Definition);
+        _activeIndex = 0;
+    }
+
+    private void SelectView(int index) => _activeIndex = index;
+}

@@ -35,7 +35,7 @@ Use `MoMarkdown` from `Monica.UI.Shared.Components.Markdown` inside a product pa
 }
 ````
 
-`EnableMermaid` defaults to `true`: a `mermaid` fenced block renders with the packaged local Mermaid runtime and the active Monica theme. Setting it to `false` retains ordinary fenced-code rendering. Every successfully rendered diagram includes a shared immersive reader. Click the diagram or its expand control, or focus the diagram and press Enter or Space. Authored links inside the SVG keep their own navigation.
+`EnableMermaid` defaults to `true`: a `mermaid` fenced block renders with the packaged local Mermaid runtime and the active Monica theme. Use [named diagram views](mermaid-views.md) for tabs, synchronized explanations, semantic node styles and generated legends. Setting `EnableMermaid` to `false` retains ordinary fenced-code rendering for both `mermaid` and `mermaid-tabs`. Every successfully rendered diagram includes a shared immersive reader. Click the diagram or its expand control, or focus the diagram and press Enter or Space. Authored links inside the SVG keep their own navigation.
 
 The reader fills the available viewport and supports:
 
@@ -53,7 +53,7 @@ The reader reuses the existing strict-rendered SVG; opening, panning and zooming
 
 ### Open application details from flowchart nodes
 
-Pass `MermaidNodes` (diagram-local ASCII alias to accessible label) and `MermaidNodeActivated` (an `EventCallback<string>`) to `MoMarkdown`. For `Order["Order entity"]`, a binding such as `new Dictionary<string, string> { ["Order"] = "Open Order design" }` makes that node a keyboard-accessible button. Resolve the returned alias against the application-owned binding map, not the visible label. The same binding works in the immersive reader; activating there closes that reader before the application opens its detail view. The adjacent product list should remain an accessible alternative.
+Pass `MermaidNodes` (diagram-local ASCII alias to `MoMermaidNode`) and `MermaidNodeActivated` (an `EventCallback<string>`) to `MoMarkdown`. For `Order["Order entity"]`, a binding such as `new Dictionary<string, MoMermaidNode> { ["Order"] = new("Open Order design", MoIcons.Layers, "Entity") }` supplies the accessible name, optional trusted icon and optional kind tooltip. The callback makes bound nodes keyboard-accessible buttons. Icons and tooltips also work without a callback. This replaces string-valued bindings; migrate consumers to the typed record. Resolve the returned alias against the application-owned binding map, not the visible label. The same binding works across named views and in the immersive reader; activating there closes that reader before the application opens its detail view. The adjacent product list should remain an accessible alternative.
 
 Only flowchart aliases beginning with a letter and containing letters, digits or underscores are bound. Unknown nodes remain ordinary diagram content. Bindings are explicit consumer input and checked again before invoking .NET. Mermaid keeps `securityLevel: strict`; do not enable loose security or author `click` callbacks in Markdown. The diagram component owns delegated listeners and its .NET callback target through rerenders, theme changes and disposal; consumers need no global JavaScript callback.
 

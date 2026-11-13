@@ -19,7 +19,7 @@
     <div class="mo-markdown-mermaid-frame">
         <div @ref="_containerRef"
              class="mo-markdown-mermaid-surface @(!_diagramReady ? "is-pending" : null)"
-             role="@(Nodes?.Count > 0 ? "group" : "button")" tabindex="@(_diagramReady && Nodes?.Count is not > 0 ? "0" : "-1")"
+             role="@(HasNodeActions ? "group" : "button")" tabindex="@(_diagramReady && !HasNodeActions ? "0" : "-1")"
              aria-disabled="@(_diagramReady ? "false" : "true")"
              aria-label="@L["Markdown:Mermaid:Open"]" aria-haspopup="dialog"></div>
         @if (_diagramReady)
@@ -30,10 +30,14 @@
             </button>
         }
     </div>
+    @if (_diagramReady && _roles.Length > 0)
+    {
+        @Legend
+    }
 
     <dialog @ref="_dialogRef" class="mo-mermaid-reader" aria-labelledby="@_titleId" aria-describedby="@_hintId" data-markdown-search-ignore="true">
         <header class="mo-mermaid-reader__header">
-            <div class="mo-mermaid-reader__identity"><MoIcon Icon="@MoIcons.Maximize" Size="19px" /><span class="mo-mermaid-reader__title" id="@_titleId">@L["Markdown:Mermaid:Title"]</span></div>
+            <div class="mo-mermaid-reader__identity"><MoIcon Icon="@MoIcons.Maximize" Size="19px" /><span class="mo-mermaid-reader__title" id="@_titleId">@(Title ?? L["Markdown:Mermaid:Title"])</span></div>
             <div class="mo-mermaid-reader__tools" role="group" aria-label="@L["Markdown:Mermaid:Controls"]">
                 <button type="button" data-mo-mermaid-action="out" title="@L["Markdown:Mermaid:ZoomOut"]" aria-label="@L["Markdown:Mermaid:ZoomOut"]"><MoIcon Icon="@MoIcons.ZoomOut" Size="18px" /></button>
                 <output data-mo-mermaid-zoom aria-label="@L["Markdown:Mermaid:ZoomLevel"]" aria-live="polite">100%</output>
@@ -48,6 +52,7 @@
         <div class="mo-mermaid-reader__viewport" data-mo-mermaid-viewport tabindex="0" role="region" aria-label="@L["Markdown:Mermaid:Canvas"]" aria-describedby="@_hintId">
             <div class="mo-mermaid-reader__canvas" data-mo-mermaid-canvas></div>
         </div>
+        @if (_roles.Length > 0) { @Legend }
         <footer class="mo-mermaid-reader__footer" id="@_hintId"><MoIcon Icon="@MoIcons.Focus" Size="15px" /><span>@L["Markdown:Mermaid:Hint"]</span></footer>
     </dialog>
 </div>
@@ -57,8 +62,11 @@
     [Parameter, EditorRequired]
     public string Definition { get; set; } = string.Empty;
 
-    /// <summary>Validated flowchart aliases and accessible labels, provided by the embedding application.</summary>
-    [Parameter] public IReadOnlyDictionary<string, string>? Nodes { get; set; }
+    /// <summary>Optional view title, also displayed in the immersive reader.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Validated flowchart aliases and trusted presentation, provided by the embedding application.</summary>
+    [Parameter] public IReadOnlyDictionary<string, MoMermaidNode>? Nodes { get; set; }
 
     /// <summary>Host-owned navigation for a configured alias. The same callback works in the immersive reader.</summary>
     [Parameter] public EventCallback<string> NodeActivated { get; set; }
@@ -76,13 +84,20 @@
     private long _requestedVersion;
     private long _renderedVersion = -1;
     private bool _diagramReady, _disposed;
+    private string[] _roles = [];
+    private bool HasNodeActions => NodeActivated.HasDelegate && Nodes?.Count > 0;
+    private RenderFragment Legend => @<div class="mo-mermaid-legend" role="list" aria-label="@L["Markdown:Mermaid:Legend"]">
+        @foreach (var role in _roles)
+        {
+            <span role="listitem"><i class="mo-mermaid-legend__swatch mo-mermaid-legend__swatch--@role" aria-hidden="true"></i>@L[$"Markdown:Mermaid:Roles:{role}"]</span>
+        }
+    </div>;
 
     protected override void OnInitialized() => ThemeService.OnThemeChanged += OnThemeChanged;
 
     protected override void OnParametersSet()
     {
-        var nodes = NodeActivated.HasDelegate && Nodes is not null
-            ? string.Join('\n', Nodes.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}\0{pair.Value}")) : string.Empty;
+        var nodes = System.Text.Json.JsonSerializer.Serialize(new { Nodes, Interactive = NodeActivated.HasDelegate });
         if (string.Equals(_lastDefinition, Definition, StringComparison.Ordinal) && _lastNodes == nodes) return;
         _lastNodes = nodes;
         _lastDefinition = Definition;
@@ -94,6 +109,7 @@
         _requestedVersion++;
         _diagramReady = false;
         _renderError = null;
+        _roles = [];
     }
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -138,9 +154,13 @@
                     throw;
                 }
                 if (_disposed) return;
-                var rendered = await controller.InvokeAsync<bool>("render", definition, BuildThemePayload(), NodeActivated.HasDelegate ? Nodes : null);
+                var rendered = await controller.InvokeAsync<MermaidRenderResult>("render", definition, BuildThemePayload(), Nodes, NodeActivated.HasDelegate);
                 if (_disposed) return;
-                if (version == _requestedVersion) _diagramReady = rendered;
+                if (version == _requestedVersion)
+                {
+                    _diagramReady = rendered.Rendered;
+                    _roles = rendered.Roles;
+                }
             }
             catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException)
             {
@@ -240,4 +260,6 @@
         MonicaThemeKind ThemeKind, bool IsDarkMode, string Primary, string Secondary,
         string Surface, string Background, string TextPrimary, string TextSecondary,
         string Info, string Success, string Warning, string Error, string[]? FontFamily);
+
+    private sealed record MermaidRenderResult(bool Rendered, string[] Roles);
 }

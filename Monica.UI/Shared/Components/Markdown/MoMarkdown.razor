@@ -51,7 +51,7 @@
     public bool EnableMermaid { get; set; } = true;
 
     /// <summary>Trusted flowchart node aliases mapped to accessible labels; authored callbacks remain disabled.</summary>
-    [Parameter] public IReadOnlyDictionary<string, string>? MermaidNodes { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, MoMermaidNode>? MermaidNodes { get; set; }
 
     /// <summary>Invoked only for an alias explicitly supplied through MermaidNodes.</summary>
     [Parameter] public EventCallback<string> MermaidNodeActivated { get; set; }

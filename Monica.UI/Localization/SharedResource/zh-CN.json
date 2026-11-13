@@ -209,6 +209,18 @@
     "CopyFailed": "复制失败，请选中代码手动复制。",
     "Mermaid": {
       "Rendering": "正在绘制图表…",
+      "Legend": "图例",
+      "Roles": {
+        "persistent": "持久状态",
+        "process": "处理与执行",
+        "external": "外部参与方"
+      },
+      "Views": {
+        "Label": "图表视图",
+        "StructureError": "每个视图以纯文本 ## 标题开始，随后放置 Mermaid 图表和可选的说明。",
+        "DiagramError": "每个视图的标题后必须紧接一个非空 Mermaid 代码块，且只能包含一个图表。",
+        "DuplicateTitle": "每个图表视图的标题必须唯一。"
+      },
       "Open": "沉浸式阅读图表",
       "Expand": "放大阅读",
       "Title": "图表阅读",

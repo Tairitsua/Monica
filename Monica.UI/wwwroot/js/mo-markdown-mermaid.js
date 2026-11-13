@@ -135,6 +135,14 @@ function createFlowchartConfig(config, theme) {
                 stroke: color-mix(in srgb, ${theme.primary} 30%, ${theme.surface});
                 stroke-width: 1px;
             }
+            .node.mo-persistent .label-container { fill: color-mix(in srgb, ${theme.success} 12%, ${theme.surface}); stroke: ${theme.success}; }
+            .node.mo-process .label-container { fill: color-mix(in srgb, ${theme.info} 9%, ${theme.surface}); stroke: color-mix(in srgb, ${theme.info} 65%, ${theme.surface}); }
+            .node.mo-external .label-container { fill: ${theme.surface}; stroke: ${theme.textSecondary}; stroke-dasharray: 5 4; }
+            .node .label-container { transition: fill 140ms ease, stroke 140ms ease, stroke-width 140ms ease; }
+            .node:hover .label-container, .node:focus-visible .label-container { stroke: ${theme.primary}; stroke-width: 2px; fill: color-mix(in srgb, ${theme.primary} 16%, ${theme.surface}); }
+            .node .mo-mermaid-kind-icon { color: ${theme.textSecondary}; pointer-events: none; }
+            .node.mo-persistent .mo-mermaid-kind-icon { color: ${theme.success}; }
+            @media (prefers-reduced-motion: reduce) { .node .label-container { transition: none; } }
             .edgeLabels text, .edgeLabels tspan { font-size: 13px; font-weight: 600; fill: ${theme.primary}; }
             .edgeLabel .label rect {
                 opacity: 1; rx: 13px; ry: 13px;
@@ -223,6 +231,45 @@ export async function renderMermaid(element, definition, theme, isCurrent = () =
     return true;
 }
 
+function isNodeAlias(alias) { return /^[A-Za-z][A-Za-z0-9_]*$/.test(alias); }
+
+function decorateNodes(surface, nodes, interactive) {
+    const svgNamespace = 'http://www.w3.org/2000/svg';
+    for (const node of surface.querySelectorAll('g.node')) {
+        const alias = Object.keys(nodes).find(key => isNodeAlias(key) && new RegExp(`^flowchart-${key}-\\d+$`).test(node.id));
+        if (!alias) continue;
+        const presentation = nodes[alias];
+        const label = [presentation.kind, presentation.label].filter(Boolean).join(' · ');
+        const title = document.createElementNS(svgNamespace, 'title');
+        title.textContent = label;
+        node.prepend(title);
+        node.setAttribute('aria-label', label);
+        if (interactive) {
+            node.dataset.moMermaidNode = alias;
+            node.setAttribute('tabindex', '0');
+            node.setAttribute('role', 'button');
+        }
+        const rectangle = node.querySelector('rect.label-container');
+        if (!presentation.icon || !rectangle) continue;
+        const bounds = rectangle.getBBox();
+        const icon = document.createElementNS(svgNamespace, 'svg');
+        icon.setAttribute('class', 'mo-mermaid-kind-icon');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('x', bounds.x + 8);
+        icon.setAttribute('y', bounds.y + 6);
+        icon.setAttribute('width', '16');
+        icon.setAttribute('height', '16');
+        icon.setAttribute('aria-hidden', 'true');
+        // This fragment comes exclusively from the host's MoIcons catalog, never from Markdown.
+        icon.innerHTML = presentation.icon;
+        node.append(icon);
+    }
+}
+
+function diagramRoles(surface) {
+    return ['persistent', 'process', 'external'].filter(role => surface.querySelector(`g.node.mo-${role}`));
+}
+
 function cloneDiagram(source) {
     const clone = source.cloneNode(true);
     const prefix = `${createDiagramId()}-reader-`;
@@ -287,17 +334,6 @@ export function connectReader(root, surface, dialog, nodeTarget = null) {
     }
     function active() { return !retired && root.isConnected; }
     function hasLink(target) { return target instanceof Element && Boolean(target.closest('a, [data-mo-mermaid-node]')); }
-    function decorateNodes() {
-        for (const node of surface.querySelectorAll('g.node')) {
-            const alias = Object.keys(nodeLabels).find(key => /^[A-Za-z][A-Za-z0-9_]*$/.test(key)
-                && new RegExp(`^flowchart-${key}-\\d+$`).test(node.id));
-            if (!alias) continue;
-            node.dataset.moMermaidNode = alias;
-            node.setAttribute('tabindex', '0');
-            node.setAttribute('role', 'button');
-            node.setAttribute('aria-label', nodeLabels[alias]);
-        }
-    }
     function activateNode(event) {
         const node = event.target.closest?.('[data-mo-mermaid-node]');
         const alias = node?.dataset.moMermaidNode;
@@ -509,18 +545,18 @@ export function connectReader(root, surface, dialog, nodeTarget = null) {
         // Do not close/remove/clear DOM here: this can run after the Blazor renderer removed it.
     }
     return {
-        async render(definition, theme, nodes = null) {
-            if (!active()) return false;
+        async render(definition, theme, nodes = null, interactive = false) {
+            if (!active()) return { rendered: false, roles: [] };
             const version = ++generation;
             const isCurrent = () => active() && version === generation;
             try {
                 const rendered = await renderMermaid(surface, definition, theme, isCurrent);
-                if (!isCurrent()) return false;
-                nodeLabels = nodes ?? {};
-                if (rendered) decorateNodes();
+                if (!isCurrent()) return { rendered: false, roles: [] };
+                nodeLabels = interactive ? nodes ?? {} : {};
+                if (rendered) decorateNodes(surface, nodes ?? {}, interactive);
                 if (!rendered) close();
                 else if (dialog.open) { refreshClone(); if (fitted) fit(); else paint(); }
-                return rendered;
+                return { rendered, roles: rendered ? diagramRoles(surface) : [] };
             } catch (error) {
                 if (isCurrent()) { surface.replaceChildren(); close(); }
                 throw error;

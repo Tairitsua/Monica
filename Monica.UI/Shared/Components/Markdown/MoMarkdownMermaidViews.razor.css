@@ -1,0 +1,10 @@
+.mo-mermaid-views { min-width: 0; margin: 24px 0; }
+.mo-mermaid-views ::deep .mud-tabs { min-width: 0; }
+.mo-mermaid-views ::deep .mud-tabs-panels { background: transparent; }
+.mo-mermaid-views ::deep .mud-tabs-tabbar { margin-bottom: 12px; }
+.mo-mermaid-views ::deep .mud-tab { text-transform: none; padding-inline: 16px; font-size: 13px; }
+.mo-mermaid-views ::deep .mo-markdown-mermaid-block { margin: 0; }
+.mo-mermaid-view__description { min-width: 0; margin-top: 18px; }
+.mo-mermaid-view__description ::deep .mud-markdown-body > ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 18px 28px; padding-left: 22px; }
+.mo-mermaid-view__description ::deep .mud-markdown-body > ol > li { padding-left: 3px; }
+.mo-mermaid-view__description ::deep .mud-markdown-body > ol > li::marker { color: var(--mud-palette-primary); font-weight: 600; }
