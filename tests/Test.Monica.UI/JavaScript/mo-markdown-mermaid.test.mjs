@@ -42,6 +42,8 @@ test('rendered diagrams fit their content when staging bounds are oversized or c
     let config;
     let boundElement;
     const mermaid = {
+        registerLayoutLoaders() {},
+        detectType() { return 'flowchart-v2'; },
         initialize(value) { config = value; },
         async render() { return { svg: '<svg></svg>', bindFunctions: element => { boundElement = element; } }; }
     };
@@ -72,7 +74,12 @@ test('rendered diagrams fit their content when staging bounds are oversized or c
 
 test('an empty or invalid measurement does not replace the renderer viewport', async () => {
     const previousWindow = globalThis.window;
-    globalThis.window = { mermaid: { initialize() {}, async render() { return { svg: '<svg></svg>' }; } } };
+    globalThis.window = { mermaid: {
+        registerLayoutLoaders() {},
+        detectType() { return 'flowchart-v2'; },
+        initialize() {},
+        async render() { return { svg: '<svg></svg>' }; }
+    } };
     try {
         for (const bounds of [{ x: 0, y: 0, width: 0, height: 0 }, { x: 0, y: 0, width: NaN, height: 50 }]) {
             const { element, attributes } = diagramSurface(bounds, '0 0 100 50');
@@ -91,6 +98,8 @@ test('retiring an in-flight render leaves the existing diagram and handlers unto
     let bound = false;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
+        registerLayoutLoaders() {},
+        detectType() { return 'flowchart-v2'; },
         initialize() {},
         async render() {
             started.resolve();
@@ -121,6 +130,8 @@ test('a retired queued request skips Mermaid without blocking following diagrams
     let current = true;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
+        registerLayoutLoaders() {},
+        detectType() { return 'flowchart-v2'; },
         initialize() {},
         async render(_, definition) {
             calls.push(definition);
@@ -160,6 +171,8 @@ test('each async diagram keeps its global theme and a failed render does not poi
     let rendering = false;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
+        registerLayoutLoaders() {},
+        detectType() { return 'flowchart-v2'; },
         initialize(config) {
             assert.equal(rendering, false, 'Another request must not reconfigure an in-flight diagram');
             activeColor = config.themeVariables.primaryColor;

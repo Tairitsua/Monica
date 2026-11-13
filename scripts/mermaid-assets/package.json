@@ -1,0 +1,12 @@
+{
+  "name": "monica-mermaid-assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@mermaid-js/layout-elk": "0.2.0",
+    "esbuild": "0.28.2"
+  }
+}

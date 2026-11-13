@@ -47,6 +47,8 @@ The reader fills the available viewport and supports:
 | Reset | 100% control or 0; restores the SVG's intrinsic size and centers it. |
 | Close | Close control, Escape, or the backdrop; restores focus to the connected opener. |
 
+Flowcharts use a locally bundled ELK layout by default, including nested subgraphs and feedback edges. Their nodes use compact semibold labels and rounded rectangular shapes, while decision diamonds and other authored shapes retain their meaning. Edge-label padding participates in layout, so the pill background has reserved space along the connector. Colors follow the active Monica palette in light and dark modes. Other diagram types keep their Mermaid layout defaults. The renderer and ELK assets load from Monica.UI static content and work without a CDN.
+
 The reader reuses the existing strict-rendered SVG; opening, panning and zooming do not rerun Mermaid or change the Markdown source. Generated reader controls and the cloned diagram stay outside the document outline and search-highlight text. Theme changes refresh its diagram from the newly rendered themed SVG. Invalid or empty definitions retain the inline renderer's existing error/empty behavior and provide no diagram to inspect. The reader works in embedded Markdown, document pages and reference drawers without a consumer-owned dialog, zoom controller or additional provider registration. Keep the page or document owner responsible for loading Markdown; the diagram component owns its browser listeners and observers and retires them when removed.
 
 ### Open application details from flowchart nodes

@@ -1,5 +1,16 @@
 let mermaidLoadPromise;
 let renderQueue = Promise.resolve();
+const configuredRuntimes = new WeakSet();
+
+function registerFlowchartLayout(mermaid) {
+    if (configuredRuntimes.has(mermaid)) return;
+    mermaid.registerLayoutLoaders([{
+        name: 'monica-flowchart',
+        algorithm: 'elk.layered',
+        loader: () => import('./mo-markdown-mermaid-flowchart.js')
+    }]);
+    configuredRuntimes.add(mermaid);
+}
 
 function getMermaidSource() {
     return '/_content/Monica.UI/lib/mermaid/mermaid.min.js';
@@ -112,6 +123,30 @@ function createConfig(theme) {
     };
 }
 
+function createFlowchartConfig(config, theme) {
+    return {
+        ...config,
+        layout: 'monica-flowchart',
+        themeVariables: { ...config.themeVariables, fontSize: '14px', lineColor: theme.textSecondary },
+        themeCSS: `
+            .node text, .node tspan { font-size: 14px; font-weight: 600; }
+            .node .label-container {
+                fill: color-mix(in srgb, ${theme.primary} 10%, ${theme.surface});
+                stroke: color-mix(in srgb, ${theme.primary} 30%, ${theme.surface});
+                stroke-width: 1px;
+            }
+            .edgeLabels text, .edgeLabels tspan { font-size: 13px; font-weight: 600; fill: ${theme.primary}; }
+            .edgeLabel .label rect {
+                opacity: 1; rx: 13px; ry: 13px;
+                fill: ${theme.surface}; stroke: ${theme.primary}; stroke-width: 1px;
+            }
+            .edgePaths .flowchart-link { stroke-width: 1px; stroke-linecap: round; stroke-linejoin: round; }
+            .cluster rect { fill: ${theme.background}; stroke: color-mix(in srgb, ${theme.textSecondary} 25%, ${theme.surface}); }
+            .cluster-label text, .cluster-label tspan { font-size: 14px; font-weight: 600; }
+        `
+    };
+}
+
 export async function clearMermaid(element) {
     if (element) {
         element.replaceChildren();
@@ -152,7 +187,13 @@ function renderDiagram(definition, theme, isCurrent) {
         if (!isCurrent()) return null;
         const mermaid = await ensureMermaid();
         if (!isCurrent()) return null;
-        mermaid.initialize(createConfig(theme));
+        registerFlowchartLayout(mermaid);
+        const config = createConfig(theme);
+        mermaid.initialize(config);
+        const diagramType = mermaid.detectType(definition, config);
+        if (diagramType === 'flowchart' || diagramType === 'flowchart-v2') {
+            mermaid.initialize(createFlowchartConfig(config, theme));
+        }
         return mermaid.render(createDiagramId(), definition);
     });
     renderQueue = pending.catch(() => {});
