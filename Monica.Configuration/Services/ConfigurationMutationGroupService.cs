@@ -22,7 +22,7 @@ internal sealed class ConfigurationMutationGroupService(
         var group = new ConfigurationMutationGroup
         {
             GroupId = string.IsNullOrWhiteSpace(context.MutationGroupId)
-                ? Guid.NewGuid().ToString("N")
+                ? Guid.CreateVersion7().ToString("D")
                 : context.MutationGroupId.Trim(),
             Label = string.IsNullOrWhiteSpace(label) ? $"Changes {now:yyyy-MM-dd HH:mm}" : label.Trim(),
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),

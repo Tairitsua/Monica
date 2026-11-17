@@ -42,6 +42,9 @@ public sealed class OutboxGatewayTests
         sink.Messages.Select(message => message.Metadata.MessageId).Distinct().Should().HaveCount(4);
         sink.Messages.Should().AllSatisfy(message =>
         {
+            var id = Guid.Parse(Assert.IsType<string>(message.Metadata.MessageId));
+            id.Version.Should().Be(7);
+            message.Metadata.MessageId.Should().Be(id.ToString("D"));
             message.Scope.Should().Be(EventSubscriptionScope.Local);
             message.Metadata.Source.Should().Be("urn:monica:Test.Monica.EventBus");
             message.Metadata.EventName.Should().Be("test.durable.v1");

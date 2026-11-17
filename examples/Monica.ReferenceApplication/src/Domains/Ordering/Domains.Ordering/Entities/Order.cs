@@ -66,7 +66,7 @@ public sealed class Order : Entity<Guid>
     /// <returns>The new draft order.</returns>
     public static Order Create(string orderNumber, string customerName, decimal total)
     {
-        return new Order(Guid.NewGuid(), orderNumber, customerName, total, DateTimeOffset.UtcNow);
+        return new Order(Guid.CreateVersion7(), orderNumber, customerName, total, DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -114,17 +114,6 @@ public sealed class Order : Entity<Guid>
                 CreatedAtUtc,
                 _approvedAtUtc);
         }
-    }
-
-    /// <inheritdoc />
-    public override void AutoSetNewId(bool notSetWhenNotDefault = false)
-    {
-        if (notSetWhenNotDefault && Id != Guid.Empty)
-        {
-            return;
-        }
-
-        Id = Guid.NewGuid();
     }
 
     private static string NormalizeRequired(string value, string parameterName, int maximumLength)

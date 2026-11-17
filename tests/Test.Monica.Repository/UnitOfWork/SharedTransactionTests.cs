@@ -14,7 +14,6 @@ using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
-using Monica.Repository.Snowflake.Abstractions;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Repository.UnitOfWork.Models;
 using Monica.Testing.Hosting;
@@ -341,7 +340,6 @@ public sealed class SharedTransactionTests
             if (withInbox) repository.AddInbox<TestRepositoryDbContext>();
         });
         builder.Services.AddMonicaTestSeams();
-        builder.Services.AddSingleton<ISnowflakeIdGenerator, SequentialTestIdGenerator>();
         if (withInbox) builder.Services.AddScoped<SharedInboxHandler>();
         return builder.Build();
     }

@@ -816,7 +816,7 @@ public sealed class ConfigurationFacade(IServiceProvider services)
                 [
                     new ConfigurationMutationCommand
                     {
-                        RequestId = Guid.NewGuid().ToString("N"),
+                        RequestId = Guid.CreateVersion7().ToString("D"),
                         DefinitionKey = request.DefinitionKey,
                         LogicalPath = request.LogicalPath,
                         MutationKind = request.MutationKind,
@@ -855,7 +855,7 @@ public sealed class ConfigurationFacade(IServiceProvider services)
                 [
                     new ConfigurationMutationCommand
                     {
-                        RequestId = Guid.NewGuid().ToString("N"),
+                        RequestId = Guid.CreateVersion7().ToString("D"),
                         DefinitionKey = request.DefinitionKey,
                         LogicalPath = request.LogicalPath,
                         MutationKind = request.MutationKind,

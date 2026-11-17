@@ -7,7 +7,6 @@ using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Services;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Extensions;
-using Monica.Repository.Snowflake.Abstractions;
 using Monica.Testing.Doubles;
 using Monica.Testing.Repository;
 using Xunit;
@@ -31,7 +30,7 @@ public sealed class RepositoryDbContextConceptTests
         fixture.Context.Add(row);
         await fixture.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        row.Id.Should().NotBe(0);
+        row.Id.Should().NotBe(Guid.Empty);
         row.CreationTime.Should().NotBe(default);
         row.CreatorId.Should().Be(TESTER_ID);
 
@@ -148,7 +147,6 @@ public sealed class RepositoryDbContextConceptTests
         // Replace the identity input while retaining the production audit implementation.
         var fixture = DbContextFixture<TestRepositoryDbContext>.UseSqliteInMemory(services =>
         {
-            services.AddSingleton<ISnowflakeIdGenerator>(new SequentialTestIdGenerator());
             services.AddSingleton<IAuditPropertySetter>(new AuditPropertySetter(
                 new TestCurrentUser(TESTER_ID, "concept-tester"), TimeProvider.System,
                 Options.Create(new ModuleClockOption())));

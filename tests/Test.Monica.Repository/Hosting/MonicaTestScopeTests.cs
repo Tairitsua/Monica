@@ -17,7 +17,7 @@ public sealed class MonicaTestScopeTests
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
         TestRepositoryDbContext? arrange = null;
         TestRepositoryDbContext? act = null;
-        var id = await app.SeedAsync<TestRepositoryDbContext, long>(async (db, ct) =>
+        var id = await app.SeedAsync<TestRepositoryDbContext, Guid>(async (db, ct) =>
         {
             arrange = db;
             var row = new SoftDeleteAuditRow { Title = "before" };
@@ -31,7 +31,7 @@ public sealed class MonicaTestScopeTests
             act = scope.Resolve<TestRepositoryDbContext>();
             Assert.NotSame(arrange, act);
             Assert.Same(act, await scope.Resolve<IDbContextProvider<TestRepositoryDbContext>>().GetDbContextAsync());
-            var repository = scope.Resolve<IRepository<SoftDeleteAuditRow, long>>();
+            var repository = scope.Resolve<IRepository<SoftDeleteAuditRow, Guid>>();
             Assert.Same(act, scope.Resolve<IEfEntityStore<SoftDeleteAuditRow>>().Context);
             var first = await repository.GetAsync(id, Token);
             first.Title = "middle";

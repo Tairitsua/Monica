@@ -24,7 +24,7 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
     /// <summary>
     /// Change item ID
     /// </summary>
-    public string Id { get; set; }
+    public Guid Id { get; set; }
 
 
     #region Change data
@@ -66,7 +66,7 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
     /// <summary>
     /// Target rollback ID
     /// </summary>
-    public List<string>? TargetRollbackIds { get; set; }
+    public List<Guid>? TargetRollbackIds { get; set; }
 
     /// <summary>Whether this entry rolls back a nonempty set of accepted changes.</summary>
     [NotMapped, JsonIgnore]
@@ -80,9 +80,9 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
     /// <summary>
     /// (If it has a value, it is considered to have been rolled back) The rollback modification item ID that causes the modification item to be rolled back
     /// </summary>
-    public string? RollbackBy { get; set; }
+    public Guid? RollbackBy { get; set; }
 
-    public void DoRollback(string rollbackBy)
+    public void DoRollback(Guid rollbackBy)
     {
         RollbackBy = rollbackBy;
     }
@@ -153,7 +153,7 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
     public List<string>? RelatedSourceIds { get; set; }
     #endregion
 
-    public ChangeEntry(string id, TEnumAlterSource source, DateTime alterTime, TChangeItemData data, string? sourceId, string? sourceInfo = null)
+    public ChangeEntry(Guid id, TEnumAlterSource source, DateTime alterTime, TChangeItemData data, string? sourceId, string? sourceInfo = null)
     {
         Id = id;
         Source = source;
@@ -164,7 +164,7 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
         SourceInfo = sourceInfo;
     }
 
-    public ChangeEntry(string id, TEnumAlterSource source, DateTime alterTime, List<string> targetRollbackIds, string? sourceId, string? sourceInfo = null)
+    public ChangeEntry(Guid id, TEnumAlterSource source, DateTime alterTime, List<Guid> targetRollbackIds, string? sourceId, string? sourceInfo = null)
         : this(id, source, alterTime, new TChangeItemData(), sourceId, sourceInfo)
     {
         TargetRollbackIds = targetRollbackIds;
@@ -172,7 +172,6 @@ public class ChangeEntry<TTargetEntity, TChangeItemData, TEnumAlterSource> : ICh
 
     protected ChangeEntry()
     {
-        Id = "";
     }
 
     /// <summary>

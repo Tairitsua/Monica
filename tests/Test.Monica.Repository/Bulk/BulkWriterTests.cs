@@ -31,11 +31,11 @@ public sealed class BulkWriterTests
         await using var app = await Factory().CreateAsync(seams => seams
             .With<TimeProvider>(clock)
             .With<ICurrentUser>(new TestCurrentUser("importer", "Import User")), Token);
-        var plain = new SoftDeleteAuditRow { Id = 101, Title = "plain" };
-        var audited = new SoftDeleteAuditRow { Id = 102, Title = "audited" };
+        var plain = new SoftDeleteAuditRow { Id = new Guid("019a8c82-1d00-7000-8000-000000000065"), Title = "plain" };
+        var audited = new SoftDeleteAuditRow { Id = new Guid("019a8c82-1d00-7000-8000-000000000066"), Title = "audited" };
         var supplied = new SoftDeleteAuditRow
         {
-            Id = 103, Title = "supplied", CreatorId = "original", CreationTime = new DateTime(2020, 1, 2)
+            Id = new Guid("019a8c82-1d00-7000-8000-000000000067"), Title = "supplied", CreatorId = "original", CreationTime = new DateTime(2020, 1, 2)
         };
         await app.ExecuteAsync(async scope =>
         {
@@ -58,7 +58,7 @@ public sealed class BulkWriterTests
         {
             Assert.Equal(3, await db.SoftDeleteRows.CountAsync(ct));
             Assert.Empty(await db.Set<OutboxMessage>().ToArrayAsync(ct));
-            Assert.Equal(0, (await db.SoftDeleteRows.SingleAsync(row => row.Id == 102, ct)).EntityVersion);
+            Assert.Equal(0, (await db.SoftDeleteRows.SingleAsync(row => row.Id == new Guid("019a8c82-1d00-7000-8000-000000000066"), ct)).EntityVersion);
         }, Token);
     }
 
@@ -73,7 +73,7 @@ public sealed class BulkWriterTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.Insert(db, Array.Empty<HardDeleteRow>())
             .ExecuteAsync(new CancellationToken(true)));
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.Insert(db,
-            new[] { new HardDeleteRow { Id = 10, Title = "outside" } }).ExecuteAsync(Token));
+            new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000a"), Title = "outside" } }).ExecuteAsync(Token));
         Assert.Empty(app.Services.GetRequiredService<SqliteNativeInsertProvider>().InsertedTypes);
     }
 
@@ -83,7 +83,7 @@ public sealed class BulkWriterTests
         await using var app = await new RepositoryScenarioFactory(outbox: false).CreateAsync(cancellationToken: Token);
         await Assert.ThrowsAsync<InvalidOperationException>(() => app.ExecuteAsync(scope =>
             scope.Resolve<IBulkWriter>().Insert(scope.Resolve<TestRepositoryDbContext>(),
-                new[] { new HardDeleteRow { Id = 10, Title = "unsupported" } }).ExecuteAsync(Token), cancellationToken: Token));
+                new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000a"), Title = "unsupported" } }).ExecuteAsync(Token), cancellationToken: Token));
         await AssertNoRowsAsync(app);
     }
 
@@ -93,7 +93,7 @@ public sealed class BulkWriterTests
         await using var app = await Factory().CreateAsync(cancellationToken: Token);
         await app.SeedAsync<TestRepositoryDbContext, int>(async (db, ct) =>
         {
-            db.Add(new HardDeleteRow { Id = 10, Title = "existing" });
+            db.Add(new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000a"), Title = "existing" });
             return await db.SaveChangesAsync(ct);
         }, Token);
         await app.ExecuteAsync(async scope =>
@@ -102,14 +102,14 @@ public sealed class BulkWriterTests
             var writer = scope.Resolve<IBulkWriter>();
             await Assert.ThrowsAsync<ArgumentException>(() => writer.Insert(db, new[]
             {
-                new HardDeleteRow { Id = 11 }, new HardDeleteRow { Id = 11 }
+                new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000b") }, new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000b") }
             }).ExecuteAsync(Token));
             var tracked = await db.HardDeleteRows.SingleAsync(Token);
             await Assert.ThrowsAsync<InvalidOperationException>(() => writer.Insert(db,
                 new[] { new HardDeleteRow { Id = tracked.Id } }).ExecuteAsync(Token));
             tracked.Title = "pending";
             await Assert.ThrowsAsync<InvalidOperationException>(() => writer.Insert(db,
-                new[] { new HardDeleteRow { Id = 12 } }).ExecuteAsync(Token));
+                new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-00000000000c") } }).ExecuteAsync(Token));
             Assert.Empty(scope.Resolve<SqliteNativeInsertProvider>().InsertedTypes);
         }, cancellationToken: Token);
     }
@@ -124,7 +124,7 @@ public sealed class BulkWriterTests
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             db.Add(new GeneratedKeyRow { Title = "tracked" });
-            await scope.Resolve<IBulkWriter>().Insert(db, new[] { new HardDeleteRow { Id = 200, Title = "native" } })
+            await scope.Resolve<IBulkWriter>().Insert(db, new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-0000000000c8"), Title = "native" } })
                 .WithAuditProperties().ExecuteAsync(Token);
             await scope.Resolve<IDistributedEventBus>().BulkPublishAsync(
                 new[] { new IntegrationNotice("one"), new IntegrationNotice("two") }, cancellationToken: Token);
@@ -160,7 +160,7 @@ public sealed class BulkWriterTests
         {
             var db = scope.Resolve<TestRepositoryDbContext>();
             db.Add(new GeneratedKeyRow { Title = "tracked" });
-            await scope.Resolve<IBulkWriter>().Insert(db, new[] { new HardDeleteRow { Id = 200, Title = "native" } })
+            await scope.Resolve<IBulkWriter>().Insert(db, new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-0000000000c8"), Title = "native" } })
                 .ExecuteAsync(Token);
             await db.SaveChangesAsync(Token);
             throw new ApplicationException("later operation failed");
@@ -191,7 +191,7 @@ public sealed class BulkWriterTests
             {
                 if (failOutbox) await db.SaveChangesAsync(Token);
                 else await scope.Resolve<IBulkWriter>().Insert(db,
-                    new[] { new HardDeleteRow { Id = 200, Title = "native" } }).ExecuteAsync(cancellation.Token);
+                    new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-0000000000c8"), Title = "native" } }).ExecuteAsync(cancellation.Token);
             }
             catch (Exception exception) when (exception == original || exception is OperationCanceledException)
             {
@@ -211,7 +211,7 @@ public sealed class BulkWriterTests
         await app.ExecuteAsync(async scope =>
         {
             await Assert.ThrowsAsync<ApplicationException>(() => scope.Resolve<IBulkWriter>()
-                .Insert(scope.Resolve<TestRepositoryDbContext>(), new[] { new HardDeleteRow { Id = 200 } })
+                .Insert(scope.Resolve<TestRepositoryDbContext>(), new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-0000000000c8") } })
                 .WithAuditProperties().ExecuteAsync(Token));
             Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);
         }, cancellationToken: Token);
@@ -236,7 +236,7 @@ public sealed class BulkWriterTests
             try
             {
                 await scope.Resolve<IBulkWriter>().Insert(scope.Resolve<TestRepositoryDbContext>(),
-                    new[] { new HardDeleteRow { Id = 201, Title = "accepted partial work" } }).ExecuteAsync(cancellation.Token);
+                    new[] { new HardDeleteRow { Id = new Guid("019a8c82-1d00-7000-8000-0000000000c9"), Title = "accepted partial work" } }).ExecuteAsync(cancellation.Token);
             }
             catch (Exception exception) when (exception == original || exception is OperationCanceledException) { }
             Assert.Null(scope.Resolve<IUnitOfWorkManager>().Current!.FirstFailure);

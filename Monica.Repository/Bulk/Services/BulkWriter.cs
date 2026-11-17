@@ -65,6 +65,8 @@ internal sealed class BulkWriter : IBulkWriter
                 throw new ArgumentException("Every row must be non-null and have the exact declared mapped type.", nameof(rows));
             var values = key.Properties.Select(property => property.PropertyInfo is { } info
                 ? info.GetValue(row) : property.FieldInfo!.GetValue(row)).ToArray();
+            for (var index = 0; index < key.Properties.Count; index++)
+                ApplicationKeyValidation.Validate(key.Properties[index], values[index]);
             // Database-generated keys are absent from the insert and cannot identify a tracked/input conflict.
             if (key.Properties.Any(property => property.ValueGenerated != ValueGenerated.Never)) continue;
             if (!keys.Add(values)) throw new ArgumentException("Native insert input contains duplicate primary keys.", nameof(rows));

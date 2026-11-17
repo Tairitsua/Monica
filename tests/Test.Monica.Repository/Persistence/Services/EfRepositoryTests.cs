@@ -15,7 +15,7 @@ public sealed class EfRepositoryTests
 
     private readonly RepositoryScenarioFactory _factory = new(outbox: false, configure: services =>
     {
-        services.AddScoped<EfRepository<TestRepositoryDbContext, HardDeleteRow, long>>();
+        services.AddScoped<EfRepository<TestRepositoryDbContext, HardDeleteRow, Guid>>();
         services.AddScoped<DetailsRepository>();
         services.AddScoped<DetailsCrudService>();
     });
@@ -28,7 +28,7 @@ public sealed class EfRepositoryTests
 
         await app.ExecuteAsync(async scope =>
         {
-            var repository = scope.Resolve<EfRepository<TestRepositoryDbContext, HardDeleteRow, long>>();
+            var repository = scope.Resolve<EfRepository<TestRepositoryDbContext, HardDeleteRow, Guid>>();
             var row = await repository.Details.SingleAsync(row => row.Id == id, Token);
 
             Assert.Empty(row.Children);
@@ -96,8 +96,8 @@ public sealed class EfRepositoryTests
         }, Token);
     }
 
-    private static Task<long> SeedRowsAsync(MonicaTestApplication app)
-        => app.SeedAsync<TestRepositoryDbContext, long>(async (db, ct) =>
+    private static Task<Guid> SeedRowsAsync(MonicaTestApplication app)
+        => app.SeedAsync<TestRepositoryDbContext, Guid>(async (db, ct) =>
         {
             var row = new HardDeleteRow
             {
@@ -110,7 +110,7 @@ public sealed class EfRepositoryTests
         }, Token);
 
     private sealed class DetailsRepository(TestRepositoryDbContext context)
-        : EfRepository<TestRepositoryDbContext, HardDeleteRow, long>(context)
+        : EfRepository<TestRepositoryDbContext, HardDeleteRow, Guid>(context)
     {
         public override IQueryable<HardDeleteRow> Query => base.Query.Where(row => row.Title != "hidden");
 
@@ -119,7 +119,7 @@ public sealed class EfRepositoryTests
     }
 
     private sealed class DetailsCrudService(DetailsRepository repository)
-        : AbstractKeyCrudApplicationService<HardDeleteRow, HardDeleteRow, HardDeleteRow, long, object, object, object>(repository)
+        : AbstractKeyCrudApplicationService<HardDeleteRow, HardDeleteRow, HardDeleteRow, Guid, object, object, object>(repository)
     {
         protected override bool WithDetail() => true;
 

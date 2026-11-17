@@ -23,6 +23,14 @@ The core `IRepository<TEntity>` stages `Add`/`AddRange` and `Remove`/`RemoveRang
 
 Repository contexts use EF's standard options composition, including `ConfigureDbContext<TContext>` contributions. Contexts remain scoped and options are transient; options callbacks resolve scoped dependencies from the requesting scope. The owned factory creates a fresh scope and consumes the same options pipeline instead of constructing a separate options builder. Disposing a factory-created context also disposes that scope. Registration, configuration contribution, scoped connection identity, and factory disposal are covered by `tests/Test.Monica.Repository/Hosting/RepositoryOptionsCompositionTests.cs`.
 
+## Assign application UUID keys
+
+An application creates technical entity identities directly with `Guid.CreateVersion7()` before it adds or relates the objects. Standard `IEntity<Guid>.Id` primary keys are configured as `ValueGeneratedNever`. Configure any additional application-owned UUID key explicitly the same way. The tracked save pipeline and `IBulkWriter` reject `Guid.Empty` for these keys without changing the input. Loading, restoration, synchronization, and retry retain the supplied identity, including valid UUIDs from older versions.
+
+Repository does not provide a Snowflake module, a GUID generator service, a save-time key generator, or `AutoSetNewId`. Applications migrating from those APIs must update their creation boundaries, model, stored identities, references, and serialized contracts together. Removing a generator registration alone is insufficient. Database-generated business counters and ordered store sequences are separate contracts.
+
+`tests/Test.Monica.Repository/Persistence/ApplicationUuidKeyTests.cs` verifies the model convention, empty-key rejection without assignment, and preservation of supplied UUIDs through tracked and native inserts.
+
 ## Configure a default detail graph
 
 `EfRepository<TDbContext,TEntity>` exposes a no-tracking `Query` and a `Details` query that calls `ApplyDetails(Query)`. The default `ApplyDetails` returns its input unchanged. Override it on the concrete repository when an entity has a canonical eager-loading graph; `Order` and its `Lines` navigation here are application-owned types:

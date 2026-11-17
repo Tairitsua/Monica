@@ -40,7 +40,7 @@ internal sealed class TriggeredJobManager(
         }
 
         var schedulerOptions = options.Value;
-        var instanceId = Guid.NewGuid().ToString("N");
+        var instanceId = Guid.CreateVersion7().ToString("D");
         await store.EnqueueAsync(new JobEnqueueRequest
         {
             InstanceId = instanceId,

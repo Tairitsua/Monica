@@ -719,10 +719,16 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
         var paramExpression = Expression.Parameter(typeof(TEntity), "a");
         var memberExpression = Expression.PropertyOrField(paramExpression, "Id");
 
-        var cursorValue = (TKey) Convert.ChangeType(cursor, typeof(TKey));
+        var cursorValue = typeof(TKey) == typeof(Guid)
+            ? (TKey)(object)Guid.Parse(cursor)
+            : (TKey)Convert.ChangeType(cursor, typeof(TKey));
         var constant = Expression.Constant(cursorValue, typeof(TKey));
 
-        var lessThan = Expression.LessThan(memberExpression, constant);
+        var lessThan = typeof(TKey) == typeof(Guid)
+            ? Expression.LessThan(
+                Expression.Call(memberExpression, typeof(Guid).GetMethod(nameof(Guid.CompareTo), [typeof(Guid)])!, constant),
+                Expression.Constant(0))
+            : Expression.LessThan(memberExpression, constant);
         var lamada = Expression.Lambda<Func<TEntity, bool>>(lessThan, paramExpression);
 
         return queryable.Where(lamada);

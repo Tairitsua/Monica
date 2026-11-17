@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Models;
+using Monica.Repository.Persistence.Services.Support;
 
 namespace Monica.Repository.Persistence.Services;
 
@@ -28,6 +29,9 @@ internal static class PersistencePolicies
         foreach (var change in changes)
         {
             var entry = change.Entry;
+            if (change.Kind == PersistenceChangeKind.Created && entry.Metadata.FindPrimaryKey() is { } key)
+                foreach (var property in key.Properties)
+                    ApplicationKeyValidation.Validate(property, entry.Property(property.Name).CurrentValue, entry.Property(property.Name).IsTemporary);
             if (entry.State == EntityState.Deleted && entry.Entity is IHasSoftDelete)
             {
                 // Deletion wins over unflushed scalar edits; retained owned data is restored below.

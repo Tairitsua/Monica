@@ -64,7 +64,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
         ValidateRequest(request);
 
         var createdTime = DateTimeOffset.UtcNow;
-        var groupId = Guid.NewGuid().ToString("N");
+        var groupId = Guid.CreateVersion7().ToString("D");
         var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
         var context = request.Context with
         {
@@ -351,7 +351,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService(
                 .ToArray();
             var signal = new ConfigurationReloadSignal
             {
-                SignalId = Guid.NewGuid().ToString("N"),
+                SignalId = Guid.CreateVersion7().ToString("D"),
                 OriginInstanceId = moduleOptions.Value.InstanceId,
                 StoreKey = effectiveValueStore.Descriptor.StoreKey,
                 Kind = ConfigurationReloadSignalKind.DefinitionsChanged,

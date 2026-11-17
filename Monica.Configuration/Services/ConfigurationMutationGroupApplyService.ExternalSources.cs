@@ -84,7 +84,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
                     {
                         await historyStore.AppendHistoryAsync(new ConfigurationValueHistory
                         {
-                            HistoryId = Guid.NewGuid().ToString("N"),
+                            HistoryId = Guid.CreateVersion7().ToString("D"),
                             DefinitionKey = mutation.Definition.DefinitionKey,
                             LogicalPath = mutation.Command.LogicalPath,
                             ConfigurationPath = mutation.ConfigurationPath,

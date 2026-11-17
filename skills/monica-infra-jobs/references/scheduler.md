@@ -1,5 +1,7 @@
 # JobScheduler
 
+New framework-created job instance identities use UUIDv7 in lowercase D format. Explicit enqueue or run-now instance identities remain unchanged, as do the natural owner/job keys and numeric scheduling positions. Preserve an accepted instance identity during retry or restoration; generating a new UUID starts a different logical instance.
+
 For relational placement, `JobSchedulerDbContext` marks all scheduler tables and the shared lease table for [common infrastructure layout](../../monica-infra-persistence/references/infrastructure-table-layout.md). Apply `UseMonicaTableLayout` and a stable `UseMonicaMigrationHistory` key inside the `UseEfCoreStore` options callback and the matching design-time factory. Select one lease migration owner; layout does not merge scheduler queues or change their scope. Lease exclusion participates in model caching.
 
 Native eligibility probes and owner, gate, and execution locks resolve their qualified table names from that same EF model. They require no connection search-path change. When adopting a schema, verify publication, enqueue, claim, completion, and an idle probe on the actual provider; the opt-in `ExternalSchedulerTableLayoutTests` exercises this lifecycle with tables in `infra` and no scheduler tables in `public`.

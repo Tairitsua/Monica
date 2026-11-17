@@ -6,7 +6,6 @@ using Monica.Core.Mediator;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Modules;
 using Monica.Repository.Persistence.Abstractions;
-using Monica.Repository.Snowflake.Abstractions;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Repository.UnitOfWork.Models;
 using Monica.Testing.Hosting;
@@ -113,7 +112,6 @@ public sealed class ExecutionTransactionPolicyTests
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
-            services.AddSingleton<ISnowflakeIdGenerator, SequentialTestIdGenerator>();
             services.AddScoped<IRequestHandler<StageWriteRequest, bool>, StageWriteHandler>();
             services.AddScoped<IRequestHandler<RequiredIsolation, System.Data.IsolationLevel>, RequiredIsolationHandler>();
             services.UseTestDatabase<TestRepositoryDbContext>();

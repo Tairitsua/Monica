@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Monica.Core.Clock;
 using Monica.Modules;
-using Monica.Repository.Snowflake.Abstractions;
 using Monica.Testing.Doubles;
 using Monica.Testing.Repository;
 using Xunit;
@@ -52,7 +51,6 @@ public sealed class AuditTimeZoneTests
         // here is the only timezone input, so the stamps are independent of this host's timezone.
         var fixture = DbContextFixture<TestRepositoryDbContext>.UseSqliteInMemory(services =>
         {
-            services.AddSingleton<ISnowflakeIdGenerator>(new SequentialTestIdGenerator());
             services.AddSingleton<IOptions<ModuleClockOption>>(
                 Options.Create(new ModuleClockOption { LocalTimeZone = localTimeZone }));
         });

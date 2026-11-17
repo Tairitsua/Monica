@@ -66,7 +66,7 @@ internal sealed partial class ConfigurationMutationGroupApplyService
             var newVersion = state.FinalVersion;
             var history = new ConfigurationValueHistory
             {
-                HistoryId = Guid.NewGuid().ToString("N"),
+                HistoryId = Guid.CreateVersion7().ToString("D"),
                 DefinitionKey = mutation.Definition.DefinitionKey,
                 LogicalPath = mutation.Request.LogicalPath,
                 ConfigurationPath = mutation.ConfigurationPath,

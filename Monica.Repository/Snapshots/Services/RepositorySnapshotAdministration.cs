@@ -33,7 +33,7 @@ public sealed class RepositorySnapshotAdministration<TContext> where TContext : 
             if (missing.Length == 0) return;
             db.Set<RepositorySnapshotVersion>().AddRange(missing.Select(dataset => new RepositorySnapshotVersion
             {
-                SourceId = _registration.SourceId, DatasetKey = dataset.Key, Epoch = Guid.NewGuid(), Revision = 0
+                SourceId = _registration.SourceId, DatasetKey = dataset.Key, Epoch = Guid.CreateVersion7(), Revision = 0
             }));
             try { await db.SaveChangesAsync(cancellationToken); return; }
             catch (DbUpdateException) when (attempt < 2)

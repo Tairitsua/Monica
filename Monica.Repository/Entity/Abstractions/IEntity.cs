@@ -11,11 +11,6 @@ public interface IEntity
     /// </summary>
     /// <returns></returns>
     object?[] GetKeys();
-    /// <summary>
-    /// Automatically set the Id; if there is a sub-table that needs to be set, rewrite this method
-    /// </summary>
-    /// <param name="notSetWhenNotDefault">Not set when there is already a value</param>
-    public void AutoSetNewId(bool notSetWhenNotDefault = false);
 }
 
 /// <summary>

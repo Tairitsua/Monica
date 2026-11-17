@@ -16,7 +16,7 @@ public sealed class RepositoryRangeTests
         await app.ExecuteAsync(scope =>
         {
             scope.Resolve<IRepository<SoftDeleteAuditRow>>().AddRange(
-                [new() { Id = 101, Title = "first" }, new() { Id = 102, Title = "second" }]);
+                [new() { Id = new Guid("019a8c82-1d00-7000-8000-000000000065"), Title = "first" }, new() { Id = new Guid("019a8c82-1d00-7000-8000-000000000066"), Title = "second" }]);
             return Task.CompletedTask;
         }, cancellationToken: token);
         await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>

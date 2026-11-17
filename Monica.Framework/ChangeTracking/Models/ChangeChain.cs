@@ -18,14 +18,15 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
     /// <summary>The portable baseline and accepted facts, including frozen legacy tie ordering.</summary>
     public class ChainJsonParseBridge
     {
-        /// <summary>Version 1 is the legacy document without an explicit ordering contract.</summary>
-        public int SchemaVersion { get; set; } = 1;
+        /// <summary>Version 3 uses UUID identities and explicit business ordering.</summary>
+        [JsonRequired]
+        public int SchemaVersion { get; set; } = 3;
         public required string TracingData { get; set; }
         public required List<TEntry> ChangingList { get; set; } = [];
     }
 
     private readonly SortedList<ChangeOrderKey, TEntry> _entries = [];
-    private readonly Dictionary<string, TEntry> _byId = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, TEntry> _byId = [];
 
     public ChangeChain(ChainJsonParseBridge bridge) : this(bridge.TracingData, ReadEntries(bridge)) { }
     public ChangeChain(string tracingData, List<TEntry> changingList)
@@ -35,8 +36,8 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
     }
     public ChangeChain(TTargetEntity entity) : this(entity.GetCurTracingData(), []) { }
 
-    /// <summary>Current portable format; version 1 is accepted only through the bridge constructor.</summary>
-    public int SchemaVersion => 2;
+    /// <summary>Current portable format. Older identity formats require offline conversion before loading.</summary>
+    public int SchemaVersion => 3;
 
     [JsonIgnore]
     public DateTime? LastModifiedTime => _entries.Count == 0 ? null : _entries.Values[^1].OrderTime;
@@ -49,7 +50,7 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
     public string TracingData { get; init; }
 
     public IReadOnlyList<TEntry> ChangingList => GetChangingListSnapshot();
-    public bool ContainsChangingItemId(string id) => _byId.ContainsKey(id);
+    public bool ContainsChangingItemId(Guid id) => _byId.ContainsKey(id);
     public List<TEntry> GetChangingListSnapshot() => _entries.Values.ToList();
 
     public IEnumerable<PropertyHistory<TEntry>> GetSingleAlterItemHistory<TValue>(Expression<Func<TChangeData, TValue>> expression)
@@ -142,7 +143,7 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
 
     /// <summary>Freezes the currently known direct and related source targets before the supplied operation time.</summary>
     /// <remarks>When omitted, the operation time defaults to the current local time. Retry owners should supply their original time.</remarks>
-    public TEntry? CreateRollbackAlterItemBySourceId(string id, TSource source, string sourceId,
+    public TEntry? CreateRollbackAlterItemBySourceId(Guid id, TSource source, string sourceId,
         string? sourceInfo, string targetSourceId, DateTime? operationTime = null)
     {
         var now = operationTime ?? DateTime.Now;
@@ -159,17 +160,14 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
 
     private static List<TEntry> ReadEntries(ChainJsonParseBridge bridge)
     {
-        if (bridge.SchemaVersion is not (1 or 2))
+        if (bridge.SchemaVersion != 3)
             throw new InvalidOperationException($"Unsupported change-chain format {bridge.SchemaVersion}.");
-        if (bridge.SchemaVersion == 1)
-            for (var index = 0; index < bridge.ChangingList.Count; index++)
-                bridge.ChangingList[index].HistoricalOrder ??= index + 1L;
         return bridge.ChangingList;
     }
 
     private void Insert(TEntry entry)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(entry.Id);
+        if (entry.Id == Guid.Empty) throw new ArgumentException("A change requires a non-empty UUID identity.", nameof(entry));
         if (!_byId.TryAdd(entry.Id, entry))
             throw new InvalidOperationException($"Duplicate change identity '{entry.Id}'.");
         _entries.Add(entry.OrderKey, entry);
@@ -179,11 +177,11 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
     {
         // Evaluate rollback dependencies before targets, independently of their business timestamps.
         // This also handles overlapping rollbacks and rollback-of-rollback without recursive traversal.
-        var incoming = _byId.Keys.ToDictionary(id => id, _ => 0, StringComparer.Ordinal);
-        var edges = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var incoming = _byId.Keys.ToDictionary(id => id, _ => 0);
+        var edges = new Dictionary<Guid, Guid[]>();
         foreach (var entry in _entries.Values.Where(entry => entry.IsRollback))
         {
-            var targets = entry.TargetRollbackIds!.Distinct(StringComparer.Ordinal).ToArray();
+            var targets = entry.TargetRollbackIds!.Distinct().ToArray();
             foreach (var target in targets)
             {
                 if (!incoming.ContainsKey(target))
@@ -192,8 +190,8 @@ public class ChangeChain<TTargetEntity, TEntry, TChangeData, TSource>
             }
             edges.Add(entry.Id, targets);
         }
-        var queue = new Queue<string>(incoming.Where(pair => pair.Value == 0).Select(pair => pair.Key));
-        var invalidatedBy = new Dictionary<string, TEntry>(StringComparer.Ordinal);
+        var queue = new Queue<Guid>(incoming.Where(pair => pair.Value == 0).Select(pair => pair.Key));
+        var invalidatedBy = new Dictionary<Guid, TEntry>();
         var processed = 0;
         while (queue.TryDequeue(out var id))
         {

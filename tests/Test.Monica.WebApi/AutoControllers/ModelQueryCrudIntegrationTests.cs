@@ -25,6 +25,37 @@ namespace Test.Monica.WebApi.AutoControllers;
 
 public sealed class ModelQueryCrudIntegrationTests
 {
+    [Fact]
+    public async Task GetList_WhenUuidCursorIsContinued_ShouldReadEveryRowOnceWithTheRelationalProvider()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var host = await new ModelQueryCrudFactory().CreateAsync(cancellationToken: token);
+        Guid[] ids =
+        [
+            Guid.Parse("019a8c82-1d00-7000-8000-000000002329"),
+            Guid.Parse("67ef9c86-f704-4d65-b3bf-f89d602ee1a9"),
+            Guid.Parse("f74192cb-dbcf-4884-921a-b4a2c69982be")
+        ];
+        await host.SeedAsync<ModelQueryCrudContext, int>(async (db, ct) =>
+        {
+            db.UuidRows.AddRange(ids.Select(id => new UuidCursorRow { Id = id }));
+            return await db.SaveChangesAsync(ct);
+        }, token);
+        using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
+
+        using var first = await client.GetAsync("/uuid-cursor/records?MaxResultCount=2", token);
+        first.EnsureSuccessStatusCode();
+        using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync(token));
+        var firstPage = firstJson.RootElement.GetProperty("data");
+        Assert.Equal(new[] { ids[2], ids[1] }, firstPage.GetProperty("items").EnumerateArray().Select(row => row.GetProperty("id").GetGuid()));
+        Assert.Equal(ids[1].ToString("D"), firstPage.GetProperty("cursor").GetString());
+
+        using var second = await client.GetAsync("/uuid-cursor/records?MaxResultCount=2&Cursor=" + ids[1].ToString("D"), token);
+        second.EnsureSuccessStatusCode();
+        using var secondJson = JsonDocument.Parse(await second.Content.ReadAsStringAsync(token));
+        Assert.Equal(ids[0], Assert.Single(secondJson.RootElement.GetProperty("data").GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("?DisablePage=true")]
@@ -209,6 +240,7 @@ public sealed class ModelQueryCrudIntegrationTests
                 if (interceptor is not null) options.AddInterceptors(interceptor);
             });
             services.AddScoped<ModelQueryCrudRepository>();
+            services.AddScoped<UuidCursorRepository>();
         }
     }
 }
@@ -229,6 +261,7 @@ public sealed class ModelQueryCrudContext(DbContextOptions<ModelQueryCrudContext
     : RepositoryDbContext<ModelQueryCrudContext>(options, services)
 {
     public DbSet<ModelQueryCrudRow> Rows => Set<ModelQueryCrudRow>();
+    public DbSet<UuidCursorRow> UuidRows => Set<UuidCursorRow>();
 }
 
 public sealed class ModelQueryCrudRepository(ModelQueryCrudContext context)
@@ -244,4 +277,17 @@ public sealed class ModelQueryFixtureCrudService(ModelQueryCrudRepository reposi
 
     [HttpPost("records/query")]
     public Task<PagedResult<dynamic>> QueryRecordsAsync([FromBody] CrudPageRequestDto input) => base.GetListAsync(input);
+}
+
+public sealed class UuidCursorRow : Entity<Guid>;
+public sealed class UuidCursorDto : EntityDto<Guid>;
+public sealed class UuidCursorRepository(ModelQueryCrudContext context)
+    : EfRepository<ModelQueryCrudContext, UuidCursorRow, Guid>(context);
+
+[Route("uuid-cursor")]
+public sealed class UuidCursorFixtureCrudService(UuidCursorRepository repository)
+    : CrudApplicationService<UuidCursorRow, UuidCursorDto, Guid, CrudPageRequestDto, UuidCursorRepository>(repository)
+{
+    [HttpGet("records")]
+    public override Task<PagedResult<dynamic>> GetListAsync([FromQuery] CrudPageRequestDto input) => base.GetListAsync(input);
 }

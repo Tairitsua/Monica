@@ -12,18 +12,13 @@ public abstract class Entity : IEntity
     }
     public abstract object?[] GetKeys();
 
-    public virtual void AutoSetNewId(bool notSetWhenNotDefault = false)
-    {
-        throw new NotImplementedException("请自己实现新ID设置方法");
-    }
-
 }
 
 [Serializable]
 public abstract class Entity<TKey> : Entity, IEntity<TKey>
 {
     /// <summary>
-    /// Id of the entity.
+    /// Identity assigned by the creation boundary and preserved during loading, retries and replication.
     /// </summary>
     [JsonInclude]
    // [Key]

@@ -274,7 +274,7 @@ public sealed partial class JobSchedulerFacade(
             OwnerKey = request.OwnerKey,
             JobKey = request.JobKey,
             InstanceId = string.IsNullOrWhiteSpace(request.InstanceId)
-                ? Guid.NewGuid().ToString("N")
+                ? Guid.CreateVersion7().ToString("D")
                 : request.InstanceId,
             JobArgs = request.JobArgs,
             AvailableAtUtc = request.AvailableAtUtc,
@@ -301,7 +301,7 @@ public sealed partial class JobSchedulerFacade(
             OwnerKey = request.OwnerKey,
             JobKey = request.JobKey,
             InstanceId = string.IsNullOrWhiteSpace(request.InstanceId)
-                ? Guid.NewGuid().ToString("N")
+                ? Guid.CreateVersion7().ToString("D")
                 : request.InstanceId
         };
         return ExecuteAsync(

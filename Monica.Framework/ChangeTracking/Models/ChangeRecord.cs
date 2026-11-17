@@ -1,4 +1,4 @@
-﻿namespace Monica.Framework.ChangeTracking.Models;
+namespace Monica.Framework.ChangeTracking.Models;
 
 public record ChangeRecord
 {
@@ -24,5 +24,5 @@ public record ChangeRecord
     /// <summary>
     /// Target rollback ID
     /// </summary>
-    public List<string>? TargetRollbackIds { get; set; }
+    public List<Guid>? TargetRollbackIds { get; set; }
 }

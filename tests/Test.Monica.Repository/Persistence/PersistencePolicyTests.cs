@@ -55,7 +55,7 @@ public sealed class PersistencePolicyTests
     public async Task SaveChanges_WhenConcurrencyConflicts_ShouldPreserveExceptionAndFaultContext()
     {
         await using var app = await new RepositoryScenarioFactory(outbox: false).CreateAsync(cancellationToken: Token);
-        var id = await app.SeedAsync<TestRepositoryDbContext, long>(async (db, ct) =>
+        var id = await app.SeedAsync<TestRepositoryDbContext, Guid>(async (db, ct) =>
         {
             var row = new SoftDeleteAuditRow { Title = "seed" };
             db.Add(row);
@@ -143,7 +143,7 @@ public sealed class PersistencePolicyTests
     public async Task SaveChanges_WhenOrphanDeletionIsDisabled_ShouldPreserveCallerProtection()
     {
         await using var app = await new RepositoryScenarioFactory().CreateAsync(cancellationToken: Token);
-        var id = await app.SeedAsync<TestRepositoryDbContext, long>(async (db, ct) =>
+        var id = await app.SeedAsync<TestRepositoryDbContext, Guid>(async (db, ct) =>
         {
             var row = new HardDeleteRow { Title = "owner", Children = [new RequiredChildRow()] };
             db.Add(row);

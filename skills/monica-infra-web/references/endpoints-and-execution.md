@@ -1,5 +1,7 @@
 # Request endpoints and execution
 
+Keyed CRUD cursor paging parses a `Guid` key as UUID and builds a typed `Guid.CompareTo` predicate; it does not convert UUIDs to integers. Use the same key ordering for page selection and cursor continuation, and validate translation and index use with the deployed relational provider. A malformed UUID cursor is rejected. UUID ordering is a paging mechanism, not a business chronology or revision counter.
+
 The execution-pipeline UI formats its plan-capture timestamp with the shell's shared Clock display policy in `$monica-infra-ui` (`references/time-display.md`); the catalog's captured instant and pipeline behavior are unchanged.
 
 ## Transport-independent application calls

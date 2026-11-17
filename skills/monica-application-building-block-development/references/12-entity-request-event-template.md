@@ -60,13 +60,14 @@ namespace $DomainNamespace$.Entities;
     Description = "Owns order state transitions and invariants.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
-public sealed class Order : Entity<long>
+public sealed class Order : Entity<Guid>
 {
     public string Number { get; private set; } = string.Empty;
     public bool IsApproved { get; private set; }
 
-    public Order(long id, string number)
+    public Order(Guid id, string number)
     {
+        if (id == Guid.Empty) throw new ArgumentException("Order identity is required.", nameof(id));
         Id = id;
         Rename(number);
     }
@@ -91,19 +92,14 @@ public sealed class Order : Entity<long>
         IsApproved = true;
     }
 
-    public override void AutoSetNewId(bool notSetWhenNotDefault = false)
-    {
-        if (notSetWhenNotDefault && Id != default)
-        {
-            return;
-        }
-
-        Id = 0;
-    }
 }
 ```
 
 Rules:
+
+- Allocate a new technical identity directly at creation with `Guid.CreateVersion7()`, for example `new Order(Guid.CreateVersion7(), number)`. Assign object identities before wiring foreign keys. Preserve existing UUIDs when loading, restoring, importing, synchronizing, or retrying the same accepted object; their UUID version is not a reason to regenerate them.
+- Entity and repository abstractions do not generate identities. Standard `IEntity<Guid>` keys use `ValueGeneratedNever`; tracked and native inserts reject an empty application-owned UUID. An update mapper must preserve the loaded identity. A copy that represents a new object receives a new identity at its explicit creation boundary.
+- Keep business numbers, external source identifiers, revisions, sequence positions, leases, and tokens in their owning contracts; they are not interchangeable with entity identities.
 
 - Keep behavior close to the state it protects.
 - Avoid public setters unless a property is intentionally unconstrained.

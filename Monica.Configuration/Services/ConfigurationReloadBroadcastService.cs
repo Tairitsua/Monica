@@ -38,7 +38,7 @@ internal sealed class ConfigurationReloadBroadcastService(
 
         var signal = new ConfigurationReloadSignal
         {
-            SignalId = Guid.NewGuid().ToString("N"),
+            SignalId = Guid.CreateVersion7().ToString("D"),
             OriginInstanceId = moduleOptions.Value.InstanceId,
             StoreKey = effectiveValueStore.Descriptor.StoreKey,
             Kind = ConfigurationReloadSignalKind.ReloadAll

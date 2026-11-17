@@ -7,7 +7,6 @@ using Monica.Modules;
 using Monica.Repository.Outbox.Models;
 using Monica.EventBus.Annotations;
 using Monica.Repository.Persistence.Models;
-using Monica.Repository.Snowflake.Abstractions;
 using Monica.Testing.Hosting;
 using Test.Monica.Repository.Persistence;
 using Test.Monica.Repository.UnitOfWork;
@@ -63,7 +62,6 @@ internal sealed class RepositoryScenarioFactory(
     protected override void ConfigureServices(IServiceCollection services)
     {
         base.ConfigureServices(services);
-        services.AddSingleton<ISnowflakeIdGenerator, SequentialTestIdGenerator>();
         if (inbox)
         {
             services.AddScoped<FirstInboxHandler>();
@@ -77,7 +75,7 @@ internal sealed class RepositoryScenarioFactory(
     }
 }
 
-public sealed record RowProjection(long Id, string Title);
+public sealed record RowProjection(Guid Id, string Title);
 public sealed record GeneratedProjection(int Id, string Title);
 [Outbox, EventName("tests.row-change.v1")]
 public sealed record RowChanged(PersistenceChangeKind Kind, RowProjection Entity);

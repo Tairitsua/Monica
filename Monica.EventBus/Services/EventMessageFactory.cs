@@ -53,7 +53,7 @@ internal sealed class EventMessageFactory(
 
         var activity = Activity.Current;
         var metadata = new EventDeliveryMetadata(
-            Guid.NewGuid().ToString("N"),
+            Guid.CreateVersion7().ToString("D"),
             $"urn:monica:{Uri.EscapeDataString(hostEnvironment.ApplicationName)}",
             eventName,
             topicName ?? eventName,

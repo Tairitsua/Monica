@@ -25,9 +25,6 @@ using Monica.Repository.Bulk.Services;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Services;
 using Monica.Repository.Facades;
-using Monica.Repository.GuidGeneration.Abstractions;
-using Monica.Repository.GuidGeneration.Models;
-using Monica.Repository.GuidGeneration.Services;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Metrics;
 using Monica.Repository.Persistence.Models;
@@ -59,8 +56,6 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
     {
         var services = context.Services;
         services.TryAddSingleton<IBulkWriter, BulkWriter>();
-        services.AddOptions<SequentialGuidGeneratorOptions>();
-        services.TryAddTransient<IGuidGenerator, SequentialGuidGenerator>();
         services.TryAddSingleton<IRepositoryDbContextRegistry, RepositoryDbContextRegistry>();
         services.TryAddScoped<IRepositoryDbContextDiagnosticsService, RepositoryDbContextDiagnosticsService>();
         services.TryAddScoped<RepositoryDiagnosticsFacade>();

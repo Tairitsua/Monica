@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Monica.Core.JsonSerialization.Converters;
 
+/// <summary>Reads nullable UUIDs in the supported .NET formats and rejects malformed input.</summary>
 public class NullableGuidJsonConverter : JsonConverter<Guid?>
 {
     public override Guid? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -22,12 +23,7 @@ public class NullableGuidJsonConverter : JsonConverter<Guid?>
             }
         }
 
-        if (reader.TryGetGuid(out var guid2))
-        {
-            return guid2;
-        }
-
-        return null;
+        throw new JsonException("Expected null or a valid UUID string.");
     }
 
 

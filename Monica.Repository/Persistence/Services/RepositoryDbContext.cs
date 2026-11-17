@@ -184,11 +184,10 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
         {
             foreach (var property in entityType.GetProperties())
             {
-                //Set up automatic generation of SnowflakeIdGenerator ID
-                if (property.Name.Equals("Id") && property.ValueGenerated != ValueGenerated.Never &&
-                    property.ClrType == typeof(long))
+                // Entity identities belong to the application, including restored pre-existing UUIDs.
+                if (typeof(IEntity<Guid>).IsAssignableFrom(entityType.ClrType)
+                    && property.Name == nameof(IEntity<Guid>.Id) && property.IsPrimaryKey())
                 {
-                    property.SetValueGeneratorFactory((_, _) => new SnowflakeLongValueGenerator());
                     builder.Entity(entityType.ClrType).Property(property.Name).ValueGeneratedNever();
                 }
 

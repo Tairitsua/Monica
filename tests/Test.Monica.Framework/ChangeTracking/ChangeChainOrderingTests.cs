@@ -6,6 +6,23 @@ namespace Test.Monica.Framework.ChangeTracking;
 
 public sealed class ChangeChainOrderingTests
 {
+    private static readonly Guid _idA = new("019a8c82-1d00-7000-8000-000000000001");
+    private static readonly Guid _idB = new("019a8c82-1d00-7000-8000-000000000002");
+    private static readonly Guid _idC = new("019a8c82-1d00-7000-8000-000000000003");
+    private static readonly Guid _idDirect = new("019a8c82-1d00-7000-8000-000000000004");
+    private static readonly Guid _idFirst = new("019a8c82-1d00-7000-8000-000000000005");
+    private static readonly Guid _idLater = new("019a8c82-1d00-7000-8000-000000000006");
+    private static readonly Guid _idMissing = new("019a8c82-1d00-7000-8000-000000000007");
+    private static readonly Guid _idObsolete = new("019a8c82-1d00-7000-8000-000000000008");
+    private static readonly Guid _idR = new("019a8c82-1d00-7000-8000-000000000009");
+    private static readonly Guid _idR1 = new("019a8c82-1d00-7000-8000-00000000000a");
+    private static readonly Guid _idR2 = new("019a8c82-1d00-7000-8000-00000000000b");
+    private static readonly Guid _idR3 = new("019a8c82-1d00-7000-8000-00000000000c");
+    private static readonly Guid _idR4 = new("019a8c82-1d00-7000-8000-00000000000d");
+    private static readonly Guid _idRelated = new("019a8c82-1d00-7000-8000-00000000000e");
+    private static readonly Guid _idRollback = new("019a8c82-1d00-7000-8000-00000000000f");
+    private static readonly Guid _idSecond = new("019a8c82-1d00-7000-8000-000000000010");
+    private static readonly Guid _idZ = new("019a8c82-1d00-7000-8000-000000000011");
     private static readonly DateTime _time = new(2026, 11, 13, 10, 0, 0, DateTimeKind.Utc);
 
     [Theory]
@@ -19,7 +36,7 @@ public sealed class ChangeChainOrderingTests
     {
         var chain = new Chain(new State());
         foreach (var id in arrival) chain.Add(Entry(id.ToString()));
-        Assert.Equal(["a", "b", "c"], chain.ChangingList.Select(entry => entry.Id));
+        Assert.Equal(new[] { "a", "b", "c" }.Select(Identity), chain.ChangingList.Select(entry => entry.Id));
         Assert.Equal("c", chain.GetFinalStatus().Value);
         Assert.All(chain.ChangingList, entry => Assert.Equal(0, entry.OffsetAdjust));
     }
@@ -45,26 +62,26 @@ public sealed class ChangeChainOrderingTests
         later.AlterTime = _time.AddMinutes(2);
         var chain = new Chain(new Chain.ChainJsonParseBridge
         {
-            SchemaVersion = 2, TracingData = "{}", ChangingList = [direct, related, later]
+            SchemaVersion = 3, TracingData = "{}", ChangingList = [direct, related, later]
         });
         var acceptedTime = _time.AddMinutes(1);
-        var rollback = chain.CreateRollbackAlterItemBySourceId("rollback", Source.System, "operation", null, "message", acceptedTime);
+        var rollback = chain.CreateRollbackAlterItemBySourceId(Identity("rollback"), Source.System, "operation", null, "message", acceptedTime);
         Assert.NotNull(rollback);
         Assert.Equal(acceptedTime, rollback.AlterTime);
-        Assert.Equal(["direct", "related"], rollback.TargetRollbackIds);
+        Assert.Equal(new[] { "direct", "related" }.Select(Identity), rollback.TargetRollbackIds);
     }
 
     [Fact]
-    public void ReadLegacy_WhenTimesAreEqual_ShouldPreserveRecordedOrder()
+    public void ReadConvertedHistory_WhenTimesAreEqual_ShouldPreserveRecordedOrder()
     {
         var chain = new Chain(new Chain.ChainJsonParseBridge
         {
-            TracingData = "{}", ChangingList = [Entry("z"), Entry("a")]
+            TracingData = "{}", ChangingList = [HistoricalEntry("z", 1), HistoricalEntry("a", 2)]
         });
         Assert.Equal("a", chain.GetFinalStatus().Value);
         Assert.Equal([1L, 2L], chain.ChangingList.Select(entry => entry.HistoricalOrder!.Value));
         chain.Add(Entry("b"));
-        Assert.Equal(["z", "a", "b"], chain.ChangingList.Select(entry => entry.Id));
+        Assert.Equal(new[] { "z", "a", "b" }.Select(Identity), chain.ChangingList.Select(entry => entry.Id));
         Assert.Equal("b", chain.GetFinalStatus().Value);
     }
 
@@ -89,10 +106,10 @@ public sealed class ChangeChainOrderingTests
         rollback.ActualEffectTime = _time.AddHours(-1);
         var chain = new Chain(new Chain.ChainJsonParseBridge
         {
-            SchemaVersion = 2, TracingData = "{}", ChangingList = [rollback, target]
+            SchemaVersion = 3, TracingData = "{}", ChangingList = [rollback, target]
         });
         Assert.Equal("", chain.GetFinalStatus().Value);
-        Assert.Equal("r", target.RollbackBy);
+        Assert.Equal(Identity("r"), target.RollbackBy);
     }
 
     [Fact]
@@ -110,7 +127,7 @@ public sealed class ChangeChainOrderingTests
     {
         Assert.Throws<InvalidOperationException>(() => new Chain(new Chain.ChainJsonParseBridge
         {
-            SchemaVersion = 2, TracingData = "{}",
+            SchemaVersion = 3, TracingData = "{}",
             ChangingList = [Rollback("r1", "r2"), Rollback("r2", "r1")]
         }));
     }
@@ -128,10 +145,10 @@ public sealed class ChangeChainOrderingTests
     public void Read_WhenStoredRollbackFlagIsStale_ShouldDeriveItFromFacts()
     {
         var entry = Entry("a");
-        entry.RollbackBy = "obsolete";
+        entry.RollbackBy = Identity("obsolete");
         var chain = new Chain(new Chain.ChainJsonParseBridge
         {
-            SchemaVersion = 2, TracingData = "{}", ChangingList = [entry]
+            SchemaVersion = 3, TracingData = "{}", ChangingList = [entry]
         });
         Assert.Equal("a", chain.GetFinalStatus().Value);
         Assert.Null(entry.RollbackBy);
@@ -155,12 +172,50 @@ public sealed class ChangeChainOrderingTests
         Assert.Equal("b", entry.Data.Value);
     }
 
+    [Fact]
+    public void Read_WhenPortableDocumentOmitsVersion_ShouldRejectInsteadOfAssumingUuidOrdering()
+    {
+        Assert.Throws<System.Text.Json.JsonException>(() =>
+            System.Text.Json.JsonSerializer.Deserialize<Chain.ChainJsonParseBridge>(
+                """{"TracingData":"{}","ChangingList":[]}"""));
+    }
+
+    private static TestEntry HistoricalEntry(string id, long position)
+    {
+        var entry = Entry(id);
+        entry.HistoricalOrder = position;
+        return entry;
+    }
+
     private static TestEntry Entry(string id) => new()
     {
-        Id = id, AlterTime = _time, Data = new ChangeData { Value = id }
+        Id = Identity(id), AlterTime = _time, Data = new ChangeData { Value = id }
     };
     private static TestEntry Rollback(string id, params string[] targets)
-        => new() { Id = id, AlterTime = _time, TargetRollbackIds = [.. targets], Data = new ChangeData() };
+        => new() { Id = Identity(id), AlterTime = _time, TargetRollbackIds = targets.Select(Identity).ToList(), Data = new ChangeData() };
+
+
+    private static Guid Identity(string label) => label switch
+    {
+        "a" => _idA,
+        "b" => _idB,
+        "c" => _idC,
+        "direct" => _idDirect,
+        "first" => _idFirst,
+        "later" => _idLater,
+        "missing" => _idMissing,
+        "obsolete" => _idObsolete,
+        "r" => _idR,
+        "r1" => _idR1,
+        "r2" => _idR2,
+        "r3" => _idR3,
+        "r4" => _idR4,
+        "related" => _idRelated,
+        "rollback" => _idRollback,
+        "second" => _idSecond,
+        "z" => _idZ,
+        _ => throw new ArgumentException("Unknown test identity.", nameof(label))
+    };
 
     private sealed class Chain : ChangeChain<State, TestEntry, ChangeData, Source>
     {
