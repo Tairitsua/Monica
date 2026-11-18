@@ -210,8 +210,8 @@ public class ModuleEventBusOption : ModuleOptions<ModuleEventBus>
     /// Defaults to one (two attempts in total); zero disables retries. Must be nonnegative.
     /// Dapr and native Kafka apply this budget to all processing failures, including business exceptions,
     /// timeouts, deserialization failures and handler cancellation. Transport shutdown stops processing
-    /// without acknowledging the message. Exhaustion logs and ends delivery, forwarding to the provider's
-    /// dead-letter destination when configured. Local events and Outbox publishing have separate semantics.
+    /// without acknowledging the message. On exhaustion the provider applies its configured failure action.
+    /// Local events and Outbox publishing have separate semantics.
     /// The budget is per transport delivery and resets after broker redelivery or process restart.
     /// </summary>
     public int MessageRetryCount { get; set; } = 1;

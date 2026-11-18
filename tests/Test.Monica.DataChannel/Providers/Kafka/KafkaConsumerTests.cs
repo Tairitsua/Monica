@@ -4,6 +4,7 @@ using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Pipeline;
 using Monica.DataChannel.Providers.Kafka;
 using Monica.Testing.Hosting;
+using Monica.Kafka;
 using Xunit;
 
 namespace Test.Monica.DataChannel.Providers.Kafka;
@@ -123,12 +124,16 @@ public sealed class KafkaConsumerTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Input_WhenOwnershipChanges_ShouldDrainOldWorkAndIgnoreItsLateSuccess(bool lost)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Input_WhenOwnershipChanges_ShouldDrainOldWorkAndIgnoreItsLateResult(bool lost, bool failOldHandler)
     {
         using var deadline = Deadline();
         var scenario = new KafkaScenario();
+        scenario.Options.ProcessingFailureAction = KafkaFailureAction.LogAndSkip;
+        scenario.Options.ProcessingMaxAttempts = 1;
         var oldRelease = Signal();
         var replacementRelease = Signal();
         var oldEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -142,6 +147,7 @@ public sealed class KafkaConsumerTests
                 oldEntered.TrySetResult(context.CancellationToken);
                 // Deliberately emulate an application that ignores cancellation while completing its I/O.
                 await oldRelease.Task;
+                if (failOldHandler) throw new InvalidOperationException("Late failure from revoked assignment.");
             }
             else
             {
@@ -170,6 +176,7 @@ public sealed class KafkaConsumerTests
             await scenario.Signal.UntilAsync(() => Positions(consumer, 0).Length == 1, deadline.Token);
             Assert.Equal([1L], Positions(consumer, 0));
             Assert.Equal(2, Volatile.Read(ref attempts));
+            Assert.Equal(0, KafkaScenario.Snapshot(Channel(application)).SkippedMessages);
             AssertSingleConsumerOwner(consumer);
         }
         finally
@@ -329,6 +336,106 @@ public sealed class KafkaConsumerTests
         Assert.Equal("", Assert.IsType<string>(deliveries[0].Data));
         Assert.Null(deliveries[1].Data);
         Assert.Equal([1L, 2L], Positions(consumer, 0));
+    }
+
+    [Fact]
+    public async Task Input_WhenSkippingFailedHead_ShouldRetryOnlyCommitAndContinueSamePartition()
+    {
+        using var deadline = Deadline();
+        var scenario = new KafkaScenario();
+        scenario.Options.ProcessingMaxAttempts = 3;
+        scenario.Options.ProcessingFailureAction = KafkaFailureAction.LogAndSkip;
+        scenario.Receive = context => Metadata(context).Offset == 7
+            ? Task.FromException(new InvalidDataException("Journal mismatch.")) : Task.CompletedTask;
+        await using var application = await StartAsync(scenario, deadline.Token);
+        var channel = Channel(application);
+        var consumer = Assert.Single(scenario.Clients.Consumers);
+        consumer.CommitFailuresRemaining = 1;
+        consumer.Assign(0);
+        consumer.Enqueue(KafkaScenario.Record(0, 7), KafkaScenario.Record(0, 8));
+
+        await scenario.Signal.UntilAsync(() => KafkaScenario.Snapshot(channel).CommittedMessages == 2, deadline.Token);
+        Assert.Equal([7L, 7L, 7L, 8L], scenario.Deliveries.Select(context => Metadata(context).Offset));
+        Assert.Equal([8L, 8L, 9L], consumer.CommitAttempts.Select(position => position.Offset.Value));
+        var snapshot = KafkaScenario.Snapshot(channel);
+        Assert.Equal(1, snapshot.SkippedMessages);
+        Assert.Equal(1, snapshot.ProcessedMessages);
+        Assert.Equal(0, snapshot.DeadLetteredMessages);
+        Assert.Empty(snapshot.BlockedPartitions);
+        Assert.Empty(scenario.Clients.Producers);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Input_WhenDeadLettering_ShouldPreserveWireRecordAndWaitForDurableHandoff(bool tombstone)
+    {
+        using var deadline = Deadline();
+        var scenario = new KafkaScenario();
+        scenario.Options.ProcessingFailureAction = KafkaFailureAction.DeadLetter;
+        scenario.Options.DeadLetterTopic = "failed-sync";
+        scenario.Options.ProcessingMaxAttempts = 1;
+        scenario.Options.InputPayloadFormat = KafkaInputPayloadFormat.RawBytes;
+        scenario.Receive = context => Metadata(context).Offset == 7
+            ? Task.FromException(new InvalidDataException("Journal mismatch.")) : Task.CompletedTask;
+        var confirmed = new TaskCompletionSource<DeliveryResult<byte[], byte[]>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var forwards = 0;
+        scenario.Clients.Produce = (_, token) => Interlocked.Increment(ref forwards) == 1
+            ? Task.FromResult(new DeliveryResult<byte[], byte[]> { Status = PersistenceStatus.PossiblyPersisted })
+            : confirmed.Task.WaitAsync(token);
+        await using var application = await StartAsync(scenario, deadline.Token);
+        var channel = Channel(application);
+        var consumer = Assert.Single(scenario.Clients.Consumers);
+        var producer = Assert.Single(scenario.Clients.Producers);
+        var bad = KafkaScenario.Record(0, 7);
+        bad.Message.Value = tombstone ? null! : [0xff, 0x00];
+        bad.Message.Headers.Add("repeat", [0xf1]);
+        bad.Message.Headers.Add("repeat", null);
+        consumer.CommitFailuresRemaining = 1;
+        consumer.Assign(0);
+        consumer.Enqueue(bad, KafkaScenario.Record(0, 8));
+
+        await scenario.Signal.UntilAsync(() => producer.Records.Count == 2, deadline.Token);
+        Assert.Empty(consumer.CommitAttempts);
+        Assert.Single(scenario.Deliveries);
+        confirmed.SetResult(new DeliveryResult<byte[], byte[]> { Status = PersistenceStatus.Persisted });
+        await scenario.Signal.UntilAsync(() => KafkaScenario.Snapshot(channel).CommittedMessages == 2, deadline.Token);
+        Assert.Equal([8L, 8L, 9L], consumer.CommitAttempts.Select(position => position.Offset.Value));
+        Assert.Equal([7L, 8L], scenario.Deliveries.Select(context => Metadata(context).Offset));
+        Assert.Equal(1, KafkaScenario.Snapshot(channel).DeadLetteredMessages);
+        Assert.Equal(1, KafkaScenario.Snapshot(channel).ProcessedMessages);
+        Assert.Equal(0, KafkaScenario.Snapshot(channel).SkippedMessages);
+        Assert.All(producer.Records, attempt =>
+        {
+            Assert.Equal("failed-sync", attempt.Topic);
+            Assert.Equal(bad.Message.Key, attempt.Message.Key);
+            Assert.Equal(bad.Message.Value, attempt.Message.Value);
+            var headers = attempt.Message.Headers;
+            Assert.Equal(["repeat", "repeat"], headers.Take(2).Select(header => header.Key));
+            Assert.Equal(new byte[] { 0xf1 }, headers[0].GetValueBytes());
+            Assert.Null(headers[1].GetValueBytes());
+            Assert.Equal(KafkaScenario.TOPIC, Header("topic"));
+            Assert.Equal("0", Header("partition"));
+            Assert.Equal("7", Header("offset"));
+            Assert.Equal("scenario-owner", Header("consumer-group"));
+            Assert.Equal("Journal mismatch.", Header("error"));
+            string Header(string name) => System.Text.Encoding.UTF8.GetString(headers.GetLastBytes("monica-dlq-" + name));
+        });
+    }
+
+    [Fact]
+    public void Describe_WhenIdentityIsOnlyOnLegacyFailure_ShouldRetainIdKeyAndBrokerPosition()
+    {
+        var record = KafkaScenario.Record(2, 17);
+        var failure = new InvalidOperationException();
+        var id = Guid.NewGuid();
+        failure.Data[KafkaDeliveryFailure.MessageIdHeader] = id;
+        var identity = KafkaDeliveryFailure.Describe(record, failure);
+        Assert.Contains(id.ToString(), identity);
+        Assert.Contains("resource-2", identity);
+        Assert.Contains(record.TopicPartitionOffset.ToString(), identity);
+        record.Message.Headers.Add(KafkaDeliveryFailure.MessageIdHeader, "wire-id"u8.ToArray());
+        Assert.Contains("MessageId=wire-id", KafkaDeliveryFailure.Describe(record, failure));
     }
 
     private static async Task<MonicaTestApplication> StartAsync(KafkaScenario scenario, CancellationToken cancellationToken)

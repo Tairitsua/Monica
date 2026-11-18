@@ -11,6 +11,7 @@ using Monica.EventBus.Kafka.Services.Support;
 using Monica.EventBus.Models;
 using Monica.EventBus.Services.Support;
 using Monica.Modules;
+using Monica.Kafka;
 
 namespace Monica.EventBus.Kafka.Providers.ConfluentKafka;
 
@@ -135,7 +136,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey, topicConsumer.WorkloadOwner);
         var hasProvenHealthy = false;
         var assignmentVersion = 0;
-        using var consumer = new ConsumerBuilder<string, string>(consumerConfig)
+        using var consumer = new ConsumerBuilder<byte[], byte[]>(consumerConfig)
             .SetPartitionsAssignedHandler((_, partitions) =>
             {
                 assignmentVersion++;
@@ -159,11 +160,41 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             })
             .Build();
         consumer.Subscribe(topicConsumer.TopicName);
-        ConsumeResult<string, string>? pending = null;
+        ConsumeResult<byte[], byte[]>? pending = null;
         var batchSubscription = SubscriptionManager.GetAll().SingleOrDefault(subscription => subscription.IsBatch
             && subscription.Scope == EventSubscriptionScope.Distributed && subscription.ServiceKey == ServiceKey
             && subscription.TopicName == topicConsumer.TopicName && subscription.WorkloadOwner == topicConsumer.WorkloadOwner
             && subscription.State == EventSubscriptionState.Active);
+
+        var policy = options.Value.ResolveFailurePolicy(topicConsumer.TopicName, ServiceKey, topicConsumer.WorkloadOwner, batchSubscription is not null);
+        using var deadLetterProducer = policy.Action == KafkaFailureAction.DeadLetter
+            ? new ProducerBuilder<byte[], byte[]>(KafkaClientConfigFactory.BuildProducerConfig(cluster, options.Value)).Build()
+            : null;
+
+        async Task HandleExhaustedAsync(ConsumeResult<byte[], byte[]> record, Exception failure)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var identity = KafkaDeliveryFailure.Describe(record, failure);
+            var detail = $"Kafka processing exhausted at {identity}, action={policy.Action}, group={consumerConfig.GroupId}";
+            TopicStatusStore.ReportError(ServiceKey, topicConsumer.TopicName, detail, failure);
+            RecordState(detail, HostedServiceState.Degraded, failure);
+            Logger.LogError(failure, "Kafka processing exhausted at {Identity}, action={Action}, group={ConsumerGroup}",
+                identity, policy.Action, consumerConfig.GroupId);
+            if (policy.Action == KafkaFailureAction.Block)
+                throw new KafkaProcessingBlockedException($"Kafka consumer blocked at {identity}.", failure);
+            if (policy.Action == KafkaFailureAction.DeadLetter)
+            {
+                try
+                {
+                    await KafkaDeliveryFailure.ForwardAsync(deadLetterProducer!, policy.DeadLetterTopic!,
+                        consumerConfig.GroupId, record, failure, cancellationToken);
+                }
+                catch (Exception error) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new KafkaConsumerRestartRequiredException($"Kafka dead-letter handoff failed at {identity}.", error);
+                }
+            }
+        }
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -192,10 +223,10 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                                     consumer.Commit(record);
                                     for (var index = 0; index < count; index++)
                                         TopicStatusStore.ReportMessageProcessed(ServiceKey, topicConsumer.TopicName);
-                                }, retryPolicy, cancellationToken);
+                                }, retryPolicy, cancellationToken, HandleExhaustedAsync);
                         }
                     }
-                    catch (KafkaEventBatchReceiver.KafkaBatchProcessingException) { throw; }
+                    catch (KafkaProcessingBlockedException) { throw; }
                     catch (KafkaConsumerRestartRequiredException) { throw; }
                     catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
                     {
@@ -209,20 +240,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                         CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner),
                     () => consumer.Commit(result),
                     () => consumer.Seek(result.TopicPartitionOffset),
-                    failure =>
-                    {
-                        var idBytes = result.Message.Headers?.LastOrDefault(header => header.Key == "monica-message-id")?.GetValueBytes();
-                        var messageId = idBytes is null ? null : Encoding.UTF8.GetString(idBytes);
-                        TopicStatusStore.ReportError(ServiceKey, topicConsumer.TopicName,
-                            $"Retry budget exhausted for Kafka message {messageId} at {result.TopicPartitionOffset}",
-                            failure);
-                        RecordState($"Kafka message retry budget exhausted for topic {topicConsumer.TopicName}",
-                            HostedServiceState.Degraded, failure);
-                        Logger.LogError(failure,
-                            "Retry budget exhausted for Kafka message {MessageId} at {TopicPartitionOffset}; skipping delivery " +
-                            "(ServiceKey: {ServiceKey})",
-                            messageId, result.TopicPartitionOffset, ServiceKey ?? "default");
-                    },
+                    failure => HandleExhaustedAsync(result, failure),
                     retryPolicy, cancellationToken);
 
                 if (processed)
@@ -247,7 +265,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 // After a failed seek, this consumer cannot safely commit any later offset.
                 throw;
             }
-            catch (KafkaEventBatchReceiver.KafkaBatchProcessingException)
+            catch (KafkaProcessingBlockedException)
             {
                 // Exhaustion is terminal for this topic/owner; an operator can repair and restart it.
                 throw;
@@ -285,7 +303,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     }
 
     internal static async Task<bool> CommitAfterHandlingAsync(
-        Func<Task> handle, Action commit, Action rewind, Action<Exception> reject,
+        Func<Task> handle, Action commit, Action rewind, Func<Exception, Task> reject,
         EventMessageRetryPolicy retryPolicy,
         CancellationToken cancellationToken = default)
     {
@@ -300,7 +318,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             {
                 // End exhausted processing only after the last attempt's transaction and scope unwind.
                 cancellationToken.ThrowIfCancellationRequested();
-                reject(failure);
+                await reject(failure).ConfigureAwait(false);
                 processed = false;
             }
 
@@ -309,6 +327,10 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         catch (Exception) when (cancellationToken.IsCancellationRequested)
         {
             // The caller disposes this consumer without advancing its broker position.
+            throw;
+        }
+        catch (Exception failure) when (failure is KafkaProcessingBlockedException or KafkaConsumerRestartRequiredException)
+        {
             throw;
         }
         catch (Exception failure)
@@ -337,7 +359,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         return processed;
     }
 
-    internal static EventMessage CreateReceivedMessage(ConsumeResult<string, string> result, string? serviceKey)
+    internal static EventMessage CreateReceivedMessage(ConsumeResult<byte[], byte[]> result, string? serviceKey)
     {
         string? Header(string name)
         {
@@ -362,8 +384,8 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             throw new EventMessageDeserializationException($"Kafka message on topic '{result.Topic}' has a null body.");
         }
 
-        metadata = metadata with { TransportKey = result.Message.Key };
-        return new EventMessage(metadata, EventSubscriptionScope.Distributed, Encoding.UTF8.GetBytes(result.Message.Value));
+        metadata = metadata with { TransportKey = result.Message.Key is null ? null : Encoding.UTF8.GetString(result.Message.Key) };
+        return new EventMessage(metadata, EventSubscriptionScope.Distributed, result.Message.Value);
     }
 
     // A protocol mismatch consumes the same finite budget as any other processing failure.
@@ -393,6 +415,8 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 new AggregateException(originalFailure, seekFailure));
         }
     }
+
+    internal sealed class KafkaProcessingBlockedException(string message, Exception cause) : Exception(message, cause);
 
     internal sealed class KafkaConsumerRestartRequiredException(string message, Exception innerException)
         : Exception(message, innerException)

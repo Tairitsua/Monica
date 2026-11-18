@@ -593,6 +593,7 @@
         "sourcePaths": [
           "Monica.EventBus",
           "Monica.EventBus.Kafka",
+          "Monica.Kafka",
           "Monica.DataChannel",
           "Monica.DataChannel.Dapr",
           "Monica.SignalR",

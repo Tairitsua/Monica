@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.EventBus.Services.Support;
 using Monica.Modules;
+using Monica.Kafka;
 using Monica.EventBus.Kafka.Providers.ConfluentKafka;
 using Monica.EventBus.Models;
 using Xunit;
@@ -24,7 +25,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             () => handled.Task,
             () => committed = true,
             () => rewound = true,
-            _ => Assert.Fail("A successful delivery must not be rejected."),
+            _ => throw new Xunit.Sdk.XunitException("A successful delivery must not be rejected."),
             CreatePolicy(), TestContext.Current.CancellationToken);
 
         committed.Should().BeFalse();
@@ -53,7 +54,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             },
             () => committed = true,
             () => Assert.Fail("Exhausted processing must not rewind."),
-            exception => rejected = exception,
+            exception => { rejected = exception; return Task.CompletedTask; },
             CreatePolicy(retries), TestContext.Current.CancellationToken);
 
         Assert.False(processed);
@@ -86,13 +87,14 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             {
                 rejected = exception;
                 operations.Add("reject");
+                return Task.CompletedTask;
             },
             CreatePolicy(), TestContext.Current.CancellationToken);
         var nextProcessed = await KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
             () => Task.CompletedTask,
             () => operations.Add("next-commit"),
             () => operations.Add("next-rewind"),
-            _ => Assert.Fail("The next delivery must not be rejected."),
+            _ => throw new Xunit.Sdk.XunitException("The next delivery must not be rejected."),
             CreatePolicy(), TestContext.Current.CancellationToken);
 
         processed.Should().BeFalse();
@@ -110,7 +112,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             () => ++attempts == 1 ? Task.FromException(new TimeoutException()) : Task.CompletedTask,
             () => committed = true,
             () => Assert.Fail("Successful retry must not rewind."),
-            _ => Assert.Fail("Successful retry must not reject."),
+            _ => throw new Xunit.Sdk.XunitException("Successful retry must not reject."),
             CreatePolicy(), TestContext.Current.CancellationToken);
 
         Assert.True(processed);
@@ -133,7 +135,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => rejectHandler ? Task.FromException(new BusinessException("Rejected.")) : Task.CompletedTask,
                 () => throw commitFailure,
                 () => rewound = true,
-                _ => rejectionCount++,
+                _ => { rejectionCount++; return Task.CompletedTask; },
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         thrown.Should().BeSameAs(commitFailure);
@@ -152,7 +154,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw handlerFailure,
                 () => throw seekFailure,
-                _ => Assert.Fail("An unexpected failure must remain retryable."),
+                _ => throw new Xunit.Sdk.XunitException("An unexpected failure must remain retryable."),
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         Assert.IsType<AggregateException>(thrown.InnerException).InnerExceptions
@@ -171,7 +173,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => cancellation.CancelAsync(),
                 () => committed = true,
                 () => rewound = true,
-                _ => Assert.Fail("Cancellation must not reject delivery."),
+                _ => throw new Xunit.Sdk.XunitException("Cancellation must not reject delivery."),
                 CreatePolicy(), cancellation.Token));
 
         committed.Should().BeFalse();
@@ -188,7 +190,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.FromException(new BusinessException("Rejected.")),
                 () => Assert.Fail("A canceled delivery must not be acknowledged."),
                 () => Assert.Fail("A stopped consumer must not seek."),
-                _ => cancellation.Cancel(),
+                _ => cancellation.CancelAsync(),
                 CreatePolicy(), cancellation.Token));
     }
 
@@ -203,7 +205,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.FromException(new BusinessException("Rejected.")),
                 () => throw failure,
                 () => Assert.Fail("A transferred partition must not be sought."),
-                _ => rejected = true,
+                _ => { rejected = true; return Task.CompletedTask; },
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         rejected.Should().BeTrue();
@@ -226,7 +228,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             },
             () => committed = true,
             () => Assert.Fail("A permanent body rejection must not rewind."),
-            failure => rejection = failure,
+            failure => { rejection = failure; return Task.CompletedTask; },
             CreatePolicy(), TestContext.Current.CancellationToken);
 
         processed.Should().BeFalse();
@@ -250,7 +252,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw failure,
                 () => rewound = true,
-                _ => Assert.Fail("This failure must remain retryable."),
+                _ => throw new Xunit.Sdk.XunitException("This failure must remain retryable."),
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         restart.InnerException.Should().BeSameAs(failure);
@@ -268,7 +270,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw failure,
                 () => rewound = true,
-                _ => Assert.Fail("This failure must remain retryable."),
+                _ => throw new Xunit.Sdk.XunitException("This failure must remain retryable."),
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         thrown.Should().BeSameAs(failure);
@@ -287,7 +289,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
                 () => Task.CompletedTask,
                 () => throw failure,
                 () => throw seekFailure,
-                _ => Assert.Fail("This failure must remain retryable."),
+                _ => throw new Xunit.Sdk.XunitException("This failure must remain retryable."),
                 CreatePolicy(), TestContext.Current.CancellationToken));
 
         committed.Should().BeFalse();
@@ -312,7 +314,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
         message.Metadata.TraceParent.Should().Be("original-parent");
         message.Metadata.TraceState.Should().Be("original-state");
         message.Metadata.TransportKey.Should().Be("order-17");
-        Encoding.UTF8.GetString(message.Body.Span).Should().Be(record.Message.Value);
+        message.Body.ToArray().Should().Equal(record.Message.Value);
     }
 
     [Theory]
@@ -334,7 +336,7 @@ public class KafkaEventBusSubscriptionHostedServiceTests
     {
         var record = CreateRecord();
         record.Message.Headers = new Headers();
-        record.Message.Value = "{}";
+        record.Message.Value = "{}"u8.ToArray();
         var attempts = 0;
         var committed = false;
         Exception? rejection = null;
@@ -348,13 +350,47 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             },
             () => committed = true,
             () => Assert.Fail("Exhausted processing must not rewind."),
-            exception => rejection = exception,
+            exception => { rejection = exception; return Task.CompletedTask; },
             CreatePolicy(), TestContext.Current.CancellationToken);
 
         Assert.False(processed);
         Assert.True(committed);
         Assert.Equal(2, attempts);
         Assert.IsType<KafkaEventBusSubscriptionHostedService.KafkaNativeEnvelopeException>(rejection);
+    }
+
+    [Fact]
+    public void ResolveFailurePolicy_SelectsExactGroupAndPreservesSingleAndBatchDefaults()
+    {
+        var options = new ModuleEventBusKafkaOption
+        {
+            SubscriptionFailurePolicies = [new("changes", KafkaFailureAction.DeadLetter, "audit", "secondary", "changes-dlq")]
+        };
+        options.ValidateSubscriptionFailurePolicies();
+        Assert.Equal("changes-dlq", options.ResolveFailurePolicy("changes", "audit", "secondary", true).DeadLetterTopic);
+        Assert.Equal(KafkaFailureAction.Block, options.ResolveFailurePolicy("changes", "audit", "another", true).Action);
+        Assert.Equal(KafkaFailureAction.LogAndSkip, options.ResolveFailurePolicy("changes", null, "secondary", false).Action);
+        options.SubscriptionFailurePolicies.Add(new("changes", KafkaFailureAction.LogAndSkip, "audit", "secondary"));
+        Assert.Throws<ArgumentException>(options.ValidateSubscriptionFailurePolicies);
+        options.SubscriptionFailurePolicies = [new("changes", KafkaFailureAction.DeadLetter, DeadLetterTopic: "changes")];
+        Assert.Throws<ArgumentException>(options.ValidateSubscriptionFailurePolicies);
+    }
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenHandoffFails_ShouldRetainOffsetUntilConsumerRestarts()
+    {
+        var confirmation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var commits = 0;
+        var delivery = KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+            () => Task.FromException(new InvalidDataException("Bad record.")), () => commits++,
+            () => Assert.Fail("The failed consumer is replaced."), _ => confirmation.Task, CreatePolicy(0),
+            TestContext.Current.CancellationToken);
+        Assert.False(delivery.IsCompleted);
+        Assert.Equal(0, commits);
+        confirmation.SetException(new KafkaEventBusSubscriptionHostedService.KafkaConsumerRestartRequiredException(
+            "Failed to forward", new IOException()));
+        await Assert.ThrowsAsync<KafkaEventBusSubscriptionHostedService.KafkaConsumerRestartRequiredException>(() => delivery);
+        Assert.Equal(0, commits);
     }
 
     private static EventMessageRetryPolicy CreatePolicy(int retries = 1)
@@ -466,16 +502,16 @@ public class KafkaEventBusSubscriptionHostedServiceTests
             workloadOwner);
     }
 
-    private static ConsumeResult<string, string> CreateRecord()
+    private static ConsumeResult<byte[], byte[]> CreateRecord()
         => new()
         {
             Topic = "orders",
             Partition = 0,
             Offset = 17,
-            Message = new Message<string, string>
+            Message = new Message<byte[], byte[]>
             {
-                Key = "order-17",
-                Value = "{\"orderId\":17}",
+                Key = "order-17"u8.ToArray(),
+                Value = "{\"orderId\":17}"u8.ToArray(),
                 Headers = new Headers
                 {
                     { "monica-message-id", Encoding.UTF8.GetBytes("stable-id") },

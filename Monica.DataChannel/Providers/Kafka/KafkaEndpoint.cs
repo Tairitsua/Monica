@@ -1,6 +1,7 @@
 using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
+using Monica.Kafka;
 using Monica.DataChannel.Abstractions.Communication;
 using Monica.DataChannel.Abstractions.Partitioning;
 using Monica.DataChannel.Pipeline;
@@ -9,8 +10,8 @@ namespace Monica.DataChannel.Providers.Kafka;
 
 /// <summary>Owns native Kafka clients and explicitly acknowledges completed pipeline deliveries.</summary>
 /// <remarks>
-/// Input has one unacknowledged head per partition and bounded cross-partition workers. Processing failures block
-/// their partition after finite retries. Reinitialization drains the old runtime and retries from committed offsets.
+/// Input retains one unacknowledged head per partition. After finite retries the input applies its configured failure action.
+/// Reinitialization drains the old runtime and resumes from committed offsets.
 /// Partition cancellation is cooperative; application transactions and receipts must reject stale or repeated effects.
 /// </remarks>
 public class KafkaEndpoint(
@@ -100,14 +101,15 @@ public class KafkaEndpoint(
             Metadata.EnrichOrValidate();
             try
             {
-                if (Metadata.Direction is ConnectionDirection.Output or ConnectionDirection.InputAndOutput)
+                var hasOutput = Metadata.Direction is ConnectionDirection.Output or ConnectionDirection.InputAndOutput;
+                if (hasOutput || Metadata.Direction == ConnectionDirection.Input && Metadata.ProcessingFailureAction == KafkaFailureAction.DeadLetter)
                 {
-                    _producer = clients.CreateProducer(KafkaClientConfiguration.Producer(Metadata), Metadata.Partitioner);
-                    lock (_sendGate) _acceptingSends = true;
+                    _producer = clients.CreateProducer(KafkaClientConfiguration.Producer(Metadata), hasOutput ? Metadata.Partitioner : null);
+                    lock (_sendGate) _acceptingSends = hasOutput;
                 }
                 if (Metadata.Direction is ConnectionDirection.Input or ConnectionDirection.InputAndOutput)
                 {
-                    _consumer = new KafkaConsumerRuntime(Metadata, clients, DeliverAsync,
+                    _consumer = new KafkaConsumerRuntime(Metadata, clients, _producer, DeliverAsync,
                         ReportFailure, unavailable => Pipe.IsNotAvailable = unavailable);
                     await _consumer.StartAsync(cancellationToken);
                 }

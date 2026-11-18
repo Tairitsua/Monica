@@ -20,6 +20,7 @@ using Monica.EventBus.Kafka.Models;
 using Monica.EventBus.Kafka.Providers.ConfluentKafka;
 using Monica.EventBus.Kafka.Providers.EfCore;
 using Monica.EventBus.Kafka.Services;
+using Monica.Kafka;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -79,6 +80,7 @@ public sealed class ModuleEventBusKafka : MonicaModule<ModuleEventBusKafkaOption
     public override void ConfigureServices(ModuleContext<ModuleEventBusKafkaOption> context)
     {
         var services = context.Services;
+        context.Options.ValidateSubscriptionFailurePolicies();
         services.TryAddSingleton<IKafkaConsoleRepository, InMemoryKafkaConsoleRepository>();
         services.TryAddSingleton<IKafkaClusterConfigProvider, KafkaClusterConfigProvider>();
         services.TryAddSingleton<KafkaBootstrapEndpointProbe>();
@@ -503,9 +505,29 @@ public sealed class ModuleEventBusKafkaOption : MinimalApiModuleOptions<ModuleEv
     /// <summary>
     /// Bounds collection for explicit distributed batch handlers: 100 records, 1 MiB and 50 ms by default.
     /// Single-event subscriptions retain their existing receive behavior. Each batch has one partition and
-    /// transaction; exhausted singleton failures stop that topic/owner consumer without acknowledging it.
+    /// transaction. By default an exhausted singleton stops its topic/owner consumer.
     /// </summary>
     public KafkaEventBatchOptions ReceiveBatch { get; set; } = new();
+
+    /// <summary>Overrides by exact topic, service key and workload owner. Single delivery defaults to LogAndSkip and batch delivery to Block.</summary>
+    public List<KafkaSubscriptionFailurePolicy> SubscriptionFailurePolicies { get; set; } = [];
+
+    internal void ValidateSubscriptionFailurePolicies()
+    {
+        var groups = new HashSet<(string Topic, string? ServiceKey, string? WorkloadOwner)>();
+        foreach (var policy in SubscriptionFailurePolicies)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(policy.Topic);
+            if (!groups.Add((policy.Topic, policy.ServiceKey, policy.WorkloadOwner)))
+                throw new ArgumentException($"Duplicate Kafka subscription failure policy for '{policy.Topic}', service '{policy.ServiceKey}', owner '{policy.WorkloadOwner}'.");
+            KafkaDeliveryFailure.Validate(policy.Action, policy.Topic, policy.DeadLetterTopic);
+        }
+    }
+
+    internal KafkaSubscriptionFailurePolicy ResolveFailurePolicy(string topic, string? serviceKey, string? owner, bool isBatch)
+        => SubscriptionFailurePolicies.SingleOrDefault(policy => policy.Topic == topic && policy.ServiceKey == serviceKey
+            && policy.WorkloadOwner == owner)
+            ?? new(topic, isBatch ? KafkaFailureAction.Block : KafkaFailureAction.LogAndSkip, serviceKey, owner);
 
     /// <summary>
     /// Gets or sets the native producer delivery deadline including retries, two minutes by default.

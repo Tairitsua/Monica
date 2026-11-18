@@ -96,6 +96,7 @@
   <Project Path="Monica.WebApi/Monica.WebApi.csproj" />
   <Project Path="Monica.EntityFrameworkCore/Monica.EntityFrameworkCore.csproj" />
   <Project Path="Monica.EventBus.Kafka/Monica.EventBus.Kafka.csproj" />
+  <Project Path="Monica.Kafka/Monica.Kafka.csproj" />
   <Project Path="Monica.EventBus/Monica.EventBus.csproj" />
   <Project Path="Monica.Framework.Generators/Monica.Framework.Generators.csproj" />
   <Project Path="Monica.Framework.UI/Monica.Framework.UI.csproj" />

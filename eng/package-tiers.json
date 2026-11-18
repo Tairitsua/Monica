@@ -67,6 +67,7 @@
         "Monica.EventBus.Kafka",
         "Monica.JobScheduler.EfCore",
         "Monica.JobScheduler.ServiceDiscovery",
+        "Monica.Kafka",
         "Monica.Locker.Redis",
         "Monica.SignalR",
         "Monica.StateStore.StackExchange"

@@ -17,7 +17,7 @@ public sealed class KafkaEventBatchReceiverTests
     [Fact]
     public void Collect_WhenCountReached_ShouldStopWithoutReadingAnotherRecord()
     {
-        var consumer = Substitute.For<IConsumer<string, string>>();
+        var consumer = Substitute.For<IConsumer<byte[], byte[]>>();
         consumer.Consume(Arg.Any<TimeSpan>()).Returns(Record(1), Record(2));
         var batch = KafkaEventBatchReceiver.Collect(consumer, Record(0), new(maxMessages: 2), () => 1, Token);
         Assert.Equal([0L, 1L], batch.Records.Select(record => record.Offset.Value));
@@ -30,7 +30,7 @@ public sealed class KafkaEventBatchReceiverTests
     {
         var first = Record(0);
         var second = Record(1);
-        var consumer = Substitute.For<IConsumer<string, string>>();
+        var consumer = Substitute.For<IConsumer<byte[], byte[]>>();
         consumer.Consume(Arg.Any<TimeSpan>()).Returns(second);
         var size = KafkaEventBatchReceiver.GetSize(first);
         var batch = KafkaEventBatchReceiver.Collect(consumer, first, new(maxBytes: size + 1), () => 1, Token);
@@ -45,7 +45,7 @@ public sealed class KafkaEventBatchReceiverTests
     [Fact]
     public void Collect_WhenPartitionsInterleave_ShouldGroupOrderedRecordsWithinOneBoundedWindow()
     {
-        var consumer = Substitute.For<IConsumer<string, string>>();
+        var consumer = Substitute.For<IConsumer<byte[], byte[]>>();
         var other = Record(20, partition: 1);
         consumer.Consume(Arg.Any<TimeSpan>()).Returns(other, Record(1), Record(21, partition: 1));
         var batch = KafkaEventBatchReceiver.Collect(consumer, Record(0), new(maxMessages: 4), () => 1, Token);
@@ -60,7 +60,7 @@ public sealed class KafkaEventBatchReceiverTests
     public void Collect_WhenLowTraffic_ShouldWaitOnlyConfiguredWindowAndReturnSingleton()
     {
         var time = new CollectionClock();
-        var consumer = Substitute.For<IConsumer<string, string>>();
+        var consumer = Substitute.For<IConsumer<byte[], byte[]>>();
         consumer.Consume(Arg.Any<TimeSpan>()).Returns(call =>
         {
             time.Advance(call.Arg<TimeSpan>());
@@ -76,7 +76,7 @@ public sealed class KafkaEventBatchReceiverTests
     public void Collect_WhenAssignmentChanges_ShouldDiscardUnacknowledgedBufferAndRestart()
     {
         var generation = 1;
-        var consumer = Substitute.For<IConsumer<string, string>>();
+        var consumer = Substitute.For<IConsumer<byte[], byte[]>>();
         consumer.Consume(Arg.Any<TimeSpan>()).Returns(_ => { generation++; return Record(1); });
         Assert.Throws<KafkaConsumerRestartRequiredException>(() =>
             KafkaEventBatchReceiver.Collect(consumer, Record(0), new(), () => generation, Token));
@@ -101,7 +101,7 @@ public sealed class KafkaEventBatchReceiverTests
         var attempts = new List<long[]>();
         var commits = new List<long>();
         var failure = new InvalidOperationException("poison");
-        var exception = await Assert.ThrowsAsync<KafkaEventBatchReceiver.KafkaBatchProcessingException>(() =>
+        var exception = await Assert.ThrowsAsync<KafkaProcessingBlockedException>(() =>
             KafkaEventBatchReceiver.DeliverAsync([Record(0), Record(1), Record(2), Record(3)], records =>
             {
                 var offsets = records.Select(record => record.Offset.Value).ToArray();
@@ -159,15 +159,29 @@ public sealed class KafkaEventBatchReceiverTests
         Assert.Equal(0, commits);
     }
 
+    [Fact]
+    public async Task DeliverAsync_WhenExhaustedSingletonIsSkipped_ShouldAcknowledgeItAndContinueInOrder()
+    {
+        var positions = new List<(long Offset, int Processed)>();
+        var rejected = new List<long>();
+        await KafkaEventBatchReceiver.DeliverAsync([Record(3), Record(4), Record(5)],
+            records => records.Any(record => record.Offset.Value == 4)
+                ? Task.FromException(new InvalidDataException("Rejected")) : Task.CompletedTask,
+            (record, count) => positions.Add((record.Offset.Value, count)), Policy(), Token,
+            (record, _) => { rejected.Add(record.Offset.Value); return Task.CompletedTask; });
+        Assert.Equal([4L], rejected);
+        Assert.Equal([(3L, 1), (4L, 0), (5L, 1)], positions);
+    }
+
     private static EventMessageRetryPolicy Policy(int retries = 1)
         => new(Options.Create(new ModuleEventBusOption { MessageRetryCount = retries }));
 
-    private static ConsumeResult<string, string> Record(long offset, int partition = 0) => new()
+    private static ConsumeResult<byte[], byte[]> Record(long offset, int partition = 0) => new()
     {
         Topic = "batch-test", Partition = partition, Offset = offset,
-        Message = new Message<string, string>
+        Message = new Message<byte[], byte[]>
         {
-            Key = "key", Value = "事件", Headers = new Headers { { "id", [1, 2, 3] } }
+            Key = "key"u8.ToArray(), Value = "事件"u8.ToArray(), Headers = new Headers { { "id", [1, 2, 3] } }
         }
     };
 

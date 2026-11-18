@@ -1,11 +1,13 @@
 using Confluent.Kafka;
+using Monica.Kafka;
 
 namespace Monica.DataChannel.Providers.Kafka;
 
-/// <summary>Owns all native consumer calls. Workers only execute pipeline work and return a result.</summary>
+/// <summary>Owns all native consumer calls. Workers execute the pipeline or publish a dead letter and report completion to the owner.</summary>
 internal sealed class KafkaConsumerRuntime(
     KafkaOptions options,
     IKafkaDataChannelClientFactory clients,
+    IProducer<byte[], byte[]>? deadLetterProducer,
     Func<ConsumeResult<byte[], byte[]>, CancellationToken, Task> deliver,
     Action<Exception, string> reportFailure,
     Action<bool> reportAvailability)
@@ -23,6 +25,8 @@ internal sealed class KafkaConsumerRuntime(
     private long _received;
     private long _processed;
     private long _committed;
+    private long _skipped;
+    private long _deadLettered;
     private string _state = "Starting";
     private Error? _fatalError;
     private DateTimeOffset _nextNativeErrorReport;
@@ -130,7 +134,7 @@ internal sealed class KafkaConsumerRuntime(
         {
             CompleteWorkers();
             ReleaseRetiredStates();
-            CommitSuccessfulHeads(consumer);
+            CommitReadyHeads(consumer);
             StartWorkers();
             ApplyBackpressure(consumer);
             PublishSnapshot();
@@ -231,10 +235,11 @@ internal sealed class KafkaConsumerRuntime(
         {
             if (_lifetime.IsCancellationRequested) break;
             if (ActiveWorkCount() >= options.MaxConcurrentPartitions) break;
-            if (state.Record is null || state.IsRunning || state.Succeeded || state.Blocked is not null
+            if (state.Record is null || state.IsRunning || state.ReadyToCommit || state.Blocked is not null
                 || state.RetryAt > DateTimeOffset.UtcNow || _workers.Any(worker => worker.State.Partition == state.Partition)
                 || _retiredStates.Any(retired => retired.Partition == state.Partition)) continue;
-            state.Attempts++;
+            var processingFailure = state.ProcessingFailure;
+            if (processingFailure is null) state.Attempts++;
             state.IsRunning = true;
             var record = state.Record;
             var token = state.Cancellation.Token;
@@ -243,7 +248,11 @@ internal sealed class KafkaConsumerRuntime(
                 try
                 {
                     token.ThrowIfCancellationRequested();
-                    await deliver(record, token);
+                    if (processingFailure is null)
+                        await deliver(record, token);
+                    else
+                        await KafkaDeliveryFailure.ForwardAsync(deadLetterProducer!, options.DeadLetterTopic!,
+                            options.ConsumerGroupId!, record, processingFailure, token);
                     token.ThrowIfCancellationRequested();
                     return (Exception?)null;
                 }
@@ -262,49 +271,69 @@ internal sealed class KafkaConsumerRuntime(
             _workers.RemoveAt(index);
             worker.State.IsRunning = false;
             var failure = worker.Task.GetAwaiter().GetResult();
-            if (!IsCurrent(worker.State))
+            var state = worker.State;
+            if (!IsCurrent(state) || state.Cancellation.IsCancellationRequested || _lifetime.IsCancellationRequested) continue;
+            var record = state.Record!;
+            if (failure is null)
             {
+                state.ReadyToCommit = true;
+                if (state.ProcessingFailure is null) _processed++;
                 continue;
             }
-            if (failure is null && !worker.State.Cancellation.IsCancellationRequested)
+            if (state.ProcessingFailure is not null)
             {
-                worker.State.Succeeded = true;
-                _processed++;
+                state.RetryAt = DateTimeOffset.UtcNow + options.RetryDelay;
+                reportFailure(failure, $"Kafka dead-letter publication failed at {record.TopicPartitionOffset}; retrying the handoff without acknowledging.");
                 continue;
             }
-            var record = worker.State.Record!;
-            if (worker.State.Attempts >= options.ProcessingMaxAttempts)
+            if (state.Attempts < options.ProcessingMaxAttempts)
             {
-                worker.State.Blocked = new(record.Topic, record.Partition.Value, record.Offset.Value,
-                    failure?.GetType().Name ?? "Canceled");
-                // Broker state retains the uncommitted head. Release payload memory and the global worker slot.
-                worker.State.Record = null;
-                reportFailure(failure ?? new OperationCanceledException(),
-                    $"Kafka partition {record.TopicPartition} is blocked at offset {record.Offset}; reinitialize after correcting the failure.");
+                state.RetryAt = DateTimeOffset.UtcNow + options.RetryDelay;
+                reportFailure(failure, $"Kafka processing failed at {record.TopicPartitionOffset}; retry {state.Attempts + 1} is pending without acknowledgment.");
+                continue;
             }
-            else
+
+            var identity = KafkaDeliveryFailure.Describe(record, failure);
+            switch (options.ProcessingFailureAction)
             {
-                worker.State.RetryAt = DateTimeOffset.UtcNow + options.RetryDelay;
-                reportFailure(failure ?? new OperationCanceledException(),
-                    $"Kafka processing failed at {record.TopicPartitionOffset}; retry {worker.State.Attempts + 1} is pending without acknowledgment.");
+                case KafkaFailureAction.LogAndSkip:
+                    reportFailure(failure, $"Kafka input is skipping {identity} after {state.Attempts} attempts.");
+                    state.ProcessingFailure = failure;
+                    state.ReadyToCommit = true;
+                    break;
+                case KafkaFailureAction.DeadLetter:
+                    reportFailure(failure, $"Kafka input is forwarding {identity} to '{options.DeadLetterTopic}' after {state.Attempts} attempts.");
+                    state.ProcessingFailure = failure;
+                    break;
+                default:
+                    state.Blocked = new(record.Topic, record.Partition.Value, record.Offset.Value, failure.GetType().Name);
+                    state.Record = null;
+                    reportFailure(failure, $"Kafka partition {record.TopicPartition} is blocked at offset {record.Offset}; reinitialize after correcting the failure. {identity}");
+                    break;
             }
         }
     }
 
-    private void CommitSuccessfulHeads(IConsumer<byte[], byte[]> consumer)
+    private void CommitReadyHeads(IConsumer<byte[], byte[]> consumer)
     {
         foreach (var state in _partitions.Values)
         {
             if (_lifetime.IsCancellationRequested) break;
-            if (!state.Succeeded || state.Record is null || state.Cancellation.IsCancellationRequested
+            if (!state.ReadyToCommit || state.Record is null || state.Cancellation.IsCancellationRequested
                 || state.RetryAt > DateTimeOffset.UtcNow) continue;
             var record = state.Record;
             try
             {
-                // One head per partition means this is always the complete contiguous successful prefix.
+                // Each earlier record in this partition already has a committed disposition.
                 consumer.Commit([new TopicPartitionOffset(state.Partition, record.Offset + 1)]);
+                if (state.ProcessingFailure is not null)
+                {
+                    if (options.ProcessingFailureAction == KafkaFailureAction.LogAndSkip) _skipped++;
+                    else _deadLettered++;
+                }
+                state.ProcessingFailure = null;
                 state.Record = null;
-                state.Succeeded = false;
+                state.ReadyToCommit = false;
                 state.CommitFailed = false;
                 state.Attempts = 0;
                 state.RetryAt = DateTimeOffset.MinValue;
@@ -387,10 +416,10 @@ internal sealed class KafkaConsumerRuntime(
         var blocked = _partitions.Values.Where(state => state.Blocked is not null).Select(state => state.Blocked!).ToArray();
         var stateName = blocked.Length > 0 ? "Blocked"
             : _partitions.Values.Any(state => state.CommitFailed) ? "Recovering"
-            : _partitions.Values.Any(state => state.Record is not null && !state.Succeeded && !state.IsRunning && state.Attempts > 0) ? "Retrying"
+            : _partitions.Values.Any(state => state.Record is not null && !state.ReadyToCommit && !state.IsRunning && state.Attempts > 0) ? "Retrying"
             : _state;
         Volatile.Write(ref _snapshot, new(stateName, _partitions.Count, _paused.Count, BufferedCount(), ActiveWorkCount(),
-            _received, _processed, _committed, Array.AsReadOnly(blocked)));
+            _received, _processed, _committed, Array.AsReadOnly(blocked)) { SkippedMessages = _skipped, DeadLetteredMessages = _deadLettered });
         reportAvailability(stateName is "Recovering" or "Retrying" or "Blocked" or "Stopped");
     }
 
@@ -408,8 +437,9 @@ internal sealed class KafkaConsumerRuntime(
         internal Task CancellationCompletion { get; set; } = Task.CompletedTask;
         internal ConsumeResult<byte[], byte[]>? Record { get; set; }
         internal KafkaBlockedPartition? Blocked { get; set; }
+        internal Exception? ProcessingFailure { get; set; }
         internal bool IsRunning { get; set; }
-        internal bool Succeeded { get; set; }
+        internal bool ReadyToCommit { get; set; }
         internal bool CommitFailed { get; set; }
         internal int Attempts { get; set; }
         internal DateTimeOffset RetryAt { get; set; }

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Confluent.Kafka;
+using Monica.Kafka;
 using Monica.DataChannel.Abstractions.Communication;
 
 namespace Monica.DataChannel.Providers.Kafka;
@@ -29,7 +30,7 @@ public class KafkaOptions : CommunicationOptions<KafkaEndpoint>
     public string? SslCaLocation { get; set; }
     /// <summary>Gets or sets missing/out-of-range offset behavior. Defaults to Error; no implicit backlog skip.</summary>
     public AutoOffsetReset AutoOffsetReset { get; set; } = AutoOffsetReset.Error;
-    /// <summary>Must remain false. This endpoint commits only successfully completed deliveries.</summary>
+    /// <summary>Must remain false. This endpoint acknowledges processing and terminal dispositions explicitly.</summary>
     public bool EnableAutoCommit { get; set; }
     /// <summary>Gets or sets input decoding. UTF-8 text is the default; RawBytes retains tombstones and empty bytes.</summary>
     public KafkaInputPayloadFormat InputPayloadFormat { get; set; } = KafkaInputPayloadFormat.Utf8String;
@@ -37,8 +38,12 @@ public class KafkaOptions : CommunicationOptions<KafkaEndpoint>
     public int MaxConcurrentPartitions { get; set; } = 4;
     /// <summary>Gets or sets the maximum retained records, including active/retired workers. Defaults to 64.</summary>
     public int MaxBufferedMessages { get; set; } = 64;
-    /// <summary>Gets or sets processing attempts per record before visibly blocking its partition. Defaults to three.</summary>
+    /// <summary>Gets or sets the total processing attempts before applying the failure action. Defaults to three.</summary>
     public int ProcessingMaxAttempts { get; set; } = 3;
+    /// <summary>Disposition after processing attempts are exhausted. Block retains the partition by default.</summary>
+    public KafkaFailureAction ProcessingFailureAction { get; set; } = KafkaFailureAction.Block;
+    /// <summary>Distinct topic on the same broker for a DeadLetter input. Provision its retention for replay.</summary>
+    public string? DeadLetterTopic { get; set; }
     /// <summary>Gets or sets processing and commit retry spacing. Defaults to one second; polling continues.</summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
     /// <summary>Gets or sets the native maximum interval between polls. Defaults to five minutes.</summary>
@@ -78,7 +83,10 @@ public class KafkaOptions : CommunicationOptions<KafkaEndpoint>
             throw new ArgumentException("Kafka options contain an unknown enum value.");
         if (Direction != ConnectionDirection.None) ArgumentException.ThrowIfNullOrWhiteSpace(Topic);
         if (Direction is ConnectionDirection.Input or ConnectionDirection.InputAndOutput)
+        {
             ArgumentException.ThrowIfNullOrWhiteSpace(ConsumerGroupId);
+            KafkaDeliveryFailure.Validate(ProcessingFailureAction, Topic!, DeadLetterTopic);
+        }
         if (EnableAutoCommit) throw new ArgumentException("Kafka DataChannel requires explicit commits after successful processing.");
         if (SecurityProtocol is SecurityProtocol.SaslPlaintext or SecurityProtocol.SaslSsl)
         {

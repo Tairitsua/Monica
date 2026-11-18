@@ -6,26 +6,26 @@ using static Monica.EventBus.Kafka.Providers.ConfluentKafka.KafkaEventBusSubscri
 
 namespace Monica.EventBus.Kafka.Providers.ConfluentKafka;
 
-/// <summary>Collects bounded partition groups and commits only successfully handled ordered prefixes.</summary>
+/// <summary>Collects bounded partition groups and commits ordered prefixes after processing or the configured failure action.</summary>
 internal static class KafkaEventBatchReceiver
 {
-    internal sealed record CollectedBatch(IReadOnlyList<ConsumeResult<string, string>> Records,
-        ConsumeResult<string, string>? Pending)
+    internal sealed record CollectedBatch(IReadOnlyList<ConsumeResult<byte[], byte[]>> Records,
+        ConsumeResult<byte[], byte[]>? Pending)
     {
         // Kafka may interleave partitions while polling. Keep one bounded window, then preserve
         // order within each partition instead of reducing every interleaved record to a singleton.
-        internal IEnumerable<IReadOnlyList<ConsumeResult<string, string>>> PartitionGroups
-            => Records.GroupBy(record => record.TopicPartition).Select(group => (IReadOnlyList<ConsumeResult<string, string>>)group.ToArray());
+        internal IEnumerable<IReadOnlyList<ConsumeResult<byte[], byte[]>>> PartitionGroups
+            => Records.GroupBy(record => record.TopicPartition).Select(group => (IReadOnlyList<ConsumeResult<byte[], byte[]>>)group.ToArray());
     }
 
-    internal static CollectedBatch Collect(IConsumer<string, string> consumer, ConsumeResult<string, string> first,
+    internal static CollectedBatch Collect(IConsumer<byte[], byte[]> consumer, ConsumeResult<byte[], byte[]> first,
         KafkaEventBatchOptions options, Func<int> assignmentVersion, CancellationToken cancellationToken,
         TimeProvider? timeProvider = null)
     {
         var time = timeProvider ?? TimeProvider.System;
         var started = time.GetTimestamp();
         var version = assignmentVersion();
-        var records = new List<ConsumeResult<string, string>> { first };
+        var records = new List<ConsumeResult<byte[], byte[]>> { first };
         var bytes = GetSize(first);
         while (records.Count < options.MaxMessages && bytes < options.MaxBytes)
         {
@@ -55,12 +55,13 @@ internal static class KafkaEventBatchReceiver
         return new CollectedBatch(records, null);
     }
 
-    internal static async Task DeliverAsync(IReadOnlyList<ConsumeResult<string, string>> records,
-        Func<IReadOnlyList<ConsumeResult<string, string>>, Task> handle,
-        Action<ConsumeResult<string, string>, int> commit, EventMessageRetryPolicy retryPolicy,
-        CancellationToken cancellationToken)
+    internal static async Task DeliverAsync(IReadOnlyList<ConsumeResult<byte[], byte[]>> records,
+        Func<IReadOnlyList<ConsumeResult<byte[], byte[]>>, Task> handle,
+        Action<ConsumeResult<byte[], byte[]>, int> commit, EventMessageRetryPolicy retryPolicy,
+        CancellationToken cancellationToken, Func<ConsumeResult<byte[], byte[]>, Exception, Task>? handleExhausted = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var processed = records.Count;
         if (records.Count == 1)
         {
             try
@@ -69,8 +70,11 @@ internal static class KafkaEventBatchReceiver
             }
             catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new KafkaBatchProcessingException(
-                    $"Batch consumer stopped at {records[0].TopicPartitionOffset} after exhausting singleton retries; the record remains unacknowledged.", failure);
+                if (handleExhausted is null)
+                    throw new KafkaProcessingBlockedException(
+                        $"Batch consumer stopped at {records[0].TopicPartitionOffset} after exhausting singleton retries; the record remains unacknowledged.", failure);
+                await handleExhausted(records[0], failure).ConfigureAwait(false);
+                processed = 0;
             }
         }
         else
@@ -83,14 +87,14 @@ internal static class KafkaEventBatchReceiver
             {
                 // Each tree node is attempted once. Singleton retry budgets never restart in this tree.
                 var middle = records.Count / 2;
-                await DeliverAsync(records.Take(middle).ToArray(), handle, commit, retryPolicy, cancellationToken).ConfigureAwait(false);
-                await DeliverAsync(records.Skip(middle).ToArray(), handle, commit, retryPolicy, cancellationToken).ConfigureAwait(false);
+                await DeliverAsync(records.Take(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted).ConfigureAwait(false);
+                await DeliverAsync(records.Skip(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted).ConfigureAwait(false);
                 return;
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
         // A failed/ambiguous commit must never cause splitting or a later offset acknowledgment.
-        try { commit(records[^1], records.Count); }
+        try { commit(records[^1], processed); }
         catch (Exception failure)
         {
             throw new KafkaConsumerRestartRequiredException(
@@ -98,12 +102,10 @@ internal static class KafkaEventBatchReceiver
         }
     }
 
-    internal static long GetSize(ConsumeResult<string, string> record)
+    internal static long GetSize(ConsumeResult<byte[], byte[]> record)
     {
         static int Size(string? text) => text is null ? 0 : Encoding.UTF8.GetByteCount(text);
-        return (long)Size(record.Topic) + Size(record.Message?.Key) + Size(record.Message?.Value)
+        return (long)Size(record.Topic) + (record.Message?.Key?.Length ?? 0) + (record.Message?.Value?.Length ?? 0)
             + (record.Message?.Headers?.Sum(header => (long)Size(header.Key) + (header.GetValueBytes()?.Length ?? 0)) ?? 0);
     }
-
-    internal sealed class KafkaBatchProcessingException(string message, Exception innerException) : Exception(message, innerException);
 }

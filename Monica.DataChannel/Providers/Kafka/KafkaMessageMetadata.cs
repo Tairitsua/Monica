@@ -24,4 +24,10 @@ public sealed record KafkaBlockedPartition(string Topic, int Partition, long Off
 /// <summary>A detached bounded-input snapshot; it contains no credentials or live clients.</summary>
 public sealed record KafkaConsumerSnapshot(
     string State, int AssignedPartitions, int PausedPartitions, int BufferedMessages, int ActiveWorkers,
-    long ReceivedMessages, long ProcessedMessages, long CommittedMessages, IReadOnlyList<KafkaBlockedPartition> BlockedPartitions);
+    long ReceivedMessages, long ProcessedMessages, long CommittedMessages, IReadOnlyList<KafkaBlockedPartition> BlockedPartitions)
+{
+    /// <summary>Failed records whose offset was committed under LogAndSkip.</summary>
+    public long SkippedMessages { get; init; }
+    /// <summary>Failed records durably forwarded before their source offset was committed.</summary>
+    public long DeadLetteredMessages { get; init; }
+}
