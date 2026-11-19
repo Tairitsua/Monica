@@ -85,7 +85,7 @@ class ModuleDeclaration:
     implements_web: bool
     requires_web_host: bool
     provides_for_type: str | None
-    dependencies: tuple[tuple[str, str], ...]
+    dependencies: tuple[tuple[str, str | None], ...]
 
 
 @dataclass(frozen=True)
@@ -350,10 +350,12 @@ def find_module_declarations(project: Path) -> list[ModuleDeclaration]:
             dependencies = tuple(
                 (
                     normalize_csharp_type(invocation.type_arguments[0]),
-                    normalize_csharp_type(invocation.type_arguments[1]),
+                    normalize_csharp_type(invocation.type_arguments[1])
+                    if len(invocation.type_arguments) == 2
+                    else None,
                 )
                 for invocation in find_generic_invocations(describe_body, "Require")
-                if len(invocation.type_arguments) == 2
+                if len(invocation.type_arguments) in (1, 2)
             )
             declarations.append(
                 ModuleDeclaration(
@@ -1477,12 +1479,14 @@ def validate_repository_contract(
                     full_module_type_to_key,
                     simple_module_type_to_keys,
                 )
-                option_key, invalid_option_type = resolve_repository_type(
-                    package_id,
-                    option_type,
-                    full_option_type_to_key,
-                    simple_option_type_to_keys,
-                )
+                option_key, invalid_option_type = dependency_key, False
+                if option_type is not None:
+                    option_key, invalid_option_type = resolve_repository_type(
+                        package_id,
+                        option_type,
+                        full_option_type_to_key,
+                        simple_option_type_to_keys,
+                    )
                 if dependency_key is not None and dependency_key == option_key:
                     actual_dependencies.add(dependency_key)
                 elif (
@@ -1491,14 +1495,16 @@ def validate_repository_contract(
                     or invalid_module_type
                     or invalid_option_type
                 ):
-                    invalid_dependencies.append(f"{module_type}, {option_type}")
+                    invalid_dependencies.append(
+                        f"{module_type}, {option_type}" if option_type is not None else module_type
+                    )
             if actual_dependencies != expected_dependencies or invalid_dependencies:
                 detail = (
                     f"expected {sorted(expected_dependencies)}, found {sorted(actual_dependencies)}"
                 )
                 if invalid_dependencies:
                     detail += (
-                        "; unresolved or mismatched concrete module/option pairs: "
+                        "; unresolved module types or mismatched option types: "
                         f"{sorted(invalid_dependencies)}"
                     )
                 add(

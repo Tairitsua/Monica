@@ -245,7 +245,7 @@ public sealed class SwaggerUiCompositionTests
 
 public sealed class SwaggerUiConsumerModule : MonicaModule<SwaggerUiConsumerModuleOption>
 {
-    public override void Describe(ModuleDescriptor module) => module.Require<ModuleSwaggerUI, ModuleSwaggerUIOption>();
+    public override void Describe(ModuleDescriptor module) => module.Require<ModuleSwaggerUI>();
 }
 
 public sealed class SwaggerUiConsumerModuleOption : ModuleOptions<SwaggerUiConsumerModule>;

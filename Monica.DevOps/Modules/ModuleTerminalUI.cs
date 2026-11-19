@@ -38,7 +38,7 @@ public sealed class ModuleTerminalUI : MonicaModule<ModuleTerminalUIOption>, IUI
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleTerminal, ModuleTerminalOption>();
+        module.Require<ModuleTerminal>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<TerminalResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

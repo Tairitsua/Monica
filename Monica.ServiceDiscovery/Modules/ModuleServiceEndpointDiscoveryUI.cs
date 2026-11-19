@@ -14,7 +14,7 @@ public sealed class ModuleServiceEndpointDiscoveryUI : MonicaModule<ModuleServic
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleServiceEndpointDiscovery, ModuleServiceEndpointDiscoveryOption>();
+        module.Require<ModuleServiceEndpointDiscovery>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(o => o.AddResource<ServiceDiscoveryResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(o => o.ConfigureNavigation(n =>
             n.RegisterLocalizedPage<UIServiceDiscoveryEndpointsPage, ServiceDiscoveryResource>(

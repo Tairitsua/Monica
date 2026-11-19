@@ -22,13 +22,13 @@ internal sealed class ModuleRegistrationState
     private readonly List<ModuleConfigurationRequest> _configurationRequests = [];
     private IModuleOptions? _moduleOption;
     private long _requestOrdinal;
-    private Func<object>? _optionFactory;
     private bool _finalizingOptions;
 
-    internal ModuleRegistrationState(MonicaApplication application, Type moduleType)
+    internal ModuleRegistrationState(MonicaApplication application, MonicaModule module)
     {
         Application = application;
-        ModuleType = moduleType;
+        ModuleSingleton = module;
+        ModuleType = module.GetType();
     }
 
     internal MonicaApplication Application { get; }
@@ -56,7 +56,7 @@ internal sealed class ModuleRegistrationState
     /// <summary>
     /// Gets the primary module option type.
     /// </summary>
-    public Type ModuleOptionType { get; private set; } = null!;
+    public Type ModuleOptionType => ModuleSingleton.OptionsType;
 
     /// <summary>
     /// Gets the finalized primary module option.
@@ -77,7 +77,7 @@ internal sealed class ModuleRegistrationState
     /// <summary>
     /// Gets the single host-owned module strategy instance.
     /// </summary>
-    public MonicaModule ModuleSingleton { get; private set; } = null!;
+    public MonicaModule ModuleSingleton { get; }
 
     internal string? DisabledReason { get; private set; }
 
@@ -103,26 +103,6 @@ internal sealed class ModuleRegistrationState
     }
 
     internal bool IsFinalized => _moduleOption is not null;
-
-    internal void Initialize<TModule, TOptions>()
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
-    {
-        if (_optionFactory is not null)
-        {
-            if (ModuleOptionType != typeof(TOptions) || ModuleType != typeof(TModule))
-            {
-                throw new InvalidOperationException(
-                    $"Module {ModuleType.Name} was registered with conflicting option metadata.");
-            }
-
-            return;
-        }
-
-        ModuleOptionType = typeof(TOptions);
-        ModuleSingleton = new TModule();
-        _optionFactory = static () => new TOptions();
-    }
 
     internal void AddOptionContribution<TOptions>(Type? configuredBy, Action<TOptions> configure, Type? owner = null)
         where TOptions : class, IModuleOptions, new()
@@ -260,11 +240,6 @@ internal sealed class ModuleRegistrationState
 
     internal void FinalizeOptions()
     {
-        if (_optionFactory is null)
-        {
-            throw new InvalidOperationException($"Module {ModuleType.Name} has no option factory.");
-        }
-
         if (IsFinalized || _finalizingOptions)
         {
             throw new InvalidOperationException($"Module {ModuleType.Name} was already finalized.");
@@ -279,7 +254,7 @@ internal sealed class ModuleRegistrationState
             Application.Composition.RunOwned(contribution.Owner, () => contribution.Apply(option));
         }
 
-        _moduleOption = (IModuleOptions)option;
+        _moduleOption = option;
         foreach (var (name, contributions) in _profileContributions)
         {
             var profile = CreateBoundOption();
@@ -426,9 +401,9 @@ internal sealed class ModuleRegistrationState
         Application.Profiling.StopModulePhase(ModuleType, phase);
     }
 
-    private object CreateBoundOption()
+    private IModuleOptions CreateBoundOption()
     {
-        var option = _optionFactory!();
+        var option = ModuleSingleton.CreateOptions();
         if (option is IModuleOptionsContext context)
         {
             context.Bind(Application);

@@ -28,7 +28,7 @@ public sealed class ModuleConfigurationEfCore : MonicaModule<ModuleConfiguration
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleConfiguration, ModuleConfigurationOption>();
+        module.Require<ModuleConfiguration>();
         module.RequireFeature(nameof(ModuleConfigurationEfCoreRegistrationExtensions.UseDbContext));
     }
 

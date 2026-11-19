@@ -48,7 +48,7 @@ public class ModuleSignalRUI : MonicaModule<ModuleSignalRUIOption>, IUIModule
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleSignalR, ModuleSignalROption>();
+        module.Require<ModuleSignalR>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<SignalRResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

@@ -27,7 +27,7 @@ public class ModuleFileOpsUI : MonicaModule<ModuleFileOpsUIOption>, IUIModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleFileOps, ModuleFileOpsOption>();
+        module.Require<ModuleFileOps>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<FileOpsResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

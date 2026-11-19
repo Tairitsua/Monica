@@ -57,8 +57,8 @@ public sealed class ModuleSeeder : MonicaModule<ModuleSeederOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
-        module.Require<ModuleHealthCheck, ModuleHealthCheckOption>();
+        module.Require<ModuleHostedService>();
+        module.Require<ModuleHealthCheck>();
     }
 
     /// <inheritdoc />

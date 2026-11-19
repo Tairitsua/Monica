@@ -42,8 +42,8 @@ public sealed class ModuleSkillSystem : MonicaModule<ModuleSkillSystemOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAI, ModuleAIOption>();
-        module.Require<ModuleXmlDocumentation, ModuleXmlDocumentationOption>();
+        module.Require<ModuleAI>();
+        module.Require<ModuleXmlDocumentation>();
     }
 
     /// <inheritdoc />

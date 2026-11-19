@@ -23,7 +23,7 @@ public class ModuleK8S : MonicaModule<ModuleK8SOption>, IWebModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLocalization, ModuleLocalizationOption>();
+        module.Require<ModuleLocalization>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleK8SOption> context)

@@ -40,7 +40,7 @@ public sealed class ModuleRepositoryUI : MonicaModule<ModuleRepositoryUIOption>,
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleRepository, ModuleRepositoryOption>();
+        module.Require<ModuleRepository>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<RepositoryUIResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

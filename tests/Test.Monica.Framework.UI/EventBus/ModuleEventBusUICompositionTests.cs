@@ -87,7 +87,7 @@ public sealed class EventBusUIConsumerModule : MonicaModule<EventBusUIConsumerMo
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleEventBusUI, ModuleEventBusUIOption>();
+        module.Require<ModuleEventBusUI>();
     }
 }
 

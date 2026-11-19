@@ -26,7 +26,7 @@ public class ModuleK8SUI : MonicaModule<ModuleK8SUIOption>, IUIModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleK8S, ModuleK8SOption>();
+        module.Require<ModuleK8S>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<K8SResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

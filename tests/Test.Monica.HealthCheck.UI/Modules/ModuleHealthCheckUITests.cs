@@ -106,7 +106,7 @@ public sealed class HealthCheckUIConsumerModule : MonicaModule<HealthCheckUICons
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleHealthCheckUI, ModuleHealthCheckUIOption>();
+        module.Require<ModuleHealthCheckUI>();
     }
 }
 

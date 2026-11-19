@@ -38,7 +38,7 @@ public class ModuleRuntimeMetricsUI : MonicaModule<ModuleRuntimeMetricsUIOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleRuntimeMetrics, ModuleRuntimeMetricsOption>();
+        module.Require<ModuleRuntimeMetrics>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {
             option.AddResource<ProfilingResource>();

@@ -32,7 +32,7 @@ public class ModuleMapperUI : MonicaModule<ModuleMapperUIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
+        module.Require<ModuleObjectMapping>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<MapperResource>());
         module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);

@@ -51,8 +51,8 @@ public sealed class ModuleMcp : MonicaModule<ModuleMcpOption>, IWebModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleXmlDocumentation, ModuleXmlDocumentationOption>();
-        module.Require<ModuleAI, ModuleAIOption>();
+        module.Require<ModuleXmlDocumentation>();
+        module.Require<ModuleAI>();
     }
 
     /// <inheritdoc />

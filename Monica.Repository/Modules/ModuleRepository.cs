@@ -72,8 +72,8 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
-        module.Require<ModuleClock, ModuleClockOption>();
+        module.Require<ModuleObjectMapping>();
+        module.Require<ModuleClock>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(InboxExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork + 100,
                 static descriptor => (descriptor.Point == EventBusExecutionPoints.LocalHandler
@@ -108,7 +108,7 @@ public static class ModuleRepositoryRegistrationExtensions
     {
         if (dbContextProviderType == DbContextProviderType.UnitOfWork)
         {
-            module.Require<ModuleUnitOfWork, ModuleUnitOfWorkOption>();
+            module.Require<ModuleUnitOfWork>();
         }
         else if (dbContextProviderType != DbContextProviderType.Default)
         {
@@ -185,9 +185,9 @@ public static class ModuleRepositoryRegistrationExtensions
             throw new ArgumentOutOfRangeException(nameof(configure), "Retry delays must be positive and ordered.");
         if (options.DeliveredRetention <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(configure), "Delivered retention must be positive.");
-        module.Require<ModuleUnitOfWork, ModuleUnitOfWorkOption>();
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+        module.Require<ModuleUnitOfWork>();
+        module.Require<ModuleEventBus>();
+        module.Require<ModuleHostedService>();
         module.ConfigureServices(context =>
         {
             if (context.Services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistration<TDbContext>)))
@@ -263,8 +263,8 @@ public static class ModuleRepositoryRegistrationExtensions
     {
         var options = new RepositoryInboxOptions();
         configure?.Invoke(options);
-        module.Require<ModuleUnitOfWork, ModuleUnitOfWorkOption>();
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
+        module.Require<ModuleUnitOfWork>();
+        module.Require<ModuleEventBus>();
         module.ConfigureServices(context =>
         {
             context.Services.AddSingleton(new InboxRegistration<TDbContext>(options));

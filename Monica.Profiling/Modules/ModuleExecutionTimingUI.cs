@@ -35,7 +35,7 @@ public class ModuleExecutionTimingUI : MonicaModule<ModuleExecutionTimingUIOptio
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionTiming, ModuleExecutionTimingOption>();
+        module.Require<ModuleExecutionTiming>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {
             option.AddResource<ProfilingResource>();

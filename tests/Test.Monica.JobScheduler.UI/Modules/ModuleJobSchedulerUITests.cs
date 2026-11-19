@@ -137,7 +137,7 @@ public sealed class JobSchedulerUIConsumerModule : MonicaModule<JobSchedulerUICo
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJobSchedulerUI, ModuleJobSchedulerUIOption>();
+        module.Require<ModuleJobSchedulerUI>();
     }
 }
 

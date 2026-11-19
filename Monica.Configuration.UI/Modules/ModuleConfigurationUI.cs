@@ -43,8 +43,8 @@ public sealed class ModuleConfigurationUI : MonicaModule<ModuleConfigurationUIOp
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleConfiguration, ModuleConfigurationOption>();
-        module.Require<ModuleDiffHighlight, ModuleDiffHighlightOption>();
+        module.Require<ModuleConfiguration>();
+        module.Require<ModuleDiffHighlight>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<ConfigurationUIResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(

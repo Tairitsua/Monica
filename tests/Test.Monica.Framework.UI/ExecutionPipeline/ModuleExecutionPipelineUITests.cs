@@ -122,7 +122,7 @@ public sealed class ExecutionPipelineUIConsumerModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionPipelineUI, ModuleExecutionPipelineUIOption>();
+        module.Require<ModuleExecutionPipelineUI>();
     }
 }
 

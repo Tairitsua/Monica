@@ -35,7 +35,7 @@ public sealed class ModuleAIEndpoints : MonicaModule<ModuleAIEndpointsOption>, I
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAI, ModuleAIOption>();
+        module.Require<ModuleAI>();
     }
 
     /// <inheritdoc />

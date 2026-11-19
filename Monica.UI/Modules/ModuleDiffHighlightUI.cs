@@ -32,7 +32,7 @@ public class ModuleDiffHighlightUI : MonicaModule<ModuleDiffHighlightUIOption>, 
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDiffHighlight, ModuleDiffHighlightOption>();
+        module.Require<ModuleDiffHighlight>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<SharedResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

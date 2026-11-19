@@ -35,7 +35,7 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>();
+        module.Require<ModuleExecutionPipeline>();
     }
 
     public override void DeclareTypeDiscovery(TypeDiscoveryPlan<ModuleMediatorOption> discovery)

@@ -43,8 +43,8 @@ public class ModuleLoggingUI : MonicaModule<ModuleLoggingUIOption>, IWebHostRequ
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLogging, ModuleLoggingOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleLogging>();
+        module.Require<ModuleResultEnvelope>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<LoggingResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

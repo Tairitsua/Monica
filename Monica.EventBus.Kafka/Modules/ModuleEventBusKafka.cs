@@ -70,10 +70,10 @@ public sealed class ModuleEventBusKafka : MonicaModule<ModuleEventBusKafkaOption
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
-        module.Require<ModuleLocalization, ModuleLocalizationOption>();
+        module.Require<ModuleEventBus>();
+        module.Require<ModuleJsonSerialization>();
+        module.Require<ModuleResultEnvelope>();
+        module.Require<ModuleLocalization>();
     }
 
     /// <inheritdoc />
@@ -388,7 +388,7 @@ public static class ModuleEventBusKafkaRegistrationExtensions
 
         module.Require<ModuleEventBus, ModuleEventBusOption>()
             .UseDistributedEventBus<KafkaEventBusProvider>();
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+        module.Require<ModuleHostedService>();
 
         module.Configure(options =>
         {

@@ -40,7 +40,7 @@ public sealed class ModuleJobSchedulerUI : MonicaModule<ModuleJobSchedulerUIOpti
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJobScheduler, ModuleJobSchedulerOption>();
+        module.Require<ModuleJobScheduler>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<JobSchedulerResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(

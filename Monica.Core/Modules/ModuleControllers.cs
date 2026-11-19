@@ -51,7 +51,7 @@ public class ModuleControllers : MonicaModule<ModuleControllersOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>();
+        module.Require<ModuleExecutionPipeline>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleControllersOption> context)

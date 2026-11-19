@@ -53,11 +53,11 @@ public class ModuleSignalR : MonicaModule<ModuleSignalROption>, IWebHostRequired
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleJsonSerialization>();
         module.RequireFeature(SERVICES_FEATURE);
         // Browser WebSocket transports pass the access token via query string; the optional edge lets this module
         // register its mapped hub routes as allowed query-string token paths when the authentication module is present.
-        module.AfterIfPresent<ModuleAuthentication, ModuleAuthenticationOption>();
+        module.AfterIfPresent<ModuleAuthentication>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleSignalROption> context)

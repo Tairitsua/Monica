@@ -77,7 +77,7 @@ public sealed class StackTraceUIModuleTests
 
     public sealed class StackTraceConsumerModule : MonicaModule<StackTraceConsumerModuleOption>
     {
-        public override void Describe(ModuleDescriptor module) => module.Require<ModuleStackTraceUI, ModuleStackTraceUIOption>();
+        public override void Describe(ModuleDescriptor module) => module.Require<ModuleStackTraceUI>();
     }
 
     public sealed class StackTraceConsumerModuleOption : ModuleOptions<StackTraceConsumerModule>

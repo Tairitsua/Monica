@@ -139,7 +139,7 @@ internal sealed class HardCycleDependentModule : MonicaModule<HardCycleDependent
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<HardCycleLeftModule, HardCycleLeftModuleOption>();
+        module.Require<HardCycleLeftModule>();
     }
 }
 
@@ -149,7 +149,7 @@ internal sealed class HardCycleLeftModule : MonicaModule<HardCycleLeftModuleOpti
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<HardCycleRightModule, HardCycleRightModuleOption>();
+        module.Require<HardCycleRightModule>();
     }
 }
 
@@ -159,7 +159,7 @@ internal sealed class HardCycleRightModule : MonicaModule<HardCycleRightModuleOp
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<HardCycleLeftModule, HardCycleLeftModuleOption>();
+        module.Require<HardCycleLeftModule>();
     }
 }
 
@@ -169,7 +169,7 @@ internal sealed class OptionalCycleDependentModule : MonicaModule<OptionalCycleD
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<OptionalCycleLeftModule, OptionalCycleLeftModuleOption>();
+        module.AfterIfPresent<OptionalCycleLeftModule>();
     }
 }
 
@@ -179,7 +179,7 @@ internal sealed class OptionalCycleLeftModule : MonicaModule<OptionalCycleLeftMo
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<OptionalCycleRightModule, OptionalCycleRightModuleOption>();
+        module.AfterIfPresent<OptionalCycleRightModule>();
     }
 }
 
@@ -189,7 +189,7 @@ internal sealed class OptionalCycleRightModule : MonicaModule<OptionalCycleRight
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<OptionalCycleLeftModule, OptionalCycleLeftModuleOption>();
+        module.AfterIfPresent<OptionalCycleLeftModule>();
     }
 }
 
@@ -199,7 +199,7 @@ internal sealed class LifecycleDependentModule : MonicaModule<LifecycleDependent
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<LifecycleDependencyModule, LifecycleDependencyModuleOption>();
+        module.Require<LifecycleDependencyModule>();
     }
 
     public override void ConfigureBuilder(ModuleBuilderContext<LifecycleDependentModuleOption> context)

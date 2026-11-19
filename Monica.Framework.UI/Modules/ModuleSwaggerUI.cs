@@ -80,10 +80,10 @@ public class ModuleSwaggerUI : MonicaModule<ModuleSwaggerUIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<ModuleUI, ModuleUIOption>();
+        module.AfterIfPresent<ModuleUI>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static options => options.AddResource<SwaggerUiResource>());
-        module.Require<ModuleSwagger, ModuleSwaggerOption>();
+        module.Require<ModuleSwagger>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleSwaggerUIOption> context)

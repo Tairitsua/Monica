@@ -614,7 +614,7 @@ internal sealed class DiagnosticsConsumerModule : MonicaModule<DiagnosticsConsum
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsProviderModule, DiagnosticsProviderModuleOption>();
+        module.Require<DiagnosticsProviderModule>();
     }
 }
 

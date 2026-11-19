@@ -1010,15 +1010,14 @@ def create_project(root: Path, manifest: Manifest, package: PackageSpec) -> Path
     return project_dir
 
 
-def module_type_references(
+def module_type_reference(
     owner: PackageSpec,
     module: ModuleSpec,
     *,
     fully_qualified: bool,
-) -> tuple[str, str]:
+) -> str:
     prefix = f"global::{owner.package_id}.Modules." if fully_qualified else ""
-    module_type = f"{prefix}Module{module.name}"
-    return module_type, f"{module_type}Option"
+    return f"{prefix}Module{module.name}"
 
 
 def module_dependencies(
@@ -1029,14 +1028,12 @@ def module_dependencies(
     dependencies: list[str] = []
     for key in module.depends_on:
         owner, dependency = modules_by_key[key.casefold()]
-        module_type, option_type = module_type_references(
+        module_type = module_type_reference(
             owner,
             dependency,
             fully_qualified=owner.package_id != package.package_id,
         )
-        dependencies.append(
-            f"module.Require<{module_type}, {option_type}>();"
-        )
+        dependencies.append(f"module.Require<{module_type}>();")
     return dependencies
 
 
@@ -1117,7 +1114,7 @@ def create_module(
     if module.is_provider:
         assert module.provider_for is not None
         target_package, target_module = modules_by_key[module.provider_for.casefold()]
-        target_module_type, target_option_type = module_type_references(
+        target_module_type = module_type_reference(
             target_package,
             target_module,
             fully_qualified=True,
@@ -1138,7 +1135,7 @@ public static class Module{module.name}BuilderExtensions
     /// <param name="configure">Optional provider option configuration.</param>
     /// <returns>The host-bound provider registration.</returns>
     public static ModuleRegistration<Module{module.name}, Module{module.name}Option> Use{module.name}Provider(
-        this ModuleRegistration<{target_module_type}, {target_option_type}> target,
+        this ModuleRegistration<{target_module_type}, {target_module_type}Option> target,
         Action<Module{module.name}Option>? configure = null)
     {{
         return target.Include<Module{module.name}, Module{module.name}Option>(configure);
@@ -1299,13 +1296,13 @@ def registration_expression(
     if module.is_provider:
         assert module.provider_for is not None
         target_owner, target = modules_by_key[module.provider_for.casefold()]
-        target_module_type, target_option_type = module_type_references(
+        target_module_type = module_type_reference(
             target_owner,
             target,
             fully_qualified=True,
         )
         return (
-            f"builder.AddModule<{target_module_type}, {target_option_type}>()"
+            f"builder.AddModule<{target_module_type}, {target_module_type}Option>()"
             f".Use{module.name}Provider();"
         )
     return f"builder.Add{module.name}();"

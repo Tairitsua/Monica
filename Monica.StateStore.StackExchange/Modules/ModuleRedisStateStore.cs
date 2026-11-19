@@ -98,8 +98,8 @@ public class ModuleRedisStateStore : MonicaModule<ModuleRedisStateStoreOption>,
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
-        module.Require<ModuleStateStore, ModuleStateStoreOption>();
+        module.Require<ModuleJsonSerialization>();
+        module.Require<ModuleStateStore>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleRedisStateStoreOption> context)

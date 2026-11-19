@@ -37,7 +37,7 @@ public class ModuleStateStoreUI : MonicaModule<ModuleStateStoreUIOption>, IUIMod
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleStateStore, ModuleStateStoreOption>();
+        module.Require<ModuleStateStore>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {
             option.AddResource<StateStoreResource>();

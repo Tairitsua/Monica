@@ -39,8 +39,8 @@ public sealed class ModuleJobSchedulerServiceDiscovery : MonicaModule<ModuleJobS
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleServiceDiscovery, ModuleServiceDiscoveryOption>();
-        module.Require<ModuleJobSchedulerUI, ModuleJobSchedulerUIOption>();
+        module.Require<ModuleServiceDiscovery>();
+        module.Require<ModuleJobSchedulerUI>();
     }
 
     /// <inheritdoc />

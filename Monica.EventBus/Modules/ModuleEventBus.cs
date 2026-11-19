@@ -70,8 +70,8 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>();
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleExecutionPipeline>();
+        module.Require<ModuleJsonSerialization>();
     }
 
     /// <inheritdoc />

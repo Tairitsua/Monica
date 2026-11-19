@@ -66,8 +66,8 @@ public class ModuleTaskProgress : MonicaModule<ModuleTaskProgressOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleCancellationManager, ModuleCancellationManagerOption>();
-        module.Require<ModuleStateStore, ModuleStateStoreOption>();
+        module.Require<ModuleCancellationManager>();
+        module.Require<ModuleStateStore>();
     }
 
     /// <inheritdoc />

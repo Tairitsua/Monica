@@ -43,8 +43,8 @@ public class ModuleUnitOfWork : MonicaModule<ModuleUnitOfWorkOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<ModuleApplicationModel, ModuleApplicationModelOption>();
-        module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
+        module.AfterIfPresent<ModuleApplicationModel>();
+        module.Require<ModuleDependencyInjection>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(UnitOfWorkExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork,
                 static descriptor => descriptor.IsBusinessOperation || descriptor.TransactionMode == ExecutionTransactionMode.Automatic));

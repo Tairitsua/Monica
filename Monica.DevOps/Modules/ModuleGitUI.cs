@@ -36,7 +36,7 @@ public class ModuleGitUI : MonicaModule<ModuleGitUIOption>, IUIModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleGit, ModuleGitOption>();
+        module.Require<ModuleGit>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<GitResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

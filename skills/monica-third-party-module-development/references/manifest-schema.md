@@ -134,8 +134,8 @@ Create a UTF-8 JSON manifest and pass it to `scripts/scaffold_repository.py`. Un
 
 - Module kind is `infrastructure`, `web`, `ui`, or `provider`.
 - Module keys are globally unique ecosystem/distribution identifiers owned by the containing package. They are not Monica runtime identities; the runtime graph is keyed by concrete module `Type`.
-- `dependsOn` contains full manifest module keys from the repository, not local module names. The scaffold resolves each entry to a concrete `module.Require<TModule, TOptions>()` call in `Describe(ModuleDescriptor)`.
-- Generated cross-package module and option type references are namespace-qualified, so different packages may safely use the same local module name.
+- `dependsOn` contains full manifest module keys from the repository. The scaffold resolves each key to a concrete `module.Require<TModule>()` call in `Describe(ModuleDescriptor)`.
+- Generated cross-package module type references are namespace-qualified, so different packages may use the same local module name. Typed option contributions use namespace-qualified option types as well.
 - Every cross-package runtime dependency must be backed by `packageDependencies`.
 - Provider modules require `providerFor`, include that manifest key in `dependsOn`, implement `IModuleProvider`, and return `typeof(TargetModule)` from `ProvidesFor`.
 - UI names end with one exact `UI` suffix, UI manifest keys end in `.UI`, navigation category identity removes only that final segment, and the generated strategy implements `IUIModule` explicitly.

@@ -42,7 +42,7 @@ public sealed class ModuleHealthCheckUI : MonicaModule<ModuleHealthCheckUIOption
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleHealthCheck, ModuleHealthCheckOption>();
+        module.Require<ModuleHealthCheck>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<HealthCheckResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

@@ -6,6 +6,7 @@ using Monica.Core;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Diagnostics.Models;
 using Monica.Core.Modularity.Diagnostics.Services;
+using Monica.Core.Modularity.Exceptions;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
 using Xunit;
@@ -34,12 +35,23 @@ public sealed class ModuleGraphCompilationTests
         observation.DependencyOptions.Should().BeSameAs(options);
     }
 
-    [Fact]
-    public void AddMonica_WhenHardDependencyIsNotExplicitlyAdded_ShouldIncludeIt()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddMonica_WhenFluentDependenciesAreDeclared_ShouldIncludeRequiredAndOrderPresentModules(
+        bool includeOptionalTarget)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.AddMonica(monica =>
-            monica.AddModule<GraphConsumerModule, GraphConsumerModuleOption>());
+        {
+            monica.AddModule<IndependentGraphModule, IndependentGraphModuleOption>()
+                .Require<GraphConsumerModule>()
+                .AfterIfPresent<OptionalTargetModule>();
+            if (includeOptionalTarget)
+            {
+                monica.AddModule<OptionalTargetModule, OptionalTargetModuleOption>();
+            }
+        });
 
         using var host = builder.Build();
         var moduleTypes = host.Services.GetRequiredService<MonicaApplication>()
@@ -47,8 +59,40 @@ public sealed class ModuleGraphCompilationTests
             .Select(static snapshot => snapshot.ModuleType)
             .ToArray();
 
-        moduleTypes.Should().Contain(typeof(GraphConsumerModule));
-        moduleTypes.Should().Contain(typeof(GraphDependencyModule));
+        moduleTypes.Should().ContainInOrder(
+            typeof(GraphDependencyModule), typeof(GraphConsumerModule), typeof(IndependentGraphModule));
+        if (includeOptionalTarget)
+        {
+            moduleTypes.Should().ContainInOrder(typeof(OptionalTargetModule), typeof(IndependentGraphModule));
+        }
+        else
+        {
+            moduleTypes.Should().NotContain(typeof(OptionalTargetModule));
+        }
+    }
+
+    [Fact]
+    public void AddMonica_WhenTypedDependencySuppliesNoOptionDefaults_ShouldIncludeDependency()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddMonica(monica =>
+            monica.AddModule<LegacyDependencyConsumerModule, LegacyDependencyConsumerModuleOption>());
+
+        using var host = builder.Build();
+        host.Services.GetRequiredService<GraphDependencyModuleOption>().Contributions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddMonica_WhenRequiredModuleUsesOptionsOwnedByAnotherModule_ShouldRejectComposition()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        Action compose = () => builder.AddMonica(monica =>
+            monica.AddModule<IndependentGraphModule, IndependentGraphModuleOption>()
+                .Require<MismatchedOptionsGraphModule>());
+
+        compose.Should().Throw<ModuleRegistrationException>()
+            .WithMessage("*MismatchedOptionsGraphModule*GraphDependencyModuleOption*ModuleOptions*");
     }
 
     [Fact]
@@ -186,13 +230,25 @@ internal sealed class GraphDependencyModuleOption : ModuleOptions<GraphDependenc
     internal List<string> Contributions { get; } = [];
 }
 
+internal sealed class LegacyDependencyConsumerModule : MonicaModule<LegacyDependencyConsumerModuleOption>
+{
+    public override void Describe(ModuleDescriptor module)
+    {
+        module.Require<GraphDependencyModule, GraphDependencyModuleOption>(null);
+    }
+}
+
+internal sealed class LegacyDependencyConsumerModuleOption : ModuleOptions<LegacyDependencyConsumerModule>;
+
+internal sealed class MismatchedOptionsGraphModule : MonicaModule<GraphDependencyModuleOption>;
+
 internal sealed record GraphOptionObservation(GraphDependencyModuleOption DependencyOptions);
 
 internal sealed class OptionalFollowerModule : MonicaModule<OptionalFollowerModuleOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<OptionalTargetModule, OptionalTargetModuleOption>();
+        module.AfterIfPresent<OptionalTargetModule>();
     }
 
     public override void ConfigureServices(ModuleContext<OptionalFollowerModuleOption> context)
@@ -218,7 +274,7 @@ internal sealed class DisabledGraphDependentModule : MonicaModule<DisabledGraphD
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DisabledGraphModule, DisabledGraphModuleOption>();
+        module.Require<DisabledGraphModule>();
     }
 }
 

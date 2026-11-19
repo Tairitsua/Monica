@@ -11,8 +11,8 @@ public sealed class ModuleDataChannelDapr : MonicaModule<ModuleDataChannelDaprOp
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDataChannel, ModuleDataChannelOption>();
-        module.Require<ModuleDaprClient, ModuleDaprClientOption>();
+        module.Require<ModuleDataChannel>();
+        module.Require<ModuleDaprClient>();
     }
 }
 

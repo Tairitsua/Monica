@@ -40,7 +40,7 @@ public sealed class ModuleExecutionPipelineUI : MonicaModule<ModuleExecutionPipe
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>();
+        module.Require<ModuleExecutionPipeline>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<ExecutionPipelineResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

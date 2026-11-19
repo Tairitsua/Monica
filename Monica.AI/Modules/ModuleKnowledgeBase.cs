@@ -40,8 +40,8 @@ public sealed class ModuleKnowledgeBase : MonicaModule<ModuleKnowledgeBaseOption
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleSkillSystem, ModuleSkillSystemOption>();
-        module.Require<ModuleMarkdown, ModuleMarkdownOption>();
+        module.Require<ModuleSkillSystem>();
+        module.Require<ModuleMarkdown>();
     }
 
     /// <inheritdoc />

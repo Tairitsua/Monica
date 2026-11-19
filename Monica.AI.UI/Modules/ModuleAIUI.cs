@@ -44,10 +44,10 @@ public class ModuleAIUI : MonicaModule<ModuleAIUIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAI, ModuleAIOption>();
-        module.Require<ModuleKnowledgeBase, ModuleKnowledgeBaseOption>();
-        module.Require<ModuleSkillSystem, ModuleSkillSystemOption>();
-        module.Require<ModuleMcp, ModuleMcpOption>();
+        module.Require<ModuleAI>();
+        module.Require<ModuleKnowledgeBase>();
+        module.Require<ModuleSkillSystem>();
+        module.Require<ModuleMcp>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<AIResource>());
         module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);

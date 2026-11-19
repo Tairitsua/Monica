@@ -53,7 +53,7 @@ public static class ModuleUIHostBuilderExtensions
 public class ModuleUIHost : MonicaModule<ModuleUIHostOption>, IWebHostRequiredModule
 {
     /// <inheritdoc />
-    public override void Describe(ModuleDescriptor module) => module.Require<ModuleUI, ModuleUIOption>();
+    public override void Describe(ModuleDescriptor module) => module.Require<ModuleUI>();
 
     /// <inheritdoc />
     public override void ConfigureBuilder(ModuleBuilderContext<ModuleUIHostOption> context)

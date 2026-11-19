@@ -92,7 +92,7 @@ public sealed class ModuleRegistrationStateTests
             monica.AddModule<InvalidDependencyFeatureConsumerModule, InvalidDependencyFeatureConsumerModuleOption>());
 
         compose.Should().Throw<InvalidOperationException>()
-            .WithMessage("*InvalidDependencyFeatureConsumerModule*without first declaring Require*");
+            .WithMessage("*InvalidDependencyFeatureConsumerModule*without first declaring Require<DependencyFeatureProviderModule>()*");
     }
 
     [Fact]
@@ -190,8 +190,8 @@ internal sealed class DependencyFeatureConsumerModule : MonicaModule<DependencyF
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DependencyFeatureProviderModule, DependencyFeatureProviderModuleOption>();
-        module.RequireDependencyFeature<DependencyFeatureProviderModule, DependencyFeatureProviderModuleOption>(
+        module.Require<DependencyFeatureProviderModule>();
+        module.RequireDependencyFeature<DependencyFeatureProviderModule>(
             DependencyFeatureProviderModule.PROVIDER_FEATURE);
     }
 }
@@ -210,7 +210,7 @@ internal sealed class InvalidDependencyFeatureConsumerModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.RequireDependencyFeature<DependencyFeatureProviderModule, DependencyFeatureProviderModuleOption>(
+        module.RequireDependencyFeature<DependencyFeatureProviderModule>(
             DependencyFeatureProviderModule.PROVIDER_FEATURE);
     }
 }

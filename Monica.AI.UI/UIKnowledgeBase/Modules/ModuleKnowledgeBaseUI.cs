@@ -42,8 +42,8 @@ public sealed class ModuleKnowledgeBaseUI : MonicaModule<ModuleKnowledgeBaseUIOp
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleKnowledgeBase, ModuleKnowledgeBaseOption>();
-        module.Require<ModuleRAG, ModuleRAGOption>();
+        module.Require<ModuleKnowledgeBase>();
+        module.Require<ModuleRAG>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<AIResource>());
         module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);

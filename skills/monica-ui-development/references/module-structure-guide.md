@@ -152,7 +152,7 @@ public class Module{Name}UI : MonicaModule<Module{Name}UIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<Module{Name}, Module{Name}Option>();
+        module.Require<Module{Name}>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<{Name}Resource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(

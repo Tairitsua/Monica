@@ -96,7 +96,7 @@ public class ModuleAuthorization : MonicaModule<ModuleAuthorizationOption>, IWeb
             static localization => localization.AddResource<AuthorityResource>());
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>(
             options => options.AddExceptionMapper<AuthorizationExceptionMapper>());
-        module.Require<ModuleAuthentication, ModuleAuthenticationOption>();
+        module.Require<ModuleAuthentication>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(options =>
             options.AddBehavior(
                 typeof(ExecutionAuthorizationBehavior<,>),

@@ -42,8 +42,8 @@ public class ModuleEventBusUI : MonicaModule<ModuleEventBusUIOption>, IWebHostRe
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleEventBus>();
+        module.Require<ModuleResultEnvelope>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {
             option.AddResource<EventBusResource>();

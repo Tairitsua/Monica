@@ -39,9 +39,9 @@ public class ModuleObservableInstanceUI : MonicaModule<ModuleObservableInstanceU
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleObservableInstance, ModuleObservableInstanceOption>();
+        module.Require<ModuleObservableInstance>();
         // Exception panes render StackTraceViewer, which needs the parser registered by the stack trace UI module.
-        module.Require<ModuleStackTraceUI, ModuleStackTraceUIOption>();
+        module.Require<ModuleStackTraceUI>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<ObservableInstanceResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

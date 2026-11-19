@@ -37,7 +37,7 @@ public class ModuleSystemUI : MonicaModule<ModuleSystemUIOption>, IUIModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleSystem, ModuleSystemOption>();
+        module.Require<ModuleSystem>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<ModuleSystemResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

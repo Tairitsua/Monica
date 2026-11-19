@@ -35,7 +35,7 @@ public class ModuleBuildingBlocksUI : MonicaModule<ModuleBuildingBlocksUIOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleBuildingBlocks, ModuleBuildingBlocksOption>();
+        module.Require<ModuleBuildingBlocks>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<BuildingBlocksResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

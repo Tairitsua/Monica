@@ -41,7 +41,7 @@ public sealed class ModuleEventBusKafkaUI : MonicaModule<ModuleEventBusKafkaUIOp
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleEventBusKafka, ModuleEventBusKafkaOption>();
+        module.Require<ModuleEventBusKafka>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<EventBusKafkaResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

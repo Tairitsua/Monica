@@ -8,6 +8,8 @@ Page payload properties follow the host's JSON naming policy. The default writes
 
 Monica composes one host-owned module graph before the .NET host is built. A module registration declares dependencies and features, so select a public `monica.Add...()` extension for each capability and let composition validate its graph. Web endpoints belong to a Web host; generic hosts keep non-Web services without endpoint mapping.
 
+For host-selected graph relationships, call `registration.Require<TDependency>()` to include a hard dependency or `registration.AfterIfPresent<TDependency>()` to order the registered module after an included target. Both return the original registration. Use `registration.Require<TDependency, TDependencyOptions>()` when the composition needs the dependency's typed registration to configure it or select a feature. For relationships intrinsic to a module, see [module registration and runtime contracts](../../monica-development/references/registration-runtime.md).
+
 ## Start with the host boundary
 
 Use [unified debug mode](debug-mode.md) for `Application:DebugMode`, its startup-frozen lifetime, participating diagnostic capabilities, and independent authorization/sensitive-value policies.

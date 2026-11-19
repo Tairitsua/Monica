@@ -51,8 +51,8 @@ public class ModuleRAG : MonicaModule<ModuleRAGOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleKnowledgeBase, ModuleKnowledgeBaseOption>();
-        module.Require<ModuleMarkdown, ModuleMarkdownOption>();
+        module.Require<ModuleKnowledgeBase>();
+        module.Require<ModuleMarkdown>();
         module.RequireFeature(VECTOR_STORE_FEATURE);
     }
 
