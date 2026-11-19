@@ -211,13 +211,14 @@ public sealed class ResultContractTests
     }
 
     [Fact]
-    public void Pagination_WhenSuccessful_ShouldRoundTripItemsAndNavigationWithExistingWireNames()
+    public void Pagination_WhenUsingDefaultJson_ShouldRoundTripWithCamelCasePropertyNames()
     {
         var success = Result.Success(new Page<int>(8, [4, 5, 6], currentPage: 2, pageSize: 3, cursor: "next"));
         var successJson = JsonSerializer.Serialize(success, WEB_JSON);
         using var successDocument = JsonDocument.Parse(successJson);
         var page = successDocument.RootElement.GetProperty("data");
-        Assert.Equal(8, page.GetProperty("sum").GetInt32());
+        Assert.Equal(8, page.GetProperty("totalCount").GetInt32());
+        Assert.False(page.TryGetProperty("sum", out _));
         Assert.Equal(3, page.GetProperty("items").GetArrayLength());
         Assert.Equal(3, page.GetProperty("pageSize").GetInt32());
         Assert.Equal(2, page.GetProperty("currentPage").GetInt32());
@@ -237,12 +238,24 @@ public sealed class ResultContractTests
     }
 
     [Fact]
+    public void Pagination_WhenUsingCustomJson_ShouldApplyTheNamingPolicyToEveryPageProperty()
+    {
+        var page = new Page<int>(8, [4, 5, 6], currentPage: 2, pageSize: 3, cursor: "next");
+        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseUpper };
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(page, options));
+
+        Assert.Equal(
+            ["CURRENT_PAGE", "CURSOR", "HAS_NEXT", "HAS_PREVIOUS", "ITEMS", "PAGE_SIZE", "TOTAL_COUNT", "TOTAL_PAGES"],
+            document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void Pagination_WhenEmptyOrFailed_ShouldDistinguishAnEmptyPageFromAbsentData()
     {
         var empty = Result.Success(new Page<int>(0, []));
         using var emptyDocument = JsonDocument.Parse(JsonSerializer.Serialize(empty, OMIT_NULL_JSON));
         var emptyPage = emptyDocument.RootElement.GetProperty("data");
-        Assert.Equal(0, emptyPage.GetProperty("sum").GetInt32());
+        Assert.Equal(0, emptyPage.GetProperty("totalCount").GetInt32());
         Assert.Equal(0, emptyPage.GetProperty("items").GetArrayLength());
         Assert.False(emptyPage.TryGetProperty("totalPages", out _));
         Assert.False(emptyPage.TryGetProperty("hasPrevious", out _));

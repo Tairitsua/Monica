@@ -64,7 +64,7 @@ Result<Page<OrderDto>> rejected = Result.Failure<Page<OrderDto>>("Invalid filter
 Result<Page<OrderDto>> forwarded = Result.FromFailure<Page<OrderDto>>(lookup);
 ```
 
-`Page<T>.TotalCount` serializes as `sum`. Pass null when the total is unknown. The optional `currentPage`, `pageSize`, and `cursor` arguments default to null. A successful query with no matches returns a page with `sum: 0` and `items: []`. Application failures, forwarded failures, and transport failures have null page data. The JSON envelope includes `"data": null` or omits `data`, according to the host's null handling. Use `ToBulkResult` to aggregate multiple results.
+Page properties follow the host's JSON naming policy. The default camelCase policy serializes `TotalCount` as `totalCount`. Pass null when the total is unknown. The optional `currentPage`, `pageSize`, and `cursor` arguments default to null. A successful query with no matches returns a page with `totalCount: 0` and `items: []` under the default policy. Application failures, forwarded failures, and transport failures have null page data. The JSON envelope includes `"data": null` or omits `data`, according to the host's null handling. Use `ToBulkResult` to aggregate multiple results.
 
 ## Error and transport boundaries
 
@@ -80,6 +80,6 @@ Generated API clients and custom forwarders use `IRemoteCallClient` for the comp
 
 Replace the old abbreviated result types and factory names, then review return expressions and callers by meaning. An old non-generic success-message call becomes `Result.Success().WithMessage(message)`, while a string payload becomes `Result.Success(value)`. Compilation cannot distinguish those intentions in an inferred variable or `IResultEnvelope` assignment. Remove success/failure extraction helpers and inspect payload absence explicitly. Use typed failures or `FromFailure<T>` instead of reconstructing a failure from its message and losing metadata.
 
-Replace `PagedResult<T>` with `Result<Page<T>>` and update derived CRUD methods and published query handlers. Use `IQuery<Page<T>>` to declare a paginated request. Read the total from `Data.TotalCount` after checking the result and required payload. Failed queries lose the old synthetic page object. Regenerate OpenAPI clients and update any code that reads page fields on a failed response.
+Replace `PagedResult<T>` with `Result<Page<T>>` and update derived CRUD methods and published query handlers. Use `IQuery<Page<T>>` to declare a paginated request. Read the total from `Data.TotalCount` after checking the result and required payload. Failed queries lose the old synthetic page object. Replace legacy JSON reads of `data.sum` with `data.totalCount` under the default naming policy. Regenerate OpenAPI clients and update any code that reads page fields on a failed response.
 
 Runtime and serialization contracts live in `tests/Test.Monica.Core/Results/ResultContractTests.cs`. Forbidden conversions and supported syntax are exercised by `tests/Test.Monica.Generators.AutoController/ResultApiCompilationTests.cs`. Verify string payloads, nullable data, Created status, failure reports, metadata copying, HTTP/local forwarding, rollback, and the distinction between an empty successful page and a failure.
