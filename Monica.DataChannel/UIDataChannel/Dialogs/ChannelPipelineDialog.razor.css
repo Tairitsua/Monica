@@ -348,11 +348,11 @@
     font-weight: 500;
 }
 
-.middleware-information {
+.pipeline-fields {
     margin: 0;
 }
 
-.middleware-information > div {
+.pipeline-fields > div {
     display: grid;
     grid-template-columns: minmax(100px,.4fr) minmax(0,1fr);
     gap: 20px;
@@ -360,15 +360,16 @@
     border-bottom: 1px solid var(--mud-palette-lines-default);
 }
 
-.middleware-information dt {
+.pipeline-fields dt {
     color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary));
     font-size: 12px;
     overflow-wrap: anywhere;
 }
 
-.middleware-information dd {
+.pipeline-fields dd {
     min-width: 0;
     margin: 0;
+    overflow-wrap: anywhere;
 }
 
 .pipeline-inspector ::deep .mud-button-text-primary:not(:disabled),
@@ -419,7 +420,7 @@
     .middleware-evidence {
         padding: 16px;
     }
-    .middleware-information > div {
+    .pipeline-fields > div {
         grid-template-columns: minmax(0,1fr);
         gap: 5px;
     }

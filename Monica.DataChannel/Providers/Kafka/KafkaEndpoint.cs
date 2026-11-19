@@ -191,8 +191,10 @@ public class KafkaEndpoint(
     private void ReportFailure(Exception exception, string message) => CollectException(exception, this, message, logger);
 
     /// <summary>Returns safe configuration and detached input state, including paused and blocked counts.</summary>
-    public override dynamic GetMetadata() => new { Options = Metadata, Consumer = _consumer?.Snapshot };
+    public override dynamic GetMetadata() => new KafkaEndpointMetadata(Metadata, _consumer?.Snapshot);
 
     /// <inheritdoc />
     public override ConnectionDirection SupportedConnectionDirection() => ConnectionDirection.InputAndOutput;
 }
+
+internal sealed record KafkaEndpointMetadata(KafkaOptions Options, KafkaConsumerSnapshot? Consumer);

@@ -183,6 +183,22 @@
     "InspectComponent": "Inspect {0} · stage position {1}",
     "Metadata": "Captured metadata"
   },
+  "KafkaInput": {
+    "FailurePolicy": "Failure policy",
+    "Block": "Block the partition",
+    "DeadLetter": "Send to the dead-letter topic",
+    "LogAndSkip": "Log and skip",
+    "AfterOneFailure": "{0} after 1 failed attempt",
+    "AfterFailures": "{0} after {1} failed attempts",
+    "DeadLetterTopic": "Dead-letter topic",
+    "Processed": "Successfully processed",
+    "Skipped": "Skipped messages",
+    "DeadLettered": "Dead-lettered messages",
+    "BlockedPartition": "Blocked partition {0}",
+    "Offset": "Offset {0}",
+    "Counters": "Consumer counts",
+    "Unavailable": "Unavailable at capture"
+  },
   "Pipeline": {
     "ComponentKinds": {
       "Endpoint": "Endpoint",

@@ -183,6 +183,22 @@
     "InspectComponent": "检查 {0} · 阶段位置 {1}",
     "Metadata": "已采集元数据"
   },
+  "KafkaInput": {
+    "FailurePolicy": "失败处理策略",
+    "Block": "阻塞该分区",
+    "DeadLetter": "转发到死信主题",
+    "LogAndSkip": "记录日志并跳过",
+    "AfterOneFailure": "首次处理失败后，{0}",
+    "AfterFailures": "共尝试 {1} 次均失败后，{0}",
+    "DeadLetterTopic": "死信主题",
+    "Processed": "已成功处理",
+    "Skipped": "已跳过消息数",
+    "DeadLettered": "已转发死信数",
+    "BlockedPartition": "已阻塞分区 {0}",
+    "Offset": "偏移量 {0}",
+    "Counters": "消费计数",
+    "Unavailable": "采集时未取得计数"
+  },
   "Pipeline": {
     "ComponentKinds": {
       "Endpoint": "端点",

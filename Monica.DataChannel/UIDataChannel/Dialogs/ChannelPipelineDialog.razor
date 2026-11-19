@@ -3,6 +3,7 @@
 @using Monica.DataChannel.UIDataChannel.Abstractions
 @using Monica.DataChannel.UIDataChannel.Models
 @using Monica.DataChannel.UIDataChannel.Support
+@using Monica.Kafka
 @inject IStringLocalizer<DataChannelResource> L
 @inject IEnumerable<IDataChannelMiddlewareRowAction> MiddlewareRowActions
 @inject ISnackbar Snackbar
@@ -111,6 +112,54 @@
                                             <p>@L["PipelineInspector:Transient"]</p>
                                         }
                                     </header>
+                                    @if (endpoint.KafkaInput is { } input)
+                                    {
+                                        <dl class="pipeline-fields">
+                                            <div>
+                                                <dt>@L["KafkaInput:FailurePolicy"]</dt>
+                                                <dd>@DataChannelPresentation.FailurePolicy(input, L)</dd>
+                                            </div>
+                                            @if (input.Action == KafkaFailureAction.DeadLetter)
+                                            {
+                                                <div>
+                                                    <dt>@L["KafkaInput:DeadLetterTopic"]</dt>
+                                                    <dd><code>@input.DeadLetterTopic</code></dd>
+                                                </div>
+                                            }
+                                            @if (input.Consumer is { } consumer)
+                                            {
+                                                <div>
+                                                    <dt>@L["KafkaInput:Processed"]</dt>
+                                                    <dd>@consumer.ProcessedMessages.ToString("N0")</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>@L["KafkaInput:Skipped"]</dt>
+                                                    <dd>@consumer.SkippedMessages.ToString("N0")</dd>
+                                                </div>
+                                                @if (input.Action == KafkaFailureAction.DeadLetter)
+                                                {
+                                                    <div>
+                                                        <dt>@L["KafkaInput:DeadLettered"]</dt>
+                                                        <dd>@consumer.DeadLetteredMessages.ToString("N0")</dd>
+                                                    </div>
+                                                }
+                                                @foreach (var partition in consumer.BlockedPartitions)
+                                                {
+                                                    <div>
+                                                        <dt>@L["KafkaInput:BlockedPartition", partition.Partition]</dt>
+                                                        <dd>@L["KafkaInput:Offset", partition.Offset]</dd>
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <div>
+                                                    <dt>@L["KafkaInput:Counters"]</dt>
+                                                    <dd>@L["KafkaInput:Unavailable"]</dd>
+                                                </div>
+                                            }
+                                        </dl>
+                                    }
                                     <MetadataDisplay Metadata="endpoint.Metadata" />
                                 </section>
                             }
@@ -173,7 +222,7 @@
                                         </header>
                                         @if (selected.InfoDictionary is { Count: > 0 } information)
                                         {
-                                            <dl class="middleware-information">
+                                            <dl class="pipeline-fields">
                                                 @foreach (var entry in information)
                                                 {
                                                     <div>

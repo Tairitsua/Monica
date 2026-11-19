@@ -49,7 +49,7 @@ Set `KafkaMessageMetadata.OUTPUT_HEADERS_METADATA_KEY` (`Kafka.Headers`) to an `
 
 Inputs require `EnableAutoCommit = false` (the default); enabling it is rejected. The endpoint also disables automatic offset storage. One dedicated owner performs native polling, assignment handling, pausing, resuming and commits. It retains one unacknowledged head per partition, pauses that partition, and runs at most `MaxConcurrentPartitions` workers (four by default). `MaxBufferedMessages` bounds retained application records including active and retired workers (64 by default, at least the worker count). Polling continues while business work runs, so long work does not itself exceed `ConsumerMaxPollInterval`. Native fetching has a separate queue target (`ConsumerQueuedMaxMessagesKbytes`, 64 MiB by default); Kafka can return a first batch exceeding fetch targets. Record bounds are not hard process-memory bounds. Configure fetch/message limits and broker limits together for large payloads.
 
-An input retains the head of each owned partition during processing. After `ProcessingMaxAttempts` (default 3, with `RetryDelay` defaulting to 1s), `KafkaOptions.ProcessingFailureAction` selects its disposition.
+An input retains the head of each owned partition during processing. After `ProcessingMaxAttempts` (default 3, with `RetryDelay` defaulting to 1s), `KafkaOptions.ProcessingFailureAction` selects its disposition. In the pipeline inspector, open **Endpoints** to see the configured action and total attempts for a receiving Kafka endpoint. The capture shows successful and skipped message counts separately, the destination and forwarded count for dead-letter delivery, and the offset of each blocked partition.
 
 | Action | Behavior after exhaustion |
 | --- | --- |

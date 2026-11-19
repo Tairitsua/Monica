@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Localization;
 using Monica.DataChannel.Localization;
 using Monica.DataChannel.UIDataChannel.Models;
+using Monica.Kafka;
 using Monica.UI.Icons;
 using MudBlazor;
 
@@ -40,4 +41,18 @@ internal static class DataChannelPresentation
     };
     public static string Group(string? groupId, IStringLocalizer<DataChannelResource> localizer) =>
         string.IsNullOrEmpty(groupId) ? localizer["Workbench:Ungrouped"].Value : groupId;
+
+    public static string FailurePolicy(KafkaInputDetails input, IStringLocalizer<DataChannelResource> localizer)
+    {
+        var action = input.Action switch
+        {
+            KafkaFailureAction.Block => localizer["KafkaInput:Block"].Value,
+            KafkaFailureAction.DeadLetter => localizer["KafkaInput:DeadLetter"].Value,
+            KafkaFailureAction.LogAndSkip => localizer["KafkaInput:LogAndSkip"].Value,
+            _ => input.Action.ToString()
+        };
+        return input.MaxAttempts == 1
+            ? localizer["KafkaInput:AfterOneFailure", action].Value
+            : localizer["KafkaInput:AfterFailures", action, input.MaxAttempts].Value;
+    }
 }

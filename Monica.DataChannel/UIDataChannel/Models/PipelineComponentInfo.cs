@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using Monica.DataChannel.Abstractions.Communication;
 using Monica.DataChannel.Abstractions.Pipeline;
 using Monica.DataChannel.Middlewares;
 using Monica.DataChannel.Models;
 using Monica.DataChannel.Pipeline;
+using Monica.DataChannel.Providers.Kafka;
+using Monica.Kafka;
 using Monica.Tool.Extensions;
 
 namespace Monica.DataChannel.UIDataChannel.Models;
@@ -38,7 +41,13 @@ public class PipelineComponentInfo
         AssemblyQualifiedName = componentType.AssemblyQualifiedName ?? TypeName;
         IsTransient = component is TransientComponentProxyBase;
         CanDebugMessages = component is MessageDebuggerMiddleware && !IsTransient;
-        Metadata = DataChannelValueSnapshot.Capture(() => (object?)component.GetMetadata());
+        object? metadata = null;
+        Metadata = DataChannelValueSnapshot.Capture(() => metadata = (object?)component.GetMetadata());
+        if (metadata is KafkaEndpointMetadata { Options.Direction: ConnectionDirection.Input or ConnectionDirection.InputAndOutput } kafka)
+        {
+            KafkaInput = new(kafka.Options.ProcessingFailureAction, kafka.Options.ProcessingMaxAttempts,
+                kafka.Options.DeadLetterTopic, kafka.Consumer);
+        }
         if (component is PipelineInfoDisplayMiddlewareBase infoMiddleware)
         {
             InfoDictionary = new ReadOnlyDictionary<string, DataChannelValueSnapshot>(infoMiddleware.GetInfoDictionary()
@@ -68,6 +77,7 @@ public class PipelineComponentInfo
     public bool CanDebugMessages { get; }
     /// <summary>Gets complete detached metadata or its local capture failure.</summary>
     public DataChannelValueSnapshot Metadata { get; }
+    internal KafkaInputDetails? KafkaInput { get; }
     /// <summary>Gets detached information values for persistent information-display middleware, if present.</summary>
     public IReadOnlyDictionary<string, DataChannelValueSnapshot>? InfoDictionary { get; }
 
@@ -84,3 +94,6 @@ public class PipelineComponentInfo
         return PipelineComponentKind.BaseMiddleware;
     }
 }
+
+internal sealed record KafkaInputDetails(KafkaFailureAction Action, int MaxAttempts, string? DeadLetterTopic,
+    KafkaConsumerSnapshot? Consumer);
