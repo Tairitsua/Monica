@@ -1,4 +1,4 @@
-namespace Monica.BuildingBlocks.Annotations;
+namespace Monica.ApplicationModel.Annotations;
 
 /// <summary>
 /// Associates a building block with one externally managed requirement identifier.

@@ -1,13 +1,15 @@
 using Microsoft.Extensions.Logging;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
+using Monica.ApplicationModel.Annotations;
+using Monica.EventBus.Abstractions.Handlers;
 using Platform.Protocol.PublishedLanguages.DomainOrdering.Events;
 
 namespace Roles.Ordering.HandlersEvent;
 
 /// <summary>
-/// Records the in-process reaction to an approval in the demo's process-local repository.
+/// Records approvals delivered by the local event bus.
 /// </summary>
+[BuildingBlockMetadata("Record Order Approval",
+    Description = "Logs the order identity and time after the reference application records its approval.")]
 public sealed class LocalEventHandlerOrderApproved : LocalEventHandler<EventOrderApproved>
 {
     /// <inheritdoc />

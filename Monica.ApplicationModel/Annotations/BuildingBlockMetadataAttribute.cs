@@ -1,4 +1,4 @@
-namespace Monica.BuildingBlocks.Annotations;
+namespace Monica.ApplicationModel.Annotations;
 
 /// <summary>
 /// Declares human-readable context for a building block.

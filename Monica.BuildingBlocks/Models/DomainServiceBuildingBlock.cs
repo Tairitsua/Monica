@@ -2,7 +2,6 @@ using Monica.Core.TypeDiscovery.Models;
 using Monica.Modules;
 using Monica.BuildingBlocks.Services.Support;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 
 namespace Monica.BuildingBlocks.Models;
 

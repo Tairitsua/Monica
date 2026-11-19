@@ -40,7 +40,7 @@ using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Domains.Ordering.Interfaces;
 
 namespace Roles.Ordering.HostedServices;

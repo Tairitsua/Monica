@@ -166,7 +166,7 @@ public sealed class BuildingBlockSourceAnalyzerTests
             """);
         File.WriteAllText(Path.Combine(consumerDirectory, "DependentUnit.cs"), """
             namespace Consumer;
-            [Monica.BuildingBlocks.Annotations.BuildingBlockMetadata(Sample.AnalysisGeneration.Title)]
+            [Monica.ApplicationModel.Annotations.BuildingBlockMetadata(Sample.AnalysisGeneration.Title)]
             public sealed class DependentUnit : Monica.Application.Abstractions.DomainService { }
             """);
         await fixture.RestoreAsync(TestContext.Current.CancellationToken, consumerProject);
@@ -332,7 +332,7 @@ public sealed class BuildingBlockSourceAnalyzerTests
                     public abstract class DomainService { }
                 }
 
-                namespace Monica.BuildingBlocks.Annotations
+                namespace Monica.ApplicationModel.Annotations
                 {
                     [System.AttributeUsage(System.AttributeTargets.Class)]
                     public sealed class BuildingBlockMetadataAttribute(string title) : System.Attribute
@@ -346,7 +346,7 @@ public sealed class BuildingBlockSourceAnalyzerTests
 
                 namespace Sample
                 {
-                    using Monica.BuildingBlocks.Annotations;
+                    using Monica.ApplicationModel.Annotations;
                     using Monica.Application.Abstractions;
 
                     /// <summary>Fallback documentation.</summary>

@@ -70,7 +70,6 @@ public sealed class GeneratorContractValidationTests
         using System.Threading.Tasks;
         using Monica.Core.Results;
         using Monica.Application.Abstractions;
-        using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
 
@@ -98,7 +97,6 @@ public sealed class GeneratorContractValidationTests
         using System.Threading.Tasks;
         using Monica.Core.Results;
         using Monica.Application.Abstractions;
-        using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
 
@@ -151,7 +149,6 @@ public sealed class GeneratorContractValidationTests
         using System.Threading.Tasks;
         using Monica.Core.Results;
         using Monica.Application.Abstractions;
-        using Monica.WebApi.Abstractions;
         using Monica.WebApi.Annotations;
         using Monica.Application.Annotations;
 

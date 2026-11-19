@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Monica.ApplicationModel.Annotations;
 
 namespace Monica.BuildingBlocks.Models;
 
@@ -40,7 +41,7 @@ public sealed class BuildingBlockServiceIdentity
 public enum BuildingBlockCoverageKind
 {
     /// <summary>
-    /// Explicit <see cref="Annotations.BuildingBlockMetadataAttribute"/> presence.
+    /// Explicit <see cref="BuildingBlockMetadataAttribute"/> presence.
     /// </summary>
     Metadata,
 

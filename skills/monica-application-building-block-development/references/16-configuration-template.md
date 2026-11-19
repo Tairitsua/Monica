@@ -20,7 +20,7 @@ This example belongs in `Domains.Ordering/Configurations/OptionsOrderProcessing.
 using System.ComponentModel.DataAnnotations;
 using Monica.Configuration.Annotations;
 using Monica.Configuration.Models;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace Domains.Ordering.Configurations;
 
@@ -48,7 +48,7 @@ The domain owns this connection setting because its passive repository needs it 
 using System.ComponentModel.DataAnnotations;
 using Monica.Configuration.Annotations;
 using Monica.Configuration.Models;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace Domains.Ordering.Configurations;
 

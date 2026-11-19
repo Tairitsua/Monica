@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Monica.Core.Execution;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.BuildingBlocks.Services.Support;
 using Monica.Tool.Extensions;
 

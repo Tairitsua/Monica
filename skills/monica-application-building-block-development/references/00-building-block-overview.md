@@ -43,7 +43,7 @@ The original solution supplies `SolutionDir` for input evaluation, loading, and 
 Every application-authored discovered building block must declare its own human-readable responsibility and associate applicable actual requirement IDs when they can be resolved. Generated types remain generator-owned. Missing legitimate traceability is [coverage debt](03-building-block-context-metadata.md), not permission to invent a behavioral commitment:
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 [BuildingBlockMetadata(
     "Approve Order",

@@ -20,7 +20,6 @@ using Monica.Repository.Persistence.Extensions;
 using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Tool.Extensions;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 using Monica.WebApi.AutoControllers.Models;
 

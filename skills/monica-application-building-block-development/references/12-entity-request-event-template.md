@@ -7,7 +7,7 @@ Use `$ContractNamespace$` for the contract project selected by the architecture 
 Use request contracts for use-case input. Keep them stable and serializable.
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Application.Abstractions;
 using Monica.Application.Annotations;
 
@@ -50,7 +50,7 @@ Rules:
 Use entities to own identity, state transitions, and invariants.
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Entity.Abstractions;
 
 namespace $DomainNamespace$.Entities;
@@ -112,7 +112,7 @@ Use domain events to describe meaningful business facts or shared application no
 ```csharp
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Events;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace $ContractNamespace$.Events;
 

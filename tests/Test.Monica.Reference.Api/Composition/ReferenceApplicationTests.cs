@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Monica.ApplicationModel.Abstractions;
+using Monica.BuildingBlocks.Abstractions;
+using Monica.BuildingBlocks.Models;
 using Monica.Configuration.Facades;
 using Monica.Configuration.Models;
 using Monica.Core.Results;
@@ -78,10 +80,17 @@ public sealed class ReferenceApplicationTests
         Assert.Equal(ResultStatus.Ok, summary.Status);
         Assert.Equal(3, summary.Data!.TotalOrders);
         Assert.Equal(2, summary.Data.DraftOrders);
-        Assert.Contains(factory.Logs.Entries, entry => entry.Category == typeof(LocalEventHandlerOrderApproved).FullName
+        var handlerType = typeof(LocalEventHandlerOrderApproved);
+        Assert.Contains(factory.Logs.Entries, entry => entry.Category == handlerType.FullName
             && entry.Message.Contains("MANUAL-1003", StringComparison.Ordinal));
         Assert.All(app.Services.GetRequiredService<IEventSubscriptionRegistry>().GetByEventType(typeof(EventOrderApproved)),
             subscription => Assert.Equal(EventSubscriptionState.Active, subscription.State));
+
+        var catalog = app.Services.GetRequiredService<IBuildingBlockCatalog>();
+        var handler = catalog.FindByFullName<LocalEventHandlerBuildingBlock>(handlerType.FullName);
+        Assert.NotNull(handler);
+        Assert.Equal("Record Order Approval", handler.MetadataTitle);
+        Assert.Equal(typeof(EventOrderApproved), handler.EventType);
 
         using var client = ((TestServer)app.Services.GetRequiredService<IServer>()).CreateClient();
         using var response = await client.PostAsJsonAsync("/api/v1/Ordering/queries/GetOrders", new QueryGetOrders(), token);

@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis.Text;
 using Monica.Core.Results;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Monica.WebApi.Annotations;
 using Monica.Application.Annotations;
 using Monica.ApplicationModel.Annotations;

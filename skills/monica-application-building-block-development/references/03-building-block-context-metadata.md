@@ -1,6 +1,6 @@
 # Building Block Context Metadata
 
-Use this reference when authoring or maintaining discovered Building Block metadata. The annotations form the agent-readable architecture catalog shown by Monica's status dashboard and typed APIs.
+`Monica.ApplicationModel` supplies `BuildingBlockMetadataAttribute` and `BuildingBlockRequirementAttribute` in `Monica.ApplicationModel.Annotations`. Business projects declare this metadata directly. Hosts that compose `Monica.BuildingBlocks` read it for the architecture catalog, dashboard and typed APIs.
 
 ## Required Decisions
 
@@ -28,7 +28,7 @@ Keep `Owner`, tags, requirement IDs, namespaces and CLR type names stable. Local
 ```csharp
 using Monica.Application.Abstractions;
 using Monica.Core.Results;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 [BuildingBlockMetadata(
     "$Title$",

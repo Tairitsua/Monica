@@ -10,14 +10,13 @@ using Monica.Core.Results.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.BuildingBlocks.CodeAnalysis.Models;
 using Monica.BuildingBlocks.CodeAnalysis.Services;
 using Monica.BuildingBlocks.Models;
 using Monica.BuildingBlocks.Services.Support;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Xunit;
 
 namespace Test.Monica.BuildingBlocks.CodeAnalysis.Services;
@@ -203,9 +202,8 @@ public sealed class BuildingBlockUseCaseTemplateTests
         using System.Threading;
         using System.Threading.Tasks;
         using Monica.Core.Results;
-        using Monica.BuildingBlocks.Annotations;
+        using Monica.ApplicationModel.Annotations;
         using Monica.Application.Abstractions;
-        using Monica.WebApi.Abstractions;
         using Domains.Ordering.Interfaces;
         using Domains.Ordering.Models;
 

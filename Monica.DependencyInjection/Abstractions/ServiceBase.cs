@@ -1,17 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Monica.Core.ObjectMapping.Abstractions;
-using Monica.DependencyInjection.Abstractions;
 
-namespace Monica.Application.Abstractions;
+namespace Monica.DependencyInjection.Abstractions;
 
 /// <summary>
-/// Provides host-bound infrastructure shared by Monica application and domain services.
+/// Provides host-bound logging and object mapping for conventionally activated services.
 /// </summary>
 /// <remarks>
-/// Instances must be resolved through Monica dependency injection so the cached service provider is assigned
-/// before protected host services such as <see cref="Logger"/> or <see cref="Mapper"/> are used. These properties
-/// are available after activation and must not be accessed from a derived constructor.
+/// Use a scoped or transient Monica DI convention so activation assigns the cached service provider.
+/// Access <see cref="Logger"/> and <see cref="Mapper"/> from service methods after activation.
 /// </remarks>
 public abstract class ServiceBase : ICachedServiceProviderAccessor
 {

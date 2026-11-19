@@ -1,6 +1,4 @@
-using Monica.EventBus.Abstractions.Handlers;
-
-namespace Monica.WebApi.Abstractions;
+namespace Monica.EventBus.Abstractions.Handlers;
 
 /// <summary>
 /// Base class for local event handlers.

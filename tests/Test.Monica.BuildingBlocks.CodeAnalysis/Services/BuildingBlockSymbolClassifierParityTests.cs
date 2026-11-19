@@ -26,7 +26,7 @@ using Monica.Framework.Seeder.Abstractions;
 using Monica.JobScheduler;
 using Monica.JobScheduler.Abstractions;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.BuildingBlocks.CodeAnalysis.Models;
 using Monica.BuildingBlocks.CodeAnalysis.Services;
 using Monica.BuildingBlocks.Models;
@@ -35,7 +35,6 @@ using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Monica.WebApi.AutoControllers.Abstractions;
 using Xunit;
 
@@ -261,12 +260,11 @@ public sealed class BuildingBlockSymbolClassifierParityTests
         using Monica.Framework.Seeder.Abstractions;
         using Monica.JobScheduler.Abstractions;
         using Monica.Modules;
-        using Monica.BuildingBlocks.Annotations;
+        using Monica.ApplicationModel.Annotations;
         using Monica.Repository.Entity.Abstractions;
         using Monica.Repository.Persistence.Abstractions;
         using Monica.Repository.Persistence.Services;
         using Monica.Application.Abstractions;
-        using Monica.WebApi.Abstractions;
         using Monica.WebApi.AutoControllers.Abstractions;
 
         namespace Samples;

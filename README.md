@@ -110,7 +110,7 @@ Each discovered Building Block can carry explicit agent context and requirement 
 
 ```csharp
 using Monica.Application.Abstractions;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 [BuildingBlockMetadata(
     "Approve Order",

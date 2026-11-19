@@ -24,7 +24,7 @@ Use `$DomainNamespace$` for the domain project namespace and `$RepositoryNamespa
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
 

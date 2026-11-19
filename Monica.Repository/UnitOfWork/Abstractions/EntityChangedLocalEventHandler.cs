@@ -1,7 +1,7 @@
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.Repository.UnitOfWork.Models;
 
-namespace Monica.WebApi.Abstractions;
+namespace Monica.Repository.UnitOfWork.Abstractions;
 
 /// <summary>
 /// Base class for local handlers that react to any tracked change for one entity type.

@@ -9,6 +9,7 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 
 ## Rules
 
+- Import the handler bases from `Monica.EventBus.Abstractions.Handlers`. For automatic activation, include the concrete handler's assembly in type discovery and compose [conventional DI](../../monica-infra-hosting/references/dependency-injection.md).
 - Use `DistributedEventHandler<TEvent>` for distributed events.
 - Use `DistributedBatchEventHandler<TEvent>` only for an explicit consumer that combines database work. Keep the `DistributedEventHandler` naming prefix and Building Block metadata; implement `HandleBatchAsync(IReadOnlyList<TEvent>, CancellationToken)` and select its transaction context on that method. Follow [batch receive prerequisites and limits](../../monica-infra-messaging/references/event-bus.md#explicit-batch-consumers) and [batch Inbox](../../monica-infra-persistence/references/transactional-events.md#inbox-and-timestamp-behavior). Keep ordinary handlers for independent reactions that gain nothing from combining work.
 - Use `LocalEventHandler<TEvent>` for in-process reactions.
@@ -25,9 +26,8 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 ## Distributed Handler Example
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
+using Monica.ApplicationModel.Annotations;
+using Monica.EventBus.Abstractions.Handlers;
 using $ContractNamespace$.Events;
 using $DomainNamespace$.DomainServices;
 
@@ -54,9 +54,9 @@ public sealed class DistributedEventHandlerOrderApproved(DomainNotifyWarehouse d
 
 ```csharp
 using Monica.Core.Execution;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Inbox.Annotations;
-using Monica.WebApi.Abstractions;
+using Monica.EventBus.Abstractions.Handlers;
 
 [BuildingBlockMetadata("Record Order Notices", Description = "Stores new notices and their Inbox receipts in one transaction.")]
 [Inbox("orders.record-notices.v1")]
@@ -78,9 +78,8 @@ Register `AddInbox<OrdersDbContext>()` and its schema before receiving. The oper
 ## Local Handler Example
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
+using Monica.ApplicationModel.Annotations;
+using Monica.EventBus.Abstractions.Handlers;
 using $ContractNamespace$.Events;
 using $DomainNamespace$.DomainServices;
 

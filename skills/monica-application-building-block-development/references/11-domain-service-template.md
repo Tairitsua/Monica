@@ -11,7 +11,7 @@ A handler that loads one order and calls `order.Approve()` does not need a Domai
 
 ## Rules
 
-- Derive from `DomainService`.
+- Derive from `DomainService` in `Monica.Application.Abstractions`. The base carries the transient DI convention.
 - Declare business collaborators in the constructor, preferably a primary constructor, and inject only dependencies the service uses. Current-user access and ID generation are explicit application dependencies; do not add them to a shared service base or resolve them through `IServiceProvider` / `CachedServiceProvider`.
 - Use the inherited `Logger` in service methods when logging is needed. Monica resolves it after activation from the
   host that owns the service instance; do not access it from a constructor.
@@ -25,9 +25,8 @@ A handler that loads one order and calls `order.Approve()` does not need a Domai
 `Order`, `Warehouse`, and their repositories are application-owned example types. Here fulfillment is a cross-aggregate rule; the order still protects its own approval transition.
 
 ```csharp
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 
 namespace $DomainNamespace$.DomainServices;
 

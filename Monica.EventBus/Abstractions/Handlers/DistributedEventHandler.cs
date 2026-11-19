@@ -1,6 +1,4 @@
-using Monica.EventBus.Abstractions.Handlers;
-
-namespace Monica.WebApi.Abstractions;
+namespace Monica.EventBus.Abstractions.Handlers;
 
 /// <summary>
 /// Provides the application execution boundary for one distributed event delivery.

@@ -34,12 +34,12 @@ internal sealed class BuildingBlockSymbolClassifier
     private const string SEEDER = "Monica.Framework.Seeder.Abstractions.ISeeder";
     private const string SEEDER_RUN_EXECUTION_POINT = "seeder.run";
     private const string LOCAL_EVENT_HANDLER = "Monica.EventBus.Abstractions.Handlers.ILocalEventHandler`1";
-    private const string METADATA_ATTRIBUTE = "Monica.BuildingBlocks.Annotations.BuildingBlockMetadataAttribute";
+    private const string METADATA_ATTRIBUTE = "Monica.ApplicationModel.Annotations.BuildingBlockMetadataAttribute";
     private const string RECURRING_JOB = "Monica.JobScheduler.Abstractions.RecurringJob";
     private const string REPOSITORY = "Monica.Repository.Persistence.Abstractions.IRepository`1";
     private const string REQUEST = "Monica.Application.Abstractions.IResultRequestBase";
     private const string NATIVE_REQUEST = "Monica.Core.Mediator.IRequest`1";
-    private const string REQUIREMENT_ATTRIBUTE = "Monica.BuildingBlocks.Annotations.BuildingBlockRequirementAttribute";
+    private const string REQUIREMENT_ATTRIBUTE = "Monica.ApplicationModel.Annotations.BuildingBlockRequirementAttribute";
     private const string TRIGGERED_JOB = "Monica.JobScheduler.Abstractions.TriggeredJob`1";
     private const string TRIGGERED_JOB_EXECUTION_POINT = "jobs.triggered-attempt";
     private const string OPTIONS = "Microsoft.Extensions.Options.IOptions`1";

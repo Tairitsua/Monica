@@ -174,7 +174,7 @@ Stable 不依赖 Labs，Integration 也始终是按需引入的 provider-specifi
 
 ```csharp
 using Monica.Application.Abstractions;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 [BuildingBlockMetadata(
     "审核订单",

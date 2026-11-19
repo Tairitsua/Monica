@@ -12,9 +12,8 @@ The attributed requests are outside `PublishedLanguages`, so they are local HTTP
 using System.Threading;
 using System.Threading.Tasks;
 using Monica.Core.Results;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Monica.Application.Annotations;
 using Domains.Ordering.Interfaces;
 using Domains.Ordering.Models;
@@ -75,7 +74,7 @@ Place the state owner in `Entities/Order.cs`. Approval rejects a repeated transi
 
 ```csharp
 using System;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Entity.Abstractions;
 
 namespace Domains.Ordering.Entities;
@@ -120,7 +119,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
 using Domains.Ordering.Entities;

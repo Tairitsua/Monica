@@ -1,5 +1,6 @@
 
 using Monica.Repository.Entity.Abstractions;
+using Monica.Repository.UnitOfWork.Abstractions;
 
 namespace Monica.Repository.UnitOfWork.Models;
 
@@ -12,8 +13,8 @@ namespace Monica.Repository.UnitOfWork.Models;
 /// This base type is only a shared payload abstraction. Monica dispatches entity change
 /// events by the exact concrete event type, so a handler registered for
 /// <see cref="EntityChangedEventData{TEntity}"/> will not receive create, update, or delete
-/// events. Use exact handlers or the WebApi entity-change local handler base for local
-/// "any change" reactions.
+/// events. Use <see cref="EntityChangedLocalEventHandler{TEntity}"/> for a single local handler
+/// that reacts to all three event types.
 /// </remarks>
 /// <param name="entity">Changed entity in this event</param>
 [Serializable]

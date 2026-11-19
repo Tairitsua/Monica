@@ -10,7 +10,7 @@ using Monica.EventBus.Events;
 using Monica.EventBus.Models;
 using Monica.EventBus.Services.Support;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.BuildingBlocks.Facades;
 using Monica.Testing.Hosting;
 using Xunit;

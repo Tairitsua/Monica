@@ -23,7 +23,7 @@
 using Microsoft.Extensions.Logging;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Annotations;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace $ApplicationNamespace$.BackgroundWorkers;
 
@@ -50,7 +50,7 @@ public sealed class WorkerRefreshOrderSnapshot(
 ```csharp
 using Microsoft.Extensions.Logging;
 using Monica.JobScheduler.Abstractions;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 
 namespace $ApplicationNamespace$.BackgroundWorkers;
 

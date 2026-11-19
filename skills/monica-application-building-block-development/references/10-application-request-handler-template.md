@@ -47,7 +47,7 @@ ApiEndpoint declares the HTTP method, relative route and binding for every publi
 ```csharp
 using Monica.Core.Results;
 using Monica.Core.Execution;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Application.Abstractions;
 using Monica.Application.Annotations;
@@ -95,7 +95,7 @@ public sealed class QueryHandler$FeatureName$($RepositoryName$ repository)
 
 ```csharp
 using Monica.Core.Results;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.Application.Abstractions;
 using Monica.Application.Annotations;
 

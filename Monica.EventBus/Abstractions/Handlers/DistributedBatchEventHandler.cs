@@ -1,6 +1,4 @@
-using Monica.EventBus.Abstractions.Handlers;
-
-namespace Monica.WebApi.Abstractions;
+namespace Monica.EventBus.Abstractions.Handlers;
 
 /// <summary>Provides host-bound application services to an explicit distributed batch consumer.</summary>
 /// <remarks>

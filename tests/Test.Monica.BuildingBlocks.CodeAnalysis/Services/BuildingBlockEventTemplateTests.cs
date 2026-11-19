@@ -6,16 +6,15 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.DependencyInjection.Abstractions;
+using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Events;
 using Monica.Modules;
-using Monica.BuildingBlocks.Annotations;
+using Monica.ApplicationModel.Annotations;
 using Monica.BuildingBlocks.CodeAnalysis.Models;
 using Monica.BuildingBlocks.CodeAnalysis.Services;
 using Monica.BuildingBlocks.Models;
 using Monica.BuildingBlocks.Services.Support;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Xunit;
 
 namespace Test.Monica.BuildingBlocks.CodeAnalysis.Services;
@@ -23,7 +22,7 @@ namespace Test.Monica.BuildingBlocks.CodeAnalysis.Services;
 public sealed class BuildingBlockEventTemplateTests
 {
     [Fact]
-    public void Compile_WhenCanonicalEventTemplatesAreUsed_ShouldDiscoverCompleteConnectedBuildingBlocks()
+    public void Compile_WhenCanonicalEventTemplatesUseEventBusAndApplicationModel_ShouldDiscoverConnectedBuildingBlocks()
     {
         var sources = new[]
         {
@@ -127,11 +126,12 @@ public sealed class BuildingBlockEventTemplateTests
     private static CSharpCompilation CreateCompilation(IEnumerable<string> sources, CancellationToken cancellationToken)
     {
         var trustedAssemblies = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Where(static path => !Path.GetFileName(path).StartsWith("Monica.", StringComparison.OrdinalIgnoreCase));
         var projectAssemblies = new[]
         {
+            typeof(BusinessTypeShape).Assembly.Location,
             typeof(DomainEvent).Assembly.Location,
-            typeof(DistributedEventHandler<>).Assembly.Location,
             typeof(BuildingBlockMetadataAttribute).Assembly.Location,
             typeof(ICachedServiceProvider).Assembly.Location
         };

@@ -32,7 +32,7 @@ src/
     Program.cs                       # Native host lifecycle
 ```
 
-Create shared projects only when they contain real shared code. Protocol directly references Monica's application and event contract types and the API generator. The core, roles and host directly reference the capabilities they use. This example has no reusable product infrastructure, independent foundation library, shared testing library or migration project to extract. Four allowed Platform responsibilities do not require four empty projects.
+Create shared projects only when they contain real shared code. Protocol directly references Monica's application and event contract types and the API generator. The core, roles and host directly reference the capabilities they use. The Ordering approval handler uses the EventBus base and declares its catalog metadata with ApplicationModel. The executable composes the architecture catalog and Web API. This example has no reusable product infrastructure, independent foundation library, shared testing library or migration project to extract. Four allowed Platform responsibilities do not require four empty projects.
 
 Each core/role assembly declares `ApplicationDomain` or `ApplicationRole`. The host's `[assembly: ApplicationHost]` generates its manifest and operation callers/receivers from the referenced implementations. Protocol independently generates the stable Ordering API interfaces. The host includes both roles; each role references only its own core and published contracts. The UI references Protocol and Monica.Application.UI.
 
