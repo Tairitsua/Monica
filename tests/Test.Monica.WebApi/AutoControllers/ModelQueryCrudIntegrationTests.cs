@@ -47,7 +47,7 @@ public sealed class ModelQueryCrudIntegrationTests
         first.EnsureSuccessStatusCode();
         using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync(token));
         var firstPage = firstJson.RootElement.GetProperty("data");
-        Assert.Equal(3, firstPage.GetProperty("sum").GetInt32());
+        Assert.Equal(3, firstPage.GetProperty("totalCount").GetInt32());
         Assert.Equal(new[] { ids[2], ids[1] }, firstPage.GetProperty("items").EnumerateArray().Select(row => row.GetProperty("id").GetGuid()));
         Assert.Equal(ids[1].ToString("D"), firstPage.GetProperty("cursor").GetString());
 
