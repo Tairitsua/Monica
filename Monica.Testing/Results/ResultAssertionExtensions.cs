@@ -69,18 +69,4 @@ public static class ResultAssertionExtensions
 
         return result;
     }
-
-    /// <summary>
-    /// Asserts that the paged result succeeded and returns the page payload.
-    /// </summary>
-    public static PagedResult<T>.PageData ShouldSucceed<T>(this PagedResult<T> result, string? expectedMessage = null)
-    {
-        result.IsSuccess().Should().BeTrue();
-        if (expectedMessage is not null)
-        {
-            result.Message.Should().Be(expectedMessage);
-        }
-
-        return result.Data;
-    }
 }

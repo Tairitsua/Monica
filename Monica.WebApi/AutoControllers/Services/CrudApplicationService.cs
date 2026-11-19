@@ -175,9 +175,12 @@ public abstract class CrudApplicationService<TEntity, TGetOutputDto, TGetListOut
 
     // TODO: Remove this feature or move it elsewhere.
     // TODO: When overriding a method with a different signature, add the POST attribute explicitly because it is not inherited.
+    /// <summary>Queries a page of entities using the request body.</summary>
+    /// <param name="input">The list query parameters.</param>
+    /// <returns>A result containing the page on success.</returns>
     [HttpPost]
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public virtual async Task<PagedResult<dynamic>> ListAsync(TGetListInput input)
+    public virtual async Task<Result<Page<dynamic>>> ListAsync(TGetListInput input)
     {
         return await GetListAsync(input);
     }

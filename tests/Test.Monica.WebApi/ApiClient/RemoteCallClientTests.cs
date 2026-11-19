@@ -57,7 +57,8 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory(ignoreCondition: ignoreCondition)
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var options = host.Services.GetRequiredService<IJsonSerializerOptionsProvider>().SerializerOptions;
-        var downstream = status == 201 ? Result.Created("payload") : Result.Success("payload");
+        var page = new Page<string>(4, ["payload"], currentPage: 2, pageSize: 1);
+        var downstream = status == 201 ? Result.Created(page) : Result.Success(page);
         Assert.Null(downstream.Message);
         var json = JsonSerializer.Serialize(downstream, options);
         using var document = JsonDocument.Parse(json);
@@ -65,10 +66,13 @@ public sealed class RemoteCallClientTests
             document.RootElement.TryGetProperty("message", out _));
         using var client = Client((_, _) => Task.FromResult(Response(status, json)));
 
-        var result = await Invoke<Result<string>>(host, client);
+        var result = await Invoke<Result<Page<string>>>(host, client);
 
         Assert.Equal((ResultStatus)status, result.Status);
-        Assert.Equal("payload", result.Data);
+        Assert.NotNull(result.Data);
+        Assert.Equal(4, result.Data.TotalCount);
+        Assert.Equal("payload", Assert.Single(result.Data.Items));
+        Assert.True(result.Data.HasNext);
         Assert.True(result.IsSuccess());
         Assert.False(result.TryGetError(options, out _));
     }
@@ -205,9 +209,10 @@ public sealed class RemoteCallClientTests
         await using var host = await new RpcFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var client = Client((_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("unreachable")));
-        var result = await Invoke<Result>(host, client);
+        var result = await Invoke<Result<Page<string>>>(host, client);
 
         Assert.Equal(ResultStatus.ServiceUnavailable, result.Status);
+        Assert.Null(result.Data);
         // The local envelope bypasses remote presentation, so the stamp stays for in-process chain consumers.
         Assert.Contains("\"remoteService\":\"Orders\"", JsonSerializer.Serialize(result));
         Assert.Equal("Orders", Error(host, result).Service);

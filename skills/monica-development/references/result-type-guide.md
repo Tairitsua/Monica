@@ -1,6 +1,6 @@
 # Explicit result envelopes
 
-Use `Result`, `Result<T>`, or `PagedResult<T>` at Facades and other public boundaries that intentionally expose Monica's envelope. Internal infrastructure services use direct returns and exceptions. All three result types implement `IResultEnvelope`; generic results do not inherit from `Result`. There are no implicit or explicit conversion operators between payloads, strings, exceptions, or envelopes.
+Use `Result` or `Result<T>` at Facades and other public boundaries that intentionally expose Monica's envelope. Internal infrastructure services use direct returns and exceptions. Both result types implement `IResultEnvelope`. Generic results do not inherit from `Result`. There are no implicit or explicit conversion operators between payloads, strings, exceptions, or envelopes.
 
 ## Constructing an outcome
 
@@ -50,20 +50,21 @@ Result withoutReport = rejected.WithoutData();
 Result<OrderSummary> forwarded = Result.FromFailure<OrderSummary>(rejected);
 ```
 
-For a different report schema, map the report explicitly and attach it with `WithData`. `Result.WithData<T>(data)`, `Result<T>.WithoutData()`, and `PagedResult<T>.WithoutData()` create a new envelope while preserving classification, message, and metadata. They copy the top-level metadata dictionary; nested metadata objects are shared. `WithMessage<TSelf>(message)` changes the same receiver and preserves its concrete type. There is no automatic payload erasure or cross-generic conversion.
+For a different report schema, map the report explicitly and attach it with `WithData`. `Result.WithData<T>(data)` and `Result<T>.WithoutData()` create a new envelope while preserving classification, message, and metadata. They copy the top-level metadata dictionary and share the nested metadata objects. `WithMessage<TSelf>(message)` changes the same receiver and preserves its concrete type. There is no automatic payload erasure or cross-generic conversion.
 
 ## Pagination and aggregation
 
-Create a page through the non-generic `PagedResult` factory:
+Use `Page<T>` as the payload for a paginated query. Construct and forward outcomes with the ordinary `Result` factories.
 
 ```csharp
-PagedResult<OrderDto> page = PagedResult.Success(
-    totalCount: 42, items: orders, currentPage: 2, pageSize: 10);
-PagedResult<OrderDto> rejected = PagedResult.Failure<OrderDto>("Invalid filter.");
-PagedResult<OrderDto> forwarded = PagedResult.FromFailure<OrderDto>(lookup);
+Result<Page<OrderDto>> page = Result.Success(
+    new Page<OrderDto>(totalCount: 42, items: orders, currentPage: 2, pageSize: 10));
+Result<Page<OrderDto>> empty = Result.Success(new Page<OrderDto>(0, []));
+Result<Page<OrderDto>> rejected = Result.Failure<Page<OrderDto>>("Invalid filter.");
+Result<Page<OrderDto>> forwarded = Result.FromFailure<Page<OrderDto>>(lookup);
 ```
 
-The optional `currentPage`, `pageSize`, and `cursor` arguments default to null. The nested `PageData` and its pagination calculations retain their wire contract. Ordinary paged failures initialize `sum` to zero and `items` to an empty collection. The `IRemoteResultEnvelope<TSelf>.CreateRemoteFailure` transport path retains null `sum` and `items`; do not normalize away that distinction. Use `ToBulkResult` for the existing aggregate-result behavior.
+`Page<T>.TotalCount` serializes as `sum`. Pass null when the total is unknown. The optional `currentPage`, `pageSize`, and `cursor` arguments default to null. A successful query with no matches returns a page with `sum: 0` and `items: []`. Application failures, forwarded failures, and transport failures have null page data. The JSON envelope includes `"data": null` or omits `data`, according to the host's null handling. Use `ToBulkResult` to aggregate multiple results.
 
 ## Error and transport boundaries
 
@@ -79,4 +80,6 @@ Generated API clients and custom forwarders use `IRemoteCallClient` for the comp
 
 Replace the old abbreviated result types and factory names, then review return expressions and callers by meaning. An old non-generic success-message call becomes `Result.Success().WithMessage(message)`, while a string payload becomes `Result.Success(value)`. Compilation cannot distinguish those intentions in an inferred variable or `IResultEnvelope` assignment. Remove success/failure extraction helpers and inspect payload absence explicitly. Use typed failures or `FromFailure<T>` instead of reconstructing a failure from its message and losing metadata.
 
-Runtime and serialization contracts live in `tests/Test.Monica.Core/Results/ResultContractTests.cs`; forbidden conversions and supported syntax are exercised by `tests/Test.Monica.Generators.AutoController/ResultApiCompilationTests.cs`. Verify string payloads, nullable data, Created status, failure reports, metadata copying, HTTP/local forwarding, rollback, and the distinct pagination failure defaults when changing these contracts.
+Replace `PagedResult<T>` with `Result<Page<T>>` and update derived CRUD methods and published query handlers. Use `IQuery<Page<T>>` to declare a paginated request. Read the total from `Data.TotalCount` after checking the result and required payload. Failed queries lose the old synthetic page object. Regenerate OpenAPI clients and update any code that reads page fields on a failed response.
+
+Runtime and serialization contracts live in `tests/Test.Monica.Core/Results/ResultContractTests.cs`. Forbidden conversions and supported syntax are exercised by `tests/Test.Monica.Generators.AutoController/ResultApiCompilationTests.cs`. Verify string payloads, nullable data, Created status, failure reports, metadata copying, HTTP/local forwarding, rollback, and the distinction between an empty successful page and a failure.

@@ -48,19 +48,15 @@ public sealed class ResultContractTests
     {
         var plain = Result.Success();
         var typed = Result.Success("payload");
-        var paged = PagedResult.Success<int>(1, [42]);
 
         Result plainReturned = plain.WithMessage("saved");
         Result<string> typedReturned = typed.WithMessage("loaded");
-        PagedResult<int> pagedReturned = paged.WithMessage("listed");
 
         Assert.Same(plain, plainReturned);
         Assert.Same(typed, typedReturned);
-        Assert.Same(paged, pagedReturned);
         Assert.Equal("payload", typedReturned.Data);
         Assert.Equal("loaded", typedReturned.Message);
         Assert.Equal(ResultStatus.Ok, typedReturned.Status);
-        Assert.Equal("listed", pagedReturned.Message);
     }
 
     [Fact]
@@ -95,7 +91,6 @@ public sealed class ResultContractTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => Result.Failure("error", status));
         Assert.Throws<ArgumentOutOfRangeException>(() => Result.Failure<int>("error", status));
-        Assert.Throws<ArgumentOutOfRangeException>(() => PagedResult.Failure<int>("error", status));
     }
 
     [Fact]
@@ -110,17 +105,15 @@ public sealed class ResultContractTests
         var withData = source.WithData(report);
         var withoutData = withData.WithoutData();
         var forwarded = Result.FromFailure<int>(withData);
-        var page = PagedResult.FromFailure<int>(withData);
-        var pageWithoutData = page.WithoutData();
-        Result[] copies = [withoutData, pageWithoutData, Result.FromFailure(withData)];
+        var page = Result.FromFailure<Page<int>>(withData);
+        IResultEnvelope[] copies = [withData, withoutData, Result.FromFailure(withData), forwarded, page];
 
         Assert.Same(report, withData.Data);
         Assert.Equal(ResultStatus.Conflict, withData.Status);
         Assert.Equal("Rejected", withData.Message);
         Assert.Equal(0, forwarded.Data);
-        Assert.Equal(0, page.Data.Sum);
-        Assert.Empty(page.Data.Items!);
-        foreach (IResultEnvelope copy in copies.Cast<IResultEnvelope>().Concat([withData, forwarded, page]))
+        Assert.Null(page.Data);
+        foreach (var copy in copies)
         {
             Assert.NotSame(source.Metadata, copy.Metadata);
             Assert.Equal(ResultStatus.Conflict, copy.Status);
@@ -139,14 +132,12 @@ public sealed class ResultContractTests
     {
         Assert.Throws<ArgumentNullException>(() => Result.FromFailure(null!));
         Assert.Throws<ArgumentNullException>(() => Result.FromFailure<int>(null!));
-        Assert.Throws<ArgumentNullException>(() => PagedResult.FromFailure<int>(null!));
 
         IResultEnvelope[] invalid = [Result.Success(), Result.Created(1), new Result(), new Result { Status = (ResultStatus)460 }];
         foreach (var source in invalid)
         {
             Assert.Throws<InvalidOperationException>(() => Result.FromFailure(source));
             Assert.Throws<InvalidOperationException>(() => Result.FromFailure<int>(source));
-            Assert.Throws<InvalidOperationException>(() => PagedResult.FromFailure<int>(source));
         }
     }
 
@@ -220,9 +211,9 @@ public sealed class ResultContractTests
     }
 
     [Fact]
-    public void Pagination_WhenSuccessfulOrFailed_ShouldKeepPageWireDefaultsAndCalculations()
+    public void Pagination_WhenSuccessful_ShouldRoundTripItemsAndNavigationWithExistingWireNames()
     {
-        var success = PagedResult.Success<int>(8, [4, 5, 6], currentPage: 2, pageSize: 3, cursor: "next");
+        var success = Result.Success(new Page<int>(8, [4, 5, 6], currentPage: 2, pageSize: 3, cursor: "next"));
         var successJson = JsonSerializer.Serialize(success, WEB_JSON);
         using var successDocument = JsonDocument.Parse(successJson);
         var page = successDocument.RootElement.GetProperty("data");
@@ -234,25 +225,42 @@ public sealed class ResultContractTests
         Assert.True(page.GetProperty("hasPrevious").GetBoolean());
         Assert.True(page.GetProperty("hasNext").GetBoolean());
         Assert.Equal("next", page.GetProperty("cursor").GetString());
-        var roundTrip = JsonSerializer.Deserialize<PagedResult<int>>(successJson, WEB_JSON);
+        var roundTrip = JsonSerializer.Deserialize<Result<Page<int>>>(successJson, WEB_JSON);
         Assert.NotNull(roundTrip);
+        Assert.NotNull(roundTrip.Data);
+        Assert.Equal(8, roundTrip.Data.TotalCount);
         Assert.Equal(new[] { 4, 5, 6 }, roundTrip.Data.Items);
         Assert.Equal(3, roundTrip.Data.TotalPages);
+        Assert.True(roundTrip.Data.HasPrevious);
+        Assert.True(roundTrip.Data.HasNext);
+        Assert.Equal("next", roundTrip.Data.Cursor);
+    }
 
-        var failure = PagedResult.Failure<int>("Rejected", ResultStatus.Conflict);
-        using var failureDocument = JsonDocument.Parse(JsonSerializer.Serialize(failure, OMIT_NULL_JSON));
-        var failedPage = failureDocument.RootElement.GetProperty("data");
-        Assert.Equal(0, failedPage.GetProperty("sum").GetInt32());
-        Assert.Equal(0, failedPage.GetProperty("items").GetArrayLength());
-        Assert.False(failedPage.TryGetProperty("pageSize", out _));
-        Assert.False(failedPage.TryGetProperty("currentPage", out _));
-        Assert.False(failedPage.TryGetProperty("cursor", out _));
+    [Fact]
+    public void Pagination_WhenEmptyOrFailed_ShouldDistinguishAnEmptyPageFromAbsentData()
+    {
+        var empty = Result.Success(new Page<int>(0, []));
+        using var emptyDocument = JsonDocument.Parse(JsonSerializer.Serialize(empty, OMIT_NULL_JSON));
+        var emptyPage = emptyDocument.RootElement.GetProperty("data");
+        Assert.Equal(0, emptyPage.GetProperty("sum").GetInt32());
+        Assert.Equal(0, emptyPage.GetProperty("items").GetArrayLength());
+        Assert.False(emptyPage.TryGetProperty("totalPages", out _));
+        Assert.False(emptyPage.TryGetProperty("hasPrevious", out _));
+        Assert.False(emptyPage.TryGetProperty("hasNext", out _));
 
-        var remote = PagedResult<int>.CreateRemoteFailure(ResultStatus.BadGateway, "Remote failure");
-        using var remoteDocument = JsonDocument.Parse(JsonSerializer.Serialize(remote, WEB_JSON));
-        var remotePage = remoteDocument.RootElement.GetProperty("data");
-        Assert.Equal(JsonValueKind.Null, remotePage.GetProperty("sum").ValueKind);
-        Assert.Equal(JsonValueKind.Null, remotePage.GetProperty("items").ValueKind);
-        Assert.Equal(ResultStatus.BadGateway, remote.Status);
+        Result<Page<int>>[] failures =
+        [
+            Result.Failure<Page<int>>("Rejected", ResultStatus.Conflict),
+            Result<Page<int>>.CreateRemoteFailure(ResultStatus.BadGateway, "Remote failure")
+        ];
+        foreach (var failure in failures)
+        {
+            Assert.True(failure.IsFailure());
+            Assert.Null(failure.Data);
+            using var withNull = JsonDocument.Parse(JsonSerializer.Serialize(failure, WEB_JSON));
+            Assert.Equal(JsonValueKind.Null, withNull.RootElement.GetProperty("data").ValueKind);
+            using var withoutNull = JsonDocument.Parse(JsonSerializer.Serialize(failure, OMIT_NULL_JSON));
+            Assert.False(withoutNull.RootElement.TryGetProperty("data", out _));
+        }
     }
 }

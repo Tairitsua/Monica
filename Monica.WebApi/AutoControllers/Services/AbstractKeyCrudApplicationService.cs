@@ -181,23 +181,25 @@ public abstract class AbstractKeyCrudApplicationService<TEntity, TGetOutputDto, 
     /// Supports dynamic filtering, sorting, paging, and selecting specific properties.
     /// </summary>
     /// <param name="input">The input parameters for the list operation</param>
-    /// <returns>A paged response containing the mapped entity DTOs</returns>
+    /// <returns>A result containing the page on success, or the failure from response processing.</returns>
     [ExecutionTransaction(ExecutionTransactionMode.None)]
-    public virtual async Task<Monica.Core.Results.PagedResult<dynamic>> GetListAsync(TGetListInput input)
+    public virtual async Task<Result<Page<dynamic>>> GetListAsync(TGetListInput input)
     {
         var result = await InnerGetListAsync(input);
-        if (result.TotalCounts == 0) return Monica.Core.Results.PagedResult.Success<dynamic>(0, []);
+        if (result.TotalCounts == 0) return Result.Success(new Page<dynamic>(0, []));
 
-        if (result.Results is not List<TGetListOutputDto> dtos)
-            return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, result.Results, result.CurrentPage,
-                result.PageSize, result.Cursor);
-        
-        var customResult = await ApplyCustomActionToResponseListAsync(input, dtos);
-        if (customResult.IsFailure()) return Monica.Core.Results.PagedResult.FromFailure<dynamic>(customResult);
-        var data = customResult.Data
-            ?? throw new InvalidOperationException("The custom response list action returned no data.");
-        return Monica.Core.Results.PagedResult.Success<dynamic>(result.TotalCounts, (IReadOnlyList<dynamic>) data, result.CurrentPage,
-            result.PageSize, result.Cursor);
+        var items = result.Results;
+        if (items is List<TGetListOutputDto> dtos)
+        {
+            var customResult = await ApplyCustomActionToResponseListAsync(input, dtos);
+            if (customResult.IsFailure()) return Result.FromFailure<Page<dynamic>>(customResult);
+
+            var data = customResult.Data
+                ?? throw new InvalidOperationException("The custom response list action returned no data.");
+            items = (IReadOnlyList<dynamic>)data;
+        }
+
+        return Result.Success(new Page<dynamic>(result.TotalCounts, items, result.CurrentPage, result.PageSize, result.Cursor));
     }
 
     /// <summary>

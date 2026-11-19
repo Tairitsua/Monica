@@ -98,13 +98,13 @@ public class Result : IRemoteResultEnvelope<Result>
         ? $"{Message}({Status})\n{Metadata.ToJsonString()!}"
         : $"{Message}({Status})";
 
-    internal static void ValidateFailureStatus(ResultStatus status)
+    private static void ValidateFailureStatus(ResultStatus status)
     {
         if (status is ResultStatus.Unknown or ResultStatus.Ok or ResultStatus.Created || !Enum.IsDefined(status))
             throw new ArgumentOutOfRangeException(nameof(status), status, "A defined failure status is required.");
     }
 
-    internal static void ValidateFailureSource(IResultEnvelope source)
+    private static void ValidateFailureSource(IResultEnvelope source)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (!source.IsFailure())

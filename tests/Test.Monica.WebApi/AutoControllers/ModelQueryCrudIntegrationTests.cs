@@ -47,6 +47,7 @@ public sealed class ModelQueryCrudIntegrationTests
         first.EnsureSuccessStatusCode();
         using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync(token));
         var firstPage = firstJson.RootElement.GetProperty("data");
+        Assert.Equal(3, firstPage.GetProperty("sum").GetInt32());
         Assert.Equal(new[] { ids[2], ids[1] }, firstPage.GetProperty("items").EnumerateArray().Select(row => row.GetProperty("id").GetGuid()));
         Assert.Equal(ids[1].ToString("D"), firstPage.GetProperty("cursor").GetString());
 
@@ -273,10 +274,10 @@ public sealed class ModelQueryFixtureCrudService(ModelQueryCrudRepository reposi
         ICrudDisableDelete
 {
     [HttpGet("records")]
-    public override Task<PagedResult<dynamic>> GetListAsync([FromQuery] CrudPageRequestDto input) => base.GetListAsync(input);
+    public override Task<Result<Page<dynamic>>> GetListAsync([FromQuery] CrudPageRequestDto input) => base.GetListAsync(input);
 
     [HttpPost("records/query")]
-    public Task<PagedResult<dynamic>> QueryRecordsAsync([FromBody] CrudPageRequestDto input) => base.GetListAsync(input);
+    public Task<Result<Page<dynamic>>> QueryRecordsAsync([FromBody] CrudPageRequestDto input) => base.GetListAsync(input);
 }
 
 public sealed class UuidCursorRow : Entity<Guid>;
@@ -289,5 +290,5 @@ public sealed class UuidCursorFixtureCrudService(UuidCursorRepository repository
     : CrudApplicationService<UuidCursorRow, UuidCursorDto, Guid, CrudPageRequestDto, UuidCursorRepository>(repository)
 {
     [HttpGet("records")]
-    public override Task<PagedResult<dynamic>> GetListAsync([FromQuery] CrudPageRequestDto input) => base.GetListAsync(input);
+    public override Task<Result<Page<dynamic>>> GetListAsync([FromQuery] CrudPageRequestDto input) => base.GetListAsync(input);
 }

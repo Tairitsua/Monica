@@ -127,7 +127,8 @@ public sealed class RequestOwnedWebApiGeneratorTests
         var apiContract = run.GeneratedSources["IOrderingQueryApi.g.cs"];
 
         apiContract.Should().Contain("global::Monica.Core.Results.Result");
-        apiContract.Should().Contain("global::Monica.Core.Results.PagedResult");
+        apiContract.Should().Contain(
+            "global::Monica.Core.Results.Result<global::Monica.Core.Results.Page<global::Scenario.Alpha.SharedDto>>");
         apiContract.Should().Contain("global::Scenario.Results.CustomEnvelope");
         apiContract.Should().Contain("global::Scenario.Alpha.SharedDto");
         apiContract.Should().Contain("global::Scenario.Beta.SharedDto");
@@ -579,7 +580,7 @@ public sealed class RequestOwnedWebApiGeneratorTests
 
             /// <summary>Returns a paged result.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "paged")]
-            public sealed record QueryPaged : IRequest<PagedResult<global::Scenario.Alpha.SharedDto>>, global::Monica.Core.Mediator.IQueryRequest;
+            public sealed record QueryPaged : IQuery<Page<global::Scenario.Alpha.SharedDto>>;
 
             /// <summary>Returns a custom result envelope.</summary>
             [ApiEndpoint(ApiHttpMethod.Get, "custom")]
@@ -607,9 +608,9 @@ public sealed class RequestOwnedWebApiGeneratorTests
             }
 
             public sealed class QueryHandlerPaged
-                : ApplicationRequestHandler<QueryPaged, PagedResult<global::Scenario.Alpha.SharedDto>>
+                : ApplicationRequestHandler<QueryPaged, Result<Page<global::Scenario.Alpha.SharedDto>>>
             {
-                public override Task<PagedResult<global::Scenario.Alpha.SharedDto>> Handle(QueryPaged request, CancellationToken cancellationToken) => throw new NotImplementedException();
+                public override Task<Result<Page<global::Scenario.Alpha.SharedDto>>> Handle(QueryPaged request, CancellationToken cancellationToken) => throw new NotImplementedException();
             }
 
             public sealed class QueryHandlerCustom
