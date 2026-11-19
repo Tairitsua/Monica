@@ -273,7 +273,7 @@ internal sealed class AuthorityDefaultsOptions : ModuleOptions<AuthorityDefaults
 
 internal sealed class AddedDuringRegistration : MonicaModule<AddedOptions>
 {
-    public override void Describe(ModuleDescriptor module) => module.Require<AddedLeaf, AddedLeafOptions>();
+    public override void Describe(ModuleDescriptor module) => module.Require<AddedLeaf>();
     public override void ConfigureServices(ModuleContext<AddedOptions> context)
     {
         context.Modules.Get<AddedLeaf, AddedLeafOptions>().Should().NotBeNull();

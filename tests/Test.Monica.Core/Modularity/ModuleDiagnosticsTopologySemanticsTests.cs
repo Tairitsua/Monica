@@ -97,7 +97,7 @@ internal sealed class DiagnosticsChainRootModule : MonicaModule<DiagnosticsChain
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsChainMiddleModule, DiagnosticsChainMiddleOption>();
+        module.Require<DiagnosticsChainMiddleModule>();
     }
 }
 
@@ -107,7 +107,7 @@ internal sealed class DiagnosticsChainMiddleModule : MonicaModule<DiagnosticsCha
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsChainLeafModule, DiagnosticsChainLeafOption>();
+        module.Require<DiagnosticsChainLeafModule>();
     }
 }
 
@@ -121,8 +121,8 @@ internal sealed class DiagnosticsDiamondRootModule : MonicaModule<DiagnosticsDia
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsDiamondLeftModule, DiagnosticsDiamondLeftOption>();
-        module.Require<DiagnosticsDiamondRightModule, DiagnosticsDiamondRightOption>();
+        module.Require<DiagnosticsDiamondLeftModule>();
+        module.Require<DiagnosticsDiamondRightModule>();
     }
 }
 
@@ -132,7 +132,7 @@ internal sealed class DiagnosticsDiamondLeftModule : MonicaModule<DiagnosticsDia
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsDiamondLeafModule, DiagnosticsDiamondLeafOption>();
+        module.Require<DiagnosticsDiamondLeafModule>();
     }
 }
 
@@ -142,7 +142,7 @@ internal sealed class DiagnosticsDiamondRightModule : MonicaModule<DiagnosticsDi
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<DiagnosticsDiamondLeafModule, DiagnosticsDiamondLeafOption>();
+        module.Require<DiagnosticsDiamondLeafModule>();
     }
 }
 

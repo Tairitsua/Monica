@@ -91,9 +91,9 @@ public sealed class ModuleDaprClient : MonicaModule<ModuleDaprClientOption>, IWe
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleHealthCheck, ModuleHealthCheckOption>();
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleHealthCheck>();
+        module.Require<ModuleHostedService>();
+        module.Require<ModuleJsonSerialization>();
     }
 }
 

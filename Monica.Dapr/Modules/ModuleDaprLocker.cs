@@ -58,7 +58,7 @@ public class ModuleDaprLocker : MonicaModule<ModuleDaprLockerOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLocker, ModuleLockerOption>();
+        module.Require<ModuleLocker>();
     }
 }
 

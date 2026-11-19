@@ -63,9 +63,9 @@ public class ModuleDaprEventBus : MonicaModule<ModuleDaprEventBusOption>,
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDaprClient, ModuleDaprClientOption>();
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+        module.Require<ModuleDaprClient>();
+        module.Require<ModuleEventBus>();
+        module.Require<ModuleHostedService>();
     }
 }
 

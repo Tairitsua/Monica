@@ -28,8 +28,8 @@ public class ModuleApplicationUI : MonicaModule<ModuleApplicationUIOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleApplication, ModuleApplicationOption>();
-        module.Require<ModuleUIHost, ModuleUIHostOption>();
+        module.Require<ModuleApplication>();
+        module.Require<ModuleUIHost>();
     }
 
     /// <inheritdoc />

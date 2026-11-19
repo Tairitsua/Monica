@@ -12,15 +12,15 @@ public class ModuleWebApi : MonicaModule<ModuleWebApiOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleApplication, ModuleApplicationOption>();
-        module.Require<ModuleAutoControllers, ModuleAutoControllersOption>();
-        module.Require<ModuleModelQuery, ModuleModelQueryOption>();
-        module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
-        module.Require<ModuleSwagger, ModuleSwaggerOption>();
-        module.Require<ModuleAuthentication, ModuleAuthenticationOption>();
-        module.Require<ModuleMediator, ModuleMediatorOption>();
-        module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
-        module.Require<ModuleRepository, ModuleRepositoryOption>();
+        module.Require<ModuleApplication>();
+        module.Require<ModuleAutoControllers>();
+        module.Require<ModuleModelQuery>();
+        module.Require<ModuleDependencyInjection>();
+        module.Require<ModuleSwagger>();
+        module.Require<ModuleAuthentication>();
+        module.Require<ModuleMediator>();
+        module.Require<ModuleObjectMapping>();
+        module.Require<ModuleRepository>();
     }
 }
 

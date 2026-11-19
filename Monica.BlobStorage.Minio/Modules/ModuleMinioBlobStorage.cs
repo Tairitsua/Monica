@@ -34,7 +34,7 @@ public sealed class ModuleMinioBlobStorage : MonicaModule<ModuleMinioBlobStorage
 {
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
-        => module.Require<ModuleBlobStorage, ModuleBlobStorageOption>();
+        => module.Require<ModuleBlobStorage>();
 
     /// <inheritdoc />
     public override void ValidateOptions(ModuleMinioBlobStorageOption options, string? profileName)

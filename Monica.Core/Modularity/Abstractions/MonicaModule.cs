@@ -43,6 +43,10 @@ public abstract class MonicaModule : IModule
     {
     }
 
+    internal abstract Type OptionsType { get; }
+
+    internal abstract IModuleOptions CreateOptions();
+
     internal abstract void BindOptions(MonicaApplication application, object options);
 
     internal abstract void ValidateFinalOptions(object options, string? profileName);
@@ -142,7 +146,7 @@ public abstract class MonicaModule : IModule
 /// <summary>
 /// Defines a module with one primary, startup-frozen option object.
 /// </summary>
-/// <typeparam name="TOptions">The module-owned option type.</typeparam>
+/// <typeparam name="TOptions">The option type derived from <c>ModuleOptions&lt;TModule&gt;</c> for this module.</typeparam>
 public abstract class MonicaModule<TOptions> : MonicaModule
     where TOptions : class, IModuleOptions, new()
 {
@@ -231,6 +235,10 @@ public abstract class MonicaModule<TOptions> : MonicaModule
     /// Gets the named routing boundary for module-owned middleware configuration.
     /// </summary>
     protected virtual ModuleWebStage GetApplicationBuilderStage() => ModuleWebStage.BeforeRouting;
+
+    internal sealed override Type OptionsType => typeof(TOptions);
+
+    internal sealed override IModuleOptions CreateOptions() => new TOptions();
 
     internal sealed override void BindOptions(MonicaApplication application, object options)
     {

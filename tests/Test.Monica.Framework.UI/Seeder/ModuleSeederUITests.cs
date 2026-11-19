@@ -153,7 +153,7 @@ public sealed class SeederUIConsumerModule : MonicaModule<SeederUIConsumerModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleSeederUI, ModuleSeederUIOption>();
+        module.Require<ModuleSeederUI>();
     }
 }
 

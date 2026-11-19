@@ -113,10 +113,10 @@ public class ModuleApiClient : MonicaModule<ModuleApiClientOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleAuthentication, ModuleAuthenticationOption>();
-        module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
-        module.Require<ModuleMediator, ModuleMediatorOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleAuthentication>();
+        module.Require<ModuleDependencyInjection>();
+        module.Require<ModuleMediator>();
+        module.Require<ModuleResultEnvelope>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleApiClientOption> context)

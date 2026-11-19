@@ -23,7 +23,7 @@ public class ModuleFileOps : MonicaModule<ModuleFileOpsOption>, IWebModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLocalization, ModuleLocalizationOption>();
+        module.Require<ModuleLocalization>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleFileOpsOption> context)

@@ -57,7 +57,7 @@ public static class ModuleRepositorySnapshotExtensions
         var registration = new SnapshotRegistration<TContext>(options.SourceId, options.Datasets.Values.ToArray(),
             options.MaximumCachedEntries, options.MaximumConcurrentBuilds, options.MaximumPendingBuilds,
             options.BuildTimeout, options.MaximumBuildAttempts);
-        module.Require<ModuleUnitOfWork, ModuleUnitOfWorkOption>();
+        module.Require<ModuleUnitOfWork>();
         module.AddSnapshotVersionTable<TContext>(options.ExcludeFromMigrations);
         module.ConfigureServices(context =>
         {

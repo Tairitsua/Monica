@@ -51,9 +51,9 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.AfterIfPresent<ModuleAutoControllers, ModuleAutoControllersOption>();
+        module.Require<ModuleJsonSerialization>();
+        module.Require<ModuleEventBus>();
+        module.AfterIfPresent<ModuleAutoControllers>();
     }
 
     /// <inheritdoc />
@@ -267,7 +267,7 @@ public static class ModuleBuildingBlocksRegistrationExtensions
         this ModuleRegistration<ModuleBuildingBlocks, ModuleBuildingBlocksOption> module)
     {
         module.Configure(options => options.IncludeDocumentation = true);
-        module.Require<ModuleXmlDocumentation, ModuleXmlDocumentationOption>();
+        module.Require<ModuleXmlDocumentation>();
         return module;
     }
 

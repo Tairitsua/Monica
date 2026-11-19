@@ -37,7 +37,7 @@ A package may expose any coherent number of Monica modules. Mirror Monica's offi
 
 - place one registration unit per `Modules/Module{Name}.cs`
 - use feature folders when the package contains independent capabilities
-- derive every strategy from `MonicaModule<Module{Name}Option>` and declare dependencies in `Describe(ModuleDescriptor)` with concrete `module.Require<ModuleX, ModuleXOption>()` pairs
+- derive every strategy from `MonicaModule<Module{Name}Option>` and declare dependencies in `Describe(ModuleDescriptor)` with `module.Require<ModuleX>()`. Use the typed overload when contributing dependency defaults.
 - provide an aggregator module only when registering the full bundle is a meaningful user action
 - do not create a package per module merely to satisfy this standard
 

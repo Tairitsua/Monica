@@ -45,7 +45,7 @@ public sealed class ModuleApplicationInvocation : MonicaModule<ModuleApplication
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleApplicationModel, ModuleApplicationModelOption>();
+        module.Require<ModuleApplicationModel>();
         module.Require<ModuleApiClient, ModuleApiClientOption>(options => options.ApplicationModelRouting = true);
     }
 

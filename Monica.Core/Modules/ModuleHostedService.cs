@@ -36,8 +36,8 @@ public class ModuleHostedService : MonicaModule<ModuleHostedServiceOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleObservableInstance, ModuleObservableInstanceOption>();
-        module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>();
+        module.Require<ModuleObservableInstance>();
+        module.Require<ModuleExecutionPipeline>();
     }
 
     public override void ConfigureServices(ModuleContext<ModuleHostedServiceOption> context)

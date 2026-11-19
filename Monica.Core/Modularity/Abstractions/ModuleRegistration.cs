@@ -28,7 +28,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
         _application = application;
         _configuredBy = configuredBy;
         _registrationOwner = registrationOwner;
-        _application.Modules.GetOrAddRegistration<TModule, TOptions>();
+        _application.Modules.GetOrAddRegistration<TModule>();
     }
 
     /// <summary>
@@ -61,22 +61,43 @@ public sealed class ModuleRegistration<TModule, TOptions>
     }
 
     /// <summary>
+    /// Includes a hard dependency and returns this registration for further composition.
+    /// </summary>
+    /// <typeparam name="TDependency">The concrete dependency module.</typeparam>
+    public ModuleRegistration<TModule, TOptions> Require<TDependency>() where TDependency : MonicaModule, new()
+    {
+        _application.Modules.Require<TDependency>(typeof(TModule));
+        return this;
+    }
+
+    /// <summary>
     /// Includes and hard-requires another module, returning its registration for explicit feature configuration.
     /// </summary>
+    /// <typeparam name="TDependency">The concrete dependency module.</typeparam>
+    /// <typeparam name="TDependencyOptions">The dependency's option type.</typeparam>
+    /// <param name="configure">Optional defaults applied before host option contributions.</param>
     public ModuleRegistration<TDependency, TDependencyOptions> Require<TDependency, TDependencyOptions>(
         Action<TDependencyOptions>? configure = null)
         where TDependency : MonicaModule<TDependencyOptions>, new()
         where TDependencyOptions : ModuleOptions<TDependency>, new()
     {
-        return _application.Modules.Require<TDependency, TDependencyOptions>(typeof(TModule), configure, _registrationOwner);
+        var dependency = _application.Modules.Require<TDependency>(typeof(TModule));
+        if (configure is not null)
+        {
+            dependency.AddOptionContribution(typeof(TModule), configure, _registrationOwner);
+        }
+
+        return new ModuleRegistration<TDependency, TDependencyOptions>(
+            _application, typeof(TModule), _registrationOwner);
     }
 
     /// <summary>
     /// Orders this module after another module only when the target is already included.
     /// </summary>
-    public ModuleRegistration<TModule, TOptions> AfterIfPresent<TDependency, TDependencyOptions>()
-        where TDependency : MonicaModule<TDependencyOptions>, new()
-        where TDependencyOptions : ModuleOptions<TDependency>, new()
+    /// <typeparam name="TDependency">The concrete module to order before this module when present.</typeparam>
+    /// <returns>This registration for further composition.</returns>
+    public ModuleRegistration<TModule, TOptions> AfterIfPresent<TDependency>()
+        where TDependency : MonicaModule, new()
     {
         _application.Modules.AfterIfPresent(typeof(TModule), typeof(TDependency));
         return this;
@@ -140,7 +161,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
         ArgumentNullException.ThrowIfNull(configure);
         EnsureWebCapability();
         _application.Modules
-            .GetOrAddRegistration<TModule, TOptions>()
+            .GetOrAddRegistration<TModule>()
             .AddApplicationBuilderContributionRequest(
                 stage,
                 context => configure(new WebModuleContext<TOptions>(context)), _registrationOwner);
@@ -170,7 +191,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
     public ModuleRegistration<TModule, TOptions> RecordKeyedServiceKey(string serviceKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
-        _application.Modules.GetOrAddRegistration<TModule, TOptions>().AddKeyedServiceKey(serviceKey);
+        _application.Modules.GetOrAddRegistration<TModule>().AddKeyedServiceKey(serviceKey);
         return this;
     }
 
@@ -212,7 +233,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         EnsureWebCapability();
-        _application.Modules.GetOrAddRegistration<TModule, TOptions>().RequireWebHost(reason);
+        _application.Modules.GetOrAddRegistration<TModule>().RequireWebHost(reason);
         return this;
     }
 
@@ -254,7 +275,7 @@ public sealed class ModuleRegistration<TModule, TOptions>
         Action<ModuleConfigurationContext> configure)
     {
         _application.Modules
-            .GetOrAddRegistration<TModule, TOptions>()
+            .GetOrAddRegistration<TModule>()
             .AddContributionRequest(phase, order, configure, _registrationOwner);
     }
 

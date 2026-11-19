@@ -43,7 +43,7 @@ public class ModuleMarkdownUI : MonicaModule<ModuleMarkdownUIOption>, IWebHostRe
     /// </summary>
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleMarkdown, ModuleMarkdownOption>();
+        module.Require<ModuleMarkdown>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<MarkdownResource>());
         module.Require<ModuleUI, ModuleUIOption>(options => options.EnableMarkdown = true);

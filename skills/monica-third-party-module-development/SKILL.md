@@ -66,7 +66,7 @@ Independently published packages override Monica's first-party test naming rule:
 - Declare the NuGet graph through package `packageDependencies` using full package IDs.
 - Preserve declared package/module casing in the repository contract. The scaffold resolves
   case-insensitive dependency input to the owning declaration before emitting Linux-sensitive paths.
-- Declare the repository distribution graph through module `dependsOn` using full manifest ecosystem keys. The scaffold resolves those keys to concrete CLR module and option types in `Describe(ModuleDescriptor)`; runtime identity is always the module `Type`.
+- Declare the repository distribution graph through module `dependsOn` using full manifest ecosystem keys. The scaffold resolves each key to a concrete `Require<TModule>()` call in `Describe(ModuleDescriptor)`. Runtime identity is the module `Type`.
 - Back every cross-package module dependency with a package dependency.
 - Use `kind: provider` plus `providerFor` for a module implementing `IModuleProvider`; include the target manifest key in `dependsOn`, return the target CLR type from `ProvidesFor`, and declare the hard runtime edge in `Describe`.
 - Never embed a sibling package assembly to avoid a dependency. The packed-artifact inspector rejects this.
@@ -77,7 +77,7 @@ Independently published packages override Monica's first-party test naming rule:
 - Reserve `Monica.*` and the purple Monica logo for first-party packages.
 - Name third-party packages `<Publisher>.Monica.<Package>[.<Variant>]` with dot-separated ASCII letter-or-digit segments and at most 100 characters.
 - Keep all packages in one repository under the same publisher segment.
-- Put package-owned module types and registration extensions in `<PackageId>.Modules`. Cross-package dependencies use fully qualified concrete module and option types; Monica-owned modules remain in `Monica.Modules`.
+- Put package-owned module types and registration extensions in `<PackageId>.Modules`. Cross-package dependencies use fully qualified concrete module types and qualify option types when an option contribution is needed. Monica-owned modules live in `Monica.Modules`.
 - Make every manifest module key equal its owning package ID or start with `<PackageId>.`.
 - Use a final `.UI` package/key segment for a separately distributed UI package.
 - Derive a UI category ID by removing only the UI module's manifest ecosystem key final `.UI` segment. Implement `IUIModule`; do not infer UI runtime identity from the key suffix.

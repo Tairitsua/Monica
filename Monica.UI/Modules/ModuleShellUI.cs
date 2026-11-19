@@ -74,7 +74,7 @@ public class ModuleShellUI : MonicaModule<ModuleShellUIOption>, IWebHostRequired
             options.CatalogPageLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
             options.DefaultLayout = typeof(Monica.UI.Shell.Components.Layout.MainLayout);
         });
-        module.Require<ModuleClock, ModuleClockOption>();
+        module.Require<ModuleClock>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             options => options.AddResource<NavigationSearchResource>());
     }

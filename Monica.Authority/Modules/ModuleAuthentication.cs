@@ -69,7 +69,7 @@ public class ModuleAuthentication : MonicaModule<ModuleAuthenticationOption>, IW
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.AfterIfPresent<ModuleCors, ModuleCorsOption>();
+        module.AfterIfPresent<ModuleCors>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static localization => localization.AddResource<AuthorityResource>());
     }

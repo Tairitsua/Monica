@@ -69,8 +69,8 @@ public class ModuleDaprStateStore : MonicaModule<ModuleDaprStateStoreOption>,
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDaprClient, ModuleDaprClientOption>();
-        module.Require<ModuleStateStore, ModuleStateStoreOption>();
+        module.Require<ModuleDaprClient>();
+        module.Require<ModuleStateStore>();
     }
 
     #region IStateStoreModuleProvider Implementation

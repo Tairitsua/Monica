@@ -189,35 +189,39 @@ public sealed class ModuleRegistry(MonicaApplication application)
         return _state.TryGetRegistration(moduleType, out registration);
     }
 
-    internal ModuleRegistrationState GetOrAddRegistration<TModule, TOptions>()
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    internal ModuleRegistrationState GetOrAddRegistration<TModule>() where TModule : MonicaModule, new()
     {
         EnsureCompositionIsOpen();
-        var registration = GetOrAddRegistrationCore<TModule, TOptions>();
+        var registration = GetOrAddRegistrationCore<TModule>();
         if (registration.IsFinalized && registration.ModuleSingleton is IApplicationCompositionModule)
             throw new InvalidOperationException("The application authority is finalized and cannot be declared or configured again.");
         return registration;
     }
 
-    private ModuleRegistrationState GetOrAddRegistrationCore<TModule, TOptions>()
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    private ModuleRegistrationState GetOrAddRegistrationCore<TModule>() where TModule : MonicaModule, new()
     {
-        if (_state.TryGetRegistration(typeof(TModule), out var existing))
+        var moduleType = typeof(TModule);
+        if (_state.TryGetRegistration(moduleType, out var existing))
         {
-            existing.Initialize<TModule, TOptions>();
             return existing;
         }
 
-        var registration = new ModuleRegistrationState(application, typeof(TModule));
-        registration.Initialize<TModule, TOptions>();
-        if (!_state.TryAddRegistration(typeof(TModule), registration))
+        var module = new TModule();
+        var optionBaseType = typeof(ModuleOptions<TModule>);
+        if (!optionBaseType.IsAssignableFrom(module.OptionsType))
         {
-            throw new ModuleRegistrationException($"Module type {typeof(TModule).FullName} is already registered.");
+            throw new ModuleRegistrationException(
+                $"Module {moduleType.GetCleanFullName()} declares {module.OptionsType.GetCleanFullName()} as its options. " +
+                $"Its options must derive from {optionBaseType.GetCleanFullName()}.");
         }
 
-        _registrationOrdinals.Add(typeof(TModule), _nextRegistrationOrdinal++);
+        var registration = new ModuleRegistrationState(application, module);
+        if (!_state.TryAddRegistration(moduleType, registration))
+        {
+            throw new ModuleRegistrationException($"Module type {moduleType.FullName} is already registered.");
+        }
+
+        _registrationOrdinals.Add(moduleType, _nextRegistrationOrdinal++);
         return registration;
     }
 
@@ -225,40 +229,29 @@ public sealed class ModuleRegistry(MonicaApplication application)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        GetOrAddRegistration<TModule, TOptions>().AddOptionContribution(configuredBy, configure, owner);
+        GetOrAddRegistration<TModule>().AddOptionContribution(configuredBy, configure, owner);
     }
 
-    internal ModuleRegistration<TModule, TOptions> Require<TModule, TOptions>(
-        Type ownerModuleType,
-        Action<TOptions>? configure,
-        Type? registrationOwner)
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    internal ModuleRegistrationState Require<TModule>(Type ownerModuleType)
+        where TModule : MonicaModule, new()
     {
         EnsureRegistrationIsMutable(ownerModuleType);
-        var dependency = GetOrAddRegistrationCore<TModule, TOptions>();
-        AddEdge(_hardDependencies, ownerModuleType, typeof(TModule));
-        if (configure is not null)
-        {
-            dependency.AddOptionContribution(ownerModuleType, configure, registrationOwner);
-        }
-
-        return new ModuleRegistration<TModule, TOptions>(application, ownerModuleType, registrationOwner);
+        return AddHardDependency<TModule>(ownerModuleType);
     }
 
-    internal void DescribeRequire<TModule, TOptions>(
-        Type ownerModuleType,
-        Action<TOptions>? configure)
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    internal ModuleRegistrationState DescribeRequire<TModule>(Type ownerModuleType)
+        where TModule : MonicaModule, new()
     {
         EnsureActiveDescriptor(ownerModuleType);
-        var dependency = GetOrAddRegistrationCore<TModule, TOptions>();
+        return AddHardDependency<TModule>(ownerModuleType);
+    }
+
+    private ModuleRegistrationState AddHardDependency<TModule>(Type ownerModuleType)
+        where TModule : MonicaModule, new()
+    {
+        var dependency = GetOrAddRegistrationCore<TModule>();
         AddEdge(_hardDependencies, ownerModuleType, typeof(TModule));
-        if (configure is not null)
-        {
-            dependency.AddOptionContribution(ownerModuleType, configure);
-        }
+        return dependency;
     }
 
     internal void AfterIfPresent(Type ownerModuleType, Type dependencyModuleType)
@@ -291,22 +284,21 @@ public sealed class ModuleRegistry(MonicaApplication application)
         GetRegistration(moduleType).RequireFeature(featureName);
     }
 
-    internal void DescribeRequireDependencyFeature<TModule, TOptions>(
+    internal void DescribeRequireDependencyFeature(
         Type ownerModuleType,
+        Type dependencyModuleType,
         string featureName)
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
     {
         EnsureActiveDescriptor(ownerModuleType);
         if (!_hardDependencies.TryGetValue(ownerModuleType, out var dependencies)
-            || !dependencies.Contains(typeof(TModule)))
+            || !dependencies.Contains(dependencyModuleType))
         {
             throw new InvalidOperationException(
-                $"{ownerModuleType.Name} cannot require feature '{featureName}' from {typeof(TModule).Name} " +
-                $"without first declaring Require<{typeof(TModule).Name}, {typeof(TOptions).Name}>().");
+                $"{ownerModuleType.Name} cannot require feature '{featureName}' from {dependencyModuleType.Name} " +
+                $"without first declaring Require<{dependencyModuleType.Name}>().");
         }
 
-        GetRegistration(typeof(TModule)).RequireFeature(featureName);
+        GetRegistration(dependencyModuleType).RequireFeature(featureName);
     }
 
     internal void Disable(Type moduleType, string reason)
@@ -319,7 +311,7 @@ public sealed class ModuleRegistry(MonicaApplication application)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        GetOrAddRegistration<TModule, TOptions>().AddProfileContribution(name, configure, owner);
+        GetOrAddRegistration<TModule>().AddProfileContribution(name, configure, owner);
     }
 
     internal TOptions GetProfile<TModule, TOptions>(string name)

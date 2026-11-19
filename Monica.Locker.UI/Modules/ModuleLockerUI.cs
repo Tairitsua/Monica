@@ -31,7 +31,7 @@ public sealed class ModuleLockerUI : MonicaModule<ModuleLockerUIOption>, IUIModu
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLeaseDiagnostics, ModuleLeaseDiagnosticsOption>();
+        module.Require<ModuleLeaseDiagnostics>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(options => options.AddResource<LockerResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(options => options.ConfigureNavigation(registry =>
         {

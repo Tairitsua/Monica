@@ -58,8 +58,8 @@ public class ModuleOpenTelemetry : MonicaModule<ModuleOpenTelemetryOption>, IWeb
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLocalization, ModuleLocalizationOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleLocalization>();
+        module.Require<ModuleResultEnvelope>();
     }
 
     /// <inheritdoc />

@@ -30,10 +30,10 @@ public class ModuleApplication : MonicaModule<ModuleApplicationOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleMediator, ModuleMediatorOption>();
-        module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>();
-        module.Require<ModuleObjectMapping, ModuleObjectMappingOption>();
-        module.Require<ModuleAuthorization, ModuleAuthorizationOption>();
+        module.Require<ModuleMediator>();
+        module.Require<ModuleDependencyInjection>();
+        module.Require<ModuleObjectMapping>();
+        module.Require<ModuleAuthorization>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>(
             options => options.AddExceptionMapper<ValidationExceptionMapper>());
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(options => options.AddBehavior(

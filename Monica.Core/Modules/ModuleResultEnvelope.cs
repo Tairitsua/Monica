@@ -44,7 +44,7 @@ public class ModuleResultEnvelope : MonicaModule<ModuleResultEnvelopeOption>
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleJsonSerialization>();
     }
 
     /// <inheritdoc />

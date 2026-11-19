@@ -87,11 +87,11 @@ public class ModuleServiceDiscovery : MonicaModule<ModuleServiceDiscoveryOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDomainCatalog, ModuleDomainCatalogOption>();
+        module.Require<ModuleDomainCatalog>();
         module.RequireFeature(STATE_STORE_FEATURE);
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static localization => localization.AddResource<ServiceDiscoveryResource>());
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+        module.Require<ModuleHostedService>();
         module.Require<ModuleResilience, ModuleResilienceOption>(resilience =>
             resilience.PipelineConfigurations[ResiliencePipelineNames.ServiceDiscovery] = builder =>
                 builder.AddRetry(new RetryStrategyOptions
@@ -301,7 +301,7 @@ public static class ModuleServiceDiscoveryBuilderExtensions
         /// </summary>
         public ModuleRegistration<ModuleServiceDiscovery, ModuleServiceDiscoveryOption> UseMemoryStorage()
         {
-            registration.Require<ModuleStateStore, ModuleStateStoreOption>();
+            registration.Require<ModuleStateStore>();
             return registration
                 .Configure(options =>
                 {

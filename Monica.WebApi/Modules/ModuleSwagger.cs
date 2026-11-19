@@ -19,9 +19,9 @@ public class ModuleSwagger : MonicaModule<ModuleSwaggerOption>, IWebHostRequired
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleResultEnvelope>();
         // The native Swagger middleware can complete a request before later middleware runs.
-        module.AfterIfPresent<ModuleLocalization, ModuleLocalizationOption>();
+        module.AfterIfPresent<ModuleLocalization>();
     }
     private SwaggerDocumentCatalog? _documentCatalog;
 

@@ -21,40 +21,52 @@ public sealed class ModuleDescriptor
     /// <summary>
     /// Adds a hard dependency. The dependency is included in the composition automatically.
     /// </summary>
-    public void Require<TModule, TOptions>(Action<TOptions>? configure = null)
+    /// <typeparam name="TModule">The concrete dependency module.</typeparam>
+    public void Require<TModule>() where TModule : MonicaModule, new()
+    {
+        _application.Modules.DescribeRequire<TModule>(_ownerModuleType);
+    }
+
+    /// <summary>
+    /// Adds a hard dependency and contributes defaults applied before host option contributions.
+    /// </summary>
+    /// <typeparam name="TModule">The concrete dependency module.</typeparam>
+    /// <typeparam name="TOptions">The dependency's option type.</typeparam>
+    /// <param name="configure">The option defaults to contribute, or <see langword="null"/> to declare only the dependency.</param>
+    /// <remarks>
+    /// Calls compiled against the former optional callback can pass <see langword="null"/>.
+    /// Use <see cref="Require{TModule}()"/> for graph-only declarations in source.
+    /// </remarks>
+    public void Require<TModule, TOptions>(Action<TOptions>? configure)
         where TModule : MonicaModule<TOptions>, new()
         where TOptions : ModuleOptions<TModule>, new()
     {
-        _application.Modules.DescribeRequire<TModule, TOptions>(_ownerModuleType, configure);
+        var dependency = _application.Modules.DescribeRequire<TModule>(_ownerModuleType);
+        if (configure is not null)
+        {
+            dependency.AddOptionContribution(_ownerModuleType, configure);
+        }
     }
 
     /// <summary>
     /// Declares a feature that must be selected on a directly required dependency.
     /// </summary>
     /// <typeparam name="TModule">The directly required dependency module.</typeparam>
-    /// <typeparam name="TOptions">The dependency's option type.</typeparam>
     /// <param name="featureName">The stable dependency feature name used in validation diagnostics.</param>
     /// <remarks>
-    /// Call <see cref="Require{TModule,TOptions}(Action{TOptions}?)"/> first. This narrow operation preserves the
-    /// graph-only descriptor boundary while allowing an intrinsic consumer to require a provider capability owned
-    /// by its dependency.
+    /// Declare the hard dependency with <see cref="Require{TModule}()"/> before requiring its feature.
     /// </remarks>
-    public void RequireDependencyFeature<TModule, TOptions>(string featureName)
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    public void RequireDependencyFeature<TModule>(string featureName) where TModule : MonicaModule, new()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(featureName);
-        _application.Modules.DescribeRequireDependencyFeature<TModule, TOptions>(
-            _ownerModuleType,
-            featureName);
+        _application.Modules.DescribeRequireDependencyFeature(_ownerModuleType, typeof(TModule), featureName);
     }
 
     /// <summary>
     /// Adds an ordering relationship without including the target module.
     /// </summary>
-    public void AfterIfPresent<TModule, TOptions>()
-        where TModule : MonicaModule<TOptions>, new()
-        where TOptions : ModuleOptions<TModule>, new()
+    /// <typeparam name="TModule">The concrete module to order before this module when present.</typeparam>
+    public void AfterIfPresent<TModule>() where TModule : MonicaModule, new()
     {
         _application.Modules.DescribeAfterIfPresent(_ownerModuleType, typeof(TModule));
     }

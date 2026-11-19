@@ -21,8 +21,8 @@ public class ModuleDataChannelUI : MonicaModule<ModuleDataChannelUIOption>, IUIM
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDataChannel, ModuleDataChannelOption>();
-        module.Require<ModuleStackTraceUI, ModuleStackTraceUIOption>();
+        module.Require<ModuleDataChannel>();
+        module.Require<ModuleStackTraceUI>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<DataChannelResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

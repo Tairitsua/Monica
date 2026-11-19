@@ -42,7 +42,7 @@ public sealed class ModuleSeederUI : MonicaModule<ModuleSeederUIOption>, IUIModu
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleSeeder, ModuleSeederOption>();
+        module.Require<ModuleSeeder>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<SeederResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>

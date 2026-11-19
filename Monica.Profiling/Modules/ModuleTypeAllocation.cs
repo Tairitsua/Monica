@@ -40,7 +40,7 @@ public static class ModuleTypeAllocationBuilderExtensions
         public ModuleRegistration<ModuleTypeAllocation, ModuleTypeAllocationOption> StartAutomatically(
             AllocationSamplingMode samplingMode = AllocationSamplingMode.High)
         {
-            registration.Require<ModuleHostedService, ModuleHostedServiceOption>();
+            registration.Require<ModuleHostedService>();
             return registration.Configure(options =>
             {
                 options.AutoStartCollection = true;

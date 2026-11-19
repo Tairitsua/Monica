@@ -41,8 +41,8 @@ public class ModuleGit : MonicaModule<ModuleGitOption>, IWebModule
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+        module.Require<ModuleEventBus>();
+        module.Require<ModuleHostedService>();
     }
 
     /// <inheritdoc />

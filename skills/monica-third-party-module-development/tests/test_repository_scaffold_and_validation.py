@@ -590,14 +590,20 @@ class RepositorySkillTests(unittest.TestCase):
             source = module.read_text(encoding="utf-8")
 
             self.assertIn(
-                "module.Require<global::Acme.Monica.One.Modules.ModuleShared, "
-                "global::Acme.Monica.One.Modules.ModuleSharedOption>()",
+                "module.Require<global::Acme.Monica.One.Modules.ModuleShared>()",
                 source,
             )
             self.assertIn(
-                "module.Require<global::Acme.Monica.Two.Modules.ModuleShared, "
-                "global::Acme.Monica.Two.Modules.ModuleSharedOption>()",
+                "module.Require<global::Acme.Monica.Two.Modules.ModuleShared>()",
                 source,
+            )
+            module.write_text(
+                source.replace(
+                    "module.Require<global::Acme.Monica.One.Modules.ModuleShared>();",
+                    "module.Require<global::Acme.Monica.One.Modules.ModuleShared, "
+                    "global::Acme.Monica.One.Modules.ModuleSharedOption>(static _ => { });",
+                ),
+                encoding="utf-8",
             )
             findings = validator.validate_repository_contract(output, contract, None)
             for package in contract["packages"]:
@@ -627,8 +633,7 @@ class RepositorySkillTests(unittest.TestCase):
                 "",
             )
             provider_text = provider_text.replace(
-                "        module.Require<global::Acme.Monica.AI.OCR.Modules.ModuleOcr, "
-                "global::Acme.Monica.AI.OCR.Modules.ModuleOcrOption>();\n",
+                "        module.Require<global::Acme.Monica.AI.OCR.Modules.ModuleOcr>();\n",
                 "",
             )
             provider_source.write_text(provider_text, encoding="utf-8")

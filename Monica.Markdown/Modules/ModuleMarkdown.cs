@@ -33,7 +33,7 @@ public class ModuleMarkdown : MonicaModule<ModuleMarkdownOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleLocalization, ModuleLocalizationOption>();
+        module.Require<ModuleLocalization>();
     }
 
     /// <inheritdoc />

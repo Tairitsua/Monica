@@ -40,8 +40,8 @@ public class ModuleRAGUI : MonicaModule<ModuleRAGUIOption>, IUIModule
 {
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleRAG, ModuleRAGOption>();
-        module.Require<ModuleKnowledgeBaseUI, ModuleKnowledgeBaseUIOption>();
+        module.Require<ModuleRAG>();
+        module.Require<ModuleKnowledgeBaseUI>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<AIResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(

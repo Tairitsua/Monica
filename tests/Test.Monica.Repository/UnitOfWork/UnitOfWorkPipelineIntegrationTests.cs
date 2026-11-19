@@ -113,7 +113,7 @@ public sealed class UnitOfWorkPipelineIntegrationTests
     {
         public override void Describe(ModuleDescriptor module)
         {
-            module.Require<ModuleUnitOfWork, ModuleUnitOfWorkOption>();
+            module.Require<ModuleUnitOfWork>();
         }
     }
 

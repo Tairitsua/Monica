@@ -38,8 +38,8 @@ public sealed class ModuleConfigurationEventBus : MonicaModule<ModuleConfigurati
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleConfiguration, ModuleConfigurationOption>();
-        module.Require<ModuleEventBus, ModuleEventBusOption>();
+        module.Require<ModuleConfiguration>();
+        module.Require<ModuleEventBus>();
     }
 
     /// <inheritdoc />

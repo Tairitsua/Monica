@@ -59,7 +59,7 @@ public class ModuleExcel : MonicaModule<ModuleExcelOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleTaskProgress, ModuleTaskProgressOption>();
+        module.Require<ModuleTaskProgress>();
         module.RequireFeature(PROVIDER_FEATURE);
     }
 }

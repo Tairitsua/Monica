@@ -42,7 +42,7 @@ public class ModuleExceptionHandling : MonicaModule<ModuleExceptionHandlingOptio
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleResultEnvelope>();
     }
     /// <summary>
     /// Adds ASP.NET Core exception handling and structured request-rejection responses.

@@ -30,8 +30,8 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleHostedService, ModuleHostedServiceOption>();
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
+        module.Require<ModuleHostedService>();
+        module.Require<ModuleResultEnvelope>();
         module.RequireFeature(CHANNEL_SETUP_FEATURE);
     }
 

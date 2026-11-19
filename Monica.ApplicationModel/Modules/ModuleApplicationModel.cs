@@ -32,7 +32,7 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
     private bool _registered;
 
     /// <inheritdoc />
-    public override void Describe(ModuleDescriptor module) => module.Require<ModuleDomainCatalog, ModuleDomainCatalogOption>();
+    public override void Describe(ModuleDescriptor module) => module.Require<ModuleDomainCatalog>();
 
     /// <inheritdoc />
     public void PrepareApplication(IMonicaBuilder builder, IHostApplicationBuilder hostBuilder)

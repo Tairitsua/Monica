@@ -47,7 +47,7 @@ public class ModuleChainTracing : MonicaModule<ModuleChainTracingOption>, IWebMo
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleJsonSerialization>();
     }
 }
 
@@ -91,7 +91,7 @@ public static class ModuleChainTracingRegistrationExtensions
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> AttachControllerTraceMetadata(
         this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
-        module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
+        module.Require<ModuleExceptionHandling>();
         module.Require<ModuleControllers, ModuleControllersOption>()
             .ConfigMvcOption(options => options.Filters.Add<ChainTracingResultMetadataActionFilter>(
                 ChainTracingResultMetadataActionFilter.ExecutionOrder));
@@ -128,10 +128,10 @@ public static class ModuleChainTracingRegistrationExtensions
     /// </summary>
     public static ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> UseActorInvocationTracing(this ModuleRegistration<ModuleChainTracing, ModuleChainTracingOption> module)
     {
-        module.Require<ModuleJsonSerialization, ModuleJsonSerializationOption>();
+        module.Require<ModuleJsonSerialization>();
         module.RequireWebHost("Actor invocation tracing middleware must run in an ASP.NET Core request pipeline.");
-        module.Require<ModuleResultEnvelope, ModuleResultEnvelopeOption>();
-        module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>();
+        module.Require<ModuleResultEnvelope>();
+        module.Require<ModuleExceptionHandling>();
 
         module.ConfigureServices(context => { context.Services.TryAddTransient<ActorInvocationTracingMiddleware>(); });
         module.ConfigureApplicationBuilder(

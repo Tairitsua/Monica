@@ -37,7 +37,7 @@ public static class ModuleMemoryAnalysisUIBuilderExtensions
         /// <returns>The same host-bound memory-analysis registration.</returns>
         public ModuleRegistration<ModuleMemoryAnalysisUI, ModuleMemoryAnalysisUIOption> EnableTypeAllocationTab()
         {
-            registration.Require<ModuleTypeAllocation, ModuleTypeAllocationOption>();
+            registration.Require<ModuleTypeAllocation>();
             return registration.Configure(option => option.EnableTypeAllocationTab = true);
         }
     }
@@ -51,8 +51,8 @@ public class ModuleMemoryAnalysisUI : MonicaModule<ModuleMemoryAnalysisUIOption>
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleMemoryDiagnostics, ModuleMemoryDiagnosticsOption>();
-        module.Require<ModuleRuntimeMetrics, ModuleRuntimeMetricsOption>();
+        module.Require<ModuleMemoryDiagnostics>();
+        module.Require<ModuleRuntimeMetrics>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(static option =>
         {
             option.AddResource<ProfilingResource>();

@@ -25,7 +25,7 @@ public class ModuleDaprApiClient : MonicaModule<ModuleDaprApiClientOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleDaprClient, ModuleDaprClientOption>();
+        module.Require<ModuleDaprClient>();
         module.Require<ModuleApiClient, ModuleApiClientOption>(options =>
         {
             options.UseHttpClientProvider<DaprApiClientProvider>();

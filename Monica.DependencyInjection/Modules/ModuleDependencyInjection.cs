@@ -95,7 +95,7 @@ public static class ModuleDependencyInjectionRegistrationExtensions
         module.Configure(options => options.EnableAutoRegistrationDiagnostics = enabled);
         if (enabled)
         {
-            module.Require<ModuleHostedService, ModuleHostedServiceOption>();
+            module.Require<ModuleHostedService>();
         }
 
         return module;

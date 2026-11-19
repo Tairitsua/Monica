@@ -55,7 +55,7 @@ public static class ModuleExecutionTimingBuilderExtensions
         public ModuleRegistration<ModuleExecutionTiming, ModuleExecutionTimingOption> UseBackgroundBatchAggregation(
             TimeSpan? flushInterval = null)
         {
-            registration.Require<ModuleHostedService, ModuleHostedServiceOption>();
+            registration.Require<ModuleHostedService>();
             return registration.Configure(option =>
             {
                 option.AggregationMode = ExecutionTimingAggregationMode.BackgroundBatch;
