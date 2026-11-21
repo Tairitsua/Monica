@@ -798,12 +798,6 @@
           "Monica.DevOps/Modules/ModuleK8SUI.cs",
           "Monica.DevOps/Localization/K8SResource.cs",
           "Monica.DevOps/Localization/K8SResource",
-          "Monica.Framework.UI/Pages/UIMapperDebugPage.razor",
-          "Monica.Framework.UI/Pages/UIMapperDebugPage.razor.css",
-          "Monica.Framework.UI/UIMapper",
-          "Monica.Framework.UI/Modules/ModuleMapperUI.cs",
-          "Monica.Framework.UI/Localization/MapperResource",
-          "Monica.Framework.UI/wwwroot/UIMapper",
           "Monica.Application.UI"
         ]
       }

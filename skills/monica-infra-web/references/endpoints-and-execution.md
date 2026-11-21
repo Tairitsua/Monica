@@ -1,8 +1,37 @@
 # Request endpoints and execution
 
-Keyed CRUD cursor paging parses a `Guid` key as UUID and builds a typed `Guid.CompareTo` predicate; it does not convert UUIDs to integers. Use the same key ordering for page selection and cursor continuation, and validate translation and index use with the deployed relational provider. A malformed UUID cursor is rejected. UUID ordering is a paging mechanism, not a business chronology or revision counter.
-
 The execution-pipeline UI formats its plan-capture timestamp with the shell's shared Clock display policy in `$monica-infra-ui` (`references/time-display.md`); the catalog's captured instant and pipeline behavior are unchanged.
+
+## Typed CRUD services
+
+Derive a resource from `Monica.WebApi.AutoControllers.Services.CrudService<TEntity, TKey, TDetail, TRow, TQuery>`. Inject the scoped EF store through the constructor and include the concrete service in the host's type discovery. The base implements `ICrudApplicationService`. Its `ToDetailAsync` hook converts a visible entity to a detail DTO, which can be immutable. `ReadRowsAsync` reads one keyed row per entity from the ordered query window. A generated projection or handwritten `Select` can run in SQL. A local converter can enumerate the EF entity window with the supplied cancellation token and yield the converted rows in order.
+
+```csharp
+public sealed class StockItemCrudService(StockItemRepository repository)
+    : CrudService<StockItem, int, StockItemDetail, StockItemRow, CrudPageRequestDto>(repository)
+{
+    protected override Task<StockItemDetail> ToDetailAsync(StockItem entity, CancellationToken ct)
+        => Task.FromResult(new StockItemDetail(entity.Id, entity.Sku, entity.Description));
+
+    protected override IAsyncEnumerable<StockItemRow> ReadRowsAsync(IQueryable<StockItem> window, CancellationToken ct)
+        => window.Select(item => new StockItemRow { Id = item.Id, Sku = item.Sku }).AsAsyncEnumerable();
+
+    public Task<Result> UpdateAsync(int id, RenameStockItem input)
+        => UpdateEntityAsync(id, item => item.Rename(input.Description), QueryCancellationToken);
+}
+```
+
+Keep named mapping methods in the application project that owns the operation. For Mapperly-generated mappings, reference `Riok.Mapperly` in the project declaring the mapper and call its projection from `ReadRowsAsync`. Use `RequiredMappingStrategy.Target` and add `RMG012` to the project's `WarningsAsErrors` so newly added response members require an explicit mapping decision. Check the generated projection against the deployed EF provider. [Mapperly projections](https://mapperly.riok.app/docs/configuration/queryable-projections/) · [Mapperly diagnostics](https://mapperly.riok.app/docs/configuration/analyzer-diagnostics/)
+
+`CrudPageRequestDto` supplies filtering, search, sorting, field selection, and pagination. A narrower `TQuery` enables the features expressed by its implemented request interfaces. With default conventions, `GetAsync(id)` binds `GET {resource}/{id}`, `GetListAsync(input)` binds `GET {resource}` from the query string, `ListAsync(input)` binds `POST {resource}/list` from the body, and `ListStreamAsync(input, cancellationToken)` binds `POST {resource}/list-stream` from the body. The suffix `CrudService` is stripped by default to form the resource name. Use `id` for the conventional key route token. The built-in read actions declare transaction mode `None`. HTTP reads use `RequestAborted`, and a stream's `CancellationToken` is execution context. Enumerate streams inside the DI scope that owns the repository.
+
+The page actions wrap `Page<dynamic>` in a `Result`. They return full `TRow` objects or [ModelQuery](model-query.md) properties selected through the request. Distinct field pages count distinct selected tuples. When the count is skipped, the page reports the number of items read. Selected pages carry items and count with null navigation metadata. Offset ordering uses the entity key to break ties where needed. UUID continuation uses a relational `Guid.CompareTo` predicate. Validate key ordering with the deployed provider and include the key in any projection that offers continuation.
+
+`CreateFilteredQueryAsync` composes the store's visibility filters, includes, resource filters, and ModelQuery terms. Supply another scoped store for a history table when appropriate. `ReadPageAsync(input, filtered, ct)` returns the raw typed page. The overload with a named `IQueryable<TEntity>` projection returns the alternate row type and derives its cursor when that type exposes the entity key. `ReadFieldPageAsync(input, filtered, selection, ct)` reads the explicit selected shape. For sharded queries, pass the selection to `ApplySorting` only when executing selected fields. Fixed-row callers can retain selections for their own use, such as export headers. The standard page calls `EnrichPageAsync` once on a nonzero full-row page after the reader closes. Preserve row identity and order when replacing items. Failures retain their status, message, and metadata. The stream yields a bare JSON array, applies `MaxResultCount`, and preserves repeated rows. Use the page actions for offset paging, totals, distinct selection, and enrichment.
+
+Declare the public actions for the resource's supported writes. The default verbs and routes follow `POST {resource}` for `CreateAsync`, `PUT {resource}/{id}` for `UpdateAsync`, `DELETE {resource}/{id}` for `DeleteAsync`, and `POST {resource}/bulk-delete` for `BulkDeleteAsync`. Construct a valid entity before calling `InsertEntityAsync`. It requires the current execution transaction and flushes to obtain the key for the acknowledgement. `UpdateEntityAsync` loads through the tracked detail query and invokes the supplied mutation once. Validate any body key against the route key before changing the entity, preserve its identity and protected members, and apply concurrency preconditions through the repository. `DeleteEntityAsync` stages the repository's removal policy and acknowledges an already absent row. `DeleteEntitiesAsync` stages policy-aware removal for the supplied keys. The surrounding [execution transaction](../../monica-infra-persistence/references/transactions.md) owns commit and rollback.
+
+See [API documentation](api-documentation-and-visibility.md#crud-collection-responses) for collection schemas and alternate DTO actions. The relational HTTP and repository contracts are exercised in `tests/Test.Monica.WebApi/AutoControllers/ModelQueryCrudIntegrationTests.cs`.
 
 ## Transport-independent application calls
 

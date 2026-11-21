@@ -19,7 +19,6 @@ public class ModuleWebApi : MonicaModule<ModuleWebApiOption>
         module.Require<ModuleSwagger>();
         module.Require<ModuleAuthentication>();
         module.Require<ModuleMediator>();
-        module.Require<ModuleObjectMapping>();
         module.Require<ModuleRepository>();
     }
 }

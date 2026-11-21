@@ -32,7 +32,6 @@ public class ModuleApplication : MonicaModule<ModuleApplicationOption>
     {
         module.Require<ModuleMediator>();
         module.Require<ModuleDependencyInjection>();
-        module.Require<ModuleObjectMapping>();
         module.Require<ModuleAuthorization>();
         module.Require<ModuleExceptionHandling, ModuleExceptionHandlingOption>(
             options => options.AddExceptionMapper<ValidationExceptionMapper>());

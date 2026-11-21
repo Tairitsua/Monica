@@ -1,11 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageDescription>Fundamental types, utilities, and base infrastructure for Monica framework including built-in mediator dispatch, Mapster mapping, and core abstractions.</PackageDescription>
+    <PackageDescription>Fundamental types, utilities, and base infrastructure for Monica framework including built-in mediator dispatch and core abstractions.</PackageDescription>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Mapster.DependencyInjection" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.9" />
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.3.14" />
 	<PackageReference Include="Microsoft.Extensions.Resilience" Version="10.2.0" />
@@ -13,8 +12,6 @@
       <ExcludeAssets>analyzers</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="10.0.2" />
-    <PackageReference Include="Mapster" Version="10.0.13" />
-    <PackageReference Include="ExpressionTranslator" Version="2.5.0" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" />
   </ItemGroup>
 

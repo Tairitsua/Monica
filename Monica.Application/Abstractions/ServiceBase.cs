@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Monica.Core.ObjectMapping.Abstractions;
 using Monica.DependencyInjection.Abstractions;
 
 namespace Monica.Application.Abstractions;
@@ -9,9 +8,8 @@ namespace Monica.Application.Abstractions;
 /// Provides host-bound infrastructure shared by Monica application and domain services.
 /// </summary>
 /// <remarks>
-/// Instances must be resolved through Monica dependency injection so the cached service provider is assigned
-/// before protected host services such as <see cref="Logger"/> or <see cref="Mapper"/> are used. These properties
-/// are available after activation and must not be accessed from a derived constructor.
+/// Resolve instances through Monica dependency injection, which assigns the cached service provider after
+/// construction. Use <see cref="Logger"/> after activation.
 /// </remarks>
 public abstract class ServiceBase : ICachedServiceProviderAccessor
 {
@@ -34,11 +32,6 @@ public abstract class ServiceBase : ICachedServiceProviderAccessor
     protected ILogger Logger => _logger ??= CachedServiceProvider
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger(GetType());
-
-    /// <summary>
-    /// Gets the object mapper from the host that owns this service instance.
-    /// </summary>
-    protected IObjectMapper Mapper => CachedServiceProvider.GetRequiredService<IObjectMapper>();
 
     private InvalidOperationException CreateNotInitializedException()
     {

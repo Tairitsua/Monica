@@ -4,11 +4,11 @@ These choices supplement the [building block catalog](00-building-block-overview
 
 ## Bounded CRUD
 
-`CrudApplicationService<...>` implements `ICrudApplicationService` and is classified as `CrudApplicationService`, separately from request-owned mediator handlers. Use it only for a persistence-facing CRUD surface whose generic mapping and actions match the use case. Commands with meaningful state transitions use handlers and entity methods; they must not gain a generic update path that bypasses those invariants.
+`CrudService<TEntity, TKey, TDetail, TRow, TQuery>` implements `ICrudApplicationService` and is classified as `CrudApplicationService`. Use it for bounded persistence-facing CRUD. The feature owns the detail conversion, row projection, entity construction, and tracked updates. Declare the write actions that the resource supports. Use request handlers and entity methods to enforce the invariants of commands with meaningful state transitions.
 
 This adapter may consume the same concrete repository's `IEfEntityStore` view because the native CRUD contract requires EF access. The [repository rules](13-repository-and-persistence-template.md) bound this exception: ordinary handlers, jobs, and domain services still inject `IRepository{Aggregate}`. Do not widen the business interface or add a forwarding repository layer.
 
-Use the project's adopted CRUD naming convention. `CrudControllerOption.CrudControllerPostfix` defaults to `CrudService` and is stripped to derive the route name; it is a route aid, not a native Building Block naming requirement or a registration gate. Registration follows `ICrudApplicationService` and host type discovery. Use [Web endpoint integration](../../monica-infra-web/references/endpoints-and-execution.md) for setup and the persistence transaction contract for execution.
+Use the project's adopted CRUD naming convention. `CrudControllerOption.CrudControllerPostfix` defaults to `CrudService` and is stripped to derive the route name. Registration follows `ICrudApplicationService` and host type discovery. See [typed CRUD services](../../monica-infra-web/references/endpoints-and-execution.md#typed-crud-services) for the action and projection contracts and [transactions](../../monica-infra-persistence/references/transactions.md) for execution.
 
 ## Startup Seeder
 

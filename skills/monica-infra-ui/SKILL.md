@@ -16,7 +16,6 @@ Select native UI composition and the task below. Read the owning capability befo
 | Inspect host identity, timing, DbContexts, sessions, migrations, or leases | [System information](references/system-information.md), [Repository diagnostics](../monica-infra-persistence/references/repository-diagnostics.md), [Lease workbench](../monica-infra-hosting/references/lease-workbench.md) |
 | Render Markdown, diagrams, document search, or local images | [Markdown](references/markdown.md) |
 | Probe connectivity, transform text, or view and edit JSON | [Utilities](references/utilities.md), [JSON](references/json.md) |
-| Inspect mapping pairs and expressions | [Mapper workspace](references/mapper.md) |
 | Inspect Git workspaces or manage host files | [Git](references/git-workspace.md), [FileOps](references/fileops-workspace.md) |
 | Execute commands or inspect sessions, output, and cancellation | [Terminal workspace](references/terminal-workspace.md) |
 | Inspect Kubernetes, operate Services, or publish NodePorts | [K8S operations](references/k8s-workspace.md) |

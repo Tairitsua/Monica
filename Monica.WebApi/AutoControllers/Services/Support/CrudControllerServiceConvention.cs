@@ -76,8 +76,7 @@ public class CrudControllerServiceConvention(
 
         if (controller.ApiExplorer.IsVisible is not false)
         {
-            RemoveDisableAction(controller.Actions, controller.ControllerType.GetInterface(nameof(ICrudDisableDelete)) != null);
-            RemoveDuplicateActon(controller.Actions);
+            RemoveDuplicateActions(controller.Actions);
         }
 
         foreach (var action in controller.Actions)
@@ -94,29 +93,7 @@ public class CrudControllerServiceConvention(
     }
 
 
-    private static void RemoveDisableAction(ICollection<ActionModel> actionModels, bool disableDelete)
-    {
-        var removeList = new List<ActionModel>();
-        foreach (var actionModel in actionModels)
-        {
-            if (actionModel.Parameters.Any(a => a.ParameterInfo.ParameterType == typeof(CrudDisableDto)))
-            {
-                removeList.Add(actionModel);
-            }
-            else if (actionModel.ActionName.Contains("Delete") && disableDelete)
-            {
-                removeList.Add(actionModel);
-            }
-        }
-
-
-        foreach (var actionModel in removeList)
-        {
-            actionModels.Remove(actionModel);
-        }
-    }
-
-    private static void RemoveDuplicateActon(ICollection<ActionModel> actionModels)
+    private static void RemoveDuplicateActions(ICollection<ActionModel> actionModels)
     {
         var removeList = new List<ActionModel>();
         foreach (var grouping in actionModels.GroupBy(p => p.ActionName).Where(p => p.Count() > 1))
@@ -152,6 +129,13 @@ public class CrudControllerServiceConvention(
         {
             foreach (var prm in action.Parameters)
             {
+                if (prm.ParameterType == typeof(CancellationToken))
+                {
+                    prm.BindingInfo ??= new BindingInfo();
+                    prm.BindingInfo.BindingSource = BindingSource.Special;
+                    continue;
+                }
+
                 if (prm.BindingInfo != null)
                 {
                     continue;
