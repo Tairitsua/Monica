@@ -2,13 +2,13 @@
 
 When `AddJsonSerialization()` installs the nullable UUID converter, `Guid?` accepts JSON `null` or a valid UUID string and writes lowercase D format. Empty strings, numbers and malformed UUIDs raise `JsonException`; they do not silently become null. An optional selector should submit explicit null when cleared. Existing UUID versions remain valid inputs.
 
-Page payload properties follow the host's JSON naming policy. The default writes keys such as `totalCount` and `currentPage`. If you override the naming policy through `AddJsonSerialization(options => options.ConfigureSerializer(...))`, configure the same policy on HTTP producers and typed consumers. See the [result contract](../../monica-development/references/result-type-guide.md#pagination-and-aggregation) for page semantics.
+Page payload properties follow the host's JSON naming policy. The default writes keys such as `totalCount` and `currentPage`. If you override the naming policy through `AddJsonSerialization(options => options.ConfigureSerializer(...))`, configure the same policy on HTTP producers and typed consumers. For page semantics, see `$monica-development` (`references/result-type-guide.md`, “Pagination and Aggregation”).
 
 `AddClock(options => options.LocalTimeZone = CommonTimeZone.China)` selects deployment wall time for audit stamps and page timestamp display in `$monica-infra-ui` (`references/time-display.md`). Import `Monica.Core.Clock` for the enum. An unset Clock zone uses UTC; UI display does not use the server operating-system timezone. Service Discovery and observable-instance observation labels follow this same UI policy without changing lease or freshness calculations.
 
 Monica composes one host-owned module graph before the .NET host is built. A module registration declares dependencies and features, so select a public `monica.Add...()` extension for each capability and let composition validate its graph. Web endpoints belong to a Web host; generic hosts keep non-Web services without endpoint mapping.
 
-For host-selected graph relationships, call `registration.Require<TDependency>()` to include a hard dependency or `registration.AfterIfPresent<TDependency>()` to order the registered module after an included target. Both return the original registration. Use `registration.Require<TDependency, TDependencyOptions>()` when the composition needs the dependency's typed registration to configure it or select a feature. For relationships intrinsic to a module, see [module registration and runtime contracts](../../monica-development/references/registration-runtime.md).
+For host-selected graph relationships, call `registration.Require<TDependency>()` to include a hard dependency or `registration.AfterIfPresent<TDependency>()` to order the registered module after an included target. Both return the original registration. Use `registration.Require<TDependency, TDependencyOptions>()` when the composition needs the dependency's typed registration to configure it or select a feature. For relationships intrinsic to a module, see `$monica-development` (`references/registration-runtime.md`).
 
 ## Start with the host boundary
 
