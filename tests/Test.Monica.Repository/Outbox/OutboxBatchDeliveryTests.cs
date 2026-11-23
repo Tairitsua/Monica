@@ -33,6 +33,7 @@ public sealed class OutboxBatchDeliveryTests
         await SeedAsync(app, time, count + 1);
 
         Assert.Equal(count, await app.DrainOutboxAsync<TestRepositoryDbContext>(count, Token));
+        Assert.Equal(1, commands.Claims);
         Assert.Equal(expectedCommands, commands.Attempts);
         Assert.Equal(count, commands.Updated.Sum());
         Assert.All(commands.Updated, affected => Assert.InRange(affected, 1, 100));
@@ -296,28 +297,28 @@ public sealed class OutboxBatchDeliveryTests
     }
 
     [Fact]
-    public async Task DrainAsync_WhenRoutesAndLimitsDiffer_ShouldKeepGroupsWithinTheirTransportBoundary()
+    public async Task DrainAsync_WhenRoutesInterleave_ShouldGroupByRouteAndRespectTransportLimits()
     {
         var time = new OutboxTestTimeProvider();
         var probe = new Probe();
         await using var app = await CreateAsync(time, probe, 8, new EventBatchLimits(2, 400));
         await SeedAsync(app, time, 8, (row, index) =>
         {
-            row.TopicName = index < 3 ? "first" : "second";
-            row.ServiceKey = index is 5 or 6 ? "secondary" : null;
+            row.TopicName = index is 0 or 2 or 4 ? "first" : "second";
+            row.ServiceKey = index is 3 or 6 ? "secondary" : null;
             if (index == 7) row.Body = new byte[1000];
         });
 
         Assert.Equal(8, await app.Services.GetRequiredService<OutboxDispatcher<TestRepositoryDbContext>>().DrainAsync(8, Token));
-        var attempts = probe.Attempts.ToArray();
-        Assert.Equal([2, 1, 2, 2, 1], attempts.Select(attempt => attempt.Messages.Length));
+        var attempts = probe.Attempts.OrderBy(attempt => attempt.Messages[0].Metadata.MessageId, StringComparer.Ordinal).ToArray();
+        Assert.Equal(["message-0,message-2", "message-1,message-5", "message-3,message-6", "message-4", "message-7"],
+            attempts.Select(attempt => string.Join(',', attempt.Messages.Select(message => message.Metadata.MessageId))));
         Assert.All(attempts, attempt =>
         {
             Assert.Single(attempt.Messages.Select(message => message.Metadata.TopicName).Distinct());
             Assert.Single(attempt.Messages.Select(message => message.Metadata.ServiceKey).Distinct());
+            Assert.Equal(attempt.Messages.Length > 1, attempt.IsBatch);
         });
-        Assert.False(attempts[^1].IsBatch);
-        Assert.Equal("message-7", Assert.Single(attempts[^1].Messages).Metadata.MessageId);
     }
 
     [Theory]
@@ -427,7 +428,9 @@ public sealed class OutboxBatchDeliveryTests
 
     private sealed class AcknowledgmentCommands : DbCommandInterceptor
     {
+        private int _claims;
         private int _attempts;
+        public int Claims => Volatile.Read(ref _claims);
         public int Attempts => Volatile.Read(ref _attempts);
         public ConcurrentQueue<int> Updated { get; } = new();
         public int FailBeforeAttempt { get; init; }
@@ -437,6 +440,9 @@ public sealed class OutboxBatchDeliveryTests
         public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
+            if (command.CommandText.StartsWith("UPDATE ", StringComparison.Ordinal)
+                && command.CommandText.Contains("\"Attempts\"", StringComparison.Ordinal))
+                Interlocked.Increment(ref _claims);
             if (!IsAcknowledgment(command)) return result;
             var attempt = Interlocked.Increment(ref _attempts);
             if (Before is not null) await Before(cancellationToken);

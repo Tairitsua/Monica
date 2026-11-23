@@ -38,22 +38,20 @@ public sealed partial class OutboxDispatcher<TDbContext>
         var keys = await eligible.Where(x => x.Sequence > afterSequence && x.DeliveredAtUtc == null
                 && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
                 && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
-            .OrderBy(x => x.Sequence).Select(x => x.Sequence).Take(count).ToListAsync(cancellationToken);
-        foreach (var sequence in keys)
-        {
-            now = time.GetUtcNow().UtcDateTime;
-            // Repository timestamps may have whole-second precision. Round up so storage cannot shorten a claim.
-            var expiryTicks = now.Add(registration.Options.DeliveryLease).Ticks;
-            var expiry = new DateTime(expiryTicks - expiryTicks % TimeSpan.TicksPerSecond + TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-            await rows.Where(x => x.Sequence == sequence && x.DeliveredAtUtc == null
-                    && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
-                    && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
-                .ExecuteUpdateAsync(update => update.SetProperty(x => x.LeaseId, lease)
-                    .SetProperty(x => x.LeaseUntilUtc, expiry)
-                    .SetProperty(x => x.Attempts, x => x.Attempts + 1), cancellationToken);
-        }
+            .OrderBy(x => x.DeliveredAtUtc).ThenBy(x => x.Sequence).Select(x => x.Sequence).Take(count).ToListAsync(cancellationToken);
         if (keys.Count == 0) return [];
-        return await rows.AsNoTracking().Where(x => keys.Contains(x.Sequence) && x.LeaseId == lease)
+        now = time.GetUtcNow().UtcDateTime;
+        // Repository timestamps may have whole-second precision. Round up so storage cannot shorten a claim.
+        var expiryTicks = now.Add(registration.Options.DeliveryLease).Ticks;
+        var expiry = new DateTime(expiryTicks - expiryTicks % TimeSpan.TicksPerSecond + TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        var selected = eligible.Where(x => keys.Contains(x.Sequence));
+        await selected.Where(x => x.DeliveredAtUtc == null
+                && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
+                && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.LeaseId, lease)
+                .SetProperty(x => x.LeaseUntilUtc, expiry)
+                .SetProperty(x => x.Attempts, x => x.Attempts + 1), cancellationToken);
+        return await selected.AsNoTracking().Where(x => x.LeaseId == lease)
             .OrderBy(x => x.Sequence).ToListAsync(cancellationToken);
     }
 
@@ -78,6 +76,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
         var attempts = Column(nameof(OutboxMessage.Attempts));
         var capability = shared ? $"AND {Column(nameof(OutboxMessage.DeliveryTarget))} = ANY ({{4}})"
             : $"AND {Column(nameof(OutboxMessage.DeliveryTarget))} IS NULL";
+        // Including the constant-null delivery column in the order exposes the full index order to both planners.
         return $$"""
             WITH due AS (
                 SELECT {{sequence}} FROM {{name}}
@@ -85,7 +84,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
                   {{capability}}
                   AND ({{retry}} IS NULL OR {{retry}} <= (statement_timestamp() AT TIME ZONE 'UTC'))
                   AND ({{until}} IS NULL OR {{until}} <= (statement_timestamp() AT TIME ZONE 'UTC'))
-                ORDER BY {{sequence}} LIMIT {1} FOR UPDATE SKIP LOCKED
+                ORDER BY {{delivered}}, {{sequence}} LIMIT {1} FOR UPDATE SKIP LOCKED
             )
             UPDATE {{name}} AS message
             SET {{token}} = {2},

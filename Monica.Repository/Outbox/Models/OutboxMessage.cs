@@ -50,7 +50,7 @@ public sealed class OutboxMessage
     internal EventMessage ToEventMessage() => new(
         new EventDeliveryMetadata(MessageId, Source, EventName, TopicName, ServiceKey, TraceParent, TraceState)
         { TransportKey = TransportKey },
-        Scope, Body.ToArray());
+        Scope, Body);
 
     internal static OutboxMessage Capture(EventMessage message, TimeProvider time)
     {

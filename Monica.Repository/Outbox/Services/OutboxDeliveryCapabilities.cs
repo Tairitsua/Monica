@@ -20,7 +20,7 @@ internal sealed class OutboxDeliveryCapabilities(IEventSubscriptionRegistry regi
         }
         if (message.Scope != EventSubscriptionScope.Local)
             throw new InvalidOperationException($"Unknown shared Outbox scope '{message.Scope}'.");
-        var subscriptions = MatchingLocal(message);
+        var subscriptions = MatchingLocal(message.Metadata.TopicName, message.Metadata.ServiceKey);
         if (subscriptions.Any(subscription => EventNameAttribute.GetNameOrDefault(subscription.EventType) != message.Metadata.EventName))
             throw new InvalidOperationException("The local Outbox event name must match its registered event contract.");
         return LocalTarget(subscriptions) ?? throw new InvalidOperationException(
@@ -39,17 +39,16 @@ internal sealed class OutboxDeliveryCapabilities(IEventSubscriptionRegistry regi
 
     internal IReadOnlyCollection<EventSubscriptionId> SelectLocal(OutboxMessage row)
     {
-        var subscriptions = MatchingLocal(row.ToEventMessage());
+        var subscriptions = MatchingLocal(row.TopicName, row.ServiceKey);
         if (row.DeliveryTarget is null || row.DeliveryTarget != LocalTarget(subscriptions)
             || subscriptions.Any(subscription => subscription.State != EventSubscriptionState.Active))
             throw new InvalidOperationException("The complete captured local Outbox destination is no longer active on this host.");
         return subscriptions.Select(subscription => subscription.Id).ToArray();
     }
 
-    private IEventSubscription[] MatchingLocal(EventMessage message) => registry.GetAll()
+    private IEventSubscription[] MatchingLocal(string topicName, string? serviceKey) => registry.GetAll()
         .Where(subscription => subscription.Scope == EventSubscriptionScope.Local
-            && subscription.TopicName == message.Metadata.TopicName
-            && subscription.ServiceKey == message.Metadata.ServiceKey).ToArray();
+            && subscription.TopicName == topicName && subscription.ServiceKey == serviceKey).ToArray();
 
     private static string TransportTarget(string? key) => "D:" + Hash(new { ServiceKey = key });
 

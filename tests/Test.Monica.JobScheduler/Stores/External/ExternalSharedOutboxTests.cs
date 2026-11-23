@@ -18,6 +18,8 @@ namespace Test.Monica.JobScheduler.Stores.External;
 
 public sealed partial class ExternalOutboxLeaseTests
 {
+    private static readonly StoreScalarQueryGuard _storeScalarQueryGuard = new();
+
     [Theory]
     [InlineData(ExternalSchedulerDatabase.POSTGRES)]
     [InlineData(ExternalSchedulerDatabase.VASTBASE)]
@@ -33,7 +35,7 @@ public sealed partial class ExternalOutboxLeaseTests
             using var host = CreateHost(fixture.Database, TimeProvider.System, new OutboxCommands(), false,
                 transport: new FailingDeliveryTransport(), configureOutbox: options => options.SharedStoreKey = "shared-messages",
                 configureDbContext: options => options.UseMonicaTableLayout(InfrastructureTableLayout.PreferSchema("infra"))
-                    .AddInterceptors(new StoreScalarQueryGuard()), maintenanceStore: new InMemoryLeaseStore(TimeProvider.System));
+                    .AddInterceptors(_storeScalarQueryGuard), maintenanceStore: new InMemoryLeaseStore(TimeProvider.System));
             await CreateOutboxSchemaAsync(host, token);
             Assert.Equal(0, await Dispatcher(host).CleanupAsync(token));
             await using (var operation = host.Services.CreateAsyncScope())
