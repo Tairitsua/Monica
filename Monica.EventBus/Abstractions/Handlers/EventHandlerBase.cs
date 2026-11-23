@@ -3,7 +3,7 @@ using Monica.DependencyInjection.Abstractions;
 namespace Monica.EventBus.Abstractions.Handlers;
 
 /// <summary>
-/// Provides host-bound logging and mapping services to Monica event handlers.
+/// Provides host-bound logging to Monica event handlers.
 /// </summary>
 /// <remarks>
 /// Include the concrete handler in type discovery and enable Monica conventional dependency injection

@@ -10,7 +10,6 @@ Start with composition for module-graph or host-lifecycle problems, then select 
 | Task | Read |
 | --- | --- |
 | Compose a Web or generic host, select discovery assemblies, or inspect module diagnostics | [Host composition](references/host-composition.md) |
-| Contribute host-owned object-mapping profiles or review mapping upgrade compatibility | [Object mappings](references/host-composition.md#contribute-object-mappings) |
 | Compose domain/role ownership, deployment placement, or autonomous activation | [Unified application model](references/application-model.md) |
 | Configure shared domain identities and display metadata for framework consumers | [Domain catalog](references/domain-catalog.md) |
 | Discover application services, choose DI lifetimes, or decorate an interface | [Dependency injection](references/dependency-injection.md) |

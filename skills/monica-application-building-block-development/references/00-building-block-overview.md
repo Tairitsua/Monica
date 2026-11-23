@@ -21,7 +21,7 @@ Runtime and source discovery recognize the kinds below from inheritance, interfa
 | `Configuration` | `[Configuration]` class | `Options*` | Typed deployment-owned Startup or runtime Managed settings |
 | `RecurringJob` | `RecurringJob` | `Worker*` | Scheduled background work |
 | `TriggeredJob` | `TriggeredJob<TArgs>` | `Job*` | On-demand asynchronous work |
-| `CrudApplicationService` | `ApplicationService` plus `ICrudApplicationService`, normally native `CrudApplicationService<...>` | Project convention; configured CRUD suffix is a route aid | Bounded persistence-facing CRUD adapter |
+| `CrudApplicationService` | `ApplicationService` plus `ICrudApplicationService`, normally `CrudService<TEntity, TKey, TDetail, TRow, TQuery>` | Project convention; configured CRUD suffix is a route aid | Bounded persistence-facing CRUD adapter |
 | `Seeder` | `ISeeder`, normally `SeederBase` | Project convention; no native prefix rule | Finite, idempotent startup preparation |
 | `HostedService` | `IHostedService`; Monica observation uses `MoHostedService` / `MoBackgroundService` | `{Purpose}HostedService` / `{Purpose}BackgroundService`; no native naming diagnostic | Host lifecycle or continuous infrastructure work |
 | `HttpApi` | `ControllerBase` | Usually `*Controller`; no native prefix rule | HTTP transport adapter, including generated mediated controllers |

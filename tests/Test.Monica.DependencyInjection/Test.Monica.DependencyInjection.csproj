@@ -5,8 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Monica.Application\Monica.Application.csproj" />
     <ProjectReference Include="..\..\Monica.DependencyInjection\Monica.DependencyInjection.csproj" />
-    <ProjectReference Include="..\..\Monica.WebApi\Monica.WebApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

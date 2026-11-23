@@ -18,6 +18,7 @@ These conventions mirror the current `Monica.BuildingBlocks` naming diagnostics.
 | `Configuration` | Class name starts with `Options` | `Options{Purpose}` |
 | `RecurringJob` | Class name starts with `Worker` | `Worker*` |
 | `TriggeredJob` | Class name starts with `Job` | `Job*` |
+| `CrudApplicationService` | Implements `ICrudApplicationService`. With AutoControllers, the default rule uses its configured service name prefix | `CrudServices/CrudService{Resource}.cs` |
 | `HostedService` | No native naming diagnostic | `{Purpose}HostedService` for resource lifecycle; `{Purpose}BackgroundService` for a continuous loop |
 | `RequestDto` | Implements `IQuery<T>` or `ICommand<T>`/`ICommand`; these retain `IResultRequestBase` discovery | Prefer `Command*`, `Query*`, or `Request*` |
 
@@ -39,7 +40,8 @@ These names describe support types; they do not create additional discovered kin
 | `Utility` helper | `Utils*` | Pure helper code that stays inside the domain boundary and does not deserve its own `DomainService` |
 | Facade | `*Facade` | Existing deliberate adapter; new business UI normally consumes application use cases |
 | Internal mediator handler | `CommandHandler*`, `QueryHandler*`, or meaningful `*Handler*` | Internal use-case orchestration through the existing mediator contract |
-| Response/read DTO, value object, mapper, validator | Business meaning plus an existing repository convention | Data shape, invariant value, mapping, or validation without a new building block kind |
+| Business mapper | `Mapper{Subject}` | Named conversions in the owning domain core under `Mappers/` |
+| Response/read DTO, value object, validator | Business meaning plus an existing repository convention | Data shape, invariant value, or validation without a new building block kind |
 | Composition module | Existing `Module*` convention | Registration and host integration, for product bootstrap and explicit integrations; not one module per business feature |
 | Hosted-service work item and state | `{Purpose}WorkItem`, `{Purpose}State` or `{Purpose}Buffer` | Finite scoped processing and explicitly owned process state beside `HostedServices/`; not new Building Block families |
 

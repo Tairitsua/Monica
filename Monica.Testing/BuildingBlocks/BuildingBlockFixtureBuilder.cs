@@ -1,10 +1,7 @@
-using Mapster;
-using MapsterMapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Authority.Identity.Abstractions;
 using Monica.Core.Mediator;
-using Monica.Core.ObjectMapping.Abstractions;
 using Monica.DependencyInjection.Abstractions;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
@@ -12,7 +9,6 @@ using Monica.Repository.UnitOfWork.Abstractions;
 using Monica.Repository.UnitOfWork.Services;
 using Monica.Testing.Doubles;
 using Monica.Testing.Hosting;
-using Monica.Testing.ObjectMapping;
 using NSubstitute;
 
 namespace Monica.Testing.BuildingBlocks;
@@ -35,11 +31,6 @@ public sealed class BuildingBlockFixtureBuilder<TBuildingBlock>
         _services.AddMonicaTestSeams();
         _services.AddScoped<IMediator, Mediator>();
         _services.AddSingleton<ICurrentUser, TestCurrentUser>();
-
-        var mapsterConfig = new TypeAdapterConfig();
-        _services.AddSingleton(mapsterConfig);
-        _services.AddScoped<IMapper, ServiceMapper>();
-        _services.AddTransient<IObjectMapper>(provider => new TestObjectMapper(provider.GetRequiredService<IMapper>()));
     }
 
     /// <summary>
@@ -108,34 +99,6 @@ public sealed class BuildingBlockFixtureBuilder<TBuildingBlock>
         ArgumentNullException.ThrowIfNull(currentUser);
         _services.RemoveAll<ICurrentUser>();
         _services.AddSingleton(currentUser);
-        return this;
-    }
-
-    /// <summary>
-    /// Configures the Mapster rules used by the test object mapper.
-    /// </summary>
-    public BuildingBlockFixtureBuilder<TBuildingBlock> WithMappings(Action<TypeAdapterConfig> configure)
-    {
-        ArgumentNullException.ThrowIfNull(configure);
-        return WithServices(services =>
-        {
-            services.RemoveAll<TypeAdapterConfig>();
-            services.RemoveAll<IMapper>();
-            var config = new TypeAdapterConfig();
-            configure(config);
-            services.AddSingleton(config);
-            services.AddScoped<IMapper, ServiceMapper>();
-        });
-    }
-
-    /// <summary>
-    /// Registers a custom object mapper.
-    /// </summary>
-    public BuildingBlockFixtureBuilder<TBuildingBlock> WithMapper(IObjectMapper mapper)
-    {
-        ArgumentNullException.ThrowIfNull(mapper);
-        _services.RemoveAll<IObjectMapper>();
-        _services.AddSingleton(mapper);
         return this;
     }
 

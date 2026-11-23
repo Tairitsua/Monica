@@ -21,7 +21,7 @@ public sealed class RequestEndpointApiDescriptionProvider(
     IModelMetadataProvider modelMetadataProvider) : IApiDescriptionProvider
 {
     /// <summary>
-    /// Runs after ASP.NET Core's default provider and Monica's CRUD description adjustments.
+    /// Runs after ASP.NET Core's default provider.
     /// </summary>
     public int Order => -998;
 

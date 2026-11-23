@@ -201,7 +201,6 @@ public sealed record CommandApproveOrder(Guid OrderId) : ICommand;
 - [ASP.NET Core](https://github.com/dotnet/aspnetcore)
 - [Entity Framework Core](https://github.com/dotnet/efcore)
 - [MudBlazor](https://github.com/MudBlazor/MudBlazor)
-- [Mapster](https://github.com/MapsterMapper/Mapster)
 - [Microsoft Agent Framework](https://github.com/microsoft/agent-framework)
 - [Dapr](https://github.com/dapr/dapr)
 - [Serilog](https://github.com/serilog/serilog)

@@ -33,3 +33,9 @@ Monica modules can expose optional Minimal API diagnostic routes. The host's `Co
 Sources: `Monica.WebApi/Modules/ModuleSwagger.cs`, `Monica.WebApi/Swagger/Services/Support/SwaggerDocumentCatalog.cs`, `SwaggerGenOptionConfigurator.cs`, `Monica.Core/MonicaModuleSystemOptions.cs`, `Monica.Core/Modularity/Abstractions/MinimalApiModuleOptions.cs`, and `Monica.Core/Modularity/Extensions/MonicaApplicationBuilderExtensions.cs`.
 
 The native-provider scenarios in `tests/Test.Monica.ApplicationInvocation/SwaggerRoleDocumentTests.cs` cover mixed-role controllers, inherited CRUD ownership, explicit overrides, custom predicate exclusions, remote placement, empty selected-role documents, name collisions and standalone defaults.
+
+## CRUD collection responses
+
+With Swagger enabled, CRUD actions appear in API Explorer by default. Use `[ApiExplorerSettings(IgnoreApi = true)]` to hide a controller or action from documentation. A [typed CRUD service](endpoints-and-execution.md#typed-crud-services) describes its page as `Result<Page<object>>` and its stream as a JSON array. Swagger documents the concrete full-row DTO. When the input supports field selection, the item schema uses `anyOf` for the DTO and an object containing the selected properties. The page retains the envelope, paging fields, and configured JSON names. An action `CancellationToken` comes from MVC execution context and is absent from the request schema.
+
+Use `[CrudCollectionResponse(typeof(StockItemExportRow))]` from `Monica.WebApi.Annotations` on a custom `Task<Result<Page<object>>>` or `IAsyncEnumerable<object>` action to document an alternate full-row type. The standard `GetListAsync`, `ListAsync`, and `ListStreamAsync` actions supply their row metadata. Compare this response contract with existing generated clients and refresh clients that need to consume the changed item schemas.
