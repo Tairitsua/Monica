@@ -2,7 +2,6 @@ using System.Reflection;
 using AwesomeAssertions;
 using Test.Monica.Core.Execution;
 using Test.Monica.Core.Modularity;
-using Test.Monica.Core.ObjectMapping;
 using Xunit;
 
 namespace Test.Monica.Core;
@@ -30,7 +29,6 @@ public sealed class BlockingConcurrencyCollectionTests
         Type[] blockingProbeClasses =
         [
             typeof(ExecutionPipelineCatalogTests),
-            typeof(ModuleObjectMappingTests),
             typeof(ModuleDiagnosticsFacadeTests),
             typeof(ModuleDiagnosticsSnapshotConcurrencyTests),
             typeof(ModuleDiagnosticsSnapshotLifecycleTests),

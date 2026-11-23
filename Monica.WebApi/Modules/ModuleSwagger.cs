@@ -50,6 +50,7 @@ public class ModuleSwagger : MonicaModule<ModuleSwaggerOption>, IWebHostRequired
         {
             swaggerGenOptions.SchemaFilter<ResultEnvelopeSchemaFilter>();
             swaggerGenOptions.OperationFilter<ResultEnvelopeOperationFilter>();
+            swaggerGenOptions.OperationFilter<CrudCollectionOperationFilter>();
             SwaggerGenOptionConfigurator.Configure(
                 swaggerGenOptions,
                 Option,

@@ -5,6 +5,9 @@ namespace Monica.WebApi.AutoControllers.Models;
 /// </summary>
 public class CrudControllerOption
 {
+    /// <summary>The conventional CLR name prefix for generated CRUD resources.</summary>
+    public const string DefaultServiceNamePrefix = "CrudService";
+
     /// <summary>
     /// Route prefix used for auto-generated CRUD endpoints.
     /// </summary>
@@ -15,16 +18,15 @@ public class CrudControllerOption
     /// </remarks>
     public string RoutePath { get; set; } = "api/v1/[controller]";
     /// <summary>
-    /// Class-name suffix stripped from a CRUD application service when deriving its controller (route) name.
+    /// Gets or sets the case-sensitive CLR name prefix removed to derive a CRUD resource name.
+    /// Defaults to <c>CrudService</c>, so <c>CrudServiceAirport</c> exposes the resource <c>airport</c>.
+    /// An empty prefix uses the full service name.
     /// </summary>
     /// <remarks>
-    /// This is purely a route-naming aid: a service such as <c>AircraftAppService</c> becomes the controller
-    /// <c>Aircraft</c> and the route segment <c>aircraft</c>. It does not gate controller registration (that is decided
-    /// by the <c>ICrudApplicationService</c> marker interface) and is not a naming-convention rule; name-convention
-    /// enforcement lives in the building-block system (<c>Monica.BuildingBlocks</c>). If a service name does not end with this
-    /// suffix, the name is simply left unchanged.
+    /// The marker interface determines discovery. Building Blocks uses this prefix as its naming convention
+    /// when the host has not supplied an explicit CRUD rule.
     /// </remarks>
-    public string CrudControllerPostfix { get; set; } = "CrudService";
+    public string ServiceNamePrefix { get; set; } = DefaultServiceNamePrefix;
 
     /// <summary>
     /// Gets the host-specific paging defaults and safety limits applied to generated CRUD requests.

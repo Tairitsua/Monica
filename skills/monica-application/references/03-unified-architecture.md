@@ -17,8 +17,11 @@ src/
     Ordering/
       Domains.Ordering/
         {Entities,ValueObjects,DomainServices,Interfaces,Repository,Configurations}/
+        Mappers/MapperOrder.cs
       Roles.Ordering/
         {HandlersCommand,HandlersQuery,HandlersEvent,Registration}/
+        CrudServices/CrudServiceOrder.cs
+        Controllers/                       # Explicit HTTP controllers when needed
       Roles.Ordering.Reporting/
         {HandlersQuery,BackgroundWorkers,Registration}/
     File/
@@ -41,6 +44,10 @@ src/
 ```
 
 Create only projects and folders with actual responsibilities. A role is already an application-layer boundary; do not add an `Application/` wrapper inside `Roles.*`. A specialized role needs distinct application responsibility, ingress, autonomous work, integration, or scaling. An entity, CRUD feature, page, or handler does not by itself require another role or Monica module. A second executable does not move its role out of the owning domain.
+
+Keep named business conversions in the owning domain's `Mappers/Mapper{Subject}.cs`. Roles call the published methods.
+A handler or transport adapter owns conversion of its private input or output types alongside that code.
+Keep dependencies directed from roles to the domain core and from the domain core to published contracts.
 
 | Project | Responsibility and references |
 | --- | --- |

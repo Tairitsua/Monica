@@ -11,6 +11,7 @@ Choose host composition for the Web bundle or individual modules; choose endpoin
 | --- | --- |
 | Compose an HTTP host and choose the Web bundle or individual capabilities | [Web composition](references/web-composition.md) |
 | Expose request-owned endpoints or inspect and extend execution behaviors | [Endpoints and execution](references/endpoints-and-execution.md) |
+| Publish typed CRUD reads and declare resource write actions | [Typed CRUD services](references/endpoints-and-execution.md#typed-crud-services) |
 | Configure model fields, resolve query names, filter data, or project selected fields | [Model queries](references/model-query.md) |
 | Configure JWT authentication, permission checks, or CORS | [Access control](references/access-control.md) |
 | Configure Swagger documents or control the visibility of module routes | [API documentation and visibility](references/api-documentation-and-visibility.md) |

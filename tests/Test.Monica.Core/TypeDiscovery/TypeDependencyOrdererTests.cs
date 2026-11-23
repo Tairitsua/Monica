@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using Monica.Core;
 using Monica.Core.TypeDiscovery.Services;
 using Monica.Core.TypeDiscovery.Services.Support;
-using Monica.Testing.ObjectMapping;
+using Monica.Testing.Hosting;
 using Xunit;
 
 namespace Test.Monica.Core.TypeDiscovery;
@@ -15,14 +15,14 @@ public sealed class TypeDependencyOrdererTests
         var orderer = new TypeDependencyOrderer(
             [
                 typeof(TypeDependencyOrdererTests).Assembly,
-                typeof(TestObjectMapper).Assembly,
+                typeof(MonicaTestApplication).Assembly,
                 typeof(DomainTypeFinder).Assembly
             ]);
 
         var types = orderer.OrderDependencyFirst(
             [
                 typeof(ZStableOrderType),
-                typeof(TestObjectMapper),
+                typeof(MonicaTestApplication),
                 typeof(DomainTypeFinder),
                 typeof(AStableOrderType),
                 typeof(DomainTypeFinder)
@@ -30,7 +30,7 @@ public sealed class TypeDependencyOrdererTests
 
         types.Should().Equal(
             typeof(DomainTypeFinder),
-            typeof(TestObjectMapper),
+            typeof(MonicaTestApplication),
             typeof(AStableOrderType),
             typeof(ZStableOrderType));
     }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Persistence.Abstractions;
 using Monica.Repository.Persistence.Services;
 using Monica.Testing.Hosting;
@@ -118,10 +119,18 @@ public sealed class EfRepositoryTests
             => query.Include(row => row.Children);
     }
 
+    private sealed class DetailsRowDto : EntityDto<Guid>;
+
     private sealed class DetailsCrudService(DetailsRepository repository)
-        : AbstractKeyCrudApplicationService<HardDeleteRow, HardDeleteRow, HardDeleteRow, Guid, object, object, object>(repository)
+        : CrudService<HardDeleteRow, Guid, HardDeleteRow, DetailsRowDto, object>(repository)
     {
         protected override bool WithDetail() => true;
+
+        protected override Task<HardDeleteRow> ToDetailAsync(HardDeleteRow entity, CancellationToken ct)
+            => Task.FromResult(entity);
+
+        protected override IAsyncEnumerable<DetailsRowDto> ReadRowsAsync(IQueryable<HardDeleteRow> window, CancellationToken ct)
+            => window.Select(row => new DetailsRowDto { Id = row.Id }).AsAsyncEnumerable();
 
         public async Task<HardDeleteRow> ReadAsync(CancellationToken cancellationToken)
             => await (await CreateFilteredQueryAsync(new object())).SingleAsync(cancellationToken);

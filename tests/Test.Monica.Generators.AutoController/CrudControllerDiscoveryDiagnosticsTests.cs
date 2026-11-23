@@ -25,20 +25,20 @@ public sealed class CrudControllerDiscoveryDiagnosticsTests
     }
 
     [Fact]
-    public void DiscoveryDiagnostic_ShouldDescribeOnlySuffixMismatches()
+    public void DiscoveryDiagnostic_ShouldDescribeOnlyPrefixMismatches()
     {
-        var mismatch = CrudControllerSuffixMismatch.Create(
+        var mismatch = CrudControllerPrefixMismatch.Create(
             typeof(MismatchedCrudService),
             "ApplicationService");
 
         mismatch.Should().NotBeNull();
         mismatch!.ControllerName.Should().Be(nameof(MismatchedCrudService));
-        mismatch.RequiredSuffix.Should().Be("ApplicationService");
-        CrudControllerSuffixMismatch.Create(
-                typeof(MatchingCrudApplicationService),
+        mismatch.RequiredPrefix.Should().Be("ApplicationService");
+        CrudControllerPrefixMismatch.Create(
+                typeof(ApplicationServiceMatchingCrud),
                 "ApplicationService")
             .Should().BeNull();
-        CrudControllerSuffixMismatch.Create(typeof(OrdinaryService), "Service")
+        CrudControllerPrefixMismatch.Create(typeof(OrdinaryService), "Service")
             .Should().BeNull();
     }
 
@@ -54,7 +54,7 @@ public sealed class CrudControllerDiscoveryDiagnosticsTests
     }
 
     [Fact]
-    public void ModuleDiscovery_WhenSuffixDoesNotMatch_ShouldLogOnceThroughCompositionLogger()
+    public void ModuleDiscovery_WhenPrefixDoesNotMatch_ShouldLogOnceThroughCompositionLogger()
     {
         var loggerFactory = new RecordingLoggerFactory();
         var builder = WebApplication.CreateBuilder();
@@ -67,7 +67,7 @@ public sealed class CrudControllerDiscoveryDiagnosticsTests
             monica.AddModule<CompositionLoggerProbeModule, CompositionLoggerProbeModuleOption>(options =>
                 options.LoggerFactory = loggerFactory);
             monica.AddAutoControllers(
-                configureCrud: options => options.CrudControllerPostfix = "ApplicationService");
+                configureCrud: options => options.ServiceNamePrefix = "ApplicationService");
         });
         using var application = builder.Build();
 
@@ -80,8 +80,8 @@ public sealed class CrudControllerDiscoveryDiagnosticsTests
 
         mismatchLogs.Should().ContainSingle();
         mismatchLogs[0].Properties.GetValueOrDefault("DiagnosticSource")
-            .Should().Be(CrudControllerSuffixMismatch.SOURCE);
-        mismatchLogs[0].Properties.GetValueOrDefault("RequiredSuffix")
+            .Should().Be(CrudControllerPrefixMismatch.SOURCE);
+        mismatchLogs[0].Properties.GetValueOrDefault("RequiredPrefix")
             .Should().Be("ApplicationService");
     }
 
@@ -95,7 +95,7 @@ public sealed class CrudControllerDiscoveryDiagnosticsTests
 
     private sealed class MismatchedCrudService : ICrudApplicationService;
 
-    private sealed class MatchingCrudApplicationService : ICrudApplicationService;
+    private sealed class ApplicationServiceMatchingCrud : ICrudApplicationService;
 
     private sealed class OrdinaryService;
 

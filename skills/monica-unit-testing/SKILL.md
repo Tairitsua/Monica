@@ -80,7 +80,7 @@ Test source generators with raw Roslyn inputs under a dedicated `tests/Test.Moni
 
 - Assert `Result<T>` explicitly. Facade tests cover `Status`, `Message`, and `Data`; successful string paths verify data and message separately. Cover Created as success, permitted null payloads, failure metadata forwarding, and meaningful failure reports. Use the Core runtime contracts and generator-project compilation probes for the [explicit result API](../monica-development/references/result-type-guide.md).
 - Test module behavior through registration extensions, dependencies, resulting options, or DI-visible registrations rather than static tables alone.
-- Replace external boundaries, not domain logic. Resolve application services, domain services, repositories, mappers, and options from the scenario host.
+- Supply doubles for external dependencies. Resolve application services, domain services, repositories, and options from the scenario host.
 - Avoid real network, uncontrolled persistence, sleeps, random inputs, and untracked machine state.
 - Keep `InternalsVisibleTo` exceptional and scoped to the corresponding runnable test project.
 - Run independent test scenarios in parallel by default. Serialize only tests that name and document a genuinely shared external resource.

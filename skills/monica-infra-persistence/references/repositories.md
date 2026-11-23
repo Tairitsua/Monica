@@ -23,6 +23,8 @@ The core `IRepository<TEntity>` stages `Add`/`AddRange` and `Remove`/`RemoveRang
 
 Repository contexts use EF's standard options composition, including `ConfigureDbContext<TContext>` contributions. Contexts remain scoped and options are transient; options callbacks resolve scoped dependencies from the requesting scope. The owned factory creates a fresh scope and consumes the same options pipeline instead of constructing a separate options builder. Disposing a factory-created context also disposes that scope. Registration, configuration contribution, scoped connection identity, and factory disposal are covered by `tests/Test.Monica.Repository/Hosting/RepositoryOptionsCompositionTests.cs`.
 
+The read adapter owns DTO conversion. For a provider-translated read, apply a typed projection to the repository query. A [typed CRUD service](../../monica-infra-web/references/endpoints-and-execution.md#typed-crud-services) can also convert rows after the filtered, ordered entity window is materialized.
+
 ## Assign application UUID keys
 
 An application creates technical entity identities directly with `Guid.CreateVersion7()` before it adds or relates the objects. Standard `IEntity<Guid>.Id` primary keys are configured as `ValueGeneratedNever`. Configure any additional application-owned UUID key explicitly the same way. The tracked save pipeline and `IBulkWriter` reject `Guid.Empty` for these keys without changing the input. Loading, restoration, synchronization, and retry retain the supplied identity, including valid UUIDs from older versions.

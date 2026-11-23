@@ -85,7 +85,7 @@ There is no separate application-service fixture. Application services use `Buil
 - `Repository/` — direct DbContext and repository helpers
 - `Doubles/` — deterministic state, user, and event boundaries
 - `Results/` — explicit assertions for `Result` and `Result<T>`
-- `Localization/` and `ObjectMapping/` — focused shared test support
+- `Localization/` — test localizer that returns resource keys
 
 UI-specific support lives in `Monica.Testing.UI` so non-UI tests do not acquire Monica UI or bUnit dependencies through the core toolkit.
 

@@ -1,11 +1,10 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monica.Application.Abstractions;
 using Monica.Core.Mediator;
 using Monica.Core.Modularity.Extensions;
 using Monica.Modules;
-using Monica.Application.Abstractions;
-using Monica.WebApi.Abstractions;
 using Xunit;
 
 namespace Test.Monica.DependencyInjection.Activation;
@@ -15,10 +14,11 @@ public sealed class MediatorHandlerActivationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Send_WhenApplicationRequestHandlerUsesMapper_ShouldUseMonicaActivation(
+    public async Task Send_WhenApplicationRequestHandlerUsesCachedServices_ShouldResolveDependencyFromCurrentScope(
         bool registerMediatorFirst)
     {
         var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddScoped(_ => new ScopedDependency());
         builder.AddMonica(monica =>
         {
             monica.ConfigureTypeDiscovery(options => options
@@ -35,36 +35,28 @@ public sealed class MediatorHandlerActivationTests
                 monica.AddDependencyInjection();
                 monica.AddMediator();
             }
-
-            monica.AddObjectMapping();
         });
         using var host = builder.Build();
         using var scope = host.Services.CreateScope();
 
         var response = await scope.ServiceProvider
             .GetRequiredService<IMediator>()
-            .Send(new MappingRequest("mapped"), TestContext.Current.CancellationToken);
+            .Send(new ScopedDependencyRequest(), TestContext.Current.CancellationToken);
 
-        response.Should().Be("mapped");
+        response.Should().BeSameAs(scope.ServiceProvider.GetRequiredService<ScopedDependency>());
     }
 
-    private sealed record MappingRequest(string Value) : IRequest<string>;
+    private sealed record ScopedDependencyRequest : IRequest<ScopedDependency>;
 
-    private sealed class MappingHandler : ApplicationRequestHandler<MappingRequest, string>
+    private sealed class ScopedDependencyHandler : ApplicationRequestHandler<ScopedDependencyRequest, ScopedDependency>
     {
-        public override Task<string> Handle(
-            MappingRequest request,
+        public override Task<ScopedDependency> Handle(
+            ScopedDependencyRequest request,
             CancellationToken cancellationToken)
         {
-            var destination = Mapper.Map<MappingDestination>(new MappingSource(request.Value));
-            return Task.FromResult(destination.Value);
+            return Task.FromResult(CachedServiceProvider.GetRequiredService<ScopedDependency>());
         }
     }
 
-    private sealed record MappingSource(string Value);
-
-    private sealed class MappingDestination
-    {
-        public string Value { get; init; } = string.Empty;
-    }
+    private sealed class ScopedDependency;
 }

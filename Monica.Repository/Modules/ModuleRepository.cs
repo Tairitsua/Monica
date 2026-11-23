@@ -72,7 +72,6 @@ public class ModuleRepository : MonicaModule<ModuleRepositoryOption>
 
     public override void Describe(ModuleDescriptor module)
     {
-        module.Require<ModuleObjectMapping>();
         module.Require<ModuleClock>();
         module.Require<ModuleExecutionPipeline, ModuleExecutionPipelineOption>(pipeline =>
             pipeline.AddBehavior(typeof(InboxExecutionBehavior<,>), ExecutionBehaviorOrder.UnitOfWork + 100,
