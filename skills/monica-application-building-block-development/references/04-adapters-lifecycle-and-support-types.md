@@ -9,9 +9,10 @@ These choices supplement the [building block catalog](00-building-block-overview
 This adapter may consume the same concrete repository's `IEfEntityStore` view because the native CRUD contract requires EF access. The [repository rules](13-repository-and-persistence-template.md) bound this exception: ordinary handlers, jobs, and domain services still inject `IRepository{Aggregate}`. Do not widen the business interface or add a forwarding repository layer.
 
 Place the concrete service at `Roles.{Domain}/CrudServices/CrudService{Resource}.cs`. Explicit HTTP controllers live under `Controllers/`.
-Place shared conversions at `Domains.{Domain}/Mappers/Mapper{Subject}.cs`. Prefer a static method per operation, such as
-`ToDetail`, `ProjectRows`, `Create`, or `ApplyUpdate`. Use Mapperly for repetitive copies and provider-translatable projections.
-Write custom pure conversions in C# alongside the generated methods. Keep I/O, authorization and transactions with the service.
+Place shared conversions at `Domains.{Domain}/Mappers/Mapper{Subject}.cs`. Expose a named static method for each operation a caller uses.
+For example, `ToDetail` maps a materialized entity and `ProjectRows` projects an `IQueryable` for database execution. Add `Create` or `ApplyUpdate` when a write path uses that conversion.
+Use a Mapperly `partial` method for a complete structural copy or a provider-translatable projection. When an in-memory conversion selects a deliberate subset, write a C# initializer that names the fields it copies. Keep pure business conversions beside the generated methods.
+Share common Mapperly settings through assembly defaults. Keep exceptions for null assignment, cloning and service-owned write fields explicit where they apply. I/O, authorization and transactions belong in the service.
 See [typed CRUD services](../../monica-infra-web/references/endpoints-and-execution.md#typed-crud-services) for the action and projection contracts and [transactions](../../monica-infra-persistence/references/transactions.md) for execution.
 
 ## Startup Seeder
