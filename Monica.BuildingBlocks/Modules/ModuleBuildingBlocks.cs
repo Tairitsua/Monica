@@ -226,7 +226,7 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
     }
 
     /// <summary>
-    /// Uses the optional AutoControllers edge as the single source of truth for the derived CRUD service suffix.
+    /// Uses the optional AutoControllers edge as the single source of truth for the derived CRUD service prefix.
     /// An explicit Building Blocks convention remains authoritative.
     /// </summary>
     private BuildingBlockNamingOptions CreateEffectiveNamingOptions(IModuleOptionReader modules)
@@ -242,11 +242,11 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
         if (!effective.Rules.ContainsKey(BuildingBlockKind.CrudApplicationService)
             && modules.TryGet<ModuleAutoControllers, ModuleAutoControllersOption>(out var autoControllersOptions)
             && autoControllersOptions is { } configuredAutoControllers
-            && !string.IsNullOrEmpty(configuredAutoControllers.Crud.CrudControllerPostfix))
+            && !string.IsNullOrEmpty(configuredAutoControllers.Crud.ServiceNamePrefix))
         {
             effective.Rules[BuildingBlockKind.CrudApplicationService] = new BuildingBlockNamingRule
             {
-                Suffix = configuredAutoControllers.Crud.CrudControllerPostfix
+                Prefix = configuredAutoControllers.Crud.ServiceNamePrefix
             };
         }
 

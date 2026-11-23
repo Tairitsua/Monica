@@ -12,6 +12,7 @@ using Monica.Core.Execution;
 using Monica.Core.Results;
 using Monica.ModelQuery.Abstractions;
 using Monica.ModelQuery.Models;
+using Monica.ModelQuery.Exceptions;
 using Monica.Repository.Entity.Abstractions;
 using Monica.Repository.Entity.Abstractions.Auditing;
 using Monica.Repository.Persistence.Abstractions;
@@ -36,7 +37,7 @@ namespace Monica.WebApi.AutoControllers.Services;
 /// <param name="repository">The scoped EF store that owns entity visibility and persistence.</param>
 /// <remarks>
 /// Register AutoControllers, the scoped repository, and the execution transaction pipeline for write actions.
-/// The configured <see cref="CrudControllerOption.CrudControllerPostfix"/> is stripped from the conventional route name.
+/// The configured <see cref="CrudControllerOption.ServiceNamePrefix"/> is stripped from the conventional route name.
 /// </remarks>
 public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntityStore<TEntity, TKey> repository)
     : ApplicationService, ICrudApplicationService
@@ -84,11 +85,11 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
         var ct = QueryCancellationToken;
         ct.ThrowIfCancellationRequested();
         var selection = (input as IFieldSelectionRequest)?.GetFieldSelection();
-        if (selection is not null) ModelQuery.ResolveFields(selection);
+        IReadOnlyList<QueryField> fields = selection is null ? [] : ModelQuery.ResolveFields(selection);
         var filtered = await CreateFilteredQueryAsync(input);
         if (selection is not null)
         {
-            return Result.Success(await ReadValidatedFieldPageAsync(input, filtered, selection, ct));
+            return Result.Success(await ReadValidatedFieldPageAsync(input, filtered, selection, fields, ct));
         }
 
         var page = await ReadPageAsync(input, filtered, ct);
@@ -165,12 +166,12 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
         FieldSelection selection, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        ModelQuery.ResolveFields(selection);
-        return await ReadValidatedFieldPageAsync(input, filtered, selection, ct);
+        var fields = ModelQuery.ResolveFields(selection);
+        return await ReadValidatedFieldPageAsync(input, filtered, selection, fields, ct);
     }
 
     private async Task<Page<object>> ReadValidatedFieldPageAsync(TQuery input, IQueryable<TEntity> filtered,
-        FieldSelection selection, CancellationToken ct)
+        FieldSelection selection, IReadOnlyList<QueryField> fields, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         ApplyHostPagingDefaults(input);
@@ -182,11 +183,19 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
             if (total == 0) return new Page<object>(0, []);
         }
 
-        var query = ModelQuery.SelectFields(ApplySorting(filtered, input, selection), selection);
+        IQueryable query;
         if (distinct)
         {
-            query = query.Distinct();
-            total = await query.CountAsync(ct);
+            if (input is IHasRequestKeysetPage cursor && cursor.HasUsingKeyset())
+                throw new ModelQueryNormalizationException("Distinct field pages use offset pagination.");
+
+            var tuples = ModelQuery.SelectFields(filtered, selection).Distinct();
+            query = OrderDistinctFields(tuples, input, fields);
+            total = await tuples.CountAsync(ct);
+        }
+        else
+        {
+            query = ModelQuery.SelectFields(ApplySorting(filtered, input, selection), selection);
         }
 
         var (offset, limit, _, _) = GetPagingWindow(input);
@@ -195,6 +204,33 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
 
         var rows = await query.ToDynamicListAsync(ct);
         return new Page<object>(total ?? rows.Count, rows);
+    }
+
+    private static IQueryable OrderDistinctFields(IQueryable tuples, TQuery input, IReadOnlyList<QueryField> fields)
+    {
+        var order = new List<string>();
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (input is IHasRequestSorting { Sorting: { } sorting })
+        {
+            foreach (var segment in sorting.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = segment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var field = fields.FirstOrDefault(candidate =>
+                    candidate.ReflectionName.Equals(parts[0], StringComparison.OrdinalIgnoreCase)
+                    || candidate.QueryNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase)
+                    || string.Equals(string.Join('.', (candidate.NavigationProperties?.Select(p => p.PropertyName) ?? [])
+                        .Append(candidate.ReflectionName)), parts[0], StringComparison.OrdinalIgnoreCase));
+                var direction = parts.Length == 1 ? "asc" : parts[1].ToLowerInvariant();
+                if (field is null || parts.Length > 2 || direction is not ("asc" or "ascending" or "desc" or "descending"))
+                    throw new ModelQueryNormalizationException($"Distinct sorting must name a selected field with an optional direction: {segment}.");
+
+                if (used.Add(field.ReflectionName)) order.Add($"{field.ReflectionName} {direction}");
+            }
+        }
+
+        // The complete tuple is unique. Its remaining members break ties before offset paging.
+        order.AddRange(fields.Select(field => field.ReflectionName).Where(used.Add));
+        return tuples.OrderBy(string.Join(", ", order));
     }
 
     private async Task<Page<TItem>> ReadProjectedPageAsync<TItem>(TQuery input, IQueryable<TEntity> filtered,
@@ -380,21 +416,21 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
     protected virtual IQueryable<TEntity> ApplySorting(IQueryable<TEntity> query, TQuery input,
         FieldSelection? selection = null)
     {
+        var keyset = input as IHasRequestKeysetPage;
+        var hasCursor = keyset?.HasUsingKeyset() == true;
         if (input is IHasRequestSorting { Sorting: { } sorting } && !string.IsNullOrWhiteSpace(sorting))
         {
             query = ApplyRequestedSorting(query, sorting);
-            return ShouldApplyStablePaginationSorting(input) ? ApplyStablePaginationSorting(query, sorting) : query;
+            if (ShouldApplyStablePaginationSorting(input)) query = ApplyStablePaginationSorting(query, sorting);
         }
-
-        // Sharding providers may sort after projection, where the entity's ordering fields are absent.
-        if (selection is not null && Repository.IsShardingTable) return query;
-
-        if (input is IHasRequestKeysetPage request && request.HasUsingKeyset())
+        else if (input is IHasRequestLimitedResult)
         {
-            query = FilterByKeyset(query, request.Cursor!);
+            // Sharded field reads can sort after projection, where unselected ordering fields are absent.
+            if (selection is not null && Repository.IsShardingTable && !hasCursor) return query;
+            query = ApplyDefaultSorting(query);
         }
 
-        return input is IHasRequestLimitedResult ? ApplyDefaultSorting(query) : query;
+        return hasCursor ? FilterByKeyset(query, keyset!.Cursor!) : query;
     }
 
     /// <summary>Applies explicit client ordering as the query's primary order.</summary>
@@ -407,10 +443,9 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
             ? query
             : ordered.ThenBy(entity => entity.Id);
 
-    /// <summary>Determines whether the input uses offset-style pagination requiring a stable ordering.</summary>
+    /// <summary>Determines whether a bounded page requires a stable ordering.</summary>
     protected virtual bool ShouldApplyStablePaginationSorting(TQuery input)
-        => input is IHasRequestLimitedResult and not IHasRequestPage { DisablePage: true }
-            && (input is not IHasRequestKeysetPage request || !request.HasUsingKeyset());
+        => input is IHasRequestLimitedResult and not IHasRequestPage { DisablePage: true };
 
     /// <summary>Determines whether the explicit ordering contains the entity key.</summary>
     protected virtual bool ContainsEntityIdSorting(string sorting)
@@ -442,23 +477,47 @@ public abstract class CrudService<TEntity, TKey, TDetail, TRow, TQuery>(IEfEntit
             : query.OrderByDescending(entity => entity.Id);
     }
 
-    /// <summary>Applies the existing descending key comparison for cursor continuation.</summary>
+    /// <summary>Continues the effective ordering after the entity key supplied by the previous page.</summary>
     protected virtual IQueryable<TEntity> FilterByKeyset(IQueryable<TEntity> query, string cursor)
     {
-        if (string.IsNullOrEmpty(cursor)) return query;
+        if (string.IsNullOrWhiteSpace(cursor)) return query;
+        TKey keyValue;
+        try
+        {
+            keyValue = typeof(TKey) == typeof(Guid)
+                ? (TKey)(object)Guid.Parse(cursor)
+                : (TKey)Convert.ChangeType(cursor, typeof(TKey), System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException)
+        {
+            throw new ModelQueryNormalizationException($"Invalid cursor for the {typeof(TKey).Name} resource key.");
+        }
 
-        var parameter = Expression.Parameter(typeof(TEntity), "entity");
-        var key = Expression.PropertyOrField(parameter, nameof(IEntity<TKey>.Id));
-        var cursorValue = typeof(TKey) == typeof(Guid)
-            ? (TKey)(object)Guid.Parse(cursor)
-            : (TKey)Convert.ChangeType(cursor, typeof(TKey));
-        var constant = Expression.Constant(cursorValue, typeof(TKey));
+        if (query.Expression is MethodCallExpression { Arguments.Count: 2 } order
+            && order.Method.DeclaringType == typeof(Queryable)
+            && order.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+            && order.Arguments[1] is UnaryExpression { Operand: LambdaExpression { Body: MemberExpression member } selector }
+            && member.Expression == selector.Parameters[0] && member.Member.Name == nameof(IEntity<TKey>.Id))
+        {
+            Expression left = member;
+            Expression right = Expression.Constant(keyValue, typeof(TKey));
+            if (typeof(TKey) == typeof(Guid) || typeof(TKey) == typeof(string) || typeof(TKey) == typeof(bool))
+            {
+                left = Expression.Call(member, nameof(IComparable<TKey>.CompareTo), Type.EmptyTypes, right);
+                right = Expression.Constant(0);
+            }
 
-        var lessThan = typeof(TKey) == typeof(Guid)
-            ? Expression.LessThan(Expression.Call(key, typeof(Guid).GetMethod(nameof(Guid.CompareTo), [typeof(Guid)])!, constant),
-                Expression.Constant(0))
-            : Expression.LessThan(key, constant);
-        return query.Where(Expression.Lambda<Func<TEntity, bool>>(lessThan, parameter));
+            var predicate = order.Method.Name == nameof(Queryable.OrderBy)
+                ? Expression.GreaterThan(left, right)
+                : Expression.LessThan(left, right);
+            return query.Where(Expression.Lambda<Func<TEntity, bool>>(predicate, selector.Parameters));
+        }
+
+        // A key alone does not encode a composite sort. Let the provider compare each candidate with
+        // the anchor using the exact order, including custom selectors, collation and null placement.
+        return query.Where(row => !row.Id!.Equals(keyValue) &&
+            query.Where(candidate => candidate.Id!.Equals(row.Id) || candidate.Id.Equals(keyValue))
+                .Select(candidate => candidate.Id).First()!.Equals(keyValue));
     }
 
     private static (int? Offset, int? Limit, int? CurrentPage, int? PageSize) GetPagingWindow(TQuery input)

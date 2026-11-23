@@ -51,7 +51,7 @@ public class CrudControllerServiceConvention(
             {
                 continue;
             }
-            controller.ControllerName = controller.ControllerName.RemovePostFix(CrudControllerOption.CrudControllerPostfix);
+            controller.ControllerName = controller.ControllerName.RemovePreFix(CrudControllerOption.ServiceNamePrefix);
 
             ConfigureCrudController(controller, new ConventionalControllerSetting());
         }

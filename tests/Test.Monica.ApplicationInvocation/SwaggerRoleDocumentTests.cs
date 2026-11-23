@@ -54,7 +54,7 @@ public sealed class SwaggerRoleDocumentTests
         Assert.Equal("ordering.invocation", invocation.Info.Title);
 
         var inherited = Descriptions(host).Single(description => description.ActionDescriptor is ControllerActionDescriptor action
-            && action.ControllerTypeInfo.AsType() == typeof(InheritedLedgerCrudService));
+            && action.ControllerTypeInfo.AsType() == typeof(CrudServiceInheritedLedger));
         var inheritedAction = Assert.IsType<ControllerActionDescriptor>(inherited.ActionDescriptor);
         Assert.Equal(typeof(SharedCrudServiceBase), inheritedAction.MethodInfo.DeclaringType);
         Assert.NotEqual(inheritedAction.ControllerTypeInfo.Assembly, inheritedAction.MethodInfo.DeclaringType!.Assembly);

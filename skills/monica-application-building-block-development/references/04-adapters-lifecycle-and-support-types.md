@@ -8,7 +8,11 @@ These choices supplement the [building block catalog](00-building-block-overview
 
 This adapter may consume the same concrete repository's `IEfEntityStore` view because the native CRUD contract requires EF access. The [repository rules](13-repository-and-persistence-template.md) bound this exception: ordinary handlers, jobs, and domain services still inject `IRepository{Aggregate}`. Do not widen the business interface or add a forwarding repository layer.
 
-Use the project's adopted CRUD naming convention. `CrudControllerOption.CrudControllerPostfix` defaults to `CrudService` and is stripped to derive the route name. Registration follows `ICrudApplicationService` and host type discovery. See [typed CRUD services](../../monica-infra-web/references/endpoints-and-execution.md#typed-crud-services) for the action and projection contracts and [transactions](../../monica-infra-persistence/references/transactions.md) for execution.
+Place the concrete service at `Roles.{Domain}/CrudServices/CrudService{Resource}.cs`. Explicit HTTP controllers live under `Controllers/`.
+Place shared conversions at `Domains.{Domain}/Mappers/Mapper{Subject}.cs`. Prefer a static method per operation, such as
+`ToDetail`, `ProjectRows`, `Create`, or `ApplyUpdate`. Use Mapperly for repetitive copies and provider-translatable projections.
+Write custom pure conversions in C# alongside the generated methods. Keep I/O, authorization and transactions with the service.
+See [typed CRUD services](../../monica-infra-web/references/endpoints-and-execution.md#typed-crud-services) for the action and projection contracts and [transactions](../../monica-infra-persistence/references/transactions.md) for execution.
 
 ## Startup Seeder
 

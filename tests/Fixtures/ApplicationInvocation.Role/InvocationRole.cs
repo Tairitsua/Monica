@@ -31,12 +31,12 @@ public sealed class InvocationLedger : ISingletonDependency
     public void RecordConstrained() => Interlocked.Increment(ref _constrained);
 }
 
-public sealed class LedgerCrudService : ICrudApplicationService
+public sealed class CrudServiceLedger : ICrudApplicationService
 {
     public Result<int> Get() => Result.Success(43);
 }
 
-public sealed class InheritedLedgerCrudService : SharedCrudServiceBase, ICrudApplicationService;
+public sealed class CrudServiceInheritedLedger : SharedCrudServiceBase, ICrudApplicationService;
 
 [ApiController, Route("role-owned/manual")]
 public sealed class RoleOwnedController : ControllerBase

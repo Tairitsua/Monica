@@ -233,6 +233,68 @@ public sealed class ModelQueryCrudIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, conflicting.StatusCode);
     }
 
+    [Theory]
+    [InlineData("Id desc", 4, 3, 2, 1)]
+    [InlineData("Id asc", 1, 2, 3, 4)]
+    [InlineData("Region desc, Number asc", 1, 3, 2, 4)]
+    public async Task Cursor_ShouldContinueTheEffectiveOrder(string sorting, params int[] expected)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await new ModelQueryCrudFactory().CreateAsync(cancellationToken: ct);
+        await host.SeedAsync<ModelQueryCrudContext, int>(async (db, token) =>
+        {
+            db.Rows.AddRange(
+                new ModelQueryCrudRow { Id = 1, Region = "B", Number = "M" },
+                new ModelQueryCrudRow { Id = 2, Region = "A", Number = "Z" },
+                new ModelQueryCrudRow { Id = 3, Region = "B", Number = "M" },
+                new ModelQueryCrudRow { Id = 4, Region = "A", Number = "Z" });
+            return await db.SaveChangesAsync(token);
+        }, ct);
+        using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
+        var url = "/model-query-crud/records?MaxResultCount=2&Sorting=" + Uri.EscapeDataString(sorting);
+        var cursor = "";
+        var ids = new List<int>();
+        for (var page = 0; page < 3; page++)
+        {
+            using var response = await client.GetAsync(url + cursor, ct);
+            response.EnsureSuccessStatusCode();
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            var data = json.RootElement.GetProperty("data");
+            ids.AddRange(data.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetInt32()));
+            if (page < 2) cursor = "&Cursor=" + data.GetProperty("cursor").GetString();
+        }
+        Assert.Equal(expected, ids);
+    }
+
+    [Fact]
+    public async Task DistinctPages_ShouldSortTheSelectedTupleBeforeApplyingTheOffset()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await new ModelQueryCrudFactory().CreateAsync(cancellationToken: ct);
+        await host.SeedAsync<ModelQueryCrudContext, int>(async (db, token) =>
+        {
+            db.Rows.AddRange(
+                new ModelQueryCrudRow { Id = 1, Number = "B" },
+                new ModelQueryCrudRow { Id = 2, Number = "A" },
+                new ModelQueryCrudRow { Id = 3, Number = "C" },
+                new ModelQueryCrudRow { Id = 4, Number = "B" });
+            return await db.SaveChangesAsync(token);
+        }, ct);
+        using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
+        const string url = "/model-query-crud/records?IncludeFields=code&Features=Distinct&MaxResultCount=1&Sorting=";
+        foreach (var (page, number) in new[] { (1, "C"), (2, "B"), (3, "A") })
+        {
+            using var response = await client.GetAsync($"{url}code%20desc&Page={page}", ct);
+            response.EnsureSuccessStatusCode();
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            var data = json.RootElement.GetProperty("data");
+            Assert.Equal(3, data.GetProperty("totalCount").GetInt32());
+            Assert.Equal(number, Assert.Single(data.GetProperty("items").EnumerateArray()).GetProperty("number").GetString());
+        }
+        using var invalid = await client.GetAsync(url + "Region", ct);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
     [Fact]
     public async Task GetList_WhenSortingTiedRows_ShouldPreservePagingAndEnrichOnce()
     {
@@ -347,7 +409,7 @@ public sealed class ModelQueryCrudIntegrationTests
         await using var host = await new ModelQueryCrudFactory(payloadName: "payload").CreateAsync(cancellationToken: ct);
         var actions = host.Services.GetRequiredService<IActionDescriptorCollectionProvider>().ActionDescriptors.Items
             .OfType<ControllerActionDescriptor>();
-        var catalog = actions.Where(action => action.ControllerTypeInfo.AsType() == typeof(CatalogFixtureCrudService)).ToArray();
+        var catalog = actions.Where(action => action.ControllerTypeInfo.AsType() == typeof(CrudServiceCatalogFixture)).ToArray();
         var routes = catalog.Select(action => (
             action.MethodInfo.Name,
             Assert.Single(Assert.Single(action.ActionConstraints!.OfType<HttpMethodActionConstraint>()).HttpMethods),
@@ -364,7 +426,7 @@ public sealed class ModelQueryCrudIntegrationTests
             ("ListStreamAsync", "POST", "api/catalog-fixture/list-stream"),
             ("UpdateAsync", "PUT", "api/catalog-fixture/{id}")
         }, routes);
-        Assert.Equal(4, actions.Count(action => action.ControllerTypeInfo.AsType() == typeof(UuidCursorFixtureCrudService)));
+        Assert.Equal(4, actions.Count(action => action.ControllerTypeInfo.AsType() == typeof(CrudServiceUuidCursorFixture)));
 
         var descriptions = host.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
             .ApiDescriptionGroups.Items.SelectMany(group => group.Items);
@@ -414,7 +476,7 @@ public sealed class ModelQueryCrudIntegrationTests
         }, ct);
         await using var scope = host.CreateScope(ct);
         var input = new CrudPageRequestDto { IncludeFields = ["code"], MaxResultCount = 1, Page = 2 };
-        var page = await scope.Resolve<CatalogFixtureCrudService>().ReadExportPageAsync(input, ct);
+        var page = await scope.Resolve<CrudServiceCatalogFixture>().ReadExportPageAsync(input, ct);
 
         Assert.Equal("A", Assert.Single(page.Items).Number);
         Assert.Equal("code", Assert.Single(input.IncludeFields));
@@ -536,7 +598,7 @@ public sealed class ModelQueryCrudRepository(ModelQueryCrudContext context)
     : EfRepository<ModelQueryCrudContext, ModelQueryCrudRow, int>(context);
 
 [Route("model-query-crud")]
-public sealed class ModelQueryFixtureCrudService(ModelQueryCrudRepository repository)
+public sealed class CrudServiceModelQueryFixture(ModelQueryCrudRepository repository)
     : CrudService<ModelQueryCrudRow, int, ModelQueryCrudDetail, ModelQueryCrudDto, CrudPageRequestDto>(repository)
 {
     protected override Task<ModelQueryCrudDetail> ToDetailAsync(ModelQueryCrudRow entity, CancellationToken ct)
@@ -574,7 +636,7 @@ public sealed class UuidCursorRepository(ModelQueryCrudContext context)
     : EfRepository<ModelQueryCrudContext, UuidCursorRow, Guid>(context);
 
 [Route("uuid-cursor")]
-public sealed class UuidCursorFixtureCrudService(UuidCursorRepository repository)
+public sealed class CrudServiceUuidCursorFixture(UuidCursorRepository repository)
     : CrudService<UuidCursorRow, Guid, UuidCursorDto, UuidCursorDto, CrudPageRequestDto>(repository)
 {
     protected override Task<UuidCursorDto> ToDetailAsync(UuidCursorRow entity, CancellationToken ct)
@@ -591,7 +653,7 @@ public sealed record CatalogCreateInput(string Number, string Region, string Car
 public sealed record CatalogUpdateInput(string Number);
 public sealed record CatalogExportRow(string Number);
 
-public sealed class CatalogFixtureCrudService(ModelQueryCrudRepository repository)
+public sealed class CrudServiceCatalogFixture(ModelQueryCrudRepository repository)
     : CrudService<ModelQueryCrudRow, int, ModelQueryCrudDetail, ModelQueryCrudDto, CrudPageRequestDto>(repository)
 {
     protected override Task<ModelQueryCrudDetail> ToDetailAsync(ModelQueryCrudRow entity, CancellationToken ct)

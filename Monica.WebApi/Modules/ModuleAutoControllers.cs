@@ -95,19 +95,19 @@ public class ModuleAutoControllers : MonicaModule<ModuleAutoControllersOption>, 
                 foreach (var match in matches)
                 {
                     if (!_applicationPartCatalog.Add(match.Type)
-                        || CrudControllerSuffixMismatch.Create(
+                        || CrudControllerPrefixMismatch.Create(
                             match.Type,
-                            Option.Crud.CrudControllerPostfix) is not { } mismatch)
+                            Option.Crud.ServiceNamePrefix) is not { } mismatch)
                     {
                         continue;
                     }
 
                     Logger.LogWarning(
-                        "CRUD controller {ControllerName} ({ControllerType}) does not end with configured route suffix {RequiredSuffix}; its route name will not be stripped. Diagnostic source: {DiagnosticSource}.",
+                        "CRUD controller {ControllerName} ({ControllerType}) uses the full service name because the configured CLR prefix {RequiredPrefix} is missing. Diagnostic source: {DiagnosticSource}.",
                         mismatch.ControllerName,
                         mismatch.ControllerType,
-                        mismatch.RequiredSuffix,
-                        CrudControllerSuffixMismatch.SOURCE);
+                        mismatch.RequiredPrefix,
+                        CrudControllerPrefixMismatch.SOURCE);
                 }
             });
     }
