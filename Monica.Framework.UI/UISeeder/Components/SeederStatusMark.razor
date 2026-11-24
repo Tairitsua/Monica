@@ -1,0 +1,25 @@
+<span class="seeder-status-mark @(Pill ? "is-pill" : null) @(Zero ? "is-zero" : null)"
+      data-tone="@Tone" style="--seeder-tone:@SeederDisplay.ToneColor(Tone)">
+    <i aria-hidden="true"></i>
+    @Text
+    @if (Count is { } count)
+    {
+        <b>@count</b>
+    }
+</span>
+
+@code {
+    /// <summary>Gets the localized status text.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>Gets the visual tone assigned by the seeder status mapping.</summary>
+    [Parameter] public string Tone { get; set; } = "neutral";
+
+    /// <summary>Gets an optional observed total displayed alongside the status.</summary>
+    [Parameter] public int? Count { get; set; }
+
+    /// <summary>Gets whether the mark uses a soft capsule background.</summary>
+    [Parameter] public bool Pill { get; set; }
+
+    private bool Zero => Count == 0;
+}

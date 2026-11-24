@@ -1,0 +1,28 @@
+.seeder-copy-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 3px 8px;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 99px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.seeder-copy-button.is-icon {
+    padding: 3px;
+    border-color: transparent;
+    background: transparent;
+}
+.seeder-copy-button:hover {
+    border-color: var(--mud-palette-lines-inputs);
+    color: var(--mud-palette-text-primary);
+}
+.seeder-copy-button:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}

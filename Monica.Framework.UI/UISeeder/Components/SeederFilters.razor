@@ -1,67 +1,57 @@
+@using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<SeederResource> L
+@inject NavigationManager Navigation
 
-<div class="seeder-filters" role="group" aria-label="@L["Filters:AriaLabel"]">
-    <div class="seeder-filter-fields">
-        <div class="seeder-filter-field seeder-filter-field--search">
-            <MudTextField ClearIcon="@MoIcons.Close" T="string"
-                          Value="@Session.SearchText"
-                          ValueChanged="@Session.SetSearchTextAsync"
-                          Label="@L["Filters:SearchLabel"]"
-                          Placeholder="@L["Filters:SearchPlaceholder"]"
-                          Immediate="true"
-                          Clearable="true"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@MoIcons.Search" />
+@{
+    var facets = Session.StatusFacetSeeders;
+    var counts = facets.CountBy(seeder => seeder.Status).ToDictionary();
+    var filtered = Session.SearchText.Length > 0 || Session.StatusFilter is not null ||
+        Session.CriticalityFilter is not null || Session.FailureBehaviorFilter is not null || Session.Sort != SeederLedgerSort.Status;
+}
+
+<div class="seeder-filters" role="search" aria-label="@L["Filters:AriaLabel"]">
+    <div class="seeder-filter-tools">
+        <div class="seeder-filter-search">
+            <MudTextField T="string" Value="@Session.SearchText" ValueChanged="@ChangeSearch"
+                          Placeholder="@L["Filters:SearchPlaceholder"]" aria-label="@L["Filters:SearchLabel"]"
+                          Immediate="true" DebounceInterval="200" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
         </div>
-        <div class="seeder-filter-field">
-            <MudSelect OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" ClearIcon="@MoIcons.Close" T="SeederStatus?"
-                       Value="@Session.StatusFilter"
-                       ValueChanged="@Session.SetStatusFilterAsync"
-                       Label="@L["Filters:StatusLabel"]"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Clearable="true">
-                <MudSelectItem T="SeederStatus?" Value="@(null)">@L["Filters:AnyStatus"]</MudSelectItem>
-                @foreach (var status in Enum.GetValues<SeederStatus>())
-                {
-                    <MudSelectItem T="SeederStatus?" Value="@status">@L.GetText(status)</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
-        <div class="seeder-filter-field">
-            <MudSelect OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" ClearIcon="@MoIcons.Close" T="SeederCriticality?"
-                       Value="@Session.CriticalityFilter"
-                       ValueChanged="@Session.SetCriticalityFilterAsync"
-                       Label="@L["Filters:CriticalityLabel"]"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Clearable="true">
-                <MudSelectItem T="SeederCriticality?" Value="@(null)">@L["Filters:AnyCriticality"]</MudSelectItem>
+        <div class="seeder-filter-selects">
+            <MudSelect T="SeederCriticality?" Value="@Session.CriticalityFilter" ValueChanged="@ChangeCriticality"
+                       Label="@L["Filters:CriticalityLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                <MudSelectItem T="SeederCriticality?" Value="@((SeederCriticality?)null)">@L["Filters:AnyCriticality"]</MudSelectItem>
                 <MudSelectItem T="SeederCriticality?" Value="@SeederCriticality.Required">@L.GetText(SeederCriticality.Required)</MudSelectItem>
                 <MudSelectItem T="SeederCriticality?" Value="@SeederCriticality.Optional">@L.GetText(SeederCriticality.Optional)</MudSelectItem>
             </MudSelect>
-        </div>
-        <div class="seeder-filter-field">
-            <MudSelect OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" ClearIcon="@MoIcons.Close" T="SeederFailureBehavior?"
-                       Value="@Session.FailureBehaviorFilter"
-                       ValueChanged="@Session.SetFailureBehaviorFilterAsync"
-                       Label="@L["Filters:FailureBehaviorLabel"]"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Clearable="true">
-                <MudSelectItem T="SeederFailureBehavior?" Value="@(null)">@L["Filters:AnyFailureBehavior"]</MudSelectItem>
+            <MudSelect T="SeederFailureBehavior?" Value="@Session.FailureBehaviorFilter" ValueChanged="@ChangeFailure"
+                       Label="@L["Filters:FailureBehaviorLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                <MudSelectItem T="SeederFailureBehavior?" Value="@((SeederFailureBehavior?)null)">@L["Filters:AnyFailureBehavior"]</MudSelectItem>
                 <MudSelectItem T="SeederFailureBehavior?" Value="@SeederFailureBehavior.ContinueAndRecord">@L.GetText(SeederFailureBehavior.ContinueAndRecord)</MudSelectItem>
                 <MudSelectItem T="SeederFailureBehavior?" Value="@SeederFailureBehavior.FailFast">@L.GetText(SeederFailureBehavior.FailFast)</MudSelectItem>
             </MudSelect>
+            <MudSelect T="SeederLedgerSort" Value="@Session.Sort" ValueChanged="@ChangeSort"
+                       Label="@L["Filters:SortLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                <MudSelectItem Value="@SeederLedgerSort.Status">@L["Filters:SortByStatus"]</MudSelectItem>
+                <MudSelectItem Value="@SeederLedgerSort.Wave">@L["Filters:SortByWave"]</MudSelectItem>
+                <MudSelectItem Value="@SeederLedgerSort.Duration">@L["Filters:SortByDuration"]</MudSelectItem>
+                <MudSelectItem Value="@SeederLedgerSort.Attempts">@L["Filters:SortByAttempts"]</MudSelectItem>
+                <MudSelectItem Value="@SeederLedgerSort.Name">@L["Filters:SortByName"]</MudSelectItem>
+            </MudSelect>
         </div>
     </div>
-    <div class="seeder-filter-context">
-        <span class="seeder-filter-results" aria-live="polite">@L.FormatSeederFilterResults(Session.FilteredSeeders.Count, Session.Snapshot?.Run.TotalCount ?? 0)</span>
-        @if (HasFilters)
+    <div class="seeder-filter-statuses" role="group" aria-label="@L["Filters:StatusLabel"]">
+        <MoFilterChip Label="@L["Filters:AnyStatus"]" Count="@facets.Count"
+                      Pill="true" Selected="@(Session.StatusFilter is null)" SelectedChanged="@(_ => ChangeStatus(null))" />
+        @foreach (var status in Statuses)
         {
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@Session.ClearFiltersAsync">@L["Actions:ClearFilters"]</MudButton>
+            <MoFilterChip Label="@L.GetText(status)" Count="@counts.GetValueOrDefault(status)"
+                          Pill="true" ShowDot="true" Role="@SeederDisplay.FilterRole(status)"
+                          Selected="@(Session.StatusFilter == status)" SelectedChanged="@(selected => ChangeStatus(selected ? status : null))" />
+        }
+        @if (filtered)
+        {
+            <button type="button" class="seeder-clear-filters" @onclick="Clear">@L["Actions:ClearFilters"]</button>
         }
     </div>
 </div>
@@ -69,8 +59,27 @@
 @code {
     [Parameter, EditorRequired] public SeederPageSession Session { get; set; } = default!;
 
-    private bool HasFilters => !string.IsNullOrWhiteSpace(Session.SearchText)
-        || Session.StatusFilter.HasValue
-        || Session.CriticalityFilter.HasValue
-        || Session.FailureBehaviorFilter.HasValue;
+    private static readonly SeederStatus[] Statuses =
+    [
+        SeederStatus.Failed, SeederStatus.Blocked, SeederStatus.Running, SeederStatus.Pending,
+        SeederStatus.Succeeded, SeederStatus.Cancelled, SeederStatus.Held, SeederStatus.Disabled
+    ];
+
+    private void ChangeSearch(string? value) => Navigate("q", string.IsNullOrWhiteSpace(value) ? null : value, replace: true);
+    private void ChangeStatus(SeederStatus? value) => Navigate("status", value?.ToString().ToLowerInvariant());
+    private void ChangeCriticality(SeederCriticality? value) => Navigate("criticality", value?.ToString().ToLowerInvariant());
+    private void ChangeFailure(SeederFailureBehavior? value) => Navigate("failure", value?.ToString().ToLowerInvariant());
+    private void ChangeSort(SeederLedgerSort value) => Navigate("sort", value == SeederLedgerSort.Status ? null : value.ToString().ToLowerInvariant());
+
+    private void Navigate(string name, string? value, bool replace = false) => Navigation.NavigateTo(
+        Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { [name] = value }), replace: replace);
+
+    private void Clear() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+    {
+        ["q"] = null,
+        ["status"] = null,
+        ["criticality"] = null,
+        ["failure"] = null,
+        ["sort"] = null
+    }));
 }

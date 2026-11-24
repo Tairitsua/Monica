@@ -1,0 +1,396 @@
+.seeder-waterfall {
+    padding: 14px clamp(16px, 2vw, 28px) 16px;
+    container: seeder-waterfall / inline-size;
+}
+.seeder-waterfall-heading h2 {
+    margin: 0;
+    color: var(--mud-palette-text-primary);
+    font-size: 1rem;
+    font-weight: 650;
+}
+.seeder-waterfall-heading p {
+    max-width: 40rem;
+    margin: 4px 0 10px;
+    color: var(--mud-palette-text-secondary);
+    font-size: .8125rem;
+    line-height: 1.5;
+}
+.seeder-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+.seeder-chart {
+    --seeder-identity-width: 31%;
+    --seeder-outcome-width: 16%;
+    margin-top: 8px;
+}
+.seeder-axis,
+.seeder-lane {
+    display: grid;
+    grid-template-columns: minmax(0, var(--seeder-identity-width)) minmax(0, 1fr) minmax(0, var(--seeder-outcome-width));
+}
+.seeder-axis {
+    align-items: end;
+    height: 34px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+    color: var(--mud-palette-text-secondary);
+    font-size: .6875rem;
+}
+.seeder-axis > span {
+    padding-bottom: 4px;
+}
+.seeder-axis > span:first-child {
+    padding-inline-start: 28px;
+}
+.seeder-axis > span:last-child {
+    text-align: end;
+}
+.seeder-axis-track {
+    position: relative;
+    block-size: 100%;
+}
+.seeder-axis-tick,
+.seeder-axis-end,
+.seeder-axis-exclusive {
+    position: absolute;
+    white-space: nowrap;
+}
+.seeder-axis-tick {
+    bottom: 3px;
+    transform: translateX(-50%);
+    font-family: var(--mo-font-family-mono);
+}
+.seeder-axis-tick.is-start {
+    transform: none;
+}
+.seeder-axis-end,
+.seeder-axis-exclusive {
+    top: 0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+.seeder-axis-end {
+    transform: translateX(-100%);
+    background: var(--mud-palette-text-primary);
+    color: var(--mud-palette-surface);
+    font-family: var(--mo-font-family-mono);
+}
+.seeder-axis-end.is-early {
+    transform: none;
+}
+.seeder-axis-end.is-abort {
+    background: color-mix(in srgb, var(--mud-palette-error) 14%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mud-palette-error) 75%, var(--mud-palette-text-primary));
+}
+.seeder-axis-end.is-live {
+    background: color-mix(in srgb, var(--mud-palette-info) 14%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mud-palette-info) 75%, var(--mud-palette-text-primary));
+}
+.seeder-axis-end.is-stale {
+    background: color-mix(in srgb, var(--mud-palette-warning) 14%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mud-palette-warning) 75%, var(--mud-palette-text-primary));
+}
+.seeder-axis-exclusive {
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--mo-color-role-third) 17%, var(--mud-palette-surface));
+    color: var(--mud-palette-text-primary);
+}
+.seeder-batch-lanes {
+    position: relative;
+}
+.seeder-threads,
+.seeder-plot-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+.seeder-threads {
+    z-index: 1;
+    left: 0;
+    width: 28px;
+    height: 100%;
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+.seeder-threads .is-blocked {
+    stroke-dasharray: 3 2;
+}
+.seeder-plot-overlay {
+    left: var(--seeder-identity-width);
+    right: var(--seeder-outcome-width);
+}
+.seeder-grid-line,
+.seeder-exclusive-band,
+.seeder-end-line,
+.seeder-lane-grid-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+}
+.seeder-grid-line,
+.seeder-lane-grid-line {
+    border-left: 1px dashed var(--mud-palette-divider);
+}
+.seeder-exclusive-band {
+    border-inline: 1px solid color-mix(in srgb, var(--mo-color-role-third) 26%, var(--mud-palette-surface));
+    background: color-mix(in srgb, var(--mo-color-role-third) 8%, transparent);
+}
+.seeder-end-line {
+    border-left: 1px dashed var(--mud-palette-lines-inputs);
+}
+.seeder-end-line.is-abort {
+    border-color: var(--mud-palette-error);
+}
+.seeder-lane {
+    position: relative;
+    align-items: center;
+    width: 100%;
+    height: var(--seeder-lane-height);
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--mud-palette-divider);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.seeder-lane:hover,
+.seeder-lane[data-trace="self"] {
+    background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
+    box-shadow: inset 2px 0 var(--mud-palette-primary);
+}
+.seeder-lane[data-trace="upstream"] {
+    background: color-mix(in srgb, var(--mud-palette-info) 6%, transparent);
+}
+.seeder-lane[data-trace="downstream"] {
+    background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
+}
+.seeder-lane:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -2px;
+}
+.seeder-lane-label,
+.seeder-lane-context,
+.seeder-lane-tag,
+.seeder-lane-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.seeder-lane-label {
+    padding-inline-start: 28px;
+    padding-inline-end: 8px;
+    gap: 8px;
+}
+.seeder-wave {
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mud-palette-text-secondary) 10%, var(--mud-palette-surface));
+    color: var(--mud-palette-text-secondary);
+    font: 600 .625rem var(--mo-font-family-mono);
+}
+.seeder-lane-identity {
+    display: grid;
+    min-width: 0;
+    font-size: .8125rem;
+    line-height: 1.3;
+}
+.seeder-lane-identity strong {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.seeder-lane-identity code {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mud-palette-text-secondary);
+    font: .6875rem var(--mo-font-family-mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.seeder-lane-tag {
+    flex: none;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--seeder-tag, var(--mud-palette-text-secondary)) 12%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--seeder-tag, var(--mud-palette-text-secondary)) 75%, var(--mud-palette-text-primary));
+    font-size: .625rem;
+}
+.seeder-lane-tag[data-tone="third"] {
+    --seeder-tag: var(--mo-color-role-third);
+}
+.seeder-lane-tag[data-tone="downstream"] {
+    --seeder-tag: var(--mud-palette-primary);
+}
+.seeder-lane-tag[data-tone="upstream"] {
+    --seeder-tag: var(--mud-palette-info);
+}
+.seeder-lane-tag[data-tone="error"] {
+    --seeder-tag: var(--mud-palette-error);
+}
+.seeder-lane-track {
+    position: relative;
+    height: 100%;
+    min-width: 0;
+}
+.seeder-lane-grid-line {
+    display: none;
+}
+.seeder-attempt-bar,
+.seeder-retry-gap {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.seeder-attempt-bar {
+    height: 12px;
+    min-width: 2px;
+    border-radius: 3px;
+    background: var(--seeder-attempt-color);
+}
+.seeder-attempt-bar[data-exclusive="true"] {
+    outline: 1px solid var(--mo-color-role-third);
+    outline-offset: 2px;
+}
+.seeder-retry-gap {
+    border-top: 2px dotted var(--mud-palette-text-secondary);
+}
+.seeder-pin {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    color: color-mix(in srgb, var(--seeder-pin-color) 76%, var(--mud-palette-text-primary));
+    font-size: .6875rem;
+}
+.seeder-pin::before {
+    content: "";
+    width: var(--seeder-pin);
+    border-top: 1px dashed color-mix(in srgb, var(--seeder-pin-color) 62%, var(--mud-palette-surface));
+}
+.seeder-pin i {
+    position: absolute;
+    left: var(--seeder-pin);
+    width: 8px;
+    height: 8px;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 1px;
+    background: var(--seeder-pin-color);
+}
+.seeder-pin span {
+    position: absolute;
+    right: calc(100% - max(6px, var(--seeder-pin)) + 9px);
+    max-width: max(0px, calc(var(--seeder-pin) - 10px));
+    padding-inline: 3px;
+    overflow: hidden;
+    background: var(--mud-palette-surface);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.seeder-lane-outcome {
+    display: grid;
+    justify-items: end;
+    gap: 1px;
+    padding-inline-start: 6px;
+    font: .6875rem var(--mo-font-family-mono);
+    text-align: end;
+}
+.seeder-lane-outcome b {
+    font-weight: 600;
+}
+.seeder-lane-status {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    column-gap: 5px;
+    row-gap: 0;
+    color: var(--mud-palette-text-secondary);
+}
+.seeder-lane-status ::deep .seeder-status-mark {
+    font: .6875rem var(--mo-font-family-body);
+}
+.seeder-outside-heading {
+    margin-top: 10px;
+    padding: 5px 8px;
+    border-bottom: 1px dashed var(--mud-palette-divider);
+    color: var(--mud-palette-text-secondary);
+    font-size: .75rem;
+    font-weight: 600;
+}
+.seeder-no-track,
+.seeder-track-waiting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    color: var(--mud-palette-text-secondary);
+    font-size: .6875rem;
+}
+.seeder-no-track i {
+    width: 56px;
+    height: 9px;
+    border: 1px dashed var(--mo-color-role-third);
+    border-radius: 2px;
+}
+.seeder-no-track[data-tone="disabled"] i {
+    border-color: var(--mud-palette-lines-inputs);
+    background: repeating-linear-gradient(135deg, transparent 0 3px, var(--mud-palette-divider) 3px 5px);
+}
+.seeder-chart-readout {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 6px;
+    color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-background);
+    font-size: .75rem;
+    overflow-wrap: anywhere;
+}
+.seeder-chart-readout strong {
+    color: var(--mud-palette-text-primary);
+}
+@container seeder-waterfall (max-width: 760px) {
+    .seeder-threads,
+    .seeder-plot-overlay,
+    .seeder-axis > span {
+        display: none;
+    }
+    .seeder-axis {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .seeder-lane {
+        grid-template-columns: minmax(0, 1fr) minmax(5rem, auto);
+        grid-template-areas: "identity outcome" "track track";
+        height: auto;
+        gap: 5px 6px;
+        padding: 7px 3px;
+    }
+    .seeder-lane-label {
+        grid-area: identity;
+        padding-inline-start: 0;
+        padding-inline-end: 0;
+    }
+    .seeder-lane-outcome {
+        grid-area: outcome;
+        padding-inline-start: 0;
+    }
+    .seeder-lane-track {
+        grid-area: track;
+        height: 21px;
+        border-radius: 4px;
+        background: color-mix(in srgb, var(--mud-palette-background) 65%, var(--mud-palette-surface));
+    }
+    .seeder-lane-grid-line {
+        display: block;
+    }
+}

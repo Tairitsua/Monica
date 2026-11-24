@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Components;
 using Monica.Framework.Seeder.Models;
 using Monica.UI.Icons;
+using Monica.UI.Shared.Components.Visual;
 using MudBlazor;
 
 namespace Monica.Framework.UI.UISeeder.Support;
@@ -9,6 +11,68 @@ namespace Monica.Framework.UI.UISeeder.Support;
 /// </summary>
 public static class SeederDisplay
 {
+    internal static string Tone(SeederStatus status) => status switch
+    {
+        SeederStatus.Succeeded => "success",
+        SeederStatus.Failed => "error",
+        SeederStatus.Blocked => "warning",
+        SeederStatus.Running => "info",
+        SeederStatus.Held => "third",
+        SeederStatus.Disabled => "disabled",
+        _ => "neutral"
+    };
+
+    internal static string Tone(SeederAttemptStatus status) => status switch
+    {
+        SeederAttemptStatus.Succeeded => "success",
+        SeederAttemptStatus.Failed => "error",
+        SeederAttemptStatus.Running => "info",
+        _ => "neutral"
+    };
+
+    internal static string Tone(SeederReadinessStatus status) => status switch
+    {
+        SeederReadinessStatus.Healthy => "success",
+        SeederReadinessStatus.Degraded => "warning",
+        _ => "error"
+    };
+
+    internal static string Tone(SeederRunStatus status) => status switch
+    {
+        SeederRunStatus.Succeeded => "success",
+        SeederRunStatus.CompletedWithFailures or SeederRunStatus.Aborting => "warning",
+        SeederRunStatus.Aborted => "error",
+        SeederRunStatus.Waiting or SeederRunStatus.Running => "info",
+        SeederRunStatus.Held => "third",
+        _ => "neutral"
+    };
+
+    internal static string ToneColor(string tone) => tone switch
+    {
+        "success" => "var(--mud-palette-success)",
+        "error" => "var(--mud-palette-error)",
+        "warning" => "var(--mud-palette-warning)",
+        "info" => "var(--mud-palette-info)",
+        "primary" => "var(--mud-palette-primary)",
+        "third" => "var(--mo-color-role-third)",
+        _ => "var(--mud-palette-text-secondary)"
+    };
+
+    internal static MoVisualRole FilterRole(SeederStatus status) => status switch
+    {
+        SeederStatus.Succeeded => MoVisualRole.Success,
+        SeederStatus.Failed => MoVisualRole.Error,
+        SeederStatus.Blocked => MoVisualRole.Warning,
+        SeederStatus.Running => MoVisualRole.Info,
+        SeederStatus.Held => MoVisualRole.Secondary,
+        _ => MoVisualRole.Neutral
+    };
+
+    internal static string ShortName(string typeName) => typeName[(typeName.LastIndexOf('.') + 1)..];
+
+    internal static string EvidenceUrl(NavigationManager navigation, string? typeName) =>
+        navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["seeder"] = typeName });
+
     /// <summary>Gets the stable DOM identifier for a Seeder's detail trigger.</summary>
     public static string DetailsTriggerId(string seederTypeName)
     {

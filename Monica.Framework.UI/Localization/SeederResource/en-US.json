@@ -5,10 +5,9 @@
   },
   "Page": {
     "Title": "Seeder initialization",
-    "Eyebrow": "APPLICATION INITIALIZATION",
+    "Eyebrow": "Startup seeding",
     "Heading": "Initialization run",
-    "Subtitle": "Inspect this host's initialization progress, effective policies, and execution evidence.",
-    "CurrentHost": "Host · {0}"
+    "TimeZone": "Host time UTC{0}"
   },
   "Access": {
     "Checking": "Checking dashboard access…",
@@ -19,35 +18,48 @@
     "Refresh": "Refresh",
     "Retry": "Try again",
     "Close": "Close",
-    "Details": "Inspect details",
     "DetailsFor": "Inspect {0}",
-    "ClearFilters": "Clear filters"
+    "ClearFilters": "Clear filters",
+    "CopyHost": "Copy host {0}",
+    "CopyType": "Copy full type name",
+    "Copied": "Copied to the clipboard",
+    "CopyFailed": "Copy to the clipboard failed",
+    "Cancel": "Cancel",
+    "BackToSeeder": "Back to {0}",
+    "ClearSelection": "Clear seeder selection"
   },
   "State": {
     "Loading": "Loading Seeder diagnostics",
     "LoadingDescription": "Reading the current host's effective configuration and run ledger.",
     "LoadFailed": "Seeder diagnostics could not be loaded",
-    "RefreshFailed": "The latest refresh failed: {0}. The previous snapshot remains visible."
+    "RefreshFailed": "The latest refresh failed: {0}. The previous snapshot remains visible.",
+    "Stale": "The snapshot is stale",
+    "UnknownSeeder": "Seeder unavailable",
+    "UnknownSeederDescription": "{0} is absent from the current host snapshot."
   },
   "Overview": {
-    "RunLabel": "CURRENT RUN",
     "ProgressSummary": {
       "Singular": "{0} of {1} seeder reached a terminal state",
       "Plural": "{0} of {1} seeders reached a terminal state"
     },
-    "Duration": "Elapsed · {0}",
-    "CapturedAt": "Captured · {0}",
-    "FailFastTrigger": "Fail-fast trigger: {0}",
-    "Readiness": "Seeder readiness · {0}",
-    "TerminalCompletion": "Terminal completion",
+    "Duration": "Elapsed",
+    "CapturedAt": "Snapshot captured",
+    "FailFastTrigger": "{0} exhausted its retries and triggered cancellation of the batch.",
+    "Readiness": "Initialization readiness",
     "ActiveRefresh": "Live · updates every second",
     "CompletedRefresh": "Run ended · refresh manually",
-    "EmptyRun": "No Seeder work in this snapshot"
+    "StaleRefresh": "Stale snapshot",
+    "OfRequired": "/ {0} required",
+    "OfParticipating": "/ {0} participating",
+    "OfDiscovered": "/ {0} discovered",
+    "NotStarted": "Batch has yet to start",
+    "ConfigurationSummary": "Max concurrency {0} · {1}/{2} seeders override defaults",
+    "JumpToDefaults": "View host defaults",
+    "FailFast": "Fail-fast cancellation"
   },
   "Configuration": {
-    "Eyebrow": "EFFECTIVE DEFAULTS",
-    "Title": "Execution defaults",
-    "Subtitle": "Seeder annotations can override individual inherited policies. Inspect their origins in details.",
+    "Title": "Host execution defaults",
+    "Subtitle": "Inherited policy for seeders without an override. Individual sources appear in seeder evidence.",
     "MaxConcurrency": "Max concurrency",
     "ExecutionMode": "Execution mode",
     "Criticality": "Criticality",
@@ -60,14 +72,15 @@
       "Retries": "Retries",
       "Failure": "On failure",
       "Readiness": "Readiness"
-    }
+    },
+    "Overrides": "{0} of {1} seeders override host defaults"
   },
   "Filters": {
     "AriaLabel": "Seeder filters",
     "SearchLabel": "Search",
     "SearchPlaceholder": "Name, dependency, or diagnostic",
     "StatusLabel": "Status",
-    "AnyStatus": "Any status",
+    "AnyStatus": "All statuses",
     "CriticalityLabel": "Criticality",
     "AnyCriticality": "Any criticality",
     "FailureBehaviorLabel": "Failure behavior",
@@ -75,21 +88,22 @@
     "Results": {
       "Singular": "Showing {0} of {1} seeder",
       "Plural": "Showing {0} of {1} seeders"
-    }
+    },
+    "SortLabel": "Sort by",
+    "SortByStatus": "Status and attention",
+    "SortByWave": "Dependency wave",
+    "SortByDuration": "Longest duration",
+    "SortByAttempts": "Most attempts",
+    "SortByName": "Seeder name"
   },
   "Table": {
-    "Eyebrow": "EXECUTION LEDGER",
-    "Title": "Discovered seeders",
-    "Subtitle": "Resolved policies, dependency evidence, attempts, and timing for this process.",
+    "Title": "Execution ledger",
+    "Subtitle": "Compare seeder status, policy, dependencies, and current-process evidence.",
     "Columns": {
       "Name": "Seeder",
       "Status": "Status",
-      "Criticality": "Criticality",
-      "ExecutionMode": "Execution",
-      "FailureBehavior": "On failure",
       "Attempts": "Attempts",
       "Duration": "Duration",
-      "Dependencies": "Dependencies",
       "Actions": "Details",
       "Policy": "Effective policy"
     },
@@ -101,10 +115,13 @@
     "Empty": "No seeders match these filters",
     "EmptyDescription": "Adjust the search or policy filters to inspect another part of the execution ledger.",
     "NoSeeders": "No seeders were discovered",
-    "NoSeedersDescription": "The current host's type-discovery scope did not produce a Seeder graph."
+    "NoSeedersDescription": "The current host's type-discovery scope did not produce a Seeder graph.",
+    "Override": "Override",
+    "NoDependencies": "No direct dependencies",
+    "DependenciesNamed": "{0}: {1}"
   },
   "Details": {
-    "Eyebrow": "SEEDER EVIDENCE",
+    "Eyebrow": "Seeder evidence",
     "AttemptsSummary": {
       "Singular": "{0} recorded attempt · up to {1} per run",
       "Plural": "{0} recorded attempts · up to {1} per run"
@@ -114,17 +131,24 @@
       "ExecutionMode": "Execution mode",
       "Criticality": "Criticality",
       "FailureBehavior": "Failure behavior",
-      "MaxAttempts": "Maximum attempts"
+      "MaxAttempts": "Maximum attempts",
+      "Property": "Policy",
+      "HostDefault": "Host default",
+      "Effective": "Effective",
+      "Source": "Source"
     },
     "Timing": {
-      "Title": "Timing",
+      "Title": "Activation and timing",
       "StartedAt": "Started",
       "CompletedAt": "Completed",
       "Duration": "Duration"
     },
     "Dependencies": {
-      "Title": "Direct dependencies",
-      "None": "This Seeder has no direct dependencies."
+      "Title": "Dependencies and dependents",
+      "None": "This Seeder has no direct dependencies.",
+      "Prerequisites": "Direct prerequisites",
+      "Dependents": "Direct dependents",
+      "NoDependents": "No seeders depend directly on this one."
     },
     "Attempts": {
       "Title": "Attempt timeline",
@@ -133,13 +157,21 @@
         "Plural": "{0} attempts recorded"
       },
       "None": "No attempt has started.",
-      "Number": "Attempt {0}"
+      "Number": "Attempt {0}",
+      "RetryGap": "Retry gap · {0}"
     },
     "Error": {
       "Title": "Final diagnostic",
-      "Type": "Type",
-      "Message": "Message",
       "LogsHint": "This is a bounded diagnostic summary. Use structured logs for the complete exception evidence."
+    },
+    "Wave": "Wave {0}",
+    "InReadiness": "Readiness · {0}",
+    "OutsideReadiness": "Outside readiness",
+    "Activation": {
+      "Title": "Activation",
+      "Automatic": "Automatic",
+      "Manual": "Manual",
+      "Disabled": "Disabled"
     }
   },
   "RunStatus": {
@@ -197,15 +229,61 @@
     "NotAvailable": "Not available",
     "None": "None",
     "DurationMilliseconds": "{0:0} ms",
-    "DurationSeconds": "{0:0.0} s",
+    "DurationSeconds": "{0:0.0#} s",
     "DurationMinutesSeconds": "{0} min {1} s",
     "DurationHoursMinutes": "{0} hr {1} min"
   },
   "Manual": {
-    "Title": "Explicit execution",
+    "Title": "Explicit execution and dependency preview",
     "Effects": "Runs this seeder and its unsatisfied eligible prerequisites. This may write to shared databases or publish events. Other held seeders remain untouched.",
     "Run": "Run with prerequisites",
     "Running": "Executing…",
-    "Failed": "Execution could not complete: {0}"
+    "Failed": "Execution could not complete",
+    "TargetOnly": "This snapshot shows only the selected seeder needs to run.",
+    "Order": "Unsatisfied prerequisites are listed before their dependents.",
+    "Unavailable": "Execution is unavailable because these definitions cannot run: {0}.",
+    "Busy": "Wait for the current batch to finish before running a seeder.",
+    "Stale": "Refresh the snapshot to review the dependencies before running.",
+    "PreviewChanged": "The execution preview changed. Review it before confirming again.",
+    "ConfirmTitle": "Confirm seeder execution",
+    "ConfirmSummary": "Run {0} with the {1} seeders listed below?",
+    "ConfirmRun": "Confirm run"
+  },
+  "Finding": {
+    "Waiting": "Waiting for the host to start. {0} required seeders participate in readiness.",
+    "Aborted": "{0} required seeders remain unready. {1} blocked, {2} cancelled.",
+    "Scheduling": "Scheduling the next work. {0} of {1} required seeders are ready.",
+    "Running": "{0} seeders are running, including {1}. {2} of {3} required seeders are ready.",
+    "Failed": "{0} failed.",
+    "FailedAttempts": " Exhausted {0} attempts in the latest batch.",
+    "Cascade": " The dependency chain blocked {0} downstream seeders, including {1}.",
+    "Optional": " Optional seeder {0} also ended unsuccessfully.",
+    "Unready": "{0} required seeders have yet to succeed. Inspect their lane or ledger entry for evidence.",
+    "Ready": "All {0} participating required seeders are ready.",
+    "Degraded": "All {0} participating required seeders are ready. {1} optional seeders ended unsuccessfully, including {2}.",
+    "HeldAndDisabled": " {0} held and {1} disabled definitions are shown in separate lanes.",
+    "Held": " {0} seeders are held.",
+    "Disabled": " {0} definitions are disabled in this host."
+  },
+  "Waterfall": {
+    "Title": "Dependency waves and execution timeline",
+    "Description": "Waves follow prerequisite depth. The timeline shows observed attempts, exclusive execution, and dependency blocks in the latest batch. Hover or use the arrow keys to trace relationships.",
+    "SuccessfulAttempt": "Successful attempt",
+    "FailedAttempt": "Failed attempt",
+    "ExclusiveBarrier": "Exclusive barrier",
+    "AxisOrigin": "Batch offset",
+    "AbortAt": "Abort · {0}",
+    "LiveAt": "Live · {0}",
+    "StaleAt": "Stale · {0}",
+    "EndAt": "Finished · {0}",
+    "OutsideBatch": "Outside automatic execution",
+    "Upstream": "Upstream",
+    "Downstream": "Downstream",
+    "Trace": "· {0} · {1}/{2} attempts · Prerequisites: {3} · {4} downstream, {5} blocked",
+    "Summary": "{0} dependency waves · {1} direct links · {2} exclusive intervals",
+    "LaneLabel": "{0}, {1}, {2}, {3}",
+    "Attempt": "Attempt {0} · {1} · {2}",
+    "BlockedBy": "Blocked by {0}",
+    "NoBatchTiming": "Waiting for batch timing"
   }
 }

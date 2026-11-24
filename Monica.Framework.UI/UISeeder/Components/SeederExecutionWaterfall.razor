@@ -1,0 +1,396 @@
+@inject IStringLocalizer<SeederResource> L
+
+@{
+    var tracedName = _pointerType ?? _focusedType ?? SelectedType;
+    var traced = tracedName is null ? null : Graph.ByType.GetValueOrDefault(tracedName);
+    var upstream = traced is null ? [] : Graph.GetUpstream(traced);
+    var downstream = traced is null ? [] : Graph.GetDownstream(traced);
+}
+
+<section class="seeder-waterfall" aria-labelledby="seeder-waterfall-title">
+    <header class="seeder-waterfall-heading">
+        <h2 id="seeder-waterfall-title">@L["Waterfall:Title"]</h2>
+        <p>@L["Waterfall:Description"]</p>
+        <div class="seeder-legend">
+            @if (_attempts.Values.Any(attempts => attempts.Any(attempt => attempt.Status == SeederAttemptStatus.Succeeded)))
+            {
+                <SeederStatusMark Text="@L["Waterfall:SuccessfulAttempt"]" Tone="success" />
+            }
+            @if (_attempts.Values.Any(attempts => attempts.Any(attempt => attempt.Status == SeederAttemptStatus.Failed)))
+            {
+                <SeederStatusMark Text="@L["Waterfall:FailedAttempt"]" Tone="error" />
+            }
+            @foreach (var status in VisibleStatuses())
+            {
+                <SeederStatusMark Text="@L.GetText(status)" Tone="@SeederDisplay.Tone(status)" />
+            }
+            @if (_exclusive.Length > 0)
+            {
+                <SeederStatusMark Text="@L["Waterfall:ExclusiveBarrier"]" Tone="third" />
+            }
+        </div>
+    </header>
+
+    <div class="seeder-chart" style="--seeder-lane-height:@($"{LaneHeight}px")" @onpointerleave="@(() => _pointerType = null)">
+        <div class="seeder-axis" aria-hidden="true">
+            <span>@L["Waterfall:AxisOrigin"]</span>
+            <div class="seeder-axis-track">
+                @if (_span > 0)
+                {
+                    @foreach (var tick in _ticks)
+                    {
+                        <span class="seeder-axis-tick @(tick == 0 ? "is-start" : null)" style="left:@Position(tick)">
+                            @L.FormatSeederDuration(TimeSpan.FromMilliseconds(tick))
+                        </span>
+                    }
+                    @if (_exclusive.Length == 1)
+                    {
+                        var window = _exclusive[0];
+                        <span class="seeder-axis-exclusive" style="left:@Position((Offset(window.StartedAtUtc) + Offset(End(window))) / 2)">
+                            @L["Waterfall:ExclusiveBarrier"]
+                        </span>
+                    }
+                    @if (_abortAt is { } abort)
+                    {
+                        <span class="seeder-axis-end is-abort @(Offset(abort) < _span / 2 ? "is-early" : null)" style="left:@Position(Offset(abort))">
+                            @L["Waterfall:AbortAt", L.FormatSeederDuration(abort - Graph.Run.StartedAtUtc)]
+                        </span>
+                    }
+                    else
+                    {
+                        var live = Graph.Run.CompletedAtUtc is null;
+                        var stale = live && Session.RefreshError is not null;
+                        var key = stale ? "Waterfall:StaleAt" : live ? "Waterfall:LiveAt" : "Waterfall:EndAt";
+                        <span class="seeder-axis-end @(stale ? "is-stale" : live ? "is-live" : null) @(Offset(_end) < _span / 2 ? "is-early" : null)"
+                              style="left:@Position(Offset(_end))">
+                            @L[key, L.FormatSeederDuration(Graph.Run.Duration)]
+                        </span>
+                    }
+                }
+                else
+                {
+                    <span class="seeder-track-waiting">@L["Waterfall:NoBatchTiming"]</span>
+                }
+            </div>
+            <span>@L["Table:Columns:Duration"]</span>
+        </div>
+
+        <div class="seeder-batch-lanes">
+            @if (_span > 0)
+            {
+                <div class="seeder-plot-overlay" aria-hidden="true">
+                    @foreach (var tick in _ticks)
+                    {
+                        <i class="seeder-grid-line" style="left:@Position(tick)"></i>
+                    }
+                    @foreach (var interval in _exclusive)
+                    {
+                        <i class="seeder-exclusive-band" style="@Interval(interval.StartedAtUtc, End(interval))"></i>
+                    }
+                    <i class="seeder-end-line" style="left:@Position(Offset(_end))"></i>
+                    @if (_abortAt is { } abort)
+                    {
+                        <i class="seeder-end-line is-abort" style="left:@Position(Offset(abort))"></i>
+                    }
+                </div>
+            }
+            @if (_edges.Length > 0)
+            {
+                <svg class="seeder-threads" viewBox="@($"0 0 28 {Graph.Lanes.Count * LaneHeight}")" aria-hidden="true">
+                    @foreach (var edge in _edges)
+                    {
+                        var tone = EdgeTone(edge, tracedName, upstream, downstream);
+                        if (tone is not null)
+                        {
+                            var x = 9 + edge.From % 4 * 3;
+                            var fromY = edge.From * LaneHeight + LaneHeight / 2;
+                            var toY = edge.To * LaneHeight + LaneHeight / 2;
+                            <path d="@($"M26 {fromY} H{x} V{toY} H26 M22 {toY - 2} L26 {toY} L22 {toY + 2}")"
+                                  class="@(edge.Blocked ? "is-blocked" : null)" stroke="@SeederDisplay.ToneColor(tone)" />
+                        }
+                    }
+                </svg>
+            }
+            @foreach (var seeder in Graph.Lanes)
+            {
+                @Lane(seeder, false, tracedName, upstream, downstream)
+            }
+        </div>
+
+        @if (Graph.Outside.Count > 0)
+        {
+            <div class="seeder-outside-heading">@L["Waterfall:OutsideBatch"]</div>
+            @foreach (var seeder in Graph.Outside)
+            {
+                @Lane(seeder, true, tracedName, upstream, downstream)
+            }
+        }
+    </div>
+
+    <div class="seeder-chart-readout" aria-live="polite" aria-atomic="true">
+        <MoIcon Icon="@MoIcons.Workflow" Size="15px" />
+        @if (traced is not null)
+        {
+            var prerequisiteNames = string.Join(", ", Graph.GetPrerequisites(traced).Select(node => node.SeederName));
+            <span>
+                <strong>@traced.SeederName</strong>
+                @L["Waterfall:Trace", L.GetText(traced.Status), traced.Attempts, traced.MaxAttempts,
+                    prerequisiteNames.Length == 0 ? L["Common:None"] : prerequisiteNames,
+                    downstream.Count, Graph.GetBlockedDescendants(traced).Count()]
+            </span>
+        }
+        else
+        {
+            <span>@L["Waterfall:Summary", _waveCount, _edgeCount, _exclusive.Length]</span>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SeederPageSession Session { get; set; } = default!;
+    [Parameter] public string? SelectedType { get; set; }
+    [Parameter] public EventCallback<string> Inspect { get; set; }
+
+    private const int LaneHeight = 38;
+    private SeederGraphView Graph => Session.Graph!;
+    private readonly Dictionary<string, ElementReference> _buttons = new(StringComparer.Ordinal);
+    private SeederGraphView? _renderedGraph;
+    private SeederExecutionSnapshot[] _ordered = [];
+    private Dictionary<string, SeederAttemptSnapshot[]> _attempts = new(StringComparer.Ordinal);
+    private SeederAttemptSnapshot[] _exclusive = [];
+    private Edge[] _edges = [];
+    private double[] _ticks = [];
+    private double _span;
+    private int _waveCount;
+    private int _edgeCount;
+    private DateTimeOffset _end;
+    private DateTimeOffset? _abortAt;
+    private string? _pointerType;
+    private string? _focusedType;
+    private string? _tabType;
+
+    protected override void OnParametersSet()
+    {
+        var graph = Graph;
+        if (ReferenceEquals(_renderedGraph, graph))
+        {
+            return;
+        }
+
+        _renderedGraph = graph;
+        _ordered = [.. graph.Lanes, .. graph.Outside];
+        if (_tabType is null || !graph.ByType.ContainsKey(_tabType))
+        {
+            _tabType = _ordered.FirstOrDefault()?.SeederTypeName;
+        }
+
+        _waveCount = graph.Lanes.Select(graph.GetWave).Distinct().Count();
+        _edgeCount = graph.Run.Seeders.Sum(seeder => seeder.Dependencies.Length);
+        _attempts = graph.Lanes.ToDictionary(seeder => seeder.SeederTypeName,
+            seeder => graph.GetBatchAttempts(seeder).OrderBy(attempt => attempt.AttemptNumber).ToArray(),
+            StringComparer.Ordinal);
+        _exclusive = graph.Lanes.Where(seeder => seeder.ExecutionMode == SeederExecutionMode.Exclusive)
+            .SelectMany(seeder => _attempts[seeder.SeederTypeName]).OrderBy(attempt => attempt.StartedAtUtc).ToArray();
+        var indices = graph.Lanes.Select((seeder, index) => (seeder.SeederTypeName, index))
+            .ToDictionary(item => item.SeederTypeName, item => item.index, StringComparer.Ordinal);
+        _edges = graph.Lanes.SelectMany((seeder, index) =>
+        {
+            var blockedBy = graph.GetBlockingPrerequisites(seeder).Select(node => node.SeederTypeName).ToHashSet();
+            return seeder.Dependencies.Where(indices.ContainsKey).Select(prerequisite =>
+                new Edge(indices[prerequisite], index, prerequisite, seeder.SeederTypeName, blockedBy.Contains(prerequisite)));
+        }).ToArray();
+
+        _end = graph.Run.CompletedAtUtc ?? graph.Run.CapturedAtUtc;
+        _abortAt = graph.Run.FailFastTriggerSeederTypeName is { } cause &&
+            graph.ByType.TryGetValue(cause, out var trigger) && graph.IsInBatch(trigger.CompletedAtUtc)
+            ? trigger.CompletedAtUtc : null;
+        _span = graph.Run.StartedAtUtc is not null ? Math.Max(500, Math.Ceiling(Offset(_end) * 1.06 / 100) * 100) : 0;
+        _ticks = _span > 0 ? AxisTicks(_span) : [];
+    }
+
+    private IEnumerable<SeederStatus> VisibleStatuses()
+    {
+        var run = Graph.Run;
+        if (run.RunningCount > 0) yield return SeederStatus.Running;
+        if (run.PendingCount > 0) yield return SeederStatus.Pending;
+        if (run.BlockedCount > 0) yield return SeederStatus.Blocked;
+        if (run.CancelledCount > 0) yield return SeederStatus.Cancelled;
+        if (run.HeldCount > 0) yield return SeederStatus.Held;
+        if (run.DisabledCount > 0) yield return SeederStatus.Disabled;
+    }
+
+    private RenderFragment Lane(
+        SeederExecutionSnapshot seeder, bool outside, string? traced,
+        HashSet<string> upstream, HashSet<string> downstream)
+    {
+        var typeName = seeder.SeederTypeName;
+        var relation = typeName == traced ? "self" : upstream.Contains(typeName) ? "upstream"
+            : downstream.Contains(typeName) ? "downstream" : null;
+        var nameSpace = typeName[..Math.Max(0, typeName.LastIndexOf('.'))];
+        var wave = outside ? "—" : $"W{Graph.GetWave(seeder)}";
+        var duration = seeder.Duration is { } elapsed ? L.FormatSeederDuration(elapsed) : "—";
+        var tone = SeederDisplay.Tone(seeder.Status);
+
+        return @<button type="button" @key="typeName" @ref="_buttons[typeName]"
+                        class="seeder-lane" data-trace="@relation"
+                        tabindex="@(typeName == _tabType ? 0 : -1)"
+                        aria-label="@L["Waterfall:LaneLabel", seeder.SeederName, wave, L.GetText(seeder.Status), duration]"
+                        @onpointerenter="@(() => _pointerType = typeName)"
+                        @onfocus="@(() => FocusLane(typeName))" @onblur="@(() => _focusedType = null)"
+                        @onkeydown="@(args => OnKeyDownAsync(args, typeName))"
+                        @onclick="@(() => Inspect.InvokeAsync(typeName))">
+            <span class="seeder-lane-label">
+                <span class="seeder-wave">@wave</span>
+                <span class="seeder-lane-identity">
+                    <strong title="@typeName">@seeder.SeederName</strong>
+                    <span class="seeder-lane-context">
+                        @if (relation is "upstream" or "downstream")
+                        {
+                            <span class="seeder-lane-tag" data-tone="@relation">@L[relation == "upstream" ? "Waterfall:Upstream" : "Waterfall:Downstream"]</span>
+                        }
+                        else
+                        {
+                            @if (seeder.ExecutionMode == SeederExecutionMode.Exclusive)
+                            {
+                                <span class="seeder-lane-tag" data-tone="third"><MoIcon Icon="@MoIcons.Lock" Size="10px" />@L.GetText(seeder.ExecutionMode)</span>
+                            }
+                            @if (seeder.FailureBehavior == SeederFailureBehavior.FailFast)
+                            {
+                                <span class="seeder-lane-tag" data-tone="error">@L.GetText(seeder.FailureBehavior)</span>
+                            }
+                            @if (seeder.Criticality == SeederCriticality.Optional && !outside)
+                            {
+                                <span class="seeder-lane-tag">@L.GetText(seeder.Criticality)</span>
+                            }
+                        }
+                        <code>@nameSpace</code>
+                    </span>
+                </span>
+            </span>
+            <span class="seeder-lane-track" aria-hidden="true">@Track(seeder, outside)</span>
+            <span class="seeder-lane-outcome">
+                <b>@duration</b>
+                <span class="seeder-lane-status">
+                    <SeederStatusMark Text="@L.GetText(seeder.Status)" Tone="@tone" />
+                    @if (seeder.Attempts > 1)
+                    {
+                        <span>@L["Table:AttemptsValue", seeder.Attempts, seeder.MaxAttempts]</span>
+                    }
+                </span>
+            </span>
+        </button>;
+    }
+
+    private RenderFragment Track(SeederExecutionSnapshot seeder, bool outside) => @<text>
+        @if (outside)
+        {
+            <span class="seeder-no-track" data-tone="@SeederDisplay.Tone(seeder.Status)">
+                <i></i><span>@L.GetText(seeder.Status)</span>
+            </span>
+        }
+        else if (_span > 0)
+        {
+            @foreach (var tick in _ticks)
+            {
+                <i class="seeder-lane-grid-line" style="left:@Position(tick)"></i>
+            }
+            @if (_attempts[seeder.SeederTypeName] is { Length: > 0 } attempts)
+            {
+                @for (var index = 0; index < attempts.Length; index++)
+                {
+                    var attempt = attempts[index];
+                    var end = End(attempt);
+                    if (index > 0 && End(attempts[index - 1]) < attempt.StartedAtUtc)
+                    {
+                        <i class="seeder-retry-gap" style="@Interval(End(attempts[index - 1]), attempt.StartedAtUtc)"></i>
+                    }
+                    <i class="seeder-attempt-bar"
+                       data-exclusive="@(seeder.ExecutionMode == SeederExecutionMode.Exclusive ? "true" : null)"
+                       style="@AttemptStyle(attempt, end)"
+                       title="@L["Waterfall:Attempt", attempt.AttemptNumber, L.GetText(attempt.Status), L.FormatSeederDuration(attempt.Duration)]"></i>
+                }
+            }
+            else if (seeder.Status is SeederStatus.Blocked or SeederStatus.Cancelled &&
+                     seeder.CompletedAtUtc is { } at && Graph.IsInBatch(at))
+            {
+                var blocking = string.Join(", ", Graph.GetBlockingPrerequisites(seeder).Select(node => node.SeederName));
+                var label = blocking.Length == 0 ? L.GetText(seeder.Status) : L["Waterfall:BlockedBy", blocking];
+                var style = $"--seeder-pin:{Position(Offset(at))}; --seeder-pin-color:{SeederDisplay.ToneColor(SeederDisplay.Tone(seeder.Status))}";
+                <span class="seeder-pin" style="@style" title="@label">
+                    <i></i><span>@label</span>
+                </span>
+            }
+        }
+    </text>;
+
+    private void FocusLane(string typeName)
+    {
+        _tabType = typeName;
+        _focusedType = typeName;
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs args, string typeName)
+    {
+        var current = Array.FindIndex(_ordered, seeder => seeder.SeederTypeName == typeName);
+        var next = args.Key switch
+        {
+            "ArrowUp" => Math.Max(0, current - 1),
+            "ArrowDown" => Math.Min(_ordered.Length - 1, current + 1),
+            "Home" => 0,
+            "End" => _ordered.Length - 1,
+            _ => current
+        };
+        if (args.Key == "Escape")
+        {
+            _pointerType = null;
+            _focusedType = null;
+            return;
+        }
+
+        if (next != current && _buttons.TryGetValue(_ordered[next].SeederTypeName, out var button))
+        {
+            _pointerType = null;
+            await button.FocusAsync();
+        }
+    }
+
+    private static string? EdgeTone(Edge edge, string? selected, HashSet<string> upstream, HashSet<string> downstream)
+    {
+        if (upstream.Contains(edge.Prerequisite) && (edge.Dependent == selected || upstream.Contains(edge.Dependent)))
+        {
+            return edge.Blocked ? "warning" : "info";
+        }
+        if ((edge.Prerequisite == selected || downstream.Contains(edge.Prerequisite)) && downstream.Contains(edge.Dependent))
+        {
+            return edge.Blocked ? "warning" : "primary";
+        }
+
+        return edge.Blocked ? "warning" : null;
+    }
+
+    private double Offset(DateTimeOffset time) => (time - Graph.Run.StartedAtUtc!.Value).TotalMilliseconds;
+    private DateTimeOffset End(SeederAttemptSnapshot attempt) => attempt.CompletedAtUtc ?? _end;
+    private string Position(double milliseconds) => FormattableString.Invariant($"{Math.Clamp(milliseconds / _span * 100, 0, 100):0.###}%");
+
+    private string Interval(DateTimeOffset start, DateTimeOffset end) =>
+        $"left:{Position(Offset(start))}; width:{Position(Math.Max(0, Offset(end) - Offset(start)))}";
+
+    private string AttemptStyle(SeederAttemptSnapshot attempt, DateTimeOffset end) =>
+        $"{Interval(attempt.StartedAtUtc, end)}; --seeder-attempt-color:{SeederDisplay.ToneColor(SeederDisplay.Tone(attempt.Status))}";
+
+    private static double[] AxisTicks(double span)
+    {
+        var ideal = Math.Max(1, span / 4);
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(ideal)));
+        var step = (ideal / magnitude) switch
+        {
+            < 1.5 => magnitude,
+            < 3 => 2 * magnitude,
+            < 7 => 5 * magnitude,
+            _ => 10 * magnitude
+        };
+        return Enumerable.Range(0, (int)(span * .94 / step) + 1).Select(index => index * step).ToArray();
+    }
+
+    private sealed record Edge(int From, int To, string Prerequisite, string Dependent, bool Blocked);
+}

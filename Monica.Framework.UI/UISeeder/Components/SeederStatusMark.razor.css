@@ -1,0 +1,36 @@
+.seeder-status-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: color-mix(in srgb, var(--seeder-tone) 74%, var(--mud-palette-text-primary));
+    font-size: .75rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
+.seeder-status-mark.is-pill {
+    padding: 4px 9px;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--seeder-tone) 11%, var(--mud-palette-surface));
+}
+.seeder-status-mark i {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--seeder-tone);
+    border-radius: 2px;
+    background: var(--seeder-tone);
+}
+.seeder-status-mark[data-tone="warning"] i {
+    transform: rotate(45deg) scale(.87);
+}
+.seeder-status-mark[data-tone="disabled"] i {
+    background: repeating-linear-gradient(135deg, transparent 0 2px, var(--seeder-tone) 2px 3px);
+}
+.seeder-status-mark.is-zero i {
+    background: transparent;
+}
+.seeder-status-mark b {
+    color: var(--mud-palette-text-primary);
+    font-family: var(--mo-font-family-mono);
+    font-weight: 600;
+}

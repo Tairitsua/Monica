@@ -9,6 +9,78 @@ namespace Test.Monica.Framework.UI.Seeder;
 public sealed class SeederPageSessionTests
 {
     [Fact]
+    public async Task RefreshAsync_WhenStartupReadRecovers_ShouldOpenTheRequestedDeepLink()
+    {
+        var seeder = SeederUiTestData.CreateSeeder();
+        var calls = 0;
+        await using var session = CreateSession(_ => Task.FromResult(++calls == 1
+            ? Result.Failure<SeederDiagnosticsSnapshot>("Initial read unavailable")
+            : Result.Success(SeederUiTestData.CreateSnapshot(seeders: [seeder]))));
+
+        await session.InitializeAsync();
+        await session.ApplyLocationAsync(null, null, null, null, SeederLedgerSort.Status, seeder.SeederTypeName);
+        session.IsDetailsOpen.Should().BeFalse();
+
+        (await session.RefreshAsync()).Should().BeTrue();
+        session.IsDetailsOpen.Should().BeTrue();
+        session.SelectedSeeder.Should().Be(seeder);
+    }
+
+    [Fact]
+    public async Task RunConfirmedAsync_WhenPrerequisiteSucceededAfterPreview_ShouldRequireReviewAgain()
+    {
+        var prerequisite = SeederUiTestData.CreateSeeder("Foundation", SeederStatus.Failed);
+        var target = SeederUiTestData.CreateSeeder("Target", SeederStatus.Blocked, dependencies: [prerequisite.SeederTypeName]);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.CompletedWithFailures, [target, prerequisite]);
+        var executions = 0;
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Result.Success(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: (_, _) =>
+            {
+                executions++;
+                return Task.FromResult(Result.Success(snapshot.Run));
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(target);
+        var preview = session.RunPreview!;
+        preview.Seeders.Select(seeder => seeder.SeederTypeName).Should().Equal(prerequisite.SeederTypeName, target.SeederTypeName);
+
+        snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Succeeded,
+            [target, prerequisite with { Status = SeederStatus.Succeeded }]);
+
+        (await session.RunConfirmedAsync(preview)).Should().BeFalse();
+        executions.Should().Be(0);
+        var reviewed = session.RunPreview!;
+        reviewed.Seeders.Should().ContainSingle().Which.Should().Be(target);
+        (await session.RunConfirmedAsync(reviewed)).Should().BeTrue();
+        executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RunSelectedAsync_WhenTransitivePrerequisiteIsDisabled_ShouldRejectBeforeExecutorCall()
+    {
+        var disabled = SeederUiTestData.CreateSeeder("DisabledFoundation", SeederStatus.Disabled);
+        var intermediate = SeederUiTestData.CreateSeeder("Intermediate", SeederStatus.Held, dependencies: [disabled.SeederTypeName]);
+        var target = SeederUiTestData.CreateSeeder("Target", SeederStatus.Held, dependencies: [intermediate.SeederTypeName]);
+        var snapshot = SeederUiTestData.CreateSnapshot(SeederRunStatus.Held, [target, disabled, intermediate]);
+        var executions = 0;
+        await using var session = new SeederPageSession(
+            _ => Task.FromResult(Result.Success(snapshot)), _ => Task.FromResult(true), "test-host",
+            runAsync: (_, _) =>
+            {
+                executions++;
+                return Task.FromResult(Result.Success(snapshot.Run));
+            });
+        await session.InitializeAsync();
+        await session.OpenDetailsAsync(target);
+
+        session.RunPreview!.Unavailable.Should().Equal(disabled.SeederTypeName);
+        session.CanRunSelected.Should().BeFalse();
+        (await session.RunSelectedAsync()).Should().BeFalse();
+        executions.Should().Be(0);
+    }
+
+    [Fact]
     public async Task RunSelectedAsync_WhenAccessChanges_ShouldRejectBeforeExecutorCall()
     {
         var allowed = true;

@@ -1,133 +1,190 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using System.Globalization
+@using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Services
+@inject MoTimeFormatter UiTime
 @inject IStringLocalizer<SeederResource> L
+@inject NavigationManager Navigation
 
-@if (Session.Snapshot is { } snapshot)
-{
-    var run = snapshot.Run;
-    var counts = new[]
-    {
-        (Status: SeederStatus.Pending, Count: run.PendingCount),
-        (Status: SeederStatus.Running, Count: run.RunningCount),
-        (Status: SeederStatus.Succeeded, Count: run.SucceededCount),
-        (Status: SeederStatus.Failed, Count: run.FailedCount),
-        (Status: SeederStatus.Blocked, Count: run.BlockedCount),
-        (Status: SeederStatus.Cancelled, Count: run.CancelledCount),
-        (Status: SeederStatus.Held, Count: run.HeldCount),
-        (Status: SeederStatus.Disabled, Count: run.DisabledCount)
-    };
-
-    <section class="seeder-run-overview" aria-labelledby="seeder-run-status-title">
-        <div class="seeder-run-feature">
-            <div class="seeder-run-feature-heading">
-                <span class="seeder-run-eyebrow">@L["Overview:RunLabel"]</span>
-                <span class="seeder-run-refresh-mode">
-                    @if (SeederDisplay.IsActive(run.Status))
-                    {
-                        <span class="seeder-run-live-dot" aria-hidden="true"></span>
-                    }
-                    @L[SeederDisplay.IsActive(run.Status) ? "Overview:ActiveRefresh" : "Overview:CompletedRefresh"]
-                </span>
-            </div>
-
-            <div class="seeder-run-identity">
-                <span class="seeder-run-symbol" aria-hidden="true">
-                    <MoIcon Icon="@MoIcons.Workflow" Size="1.5rem" />
-                </span>
-                <div class="seeder-run-state">
-                    <h2 id="seeder-run-status-title">@L.GetText(run.Status)</h2>
-                    <span class="seeder-run-readiness" data-readiness="@run.ReadinessStatus.ToString().ToLowerInvariant()">
-                        <MoIcon Icon="@SeederDisplay.Icon(run.ReadinessStatus)" Size="1.5rem" />
-                        @L["Overview:Readiness", L.GetText(run.ReadinessStatus)]
-                    </span>
-                </div>
-            </div>
-
-            <div class="seeder-run-completion">
-                <div class="seeder-run-completion-heading">
-                    <span>@L["Overview:TerminalCompletion"]</span>
-                    <strong><span>@run.CompletedCount</span><span class="seeder-run-completion-divider">/</span>@run.TotalCount</strong>
-                </div>
-                <p id="seeder-run-progress-summary">
-                    @(run.TotalCount == 0
-                        ? L["Overview:EmptyRun"]
-                        : L.FormatSeederRunProgress(run.CompletedCount, run.TotalCount))
-                </p>
-                @if (run.TotalCount > 0)
-                {
-                    <MudProgressLinear Value="@Session.ProgressPercent"
-                                       Max="100"
-                                       Color="Color.Inherit"
-                                       Rounded="false"
-                                       Class="seeder-run-progress"
-                                       aria-labelledby="seeder-run-progress-summary" />
-                }
-            </div>
-
-            <dl class="seeder-run-timing">
-                <div>
-                    <dt>@L["Details:Timing:StartedAt"]</dt>
-                    <dd>
-                        @if (run.StartedAtUtc is { } startedAt)
-                        {
-                            <time datetime="@startedAt.ToString("O")" title="@UiTime.Format(startedAt)">
-                                @UiTime.FormatTime(startedAt)
-                            </time>
-                        }
-                        else
-                        {
-                            @L["Common:NotAvailable"]
-                        }
-                    </dd>
-                </div>
-                <div>
-                    <dt>@L["Details:Timing:CompletedAt"]</dt>
-                    <dd>
-                        @if (run.CompletedAtUtc is { } completedAt)
-                        {
-                            <time datetime="@completedAt.ToString("O")" title="@UiTime.Format(completedAt)">
-                                @UiTime.FormatTime(completedAt)
-                            </time>
-                        }
-                        else
-                        {
-                            @L["Common:NotAvailable"]
-                        }
-                    </dd>
-                </div>
-                <div>
-                    <dt>@L["Details:Timing:Duration"]</dt>
-                    <dd title="@L["Overview:Duration", L.FormatSeederDuration(run.Duration)]">
-                        @L.FormatSeederDuration(run.Duration)
-                    </dd>
-                </div>
-            </dl>
-
-            @if (!string.IsNullOrWhiteSpace(run.FailFastTriggerSeederTypeName))
-            {
-                <div class="seeder-run-trigger">
-                    <MoIcon Icon="@MoIcons.Warning" Size="1.25rem" />
-                    <span>@L["Overview:FailFastTrigger", run.FailFastTriggerSeederTypeName]</span>
-                </div>
-            }
-
-            <div class="seeder-run-captured">
-                @L["Overview:CapturedAt", UiTime.Format(run.CapturedAtUtc)]
-            </div>
-        </div>
-
-        <dl class="seeder-run-counts">
-            @foreach (var count in counts)
-            {
-                <div class="seeder-run-count seeder-count-@count.Status.ToString().ToLowerInvariant() @(count.Count == 0 ? "is-zero" : null)">
-                    <dt>@L.GetText(count.Status)</dt>
-                    <dd>@count.Count</dd>
-                </div>
-            }
-        </dl>
-    </section>
+@{
+    var run = Graph.Run;
+    var required = run.Seeders.Count(seeder => seeder.ParticipatesInReadiness && seeder.Criticality == SeederCriticality.Required);
+    var ready = required - run.RequiredUnsuccessfulCount;
+    var population = required != 0 ? required : Graph.Lanes.Count;
+    var numerator = required != 0 ? ready : Graph.Lanes.Count(seeder => seeder.Status == SeederStatus.Succeeded);
+    var unit = required != 0 ? L["Overview:OfRequired", required]
+        : population != 0 ? L["Overview:OfParticipating", population]
+        : L["Overview:OfDiscovered", run.TotalCount];
 }
+
+<div class="seeder-decision">
+    <div class="seeder-decision-value">
+        <div class="seeder-readiness">
+            <h2 id="seeder-readiness-title">@L["Overview:Readiness"]</h2>
+            <SeederStatusMark Text="@L.GetText(run.ReadinessStatus)" Tone="@SeederDisplay.Tone(run.ReadinessStatus)" Pill="true" />
+        </div>
+        <MoDisplayValue Value="@numerator.ToString("N0")" Unit="@unit" AccessibleLabel="@($"{numerator:N0} {unit}")" />
+        <div class="seeder-tally">
+            @Tally(SeederStatus.Failed, run.FailedCount)
+            @Tally(SeederStatus.Blocked, run.BlockedCount)
+            @if (run.CancelledCount > 0)
+            {
+                @Tally(SeederStatus.Cancelled, run.CancelledCount)
+            }
+            @if (run.RunningCount > 0 || run.Status == SeederRunStatus.Running)
+            {
+                @Tally(SeederStatus.Running, run.RunningCount)
+            }
+            @if (run.PendingCount > 0 || run.Status == SeederRunStatus.Waiting)
+            {
+                @Tally(SeederStatus.Pending, run.PendingCount)
+            }
+            @Tally(SeederStatus.Succeeded, run.SucceededCount)
+            @Tally(SeederStatus.Held, run.HeldCount)
+            @Tally(SeederStatus.Disabled, run.DisabledCount)
+        </div>
+    </div>
+    <p class="seeder-finding">
+        @Finding(ready, required)
+        @if (run.HeldCount > 0 && run.DisabledCount > 0)
+        {
+            <MoRichFinding Template="@L["Finding:HeldAndDisabled"]"
+                           Values="@([Mark(run.HeldCount, MoVisualRole.Secondary), Mark(run.DisabledCount, MoVisualRole.Neutral)])" />
+        }
+        else if (run.HeldCount > 0)
+        {
+            <MoRichFinding Template="@L["Finding:Held"]" Values="@([Mark(run.HeldCount, MoVisualRole.Secondary)])" />
+        }
+        else if (run.DisabledCount > 0)
+        {
+            <MoRichFinding Template="@L["Finding:Disabled"]" Values="@([Mark(run.DisabledCount, MoVisualRole.Neutral)])" />
+        }
+    </p>
+</div>
+
+@if (run.FailFastTriggerSeederTypeName is { } cause)
+{
+    <div class="seeder-fail-fast">
+        <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Overview:FailFast"]">
+            <MoRichFinding Template="@L["Overview:FailFastTrigger"]"
+                           Values="@([Mark(Graph.ByType.GetValueOrDefault(cause)?.SeederName ?? cause, MoVisualRole.Error, cause)])" />
+        </MoSemanticCallout>
+    </div>
+}
+
+<div class="seeder-run-strip">
+    <div class="seeder-run-strip-group">
+        <SeederStatusMark Text="@L.GetText(run.Status)" Tone="@SeederDisplay.Tone(run.Status)" />
+        <span class="mo-vl-sep" aria-hidden="true"></span>
+        @if (run.StartedAtUtc is { } started)
+        {
+            <span class="seeder-run-window">
+                <time datetime="@started.ToString("O")" title="@UiTime.Format(started)">@UiTime.FormatTime(started)</time>
+                @if (run.CompletedAtUtc is { } completed)
+                {
+                    <span aria-hidden="true"> → </span>
+                    <time datetime="@completed.ToString("O")" title="@UiTime.Format(completed)">@UiTime.FormatTime(completed)</time>
+                }
+            </span>
+        }
+        else
+        {
+            <span>@L["Overview:NotStarted"]</span>
+        }
+        @if (run.Duration is { } duration)
+        {
+            <span class="mo-vl-sep" aria-hidden="true"></span>
+            <span>@L["Overview:Duration"] <strong>@L.FormatSeederDuration(duration)</strong></span>
+        }
+    </div>
+    <div class="seeder-run-strip-group">
+        <span>@L["Overview:ConfigurationSummary", Configuration.MaxConcurrency, Graph.OverrideCount, run.TotalCount]</span>
+        <a class="seeder-defaults-link" href="#seeder-configuration-title">
+            @L["Overview:JumpToDefaults"] <MoIcon Icon="@MoIcons.ChevronDown" Size="14px" />
+        </a>
+    </div>
+</div>
 
 @code {
     [Parameter, EditorRequired] public SeederPageSession Session { get; set; } = default!;
+
+    private SeederGraphView Graph => Session.Graph!;
+    private SeederConfigurationSnapshot Configuration => Session.Snapshot!.Configuration;
+
+    private RenderFragment Tally(SeederStatus status, int count) =>
+        @<SeederStatusMark Text="@L.GetText(status)" Tone="@SeederDisplay.Tone(status)" Count="@count" />;
+
+    private RenderFragment Mark(object value, MoVisualRole role, string? typeName = null) =>
+        @<MoValueMark Role="@role" Href="@(typeName is null ? null : SeederDisplay.EvidenceUrl(Navigation, typeName))">@value</MoValueMark>;
+
+    private RenderFragment Finding(int ready, int required)
+    {
+        var run = Graph.Run;
+        var failure = run.Seeders
+            .Where(seeder => seeder.Status == SeederStatus.Failed &&
+                (seeder.FailureBehavior == SeederFailureBehavior.FailFast ||
+                 seeder.Criticality == SeederCriticality.Required && seeder.ParticipatesInReadiness))
+            .Select(seeder => (Seeder: seeder, Blocked: Graph.GetBlockedDescendants(seeder).ToArray()))
+            .OrderByDescending(item => item.Blocked.Length)
+            .ThenBy(item => item.Seeder.CompletedAtUtc)
+            .FirstOrDefault();
+        var optional = run.Seeders.FirstOrDefault(seeder => seeder != failure.Seeder &&
+            seeder.Criticality == SeederCriticality.Optional &&
+            seeder.Status is SeederStatus.Failed or SeederStatus.Blocked or SeederStatus.Cancelled);
+        var running = run.Seeders.FirstOrDefault(seeder => seeder.Status == SeederStatus.Running);
+
+        if (run.Status == SeederRunStatus.Waiting)
+        {
+            return FindingText("Finding:Waiting", Mark(required, MoVisualRole.Info));
+        }
+
+        if (run.Status is SeederRunStatus.Aborting or SeederRunStatus.Aborted)
+        {
+            return FindingText("Finding:Aborted", Mark(run.RequiredUnsuccessfulCount, MoVisualRole.Error),
+                Mark(run.BlockedCount, MoVisualRole.Warning), Mark(run.CancelledCount, MoVisualRole.Neutral));
+        }
+
+        if (run.Status == SeederRunStatus.Running)
+        {
+            return running is null
+                ? FindingText("Finding:Scheduling", Mark(ready, MoVisualRole.Success), Mark(required, MoVisualRole.Neutral))
+                : FindingText("Finding:Running", Mark(run.RunningCount, MoVisualRole.Info),
+                    Mark(running.SeederName, MoVisualRole.Info, running.SeederTypeName),
+                    Mark(ready, MoVisualRole.Success), Mark(required, MoVisualRole.Neutral));
+        }
+
+        if (failure.Seeder is { } root)
+        {
+            var blocked = failure.Blocked;
+            var attempts = Graph.GetBatchAttempts(root).Count();
+            return @<text>
+                @FindingText("Finding:Failed", Mark(root.SeederName, MoVisualRole.Error, root.SeederTypeName))
+                @if (attempts > 0)
+                {
+                    @FindingText("Finding:FailedAttempts", Mark($"{attempts}/{root.MaxAttempts}", MoVisualRole.Error))
+                }
+                @if (blocked.Length > 0)
+                {
+                    @FindingText("Finding:Cascade", Mark(blocked.Length, MoVisualRole.Warning),
+                        Mark(blocked[0].SeederName, MoVisualRole.Warning, blocked[0].SeederTypeName))
+                }
+                @if (optional is not null)
+                {
+                    @FindingText("Finding:Optional", Mark(optional.SeederName, MoVisualRole.Warning, optional.SeederTypeName))
+                }
+            </text>;
+        }
+
+        if (run.ReadinessStatus == SeederReadinessStatus.Unhealthy)
+        {
+            return FindingText("Finding:Unready", Mark(run.RequiredUnsuccessfulCount, MoVisualRole.Error));
+        }
+
+        return optional is null
+            ? FindingText("Finding:Ready", Mark(ready, MoVisualRole.Success))
+            : FindingText("Finding:Degraded", Mark(ready, MoVisualRole.Success),
+                Mark(run.OptionalUnsuccessfulCount, MoVisualRole.Warning),
+                Mark(optional.SeederName, MoVisualRole.Warning, optional.SeederTypeName));
+    }
+
+    private RenderFragment FindingText(string key, params RenderFragment[] values) =>
+        @<MoRichFinding Template="@L[key]" Values="@values" />;
 }

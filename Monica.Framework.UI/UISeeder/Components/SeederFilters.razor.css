@@ -1,14 +1,43 @@
-.seeder-filters { min-width:0; padding:20px 24px 10px; border-bottom:1px solid var(--mud-palette-divider); container:seeder-filters / inline-size; }
-.seeder-filter-fields { display:grid; grid-template-columns:minmax(0,1.7fr) repeat(3,minmax(0,1fr)); align-items:start; gap:14px; }
-.seeder-filter-field { min-width:0; }
-.seeder-filter-field ::deep .mud-input-control,.seeder-filter-field ::deep .mud-select { width:100%; min-width:0; margin-top:0; }
-.seeder-filter-field ::deep .mud-input,.seeder-filter-field ::deep .mud-input-slot,.seeder-filter-field ::deep .mud-input-label { font-family:var(--mud-typography-default-family); font-size:12px; }
-.seeder-filter-field ::deep .mud-input { border-radius:6px; background:var(--mud-palette-surface); }
-.seeder-filter-field ::deep .mud-input-label { font-size:11px; }
-.seeder-filter-field ::deep .mud-input-adornment svg { width:17px; height:17px; }
-.seeder-filter-context { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:35px; margin-top:6px; }
-.seeder-filter-results { color:var(--mud-palette-text-secondary); font-size:10px; line-height:1.5; }
-.seeder-filter-context ::deep .mud-button-root { min-height:28px; padding:4px 8px; border-radius:5px; font-size:11px; text-transform:none; }
-@container seeder-filters (max-width:850px) { .seeder-filter-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .seeder-filter-field--search { grid-column:1 / -1; } }
-@container seeder-filters (max-width:450px) { .seeder-filter-fields { grid-template-columns:1fr; gap:12px; } .seeder-filter-field--search { grid-column:auto; } .seeder-filter-context { flex-wrap:wrap; } }
-@media(max-width:600px) { .seeder-filters { padding:20px 18px 10px; } }
+.seeder-filters {
+    display: grid;
+    gap: 12px;
+    padding: 3px clamp(16px, 2vw, 24px) 14px;
+}
+.seeder-filter-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px 14px;
+}
+.seeder-filter-search {
+    flex: 2 1 16rem;
+    min-width: 0;
+}
+.seeder-filter-selects {
+    display: grid;
+    flex: 3 1 29rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.25rem), 1fr));
+    align-items: end;
+    gap: 8px 12px;
+    min-width: 0;
+}
+.seeder-filter-selects ::deep .mud-input-control {
+    min-width: 0;
+}
+.seeder-filter-statuses {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+.seeder-clear-filters {
+    border: 0;
+    background: transparent;
+    color: var(--mud-palette-primary);
+    font: inherit;
+    font-size: .75rem;
+    cursor: pointer;
+}
+.seeder-clear-filters:hover {
+    text-decoration: underline;
+}

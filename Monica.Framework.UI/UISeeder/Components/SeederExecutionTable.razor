@@ -1,128 +1,125 @@
+@using Monica.UI.Shared.Components.States
 @inject IStringLocalizer<SeederResource> L
+@inject NavigationManager Navigation
 
-<section class="seeder-table-section" aria-labelledby="seeder-table-title">
-    <header class="seeder-table-heading">
-        <div>
-            <span class="seeder-table-eyebrow">@L["Table:Eyebrow"]</span>
-            <h2 id="seeder-table-title">@L["Table:Title"]</h2>
-        </div>
-        <p>@L["Table:Subtitle"]</p>
-    </header>
-
-    <SeederFilters Session="@Session" />
-
-    <div class="seeder-table-scroll">
-        <MudTable T="SeederExecutionRow"
-                  Items="@Rows"
-                  Dense="true"
-                  Hover="true"
-                  Breakpoint="Breakpoint.None"
-                  Elevation="0"
-                  TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Table:Title"].Value })"
-                  Class="seeder-execution-table">
-            <HeaderContent>
-                <MudTh>@L["Table:Columns:Name"]</MudTh>
-                <MudTh>@L["Table:Columns:Policy"]</MudTh>
-                <MudTh>@L["Table:Columns:Status"]</MudTh>
-                <MudTh>@L["Table:Columns:Attempts"]</MudTh>
-                <MudTh>@L["Table:Columns:Duration"]</MudTh>
-                <MudTh>@L["Table:Columns:Actions"]</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="@L["Table:Columns:Name"]" Class="seeder-identity-cell">
-                    <div class="seeder-name">
-                        <strong>@context.Seeder.SeederName</strong>
-                        <code>@context.Seeder.SeederTypeName</code>
-                        <span class="seeder-dependencies" title="@string.Join(", ", context.Seeder.Dependencies)">
-                            <span>@L["Table:Columns:Dependencies"]</span>
-                            @if (context.Seeder.Dependencies.Length == 0)
-                            {
-                                <span>@L["Common:None"]</span>
-                            }
-                            else
-                            {
-                                <span>@L.FormatSeederDependencyCount(context.Seeder.Dependencies.Length)</span>
-                            }
-                        </span>
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Policy"]">
-                    <dl class="seeder-row-policy">
-                        <div><dt>@L["Table:Columns:Criticality"]</dt><dd>@L.GetText(context.Seeder.Criticality)</dd></div>
-                        <div><dt>@L["Table:Columns:ExecutionMode"]</dt><dd>@L.GetText(context.Seeder.ExecutionMode)</dd></div>
-                        <div><dt>@L["Table:Columns:FailureBehavior"]</dt><dd>@L.GetText(context.Seeder.FailureBehavior)</dd></div>
-                    </dl>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Status"]">
-                    <span class="seeder-row-status seeder-row-status--@context.Seeder.Status.ToString().ToLowerInvariant()">
-                        <i aria-hidden="true"></i>@L.GetText(context.Seeder.Status)
-                    </span>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Attempts"]">
-                    <span class="seeder-row-reading">@L["Table:AttemptsValue", context.Seeder.Attempts, context.Seeder.MaxAttempts]</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Duration"]">
-                    <span class="seeder-row-reading">@L.FormatSeederDuration(context.Seeder.Duration)</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Actions"]" Class="seeder-action-cell">
-                    <MudTooltip Text="@L["Actions:Details"]">
-                        <MudIconButton id="@SeederDisplay.DetailsTriggerId(context.Seeder.SeederTypeName)"
-                                       Icon="@MoIcons.ChevronRight"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       OnClick="@(() => Session.OpenDetailsAsync(context.Seeder))"
-                                       aria-controls="seeder-detail-dialog"
-                                       aria-expanded="@(IsDetailsOpen(context.Seeder) ? "true" : "false")"
+@if (Session.Graph is { } graph)
+{
+    var seeders = Session.FilteredSeeders;
+    <section class="seeder-ledger" aria-labelledby="seeder-ledger-title">
+        <header class="seeder-ledger-heading">
+            <div>
+                <h2 id="seeder-ledger-title">@L["Table:Title"]</h2>
+                <p>@L["Table:Subtitle"]</p>
+            </div>
+            <span class="seeder-result-count" role="status">@L.FormatSeederFilterResults(seeders.Count, graph.Run.TotalCount)</span>
+        </header>
+        @if (graph.Run.TotalCount > 0)
+        {
+            <SeederFilters Session="@Session" />
+        }
+        @if (seeders.Count == 0)
+        {
+            <div class="seeder-ledger-empty">
+                <MoContentState Compact="true" data-testid="seeder-table-empty">
+                    <MoIcon Icon="@(graph.Run.TotalCount == 0 ? MoIcons.Sprout : MoIcons.Search)" Size="24px" />
+                    <h3>@L[graph.Run.TotalCount == 0 ? "Table:NoSeeders" : "Table:Empty"]</h3>
+                    <p>@L[graph.Run.TotalCount == 0 ? "Table:NoSeedersDescription" : "Table:EmptyDescription"]</p>
+                </MoContentState>
+            </div>
+        }
+        else
+        {
+            <table class="seeder-ledger-table" role="table" aria-labelledby="seeder-ledger-title">
+                <colgroup><col class="seeder-col-name" /><col class="seeder-col-policy" /><col class="seeder-col-state" />
+                    <col class="seeder-col-attempts" /><col class="seeder-col-duration" /><col class="seeder-col-inspect" /></colgroup>
+                <thead role="rowgroup">
+                    <tr role="row">
+                        <th scope="col">@L["Table:Columns:Name"]</th>
+                        <th scope="col">@L["Table:Columns:Policy"]</th>
+                        <th scope="col">@L["Table:Columns:Status"]</th>
+                        <th scope="col" class="seeder-numeric">@L["Table:Columns:Attempts"]</th>
+                        <th scope="col" class="seeder-numeric">@L["Table:Columns:Duration"]</th>
+                        <th scope="col"><span class="seeder-visually-hidden">@L["Table:Columns:Actions"]</span></th>
+                    </tr>
+                </thead>
+                <tbody role="rowgroup">
+                    @foreach (var seeder in seeders)
+                    {
+                        var outside = SeederGraphView.IsOutsideBatch(seeder);
+                        var prerequisites = string.Join(", ", seeder.Dependencies.Select(name =>
+                            graph.ByType.GetValueOrDefault(name)?.SeederName ?? SeederDisplay.ShortName(name)));
+                        <tr role="row" @key="seeder.SeederTypeName" data-status="@seeder.Status">
+                            <td role="cell" class="seeder-ledger-identity">
+                                <div class="seeder-row-heading">
+                                    <span class="seeder-ledger-wave">@(outside ? "—" : $"W{graph.GetWave(seeder)}")</span>
+                                    <a class="seeder-ledger-link"
+                                       id="@SeederDisplay.DetailsTriggerId(seeder.SeederTypeName)"
+                                       href="@SeederDisplay.EvidenceUrl(Navigation, seeder.SeederTypeName)"
                                        aria-haspopup="dialog"
-                                       aria-label="@L["Actions:DetailsFor", context.Seeder.SeederName]" />
-                    </MudTooltip>
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <div class="seeder-table-empty" data-testid="seeder-table-empty">
-                    @if (Session.Snapshot?.Run.TotalCount == 0)
-                    {
-                        <MoIcon Icon="@MoIcons.Package" Size="2.25rem" />
-                        <strong>@L["Table:NoSeeders"]</strong>
-                        <p>@L["Table:NoSeedersDescription"]</p>
+                                       aria-label="@L["Actions:DetailsFor", seeder.SeederName]"
+                                       aria-expanded="@((Session.IsDetailsOpen && Session.SelectedSeeder?.SeederTypeName == seeder.SeederTypeName) ? "true" : "false")">
+                                        @seeder.SeederName
+                                    </a>
+                                    @if (!seeder.ParticipatesInReadiness)
+                                    {
+                                        <small class="seeder-participation-note">@L["Details:OutsideReadiness"]</small>
+                                    }
+                                </div>
+                                <code class="seeder-ledger-type">@seeder.SeederTypeName</code>
+                                <div class="seeder-ledger-dependencies">
+                                    <MoIcon Icon="@MoIcons.Workflow" Size="12px" />
+                                    <span>
+                                        @(seeder.Dependencies.Length == 0 ? L["Table:NoDependencies"] :
+                                            L["Table:DependenciesNamed", L.FormatSeederDependencyCount(seeder.Dependencies.Length), prerequisites])
+                                    </span>
+                                </div>
+                                @if (seeder.Status is SeederStatus.Blocked or SeederStatus.Failed && seeder.ErrorMessage is { Length: > 0 } error)
+                                {
+                                    <p class="seeder-ledger-diagnostic" title="@error">@error</p>
+                                }
+                            </td>
+                            <td role="cell" data-label="@L["Table:Columns:Policy"]">
+                                <div class="seeder-ledger-policy">
+                                    @PolicyPill(L.GetText(seeder.Criticality), seeder.CriticalitySource)
+                                    @PolicyPill(L.GetText(seeder.ExecutionMode), seeder.ExecutionModeSource,
+                                        seeder.ExecutionMode == SeederExecutionMode.Exclusive ? "third" : null)
+                                    @PolicyPill(L.GetText(seeder.FailureBehavior), seeder.FailureBehaviorSource,
+                                        seeder.FailureBehavior == SeederFailureBehavior.FailFast ? "error" : null)
+                                </div>
+                            </td>
+                            <td role="cell" data-label="@L["Table:Columns:Status"]">
+                                <SeederStatusMark Text="@L.GetText(seeder.Status)" Tone="@SeederDisplay.Tone(seeder.Status)" Pill="true" />
+                            </td>
+                            <td role="cell" data-label="@L["Table:Columns:Attempts"]" class="seeder-numeric">
+                                <span class="seeder-ledger-value @(seeder.MaxAttemptsSource == SeederPolicySource.SeederOverride ? "is-override" : null)"
+                                      title="@L.FormatSeederAttemptsSummary(seeder.Attempts, seeder.MaxAttempts)">
+                                    @L["Table:AttemptsValue", seeder.Attempts, seeder.MaxAttempts]
+                                </span>
+                            </td>
+                            <td role="cell" data-label="@L["Table:Columns:Duration"]" class="seeder-numeric">
+                                <span class="seeder-ledger-value">@(seeder.Duration is { } duration ? L.FormatSeederDuration(duration) : "—")</span>
+                            </td>
+                            <td role="cell" class="seeder-ledger-arrow" aria-hidden="true">
+                                <MoIcon Icon="@MoIcons.ChevronRight" Size="14px" />
+                            </td>
+                        </tr>
                     }
-                    else
-                    {
-                        <MoIcon Icon="@MoIcons.FilterOff" Size="2.25rem" />
-                        <strong>@L["Table:Empty"]</strong>
-                        <p>@L["Table:EmptyDescription"]</p>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@Session.ClearFiltersAsync">@L["Actions:ClearFilters"]</MudButton>
-                    }
-                </div>
-            </NoRecordsContent>
-        </MudTable>
-    </div>
-</section>
+                </tbody>
+            </table>
+        }
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public SeederPageSession Session { get; set; } = default!;
 
-    private IEnumerable<SeederExecutionRow> Rows =>
-        Session.FilteredSeeders.Select(static seeder => new SeederExecutionRow(seeder));
-
-    private bool IsDetailsOpen(SeederExecutionSnapshot seeder) =>
-        Session.IsDetailsOpen && string.Equals(
-            Session.SelectedSeeder?.SeederTypeName,
-            seeder.SeederTypeName,
-            StringComparison.Ordinal);
-
-    // Stable type-name equality preserves row focus as live snapshots replace their evidence.
-    private sealed class SeederExecutionRow(SeederExecutionSnapshot seeder) : IEquatable<SeederExecutionRow>
-    {
-        public SeederExecutionSnapshot Seeder { get; } = seeder;
-
-        public bool Equals(SeederExecutionRow? other) => other is not null && string.Equals(
-            Seeder.SeederTypeName,
-            other.Seeder.SeederTypeName,
-            StringComparison.Ordinal);
-
-        public override bool Equals(object? obj) => obj is SeederExecutionRow other && Equals(other);
-
-        public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Seeder.SeederTypeName);
-    }
+    private RenderFragment PolicyPill(string text, SeederPolicySource source, string? tone = null) =>
+        @<span class="seeder-policy-pill @(source == SeederPolicySource.SeederOverride ? "is-override" : null)"
+               style="--seeder-policy-tone:@SeederDisplay.ToneColor(tone ?? "neutral")">
+            @text
+            @if (source == SeederPolicySource.SeederOverride)
+            {
+                <b>@L["Table:Override"]</b>
+            }
+        </span>;
 }

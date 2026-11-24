@@ -19,6 +19,15 @@ public enum SeederPageLoadState
     Failed
 }
 
+internal enum SeederLedgerSort
+{
+    Status,
+    Wave,
+    Duration,
+    Attempts,
+    Name
+}
+
 /// <summary>
 /// Owns one Seeder page's diagnostics, filters, detail selection, authorization rechecks, and polling lifetime.
 /// </summary>
@@ -70,6 +79,8 @@ public sealed class SeederPageSession : IAsyncDisposable
     /// <summary>Gets the latest sanitized current-host diagnostics snapshot.</summary>
     public SeederDiagnosticsSnapshot? Snapshot => _state.Snapshot;
 
+    internal SeederGraphView? Graph => _state.Graph;
+
     /// <summary>Gets the state of the initial snapshot request.</summary>
     public SeederPageLoadState LoadState => _state.LoadState;
 
@@ -92,22 +103,56 @@ public sealed class SeederPageSession : IAsyncDisposable
     public string? ExecutionError => _state.ExecutionError;
 
     /// <summary>Gets whether the selected local seeder can be submitted to the native executor.</summary>
-    public bool CanRunSelected => _runAsync is not null && !_state.IsExecuting && !_state.IsAccessDenied &&
-        SelectedSeeder is { Status: not SeederStatus.Disabled } &&
-        Snapshot is { } snapshot && !SeederDisplay.IsActive(snapshot.Run.Status);
+    public bool CanRunSelected
+    {
+        get
+        {
+            var state = _state;
+            return CanRun(state, GetRunPreview(state));
+        }
+    }
+
+    internal SeederRunPreview? RunPreview => GetRunPreview(_state);
 
     /// <summary>Rechecks authorization and executes the selected seeder's dependency closure on this host.</summary>
-    public Task<bool> RunSelectedAsync()
+    public Task<bool> RunSelectedAsync() => StartExecution(confirmed: null);
+
+    internal async Task<bool> RunConfirmedAsync(SeederRunPreview confirmed)
+    {
+        var refresh = GetOrStartRefresh(throwIfDisposed: false);
+        return refresh is not null && await refresh && await StartExecution(confirmed);
+    }
+
+    private Task<bool> StartExecution(SeederRunPreview? confirmed)
     {
         lock (_stateGate)
         {
+            if (confirmed is not null && _disposed)
+            {
+                return Task.FromResult(false);
+            }
+
             ThrowIfDisposed();
-            if (_executionTask is { IsCompleted: false } || !CanRunSelected) return Task.FromResult(false);
-            var typeName = SelectedSeeder!.SeederTypeName;
-            _executionTask = ExecuteSelectedAsync(typeName, _lifetimeCancellation.Token);
+            var preview = GetRunPreview(_state);
+            if (_executionTask is { IsCompleted: false } || preview is null || !CanRun(_state, preview) ||
+                (confirmed is not null && !confirmed.Matches(preview)))
+            {
+                return Task.FromResult(false);
+            }
+
+            _executionTask = ExecuteSelectedAsync(preview.TargetTypeName, _lifetimeCancellation.Token);
             return _executionTask;
         }
     }
+
+    private bool CanRun(PageState state, SeederRunPreview? preview) =>
+        _runAsync is not null && !state.IsExecuting && !state.IsAccessDenied && !state.IsRefreshing && state.RefreshError is null &&
+        preview is { Unavailable.Count: 0 } &&
+        state.Snapshot is { } snapshot && !SeederDisplay.IsActive(snapshot.Run.Status);
+
+    private static SeederRunPreview? GetRunPreview(PageState state) =>
+        state.SelectedSeederTypeName is { } typeName && state.Graph is { } graph &&
+        graph.ByType.TryGetValue(typeName, out var seeder) ? graph.Preview(seeder) : null;
 
     private async Task<bool> ExecuteSelectedAsync(string typeName, CancellationToken cancellationToken)
     {
@@ -167,23 +212,25 @@ public sealed class SeederPageSession : IAsyncDisposable
     /// <summary>Gets the optional failure-behavior filter.</summary>
     public SeederFailureBehavior? FailureBehaviorFilter => _state.FailureBehaviorFilter;
 
+    internal SeederLedgerSort Sort => _state.Sort;
+
+    internal IReadOnlyList<SeederExecutionSnapshot> StatusFacetSeeders => FilterWithoutStatus(_state).ToArray();
+
     /// <summary>Gets the Seeder selected for detail inspection.</summary>
-    public SeederExecutionSnapshot? SelectedSeeder
+    public SeederExecutionSnapshot? SelectedSeeder => GetSelectedSeeder(_state);
+
+    /// <summary>Gets whether the requested Seeder can be shown in the detail drawer.</summary>
+    public bool IsDetailsOpen
     {
         get
         {
             var state = _state;
-            return state.SelectedSeederTypeName is null
-                ? null
-                : state.Snapshot?.Run.Seeders.FirstOrDefault(seeder => string.Equals(
-                    seeder.SeederTypeName,
-                    state.SelectedSeederTypeName,
-                    StringComparison.Ordinal));
+            return state.DetailsRequested && GetSelectedSeeder(state) is not null;
         }
     }
 
-    /// <summary>Gets whether the Seeder detail drawer is open.</summary>
-    public bool IsDetailsOpen => _state.IsDetailsOpen;
+    private static SeederExecutionSnapshot? GetSelectedSeeder(PageState state) =>
+        state.SelectedSeederTypeName is { } typeName ? state.Graph?.ByType.GetValueOrDefault(typeName) : null;
 
     /// <summary>Gets the seeders after current search and policy filters are applied.</summary>
     public IReadOnlyList<SeederExecutionSnapshot> FilteredSeeders
@@ -191,33 +238,35 @@ public sealed class SeederPageSession : IAsyncDisposable
         get
         {
             var state = _state;
-            IEnumerable<SeederExecutionSnapshot> seeders = state.Snapshot?.Run.Seeders ?? [];
-            var searchText = state.SearchText.Trim();
-            if (!string.IsNullOrWhiteSpace(searchText))
-            {
-                seeders = seeders.Where(seeder => MatchesSearch(seeder, searchText));
-            }
-
+            var seeders = FilterWithoutStatus(state);
             if (state.StatusFilter is { } status)
             {
                 seeders = seeders.Where(seeder => seeder.Status == status);
             }
 
-            if (state.CriticalityFilter is { } criticality)
+            var ordered = state.Sort switch
             {
-                seeders = seeders.Where(seeder => seeder.Criticality == criticality);
-            }
+                SeederLedgerSort.Wave => seeders.OrderBy(seeder =>
+                    SeederGraphView.IsOutsideBatch(seeder) ? int.MaxValue : state.Graph!.GetWave(seeder)),
+                SeederLedgerSort.Duration => seeders.OrderByDescending(seeder => seeder.Duration),
+                SeederLedgerSort.Attempts => seeders.OrderByDescending(seeder => seeder.Attempts),
+                SeederLedgerSort.Name => seeders.OrderBy(seeder => seeder.SeederName, StringComparer.OrdinalIgnoreCase),
+                _ => seeders.OrderBy(seeder => StatusOrder(seeder.Status))
+            };
 
-            if (state.FailureBehaviorFilter is { } failureBehavior)
-            {
-                seeders = seeders.Where(seeder => seeder.FailureBehavior == failureBehavior);
-            }
-
-            return seeders
-                .OrderBy(static seeder => StatusOrder(seeder.Status))
-                .ThenBy(static seeder => seeder.SeederName, StringComparer.OrdinalIgnoreCase)
+            return ordered.ThenBy(seeder => seeder.SeederName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(seeder => seeder.SeederTypeName, StringComparer.Ordinal)
                 .ToArray();
         }
+    }
+
+    private static IEnumerable<SeederExecutionSnapshot> FilterWithoutStatus(PageState state)
+    {
+        var searchText = state.SearchText.Trim();
+        return (state.Snapshot?.Run.Seeders ?? []).Where(seeder =>
+            (searchText.Length == 0 || MatchesSearch(seeder, searchText)) &&
+            (state.CriticalityFilter is null || seeder.Criticality == state.CriticalityFilter) &&
+            (state.FailureBehaviorFilter is null || seeder.FailureBehavior == state.FailureBehaviorFilter));
     }
 
     /// <summary>Gets terminal Seeder progress as a percentage in the inclusive 0-100 range.</summary>
@@ -305,8 +354,27 @@ public sealed class SeederPageSession : IAsyncDisposable
         SearchText = string.Empty,
         StatusFilter = null,
         CriticalityFilter = null,
-        FailureBehaviorFilter = null
+        FailureBehaviorFilter = null,
+        Sort = SeederLedgerSort.Status
     });
+
+    internal Task ApplyLocationAsync(
+        string? search,
+        SeederStatus? status,
+        SeederCriticality? criticality,
+        SeederFailureBehavior? failureBehavior,
+        SeederLedgerSort sort,
+        string? seederTypeName) => UpdatePresentationAsync(state => state with
+        {
+            SearchText = search ?? string.Empty,
+            StatusFilter = status,
+            CriticalityFilter = criticality,
+            FailureBehaviorFilter = failureBehavior,
+            Sort = sort,
+            SelectedSeederTypeName = seederTypeName,
+            DetailsRequested = seederTypeName is not null,
+            ExecutionError = state.SelectedSeederTypeName == seederTypeName ? state.ExecutionError : null
+        });
 
     /// <summary>Opens the detail drawer for one Seeder.</summary>
     public Task OpenDetailsAsync(SeederExecutionSnapshot seeder)
@@ -315,14 +383,14 @@ public sealed class SeederPageSession : IAsyncDisposable
         return UpdatePresentationAsync(state => state with
         {
             SelectedSeederTypeName = seeder.SeederTypeName,
-            IsDetailsOpen = true
+            DetailsRequested = true
         });
     }
 
     /// <summary>Closes the Seeder detail drawer.</summary>
     public Task CloseDetailsAsync() => UpdatePresentationAsync(state => state with
     {
-        IsDetailsOpen = false
+        DetailsRequested = false
     });
 
     /// <inheritdoc />
@@ -479,21 +547,15 @@ public sealed class SeederPageSession : IAsyncDisposable
                 return false;
             }
 
-            var selectionExists = _state.SelectedSeederTypeName is not null &&
-                snapshot.Run.Seeders.Any(seeder => string.Equals(
-                    seeder.SeederTypeName,
-                    _state.SelectedSeederTypeName,
-                    StringComparison.Ordinal));
             _state = _state with
             {
                 Snapshot = snapshot,
+                Graph = new SeederGraphView(snapshot.Run),
                 LoadState = SeederPageLoadState.Ready,
                 LoadError = null,
                 RefreshError = null,
                 IsAccessDenied = false,
-                IsRefreshing = false,
-                SelectedSeederTypeName = selectionExists ? _state.SelectedSeederTypeName : null,
-                IsDetailsOpen = selectionExists && _state.IsDetailsOpen
+                IsRefreshing = false
             };
             runStatus = snapshot.Run.Status;
             return true;
@@ -589,7 +651,13 @@ public sealed class SeederPageSession : IAsyncDisposable
         lock (_stateGate)
         {
             ThrowIfDisposed();
-            _state = update(_state);
+            var next = update(_state);
+            if (next == _state)
+            {
+                return;
+            }
+
+            _state = next;
         }
 
         await NotifyChangedAsync();
@@ -662,9 +730,11 @@ public sealed class SeederPageSession : IAsyncDisposable
         SeederCriticality? CriticalityFilter,
         SeederFailureBehavior? FailureBehaviorFilter,
         string? SelectedSeederTypeName,
-        bool IsDetailsOpen,
+        bool DetailsRequested,
         bool IsExecuting = false,
-        string? ExecutionError = null)
+        string? ExecutionError = null,
+        SeederGraphView? Graph = null,
+        SeederLedgerSort Sort = SeederLedgerSort.Status)
     {
         public static PageState Initial { get; } = new(
             Snapshot: null,
@@ -678,6 +748,6 @@ public sealed class SeederPageSession : IAsyncDisposable
             CriticalityFilter: null,
             FailureBehaviorFilter: null,
             SelectedSeederTypeName: null,
-            IsDetailsOpen: false);
+            DetailsRequested: false);
     }
 }

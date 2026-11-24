@@ -1,21 +1,79 @@
-.seeder-page { width:100%; min-width:0; min-height:100%; font-family:var(--mud-typography-default-family); }
-.seeder-page .seeder-workspace { display:flex; flex-direction:column; width:100%; min-width:0; min-height:100%; padding:clamp(24px,2.3vw,36px); container:seeder-page / inline-size; }
-.seeder-page-header { display:flex; align-items:center; justify-content:space-between; gap:24px; min-width:0; padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--mud-palette-divider); }
-.seeder-page-heading { min-width:0; }
-.seeder-page-eyebrow { display:block; margin-bottom:12px; color:var(--mud-palette-primary); font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
-.seeder-page-heading h1 { margin:0; color:var(--mud-palette-text-primary); font-family:var(--mud-typography-h1-family); font-size:clamp(28px,2.5vw,36px); font-weight:600; line-height:1.25; letter-spacing:-.025em; }
-.seeder-page-heading p { margin:10px 0 0; max-width:720px; color:var(--mud-palette-text-secondary); font-size:13px; line-height:1.6; }
-.seeder-page-host { display:flex; align-items:center; gap:7px; margin-top:12px; color:var(--mud-palette-text-secondary); font-family:var(--mo-font-family-mono); font-size:10px; }
-.seeder-page-host span { overflow-wrap:anywhere; }
-.seeder-page-host ::deep svg { flex:0 0 auto; width:14px; height:14px; }
-.seeder-page-actions { display:flex; align-items:center; gap:12px; flex-shrink:0; }
-.seeder-page-actions ::deep .mud-button-root { min-height:36px; padding:7px 14px; border-radius:6px; font-family:var(--mud-typography-default-family); font-size:12px; font-weight:500; text-transform:none; box-shadow:none; }
-.seeder-page-content { display:grid; gap:24px; width:100%; min-width:0; }
-.seeder-overview-grid { display:grid; min-width:0; grid-template-columns:minmax(0,1.65fr) minmax(0,1fr); gap:24px; align-items:stretch; }
-.seeder-page-state { display:flex; min-width:0; min-height:320px; padding:32px; align-items:center; justify-content:center; flex-direction:column; gap:12px; text-align:center; }
-.seeder-page ::deep .seeder-page-refresh-alert { margin-bottom:24px; }
-.seeder-page ::deep .seeder-page-refresh-alert,.seeder-page ::deep .seeder-page-refresh-alert .mud-alert-message { min-width:0; }
-.seeder-page ::deep .seeder-page-refresh-alert .mud-alert-message,.seeder-page ::deep .seeder-page-error { max-width:100%; overflow-wrap:anywhere; }
-@container seeder-page (max-width:950px) { .seeder-overview-grid { grid-template-columns:1fr; } }
-@container seeder-page (max-width:600px) { .seeder-page-header { align-items:flex-start; gap:20px; } .seeder-page-actions { padding-top:20px; } .seeder-overview-grid { gap:20px; } }
-@media(max-width:700px) { .seeder-page .seeder-workspace { padding:22px 16px; } .seeder-page-content { gap:20px; } .seeder-page-header { align-items:flex-start; flex-direction:column; gap:18px; } .seeder-page-actions { padding:0; } }
+.seeder-page {
+    display: grid;
+    align-content: start;
+    gap: 20px;
+    min-width: 0;
+    min-height: 100%;
+    padding: clamp(16px, 1.7vw, 24px) clamp(16px, 2.25vw, 30px) 28px;
+}
+.seeder-masthead {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+.seeder-masthead ::deep .mo-vl-masthead {
+    gap: 12px 20px;
+}
+.seeder-masthead ::deep .mo-vl-masthead__identity {
+    flex-basis: 26rem;
+}
+.seeder-seal {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: var(--mud-palette-text-primary);
+    color: var(--mud-palette-surface);
+}
+.seeder-masthead code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font: .75rem var(--mo-font-family-mono);
+}
+.seeder-masthead-actions {
+    display: flex;
+    align-items: end;
+    gap: 16px;
+}
+.seeder-capture {
+    display: grid;
+    text-align: end;
+    color: var(--mud-palette-text-secondary);
+    font-size: .6875rem;
+}
+.seeder-capture time {
+    color: var(--mud-palette-text-primary);
+    font: 600 .8125rem var(--mo-font-family-mono);
+}
+.seeder-masthead-actions ::deep .mud-button-root {
+    min-height: 34px;
+    box-shadow: none;
+    text-transform: none;
+}
+.seeder-surface {
+    min-width: 0;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 12px;
+    background: var(--mud-palette-surface);
+}
+.seeder-page ::deep .mo-content-state p {
+    overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+    .seeder-masthead {
+        align-items: start;
+        gap: 10px;
+    }
+    .seeder-seal {
+        width: 38px;
+        height: 38px;
+        margin-top: 12px;
+        border-radius: 10px;
+    }
+    .seeder-capture {
+        text-align: start;
+    }
+}

@@ -1,73 +1,41 @@
 @inject IStringLocalizer<SeederResource> L
 
-@if (Session.Snapshot is { Configuration: { } configuration })
+@if (Session.Snapshot is { Configuration: { } configuration } && Session.Graph is { } graph)
 {
     <section class="seeder-configuration" aria-labelledby="seeder-configuration-title">
-        <div class="seeder-configuration-heading">
+        <header class="seeder-configuration-heading">
             <div>
-                <span class="seeder-configuration-eyebrow">@L["Configuration:Eyebrow"]</span>
                 <h2 id="seeder-configuration-title">@L["Configuration:Title"]</h2>
+                <p>@L["Configuration:Subtitle"]</p>
             </div>
-            <span class="seeder-configuration-symbol" aria-hidden="true">
-                <MoIcon Icon="@MoIcons.Sliders" Size="1.5rem" />
-            </span>
-        </div>
+            <span>@L["Configuration:Overrides", graph.OverrideCount, graph.Run.TotalCount]</span>
+        </header>
 
         <div class="seeder-policy-groups">
-            <section class="seeder-policy-group" aria-labelledby="seeder-scheduling-policy-title">
-                <h3 id="seeder-scheduling-policy-title">@L["Configuration:Groups:Scheduling"]</h3>
-                <dl class="seeder-configuration-facts">
-                    <div>
-                        <dt>@L["Configuration:ExecutionMode"]</dt>
-                        <dd>@L.GetText(configuration.DefaultExecutionMode)</dd>
-                    </div>
-                    <div>
-                        <dt>@L["Configuration:MaxConcurrency"]</dt>
-                        <dd class="seeder-policy-number">@configuration.MaxConcurrency</dd>
-                    </div>
+            <section aria-labelledby="seeder-scheduling-policy-title">
+                <h3 id="seeder-scheduling-policy-title"><MoIcon Icon="@MoIcons.Workflow" Size="14px" />@L["Configuration:Groups:Scheduling"]</h3>
+                <dl>
+                    <div><dt>@L["Configuration:ExecutionMode"]</dt><dd>@L.GetText(configuration.DefaultExecutionMode)</dd></div>
+                    <div><dt>@L["Configuration:MaxConcurrency"]</dt><dd><code>@configuration.MaxConcurrency</code></dd></div>
                 </dl>
             </section>
-
-            <section class="seeder-policy-group" aria-labelledby="seeder-readiness-policy-title">
-                <h3 id="seeder-readiness-policy-title">@L["Configuration:Groups:Readiness"]</h3>
-                <dl class="seeder-configuration-facts">
-                    <div>
-                        <dt>@L["Configuration:Criticality"]</dt>
-                        <dd>@L.GetText(configuration.DefaultCriticality)</dd>
-                    </div>
+            <section aria-labelledby="seeder-readiness-policy-title">
+                <h3 id="seeder-readiness-policy-title"><MoIcon Icon="@MoIcons.Success" Size="14px" />@L["Configuration:Groups:Readiness"]</h3>
+                <dl><div><dt>@L["Configuration:Criticality"]</dt><dd>@L.GetText(configuration.DefaultCriticality)</dd></div></dl>
+            </section>
+            <section aria-labelledby="seeder-retry-policy-title">
+                <h3 id="seeder-retry-policy-title"><MoIcon Icon="@MoIcons.Refresh" Size="14px" />@L["Configuration:Groups:Retries"]</h3>
+                <dl>
+                    <div><dt>@L["Configuration:MaxAttempts"]</dt><dd><code>@configuration.DefaultMaxAttempts</code></dd></div>
+                    <div><dt>@L["Configuration:RetryBaseDelay"]</dt><dd><code>@L.FormatSeederDuration(configuration.RetryBaseDelay)</code></dd></div>
+                    <div><dt>@L["Configuration:RetryMaxDelay"]</dt><dd><code>@L.FormatSeederDuration(configuration.RetryMaxDelay)</code></dd></div>
                 </dl>
             </section>
-
-            <section class="seeder-policy-group seeder-policy-retries" aria-labelledby="seeder-retry-policy-title">
-                <h3 id="seeder-retry-policy-title">@L["Configuration:Groups:Retries"]</h3>
-                <dl class="seeder-configuration-facts">
-                    <div>
-                        <dt>@L["Configuration:MaxAttempts"]</dt>
-                        <dd class="seeder-policy-number">@configuration.DefaultMaxAttempts</dd>
-                    </div>
-                    <div>
-                        <dt>@L["Configuration:RetryBaseDelay"]</dt>
-                        <dd class="seeder-policy-number">@L.FormatSeederDuration(configuration.RetryBaseDelay)</dd>
-                    </div>
-                    <div>
-                        <dt>@L["Configuration:RetryMaxDelay"]</dt>
-                        <dd class="seeder-policy-number">@L.FormatSeederDuration(configuration.RetryMaxDelay)</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section class="seeder-policy-group" aria-labelledby="seeder-failure-policy-title">
-                <h3 id="seeder-failure-policy-title">@L["Configuration:Groups:Failure"]</h3>
-                <dl class="seeder-configuration-facts">
-                    <div>
-                        <dt>@L["Configuration:FailureBehavior"]</dt>
-                        <dd>@L.GetText(configuration.DefaultFailureBehavior)</dd>
-                    </div>
-                </dl>
+            <section aria-labelledby="seeder-failure-policy-title">
+                <h3 id="seeder-failure-policy-title"><MoIcon Icon="@MoIcons.Warning" Size="14px" />@L["Configuration:Groups:Failure"]</h3>
+                <dl><div><dt>@L["Configuration:FailureBehavior"]</dt><dd>@L.GetText(configuration.DefaultFailureBehavior)</dd></div></dl>
             </section>
         </div>
-
-        <p class="seeder-configuration-context">@L["Configuration:Subtitle"]</p>
     </section>
 }
 

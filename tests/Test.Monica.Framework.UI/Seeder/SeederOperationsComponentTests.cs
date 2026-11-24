@@ -8,6 +8,7 @@ using Monica.Framework.UI.Localization;
 using Monica.Framework.UI.UISeeder.Components;
 using Monica.Framework.UI.UISeeder.State;
 using Monica.Testing.Localization;
+using Monica.UI.Localization;
 using MudBlazor;
 using MudBlazor.Services;
 using Xunit;
@@ -32,13 +33,6 @@ public sealed class SeederOperationsComponentTests
 
         cut.Markup.Should().Contain("RunStatus:CompletedWithFailures");
         cut.Markup.Should().Contain("ReadinessStatus:Degraded");
-        var labelIds = cut.Find("[role='progressbar']").GetAttribute("aria-labelledby")!
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        labelIds.Should().NotBeEmpty();
-        foreach (var id in labelIds)
-        {
-            cut.Find($"[id='{id}']").TextContent.Should().NotBeNullOrWhiteSpace();
-        }
     }
 
     [Fact]
@@ -77,9 +71,9 @@ public sealed class SeederOperationsComponentTests
 
         filtered.Markup.Should().Contain("SearchIndexSeeder");
         filtered.Markup.Should().NotContain("CatalogSeeder");
-        var detailsButton = filtered.Find("button[aria-haspopup='dialog']");
-        detailsButton.GetAttribute("aria-controls").Should().Be("seeder-detail-dialog");
-        detailsButton.GetAttribute("aria-expanded").Should().Be("false");
+        var detailsLink = filtered.Find("a[aria-haspopup='dialog']");
+        detailsLink.GetAttribute("href").Should().Contain("seeder=Example.Seeders.SearchIndexSeeder");
+        detailsLink.GetAttribute("aria-expanded").Should().Be("false");
 
         await session.SetSearchTextAsync("not-present");
         var empty = context.Render<SeederExecutionTable>(parameters => parameters
@@ -120,24 +114,23 @@ public sealed class SeederOperationsComponentTests
         await session.OpenDetailsAsync(seeder);
         await using var context = CreateContext();
 
-        var cut = context.Render<SeederDetailsDrawer>(parameters => parameters
+        var dialogs = context.Render<MudDialogProvider>();
+        _ = context.Render<SeederDetailsDrawer>(parameters => parameters
             .Add(component => component.Session, session));
 
-        cut.Markup.Should().Contain("PolicySource:SeederOverride");
-        cut.Markup.Should().Contain("Example.Seeders.CatalogSeeder");
-        cut.Markup.Should().Contain("SeederStatus:Succeeded");
-        var attempt = cut.FindAll("[data-testid='seeder-attempt-row']").Should().ContainSingle().Which;
-        attempt.TextContent.Should().Contain("Details:Timing:CompletedAt");
-        cut.Markup.Should().Contain("System.InvalidOperationException");
-        cut.Markup.Should().Contain("Search service unavailable");
-        var dialog = cut.Find("[role='dialog']");
-        dialog.GetAttribute("aria-modal").Should().Be("true");
-        dialog.GetAttribute("aria-labelledby").Should().Be("seeder-detail-title");
-        var scrollRegion = cut.Find(".seeder-detail-content");
-        scrollRegion.GetAttribute("role").Should().Be("region");
-        scrollRegion.GetAttribute("aria-labelledby").Should().Be("seeder-detail-title");
-        scrollRegion.GetAttribute("tabindex").Should().Be("0");
-        cut.Markup.Should().Contain("mud-focus-trap");
+        dialogs.WaitForAssertion(() =>
+        {
+            var dialog = dialogs.Find("[role='dialog']");
+            dialog.TextContent.Should().Contain("PolicySource:SeederOverride");
+            dialog.TextContent.Should().Contain("Example.Seeders.CatalogSeeder");
+            dialog.TextContent.Should().Contain("SeederStatus:Succeeded");
+            dialog.TextContent.Should().Contain("System.InvalidOperationException");
+            dialog.TextContent.Should().Contain("Search service unavailable");
+            dialog.QuerySelectorAll("[data-testid='seeder-attempt-row']").Should().ContainSingle();
+            dialog.GetAttribute("aria-modal").Should().Be("true");
+            var headingId = dialog.GetAttribute("aria-labelledby");
+            dialog.QuerySelector($"[id='{headingId}']")!.TextContent.Should().Contain(seeder.SeederName);
+        });
     }
 
     private static BunitContext CreateContext()
@@ -149,6 +142,7 @@ public sealed class SeederOperationsComponentTests
         context.Services.AddOptions<global::Monica.Modules.ModuleClockOption>();
         context.Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         context.Services.AddSingleton<IStringLocalizer<SeederResource>, EchoStringLocalizer<SeederResource>>();
+        context.Services.AddSingleton<IStringLocalizer<SharedResource>, EchoStringLocalizer<SharedResource>>();
         _ = context.Render<MudPopoverProvider>();
         return context;
     }

@@ -5,10 +5,9 @@
   },
   "Page": {
     "Title": "初始化执行",
-    "Eyebrow": "应用初始化",
+    "Eyebrow": "启动播种",
     "Heading": "初始化执行",
-    "Subtitle": "查看当前主机的初始化进度、有效策略与执行证据。",
-    "CurrentHost": "主机 · {0}"
+    "TimeZone": "主机时区 UTC{0}"
   },
   "Access": {
     "Checking": "正在检查仪表板访问权限…",
@@ -19,35 +18,48 @@
     "Refresh": "刷新",
     "Retry": "重试",
     "Close": "关闭",
-    "Details": "查看详情",
     "DetailsFor": "查看 {0}",
-    "ClearFilters": "清除筛选"
+    "ClearFilters": "清除筛选",
+    "CopyHost": "复制主机名 {0}",
+    "CopyType": "复制完整类型名称",
+    "Copied": "已复制到剪贴板",
+    "CopyFailed": "复制到剪贴板失败",
+    "Cancel": "取消",
+    "BackToSeeder": "返回 {0}",
+    "ClearSelection": "清除 Seeder 选择"
   },
   "State": {
     "Loading": "正在加载 Seeder 诊断信息",
     "LoadingDescription": "正在读取当前主机的有效配置和运行记录。",
     "LoadFailed": "无法加载 Seeder 诊断信息",
-    "RefreshFailed": "最新一次刷新失败：{0}。界面继续显示上一次快照。"
+    "RefreshFailed": "最新一次刷新失败：{0}。界面继续显示上一次快照。",
+    "Stale": "当前显示的是旧快照",
+    "UnknownSeeder": "Seeder 不可用",
+    "UnknownSeederDescription": "当前宿主的快照中没有 {0}。"
   },
   "Overview": {
-    "RunLabel": "当前运行",
     "ProgressSummary": {
       "Singular": "{1} 个 Seeder 中已有 {0} 个进入终态",
       "Plural": "{1} 个 Seeder 中已有 {0} 个进入终态"
     },
-    "Duration": "耗时 · {0}",
-    "CapturedAt": "采集于 · {0}",
-    "FailFastTrigger": "触发快速失败的 Seeder：{0}",
-    "Readiness": "初始化就绪 · {0}",
-    "TerminalCompletion": "已达终态",
+    "Duration": "总耗时",
+    "CapturedAt": "快照采集",
+    "FailFastTrigger": "{0} 耗尽尝试次数，触发批次取消。",
+    "Readiness": "初始化就绪",
     "ActiveRefresh": "实时 · 每秒更新",
     "CompletedRefresh": "运行结束 · 手动刷新",
-    "EmptyRun": "当前快照中没有初始化任务"
+    "StaleRefresh": "快照已过期",
+    "OfRequired": "/ {0} 个必要项",
+    "OfParticipating": "/ {0} 个参与项",
+    "OfDiscovered": "/ {0} 个发现项",
+    "NotStarted": "批次尚未开始",
+    "ConfigurationSummary": "最大并发 {0} · {1}/{2} 项覆盖默认策略",
+    "JumpToDefaults": "查看默认策略",
+    "FailFast": "快速失败取消"
   },
   "Configuration": {
-    "Eyebrow": "有效默认值",
-    "Title": "执行默认策略",
-    "Subtitle": "Seeder 注解可覆盖部分继承策略，具体来源可在详情中查看。",
+    "Title": "主机默认执行策略",
+    "Subtitle": "未声明覆盖项的 Seeder 继承这些策略。可在证据中查看每项配置的来源。",
     "MaxConcurrency": "最大并发数",
     "ExecutionMode": "执行模式",
     "Criticality": "关键性",
@@ -60,7 +72,8 @@
       "Retries": "重试策略",
       "Failure": "失败处理",
       "Readiness": "就绪要求"
-    }
+    },
+    "Overrides": "{1} 项中有 {0} 项覆盖默认策略"
   },
   "Filters": {
     "AriaLabel": "Seeder 筛选条件",
@@ -75,21 +88,22 @@
     "Results": {
       "Singular": "正在显示 {1} 个 Seeder 中的 {0} 个",
       "Plural": "正在显示 {1} 个 Seeder 中的 {0} 个"
-    }
+    },
+    "SortLabel": "排序",
+    "SortByStatus": "优先关注异常",
+    "SortByWave": "依赖波次",
+    "SortByDuration": "耗时最长",
+    "SortByAttempts": "尝试最多",
+    "SortByName": "Seeder 名称"
   },
   "Table": {
-    "Eyebrow": "执行记录",
-    "Title": "已发现的 Seeder",
-    "Subtitle": "当前进程中解析后的策略、依赖证据、执行尝试和耗时。",
+    "Title": "执行台账",
+    "Subtitle": "比较 Seeder 状态、执行策略、前置依赖和当前进程的执行证据。",
     "Columns": {
       "Name": "Seeder",
       "Status": "状态",
-      "Criticality": "关键性",
-      "ExecutionMode": "执行方式",
-      "FailureBehavior": "失败时",
       "Attempts": "尝试次数",
       "Duration": "耗时",
-      "Dependencies": "依赖项",
       "Actions": "详情",
       "Policy": "有效策略"
     },
@@ -101,10 +115,13 @@
     "Empty": "没有 Seeder 符合当前筛选条件",
     "EmptyDescription": "请调整搜索或策略筛选条件，以查看执行记录的其他部分。",
     "NoSeeders": "未发现任何 Seeder",
-    "NoSeedersDescription": "当前主机的类型发现范围没有生成 Seeder 依赖图。"
+    "NoSeedersDescription": "当前主机的类型发现范围没有生成 Seeder 依赖图。",
+    "Override": "覆盖",
+    "NoDependencies": "无直接依赖",
+    "DependenciesNamed": "{0}：{1}"
   },
   "Details": {
-    "Eyebrow": "SEEDER 证据",
+    "Eyebrow": "Seeder 证据",
     "AttemptsSummary": {
       "Singular": "累计 {0} 次尝试 · 每次执行最多 {1} 次",
       "Plural": "累计 {0} 次尝试 · 每次执行最多 {1} 次"
@@ -114,17 +131,24 @@
       "ExecutionMode": "执行模式",
       "Criticality": "关键性",
       "FailureBehavior": "失败策略",
-      "MaxAttempts": "最大尝试次数"
+      "MaxAttempts": "最大尝试次数",
+      "Property": "策略",
+      "HostDefault": "主机默认",
+      "Effective": "实际生效",
+      "Source": "来源"
     },
     "Timing": {
-      "Title": "时间信息",
+      "Title": "激活与计时",
       "StartedAt": "开始时间",
       "CompletedAt": "完成时间",
       "Duration": "耗时"
     },
     "Dependencies": {
-      "Title": "直接依赖项",
-      "None": "此 Seeder 没有直接依赖项。"
+      "Title": "上下游依赖",
+      "None": "此 Seeder 没有直接依赖项。",
+      "Prerequisites": "直接前置依赖",
+      "Dependents": "直接下游",
+      "NoDependents": "没有 Seeder 直接依赖此项。"
     },
     "Attempts": {
       "Title": "尝试时间线",
@@ -133,13 +157,21 @@
         "Plural": "已记录 {0} 次"
       },
       "None": "尚未开始执行尝试。",
-      "Number": "第 {0} 次尝试"
+      "Number": "第 {0} 次尝试",
+      "RetryGap": "尝试间隔 · {0}"
     },
     "Error": {
       "Title": "最终诊断信息",
-      "Type": "类型",
-      "Message": "消息",
       "LogsHint": "此处仅显示长度受限的诊断摘要；完整异常证据请查看结构化日志。"
+    },
+    "Wave": "波次 {0}",
+    "InReadiness": "参与就绪 · {0}",
+    "OutsideReadiness": "不参与就绪",
+    "Activation": {
+      "Title": "激活方式",
+      "Automatic": "自动",
+      "Manual": "手动",
+      "Disabled": "不可执行"
     }
   },
   "RunStatus": {
@@ -197,15 +229,61 @@
     "NotAvailable": "暂无",
     "None": "无",
     "DurationMilliseconds": "{0:0} 毫秒",
-    "DurationSeconds": "{0:0.0} 秒",
+    "DurationSeconds": "{0:0.0#} 秒",
     "DurationMinutesSeconds": "{0} 分 {1} 秒",
     "DurationHoursMinutes": "{0} 小时 {1} 分"
   },
   "Manual": {
-    "Title": "手动执行",
+    "Title": "显式执行与依赖闭包",
     "Effects": "执行此初始化任务及其尚未成功的可执行前置任务。这可能写入共享数据库或发布事件；其他暂缓任务不会执行。",
     "Run": "执行任务及前置依赖",
     "Running": "正在执行…",
-    "Failed": "执行未能完成：{0}"
+    "Failed": "未能完成执行",
+    "TargetOnly": "当前快照显示只需执行此 Seeder。",
+    "Order": "尚未成功的前置依赖排列在其下游之前。",
+    "Unavailable": "以下定义无法运行，当前不能提交执行：{0}。",
+    "Busy": "请等待当前批次结束后再执行。",
+    "Stale": "请刷新快照并核对依赖后再执行。",
+    "PreviewChanged": "执行预览已变化，请重新核对后再确认。",
+    "ConfirmTitle": "确认执行 Seeder",
+    "ConfirmSummary": "执行 {0}？本次将运行下方列出的 {1} 项。",
+    "ConfirmRun": "确认执行"
+  },
+  "Finding": {
+    "Waiting": "正在等待宿主启动。{0} 个必要项参与就绪判定。",
+    "Aborted": "仍有 {0} 个必要项未就绪。其中批次被阻止 {1} 项，取消 {2} 项。",
+    "Scheduling": "正在调度下一批工作。{1} 个必要项中有 {0} 个已就绪。",
+    "Running": "正在运行 {0} 个 Seeder，包括 {1}。{3} 个必要项中有 {2} 个已就绪。",
+    "Failed": "{0} 执行失败。",
+    "FailedAttempts": "最近批次已尝试 {0} 次。",
+    "Cascade": "依赖链阻止了 {0} 个下游 Seeder，包括 {1}。",
+    "Optional": "可选 Seeder {0} 也未能成功。",
+    "Unready": "还有 {0} 个必要项未成功。可从时间线或台账查看证据。",
+    "Ready": "参与就绪判定的 {0} 个必要项均已就绪。",
+    "Degraded": "参与就绪判定的 {0} 个必要项均已就绪。{1} 个可选项未成功，包括 {2}。",
+    "HeldAndDisabled": "{0} 个暂缓项与 {1} 个不可执行项已在独立区域列出。",
+    "Held": "有 {0} 个暂缓项。",
+    "Disabled": "有 {0} 项在当前宿主不可执行。"
+  },
+  "Waterfall": {
+    "Title": "依赖波次与执行时间线",
+    "Description": "波次按前置依赖层级展开。时间线展示最近批次的实际尝试、独占执行与依赖阻塞。悬停或使用方向键追踪上下游。",
+    "SuccessfulAttempt": "成功尝试",
+    "FailedAttempt": "失败尝试",
+    "ExclusiveBarrier": "独占屏障",
+    "AxisOrigin": "启动偏移",
+    "AbortAt": "中止 · {0}",
+    "LiveAt": "进行中 · {0}",
+    "StaleAt": "旧快照 · {0}",
+    "EndAt": "完成 · {0}",
+    "OutsideBatch": "自动执行范围之外",
+    "Upstream": "上游",
+    "Downstream": "下游",
+    "Trace": "· {0} · 尝试 {1}/{2} 次 · 前置依赖 {3} · 下游 {4} 项，其中 {5} 项被阻止",
+    "Summary": "{0} 个依赖波次 · {1} 条直接依赖 · {2} 个独占区间",
+    "LaneLabel": "{0}，{1}，{2}，{3}",
+    "Attempt": "第 {0} 次尝试 · {1} · {2}",
+    "BlockedBy": "被 {0} 阻止",
+    "NoBatchTiming": "等待批次时间数据"
   }
 }
