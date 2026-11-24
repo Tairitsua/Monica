@@ -6,10 +6,11 @@ namespace Monica.Locker.Services;
 /// <summary>
 /// Converts caller-facing resource names into provider-ready keys.
 /// </summary>
-internal sealed class LockKeyNormalizer(IOptions<ModuleLockerOption> moduleOptions)
+public sealed class LockKeyNormalizer(IOptions<ModuleLockerOption> moduleOptions)
 {
     private ModuleLockerOption ModuleOptions { get; } = moduleOptions.Value;
 
+    /// <summary>Prepends the configured prefix verbatim, without contacting the provider.</summary>
     public string Normalize(string resourceName)
     {
         // Keep normalization intentionally simple so every provider observes the same stable key format.

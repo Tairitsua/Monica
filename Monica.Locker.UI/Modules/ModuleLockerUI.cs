@@ -41,7 +41,7 @@ public sealed class ModuleLockerUI : MonicaModule<ModuleLockerUIOption>, IUIModu
                 MoIcons.Network, category, addToNav: true, navOrder: 10,
                 accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleLockerUIOption>));
             registry.RegisterLocalizedPage<UILocksPage, LockerResource>(UILocksPage.PAGE_URL, "Navigation:Locks",
-                MoIcons.Lock, category, addToNav: true, navOrder: 20,
+                MoIcons.Lock, category, addToNav: false, navOrder: 20,
                 accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleLockerUIOption>));
         }));
     }

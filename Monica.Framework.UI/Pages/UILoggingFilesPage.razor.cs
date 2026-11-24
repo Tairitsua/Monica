@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Monica.Core.Results;
 using Monica.Framework.UI.UILogging.Models;
+using Monica.Framework.UI.UILogging.Components;
 using Monica.Framework.UI.UILogging.Support;
 
 namespace Monica.Framework.UI.Pages;
@@ -13,6 +14,18 @@ public partial class UILoggingFilesPage
     [SupplyParameterFromQuery(Name = "file")]
     public string? File { get; set; }
 
+    [SupplyParameterFromQuery(Name="q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name="folder")] public string? Folder { get; set; }
+    [SupplyParameterFromQuery(Name="sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name="page")] public string? Page { get; set; }
+    private int RequestedPage => int.TryParse(Page, out var value) && value > 1 ? value - 1 : 0;
+    private string? FolderKey => Folder switch { "all" => null, "." or "/" => "", _ => Folder };
+    private ScreenLogSnapshot? _reader;
+    private long _total;
+    private static readonly (string,string)[] Orders = [("modified","Design:FilesOrderModified"),("size","Design:FilesOrderSize"),("name","Design:FilesOrderName")];
+    protected override void OnParametersSet() { _keyword=Search; _order=Sort ?? "modified"; _page=Math.Clamp(RequestedPage,0,PageCount-1); }
+    private void SetFolder(string? folder) { _page=0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["folder"] = folder=="" ? "." : folder, ["page"] = null }),replace:true); }
+    private void SetOrder(string order) { _page=0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["sort"] = order, ["page"] = null }),replace:true); }
     private readonly object _ownership = new();
     private readonly CancellationTokenSource _retirement = new();
     private readonly HashSet<Task> _operations = [];
@@ -35,7 +48,7 @@ public partial class UILoggingFilesPage
     {
         get
         {
-            var files = _files.Where(f => string.IsNullOrWhiteSpace(_keyword) || f.RelativePath.Contains(_keyword, StringComparison.OrdinalIgnoreCase));
+            var files = _files.Where(f => string.IsNullOrWhiteSpace(_keyword) || f.RelativePath.Contains(_keyword, StringComparison.OrdinalIgnoreCase)).Where(f=>FolderKey is null || LogFootprint.FolderOf(f)==FolderKey);
             return (_order switch
             {
                 "name" => files.OrderBy(f => f.RelativePath, StringComparer.OrdinalIgnoreCase),
@@ -49,6 +62,7 @@ public partial class UILoggingFilesPage
 
     protected override Task OnInitializedAsync()
     {
+        _reader = Workspace.GetReader().GetSnapshot();
         _transfer = new LogBrowserTransfer(JSRuntime);
         return RefreshAsync();
     }
@@ -83,21 +97,23 @@ public partial class UILoggingFilesPage
 
     private Task RefreshAsync() => Admit(async () =>
     {
+        _reader=Workspace.GetReader().GetSnapshot();
         var result = await FileQuery.ListFilesAsync(_retirement.Token);
         if (_disposed) return;
         var error = result.WithoutData();
         var files = result.Data;
         if (result.IsFailure() || files is null) _error = error.Message ?? "The log file catalog was unavailable.";
-        else { _files = files; _readAt = DateTimeOffset.UtcNow; _page = Math.Min(_page, PageCount - 1); }
+        else { _files = files; _total=files.Sum(f=>f.Size); _readAt = DateTimeOffset.UtcNow; _page = Math.Clamp(RequestedPage, 0, PageCount - 1); }
     });
 
     private Task DownloadAsync(string path) => Admit(() => _transfer!.DownloadAsync(NavigationManager.ToAbsoluteUri(LogBrowserTransfer.FileUrl(path)).ToString()));
-    private void SearchChanged(ChangeEventArgs args) { _keyword = args.Value?.ToString(); _page = 0; }
-    private void OrderChanged(ChangeEventArgs args) { _order = args.Value?.ToString() ?? "modified"; _page = 0; }
-    private void PreviousPage() { if (_page > 0) _page--; }
-    private void NextPage() { if (_page + 1 < PageCount) _page++; }
+    private void SearchChanged(ChangeEventArgs args) { _page = 0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = args.Value?.ToString(), ["page"] = null }),replace:true); }
+    private void PreviousPage() { if (_page > 0) SetPage(_page - 1); }
+    private void NextPage() { if (_page + 1 < PageCount) SetPage(_page + 1); }
 
-    private static string FormatSize(long bytes)
+    private void SetPage(int index) => NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameter("page",index + 1),replace:true);
+
+    internal static string FormatSize(long bytes)
     {
         if (bytes < 1024) return $"{bytes:N0} B";
         var value = bytes / 1024d;

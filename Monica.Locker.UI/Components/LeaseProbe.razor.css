@@ -1,0 +1,10 @@
+.ls-probe-form {
+    display: grid;
+    grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 10px 12px;
+}
+@container page (max-width: 960px) {
+.ls-probe-form { grid-template-columns: minmax(0, 1fr); }
+}
+.ls-probe-surface { background: var(--mud-palette-surface); border: 1px solid var(--mud-palette-divider); border-radius: 12px; min-width: 0; padding:18px 22px; } .ls-probe-form { align-items:center; margin:12px 0; } .ls-probe-examples { display:flex; flex-wrap:wrap; gap:8px; } .ls-probe-examples button { color:var(--mud-palette-primary); overflow-wrap:anywhere; font:12px var(--mo-font-family-mono); } header { display:flex; align-items:center; gap:12px; } header p, section p { color:var(--mud-palette-text-secondary); font-size:12.5px; } h2 { font-size:16px; font-weight:600; }

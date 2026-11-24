@@ -13,8 +13,7 @@
       "Manual": "仅手动刷新"
     },
     "Actions": {
-      "AutoRefresh": "自动刷新",
-      "Refresh": "刷新证据"
+      "AutoRefresh": "自动刷新"
     },
     "Captured": "捕获于",
     "Loading": "正在读取本地耗时证据…",
@@ -25,13 +24,7 @@
     }
   },
   "Summary": {
-    "AriaLabel": "完整快照的耗时范围",
-    "Running": "捕获时执行中",
-    "Operations": "已完成操作标识",
-    "Samples": "已完成样本",
-    "Average": "各标识均值的平均值",
-    "AverageBasis": "每个操作标识具有相同权重。",
-    "Scope": "当前主机的累计证据。暂停视图不会暂停记录。"
+    "AverageBasis": "每个操作标识具有相同权重。"
   },
   "Statistics": {
     "Eyebrow": "已完成 / 排序证据",
@@ -40,17 +33,9 @@
     "EmptyHelp": "通过 Monica 执行管线测量的业务操作将在完成后显示。",
     "Search": "查找操作",
     "SearchPlaceholder": "名称或完整操作标识",
-    "Ordering": {
-      "Mean": "平均耗时降序",
-      "Latest": "最近耗时降序",
-      "Samples": "样本数量降序",
-      "Identity": "完整标识 · A–Z"
-    },
     "DurationPair": "耗时",
     "FrequencyPair": "完成记录",
     "AllocationPair": "分配记录",
-    "RelativeMean": "平均耗时为当前快照最大标识均值的 {0}%。",
-    "ComparisonHelp": "横条以完整快照中最大的标识平均耗时为基准进行对比。",
     "RateHelp": "频率为首次完成以来每分钟的累计完成数；分母至少为一分钟。",
     "Pagination": "已完成操作分页"
   },
@@ -59,8 +44,6 @@
     "Title": "进行中的执行",
     "Empty": "捕获时没有执行中的实例。",
     "Search": "查找已捕获的执行实例",
-    "AgeBasis": "捕获时的运行时长",
-    "CapturedHelp": "实例列表及运行时长均属于本次捕获。暂停视图时仍继续记录。",
     "Pagination": "已捕获执行实例分页"
   },
   "Columns": {
@@ -77,10 +60,6 @@
     "LastRecordedAt": "最近完成时间"
   },
   "Details": {
-    "CompletedTitle": "已完成操作证据",
-    "RunningTitle": "已捕获执行实例证据",
-    "CaptureHelp": "数值来自成功获取的页面快照：",
-    "DisplayName": "显示名称",
     "OperationKey": "完整操作标识",
     "InvocationId": "执行实例 ID",
     "FirstRecordedAt": "首次完成时间",
@@ -90,8 +69,7 @@
     "MeanAllocation": "平均内存分配",
     "LatestAllocation": "最近内存分配",
     "RecordedMilliseconds": "记录值：{0} 毫秒",
-    "RecordedBytes": "记录值：{0} 字节",
-    "OpenFailed": "无法打开证据详情。"
+    "RecordedBytes": "记录值：{0} 字节"
   },
   "Common": {
     "Unavailable": "—",
@@ -100,12 +78,100 @@
     "Clear": "清除搜索",
     "Details": "详情",
     "Inspect": "查看 {0}",
-    "Close": "关闭",
     "NoMatches": "没有匹配的证据。",
     "NoMatchesHelp": "修改或清除查询以查看已捕获记录。",
     "PageRange": "第 {0}–{1} 条，共 {2} 条"
   },
   "Navigation": {
     "Category": "执行计时"
+  },
+  "Bench": {
+    "LongestLingering": "超出基线最久",
+    "LongestFlight": "运行时间最长",
+    "Heaviest": "累计耗时最高",
+    "Slowest": "平均用时最高",
+    "Allocation": "{0} / {1} 项记录分配量"
+  },
+  "Design": {
+    "BenchColLatest": "最近",
+    "BenchColMean": "均值",
+    "BenchInspect": "查看证据",
+    "BenchLegendFaster": "最近回落（≤ 0.5× 且 -50 ms）",
+    "BenchLegendMean": "累计均值",
+    "BenchLegendSpike": "最近突增（≥ 2× 且 +50 ms）",
+    "BenchLegendSteady": "最近样本（稳定）",
+    "BenchReadoutAlloc": "分配 {0}",
+    "BenchReadoutRate": "{0} / 分钟",
+    "BenchReadoutSamples": "{0} 样本",
+    "BenchReadoutTotal": "累计 {0}",
+    "BenchRefLine": "标识均值 {0}",
+    "BenchScope": "按均值与突增选取 {0} / {1} 个标识（全快照基准）",
+    "BenchTitle": "耗时轮廓 · 累计均值与最近样本偏移",
+    "CollisionBadge": "同名标识",
+    "CopyKey": "复制完整操作标识",
+    "DisplayPeakFlight": "最长捕获执行时长 · 当前 {0} 个执行中实例",
+    "DisplayPeakMean": "峰值标识均值 · 共 {0} 个已完成操作标识",
+    "EmptyBody": "通过 Monica 执行管线测量的业务操作将在启动或完成后出现在此主机视图中。",
+    "EmptyTitle": "尚无已捕获的执行耗时证据",
+    "FInFlight": "捕获时执行中",
+    "FKeyMean": "各标识均值的平均值",
+    "FKeys": "已完成操作标识",
+    "FSamples": "已完成样本",
+    "FSamplesSub": "累计执行耗时 {0}",
+    "FlightEmpty": "捕获于 {0} 时没有正在执行的业务操作。",
+    "FlightLegendBaseline": "历史平均耗时基线",
+    "FlightNoBaseline": "尚无已完成基线",
+    "FlightScale": "刻度上限 {0}",
+    "FlightTitle": "执行中实例 · 捕获时长对照历史均值",
+    "KComponent": "组件类型",
+    "KCumulativeTime": "累计耗时",
+    "KDrift": "最近偏移",
+    "KExecutionPoint": "执行点",
+    "KSamples": "完成样本",
+    "LedgerFootScale": "耗时横条统一以全快照峰值 {0} 为 100% 基准。",
+    "PauseNotice": "视图已在 {0} 暂停轮询；主机收集器仍在后台持续记录。",
+    "PillInFlight": "{0} 项执行中",
+    "PillLingering": "{0} 项超时滞留",
+    "PillSpikes": "{0} 项最近突增",
+    "Points": {
+      "All": "全部入口",
+      "Direct": "直接计时范围",
+      "Eventbus": "事件总线",
+      "Hosted": "托管工作 / 播种",
+      "Jobs": "调度作业",
+      "Mediator": "Mediator 请求",
+      "Mvc": "MVC 动作"
+    },
+    "Refresh": "刷新证据",
+    "RunningDualReadNote": "已完成统计与执行中实例为两次顺序诊断读取，并非原子事务。",
+    "SheetActiveGroupTitle": "同标识当前执行中实例（{0}）",
+    "SheetCapturedAge": "捕获时已运行",
+    "SheetClose": "关闭证据面板",
+    "SheetCompletedEyebrow": "已完成操作证据",
+    "SheetLoadLatest": "载入最新快照",
+    "SheetMeanDuration": "平均耗时",
+    "SheetNotFoundBody": "该执行实例可能已完成并合入操作统计，或主机已重启清空了本地计数。可清除选择返回当前快照。",
+    "SheetNotFoundTitle": "当前快照中不存在该记录",
+    "SheetOpenBaseline": "查看该标识的已完成统计",
+    "SheetPinnedNote": "数值固定于快照 {0}（页面后台刷新不会改写当前证据）",
+    "SheetRunningEyebrow": "已捕获执行实例证据",
+    "SheetSecAllocation": "可选内存分配",
+    "SheetSecIdentity": "标识与来源",
+    "SheetSecMeasurements": "计时与频率",
+    "SheetSecTimestamps": "精确时间戳",
+    "Signals": {
+      "All": "全部状态",
+      "Alloc": "含分配数据",
+      "Inflight": "当前执行中",
+      "Spike": "最近突增"
+    },
+    "SortOptions": {
+      "Identity": "完整标识 · A–Z",
+      "Latest": "最近耗时降序",
+      "Mean": "平均耗时降序",
+      "Samples": "样本数量降序",
+      "Total": "累计耗时降序"
+    },
+    "Title": "执行耗时"
   }
 }

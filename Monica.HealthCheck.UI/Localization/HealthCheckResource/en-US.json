@@ -5,10 +5,6 @@
   },
   "Page": {
     "Title": "Health checks",
-    "Eyebrow": "Operations",
-    "Heading": "Host health",
-    "Subtitle": "Live readiness and dependency checks for this host.",
-    "CurrentHost": "Current host · {0}",
     "LastChecked": "Last updated"
   },
   "Access": {
@@ -19,7 +15,6 @@
   "Actions": {
     "Refresh": "Refresh",
     "Retry": "Retry",
-    "Details": "Inspect details",
     "DetailsFor": "Inspect details for {0}",
     "Close": "Close details",
     "ClearFilters": "Clear filters"
@@ -31,24 +26,11 @@
     "RefreshFailed": "The latest refresh failed. The previous snapshot remains visible: {0}"
   },
   "Overview": {
-    "ReadinessLabel": "Readiness",
-    "ReadinessChecks": "{0} readiness checks",
     "Ready": "Required checks passed. This host can receive traffic.",
     "ReadyDegraded": "This host can receive traffic, but some required checks are degraded.",
     "NotReady": "This host cannot receive traffic until the required checks pass.",
-    "SnapshotDuration": "Snapshot duration",
-    "DurationMilliseconds": "Last checked in {0:0.##} ms",
     "AutoRefresh": "Refreshes every 10s",
-    "Distribution": "All registered checks",
-    "AttentionTitle": "Needs attention",
-    "AllClear": "No unhealthy or degraded checks were reported in this snapshot.",
-    "CoverageMissingTitle": "Readiness not configured",
-    "CoverageMissingDescription": "No readiness checks are registered. Traffic readiness cannot be established from this snapshot.",
-    "Headlines": {
-      "Healthy": "Ready",
-      "Degraded": "Ready, with caveats",
-      "Unhealthy": "Not ready"
-    }
+    "CoverageMissingDescription": "No readiness checks are registered. Traffic readiness cannot be established from this snapshot."
   },
   "Status": {
     "Healthy": "Healthy",
@@ -56,30 +38,11 @@
     "Unhealthy": "Unhealthy"
   },
   "Filters": {
-    "AriaLabel": "Health-check filters",
-    "NameLabel": "Name or description",
-    "NamePlaceholder": "Search checks",
-    "StatusLabel": "Status",
     "AnyStatus": "All checks",
     "TagLabel": "Tag",
     "Results": "Showing {0} of {1}"
   },
-  "Table": {
-    "Eyebrow": "Live snapshot",
-    "Title": "Check registry",
-    "Subtitle": "This view is point-in-time and stores no history.",
-    "Columns": {
-      "Name": "Name",
-      "Status": "Status",
-      "Description": "Description",
-      "Duration": "Duration",
-      "Tags": "Tags",
-      "Actions": "Actions"
-    },
-    "Empty": "No health checks match the current filters."
-  },
   "Common": {
-    "NotAvailable": "Not available",
     "DurationMilliseconds": "{0:0.##} ms"
   },
   "Details": {
@@ -88,11 +51,82 @@
     "NoDescription": "No description was reported.",
     "Duration": "Duration",
     "Tags": "Tags",
-    "NoTags": "No tags",
     "Data": "Diagnostic data",
     "NoData": "No diagnostic data was reported.",
-    "Error": "Reported error",
-    "ErrorType": "Type",
-    "ErrorMessage": "Message"
+    "Error": "Reported error"
+  },
+  "Gates": {
+    "Population": "{0} / {1} readiness checks healthy · {2} registered",
+    "Overlap": "{0} participates in both probes · {1} unique checks",
+    "Impact": "{0} · {1}"
+  },
+  "Design": {
+    "AllParallelCaption": "{0} parallel",
+    "AutoRefreshPaused": "Auto-refresh paused",
+    "AutoRefreshStale": "Refresh failed · showing prior snapshot",
+    "AuxiliaryLabel": "Outside probes",
+    "AuxiliaryNote": "Does not gate traffic or restarts",
+    "Cols": {
+      "Duration": "Duration",
+      "Name": "Check",
+      "Probe": "Probe gate",
+      "Status": "Status"
+    },
+    "CopyJson": "Copy sanitized JSON",
+    "DataCountBadge": "{0} data",
+    "EnvelopeAxisLeft": "Check & probe impact",
+    "EnvelopeAxisRight": "Duration",
+    "EnvelopeDescAttention": "{0} non-healthy checks ordered by probe impact and plotted against the same parallel wall-clock snapshot",
+    "EnvelopeDescCalm": "No unhealthy or degraded checks; showing the {0} slowest of {1} checks in this parallel snapshot",
+    "EnvelopeKeyboardHint": "↑ ↓ select check · Enter inspect evidence",
+    "EnvelopeLabel": "Parallel snapshot",
+    "EnvelopeTitleAttention": "Probe impact & parallel timing envelope",
+    "EnvelopeTitleCalm": "Parallel probe latency profile (all healthy)",
+    "Eyebrow": "Operations / Health",
+    "FooterAutoActive": "Refreshes every 10s · Point-in-time snapshot, no history stored",
+    "FooterAutoPaused": "Auto-refresh paused · manual refresh remains available",
+    "Inspector": {
+      "FilterByGate": "Filter registry by {0}",
+      "MissingDesc": "Registration \"{0}\" was not reported in the latest host snapshot. It may have been removed or not registered.",
+      "MissingTitle": "Check not in current snapshot",
+      "OriginHost": "Application or host registration",
+      "OriginLabel": "Origin",
+      "OriginMonica": "Monica framework module (monica tag)",
+      "ProbeParticipation": "Probe gates",
+      "TimingTitle": "Execution timing & probe contract",
+      "WallShareLabel": "Parallel wall share"
+    },
+    "LivenessLabel": "Liveness",
+    "NoMatchDesc": "Adjust search, status, tag, or probe filters to view entries. The summary above always reflects the complete host snapshot.",
+    "NoMatchTitle": "No health checks match the current filters",
+    "ObservedOnly": "Observed",
+    "PauseAuto": "Pause auto-refresh",
+    "ReadinessLabel": "Readiness",
+    "RedactedBadge": "{0} redacted",
+    "RegistryDesc": "This view is point-in-time for the current host and stores no history or availability percentage.",
+    "RegistryTitle": "Check registry",
+    "ResumeAuto": "Resume 10s refresh",
+    "SearchLabel": "Search check name, description, tag, or error",
+    "SearchPlaceholder": "Search checks by name, description, tag, or error…",
+    "SlowestCaption": "Slowest: {0} ({1})",
+    "SortLabel": "Sort",
+    "Sorts": {
+      "Duration": "Slowest first",
+      "Name": "Name (A–Z)",
+      "Severity": "Severity first"
+    },
+    "Title": "Host health",
+    "UnconfiguredShort": "Not configured",
+    "WallShareSub": "{0} of wall",
+    "Headlines": {
+      "Degraded": "Ready, with caveats",
+      "Healthy": "Ready",
+      "Unhealthy": "Not ready"
+    },
+    "LivenessHeadlines": {
+      "Degraded": "Alive, degraded",
+      "Healthy": "Alive",
+      "Unhealthy": "Liveness failing"
+    }
   }
 }

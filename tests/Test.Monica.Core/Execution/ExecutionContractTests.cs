@@ -21,6 +21,30 @@ public sealed class ExecutionContractTests
     }
 
     [Fact]
+    public void ReadIdentity_WhenFieldsContainDelimiters_ShouldPreserveThePointAndComponent()
+    {
+        var descriptor = ExecutionDescriptor.ForMethod<string, ExecutionUnit>(
+            new ExecutionPoint("test|operation:1"), typeof(ExecutionContractTests), entryMethod: null,
+            isBusinessOperation: true, transactionMode: ExecutionTransactionMode.Automatic);
+
+        var identity = ExecutionOperationKey.ReadIdentity(descriptor.OperationKey);
+
+        identity.Should().NotBeNull();
+        identity!.Value.Point.Should().Be("test|operation:1");
+        identity.Value.Component.Should().Contain(typeof(ExecutionContractTests).FullName!);
+    }
+
+    [Theory]
+    [InlineData("direct scope")]
+    [InlineData("monica-execution-operation/v1|point:4:read")]
+    [InlineData("monica-execution-operation/v1|point:4:read|component:8:short")]
+    [InlineData("monica-execution-operation/v1|point:4:read|component:3:job|")]
+    public void ReadIdentity_WhenKeyHasNoCompleteIdentity_ShouldReturnNull(string key)
+    {
+        ExecutionOperationKey.ReadIdentity(key).Should().BeNull();
+    }
+
+    [Fact]
     public void ExecutionFeatureCollection_ShouldUseTheExactFeatureContract()
     {
         var features = new ExecutionFeatureCollection();

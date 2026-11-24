@@ -16,6 +16,9 @@ public sealed class MedallionLockProvider(
     IDistributedLockProvider distributedLockProvider)
     : ILockProvider
 {
+    /// <inheritdoc />
+    public LockProviderInfo Info => new(LockProviderKind.Medallion, DistributedLockProvider.GetType().Name);
+
     private IDistributedLockProvider DistributedLockProvider { get; } = distributedLockProvider;
 
     public async Task<IDistributedLockHandle?> TryAcquireAsync(

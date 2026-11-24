@@ -1,0 +1,78 @@
+@using Monica.UI.Shared.Components.Dialogs
+@using Monica.UI.Shared.Components.States
+@using Monica.Core.Execution
+@using Monica.Profiling.ExecutionTiming.Models
+@using Microsoft.JSInterop
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+@inject IStringLocalizer<ExecutionTimingResource> L
+
+<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:SheetClose"]" Width="36rem">
+    <TitleContent><header><small>@L[Invocation is null ? "Design:SheetCompletedEyebrow" : "Design:SheetRunningEyebrow"]</small><h2>@(_run?.DisplayName ?? _op?.DisplayName ?? L["Design:SheetNotFoundTitle"])</h2></header></TitleContent>
+    <ChildContent><div class="timing-sheet">
+        <div class="timing-pin"><MoIcon Icon="@MoIcons.Clock" Size="1rem" /> <span>@L["Design:SheetPinnedNote",Time.Format(_at)]</span>
+            @if (State.SnapshotCapturedAt != _at) { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="Capture">@L["Design:SheetLoadLatest"]</MudButton> }</div>
+        @if (_op is null && _run is null)
+        { <MoContentState><h3>@L["Design:SheetNotFoundTitle"]</h3><code>@(Operation ?? Invocation)</code><p>@L["Design:SheetNotFoundBody"]</p></MoContentState> }
+        else
+        {
+            var key = _run?.OperationKey ?? _op!.OperationKey;
+            var identity = ExecutionOperationKey.ReadIdentity(key);
+            <div class="timing-hero"><small>@L[_run is null ? "Design:SheetMeanDuration" : "Design:SheetCapturedAge"]</small><strong>@TimingAssessment.Duration(_run is null ? _op!.AverageDurationMs : TimingAssessment.Age(_run,_at))</strong>
+                @if (_run is not null) { <span>@(_baseline is null ? L["Design:FlightNoBaseline"].Value : L["Design:BenchRefLine",TimingAssessment.Duration(_baseline.AverageDurationMs)].Value)</span> }</div>
+            <section><h3>@L["Design:SheetSecIdentity"]</h3><dl><div><dt>@L["Details:OperationKey"]</dt><dd><code>@key</code></dd></div>
+                <div><dt>@L["Design:KExecutionPoint"]</dt><dd>@(identity?.Point ?? L["Design:Points:Direct"])</dd></div>
+                @if (identity is { } pipeline) { <div><dt>@L["Design:KComponent"]</dt><dd>@pipeline.Component</dd></div> }
+                @if (_run is not null) { <div><dt>@L["Details:InvocationId"]</dt><dd>@_run.InvocationId</dd></div><div><dt>@L["Columns:Description"]</dt><dd>@_run.Description</dd></div> }
+            </dl></section>
+            @if (_op is { } item)
+            {
+                <section><h3>@L["Design:SheetSecMeasurements"]</h3><dl>
+                    <div><dt>@L["Design:KSamples"]</dt><dd>@item.ExecutionCount</dd></div><div><dt>@L["Details:MeanDuration"]</dt><dd>@L["Details:RecordedMilliseconds",item.AverageDurationMs.ToString("R")]</dd></div>
+                    <div><dt>@L["Details:LatestDuration"]</dt><dd>@L["Details:RecordedMilliseconds",item.LastDurationMs]</dd></div><div><dt>@L["Design:KDrift"]</dt><dd>@L[TimingAssessment.Drift(item) switch { "spike" => "Design:Signals:Spike", "faster" => "Design:BenchLegendFaster", _ => "Design:BenchLegendSteady" }]</dd></div>
+                    <div><dt>@L["Design:KCumulativeTime"]</dt><dd>@TimingAssessment.Duration(TimingAssessment.Total(item))</dd></div><div><dt>@L["Columns:Rate"]</dt><dd>@ExecutionTimingDisplayFormatter.FormatRatePerMinute(item,_at)</dd></div></dl></section>
+                <section><h3>@L["Design:SheetSecAllocation"]</h3><dl>@foreach (var (label,bytes) in new[]{("Details:MeanAllocation",item.AverageMemoryBytes),("Details:LatestAllocation",item.LastMemoryBytes)})
+                    { <div><dt>@L[label]</dt><dd>@ExecutionTimingDisplayFormatter.FormatMemory(bytes) @if (bytes.HasValue) { <small>@L["Details:RecordedBytes",bytes.Value]</small> }</dd></div> }</dl><p>@L["Details:AllocationHelp"]</p></section>
+            }
+            <section><h3>@L["Design:SheetSecTimestamps"]</h3><dl>
+                @foreach (var (label,time) in Times) { <div><dt>@L[label]</dt><dd><time datetime="@time.ToString("O")">@Time.Format(time)</time><small>@time.UtcDateTime.ToString("O")</small></dd></div> }
+            </dl></section>
+            @if (_related.Count > 0) { <section><h3>@L["Design:SheetActiveGroupTitle",_related.Count]</h3>@foreach (var r in _related) { <a class="mo-vl-id-chip" href="@Url(null,r.InvocationId)">@r.InvocationId</a> }</section> }
+        }</div></ChildContent>
+    <FooterContent>
+        @if (_op is not null || _run is not null) { <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="Copy">@L["Design:CopyKey"]</MudButton> }
+        @if (_run is not null && _baseline is not null) { <MudButton Href="@Url(_run.OperationKey,null)" Color="Color.Primary" Variant="Variant.Filled">@L["Design:SheetOpenBaseline"]</MudButton> }
+    </FooterContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionTimingPageState State { get; set; } = default!;
+    [Parameter] public string? Operation { get; set; }
+    [Parameter] public string? Invocation { get; set; }
+    private DateTimeOffset _at;
+    private ExecutionTimingStatistics? _op, _baseline;
+    private RunningExecutionTimingInfo? _run;
+    private IReadOnlyList<RunningExecutionTimingInfo> _related = [];
+    protected override void OnInitialized() => Capture();
+    private void Capture()
+    {
+        _at = State.SnapshotCapturedAt!.Value;
+        _op = Invocation is null ? State.Statistics.FirstOrDefault(s => s.OperationKey == Operation) : null;
+        _run = Guid.TryParse(Invocation,out var id) ? State.RunningOperations.FirstOrDefault(r => r.InvocationId == id) : null;
+        _baseline = _run is null ? null : State.Statistics.FirstOrDefault(s => s.OperationKey == _run.OperationKey);
+        _related = _op is null ? [] : State.RunningOperations.Where(r => r.OperationKey == _op.OperationKey).ToArray();
+    }
+    private IEnumerable<(string,DateTimeOffset)> Times
+    {
+        get
+        {
+            if (_op is not null) { yield return ("Details:FirstRecordedAt",_op.FirstRecordedAt); if (_op.LastRecordedAt is { } last) yield return ("Columns:LastRecordedAt",last); }
+            if (_run is not null) yield return ("Columns:StartedAt",_run.StartedAt);
+            yield return ("Page:Captured",_at);
+        }
+    }
+    private Task Copy() => JS.InvokeVoidAsync("navigator.clipboard.writeText", _op?.OperationKey ?? _run?.OperationKey).AsTask();
+    private string Url(string? op,Guid? inv) => Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["op"]=op, ["inv"]=inv });
+    private void Close(bool open) { if (!open) Nav.NavigateTo(Url(null,null)); }
+}

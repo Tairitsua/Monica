@@ -1,55 +1,31 @@
 @inject IStringLocalizer<HealthCheckResource> L
-
-<section class="health-table-section" aria-labelledby="health-check-table-title">
-    <div class="health-table-heading">
-        <div><span class="health-registry-eyebrow">@L["Table:Eyebrow"]</span><h2 id="health-check-table-title">@L["Table:Title"]</h2></div>
-        <span class="health-registry-description">@L["Table:Subtitle"]</span>
-    </div>
+@inject NavigationManager Nav
+<section class="hc-registry">
+    <header><div><h2>@L["Design:RegistryTitle"]</h2><p>@L["Design:RegistryDesc"]</p></div><small>@L["Filters:Results", Session.FilteredEntries.Count, Session.Snapshot?.Entries.Count ?? 0]</small></header>
     <HealthCheckFilters Session="@Session" />
-    <div class="health-table-scroll">
-        <MudTable T="HealthCheckEntrySnapshot" Items="@Session.FilteredEntries" Dense="false" Hover="true"
-                  Breakpoint="Breakpoint.Xs" Elevation="0" Class="health-entry-table">
-            <HeaderContent>
-                <MudTh>@L["Table:Columns:Name"]</MudTh>
-                <MudTh>@L["Table:Columns:Status"]</MudTh>
-                <MudTh>@L["Table:Columns:Duration"]</MudTh>
-                <MudTh><span class="health-column-action">@L["Table:Columns:Actions"]</span></MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="@L["Table:Columns:Name"]" Class="health-check-cell">
-                    <button type="button" class="health-entry-name" @onclick="@(() => Session.OpenDetailsAsync(context))" aria-label="@L["Actions:DetailsFor", context.Name]">@context.Name</button>
-                    <p class="health-entry-description" aria-label="@L["Table:Columns:Description"]">@(string.IsNullOrWhiteSpace(context.Description) ? L["Common:NotAvailable"] : context.Description)</p>
-                    <div class="health-entry-tags" aria-label="@L["Table:Columns:Tags"]">
-                        @foreach (var tag in context.Tags) { <span>@tag</span> }
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Status"]">
-                    <span class="health-entry-status state-@context.Status.ToString().ToLowerInvariant()"><span class="health-state-dot"></span>@L.GetStatusText(context.Status)</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Duration"]"><span class="health-entry-duration">@L["Common:DurationMilliseconds", context.Duration.TotalMilliseconds]</span></MudTd>
-                <MudTd DataLabel="@L["Table:Columns:Actions"]">
-                    <MudIconButton Icon="@MoIcons.ChevronRight" Size="Size.Small" Color="Color.Default"
-                                   OnClick="@(() => Session.OpenDetailsAsync(context))" aria-label="@L["Actions:DetailsFor", context.Name]" />
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <div class="health-table-empty">
-                    <MoIcon Icon="@MoIcons.SearchOff" Size="2.25rem" />
-                    <p>@L["Table:Empty"]</p>
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@ResetFiltersAsync">@L["Actions:ClearFilters"]</MudButton>
-                </div>
-            </NoRecordsContent>
-        </MudTable>
-    </div>
-    <div class="health-registry-footer"><MoIcon Icon="@MoIcons.Clock" Size="1.25rem" /><span>@L["Overview:AutoRefresh"]</span><span class="health-footer-count">@L["Filters:Results", Session.FilteredEntries.Count, Session.Snapshot?.Entries.Count ?? 0]</span></div>
+    @if (Session.FilteredEntries.Count == 0)
+    {
+        <MoContentState><h3>@L["Design:NoMatchTitle"]</h3><p>@L["Design:NoMatchDesc"]</p><MudButton Href="@Nav.ToAbsoluteUri("health-checks").ToString()">@L["Actions:ClearFilters"]</MudButton></MoContentState>
+    }
+    else
+    {
+        <div class="hc-table-wrap"><table class="hc-table"><thead><tr><th>@L["Design:Cols:Name"]</th><th>@L["Design:Cols:Probe"]</th><th>@L["Design:Cols:Status"]</th><th>@L["Design:Cols:Duration"]</th><th></th></tr></thead><tbody>
+        @foreach (var item in Session.FilteredEntries)
+        {
+            var url = Nav.GetUriWithQueryParameter("entry",item.Name);
+            var share = Session.Snapshot!.Duration > TimeSpan.Zero ? item.Duration / Session.Snapshot.Duration : (double?)null;
+            <tr><td><a class="hc-name" href="@url">@item.Name</a><p>@item.Description</p><div class="hc-tags">@foreach (var tag in item.Tags) { <a class="mo-vl-id-chip" href="@Nav.GetUriWithQueryParameter("tag",tag)">@tag</a> }
+                @if (item.Data.Count > 0) { <small>@L["Design:DataCountBadge",item.Data.Count]</small> }
+                @if (item.Data.Values.Count(v => v == "[redacted]") is > 0 and var n) { <small>@L["Design:RedactedBadge",n]</small> }</div></td>
+                <td>@foreach (var (id, label) in Probes.Where(p => HealthCheckPageSession.MatchesProbe(item,p.Id))) { <span class="hc-probe">@L[label]</span> }</td>
+                <td><span class="hc-status" style="@HealthCheckDisplay.IconStyle(item.Status)">@L.GetStatusText(item.Status)</span></td>
+                <td><b>@L["Common:DurationMilliseconds",item.Duration.TotalMilliseconds]</b><div class="hc-meter"><i style="@FormattableString.Invariant($"width:{Math.Clamp(share ?? 0,0,1)*100:0.###}%")"></i></div><small>@L["Design:WallShareSub",share?.ToString("P1") ?? "—"]</small></td>
+                <td><a href="@url" aria-label="@L["Actions:DetailsFor",item.Name]"><MoIcon Icon="@MoIcons.ChevronRight" Size="1rem" /></a></td></tr>
+        }</tbody></table></div>
+    }
+    <footer>@L[Session.Paused ? "Design:FooterAutoPaused" : "Design:FooterAutoActive"]</footer>
 </section>
-
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-    private async Task ResetFiltersAsync()
-    {
-        await Session.SetNameFilterAsync(null);
-        await Session.SetStatusFilterAsync(null);
-        await Session.SetTagFilterAsync(null);
-    }
+    internal static readonly (string Id,string Label)[] Probes = [("ready","Design:ReadinessLabel"),("live","Design:LivenessLabel"),("other","Design:AuxiliaryLabel")];
 }

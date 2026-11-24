@@ -10,6 +10,9 @@ namespace Monica.Locker.Providers.InProcess;
 /// </summary>
 public sealed class InProcessLockProvider : ILockProvider
 {
+    /// <inheritdoc />
+    public LockProviderInfo Info => new(LockProviderKind.InProcess);
+
     // Reuse keyed semaphore instances across acquisitions to avoid allocating a new lock object per key.
     private readonly AsyncKeyedLocker<string> _lockPool = new(options =>
     {

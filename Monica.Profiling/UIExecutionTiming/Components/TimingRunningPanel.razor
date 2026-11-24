@@ -1,5 +1,7 @@
 @using Monica.UI.Shared.Components.States
 @using Monica.Profiling.ExecutionTiming.Models
+@inject NavigationManager Nav
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
 @inject IStringLocalizer<ExecutionTimingResource> L
 
 <section class="timing-running timing-evidence-panel">
@@ -9,10 +11,10 @@
     </header>
     @if (Operations.Count != 0)
     {
-        <div class="timing-running-search"><MudTextField T="string" @ref="_searchField" Value="_query" ValueChanged="SearchChanged" Immediate="true"
+        <div class="timing-running-search"><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true"
             DebounceInterval="180" Label="@L["Running:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense"
             Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
-            @if (_query.Length != 0) { <MudButton Variant="Variant.Text" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton> }
+            @if (!string.IsNullOrWhiteSpace(Search)) { <MudButton Variant="Variant.Text" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton> }
         </div>
     }
     @if (Matches.Count != 0)
@@ -32,7 +34,7 @@
                     </div>
                     <div class="timing-active-age"><span>@L["Columns:RunningFor"]</span>
                         <strong>@ExecutionTimingDisplayFormatter.FormatRunningDuration(operation, CapturedAt)</strong>
-                        <small>@L["Running:AgeBasis"]</small></div>
+                        <small>@Time.FormatTime(operation.StartedAt) · @(Statistics.FirstOrDefault(s => s.OperationKey == operation.OperationKey) is { } baseline ? L["Design:BenchRefLine",TimingAssessment.Duration(baseline.AverageDurationMs)] : L["Design:FlightNoBaseline"])</small></div>
                     <MudIconButton Icon="@MoIcons.ArrowRight" Color="Color.Primary" Size="Size.Small"
                                    aria-label="@L["Common:Inspect", operation.InvocationId]"
                                    OnClick="@(() => OnInspect.InvokeAsync(new TimingRunningEvidence(operation, CapturedAt)))" />
@@ -45,7 +47,7 @@
         <div class="timing-running-empty" role="status"><MoContentState Compact="true"><MoIcon Icon="@MoIcons.Hourglass" Size="1.25rem" />
             <span>@(Operations.Count == 0 ? L["Running:Empty"] : L["Common:NoMatches"])</span></MoContentState></div>
     }
-    <footer class="timing-running-footer"><span>@L["Running:CapturedHelp"]</span>
+    <footer class="timing-running-footer"><span>@L["Design:RunningDualReadNote"]</span>
         @if (PageCount > 1)
         {
             <MudPagination Count="@PageCount" Selected="_page" SelectedChanged="ChangePage" ShowFirstButton="true" ShowLastButton="true"
@@ -62,14 +64,15 @@
     /// <summary>Gets or sets the action that opens immutable captured invocation evidence.</summary>
     [Parameter] public EventCallback<TimingRunningEvidence> OnInspect { get; set; }
     private const int PageSize = 6;
-    private string _query = string.Empty;
-    private MudTextField<string>? _searchField;
+    [Parameter] public IReadOnlyList<ExecutionTimingStatistics> Statistics { get; set; } = [];
+    [Parameter] public string? PageNumber { get; set; }
+    [Parameter] public string? Search { get; set; }
     private int _page = 1;
     private IReadOnlyList<RunningExecutionTimingInfo> Matches
     {
         get
         {
-            var terms = _query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var terms = (Search ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             return Operations.Where(item => terms.All(term => item.OperationKey.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || item.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || item.InvocationId.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
@@ -77,12 +80,8 @@
         }
     }
     private int PageCount => Math.Max(1, (Matches.Count + PageSize - 1) / PageSize);
-    protected override void OnParametersSet() => _page = Math.Clamp(_page, 1, PageCount);
-    private void SearchChanged(string value) { _query = value ?? string.Empty; _page = 1; }
-    private async Task ClearSearchAsync()
-    {
-        SearchChanged(string.Empty);
-        if (_searchField is not null) await _searchField.ClearAsync();
-    }
-    private void ChangePage(int value) => _page = Math.Clamp(value, 1, PageCount);
+    protected override void OnParametersSet() => _page = Math.Clamp(int.TryParse(PageNumber,out var p) ? p : 1,1,PageCount);
+    private void SearchChanged(string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["rq"] = string.IsNullOrEmpty(value) ? null : value, ["rpage"]=null }), replace:true);
+    private Task ClearSearchAsync() { SearchChanged(null); return Task.CompletedTask; }
+    private void ChangePage(int value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("rpage",value),replace:true);
 }

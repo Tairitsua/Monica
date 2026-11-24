@@ -1,6 +1,8 @@
 # Lease workbench
 
-Reference `Monica.Locker.UI` and call `AddLockerUI()` for `/leases` and `/leases/locks`. The first page shows configured authority observations, holder records, filters, and an exact-resource evidence sheet. It uses the shared native side-sheet contract in `$monica-infra-ui` (`references/visual-components.md`, "Modal evidence side sheets"), also used by JobScheduler, with route-owned selection and refresh. The lock page compares the supported [critical-section lock contracts](lockers.md); it does not discover the installed provider or claim to show live lock holders. No lock inventory or forced-unlock API exists.
+Reference `Monica.Locker.UI` and call `AddLockerUI()` for the `/leases` workbench. Its validity horizon groups grants by authority or holder. The left and right segments measure time since confirmation and time to expiry at each authority’s observation. Filter or sort the inventory, open a grant, or enter a resource key at the exact lookup. A lookup can reach a permitted resource outside the retained inventory. The grant sheet uses the shared native side-sheet contract in `$monica-infra-ui` (`references/visual-components.md`, “Modal evidence side sheets”).
+
+`/leases/locks` redirects to `/leases?section=locker`. The host-locker section reads the selected `ILockProvider.Info`, the configured options and the production key normalizer. Custom adapters can supply safe backend metadata through `Info`; their default identity is Custom. The comparison remains available when the host has no selected locker. See the [critical-section lock contracts](lockers.md) for scope, expiry, and release semantics.
 
 The UI requires explicit bindings through `AddLeaseDiagnostics`. It never selects a consumer's lease store, starts a coordinator, creates a table, or requires `AddLocker()`. Read [coordinator leases](leases.md) for provider registration, migrations and authority identity before exposing one.
 

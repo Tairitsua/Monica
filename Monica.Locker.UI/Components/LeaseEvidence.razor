@@ -1,5 +1,8 @@
 @inject IStringLocalizer<LockerResource> L
 @inject MoTimeFormatter Time
+@inject NavigationManager Nav
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @using Monica.UI.Shared.Components.Dialogs
 @implements IAsyncDisposable
 
@@ -16,11 +19,15 @@
                 var expired = record.ExpiresAtUtc <= Evidence.Snapshot.ObservedAtUtc;
                 var duration = LeasePresentation.Duration((record.ExpiresAtUtc - Evidence.Snapshot.ObservedAtUtc).TotalSeconds, L);
                 <div class="ls-grant @(expired ? "warning" : "success")"><span>@L[expired ? "Evidence:Expired" : "Evidence:Unexpired"]</span><b class="ls-grant-value">@(expired ? "−" : null)@duration.Value<small>@duration.Unit</small></b><p>@L[expired ? "Evidence:ExpiredAgo" : "Evidence:Remaining"]</p><div class="ls-grant-holder"><MoIcon Icon="@MoIcons.Server" Size="1rem" />@record.HolderId</div></div>
+                <div class="ls-anatomy"><b>@L["Horizon:Grant"]</b><span>@Span((record.ExpiresAtUtc-record.ConfirmedAtUtc).TotalSeconds)</span><div><i style="@FormattableString.Invariant($"width:{Math.Clamp((Evidence.Snapshot.ObservedAtUtc-record.ConfirmedAtUtc).TotalSeconds/Math.Max(.001,(record.ExpiresAtUtc-record.ConfirmedAtUtc).TotalSeconds),0,1)*100:0.##}%")"></i></div>
+                    <small>@L["Design:HeldFor",Span(((expired ? record.ExpiresAtUtc : Evidence.Snapshot.ObservedAtUtc)-record.AcquiredAtUtc).TotalSeconds)]</small></div>
+                <a class="mo-vl-link" href="@Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["holder"]=record.HolderId, ["targetAuthority"]=null, ["source"]=null, ["resource"]=null })">@L["Design:FilterThisHolder"]</a>
                 <div class="ls-exact-action"><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton><p>@L["Evidence:ExactHint"]</p></div>
-                <section><h3>@L["Evidence:Identity"]</h3><dl><div><dt>@L["Inventory:Authority"]</dt><dd>@Evidence.Authority.DisplayName</dd></div><div><dt>@L["Evidence:Scope"]</dt><dd>@record.Resource.Scope</dd></div><div><dt>@L["Evidence:Name"]</dt><dd>@record.Resource.Name</dd></div><div><dt>@L["Evidence:ServiceKey"]</dt><dd>@Evidence.Authority.StoreKey</dd></div></dl></section>
+                <section><h3>@L["Evidence:Identity"]</h3><dl><div><dt>@L["Inventory:Authority"]</dt><dd>@Evidence.Authority.DisplayName</dd></div><div><dt>@L["Evidence:Scope"]</dt><dd>@record.Resource.Scope</dd></div><div><dt>@L["Evidence:Name"]</dt><dd><button class="mo-vl-id-chip" @onclick="@(() => CopyName(record.Resource.Name))">@record.Resource.Name <MoIcon Icon="@MoIcons.Copy" Size="0.8rem" /></button></dd></div><div><dt>@L["Evidence:ServiceKey"]</dt><dd>@Evidence.Authority.StoreKey</dd></div></dl></section>
                 <section><h3>@L["Evidence:Timeline"]</h3><ol class="ls-time-spine">
-                    @foreach (var point in new[] { ("Acquired", record.AcquiredAtUtc), ("Confirmed", record.ConfirmedAtUtc), ("Expires", record.ExpiresAtUtc), ("Observed", Evidence.Snapshot.ObservedAtUtc) })
-                    { <li><i></i><div><span>@L[$"Timestamps:{point.Item1}"]</span><time datetime="@point.Item2.ToString("O")">@Time.Format(point.Item2)</time></div></li> }
+                    @{ DateTimeOffset? previous = null; }
+                    @foreach (var point in new[] { ("Acquired", record.AcquiredAtUtc), ("Confirmed", record.ConfirmedAtUtc), ("Expires", record.ExpiresAtUtc), ("Observed", Evidence.Snapshot.ObservedAtUtc) }.OrderBy(item => item.Item2))
+                    { <li><i></i><div><span>@L[$"Timestamps:{point.Item1}"]</span><time datetime="@point.Item2.ToString("O")">@Time.Format(point.Item2)</time>@if (previous is { } t) { <small>+@Span((point.Item2-t).TotalSeconds)</small> }</div></li> previous = point.Item2; }
                 </ol><p>@L["Evidence:TimelineNote"]</p></section>
                 <section><h3>@L["Evidence:Meaning"]</h3><p>@L[$"Meaning:{Evidence.Authority.Kind}"]</p></section>
                 <section class="ls-admin"><h3>@L["Admin:Title"]</h3><p>@L["Admin:Warning"]</p>
@@ -57,6 +64,8 @@
     private Task? _retirement;
     private LeaseResourceEvidence? _target;
     private readonly DialogOptions _dialogOptions = new() { CloseOnEscapeKey = true, BackdropClick = false, MaxWidth = MaxWidth.Small, FullWidth = true };
+    private Task CopyName(string name) => JS.InvokeVoidAsync("navigator.clipboard.writeText",name).AsTask();
+    private string Span(double seconds) { var (value,unit) = LeasePresentation.Duration(seconds,L); return value + unit; }
     private Task OnSheetVisibilityChanged(bool visible) => !visible && !_retired ? Close.InvokeAsync() : Task.CompletedTask;
     private Task OpenConfirmation()
     {

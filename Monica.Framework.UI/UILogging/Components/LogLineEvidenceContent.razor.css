@@ -88,5 +88,5 @@
     .log-inspector-message { padding: 12px; }
 }
 
-.log-line-info-dialog, .log-inspector-actions { --logging-accent-ink: color-mix(in srgb, var(--mud-palette-primary) 72%, var(--mud-palette-text-primary)); --logging-muted-ink: color-mix(in srgb, var(--mud-palette-text-secondary) 78%, var(--mud-palette-text-primary)); }
-.log-line-info-dialog ::deep .mud-button-text-primary, .log-inspector-actions ::deep .mud-button-text-primary { color: var(--logging-accent-ink); }
+.log-line-info-dialog { --logging-accent-ink: color-mix(in srgb, var(--mud-palette-primary) 72%, var(--mud-palette-text-primary)); --logging-muted-ink: color-mix(in srgb, var(--mud-palette-text-secondary) 78%, var(--mud-palette-text-primary)); }
+.log-line-info-dialog ::deep .mud-button-text-primary { color: var(--logging-accent-ink); }

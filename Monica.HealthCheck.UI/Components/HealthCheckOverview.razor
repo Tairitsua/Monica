@@ -1,62 +1,94 @@
+@using Microsoft.Extensions.Options
+@using Monica.Modules
+@inject IOptions<ModuleHealthCheckOption> Options
 @inject IStringLocalizer<HealthCheckResource> L
+@inject NavigationManager Nav
 
 @if (Session.Snapshot is { } snapshot)
 {
-    var readiness = Session.ReadinessStatus;
-    var coverageMissing = Session.ReadinessEntryCount == 0;
-    var attention = snapshot.Entries.Where(static entry => entry.Status != HealthCheckState.Healthy)
-        .OrderByDescending(static entry => entry.Status).ThenBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase).ToArray();
-    <section class="health-overview state-@(coverageMissing ? "unconfigured" : readiness.ToString().ToLowerInvariant())" aria-labelledby="health-readiness-title">
-        <div class="health-readiness">
-            <div class="readiness-label"><span class="readiness-dot"></span>@L["Overview:ReadinessLabel"]</div>
-            <h2 id="health-readiness-title">@Headline(readiness, coverageMissing)</h2>
-            <p class="readiness-description">@ReadinessText(readiness, coverageMissing)</p>
-            <div class="readiness-meta"><MoIcon Icon="@MoIcons.ClipboardCheck" Size="1.25rem" /><span>@L["Overview:ReadinessChecks", Session.ReadinessEntryCount]</span><span class="meta-separator">·</span><span>@L["Overview:AutoRefresh"]</span></div>
-            <dl class="health-distribution" aria-label="@L["Overview:Distribution"]">
-                <div class="distribution-healthy @(snapshot.HealthyCount == 0 ? "is-zero" : null)"><dt>@L["Status:Healthy"]</dt><dd>@snapshot.HealthyCount</dd></div>
-                <div class="distribution-degraded @(snapshot.DegradedCount == 0 ? "is-zero" : null)"><dt>@L["Status:Degraded"]</dt><dd>@snapshot.DegradedCount</dd></div>
-                <div class="distribution-unhealthy @(snapshot.UnhealthyCount == 0 ? "is-zero" : null)"><dt>@L["Status:Unhealthy"]</dt><dd>@snapshot.UnhealthyCount</dd></div>
-                <div class="distribution-duration"><dt>@L["Overview:SnapshotDuration"]</dt><dd title="@L["Overview:DurationMilliseconds", snapshot.Duration.TotalMilliseconds]">@L["Common:DurationMilliseconds", snapshot.Duration.TotalMilliseconds]</dd></div>
-            </dl>
-        </div>
-        <aside class="health-attention" aria-labelledby="health-attention-title">
-            <div class="attention-heading"><h3 id="health-attention-title">@L["Overview:AttentionTitle"]</h3><span>@attention.Length</span></div>
-            @if (attention.Length == 0)
+    var ready = Entries("ready");
+    var verdict = Verdict(ready, "ready");
+    var slowest = snapshot.Entries.MaxBy(e => e.Duration);
+    var issues = snapshot.Entries.Where(e => e.Status != HealthCheckState.Healthy).OrderByDescending(Impact).ThenByDescending(e => e.Duration).ToArray();
+    var lanes = issues.Length > 0 ? issues : snapshot.Entries.OrderByDescending(e => e.Duration).Take(5).ToArray();
+    var overlap = ready.Where(e => HealthCheckPageSession.MatchesProbe(e, "live")).ToArray();
+    <section class="hc-sig mo-vl-role--@Role(ready)" style="--hc-role:var(--mo-vl-role)">
+        <div class="hc-decision"><div class="hc-decision-main">
+            <div class="display-label">@L["Design:ReadinessLabel"] <code>@Options.Value.ReadinessPath</code> <span class="hc-http-stamp">@Http(ready, "ready")</span></div>
+            <div class="hc-verdict"><i class="hc-verdict-mark"></i>@verdict</div><p class="hc-pop-caption">@L["Gates:Population", ready.Count(e => e.Status == HealthCheckState.Healthy), ready.Length, snapshot.Entries.Count]</p>
+        </div><p class="hc-finding">@L[ready.Length == 0 ? "Overview:CoverageMissingDescription" : Session.ReadinessStatus switch { HealthCheckState.Healthy => "Overview:Ready", HealthCheckState.Degraded => "Overview:ReadyDegraded", _ => "Overview:NotReady" }]
+            @foreach (var e in (issues.Length > 0 ? issues.Take(3) : lanes.Take(1)))
+            { <a class="mo-vl-link" href="@EntryUrl(e)">@e.Name</a> <span>@L.GetStatusText(e.Status) · @Ms(e.Duration)</span> }
+        </p></div>
+        <div class="hc-gates-wrap"><div class="hc-gates">
+            @foreach (var (id, label, icon) in Gates)
             {
-                <div class="attention-clear"><MoIcon Icon="@MoIcons.Success" Size="1.5rem" Style="color:var(--mud-palette-success);" /><p>@L["Overview:AllClear"]</p></div>
+                var entries = Entries(id);
+                <button class="hc-gate @(Session.Probe == id ? "is-selected" : null) mo-vl-role--@Role(entries)" aria-pressed="@(Session.Probe == id)" @onclick="@(() => Filter(id))">
+                    <span class="hc-gate-top"><span class="hc-gate-head"><MoIcon Icon="@icon" Size="1rem" /><strong>@L[label]</strong></span><small class="hc-gate-badge">@Http(entries, id)</small></span>
+                    <span class="hc-gate-mid"><b class="hc-gate-verdict">@Verdict(entries, id)</b><code class="hc-gate-sub">@(id == "ready" ? Options.Value.ReadinessPath : id == "live" ? Options.Value.LivenessPath : L["Design:AuxiliaryNote"].Value)</code></span>
+                    <span class="hc-marks">@foreach (var entry in entries.OrderByDescending(e => e.Status))
+                        { <i class="hc-mark mo-vl-role--@Role(entry.Status) @(entry.Status == HealthCheckState.Degraded ? "is-degraded" : entry.Status == HealthCheckState.Unhealthy ? "is-unhealthy" : null)"></i> }</span>
+                    <span class="hc-gate-tally">@foreach (var status in Enum.GetValues<HealthCheckState>()) { <small class="hc-count mo-vl-role--@Role(status)"><i></i><b>@entries.Count(e => e.Status == status)</b> @L.GetStatusText(status)</small> }</span>
+                </button>
             }
-            else
-            {
-                <div class="attention-list">
-                    @foreach (var entry in attention)
-                    {
-                        <button class="attention-entry" type="button" @onclick="@(() => Session.OpenDetailsAsync(entry))" aria-label="@L["Actions:DetailsFor", entry.Name]">
-                            <span class="attention-entry-state"><MoIcon Icon="@(entry.Status == HealthCheckState.Degraded ? MoIcons.Warning : MoIcons.Error)" Size="1.25rem" Style="@HealthCheckDisplay.IconStyle(entry.Status)" />@L.GetStatusText(entry.Status)</span>
-                            <strong>@entry.Name</strong>
-                            <span class="attention-entry-description">@(string.IsNullOrWhiteSpace(entry.Description) ? L["Details:NoDescription"] : entry.Description)</span>
-                            <span class="attention-entry-action">@L["Actions:Details"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></span>
-                        </button>
-                    }
-                </div>
-            }
-        </aside>
+            <div class="hc-gate hc-gate-wall"><div class="hc-gate-top"><strong>@L["Design:EnvelopeLabel"]</strong><small class="hc-gate-badge">@L["Design:AllParallelCaption", snapshot.Entries.Count]</small></div>
+                <strong class="hc-wall-value">@Ms(snapshot.Duration)</strong>
+                @if (slowest is not null) { <span class="hc-wall-meta">@L["Design:SlowestCaption", slowest.Name, Ms(slowest.Duration)]</span> }</div>
+        </div>@if (overlap.Length != 0) { <p class="hc-overlap">@L["Gates:Overlap", string.Join(", ", overlap.Select(e => e.Name)), snapshot.Entries.Count]</p> }</div>
+        @if (lanes.Length > 0)
+        {
+            <div class="hc-env"><header class="hc-env-copy"><h2>@L[issues.Length == 0 ? "Design:EnvelopeTitleCalm" : "Design:EnvelopeTitleAttention"]</h2><p>@L[issues.Length == 0 ? "Design:EnvelopeDescCalm" : "Design:EnvelopeDescAttention", lanes.Length, snapshot.Entries.Count]</p></header>
+                <div class="hc-env-axis"><span>@L["Design:EnvelopeAxisLeft"]</span><div class="hc-env-axis-track"><span>0 ms</span><b>@Ms(snapshot.Duration)</b></div><span>@L["Design:EnvelopeAxisRight"]</span></div>
+                <div class="hc-env-body">
+                @for (var i = 0; i < lanes.Length; i++)
+                {
+                    var index = i;
+                    var e = lanes[i];
+                    var share = snapshot.Duration > TimeSpan.Zero ? e.Duration / snapshot.Duration : (double?)null;
+                    <button type="button" class="hc-env-row mo-vl-role--@Role(e.Status)" @ref="_rows[index]" @onfocus="@(() => _active = index)" @onmouseenter="@(() => _active = index)" @onkeydown="@(args => Move(args, index, lanes.Length))" @onclick="@(() => Nav.NavigateTo(EntryUrl(e)))">
+                        <span class="hc-env-id"><span class="hc-env-top"><b class="hc-env-name">@e.Name</b><small class="hc-impact-pill">@ImpactLabel(e)</small></span><small class="hc-env-reason">@(e.Error?.Message ?? e.Description)</small></span>
+                        <span class="hc-env-track"><i class="hc-env-bar @(e.Status == HealthCheckState.Degraded ? "is-degraded" : null)" style="@FormattableString.Invariant($"width:{Math.Clamp(share ?? 0, 0, 1) * 100:0.###}%")"></i></span>
+                        <span class="hc-env-dur"><b>@Ms(e.Duration)</b><small>@(share?.ToString("P1") ?? "—")</small></span>
+                    </button>
+                }</div>
+                @{ var focused = lanes[Math.Min(_active, lanes.Length - 1)]; }
+                <div class="hc-env-readout" aria-live="polite"><b>@focused.Name</b><span>@L.GetStatusText(focused.Status) · @Ms(focused.Duration)</span><small>@L["Design:EnvelopeKeyboardHint"]</small></div>
+            </div>
+        }
     </section>
 }
-
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-
-    private string Headline(HealthCheckState status, bool missing) => missing ? L["Overview:CoverageMissingTitle"] : status switch
+    private static readonly (string Id, string Label, string Icon)[] Gates = [
+        ("ready","Design:ReadinessLabel",MoIcons.ShieldCheck), ("live","Design:LivenessLabel",MoIcons.HeartPulse), ("other","Design:AuxiliaryLabel",MoIcons.Layers)];
+    private readonly Dictionary<int,ElementReference> _rows = [];
+    private int _active;
+    private HealthCheckEntrySnapshot[] Entries(string id) => Session.Snapshot!.Entries.Where(e => HealthCheckPageSession.MatchesProbe(e,id)).ToArray();
+    private static string Role(HealthCheckState state) => state switch { HealthCheckState.Healthy => "success", HealthCheckState.Degraded => "warning", _ => "error" };
+    private static string Role(HealthCheckEntrySnapshot[] entries) => entries.Length == 0 ? "neutral" : Role(entries.Max(e => e.Status));
+    private string Verdict(HealthCheckEntrySnapshot[] entries, string id) => entries.Length == 0 ? L["Design:UnconfiguredShort"]
+        : id == "other" ? L.GetStatusText(entries.Max(e => e.Status)) : L[(id,entries.Max(e => e.Status)) switch
+        {
+            ("live", HealthCheckState.Healthy) => "Design:LivenessHeadlines:Healthy",
+            ("live", HealthCheckState.Degraded) => "Design:LivenessHeadlines:Degraded",
+            ("live", _) => "Design:LivenessHeadlines:Unhealthy",
+            (_, HealthCheckState.Healthy) => "Design:Headlines:Healthy",
+            (_, HealthCheckState.Degraded) => "Design:Headlines:Degraded",
+            _ => "Design:Headlines:Unhealthy"
+        }];
+    private string Http(HealthCheckEntrySnapshot[] entries, string id) => id == "other" ? L["Design:ObservedOnly"]
+        : entries.Length == 0 || !(id == "ready" ? Options.Value.EnableReadinessEndpoint : Options.Value.EnableLivenessEndpoint) ? "HTTP —"
+        : entries.Any(e => e.Status == HealthCheckState.Unhealthy) ? "HTTP 503" : "HTTP 200";
+    private static int Impact(HealthCheckEntrySnapshot e) => (HealthCheckPageSession.MatchesProbe(e, "other") ? 0 : 10) + (int)e.Status;
+    private string ImpactLabel(HealthCheckEntrySnapshot e) => e.Status == HealthCheckState.Healthy ? L.GetStatusText(e.Status) : L["Gates:Impact", L.GetStatusText(e.Status),
+        string.Join(" + ", Gates.Where(g => HealthCheckPageSession.MatchesProbe(e,g.Id)).Select(g => L[g.Label].Value))];
+    private string Ms(TimeSpan time) => L["Common:DurationMilliseconds", time.TotalMilliseconds];
+    private string EntryUrl(HealthCheckEntrySnapshot e) => Nav.GetUriWithQueryParameter("entry", e.Name);
+    private void Filter(string id) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("probe", Session.Probe == id ? null : id), replace:true);
+    private async Task Move(KeyboardEventArgs args, int index, int count)
     {
-        HealthCheckState.Healthy => L["Overview:Headlines:Healthy"],
-        HealthCheckState.Degraded => L["Overview:Headlines:Degraded"],
-        _ => L["Overview:Headlines:Unhealthy"]
-    };
-
-    private string ReadinessText(HealthCheckState status, bool missing) => missing ? L["Overview:CoverageMissingDescription"] : status switch
-    {
-        HealthCheckState.Healthy => L["Overview:Ready"],
-        HealthCheckState.Degraded => L["Overview:ReadyDegraded"],
-        _ => L["Overview:NotReady"]
-    };
+        var target = args.Key switch { "ArrowDown" => Math.Min(count-1,index+1), "ArrowUp" => Math.Max(0,index-1), "Home" => 0, "End" => count-1, _ => index };
+        if (target != index) await _rows[target].FocusAsync();
+    }
 }

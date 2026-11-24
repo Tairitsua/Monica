@@ -1,0 +1,57 @@
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+@using System.Globalization
+@using Monica.Framework.UI.UILogging.Models
+@using Monica.Framework.UI.UILogging.Support
+@using Monica.UI.Shared.Components.Dialogs
+@inject IStringLocalizer<LoggingResource> L
+
+        @if (Evidence is { } evidence)
+        {
+            var line = evidence.Line;
+            <div class="log-line-info-dialog" data-source-generation="@evidence.Source?.Generation" data-absolute-line-number="@line.AbsoluteLineNumber">
+                <p class="log-inspector-note">@L["Workbench:Inspector:Frozen"]</p>
+                <section class="log-inspector-source">
+                    <span>@L["Workbench:Inspector:Source"]</span>
+                    <strong data-field="RelativePath">@(evidence.Source?.RelativePath ?? L["Workbench:Inspector:Missing"].Value)</strong>
+                    @if (evidence.Source is { } source) { <code data-field="FilePath">@source.FilePath</code> }
+                </section>
+                <section class="log-inspector-text">
+                    <div class="log-inspector-text-heading"><h3>@L["Workbench:Inspector:RawTitle"]</h3>
+                        @if (CopyRawRequested.HasDelegate) { <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Copy" OnClick="@(() => CopyRawRequested.InvokeAsync(line.Raw))">@L["Workbench:Inspector:CopyRaw"]</MudButton> }</div>
+                    <p class="log-inspector-note">@L["Workbench:Inspector:RawHelp"]</p>
+                    <pre class="log-inspector-raw" data-field="Raw" tabindex="0" aria-label="@L["Workbench:Inspector:RawTitle"]">@line.Raw</pre>
+                    @if (line.Raw.Length == 0) { <p class="log-inspector-note">@L["Workbench:Inspector:Empty"]</p> }
+                </section>
+                <dl class="log-inspector-context">
+                    <div><dt>@L["Workbench:Inspector:Generation"]</dt><dd><code data-field="Generation">@(evidence.Source?.Generation ?? L["Workbench:Inspector:Missing"].Value)</code></dd></div>
+                    <div><dt>@L["Workbench:Inspector:ViewRead"]</dt><dd><time data-field="ViewReadAt" datetime="@evidence.ViewReadAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@(evidence.ViewReadAt is { } viewedAt ? UiTime.Format(viewedAt) : L["Workbench:Inspector:Missing"].Value)</time></dd></div>
+                    <div><dt>@L["Workbench:Inspector:InspectedAt"]</dt><dd><time data-field="InspectedAt" datetime="@evidence.InspectedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@UiTime.Format(evidence.InspectedAt)</time></dd></div>
+                </dl>
+                <h3>@L["Workbench:Inspector:PositionTitle"]</h3>
+                <dl class="log-inspector-context log-inspector-context--positions">
+                    <div><dt>@L["Page:Components:LineInfo:AbsoluteLine"]</dt><dd data-field="AbsoluteLineNumber">@Display(line.AbsoluteLineNumber)</dd></div>
+                    <div><dt>@L["Page:Components:LineInfo:BufferPosition"]</dt><dd data-field="BufferIndex">@Display(line.BufferIndex)</dd></div>
+                    <div><dt>@L["Page:Components:LineInfo:FilteredPosition"]</dt><dd data-field="FilteredIndex">@Display(line.FilteredIndex)</dd></div>
+                </dl>
+                <h3>@L["Workbench:Inspector:ParsedTitle"]</h3>
+                @if (string.IsNullOrEmpty(line.Header)) { <p class="log-inspector-note">@L["Workbench:Inspector:Unparsed"]</p> }
+                else
+                {
+                    <dl class="log-inspector-context">
+                        <div><dt>@L["Page:Components:LineInfo:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@line.Timestamp?.ToString("O", CultureInfo.InvariantCulture)">@(line.Timestamp is { } timestamp ? UiTime.Format(timestamp) : L["Workbench:Inspector:Missing"].Value)</time></dd></div>
+                        <div><dt>@L["Page:Components:LineInfo:Severity"]</dt><dd data-field="Severity">@(string.IsNullOrEmpty(line.LevelText) ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)</dd></div>
+                        <div><dt>@L["Page:Components:LineInfo:Thread"]</dt><dd data-field="Thread">@(string.IsNullOrEmpty(line.Thread) ? L["Workbench:Inspector:Missing"].Value : line.Thread)</dd></div>
+                    </dl>
+                }
+                @if (!string.IsNullOrEmpty(line.Header))
+                {
+                    <section class="log-inspector-text"><h3>@L["Workbench:Inspector:MessageTitle"]</h3><pre class="log-inspector-message" data-field="Message">@line.Message</pre></section>
+                }
+            </div>
+        }
+
+@code {
+    [Parameter, EditorRequired] public LogLineEvidence? Evidence { get; set; }
+    [Parameter] public EventCallback<string> CopyRawRequested { get; set; }
+    private string Display(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? L["Workbench:Inspector:Missing"].Value;
+}

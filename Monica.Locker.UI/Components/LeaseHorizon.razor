@@ -1,0 +1,110 @@
+@inject IStringLocalizer<LockerResource> L
+@inject MoTimeFormatter Time
+
+<div class="lh-wrap">
+    <header class="lh-head"><div class="lh-head-copy"><h2>@L["Design:HorizonTitle"]</h2><p>@L["Design:HorizonDesc"]</p></div>
+        <div class="lh-group-toggle"><MoFilterChip Label="@L["Design:GroupAuthority"]" Selected="@(Group != "holder")" SelectedChanged="@(() => Set("group", null))" />
+            <MoFilterChip Label="@L["Design:GroupHolder"]" Selected="@(Group == "holder")" SelectedChanged="@(() => Set("group", "holder"))" /></div></header>
+    <div class="lh-controls">
+        <label class="lh-search"><MoIcon Icon="@MoIcons.Search" Size="1rem" /><input value="@Search" @oninput="@(e => Set("q", e.Value?.ToString()))" placeholder="@L["Design:Search"]" aria-label="@L["Design:Search"]" /></label>
+        <MudSelect T="string" Label="@L["Design:SortLabel"]" Value="@(Sort ?? "urgency")" ValueChanged="@(v => Set("sort", v))" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="@("urgency")">@L["Design:SortUrgency"]</MudSelectItem><MudSelectItem Value="@("tenure")">@L["Design:SortTenure"]</MudSelectItem><MudSelectItem Value="@("name")">@L["Design:SortName"]</MudSelectItem>
+        </MudSelect>
+    </div>
+    <div class="lh-filter-row">
+        <div class="lh-chips">@foreach (var (id, label, role) in States)
+        { <MoFilterChip Label="@L[label]" Role="@role" Pill="true" ShowDot="true" Selected="@(NormalizedState == id)" Count="@_scope.Count(r => Matches(r, id))" SelectedChanged="@(() => Set("state", id))" /> }</div>
+        <div class="lh-active-pills">
+            @if (Authority is not null) { <button class="mo-vl-id-chip" @onclick="@(() => Set("authority", null))">@Authority ×</button> }
+            @if (Holder is not null) { <button class="mo-vl-id-chip" @onclick="@(() => Set("holder", null))">@Holder ×</button> }
+            <span class="lh-shown">@L["Design:ShownCount", _sorted.Count, Rows.Count]</span>
+        </div>
+    </div>
+    @if (_sorted.Count == 0)
+    {
+        <MoContentState><h3>@L[Authorities.All(a => a.Snapshot is null) ? "Evidence:Unavailable" : Rows.Count == 0 ? "Evidence:Empty" : "Inventory:NoMatch"]</h3><p>@L[Rows.Count == 0 ? "Evidence:Retention" : "Inventory:NoMatchDescription"]</p></MoContentState>
+    }
+    else
+    {
+        <div class="lh-board" @onmouseleave="@(() => _active = null)">
+            <div class="lh-col-head"><span>@L["Design:ColRole"]</span><span>@L["Design:ColHolder"]</span>
+                <div class="lh-axis-head">@foreach (var tick in Ticks)
+                    { <span class="lh-tick @(tick == 0 ? "is-zero" : null)" style="left:@Pct(tick)">@Tick(tick)</span> }</div><span class="lh-col-end">@L["Design:ColValidity"]</span></div>
+            @foreach (var group in _sorted.Skip(_page * PageSize).Take(PageSize).GroupBy(GroupKey))
+            {
+                var first = group.First();
+                <section class="lh-group"><header class="lh-group-head"><div class="lh-group-id"><MoIcon Icon="@(Group == "holder" ? MoIcons.Server : MoIcons.Database)" Size="1rem" /><h3>@(Group == "holder" ? group.Key : first.Authority.DisplayName)</h3>
+                    <span class="lh-group-scope">@first.Authority.Scope</span></div><span class="lh-group-clock">@(Group == "holder" ? string.Join(" · ", group.Select(r => r.Authority.DisplayName).Distinct()) : Time.FormatTime(first.ObservedAtUtc))</span></header>
+                @foreach (var row in group)
+                {
+                    var start = (row.Record.ConfirmedAtUtc - row.ObservedAtUtc).TotalSeconds;
+                    <button @key="(row.Authority.Id, row.Record.Resource)" data-lease-row class="lh-row @(row.Expired ? "is-expired" : null)" type="button" @onfocus="@(() => _active = row)" @onmouseenter="@(() => _active = row)" @onclick="@(() => Inspect.InvokeAsync(row))">
+                        <span class="lh-cell-role"><strong class="lh-role-title">@LeasePresentation.Title(row.Record.Resource.Name, L)</strong><code class="lh-role-key">@row.Record.Resource.Name</code></span>
+                        <span class="lh-cell-holder"><code class="lh-holder-id">@row.Record.HolderId</code><small class="lh-tenure">@L[row.Expired ? "Design:HeldBeforeExpiry" : row.Tenure.TotalSeconds <= 120 ? "Design:JustHandedOver" : "Design:HeldFor", Span(row.Tenure.TotalSeconds)]</small></span>
+                        <span class="lh-cell-track"><span class="lh-track">
+                            @foreach (var tick in Ticks) { <i class="lh-grid @(tick == 0 ? "is-zero" : null)" style="left:@Pct(tick)"></i> }
+                            @if (row.Expired)
+                            { <i class="lh-bar-expired" style="@Segment(start, row.RemainingSeconds)"></i><i class="lh-expired-gap" style="@Segment(row.RemainingSeconds, 0)"></i> }
+                            else
+                            { <i class="lh-bar-elapsed" style="@Segment(start, 0)"></i><i class="lh-confirm-dot" style="left:@Pct(start)"></i><i class="lh-bar-remain @(row.Tight ? "is-tight" : null)" style="@Segment(0, row.RemainingSeconds)"></i> }
+                        </span></span>
+                        <span class="lh-cell-validity"><b class="lh-val-num @(row.Tight || row.Expired ? "mo-vl-role--warning" : "mo-vl-role--success")">@(row.Expired ? "−" : "+")@Span(row.RemainingSeconds)</b>
+                            <small>@(row.Tight ? L["Design:TightTag"].Value : row.Expired ? L["Design:StatusExpired"].Value : "/ " + Span(row.GrantSeconds))</small></span>
+                    </button>
+                }</section>
+            }
+        </div>
+        <div class="lh-readout" aria-live="polite">@if (_active is { } current)
+            { <b>@LeasePresentation.Title(current.Record.Resource.Name, L)</b> @foreach (var (label, instant) in new[] { ("Timestamps:Acquired",current.Record.AcquiredAtUtc),("Timestamps:Confirmed",current.Record.ConfirmedAtUtc),("Timestamps:Observed",current.ObservedAtUtc),("Timestamps:Expires",current.Record.ExpiresAtUtc) })
+                { <span>@L[label] <time datetime="@instant.ToString("O")">@Time.FormatTime(instant)</time></span> } }
+            else { @L["Design:ReadoutIdle"] }</div>
+        @if (_sorted.Count > PageSize) { <MudPagination Count="@((_sorted.Count + PageSize - 1) / PageSize)" Selected="@(_page + 1)" SelectedChanged="@(p => _page = p - 1)" /> }
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    [Parameter] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
+    [Parameter] public string? Authority { get; set; }
+    [Parameter] public string? EvidenceState { get; set; }
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public string? Holder { get; set; }
+    [Parameter] public string? Group { get; set; }
+    [Parameter] public string? Sort { get; set; }
+    [Parameter] public EventCallback<(string Key, string? Value)> Filter { get; set; }
+    [Parameter] public EventCallback<LeaseRow> Inspect { get; set; }
+    private const int PageSize = 25;
+    private static readonly (string? Id, string Label, MoVisualRole Role)[] States = [
+        (null, "Design:FilterAll", MoVisualRole.Neutral), ("active", "Design:FilterActive", MoVisualRole.Success), ("expired", "Design:FilterExpired", MoVisualRole.Warning)];
+    private string? NormalizedState => EvidenceState == "unexpired" ? "active" : EvidenceState;
+    private int _page;
+    private LeaseRow? _active;
+    private List<LeaseRow> _scope = [], _sorted = [];
+    private double _left, _right;
+    private double[] Ticks => [-_left, -_left / 2, 0, _right / 2, _right];
+    private string GroupKey(LeaseRow row) => Group == "holder" ? row.Record.HolderId : row.Authority.Id;
+    private static bool Matches(LeaseRow row, string? state) => state switch { "active" => !row.Expired, "expired" => row.Expired, _ => true };
+    private Task Set(string key, string? value) { _page = 0; return Filter.InvokeAsync((key, value)); }
+    protected override void OnParametersSet()
+    {
+        _scope = Rows.Where(r => (Authority is null || Authority == r.Authority.Id) && (Holder is null || Holder == r.Record.HolderId)
+            && (string.IsNullOrWhiteSpace(Search) || string.Join(' ', r.Authority.DisplayName, r.Record.Resource.Name, r.Record.HolderId, LeasePresentation.Title(r.Record.Resource.Name, L)).Contains(Search, StringComparison.OrdinalIgnoreCase))).ToList();
+        var filtered = _scope.Where(r => Matches(r, NormalizedState));
+        _sorted = (Sort switch {
+            "tenure" => filtered.OrderBy(r => r.Expired).ThenBy(r => r.Tenure),
+            "name" => filtered.OrderBy(r => r.Record.Resource.Name, StringComparer.Ordinal),
+            _ => filtered.OrderBy(r => r.RemainingSeconds)
+        }).ToList();
+        var active = Rows.Where(r => !r.Expired).ToArray();
+        _left = Bound(active.Select(r => (r.ObservedAtUtc - r.Record.ConfirmedAtUtc).TotalSeconds).DefaultIfEmpty().Max());
+        _right = Bound(active.Select(r => r.RemainingSeconds).DefaultIfEmpty().Max());
+        _page = Math.Clamp(_page, 0, Math.Max(0, (_sorted.Count - 1) / PageSize));
+        _active = _sorted.FirstOrDefault(r => r.Authority.Id == _active?.Authority.Id && r.Record.Resource == _active?.Record.Resource);
+    }
+    private static double Bound(double v) => v <= 30 ? 30 : v <= 45 ? 45 : v <= 60 ? 60 : Math.Ceiling(v / 60) * 60;
+    private double Position(double s) => Math.Clamp((s + _left) * 100 / (_left + _right), 0, 100);
+    private string Pct(double s) => FormattableString.Invariant($"{Position(s):0.###}%");
+    private string Segment(double from, double to) => FormattableString.Invariant($"left:{Position(from):0.###}%;width:{Math.Max(0, Position(to) - Position(from)):0.###}%");
+    private string Span(double s) { var (v, u) = LeasePresentation.Duration(s, L); return v + u; }
+    private string Tick(double s) => s == 0 ? L["Design:AxisZero"] : (s < 0 ? "−" : "+") + Span(s);
+}

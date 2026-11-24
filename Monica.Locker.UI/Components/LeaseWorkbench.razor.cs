@@ -14,12 +14,18 @@ public partial class LeaseWorkbench
     [Parameter] public string? Search { get; set; }
     [Parameter] public string? ResourceAuthority { get; set; }
     [Parameter] public string? ResourceName { get; set; }
+    [Parameter] public string? Group { get; set; }
+    [Parameter] public string? Holder { get; set; }
+    [Parameter] public string? Sort { get; set; }
+    [Parameter] public string? Section { get; set; }
+    [Parameter] public string? Provider { get; set; }
     private readonly CancellationTokenSource _lifetime = new();
     private readonly CancellationToken _token;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _wake = new(0, 1);
     private readonly List<Task> _operations = [];
     private Task? _loop, _setup, _retirement;
+    private ElementReference _root;
     private IJSObjectReference? _module, _visibility;
     private DotNetObjectReference<LeaseWorkbench>? _callback;
     private bool _busy, _accessChecked, _retired, _visible = true;
@@ -41,7 +47,7 @@ public partial class LeaseWorkbench
         {
             if (selection != _selection) return;
             if (string.IsNullOrEmpty(selection.Item1) || string.IsNullOrEmpty(selection.Item2)) State.ClearSelection();
-            else if (selection.Item2.Length <= 512 && State.Authorities.FirstOrDefault(item => item.Authority.Id == selection.Item1) is { } source)
+            else if (!string.IsNullOrWhiteSpace(selection.Item2) && selection.Item2.Length <= 512 && State.Authorities.FirstOrDefault(item => item.Authority.Id == selection.Item1) is { } source)
                 await State.SelectAsync(source.Authority.Id, new LeaseResource(source.Authority.Scope, selection.Item2), token);
             else State.ClearSelection();
         });
@@ -60,7 +66,7 @@ public partial class LeaseWorkbench
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.Locker.UI/lease-workbench.js");
             if (_retired) return;
             _callback = DotNetObjectReference.Create(this);
-            _visibility = await _module.InvokeAsync<IJSObjectReference>("watchVisibility", _callback);
+            _visibility = await _module.InvokeAsync<IJSObjectReference>("watchVisibility", _callback, _root);
             if (!_retired) _loop = RefreshLoopAsync();
         }
         catch (JSDisconnectedException) { }
@@ -156,11 +162,11 @@ public partial class LeaseWorkbench
         Navigation.GetUriWithQueryParameter(filter.Key, filter.Value), replace: true);
     private void OpenResource(LeaseRow row) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
     {
-        ["source"] = row.Authority.Id, ["resource"] = row.Record.Resource.Name
+        ["targetAuthority"] = row.Authority.Id, ["source"] = null, ["resource"] = row.Record.Resource.Name
     }));
     private void CloseResource() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
     {
-        ["source"] = null, ["resource"] = null
+        ["source"] = null, ["targetAuthority"] = null, ["resource"] = null
     }));
 
     public ValueTask DisposeAsync() => new(_retirement ??= RetireAsync());

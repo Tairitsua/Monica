@@ -60,4 +60,10 @@ public sealed record LeaseRow(LeaseAuthority Authority, LeaseObservation Record,
 {
     public bool Expired => Record.ExpiresAtUtc <= ObservedAtUtc;
     public double RemainingSeconds => (Record.ExpiresAtUtc - ObservedAtUtc).TotalSeconds;
+    /// <summary>Duration of the confirmed grant in authority-clock seconds.</summary>
+    public double GrantSeconds => (Record.ExpiresAtUtc - Record.ConfirmedAtUtc).TotalSeconds;
+    /// <summary>Remaining validity at or below one normal renewal interval.</summary>
+    public bool Tight => !Expired && RemainingSeconds <= GrantSeconds / 3;
+    /// <summary>Observed continuous tenure, ending at expiry for a retained expired row.</summary>
+    public TimeSpan Tenure => (Expired ? Record.ExpiresAtUtc : ObservedAtUtc) - Record.AcquiredAtUtc;
 }

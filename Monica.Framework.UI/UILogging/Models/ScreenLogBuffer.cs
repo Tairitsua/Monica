@@ -129,6 +129,7 @@ public sealed class ScreenLogBuffer(IOptions<ModuleLoggingUIOption> options)
         return new ScreenLogSnapshot
         {
             Lines = Array.AsReadOnly(visible),
+            ShowsEarlierWindow = _showEarlier,
             RetainedLines = Array.AsReadOnly(retained),
             Version = _version,
             TotalStoredLines = retained.Length,

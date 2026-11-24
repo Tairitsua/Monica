@@ -1,5 +1,9 @@
 @* Page masthead: crumb, page title, a status meta line, and the action group with exactly one filled primary action. *@
-<header class="mo-vl-masthead @Class">
+<header class="mo-vl-masthead @(Icon is null ? null : "mo-vl-masthead--sealed") @Class">
+    @if (Icon is not null)
+    {
+        <span class="mo-vl-masthead__seal"><MoIcon Icon="@Icon" Size="1.5rem" /></span>
+    }
     <div class="mo-vl-masthead__identity">
         @if (!string.IsNullOrWhiteSpace(Crumb))
         {
@@ -27,6 +31,9 @@
 </header>
 
 @code {
+    /// <summary>Optional Monica icon identifying this workspace in the masthead.</summary>
+    [Parameter] public string? Icon { get; set; }
+
     /// <summary>Gets or sets the page title text.</summary>
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
 

@@ -84,6 +84,9 @@ public sealed record ScreenLogSnapshot
     /// <summary>All retained raw evidence, independent of display limits and filters.</summary>
     public IReadOnlyList<LogLineViewModel> RetainedLines { get; init; } = [];
 
+    /// <summary>Whether the display limit selects the earliest retained matches after loading older history.</summary>
+    public bool ShowsEarlierWindow { get; init; }
+
     public required long Version { get; init; }
 
     public required int TotalStoredLines { get; init; }

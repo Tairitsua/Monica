@@ -11,6 +11,9 @@ namespace Monica.Locker.Abstractions;
 /// </remarks>
 public interface ILockProvider
 {
+    /// <summary>Gets safe operational metadata. Custom providers default to host-defined semantics.</summary>
+    LockProviderInfo Info => new(LockProviderKind.Custom);
+
     /// <summary>
     /// Tries to acquire a lock using a provider-ready key.
     /// </summary>

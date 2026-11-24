@@ -1,19 +1,28 @@
 @inject LeaseWorkbenchState State
 @inject LeaseDiagnosticsFacade Facade
+@inject Monica.UI.Shell.Support.IPageCatalog Pages
 @inject IStringLocalizer<LockerResource> L
 @inject MoTimeFormatter Time
 @inject NavigationManager Navigation
 @inject Microsoft.JSInterop.IJSRuntime JS
 @implements IAsyncDisposable
 
-<div class="ls-root">
+<div class="ls-root" @ref="_root">
 <LeaseWorkspace>
-    <Meta><span>@L["Workspace:ConfiguredSources"]</span><span class="ls-scope">@string.Join(" · ", State.Authorities.Select(item => item.Authority.Scope).Distinct())</span></Meta>
+    <Meta>
+        @if (_accessChecked && !State.AccessDenied)
+        {
+            <span class="mo-vl-status mo-vl-role--@(State.Authorities.Any(a => a.RefreshFailed) ? "warning" : State.Authorities.Count > 0 ? "success" : "neutral")"><i class="mo-vl-status-dot"></i>@L["Horizon:Observed",State.Authorities.Count(a => a.Snapshot is not null),State.Authorities.Count]</span>
+            <span class="mo-vl-id-chip">@string.Join(" · ",State.Authorities.Select(a => a.Authority.Scope).Distinct())</span>
+            <span>@Time.TimeZone.Id</span>
+        }
+    </Meta>
     <Actions>
         @if (_accessChecked && !State.AccessDenied)
         {
             <div class="ls-refresh">
                 <div class="ls-stamp"><span>@L["Common:Captured"]</span><time datetime="@State.OldestObservation?.ToString("O")">@Time.Format(State.OldestObservation)</time></div>
+                <MudButton Variant="Variant.Outlined" Href="@(Navigation.Uri.Split('#')[0] + "#lease-probe")" StartIcon="@MoIcons.Search" Disabled="@(State.Authorities.Count == 0)">@L["Design:ProbeAction"]</MudButton>
                 <MudMenu Label="@(State.RefreshSeconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", State.RefreshSeconds])" Variant="Variant.Outlined" EndIcon="@MoIcons.ChevronDown" aria-label="@L["Refresh:Title"]">
                     @foreach (var seconds in LeaseWorkbenchState.RefreshIntervals)
                     {
@@ -35,7 +44,6 @@
         }
         else
         {
-            <p class="ls-refresh-note">@L["Refresh:Policy"]</p>
             @if (State.Failed || State.Authorities.Any(item => item.RefreshFailed))
             {
                 <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">@L["Evidence:Stale"]</MudAlert>
@@ -50,9 +58,16 @@
             }
             else
             {
-                <LeaseOwnershipMap Authorities="@State.Authorities" Rows="@State.Rows" SelectedAuthority="@Authority" SelectAuthority="SetAuthority" Inspect="OpenResource" />
-                <LeaseInventory Rows="@State.Rows" Authorities="@State.Authorities" Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" Filter="SetFilter" Inspect="OpenResource" />
-                <div class="ls-footnote"><h3>@L["Evidence:ClaimsTitle"]</h3><p>@L["Evidence:ClaimsDescription"]</p></div>
+                <section class="ls-signature">
+                    <LeaseDecision Authorities="@State.Authorities" Rows="@State.Rows" Authority="@Authority" SelectAuthority="SetAuthority" Inspect="OpenResource" />
+                    <LeaseHorizon Authorities="@State.Authorities" Rows="@State.Rows" Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" Group="@Group" Sort="@Sort" Holder="@Holder" Filter="SetFilter" Inspect="OpenResource" />
+                </section>
+                <LeaseProbe Authorities="@State.Authorities" Rows="@State.Rows" />
+            }
+            <HostLockerPanel Highlighted="@(Section == "locker")" Provider="@Provider" />
+            @if (Pages.GetRegisteredPages().Any(p => p.Route == "/job-scheduler/runtime"))
+            {
+                <footer class="ls-footer"><a class="mo-vl-link" href="@Navigation.ToAbsoluteUri("job-scheduler/runtime")">@L["Horizon:Scheduler"] ↗</a></footer>
             }
             @if (!string.IsNullOrEmpty(ResourceName) && !string.IsNullOrEmpty(ResourceAuthority))
             {

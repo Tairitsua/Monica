@@ -3,11 +3,39 @@ using System.Text;
 
 namespace Monica.Core.Execution;
 
-internal static class ExecutionOperationKey
+/// <summary>Reads the stable identity of an operation produced by the execution pipeline.</summary>
+public static class ExecutionOperationKey
 {
     private const string CONTRACT_VERSION = "monica-execution-operation/v1";
 
-    public static string Create(
+    /// <summary>Reads the execution point and component from a versioned pipeline key. Direct scope names have no pipeline identity.</summary>
+    public static (string Point, string Component)? ReadIdentity(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (!key.StartsWith(CONTRACT_VERSION + "|", StringComparison.Ordinal)) return null;
+        var remaining = key.AsSpan(CONTRACT_VERSION.Length);
+        string? point = null, component = null;
+        while (!remaining.IsEmpty)
+        {
+            if (remaining[0] != '|') return null;
+            remaining = remaining[1..];
+            var separator = remaining.IndexOf(':');
+            if (separator <= 0) return null;
+            var name = remaining[..separator];
+            remaining = remaining[(separator + 1)..];
+            separator = remaining.IndexOf(':');
+            if (separator <= 0 || !int.TryParse(remaining[..separator], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var length)
+                || length > remaining.Length - separator - 1) return null;
+            remaining = remaining[(separator + 1)..];
+            if (name.SequenceEqual("point")) point = remaining[..length].ToString();
+            if (name.SequenceEqual("component")) component = remaining[..length].ToString();
+            remaining = remaining[length..];
+        }
+        return point is { Length: > 0 } && component is { Length: > 0 } ? (point, component) : null;
+    }
+
+    internal static string Create(
         ExecutionPoint point,
         Type componentType,
         Type? contractType,

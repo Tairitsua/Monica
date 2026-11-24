@@ -1,0 +1,52 @@
+@inject IStringLocalizer<LockerResource> L
+@inject MoTimeFormatter Time
+@inject IOptions<ModuleLeaseDiagnosticsOption> Options
+<div class="ls-decision-band">
+    <div class="ls-decision-primary"><p>@L["Design:DecisionLabel"]</p>
+        <MoDisplayValue Value="@(Authorities.All(a => a.Snapshot is null) ? "—" : Active.ToString())" Unit="@L["Design:PopulationUnit", Rows.Count]" />
+        <div class="ls-reason-tally"><span>@L["Design:StatusActive"] <b>@Active</b></span><span>@L["Design:StatusExpired"] <b>@(Rows.Count - Active)</b></span>
+            @if (Rows.Any(r => r.Tight)) { <span>@L["Design:StatusTight"] <b>@Rows.Count(r => r.Tight)</b></span> }</div>
+    </div>
+    <div class="ls-decision-finding">
+        @if (Rows.Count == 0) { <p>@L[Authorities.All(a => a.Snapshot is null) ? "Design:FindingUnavailable" : "Design:FindingEmpty"]</p> }
+        else
+        {
+            var active = Rows.Where(r => !r.Expired).ToArray();
+            var top = active.GroupBy(r => r.Record.HolderId).MaxBy(g => g.Count());
+            var expired = Rows.Where(r => r.Expired).MinBy(r => r.RemainingSeconds);
+            var shortest = active.MinBy(r => r.RemainingSeconds);
+            <p>@L["Horizon:Finding", Active, active.Select(r => r.Record.HolderId).Distinct().Count()]
+                @if (expired is not null) { <button class="ls-finding-link" @onclick="@(() => Inspect.InvokeAsync(expired))">@LeasePresentation.Title(expired.Record.Resource.Name,L)</button> <span>@L["Horizon:ExpiredAgo",Duration(expired.RemainingSeconds)]</span> }
+                @if (shortest is not null) { <button class="ls-finding-link" @onclick="@(() => Inspect.InvokeAsync(shortest))">@LeasePresentation.Title(shortest.Record.Resource.Name,L)</button> <span>@L["Horizon:Shortest",Duration(shortest.RemainingSeconds),Duration(shortest.GrantSeconds)]</span> }
+                @if (top is not null && top.Count()>1) { <code>@top.Key</code> <span>@L["Horizon:TopHolder",top.Count()]</span> }
+            </p>
+        }
+        <small class="ls-policy-hint">@L["Design:RefreshPolicy",Duration(Options.Value.InventoryCacheDuration.TotalSeconds)]</small>
+    </div>
+</div>
+<div class="ls-auth-strip" aria-label="@L["Design:AuthorityStripLabel"]">
+    @foreach (var source in Authorities)
+    {
+        var rows = Rows.Where(r => r.Authority.Id == source.Authority.Id).ToArray();
+        <button class="ls-auth-card @(Authority == source.Authority.Id ? "is-selected" : null)" type="button" aria-pressed="@(Authority == source.Authority.Id)" @onclick="@(() => SelectAuthority.InvokeAsync(source.Authority.Id))">
+            <span class="ls-auth-top"><span class="ls-auth-kind">@L[$"Providers:{source.Authority.Kind}"]</span><strong class="ls-auth-name">@source.Authority.DisplayName</strong><time class="ls-auth-right">@Time.FormatTime(source.Snapshot?.ObservedAtUtc)</time></span>
+            <span class="ls-auth-bottom"><span>@(source.Snapshot is null ? L["Design:AuthorityFailNoData"] : L[rows.Any(r => r.Expired) ? "Horizon:MixedRecords" : "Design:AuthorityRecords", rows.Count(r => !r.Expired), rows.Count(r => r.Expired)])</span>
+                <small>@source.Authority.NamePrefix* · @L[source.CanRevoke ? "Design:AuthorityRevocable" : "Design:AuthorityReadOnly"]</small></span>
+            @if (source.IsTruncated) { <span>@L["Evidence:Truncated", rows.Length, source.TotalCount]</span> }
+            @if (source.RefreshFailed) { <span>@L["Evidence:RefreshFailed"]</span> }
+        </button>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    [Parameter] public string? Authority { get; set; }
+    [Parameter] public EventCallback<string> SelectAuthority { get; set; }
+    [Parameter] public EventCallback<LeaseRow> Inspect { get; set; }
+    private int Active => Rows.Count(r => !r.Expired);
+    private string Duration(double seconds)
+    {
+        var (value, unit) = LeasePresentation.Duration(Math.Abs(seconds), L);
+        return value + unit;
+    }
+}

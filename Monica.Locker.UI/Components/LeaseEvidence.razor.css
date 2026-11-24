@@ -24,3 +24,5 @@
 .ls-admin { border-top:1px solid var(--mud-palette-divider); padding-top:22px; }
 .ls-admin ::deep .mud-button-root { margin-top:12px; }
 @media(max-width:560px) { .ls-exact-action { flex-direction:column; gap:10px; } }
+
+.ls-anatomy { display:grid; grid-template-columns:1fr auto; gap:8px; font-size:13px; } .ls-anatomy > div { grid-column:1/-1; height:7px; border-radius:4px; background:var(--mud-palette-success); overflow:hidden; } .ls-anatomy i { height:100%; display:block; background:var(--mud-palette-info); } .ls-time-spine small { color:var(--mud-palette-text-secondary); margin-inline-start:8px; }

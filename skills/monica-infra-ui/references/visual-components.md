@@ -11,7 +11,7 @@ The visual instruments below live in `Monica.UI.Shared.Components.Visual`. Inspe
 | Emphasize a number or subject inside a finding | `MoValueMark` | Choose a `MoVisualRole`; use `Href` only for navigation. This is not a status label, filter toggle, or command button. |
 | Localized finding containing emphasized values or links | `MoRichFinding` | Supply one localized `Template` and ordered `Values` fragments. Keep language-specific word order in resources. |
 | One feature value and its unit | `MoDisplayValue` | Supply formatted `Value`, optional `Unit`, and a complete `AccessibleLabel` when the visual fragments need one reading. |
-| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Crumb`, `Meta`, and `Actions`; the page owns action hierarchy and links. |
+| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Icon` for the workspace seal, `Crumb`, `Meta`, and `Actions`; the page owns action hierarchy and links. |
 | Contiguous facts sharing a frame | `MoFactGrid` with `MoFact` | Supply localized labels and preformatted values; this is not a grid of independent cards. |
 | State explanation with an icon tile | `MoSemanticCallout` | Supply `Severity`, `Title`, and evidence in `ChildContent`; use it for a contextual note, not a toast or modal alert. |
 | State/category filter | `MoFilterChip` | Supply `Label`, `Selected`, `SelectedChanged`, optional `Count` and `ShowDot`; a real zero remains an operable filter. `Pill=true` selects the compact capsule silhouette; the default remains rectangular. |

@@ -105,36 +105,53 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
         .ToArray() ?? [];
 
-    /// <summary>Gets the entries after current name, state, and tag filters are applied.</summary>
+    internal bool Paused => _state.Paused;
+    internal string? Probe => _state.Probe;
+    internal string? Sort => _state.Sort;
+
+    internal IEnumerable<HealthCheckEntrySnapshot> FacetEntries => (_state.Snapshot?.Entries ?? [])
+        .Where(entry => MatchesProbe(entry, Probe)
+            && (string.IsNullOrEmpty(TagFilter) || entry.Tags.Contains(TagFilter, StringComparer.OrdinalIgnoreCase))
+            && (string.IsNullOrEmpty(NameFilter) || entry.Name.Contains(NameFilter, StringComparison.OrdinalIgnoreCase)
+                || entry.Description?.Contains(NameFilter, StringComparison.OrdinalIgnoreCase) == true
+                || entry.Tags.Any(tag => tag.Contains(NameFilter, StringComparison.OrdinalIgnoreCase))));
+
+    /// <summary>Gets the sorted entries matching the current registry filters.</summary>
     public IReadOnlyList<HealthCheckEntrySnapshot> FilteredEntries
     {
         get
         {
-            var state = _state;
-            IEnumerable<HealthCheckEntrySnapshot> entries = state.Snapshot?.Entries ?? [];
-            if (!string.IsNullOrWhiteSpace(state.NameFilter))
+            var entries = FacetEntries.Where(e => StatusFilter is null || e.Status == StatusFilter);
+            return (Sort switch
             {
-                entries = entries.Where(entry =>
-                    entry.Name.Contains(state.NameFilter, StringComparison.OrdinalIgnoreCase) ||
-                    (entry.Description?.Contains(state.NameFilter, StringComparison.OrdinalIgnoreCase) ?? false));
-            }
+                "duration" => entries.OrderByDescending(e => e.Duration).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase),
+                "name" => entries.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase),
+                _ => entries.OrderByDescending(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            }).ToArray();
+        }
+    }
 
-            if (state.StatusFilter is { } status)
+    internal static bool MatchesProbe(HealthCheckEntrySnapshot entry, string? probe) => probe switch
+    {
+        "ready" or "live" => entry.Tags.Contains(probe, StringComparer.OrdinalIgnoreCase),
+        "other" => !MatchesProbe(entry, "ready") && !MatchesProbe(entry, "live"),
+        _ => true
+    };
+
+    internal Task SetPausedAsync(bool paused) => UpdatePresentationAsync(state => state with { Paused = paused });
+
+    internal void ApplyRoute(string? query, string? status, string? tag, string? probe, string? sort)
+    {
+        lock (_stateGate)
+        {
+            _state = _state with
             {
-                entries = entries.Where(entry => entry.Status == status);
-            }
-
-            if (!string.IsNullOrWhiteSpace(state.TagFilter))
-            {
-                entries = entries.Where(entry => entry.Tags.Contains(
-                    state.TagFilter,
-                    StringComparer.OrdinalIgnoreCase));
-            }
-
-            return entries
-                .OrderByDescending(static entry => entry.Status)
-                .ThenBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+                NameFilter = query?.Trim() ?? string.Empty,
+                TagFilter = tag,
+                Probe = probe,
+                Sort = sort,
+                StatusFilter = Enum.TryParse<HealthCheckState>(status, true, out var value) && Enum.IsDefined(value) ? value : null
+            };
         }
     }
 
@@ -386,7 +403,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                await RefreshAsync();
+                if (!Paused) await RefreshAsync();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -439,7 +456,10 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         HealthCheckState? StatusFilter,
         string? TagFilter,
         HealthCheckEntrySnapshot? SelectedEntry,
-        bool IsDetailsOpen)
+        bool IsDetailsOpen,
+        bool Paused = false,
+        string? Probe = null,
+        string? Sort = null)
     {
         public static PageState Initial { get; } = new(
             Snapshot: null,

@@ -13,8 +13,7 @@
       "Manual": "Manual refresh only"
     },
     "Actions": {
-      "AutoRefresh": "Auto refresh",
-      "Refresh": "Refresh evidence"
+      "AutoRefresh": "Auto refresh"
     },
     "Captured": "Captured",
     "Loading": "Reading local timing evidence…",
@@ -25,13 +24,7 @@
     }
   },
   "Summary": {
-    "AriaLabel": "Whole snapshot timing scope",
-    "Running": "Captured in flight",
-    "Operations": "Completed keys",
-    "Samples": "Completed samples",
-    "Average": "Mean of key means",
-    "AverageBasis": "Each operation key has equal weight.",
-    "Scope": "Cumulative evidence in this host. Pausing the view does not pause recording."
+    "AverageBasis": "Each operation key has equal weight."
   },
   "Statistics": {
     "Eyebrow": "COMPLETED / RANKED EVIDENCE",
@@ -40,17 +33,9 @@
     "EmptyHelp": "Business operations measured by the Monica pipeline appear here after completion.",
     "Search": "Find an operation",
     "SearchPlaceholder": "Name or full operation key",
-    "Ordering": {
-      "Mean": "Highest mean",
-      "Latest": "Highest latest",
-      "Samples": "Most samples",
-      "Identity": "Identity · A–Z"
-    },
     "DurationPair": "Duration",
     "FrequencyPair": "Completions",
     "AllocationPair": "Allocation",
-    "RelativeMean": "Mean duration is {0}% of the largest key mean in this snapshot.",
-    "ComparisonHelp": "Bars compare key means against the largest mean in the whole snapshot.",
     "RateHelp": "Rate is cumulative completions per minute since the first completion, with a one-minute minimum denominator.",
     "Pagination": "Completed operation pages"
   },
@@ -59,8 +44,6 @@
     "Title": "Work in progress",
     "Empty": "No invocations were in flight at capture.",
     "Search": "Find a captured invocation",
-    "AgeBasis": "Age at capture",
-    "CapturedHelp": "Membership and elapsed age belong to this capture. Recording continues while the view is paused.",
     "Pagination": "Captured invocation pages"
   },
   "Columns": {
@@ -77,10 +60,6 @@
     "LastRecordedAt": "Last completed at"
   },
   "Details": {
-    "CompletedTitle": "Completed operation evidence",
-    "RunningTitle": "Captured invocation evidence",
-    "CaptureHelp": "Values from the successful page capture:",
-    "DisplayName": "Display name",
     "OperationKey": "Full operation key",
     "InvocationId": "Invocation ID",
     "FirstRecordedAt": "First completed at",
@@ -90,8 +69,7 @@
     "MeanAllocation": "Mean allocation",
     "LatestAllocation": "Latest allocation",
     "RecordedMilliseconds": "Recorded: {0} ms",
-    "RecordedBytes": "Recorded: {0} bytes",
-    "OpenFailed": "The evidence inspector could not be opened."
+    "RecordedBytes": "Recorded: {0} bytes"
   },
   "Common": {
     "Unavailable": "—",
@@ -100,12 +78,100 @@
     "Clear": "Clear search",
     "Details": "Details",
     "Inspect": "Inspect {0}",
-    "Close": "Close",
     "NoMatches": "No matching evidence.",
     "NoMatchesHelp": "Change or clear the query to see the captured records.",
     "PageRange": "{0}–{1} of {2}"
   },
   "Navigation": {
     "Category": "Execution timing"
+  },
+  "Bench": {
+    "LongestLingering": "Furthest beyond baseline",
+    "LongestFlight": "Longest in flight",
+    "Heaviest": "Most cumulative work",
+    "Slowest": "Highest mean",
+    "Allocation": "{0} / {1} with allocation"
+  },
+  "Design": {
+    "BenchColLatest": "Latest",
+    "BenchColMean": "Mean",
+    "BenchInspect": "Inspect",
+    "BenchLegendFaster": "Faster latest (≤ 0.5× & -50 ms)",
+    "BenchLegendMean": "Cumulative mean",
+    "BenchLegendSpike": "Latest spike (≥ 2× & +50 ms)",
+    "BenchLegendSteady": "Latest sample (steady)",
+    "BenchReadoutAlloc": "Alloc {0}",
+    "BenchReadoutRate": "{0} / min",
+    "BenchReadoutSamples": "{0} samples",
+    "BenchReadoutTotal": "Total {0}",
+    "BenchRefLine": "Key mean {0}",
+    "BenchScope": "Top {0} of {1} keys by mean & spikes (whole-snapshot scale)",
+    "BenchTitle": "Latency profile · cumulative mean vs. latest sample",
+    "CollisionBadge": "Name collision",
+    "CopyKey": "Copy full operation key",
+    "DisplayPeakFlight": "Longest captured age · {0} in flight",
+    "DisplayPeakMean": "Peak operation mean · {0} completed keys",
+    "EmptyBody": "Business operations measured by the Monica execution pipeline appear here once started or completed in this host.",
+    "EmptyTitle": "No execution timing evidence recorded yet",
+    "FInFlight": "Captured in flight",
+    "FKeyMean": "Mean of key means",
+    "FKeys": "Completed keys",
+    "FSamples": "Completed samples",
+    "FSamplesSub": "Cumulative work {0}",
+    "FlightEmpty": "No business operations were in flight at {0}.",
+    "FlightLegendBaseline": "Completed mean baseline",
+    "FlightNoBaseline": "No baseline yet",
+    "FlightScale": "Axis cap {0}",
+    "FlightTitle": "In flight · captured age vs. baseline mean",
+    "KComponent": "Component type",
+    "KCumulativeTime": "Cumulative time",
+    "KDrift": "Latest drift",
+    "KExecutionPoint": "Execution point",
+    "KSamples": "Samples",
+    "LedgerFootScale": "Duration bars compare against the whole-snapshot peak of {0}.",
+    "PauseNotice": "Polling paused at {0}; host collector continues recording in the background.",
+    "PillInFlight": "{0} in flight",
+    "PillLingering": "{0} lingering",
+    "PillSpikes": "{0} latest spikes",
+    "Points": {
+      "All": "All points",
+      "Direct": "Direct scope",
+      "Eventbus": "EventBus",
+      "Hosted": "Hosted / Seeder",
+      "Jobs": "Jobs",
+      "Mediator": "Mediator",
+      "Mvc": "MVC"
+    },
+    "Refresh": "Refresh evidence",
+    "RunningDualReadNote": "Completed statistics and running operations are sequential diagnostic reads, not an atomic transaction.",
+    "SheetActiveGroupTitle": "In-flight invocations for this key ({0})",
+    "SheetCapturedAge": "Captured age",
+    "SheetClose": "Close evidence sheet",
+    "SheetCompletedEyebrow": "Completed operation evidence",
+    "SheetLoadLatest": "Load latest",
+    "SheetMeanDuration": "Mean duration",
+    "SheetNotFoundBody": "A running invocation may have already completed and merged into statistics, or the host restarted. Clear selection to return.",
+    "SheetNotFoundTitle": "Record is not present in this capture",
+    "SheetOpenBaseline": "Inspect completed statistics for this key",
+    "SheetPinnedNote": "Pinned to capture {0} (background page refresh will not overwrite this view)",
+    "SheetRunningEyebrow": "Captured invocation evidence",
+    "SheetSecAllocation": "Optional allocation",
+    "SheetSecIdentity": "Identity & origin",
+    "SheetSecMeasurements": "Timing & frequency",
+    "SheetSecTimestamps": "Exact timestamps",
+    "Signals": {
+      "All": "All states",
+      "Alloc": "Allocation tracked",
+      "Inflight": "In flight now",
+      "Spike": "Latest spike"
+    },
+    "SortOptions": {
+      "Identity": "Identity · A–Z",
+      "Latest": "Highest latest",
+      "Mean": "Highest mean",
+      "Samples": "Most samples",
+      "Total": "Cumulative time"
+    },
+    "Title": "Execution Timing"
   }
 }

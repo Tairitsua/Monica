@@ -3,6 +3,8 @@
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.Support
 @using Monica.Framework.UI.UILogging.State
+@using Monica.Framework.UI.UILogging.Components
+@using Monica.UI.Shared.Components.Visual
 @inject LoggingWorkspaceSession Workspace
 @inject LogFileQueryService FileQuery
 @inject NavigationManager NavigationManager
@@ -12,24 +14,19 @@
 
 <PageTitle>@L["Workbench:FilesTitle"]</PageTitle>
 
-<div class="logging-files-workbench">
-    <header class="files-heading">
-        <div><span class="files-eyebrow">@L["Workbench:Eyebrow"]</span><h1>@L["Workbench:FilesTitle"]</h1><p>@L["Workbench:FilesIntro"]</p></div>
-        <nav aria-label="@L["Workbench:Navigation"]"><a href="@ReaderUrl">@L["Workbench:Reader"]</a><a href="@CatalogUrl" aria-current="page">@L["Workbench:Files"]</a></nav>
-    </header>
-    <section class="files-directory" aria-labelledby="files-directory-title">
-        <div><span>@L["Workbench:Directory"]</span><h2 id="files-directory-title">@Path.GetFileName(FileQuery.LogDirectory.TrimEnd(Path.DirectorySeparatorChar))</h2><code>@FileQuery.LogDirectory</code></div>
-        <div class="directory-scope"><strong>@_files.Count.ToString("N0")</strong><span>@L["Workbench:Artifacts"]</span><p>@L["Workbench:RecursiveScope"]</p></div>
-    </section>
+<div class="logging-files-workbench mo-page-shell mo-page-shell--full-width">
+    <LoggingWorkspaceHeader Files="true" Count="@(_readAt.HasValue ? _files.Count : null)" FilesUrl="@CatalogUrl" ReaderUrl="@ReaderUrl" Identity="@FileQuery.LogDirectory" ReadAt="@_readAt" Following="@(_reader?.IsRunning == true)">
+        <Commands><MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Design:RefreshFiles"]</MudButton></Commands>
+    </LoggingWorkspaceHeader>
     @if (_error is not null)
     {
         <div class="files-error" role="alert"><strong>@L["Workbench:FilesFailed"]</strong><p>@_error</p></div>
     }
+    <LogFootprint Files="@_files" Available="@_readAt.HasValue" DirectoryName="@FileQuery.LogDirectory" OpenUrl="OpenUrl" Current="@_reader?.Source?.RelativePath" Following="@(_reader?.IsRunning == true)" Folder="@FolderKey" SelectFolder="SetFolder" />
     <section class="files-registry" aria-label="@L["Workbench:FilesTitle"]">
         <div class="files-controls">
             <label class="files-search"><MoIcon Icon="@MoIcons.Search" Size="1.25rem" /><input type="search" placeholder="@L["Workbench:FilesSearch"]" aria-label="@L["Workbench:FilesSearch"]" value="@_keyword" @oninput="SearchChanged" /></label>
-            <label class="files-sort"><span>@L["Workbench:Order"]</span><select value="@_order" @onchange="OrderChanged"><option value="modified">@L["Workbench:NewestModified"]</option><option value="name">@L["Workbench:FileName"]</option><option value="size">@L["Workbench:Largest"]</option></select></label>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Workbench:RefreshFiles"]</MudButton>
+            <div class="files-sort" aria-label="@L["Workbench:Order"]">@foreach (var (id,label) in Orders) { <MoFilterChip Label="@L[label]" Selected="@(_order == id)" SelectedChanged="@(() => SetOrder(id))" /> }</div>
         </div>
         <div class="files-results-summary"><span>@L["Workbench:FileResults", MatchingFiles.Count, _files.Count]</span><span>@L["Workbench:FileReadAt", UiTime.FormatTime(_readAt) ?? "—"]</span></div>
         <div class="files-table-frame">
@@ -46,9 +43,9 @@
             {
                 @foreach (var file in PageFiles)
                 {
-                    <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(string.Equals(File, file.RelativePath, StringComparison.Ordinal) ? "is-current" : "")">
-                        <td class="artifact-name"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><div><a href="@OpenUrl(file.RelativePath)">@file.FileName</a><code>@file.RelativePath</code>@if (string.Equals(File, file.RelativePath, StringComparison.Ordinal)) { <span class="current-source">@L["Workbench:LastSource"]</span> }</div></td>
-                        <td class="artifact-size" data-bytes="@file.Size"><span class="mobile-label">@L["Workbench:Size"]</span><span>@FormatSize(file.Size)</span><small>@L["Workbench:ExactBytes", file.Size.ToString("N0")]</small></td>
+                    <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(string.Equals(_reader?.Source?.RelativePath, file.RelativePath, StringComparison.Ordinal) ? "is-current" : "")">
+                        <td class="artifact-name"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><div><a href="@OpenUrl(file.RelativePath)">@file.FileName</a><code>@file.RelativePath</code>@if (string.Equals(_reader?.Source?.RelativePath, file.RelativePath, StringComparison.Ordinal)) { <span class="current-source">@L["Workbench:LastSource"]</span> }</div></td>
+                        <td class="artifact-size" data-bytes="@file.Size"><span class="mobile-label">@L["Workbench:Size"]</span><span>@FormatSize(file.Size)</span><span class="file-share"><i style="@FormattableString.Invariant($"width:{(_total==0 ? 0 : file.Size*100d/_total):0.###}%")"></i></span><small>@L["Workbench:ExactBytes", file.Size.ToString("N0")] · @(_total==0 ? "0%" : (file.Size/(double)_total).ToString("P1"))</small></td>
                         <td class="artifact-modified"><span class="mobile-label">@L["Workbench:Modified"]</span><time datetime="@file.LastModified.ToString("O")">@UiTime.Format(file.LastModified)</time></td>
                         <td class="artifact-actions"><a href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></a><button type="button" disabled="@_busy" @onclick="() => DownloadAsync(file.RelativePath)" aria-label="@L["Workbench:DownloadFile", file.FileName]"><MoIcon Icon="@MoIcons.Download" Size="1.25rem" /><span>@L["Workbench:Download"]</span></button></td>
                     </tr>

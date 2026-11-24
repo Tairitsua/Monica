@@ -1,0 +1,31 @@
+@inject IStringLocalizer<LockerResource> L
+@inject NavigationManager Navigation
+
+<section class="ls-probe-surface" id="lease-probe">
+    <header><MoIcon Icon="@MoIcons.Search" Size="1.25rem" /><div><h2>@L["Design:ProbeTitle"]</h2><p>@L["Design:ProbeDesc"]</p></div></header>
+    <form class="ls-probe-form" @onsubmit="Submit" @onsubmit:preventDefault>
+        <MudSelect T="string" Label="@L["Design:ProbeAuthority"]" Value="@Source.Id" ValueChanged="@ChangeSource" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (var item in Authorities) { <MudSelectItem Value="@item.Authority.Id">@item.Authority.DisplayName</MudSelectItem> }
+        </MudSelect>
+        <MudTextField T="string" @bind-Value="_name" Immediate="true" MaxLength="512" Label="@L["Design:ProbeResource"]" Placeholder="@L["Design:ProbePlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense" Error="@(_error is not null)" ErrorText="@_error" />
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Search">@L["Design:ProbeSubmit"]</MudButton>
+    </form>
+    <div class="ls-probe-examples">@foreach (var row in Rows.Where(row => row.Authority.Id == Source.Id).Take(3))
+        { <button type="button" @onclick="@(() => { _name = row.Record.Resource.Name; _error = null; })">@row.Record.Resource.Name</button> }</div>
+</section>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    private string? _source, _error;
+    private string _name = string.Empty;
+    private LeaseAuthority Source => (Authorities.FirstOrDefault(a => a.Authority.Id == _source) ?? Authorities[0]).Authority;
+    private void ChangeSource(string id) { _source = id; _error = null; }
+    private void Submit()
+    {
+        _error = string.IsNullOrWhiteSpace(_name) ? L["Design:ProbeEmptyError"].Value :
+            !_name.StartsWith(Source.NamePrefix, StringComparison.Ordinal) ? L["Design:ProbePrefixError", Source.NamePrefix].Value : null;
+        if (_error is null)
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> {
+                ["targetAuthority"] = Source.Id, ["source"] = null, ["resource"] = _name }));
+    }
+}

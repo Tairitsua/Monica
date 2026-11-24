@@ -1,6 +1,8 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @inject HealthCheckPageSessionFactory SessionFactory
 @inject PageAccessEvaluator PageAccess
 @inject IStringLocalizer<HealthCheckResource> L
@@ -26,31 +28,17 @@
     else if (_session is { } session)
     {
         <div class="health-workspace">
-            <header class="health-page-header">
-                <div class="health-page-heading">
-                    <span class="health-page-eyebrow">@L["Page:Eyebrow"]</span>
-                    <h1>@L["Page:Heading"]</h1>
-                    <p>@L["Page:Subtitle"]</p>
-                    <span class="health-host"><MoIcon Icon="@MoIcons.Server" Size="1.25rem" />@L["Page:CurrentHost", session.HostName]</span>
-                </div>
-                <div class="health-page-actions">
+            <MoPageMasthead Icon="@MoIcons.HeartPulse" Title="@L["Design:Title"]" Crumb="@L["Design:Eyebrow"]" Meta="@Metadata(session)">
+
+                <Actions>
                     @if (session.Snapshot is { } snapshot)
                     {
-                        <div class="health-last-check">
-                            <span>@L["Page:LastChecked"]</span>
-                            <time datetime="@snapshot.CheckedAt.ToString("O")" title="@UiTime.Format(snapshot.CheckedAt)">@UiTime.FormatTime(snapshot.CheckedAt)</time>
-                        </div>
+                        <div class="health-last-check"><span>@L["Page:LastChecked"]</span><time datetime="@snapshot.CheckedAt.ToString("O")">@UiTime.FormatTime(snapshot.CheckedAt)</time></div>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@(session.Paused ? MoIcons.Play : MoIcons.Pause)" OnClick="@(() => session.SetPausedAsync(!session.Paused))">@L[session.Paused ? "Design:ResumeAuto" : "Design:PauseAuto"]</MudButton>
                     }
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               StartIcon="@MoIcons.Refresh"
-                               Class="health-refresh"
-                               Disabled="@session.IsRefreshing"
-                               OnClick="@(() => RefreshAsync(session))">
-                        @L["Actions:Refresh"]
-                    </MudButton>
-                </div>
-            </header>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@session.IsRefreshing" OnClick="@(() => RefreshAsync(session))">@L["Actions:Refresh"]</MudButton>
+                </Actions>
+            </MoPageMasthead>
 
             @if (session.RefreshError is { } refreshError)
             {
@@ -89,7 +77,7 @@
                     break;
             }
 
-            <HealthCheckEntryDrawer Session="@session" />
+            <HealthCheckEntryDrawer Session="@session" EntryName="@Entry" />
         </div>
     }
 </div>
@@ -97,6 +85,21 @@
 @code {
     public const string PAGE_URL = "/health-checks";
 
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery] public string? Status { get; set; }
+    [SupplyParameterFromQuery] public string? Tag { get; set; }
+    [SupplyParameterFromQuery] public string? Probe { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public string? Entry { get; set; }
+
+    private RenderFragment Metadata(HealthCheckPageSession session) => @<text>
+                    <span class="mo-vl-status mo-vl-role--info"><i class="mo-vl-status-dot"></i>@L[session.Paused ? "Design:AutoRefreshPaused" : session.RefreshError is null ? "Overview:AutoRefresh" : "Design:AutoRefreshStale"]</span>
+                    <button class="mo-vl-id-chip" @onclick="@(() => CopyHostAsync(session.HostName))"><MoIcon Icon="@MoIcons.Server" />@session.HostName<MoIcon Icon="@MoIcons.Copy" /></button>
+                    <span>@UiTime.TimeZone.Id</span>
+
+    </text>;
+    protected override void OnParametersSet() => _session?.ApplyRoute(Search, Status, Tag, Probe, Sort);
+    private Task CopyHostAsync(string value) => JS.InvokeVoidAsync("navigator.clipboard.writeText", value).AsTask();
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private HealthCheckPageSession? _session;
     private bool _accessChecked;

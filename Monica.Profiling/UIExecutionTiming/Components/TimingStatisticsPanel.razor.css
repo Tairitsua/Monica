@@ -59,3 +59,5 @@
     .timing-number-pair { gap: 8px; }
 }
 @media (max-width: 600px) { .timing-statistics { padding: 20px 18px; } }
+
+.timing-facets { display:grid; gap:6px; padding:6px 18px 14px; } .timing-facets > div { display:flex; flex-wrap:wrap; gap:5px; } .trend-latest span { background:var(--mud-palette-info); } .timing-last { white-space:nowrap; font:12px var(--mo-font-family-mono); }

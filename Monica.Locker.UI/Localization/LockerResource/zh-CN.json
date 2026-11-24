@@ -4,11 +4,6 @@
     "Leases": "协调租约",
     "Locks": "临界区锁"
   },
-  "Workspace": {
-    "Title": "租约与锁",
-    "Eyebrow": "协同运行 / 所有权",
-    "ConfiguredSources": "已配置租约源的观测"
-  },
   "Common": {
     "Captured": "最早租约源观测时间",
     "Refresh": "刷新租约清单",
@@ -22,22 +17,11 @@
   "Refresh": {
     "Title": "自动刷新",
     "Every": "每 {0} 秒",
-    "Off": "自动刷新已关闭",
-    "Policy": "后台页面暂停自动读取，清单刷新复用缓存快照。"
+    "Off": "自动刷新已关闭"
   },
   "Access": {
     "Denied": "无权访问",
     "Description": "当前用户未获主机运维策略授权。"
-  },
-  "Map": {
-    "Intro": "每项职责，清晰可见的持有者。",
-    "Population": "条租约观测记录",
-    "Across": "来自 {0} 个已配置的租约源查询",
-    "Finding": "有效期以各租约源的观测时刻为准。保留的过期记录不能说明其工作进程是否仍在运行。",
-    "Title": "职责归属图",
-    "Description": "选择一项职责，查看对应证据",
-    "Records": "{0} 条观测记录",
-    "More": "在下方记录中查看其余 {0} 项"
   },
   "Evidence": {
     "Stale": "部分刷新失败。已保留上次成功观测及其原始时间；暂不可用的租约源会单独标明。",
@@ -45,16 +29,12 @@
     "Retry": "请重试读取。查询失败不能用于判断所有权。",
     "Unconfigured": "尚未配置租约源",
     "UnconfiguredDescription": "在主机中注册租约存储及允许查看的作用域与资源前缀后，即可在此查看。",
-    "ClaimsTitle": "职责租约，不等同于消息或作业领取",
-    "ClaimsDescription": "作业执行与 Outbox 投递领取仍保留在业务记录中。本页展示共享协调职责。",
     "Unexpired": "观测时未过期",
     "Expired": "已过期记录",
     "RefreshFailed": "刷新失败",
     "Truncated": "显示 {0} / {1} 条记录",
     "Empty": "没有留存的租约观测",
-    "EmptyDescription": "已配置查询未返回记录。没有记录不代表该职责从未被获取。",
     "Retention": "SQL 可能保留过期行；Redis 过期键会从清单中消失。",
-    "CaptureNote": "有效期以各租约源的观测时刻为准。这些数值是快照，不是实时倒计时。",
     "Title": "租约证据",
     "ExactFailed": "精确查询失败；先前证据仍保留其原始观测时间。",
     "ExpiredAgo": "观测时已过期",
@@ -72,25 +52,9 @@
     "MissingDescription": "记录可能已过期、被撤销或移除。租约清单不是所有权历史。"
   },
   "Inventory": {
-    "Title": "租约记录",
-    "Description": "找到职责，再查看对应资源的精确观测。",
-    "Shown": "显示 {0} / {1} 条记录",
-    "Search": "搜索职责、持有者或资源…",
-    "AllAuthorities": "全部租约源",
     "NoMatch": "没有匹配的记录",
     "NoMatchDescription": "可切换租约源，或移除搜索与状态筛选。",
-    "Resource": "职责 / 资源",
-    "Holder": "观测到的持有者",
-    "Authority": "租约源",
-    "Validity": "观测时有效期",
-    "Previous": "上一页",
-    "Next": "下一页",
-    "Page": "第 {0} / {1} 页"
-  },
-  "Filters": {
-    "all": "全部记录",
-    "unexpired": "观测时未过期",
-    "expired": "已过期记录"
+    "Authority": "租约源"
   },
   "Providers": {
     "Sql": "SQL",
@@ -201,5 +165,80 @@
         "Signal": "不提供丢失观测，令牌不可取消"
       }
     }
+  },
+  "Horizon": {
+    "Finding": "{0} 个有效角色分布在 {1} 个持有节点。",
+    "Grant": "上次确认的授权窗口",
+    "MixedRecords": "{0} 有效 · {1} 过期",
+    "ExpiredAgo": "已过期 {0}。",
+    "Shortest": "租期 {1}，剩余 {0}。",
+    "TopHolder": "持有最多的有效角色（{0} 个）。",
+    "Observed": "已观测 {0} / {1} 个租约源",
+    "Scheduler": "调度运行时"
+  },
+  "Design": {
+    "AuthorityFailNoData": "初次读取失败",
+    "AuthorityReadOnly": "只读观测",
+    "AuthorityRecords": "{0} 有效",
+    "AuthorityRevocable": "支持撤销",
+    "AuthorityStripLabel": "已配置的租约源",
+    "AxisZero": "0s 观测",
+    "ColHolder": "持有节点与持续时长",
+    "ColRole": "协调角色与资源键",
+    "ColValidity": "观测时余量",
+    "DecisionLabel": "当前观测到的协调租约",
+    "Eyebrow": "运维 · 租约与锁",
+    "FilterActive": "有效",
+    "FilterAll": "全部",
+    "FilterExpired": "已过期",
+    "FilterThisHolder": "筛选此节点角色",
+    "FindingEmpty": "已绑定的租约源查询均正常返回，但当前没有任何留存租约记录。Redis 过期键会自动移除，无记录不代表从未获取。",
+    "FindingUnavailable": "所有已配置租约源均未能完成初次读取，当前无法判断协调角色的所有权状态。",
+    "GroupAuthority": "按租约源",
+    "GroupHolder": "按持有节点",
+    "HeldBeforeExpiry": "过期前持有 {0}",
+    "HeldFor": "已持续持有 {0}",
+    "HorizonDesc": "以各租约源观测时刻为 0s 基线：左侧圆点为最近续租，右侧实条为剩余有效期，过期留存行位于 0s 左侧。",
+    "HorizonTitle": "租约有效窗口",
+    "JustHandedOver": "刚接管 · {0}",
+    "LockerBackend": "底层实现",
+    "LockerBoundaryNote": "提示：锁句柄失效不会回滚已发出的外部请求；持久化状态写入仍需配合数据库事务与并发校验。作业执行领取与 Outbox 投递领取保留在各自业务表中，不在此处列出。",
+    "LockerCompareSummary": "参考：对比 Monica 支持的三种锁提供者契约",
+    "LockerConsolidatedBody": "临界区锁没有运行时持锁清单与管理操作，保留独立运维页易与协调租约混淆。当前宿主的锁提供者配置与键名排查工具已收纳在下方。",
+    "LockerDesc": "IDistributedLock 为短生命周期临界区句柄，不提供实时持锁清单或强制解锁；此处仅展示当前宿主的真实注册配置与键名规范化预览。",
+    "LockerExpiry": "有效期与续期",
+    "LockerNotRegistered": "未注册 AddLocker()",
+    "LockerNotRegisteredDesc": "当前宿主仅启用了协调租约诊断（AddLeaseDiagnostics），未注册分布式临界区锁服务。若业务需要短时互斥，可在宿主组合中调用 AddLocker()。",
+    "LockerPrefix": "键前缀",
+    "LockerProvider": "当前提供者",
+    "LockerTitle": "本机临界区锁配置",
+    "LockerWaitTimeout": "默认等待超时",
+    "NormalizerInputLabel": "输入逻辑锁名称",
+    "NormalizerOutput": "实际写入后端的键名",
+    "NormalizerPlaceholder": "例如 flight:sync:CA1234",
+    "NormalizerTitle": "键名规范化预览（LockKeyNormalizer）",
+    "PopulationUnit": "/ {0} 条有效",
+    "ProbeAction": "精确探测",
+    "ProbeAuthority": "目标租约源",
+    "ProbeDesc": "直接调用 GetResourceAsync 读取单个资源键（O(1) 精确查询，不触发 Redis SCAN），可用于核验已从清单消失的键。",
+    "ProbeEmptyError": "请输入要探测的资源名称。",
+    "ProbePlaceholder": "输入完整资源名，例如 service-discovery:platform-registry",
+    "ProbePrefixError": "此租约源仅允许查询前缀 \"{0}\" 开头的资源键。",
+    "ProbeResource": "资源名称（Resource.Name）",
+    "ProbeSubmit": "立即探测",
+    "ProbeTitle": "精确探测单个资源",
+    "ReadoutIdle": "聚焦或悬停任意租约行，查看获取、续租、观测与过期四个精确时刻；回车打开完整证据。",
+    "RefreshPolicy": "页面在后台时暂停自动刷新。清单读取共享此主机的 {0} 缓存。",
+    "Search": "搜索角色、资源键或持有节点…",
+    "ShownCount": "显示 {0} / {1} 条",
+    "SortLabel": "排序",
+    "SortName": "资源键 A→Z",
+    "SortTenure": "最近接管优先",
+    "SortUrgency": "优先异常 / 剩余最短",
+    "StatusActive": "观测时有效",
+    "StatusExpired": "已过期留存",
+    "StatusTight": "余量低于 1/3",
+    "TightTag": "余量偏短",
+    "Title": "协调租约"
   }
 }

@@ -1,22 +1,5 @@
-.health-page { width: 100%; min-width: 0; min-height: 100%; padding: clamp(24px, 2.3vw, 36px); font-family: var(--mud-typography-default-family); }
-.health-page .health-workspace { width: 100%; min-width: 0; padding: 0; background: transparent; }
-.health-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--mud-palette-divider); }
-.health-page-heading { min-width: 0; }
-.health-page-eyebrow { display: block; margin-bottom: 12px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mud-palette-primary); }
-.health-page-heading h1 { margin: 0; font-family: var(--mud-typography-h1-family); font-size: clamp(27px, 2.5vw, 36px); font-weight: 500; line-height: 1.25; letter-spacing: -.025em; color: var(--mud-palette-text-primary); }
-.health-page-heading p { margin: 10px 0 14px; max-width: 680px; font-size: 13px; line-height: 1.6; color: var(--mud-palette-text-secondary); }
-.health-host { display: flex; align-items: center; gap: 7px; font-family: var(--mo-font-family-mono); font-size: 10px; line-height: 1.5; color: var(--mud-palette-text-secondary); overflow-wrap: anywhere; }
-.health-host ::deep svg { width: 15px; height: 15px; flex-shrink: 0; }
-.health-page-actions { display: flex; align-items: center; gap: 20px; flex-shrink: 0; }
-.health-last-check { display: grid; gap: 5px; text-align: end; color: var(--mud-palette-text-secondary); font-size: 10px; }
-.health-last-check time { font-family: var(--mo-font-family-mono); font-size: 12px; color: var(--mud-palette-text-primary); }
-.health-page-actions ::deep .health-refresh { min-height: 36px; padding: 7px 14px; border-color: var(--mud-palette-divider); border-radius: 6px; font-size: 12px; font-weight: 500; text-transform: none; box-shadow: none; }
-.health-page-content { display: grid; gap: 24px; min-width: 0; }
-.health-page-state { display: flex; min-height: 24rem; padding: 2rem; align-items: center; justify-content: center; flex-direction: column; gap: .75rem; text-align: center; }
-@media (max-width: 700px) {
-    .health-page { padding: 22px 16px; }
-    .health-page-header { flex-direction: column; align-items: flex-start; gap: 20px; padding-bottom: 22px; margin-bottom: 22px; }
-    .health-page-actions { width: 100%; justify-content: space-between; }
-    .health-last-check { text-align: start; }
-    .health-page-content { gap: 22px; }
-}
+.health-workspace { container: page / inline-size; display: grid; gap: 20px; min-width: 0; }
+.health-page-content { display: grid; gap: 20px; min-width: 0; }
+.health-last-check { display: grid; text-align: end; font-size: 12px; color: var(--mud-palette-text-secondary); }
+.health-last-check time { font-family: var(--mo-font-family-mono); }
+.health-page-state { display: grid; min-height: 18rem; align-content: center; justify-items: center; gap: .7rem; text-align: center; }

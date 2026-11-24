@@ -18,6 +18,9 @@ public sealed class DaprLockProvider(
     : ILockProvider
 #pragma warning restore DAPR_DISTRIBUTEDLOCK
 {
+    /// <inheritdoc />
+    public LockProviderInfo Info => new(LockProviderKind.Dapr, DistributedLockDaprOptions.StoreName, DistributedLockDaprOptions.DefaultLeaseDuration);
+
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(100);
 
     private ModuleDaprLockerOption DistributedLockDaprOptions { get; } = distributedLockDaprOptions.Value;

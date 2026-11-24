@@ -4,35 +4,23 @@
 @using Monica.Profiling.ExecutionTiming.Models
 @using Monica.Profiling.UIExecutionTiming.Components
 @inject ExecutionTimingPageStateFactory PageStateFactory
-@inject IDialogService DialogService
+@using Monica.UI.Shared.Components.Visual
+@inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<ExecutionTimingResource> L
 @inject ILogger<UIExecutionTimingPage> Logger
 @implements IAsyncDisposable
 
 <PageTitle>@L["Pages:ExecutionTiming:Title"]</PageTitle>
-<div class="execution-timing-page">
-    <header class="timing-heading">
-        <div>
-            <span class="timing-eyebrow"><MoIcon Icon="@MoIcons.Timer" Size="1.25rem" /> @L["Page:Eyebrow"]</span>
-            <h1>@L["Pages:ExecutionTiming:Title"]</h1><p>@L["Page:Subtitle"]</p>
-        </div>
-        <div class="timing-heading__controls">
-            <div class="timing-heading__actions">
-                <MudSwitch T="bool" Value="PageState.AutoRefresh" ValueChanged="SetAutoRefresh" Disabled="@(!PageState.CanAutoRefresh)"
-                           Color="Color.Primary" Label="@L["Page:Actions:AutoRefresh"]" />
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh"
-                           OnClick="RefreshDataAsync" Disabled="@PageState.IsLoading">@L["Page:Actions:Refresh"]</MudButton>
-            </div>
-            <div class="timing-freshness">
-                <span class="timing-polling"><span class="timing-polling__dot" aria-hidden="true"></span>@PollingLabel</span>
-                @if (PageState.SnapshotCapturedAt is { } capturedAt)
-                {
-                    <span>@L["Page:Captured"] <time datetime="@ExecutionTimingDisplayFormatter.FormatMachineDateTime(capturedAt)">@UiTime.Format(capturedAt)</time></span>
-                }
-            </div>
-        </div>
-    </header>
+<div class="execution-timing-page mo-page-shell mo-page-shell--full-width">
+    <MoPageMasthead Icon="@MoIcons.Timer" Title="@L["Design:Title"]" Crumb="@L["Page:Eyebrow"]">
+        <Meta><span class="mo-vl-status mo-vl-role--info"><i class="mo-vl-status-dot"></i>@PollingLabel</span><code>@Environment.MachineName</code><span>@UiTime.TimeZone.Id</span></Meta>
+        <Actions>@if (PageState.SnapshotCapturedAt is { } at) { <div class="timing-stamp"><span>@L["Page:Captured"]</span><time datetime="@at.ToString("O")">@UiTime.FormatTime(at)</time></div> }
+            <MudSwitch T="bool" Value="PageState.AutoRefresh" ValueChanged="SetAutoRefresh" Disabled="@(!PageState.CanAutoRefresh)" Color="Color.Primary" Label="@L["Page:Actions:AutoRefresh"]" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshDataAsync" Disabled="@PageState.IsLoading">@L["Design:Refresh"]</MudButton>
+        </Actions>
+    </MoPageMasthead>
+    @if (!PageState.AutoRefresh && PageState.HasSnapshot) { <small>@L["Design:PauseNotice",UiTime.FormatTime(PageState.SnapshotCapturedAt)!]</small> }
     @if (PageState.LoadError is not null)
     {
         <div class="timing-error" role="status">
@@ -46,21 +34,17 @@
     {
         <div class="timing-loading" role="status" aria-label="@L["Page:Loading"]"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /></div>
     }
-    <section class="timing-scope" aria-label="@L["Summary:AriaLabel"]">
-        <div class="timing-scope__facts">
-            <div><span>@L["Summary:Running"]</span><strong>@SnapshotNumber(PageState.RunningOperations.Count)</strong></div>
-            <div><span>@L["Summary:Operations"]</span><strong>@SnapshotNumber(PageState.Statistics.Count)</strong></div>
-            <div><span>@L["Summary:Samples"]</span><strong>@SnapshotNumber(PageState.Statistics.Sum(item => (long)item.ExecutionCount))</strong></div>
-            <p>@L["Summary:Scope"]</p>
-        </div>
-        <div class="timing-scope__mean">
-            <span>@L["Summary:Average"]</span><strong>@FormatAverageDuration()</strong><small>@L["Summary:AverageBasis"]</small>
-        </div>
-    </section>
     @if (PageState.HasSnapshot && PageState.SnapshotCapturedAt is { } snapshotAt)
     {
-        <TimingStatisticsPanel Statistics="@PageState.Statistics" CapturedAt="@snapshotAt" OnInspect="InspectCompletedAsync" />
-        <TimingRunningPanel Operations="@PageState.RunningOperations" CapturedAt="@snapshotAt" OnInspect="InspectRunningAsync" />
+        @if (PageState.Statistics.Count == 0 && PageState.RunningOperations.Count == 0)
+        { <MoContentState><h2>@L["Design:EmptyTitle"]</h2><p>@L["Design:EmptyBody"]</p></MoContentState> }
+        else
+        {
+            <TimingLatencyBench Statistics="@PageState.Statistics" Running="@PageState.RunningOperations" CapturedAt="@snapshotAt" />
+            <TimingStatisticsPanel Statistics="@PageState.Statistics" Running="@PageState.RunningOperations" CapturedAt="@snapshotAt" OnInspect="InspectCompletedAsync" Search="@Search" Point="@Point" Signal="@Signal" Sort="@Sort" PageNumber="@LedgerPage" />
+            <TimingRunningPanel Operations="@PageState.RunningOperations" Statistics="@PageState.Statistics" CapturedAt="@snapshotAt" OnInspect="InspectRunningAsync" Search="@RunningSearch" PageNumber="@RunningPage" />
+        }
+        @if (Operation is not null || Invocation is not null) { <TimingEvidenceSheet @key="(Operation,Invocation)" State="@PageState" Operation="@Operation" Invocation="@Invocation" /> }
     }
     else if (PageState.LoadError is null)
     {
@@ -73,9 +57,15 @@
     private ExecutionTimingPageState PageState { get; set; } = null!;
     private readonly HashSet<Task> _renderTasks = [];
     private readonly object _renderLock = new();
-    private IDialogReference? _detailDialog;
-    private Task _dialogOpen = Task.CompletedTask;
-    private bool _openingDialog;
+    [SupplyParameterFromQuery(Name = "op")] public string? Operation { get; set; }
+    [SupplyParameterFromQuery(Name = "inv")] public string? Invocation { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "point")] public string? Point { get; set; }
+    [SupplyParameterFromQuery(Name = "signal")] public string? Signal { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public string? LedgerPage { get; set; }
+    [SupplyParameterFromQuery(Name = "rq")] public string? RunningSearch { get; set; }
+    [SupplyParameterFromQuery(Name = "rpage")] public string? RunningPage { get; set; }
     private bool _disposed;
 
     private string PollingLabel => !PageState.CanAutoRefresh ? L["Page:Status:Manual"]
@@ -94,43 +84,10 @@
             Snackbar.Add(L["Page:Messages:RefreshFailed"], Severity.Error);
     }
     private Task SetAutoRefresh(bool value) => PageState.SetAutoRefreshAsync(value);
-    private string SnapshotNumber(long value) => PageState.HasSnapshot ? value.ToString("N0") : L["Common:Unavailable"];
-    private string FormatAverageDuration() => !PageState.HasSnapshot || PageState.Statistics.Count == 0
-        ? L["Common:Unavailable"] : ExecutionTimingDisplayFormatter.FormatDuration(PageState.Statistics.Average(item => item.AverageDurationMs));
-
-    private Task InspectCompletedAsync(TimingCompletedEvidence evidence) =>
-        BeginInspectAsync(new DialogParameters<ExecutionTimingDetailDialog>
-        {
-            { dialog => dialog.Completed, evidence.Statistics }, { dialog => dialog.CapturedAt, evidence.CapturedAt }
-        }, L["Details:CompletedTitle"]);
-    private Task InspectRunningAsync(TimingRunningEvidence evidence) =>
-        BeginInspectAsync(new DialogParameters<ExecutionTimingDetailDialog>
-        {
-            { dialog => dialog.Running, evidence.Operation }, { dialog => dialog.CapturedAt, evidence.CapturedAt }
-        }, L["Details:RunningTitle"]);
-    private Task BeginInspectAsync(DialogParameters<ExecutionTimingDetailDialog> parameters, string title)
-    {
-        if (_disposed || _openingDialog) return Task.CompletedTask;
-        _openingDialog = true;
-        return _dialogOpen = OpenDetailsAsync(parameters, title);
-    }
-    private async Task OpenDetailsAsync(DialogParameters<ExecutionTimingDetailDialog> parameters, string title)
-    {
-        try
-        {
-            var reference = await DialogService.ShowAsync<ExecutionTimingDetailDialog>(title, parameters,
-                new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Medium, CloseOnEscapeKey = true, BackdropClick = true });
-            if (_disposed) { reference.Close(DialogResult.Cancel()); return; }
-            _detailDialog?.Close(DialogResult.Cancel());
-            _detailDialog = reference;
-        }
-        catch (Exception exception)
-        {
-            Logger.LogError(exception, "Execution timing evidence inspector could not be opened.");
-            if (!_disposed) Snackbar.Add(L["Details:OpenFailed"], Severity.Error);
-        }
-        finally { _openingDialog = false; }
-    }
+    private void InspectCompletedAsync(TimingCompletedEvidence evidence) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(
+        new Dictionary<string,object?> { ["op"] = evidence.Statistics.OperationKey, ["inv"] = null }));
+    private void InspectRunningAsync(TimingRunningEvidence evidence) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(
+        new Dictionary<string,object?> { ["inv"] = evidence.Operation.InvocationId, ["op"] = null }));
     private void HandleStateChanged()
     {
         if (_disposed) return;
@@ -156,14 +113,9 @@
         try { await PageState.DisposeAsync(); }
         finally
         {
-            try { await _dialogOpen; }
-            finally
-            {
-                _detailDialog?.Close(DialogResult.Cancel());
-                Task[] renders;
-                lock (_renderLock) renders = _renderTasks.ToArray();
-                await Task.WhenAll(renders);
-            }
+            Task[] renders;
+            lock (_renderLock) renders = _renderTasks.ToArray();
+            await Task.WhenAll(renders);
         }
     }
 }

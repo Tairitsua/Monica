@@ -5,10 +5,6 @@
   },
   "Page": {
     "Title": "健康检查",
-    "Eyebrow": "运维监控",
-    "Heading": "主机健康状态",
-    "Subtitle": "查看主机就绪状态与依赖检查，及时定位需要关注的问题。",
-    "CurrentHost": "当前主机 · {0}",
     "LastChecked": "最近更新"
   },
   "Access": {
@@ -19,7 +15,6 @@
   "Actions": {
     "Refresh": "刷新",
     "Retry": "重试",
-    "Details": "查看详情",
     "DetailsFor": "查看 {0} 的详情",
     "Close": "关闭详情",
     "ClearFilters": "清除筛选"
@@ -31,24 +26,11 @@
     "RefreshFailed": "最新刷新失败，仍显示上一次快照：{0}"
   },
   "Overview": {
-    "ReadinessLabel": "就绪状态",
-    "ReadinessChecks": "{0} 项就绪检查",
     "Ready": "必要检查已通过，主机可以接收流量。",
     "ReadyDegraded": "主机可以接收流量，但部分必要检查处于降级状态。",
     "NotReady": "必要检查通过前，主机暂时无法接收流量。",
-    "SnapshotDuration": "快照耗时",
-    "DurationMilliseconds": "最近检查耗时 {0:0.##} 毫秒",
     "AutoRefresh": "每 10 秒更新",
-    "Distribution": "全部已注册检查",
-    "AttentionTitle": "需要关注",
-    "AllClear": "当前快照没有不健康或降级的检查项。",
-    "CoverageMissingTitle": "尚未配置就绪检查",
-    "CoverageMissingDescription": "当前没有已注册的就绪检查，无法根据这份快照判断主机是否可以接收流量。",
-    "Headlines": {
-      "Healthy": "已就绪",
-      "Degraded": "已就绪，存在降级",
-      "Unhealthy": "尚未就绪"
-    }
+    "CoverageMissingDescription": "当前没有已注册的就绪检查，无法根据这份快照判断主机是否可以接收流量。"
   },
   "Status": {
     "Healthy": "健康",
@@ -56,30 +38,11 @@
     "Unhealthy": "不健康"
   },
   "Filters": {
-    "AriaLabel": "健康检查筛选条件",
-    "NameLabel": "名称或描述",
-    "NamePlaceholder": "搜索检查项",
-    "StatusLabel": "状态",
     "AnyStatus": "全部检查",
     "TagLabel": "标签",
     "Results": "显示 {0} / {1} 项"
   },
-  "Table": {
-    "Eyebrow": "当前快照",
-    "Title": "检查项",
-    "Subtitle": "该视图仅展示即时状态，不保存历史记录。",
-    "Columns": {
-      "Name": "名称",
-      "Status": "状态",
-      "Description": "描述",
-      "Duration": "耗时",
-      "Tags": "标签",
-      "Actions": "操作"
-    },
-    "Empty": "没有健康检查符合当前筛选条件。"
-  },
   "Common": {
-    "NotAvailable": "暂无",
     "DurationMilliseconds": "{0:0.##} 毫秒"
   },
   "Details": {
@@ -88,11 +51,82 @@
     "NoDescription": "该检查未报告描述信息。",
     "Duration": "耗时",
     "Tags": "标签",
-    "NoTags": "无标签",
     "Data": "诊断数据",
     "NoData": "该检查未报告诊断数据。",
-    "Error": "检查报告的错误",
-    "ErrorType": "类型",
-    "ErrorMessage": "消息"
+    "Error": "检查报告的错误"
+  },
+  "Gates": {
+    "Population": "{0} / {1} 个就绪检查健康 · 共注册 {2} 项",
+    "Overlap": "{0} 同时参与两个探针 · 共 {1} 个独立检查",
+    "Impact": "{0} · {1}"
+  },
+  "Design": {
+    "AllParallelCaption": "{0} 项并行",
+    "AutoRefreshPaused": "自动更新已暂停",
+    "AutoRefreshStale": "更新受阻 · 保留旧快照",
+    "AuxiliaryLabel": "非探针辅助检查",
+    "AuxiliaryNote": "不阻塞流量或重启",
+    "Cols": {
+      "Duration": "耗时",
+      "Name": "检查项",
+      "Probe": "探针归属",
+      "Status": "状态"
+    },
+    "CopyJson": "复制脱敏 JSON",
+    "DataCountBadge": "{0} 项数据",
+    "EnvelopeAxisLeft": "检查项与探针影响",
+    "EnvelopeAxisRight": "耗时",
+    "EnvelopeDescAttention": "共 {0} 项非健康检查，按对探针影响与耗时排列在同一次并行快照时间轴上",
+    "EnvelopeDescCalm": "无不健康或降级检查；展示本次并行快照耗时最高的 {0} / {1} 项",
+    "EnvelopeKeyboardHint": "↑ ↓ 选择检查项 · Enter 查看证据",
+    "EnvelopeLabel": "并行快照耗时",
+    "EnvelopeTitleAttention": "探针影响与并行耗时包络",
+    "EnvelopeTitleCalm": "并行快照耗时分布（全部健康）",
+    "Eyebrow": "运维 / 健康检查",
+    "FooterAutoActive": "每 10 秒自动更新 · 即时快照，不保存历史",
+    "FooterAutoPaused": "自动更新已暂停 · 可随时手动刷新",
+    "Inspector": {
+      "FilterByGate": "在注册表中筛选「{0}」",
+      "MissingDesc": "注册名 \"{0}\" 未出现在当前主机的健康快照中，可能已移除或尚未注册。",
+      "MissingTitle": "当前快照中不存在该检查项",
+      "OriginHost": "应用或宿主自定义注册",
+      "OriginLabel": "贡献来源",
+      "OriginMonica": "Monica 框架模块（含 monica 标签）",
+      "ProbeParticipation": "探针归属",
+      "TimingTitle": "执行耗时与探针契约",
+      "WallShareLabel": "占并行快照"
+    },
+    "LivenessLabel": "存活探针",
+    "NoMatchDesc": "尝试调整搜索关键词、状态芯片、标签或探针范围筛选；上方汇总始终反映当前完整主机快照。",
+    "NoMatchTitle": "没有符合当前筛选条件的检查项",
+    "ObservedOnly": "仅观测",
+    "PauseAuto": "暂停自动更新",
+    "ReadinessLabel": "就绪探针",
+    "RedactedBadge": "{0} 项已脱敏",
+    "RegistryDesc": "该视图仅展示当前主机的即时快照，不保存历史记录或可用率趋势。",
+    "RegistryTitle": "检查项注册表",
+    "ResumeAuto": "恢复 10s 更新",
+    "SearchLabel": "搜索名称、描述、标签或错误",
+    "SearchPlaceholder": "搜索检查项名称、描述、标签或错误…",
+    "SlowestCaption": "瓶颈：{0} ({1})",
+    "SortLabel": "排序",
+    "Sorts": {
+      "Duration": "按耗时（最慢优先）",
+      "Name": "按名称（A–Z）",
+      "Severity": "按严重程度"
+    },
+    "Title": "主机健康状态",
+    "UnconfiguredShort": "未配置",
+    "WallShareSub": "占快照 {0}",
+    "Headlines": {
+      "Degraded": "已就绪，存在降级",
+      "Healthy": "已就绪",
+      "Unhealthy": "尚未就绪"
+    },
+    "LivenessHeadlines": {
+      "Degraded": "存活降级",
+      "Healthy": "存活正常",
+      "Unhealthy": "存活异常"
+    }
   }
 }

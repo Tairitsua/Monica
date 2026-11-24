@@ -1,0 +1,76 @@
+@using Monica.Framework.UI.UILogging.Models
+@using Monica.Framework.UI.UILogging.Support
+@using Monica.UI.Shared.Components.Dialogs
+@using Monica.UI.Shared.Components.States
+@inject IStringLocalizer<LoggingResource> L
+@inject IJSRuntime JS
+
+<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:Close"]" Width="36rem">
+    <TitleContent><small>@L["Design:InspEyebrow", Number]</small><h2>@L["Design:InspTitle"]</h2></TitleContent>
+    <ChildContent>
+        @if (_evidence is null)
+        {
+            <MoContentState><h3>@L["Design:InspNotFoundTitle"]</h3><p>@L["Design:InspNotFoundBody",Number]</p></MoContentState>
+        }
+        else
+        {
+            <LogLineEvidenceContent Evidence="@_evidence" CopyRawRequested="Copy" />
+            <MudMenu Label="@L["Page:Components:Viewer:ContextMenu:Copy"]" StartIcon="@MoIcons.Copy">
+                @foreach (var (format,label) in Formats)
+                {
+                    <MudMenuItem OnClick="@(() => Copy(_evidence.Line.GetCopyText(format)))">@L[label]</MudMenuItem>
+                }
+            </MudMenu>
+        }
+    </ChildContent>
+    <FooterContent>
+        <MudButton StartIcon="@MoIcons.ChevronLeft" Disabled="@(_index <= 0)" OnClick="@(() => Step(-1))">@L["Design:InspPrevLine"]</MudButton>
+        <MudButton EndIcon="@MoIcons.ChevronRight" Disabled="@(_index < 0 || _index >= _frozen.Count - 1)" OnClick="@(() => Step(1))">@L["Design:InspNextLine"]</MudButton>
+    </FooterContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public string Number { get; set; } = string.Empty;
+    [Parameter] public string? Generation { get; set; }
+    [Parameter] public IReadOnlyList<LogLineViewModel> Lines { get; set; } = [];
+    [Parameter] public LogSourceIdentity? Source { get; set; }
+    [Parameter] public DateTimeOffset? ReadAt { get; set; }
+    [Parameter] public LogLineEvidence? Initial { get; set; }
+    [Parameter] public EventCallback<long?> Navigate { get; set; }
+    private static readonly (LogCopyFormat,string)[] Formats = [(LogCopyFormat.Raw,"Design:CopyRaw"),(LogCopyFormat.MessageOnly,"Design:CopyMessage"),(LogCopyFormat.WithTimestamp,"Design:CopyTimestamp"),(LogCopyFormat.WithLineNumber,"Design:CopyLineNumber")];
+    private IReadOnlyList<LogLineViewModel> _frozen = [];
+    private LogSourceIdentity? _source;
+    private DateTimeOffset? _readAt;
+    private LogLineEvidence? _evidence;
+    private string? _previous;
+    private int _index;
+
+    protected override void OnInitialized()
+    {
+        _source = Initial?.Source ?? Source;
+        _readAt = Initial?.ViewReadAt ?? ReadAt;
+        _frozen = (Generation is null || Generation == _source?.Generation) && Equals(_source, Source) ? Lines : [];
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Number == _previous) return;
+        _previous = Number;
+        _index = -1;
+        _evidence = null;
+        if (!long.TryParse(Number, out var number)) return;
+        for (var i = 0; i < _frozen.Count; i++)
+        {
+            if (_frozen[i].AbsoluteLineNumber != number) continue;
+            _index = i;
+            _evidence = LogLineEvidence.Capture(_frozen[i], _source, _readAt, i);
+            break;
+        }
+        if (Initial?.Line.AbsoluteLineNumber == number && (Generation is null || Generation == Initial.Source?.Generation))
+            _evidence = Initial;
+    }
+
+    private Task Step(int offset) => Navigate.InvokeAsync(_frozen[_index + offset].AbsoluteLineNumber);
+    private Task Close(bool open) => open ? Task.CompletedTask : Navigate.InvokeAsync(null);
+    private Task Copy(string raw) => JS.InvokeVoidAsync("navigator.clipboard.writeText",raw).AsTask();
+}

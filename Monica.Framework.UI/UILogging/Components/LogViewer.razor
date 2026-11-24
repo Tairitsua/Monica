@@ -88,6 +88,8 @@
     /// <summary>Gets or sets whether new rows follow the newest page unless the reader deliberately browses earlier pages.</summary>
     [Parameter] public bool AutoScroll { get; set; }
     [Parameter] public LogFilterState? Filter { get; set; }
+    /// <summary>Opens detached line evidence in the owning workspace. Standalone viewers use the native dialog.</summary>
+    [Parameter] public EventCallback<LogLineEvidence> OnInspect { get; set; }
     [Parameter] public EventCallback<LogLineViewModel> OnLineClicked { get; set; }
     [Parameter] public EventCallback<(LogLineViewModel line, int lineIndex)> OnShowContext { get; set; }
     [Parameter] public EventCallback<(LogLineViewModel line, string keyword)> OnApplyFilter { get; set; }
@@ -163,6 +165,8 @@
 
     private IReadOnlyList<LogLineViewModel> CurrentLines => Lines ?? Array.Empty<LogLineViewModel>();
     private bool HasKeyword => !string.IsNullOrWhiteSpace(Filter?.Keyword);
+    /// <summary>Physical lines on the selected ledger page, for the retained-file viewport marker.</summary>
+    public IReadOnlyList<LogLineViewModel> VisiblePage => CurrentLines.Skip(PageStart).Take(RowsPerPage).ToArray();
     private int PageCount => Math.Max(1, (CurrentLines.Count + RowsPerPage - 1) / RowsPerPage);
     private int PageStart => _page * RowsPerPage;
     private int PageStartDisplay => CurrentLines.Count == 0 ? 0 : PageStart + 1;
@@ -483,6 +487,11 @@
             if (_disposed) return;
             await OnLineClicked.InvokeAsync(evidence.Line);
             if (_disposed) return;
+            if (OnInspect.HasDelegate)
+            {
+                await OnInspect.InvokeAsync(evidence);
+                return;
+            }
             var dialog = await DialogService.ShowAsync<LogLineInfoDialog>(L["Workbench:Inspector:Title"], new DialogParameters<LogLineInfoDialog>
             {
                 { item => item.Evidence, evidence },

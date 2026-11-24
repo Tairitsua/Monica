@@ -1,6 +1,8 @@
 @using Monica.UI.Shared.Components.States
-@using System.Globalization
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.Profiling.ExecutionTiming.Models
+@using Monica.UI.Shared.Components.Visual
+@inject NavigationManager Nav
 @inject IStringLocalizer<ExecutionTimingResource> L
 
 <section class="timing-statistics timing-evidence-panel">
@@ -11,29 +13,40 @@
     @if (Statistics.Count != 0)
     {
         <div class="timing-ledger-controls">
-            <div><MudTextField T="string" @ref="_searchField" Value="_query" ValueChanged="SearchChanged" Immediate="true" DebounceInterval="180"
+            <div><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true" DebounceInterval="180"
                               Label="@L["Statistics:Search"]" Placeholder="@L["Statistics:SearchPlaceholder"]" Variant="Variant.Outlined"
                               Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" /></div>
-            <div><MudSelect T="StatisticsOrder" Value="_order" ValueChanged="OrderChanged" Label="@L["Common:Order"]"
+            <div><MudSelect T="string" Value="@(Sort ?? "mean")" ValueChanged="OrderChanged" Label="@L["Common:Order"]"
                            Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem Value="@StatisticsOrder.Mean">@L["Statistics:Ordering:Mean"]</MudSelectItem>
-                <MudSelectItem Value="@StatisticsOrder.Latest">@L["Statistics:Ordering:Latest"]</MudSelectItem>
-                <MudSelectItem Value="@StatisticsOrder.Samples">@L["Statistics:Ordering:Samples"]</MudSelectItem>
-                <MudSelectItem Value="@StatisticsOrder.Identity">@L["Statistics:Ordering:Identity"]</MudSelectItem>
+                <MudSelectItem Value="@("mean")">@L["Design:SortOptions:Mean"]</MudSelectItem>
+                <MudSelectItem Value="@("latest")">@L["Design:SortOptions:Latest"]</MudSelectItem>
+                <MudSelectItem Value="@("total")">@L["Design:SortOptions:Total"]</MudSelectItem>
+                <MudSelectItem Value="@("samples")">@L["Design:SortOptions:Samples"]</MudSelectItem>
+                <MudSelectItem Value="@("identity")">@L["Design:SortOptions:Identity"]</MudSelectItem>
             </MudSelect></div>
-            @if (_query.Length != 0)
+            @if (!string.IsNullOrEmpty(Search) || Point is not null || Signal is not null)
             {
                 <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Close" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton>
             }
         </div>
     }
+    <div class="timing-facets">
+        <div><MoFilterChip Label="@L["Design:Points:All"]" Count="@_pointPool.Length" Selected="@(Point is null)" SelectedChanged="@(() => Change("point",null))" Pill="true" />
+            @foreach (var group in _groups)
+            { <MoFilterChip Label="@GroupLabel(group)" Count="@_pointPool.Count(s => _points[s.OperationKey] == group)" Selected="@(Point == group)" SelectedChanged="@(() => Change("point",group))" ShowDot="true" Pill="true" Role="MoVisualRole.Info" /> }
+        </div>
+        <div><MoFilterChip Label="@L["Design:Signals:All"]" Count="@_signalPool.Length" Selected="@(Signal is null)" SelectedChanged="@(() => Change("signal",null))" Pill="true" />
+            @foreach (var (signal,label,role) in Signals)
+            { <MoFilterChip Label="@L[label]" Count="@_signalPool.Count(s => MatchesSignal(s,signal))" Selected="@(Signal == signal)" SelectedChanged="@(() => Change("signal",signal))" ShowDot="true" Pill="true" Role="@role" /> }
+        </div>
+    </div>
     @if (Matches.Count != 0)
     {
         <div class="timing-ledger-paint">
             <MudSimpleTable Dense="true" Hover="true" Elevation="0">
                 <thead><tr><th class="timing-identity-column">@L["Columns:Name"]</th><th class="timing-measure-column">@L["Statistics:DurationPair"]</th>
                     <th class="timing-frequency-column">@L["Statistics:FrequencyPair"]</th><th class="timing-allocation-column">@L["Statistics:AllocationPair"]</th>
-                    <th class="timing-action-column"><span class="timing-accessible-label">@L["Common:Details"]</span></th></tr></thead>
+                    <th>@L["Columns:LastRecordedAt"]</th><th class="timing-action-column"><span class="timing-accessible-label">@L["Common:Details"]</span></th></tr></thead>
                 <tbody>
                     @foreach (var item in PageItems)
                     {
@@ -41,20 +54,18 @@
                             <td class="timing-identity-column">
                                 @if (!string.Equals(item.DisplayName, item.OperationKey, StringComparison.Ordinal))
                                 {
-                                    <strong class="timing-operation-name">@item.DisplayName</strong>
+                                    <button class="timing-operation-name mo-vl-link" @onclick="@(() => OnInspect.InvokeAsync(new TimingCompletedEvidence(item,CapturedAt)))">@item.DisplayName</button>
                                 }
                                 <code class="timing-operation-key" title="@item.OperationKey">@item.OperationKey</code>
+                                @if (_collisions.Contains(item.DisplayName)) { <small>@L["Design:CollisionBadge"]</small> }
+                                <small>@GroupLabel(_points[item.OperationKey])</small>
                             </td>
                             <td class="timing-measure-column">
                                 <span class="timing-stacked-label">@L["Statistics:DurationPair"]</span>
                                 <div class="timing-number-pair"><div><span>@L["Columns:AverageDuration"]</span><strong>@ExecutionTimingDisplayFormatter.FormatDuration(item.AverageDurationMs)</strong></div>
                                     <div><span>@L["Columns:LastDuration"]</span><strong>@ExecutionTimingDisplayFormatter.FormatDuration(item.LastDurationMs)</strong></div></div>
-                                @if (PeakMean > 0)
-                                {
-                                    <div class="timing-relative-track" role="img" aria-label="@L["Statistics:RelativeMean", RelativeMean(item).ToString("0.##")]">
-                                        <span style="@($"width: {RelativeMean(item).ToString("0.###", CultureInfo.InvariantCulture)}%")"></span>
-                                    </div>
-                                }
+                                <div class="timing-relative-track" aria-hidden="true"><span style="width:@TimingAssessment.Percent(item.AverageDurationMs,_peak)"></span></div>
+                                <div class="timing-relative-track trend-latest" aria-hidden="true"><span style="width:@TimingAssessment.Percent(item.LastDurationMs,_peak)"></span></div>
                             </td>
                             <td class="timing-frequency-column"><span class="timing-stacked-label">@L["Statistics:FrequencyPair"]</span><div class="timing-number-pair">
                                 <div><span>@L["Columns:Executions"]</span><strong>@item.ExecutionCount.ToString("N0")</strong></div>
@@ -64,7 +75,7 @@
                                 <div><span>@L["Columns:AverageMemory"]</span><strong>@ExecutionTimingDisplayFormatter.FormatMemory(item.AverageMemoryBytes)</strong></div>
                                 <div><span>@L["Columns:LastMemory"]</span><strong>@ExecutionTimingDisplayFormatter.FormatMemory(item.LastMemoryBytes)</strong></div>
                             </div></td>
-                            <td class="timing-action-column"><MudIconButton Icon="@MoIcons.ArrowRight" Size="Size.Small"
+                            <td class="timing-last">@UiTime.FormatTime(item.LastRecordedAt)</td><td class="timing-action-column"><MudIconButton Icon="@MoIcons.ArrowRight" Size="Size.Small"
                                 Color="Color.Primary" aria-label="@L["Common:Inspect", item.OperationKey]"
                                 OnClick="@(() => OnInspect.InvokeAsync(new TimingCompletedEvidence(item, CapturedAt)))" /></td>
                         </tr>
@@ -80,7 +91,7 @@
                 <p>@(Statistics.Count == 0 ? L["Statistics:EmptyHelp"] : L["Common:NoMatchesHelp"])</p></div></MoContentState></div>
     }
     <footer class="timing-ledger-footer">
-        <div><p>@L["Statistics:ComparisonHelp"]</p><p>@L["Statistics:RateHelp"]</p></div>
+        <div><p>@L["Design:LedgerFootScale",TimingAssessment.Duration(_peak)]</p><p>@L["Statistics:RateHelp"]</p></div>
         @if (PageCount > 1)
         {
             <MudPagination Count="@PageCount" Selected="_page" SelectedChanged="ChangePage" ShowFirstButton="true" ShowLastButton="true"
@@ -97,41 +108,57 @@
     [Parameter, EditorRequired] public DateTimeOffset CapturedAt { get; set; }
     /// <summary>Gets or sets the action that opens immutable captured evidence.</summary>
     [Parameter] public EventCallback<TimingCompletedEvidence> OnInspect { get; set; }
+    [Parameter] public IReadOnlyList<RunningExecutionTimingInfo> Running { get; set; } = [];
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public string? Point { get; set; }
+    [Parameter] public string? Signal { get; set; }
+    [Parameter] public string? Sort { get; set; }
+    [Parameter] public string? PageNumber { get; set; }
     private const int PageSize = 12;
-    private string _query = string.Empty;
-    private MudTextField<string>? _searchField;
-    private StatisticsOrder _order;
-    private int _page = 1;
-    private enum StatisticsOrder { Mean, Latest, Samples, Identity }
-    private IReadOnlyList<ExecutionTimingStatistics> Matches
+    private int _page;
+    private double _peak;
+    private HashSet<string> _collisions = [], _running = [];
+    private Dictionary<string,string> _points = [];
+    private string[] _groups = [];
+    private ExecutionTimingStatistics[] _pointPool = [], _signalPool = [];
+    private IReadOnlyList<ExecutionTimingStatistics> Matches { get; set; } = [];
+    private static readonly (string Id,string Label,MoVisualRole Role)[] Signals = [
+        ("spike","Design:Signals:Spike",MoVisualRole.Warning),("inflight","Design:Signals:Inflight",MoVisualRole.Info),("alloc","Design:Signals:Alloc",MoVisualRole.Secondary)];
+    private bool MatchesSignal(ExecutionTimingStatistics s,string? signal) => signal switch {
+        "spike" => TimingAssessment.Drift(s) == "spike", "inflight" => _running.Contains(s.OperationKey), "alloc" => s.AverageMemoryBytes.HasValue, _ => true };
+    private string GroupLabel(string group) => group switch {
+        "mediator" => L["Design:Points:Mediator"], "jobs" => L["Design:Points:Jobs"], "eventbus" => L["Design:Points:Eventbus"], "mvc" => L["Design:Points:Mvc"],
+        "hosted" => L["Design:Points:Hosted"], "direct" => L["Design:Points:Direct"], _ => group };
+    private int PageCount => Math.Max(1,(Matches.Count+PageSize-1)/PageSize);
+    private IEnumerable<ExecutionTimingStatistics> PageItems => Matches.Skip((_page-1)*PageSize).Take(PageSize);
+    private int FirstVisible => Matches.Count == 0 ? 0 : (_page-1)*PageSize+1;
+    private int LastVisible => Math.Min(_page*PageSize,Matches.Count);
+    protected override void OnParametersSet()
     {
-        get
-        {
-            var terms = _query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var matches = Statistics.Where(item => terms.All(term => item.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || item.OperationKey.Contains(term, StringComparison.OrdinalIgnoreCase)));
-            return _order switch
-            {
-                StatisticsOrder.Latest => matches.OrderByDescending(item => item.LastDurationMs).ThenBy(item => item.OperationKey, StringComparer.Ordinal).ToArray(),
-                StatisticsOrder.Samples => matches.OrderByDescending(item => item.ExecutionCount).ThenBy(item => item.OperationKey, StringComparer.Ordinal).ToArray(),
-                StatisticsOrder.Identity => matches.OrderBy(item => item.OperationKey, StringComparer.Ordinal).ToArray(),
-                _ => matches.ToArray()
-            };
-        }
+        _points = Statistics.ToDictionary(s => s.OperationKey,s => TimingAssessment.Group(s.OperationKey));
+        _groups = _points.Values.Distinct().Order(StringComparer.Ordinal).ToArray();
+        _collisions = Statistics.GroupBy(s => s.DisplayName).Where(g => g.Count()>1).Select(g => g.Key).ToHashSet();
+        _running = Running.Select(r => r.OperationKey).ToHashSet();
+        _peak = Statistics.Select(s => Math.Max(s.AverageDurationMs,s.LastDurationMs)).DefaultIfEmpty().Max();
+        var terms = (Search ?? "").Split((char[]?)null,StringSplitOptions.RemoveEmptyEntries);
+        var pool = Statistics.Where(s => terms.All(t => s.DisplayName.Contains(t,StringComparison.OrdinalIgnoreCase) || s.OperationKey.Contains(t,StringComparison.OrdinalIgnoreCase) || _points[s.OperationKey].Contains(t,StringComparison.OrdinalIgnoreCase))).ToArray();
+        _pointPool = pool.Where(s => MatchesSignal(s,Signal)).ToArray();
+        _signalPool = pool.Where(s => Point is null || _points[s.OperationKey] == Point).ToArray();
+        var filtered = _signalPool.Where(s => MatchesSignal(s,Signal));
+        Matches = (Sort switch {
+            "latest" => filtered.OrderByDescending(s => s.LastDurationMs), "total" => filtered.OrderByDescending(TimingAssessment.Total),
+            "samples" => filtered.OrderByDescending(s => s.ExecutionCount), "identity" => filtered.OrderBy(s => s.OperationKey,StringComparer.Ordinal),
+            _ => filtered.OrderByDescending(s => s.AverageDurationMs)
+        }).ThenBy(s => s.OperationKey,StringComparer.Ordinal).ToArray();
+        _page = Math.Clamp(int.TryParse(PageNumber,out var page) ? page : 1,1,PageCount);
     }
-    private double PeakMean => Statistics.Count == 0 ? 0 : Statistics.Max(item => item.AverageDurationMs);
-    private double RelativeMean(ExecutionTimingStatistics item) => PeakMean > 0 ? Math.Clamp(item.AverageDurationMs / PeakMean * 100, 0, 100) : 0;
-    private int PageCount => Math.Max(1, (Matches.Count + PageSize - 1) / PageSize);
-    private IEnumerable<ExecutionTimingStatistics> PageItems => Matches.Skip((_page - 1) * PageSize).Take(PageSize);
-    private int FirstVisible => Matches.Count == 0 ? 0 : (_page - 1) * PageSize + 1;
-    private int LastVisible => Math.Min(_page * PageSize, Matches.Count);
-    protected override void OnParametersSet() => _page = Math.Clamp(_page, 1, PageCount);
-    private void SearchChanged(string value) { _query = value ?? string.Empty; _page = 1; }
-    private async Task ClearSearchAsync()
+    private void Change(string key,string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { [key]=value, ["page"]=null }),replace:true);
+    private void OrderChanged(string value) => Change("sort",value);
+    private void SearchChanged(string? value) => Change("q",string.IsNullOrWhiteSpace(value) ? null : value);
+    private void ChangePage(int value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("page",value),replace:true);
+    private Task ClearSearchAsync()
     {
-        SearchChanged(string.Empty);
-        if (_searchField is not null) await _searchField.ClearAsync();
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["q"]=null,["point"]=null,["signal"]=null,["page"]=null }),replace:true);
+        return Task.CompletedTask;
     }
-    private void OrderChanged(StatisticsOrder value) { _order = value; _page = 1; }
-    private void ChangePage(int value) => _page = Math.Clamp(value, 1, PageCount);
 }

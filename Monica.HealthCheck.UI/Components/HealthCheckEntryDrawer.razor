@@ -1,115 +1,48 @@
-@inject IStringLocalizer<HealthCheckResource> L
+@using Microsoft.JSInterop
+@using System.Text.Json
 @using Monica.UI.Shared.Components.Dialogs
-
-@if (Session.IsDetailsOpen && Session.SelectedEntry is { } entry)
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IStringLocalizer<HealthCheckResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+@if (!string.IsNullOrWhiteSpace(EntryName) && Session.Snapshot is { } snapshot)
 {
-    <MoSideSheet Open="true" OpenChanged="OnOpenChangedAsync" Width="34rem" CloseLabel="@L["Actions:Close"]">
-        <TitleContent>
-            <header class="health-detail-header">
-                <div class="health-detail-header__topline">
-                    <span class="health-detail-eyebrow">@L["Details:Eyebrow"]</span>
-                </div>
-                <h2>@entry.Name</h2>
-                <span class="health-detail-status">
-                    <MoIcon Icon="@StatusIcon(entry.Status)"
-                             Size="1.25rem" Style="@HealthCheckDisplay.IconStyle(entry.Status)" />
-                    <span>@L.GetStatusText(entry.Status)</span>
-                </span>
-            </header>
-        </TitleContent>
+    var entry = snapshot.Entries.FirstOrDefault(e => string.Equals(e.Name,EntryName,StringComparison.OrdinalIgnoreCase));
+    <MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Actions:Close"]" Width="36rem">
+        <TitleContent><header class="health-detail-header"><small>@L["Details:Eyebrow"]</small><h2>@EntryName</h2><time datetime="@snapshot.CheckedAt.ToString("O")">@Time.Format(snapshot.CheckedAt)</time></header></TitleContent>
         <ChildContent>
+        @if (entry is null) { <MoContentState><h3>@L["Design:Inspector:MissingTitle"]</h3><p>@L["Design:Inspector:MissingDesc",EntryName]</p></MoContentState> }
+        else
+        {
             <div class="health-detail-content">
-                <section class="health-detail-section">
-                    <h3>@L["Details:Description"]</h3>
-                    <p class="health-detail-description">
-                        @(string.IsNullOrWhiteSpace(entry.Description)
-                            ? L["Details:NoDescription"]
-                            : entry.Description)
-                    </p>
-                </section>
-
-                <dl class="health-detail-facts">
-                    <div>
-                        <dt>@L["Details:Duration"]</dt>
-                        <dd>@L["Common:DurationMilliseconds", entry.Duration.TotalMilliseconds]</dd>
-                    </div>
-                    <div>
-                        <dt>@L["Details:Tags"]</dt>
-                        <dd>
-                            @if (entry.Tags.Count == 0)
-                            {
-                                @L["Details:NoTags"]
-                            }
-                            else
-                            {
-                                <span class="health-detail-tags">
-                                    @foreach (var tag in entry.Tags)
-                                    {
-                                        <span class="health-detail-tag">@tag</span>
-                                    }
-                                </span>
-                            }
-                        </dd>
-                    </div>
-                </dl>
-
-                <section class="health-detail-section">
-                    <h3>@L["Details:Data"]</h3>
-                    @if (entry.Data.Count == 0)
-                    {
-                        <p class="health-detail-empty">@L["Details:NoData"]</p>
-                    }
-                    else
-                    {
-                        <dl class="health-detail-data">
-                            @foreach (var pair in entry.Data.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-                            {
-                                <div>
-                                    <dt>@pair.Key</dt>
-                                    <dd><code>@pair.Value</code></dd>
-                                </div>
-                            }
-                        </dl>
-                    }
-                </section>
-
-                @if (entry.Error is { } error)
-                {
-                    <section class="health-detail-section health-detail-section--error">
-                        <h3>
-                            <MoIcon Icon="@MoIcons.Error" Size="1.25rem" Style="color:var(--mud-palette-error);" />
-                            @L["Details:Error"]
-                        </h3>
-                        <dl class="health-detail-error">
-                            <div>
-                                <dt>@L["Details:ErrorType"]</dt>
-                                <dd><code>@error.Type</code></dd>
-                            </div>
-                            <div>
-                                <dt>@L["Details:ErrorMessage"]</dt>
-                                <dd>@error.Message</dd>
-                            </div>
-                        </dl>
-                    </section>
-                }
+                @if (entry.Error is { } error) { <MudAlert Severity="Severity.Error" Dense="true"><b>@L["Details:Error"]</b><p>@error.Type</p><p>@error.Message</p></MudAlert> }
+                <section class="health-detail-section"><h3>@L["Details:Description"]</h3><p>@(entry.Description ?? L["Details:NoDescription"])</p></section>
+                <section class="health-detail-section"><h3>@L["Design:Inspector:TimingTitle"]</h3><dl class="health-detail-facts">
+                    <div><dt>@L["Design:Cols:Status"]</dt><dd>@L.GetStatusText(entry.Status)</dd></div>
+                    <div><dt>@L["Details:Duration"]</dt><dd>@L["Common:DurationMilliseconds",entry.Duration.TotalMilliseconds]</dd></div>
+                    <div><dt>@L["Design:Inspector:WallShareLabel"]</dt><dd>@(snapshot.Duration > TimeSpan.Zero ? (entry.Duration/snapshot.Duration).ToString("P1") : "—")</dd></div>
+                    <div><dt>@L["Design:Inspector:ProbeParticipation"]</dt><dd>@string.Join(" + ",HealthCheckEntryTable.Probes.Where(p => HealthCheckPageSession.MatchesProbe(entry,p.Id)).Select(p => L[p.Label].Value))</dd></div>
+                    <div><dt>@L["Design:Inspector:OriginLabel"]</dt><dd>@L[entry.Tags.Contains("monica",StringComparer.OrdinalIgnoreCase) ? "Design:Inspector:OriginMonica" : "Design:Inspector:OriginHost"]</dd></div>
+                </dl></section>
+                <section class="health-detail-section"><h3>@L["Details:Tags"]</h3><div class="health-detail-tags">@foreach (var tag in entry.Tags) { <a class="mo-vl-id-chip" href="@FilterUrl("tag",tag)">@tag</a> }</div></section>
+                <section class="health-detail-section"><h3>@L["Details:Data"]</h3>
+                    @if (entry.Data.Count == 0) { <p>@L["Details:NoData"]</p> }
+                    else { <dl class="health-detail-data">@foreach (var pair in entry.Data.OrderBy(p => p.Key,StringComparer.OrdinalIgnoreCase))
+                        { <div><dt>@pair.Key</dt><dd>@if (pair.Value == "[redacted]") { <MoIcon Icon="@MoIcons.Lock" Size="0.85rem" /> }<code>@pair.Value</code></dd></div> }</dl> }</section>
             </div>
+        }
         </ChildContent>
+        <FooterContent>@if (entry is not null) {
+            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="@(() => Copy(entry))">@L["Design:CopyJson"]</MudButton>
+            var gate = HealthCheckEntryTable.Probes.First(p => HealthCheckPageSession.MatchesProbe(entry,p.Id));
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="@FilterUrl("probe",gate.Id)">@L["Design:Inspector:FilterByGate",L[gate.Label]]</MudButton>
+        }</FooterContent>
     </MoSideSheet>
 }
-
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-
-    private static string StatusIcon(HealthCheckState status) => status switch
-    {
-        HealthCheckState.Healthy => MoIcons.Success,
-        HealthCheckState.Degraded => MoIcons.Warning,
-        HealthCheckState.Unhealthy => MoIcons.Error,
-        _ => MoIcons.Help
-    };
-
-    private Task OnOpenChangedAsync(bool open) => open
-        ? Task.CompletedTask
-        : Session.CloseDetailsAsync();
-
+    [Parameter] public string? EntryName { get; set; }
+    private void Close(bool open) { if (!open) Nav.NavigateTo(Nav.GetUriWithQueryParameter("entry",(string?)null)); }
+    private string FilterUrl(string name,string value) => Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["entry"] = null, [name] = value });
+    private Task Copy(HealthCheckEntrySnapshot entry) => JS.InvokeVoidAsync("navigator.clipboard.writeText",JsonSerializer.Serialize(entry,new JsonSerializerOptions(JsonSerializerOptions.Web) { WriteIndented = true })).AsTask();
 }

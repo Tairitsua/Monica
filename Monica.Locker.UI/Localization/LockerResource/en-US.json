@@ -4,11 +4,6 @@
     "Leases": "Coordination leases",
     "Locks": "Critical-section locks"
   },
-  "Workspace": {
-    "Title": "Leases & locks",
-    "Eyebrow": "COORDINATION / OWNERSHIP",
-    "ConfiguredSources": "Configured authority observations"
-  },
   "Common": {
     "Captured": "Oldest source observation",
     "Refresh": "Refresh inventory",
@@ -22,22 +17,11 @@
   "Refresh": {
     "Title": "Automatic refresh",
     "Every": "Every {0}s",
-    "Off": "Auto off",
-    "Policy": "Automatic reads pause in background. Inventory refreshes share a cached snapshot."
+    "Off": "Auto off"
   },
   "Access": {
     "Denied": "Access unavailable",
     "Description": "The host operational policy does not allow this workspace."
-  },
-  "Map": {
-    "Intro": "One responsibility. One observed holder.",
-    "Population": "observed lease records",
-    "Across": "Across {0} configured authority queries",
-    "Finding": "Ownership is evaluated at each source’s observation time. A retained expired record does not establish whether its worker is running.",
-    "Title": "Ownership map",
-    "Description": "Select a responsibility to inspect its evidence",
-    "Records": "{0} observed records",
-    "More": "View {0} more in the records below"
   },
   "Evidence": {
     "Stale": "A refresh failed. Last successful evidence keeps its original source time; unavailable authorities are shown separately.",
@@ -45,16 +29,12 @@
     "Retry": "Retry the read. No conclusion about ownership can be made from a failed query.",
     "Unconfigured": "No lease authorities configured",
     "UnconfiguredDescription": "Register the lease stores and permitted scope/prefix bindings in the host to inspect them here.",
-    "ClaimsTitle": "A role lease is not a message or job claim",
-    "ClaimsDescription": "Job execution and Outbox delivery claims stay with their business records. This view covers shared coordination responsibilities.",
     "Unexpired": "Unexpired at observation",
     "Expired": "Expired record",
     "RefreshFailed": "Refresh failed",
     "Truncated": "Showing {0} of {1} records",
     "Empty": "No retained lease observations",
-    "EmptyDescription": "The configured queries returned no records. Absence does not prove that a responsibility was never acquired.",
     "Retention": "SQL can retain expired rows. Expired Redis keys disappear from the inventory.",
-    "CaptureNote": "Validity is measured at each authority’s observation. These values are snapshots, not live countdowns.",
     "Title": "Lease evidence",
     "ExactFailed": "The exact read failed. Any earlier evidence retains its original observation time.",
     "ExpiredAgo": "past expiry at observation",
@@ -72,25 +52,9 @@
     "MissingDescription": "The record may have expired, been revoked, or been removed. This inventory is not ownership history."
   },
   "Inventory": {
-    "Title": "Lease records",
-    "Description": "Find a responsibility, then inspect its exact resource.",
-    "Shown": "{0} of {1} records",
-    "Search": "Search role, holder or resource…",
-    "AllAuthorities": "All authorities",
     "NoMatch": "No matching records",
     "NoMatchDescription": "Try another authority or remove the search and evidence filters.",
-    "Resource": "Responsibility / resource",
-    "Holder": "Observed holder",
-    "Authority": "Authority",
-    "Validity": "Validity at observation",
-    "Previous": "Previous",
-    "Next": "Next",
-    "Page": "Page {0} of {1}"
-  },
-  "Filters": {
-    "all": "All records",
-    "unexpired": "Unexpired at observation",
-    "expired": "Expired records"
+    "Authority": "Authority"
   },
   "Providers": {
     "Sql": "SQL",
@@ -201,5 +165,80 @@
         "Signal": "Not observed; token is not cancelable"
       }
     }
+  },
+  "Horizon": {
+    "Finding": "{0} active roles across {1} holders.",
+    "Grant": "Confirmed grant window",
+    "MixedRecords": "{0} active · {1} expired",
+    "ExpiredAgo": "expired {0} ago.",
+    "Shortest": "has {0} of its {1} grant left.",
+    "TopHolder": "holds the most active roles ({0}).",
+    "Observed": "{0} / {1} authorities observed",
+    "Scheduler": "Scheduler runtime"
+  },
+  "Design": {
+    "AuthorityFailNoData": "Initial read failed",
+    "AuthorityReadOnly": "Read-only",
+    "AuthorityRecords": "{0} active",
+    "AuthorityRevocable": "Revocable",
+    "AuthorityStripLabel": "Configured lease authorities",
+    "AxisZero": "0s obs",
+    "ColHolder": "Holder & tenure",
+    "ColRole": "Role & resource key",
+    "ColValidity": "Remaining",
+    "DecisionLabel": "Observed coordination leases",
+    "Eyebrow": "Operations · Leases & locks",
+    "FilterActive": "Active",
+    "FilterAll": "All",
+    "FilterExpired": "Expired",
+    "FilterThisHolder": "Filter this holder",
+    "FindingEmpty": "Configured authority queries succeeded with zero retained lease records. Redis drops expired keys automatically; absence does not imply a role was never held.",
+    "FindingUnavailable": "All configured authorities failed their initial read. Ownership cannot be established until a read succeeds.",
+    "GroupAuthority": "By authority",
+    "GroupHolder": "By holder",
+    "HeldBeforeExpiry": "Held {0} prior",
+    "HeldFor": "Held {0}",
+    "HorizonDesc": "Aligned to each authority's observation instant (0s): dot marks last confirmation, solid bar shows remaining TTL, expired SQL rows stay left of 0s.",
+    "HorizonTitle": "Lease validity horizon",
+    "JustHandedOver": "New holder · {0}",
+    "LockerBackend": "Native backend",
+    "LockerBoundaryNote": "Note: Lock loss or cancellation does not undo outbound requests; retain database transactions and concurrency guards for durable state. Job execution and Outbox delivery claims stay in their own tables.",
+    "LockerCompareSummary": "Reference: compare Monica's three lock provider contracts",
+    "LockerConsolidatedBody": "Critical-section locks expose no runtime inventory or revocation actions. Host provider configuration and key normalization now live here alongside coordination leases.",
+    "LockerDesc": "IDistributedLock handles are ephemeral and have no live holder inventory or force-unlock. This panel shows the host's active provider registration and key normalizer.",
+    "LockerExpiry": "Expiry & renewal",
+    "LockerNotRegistered": "AddLocker() not registered",
+    "LockerNotRegisteredDesc": "This host registers AddLeaseDiagnostics without IDistributedLock. Call AddLocker() in host composition if application code needs short-lived mutex handles.",
+    "LockerPrefix": "LockKeyPrefix",
+    "LockerProvider": "Active provider",
+    "LockerTitle": "Host critical-section locker",
+    "LockerWaitTimeout": "DefaultWaitTimeout",
+    "NormalizerInputLabel": "Logical resource name",
+    "NormalizerOutput": "Physical provider key",
+    "NormalizerPlaceholder": "e.g. flight:sync:CA1234",
+    "NormalizerTitle": "Key normalization preview (LockKeyNormalizer)",
+    "PopulationUnit": "/ {0} active",
+    "ProbeAction": "Probe key",
+    "ProbeAuthority": "Authority",
+    "ProbeDesc": "Runs GetResourceAsync directly (O(1) lookup, no Redis SCAN) to verify a specific key—even one absent from the inventory.",
+    "ProbeEmptyError": "Enter a resource name to probe.",
+    "ProbePlaceholder": "e.g. service-discovery:platform-registry",
+    "ProbePrefixError": "This authority only permits names starting with \"{0}\".",
+    "ProbeResource": "Resource name (Resource.Name)",
+    "ProbeSubmit": "Probe key",
+    "ProbeTitle": "Probe an exact resource key",
+    "ReadoutIdle": "Hover or focus any lease row for exact acquired, confirmed, observed, and expiry instants; press Enter to inspect.",
+    "RefreshPolicy": "Polling pauses in background tabs. Inventory reads share the host’s {0} cache.",
+    "Search": "Search role, resource key, or holder…",
+    "ShownCount": "{0} of {1} shown",
+    "SortLabel": "Sort",
+    "SortName": "Resource key A→Z",
+    "SortTenure": "Recent handover first",
+    "SortUrgency": "Expired / shortest remaining",
+    "StatusActive": "Active at capture",
+    "StatusExpired": "Expired retained",
+    "StatusTight": "Under 1/3 left",
+    "TightTag": "Tight margin",
+    "Title": "Coordination leases"
   }
 }

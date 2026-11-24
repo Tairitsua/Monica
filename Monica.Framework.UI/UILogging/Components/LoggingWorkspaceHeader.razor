@@ -1,0 +1,23 @@
+@using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.Visual
+@inject IStringLocalizer<LoggingResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+@inject IJSRuntime JS
+<MoPageMasthead Icon="@(Files ? MoIcons.FolderOpen : MoIcons.FileText)" Title="@L[Files ? "Workbench:FilesTitle" : "Workbench:ReaderTitle"]" Crumb="@L["Design:Eyebrow"]">
+    <Meta><span class="mo-vl-status mo-vl-role--@(Following ? "info" : "neutral")"><i class="mo-vl-status-dot"></i>@L[Following ? "Workbench:Following" : "Workbench:Paused"]</span>
+        <button class="mo-vl-id-chip" title="@Identity" @onclick="Copy"><MoIcon Icon="@MoIcons.FileText" /><span>@Identity</span><MoIcon Icon="@MoIcons.Copy" /></button><span>@Time.TimeZone.Id</span></Meta>
+    <Actions>@if (ReadAt is { } at) { <div class="log-stamp"><span>@L[Files ? "Design:DirectoryReadAt" : "Design:Captured"]</span><time datetime="@at.ToString("O")">@Time.FormatTime(at)</time></div> } @Commands</Actions>
+</MoPageMasthead>
+<MoWorkbenchNavigation Label="@L["Workbench:Navigation"]"><a href="@ReaderUrl" aria-current="@(!Files ? "page" : null)"><MoIcon Icon="@MoIcons.FileText" Size="1rem" />@L["Workbench:Reader"]</a>
+    <a href="@FilesUrl" aria-current="@(Files ? "page" : null)"><MoIcon Icon="@MoIcons.FolderOpen" Size="1rem" />@L["Workbench:Files"] @if (Count.HasValue) { <small>@Count</small> }</a></MoWorkbenchNavigation>
+@code {
+    [Parameter] public bool Files { get; set; }
+    [Parameter] public bool Following { get; set; }
+    [Parameter] public int? Count { get; set; }
+    [Parameter] public DateTimeOffset? ReadAt { get; set; }
+    [Parameter, EditorRequired] public string Identity { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string FilesUrl { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ReaderUrl { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Commands { get; set; }
+    private Task Copy() => JS.InvokeVoidAsync("navigator.clipboard.writeText",Identity).AsTask();
+}

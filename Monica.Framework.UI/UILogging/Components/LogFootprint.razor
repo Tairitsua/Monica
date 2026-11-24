@@ -1,0 +1,75 @@
+@using Monica.Framework.UI.UILogging.Models
+@using Monica.UI.Shared.Components.Visual
+@using Monica.Logging.Services.Support
+@using Monica.Modules
+@inject Microsoft.Extensions.Options.IOptions<ModuleLoggingOption> Options
+@inject IStringLocalizer<LoggingResource> L
+
+<section class="lm-files-sig">
+    <div class="lm-decision"><div class="lm-decision-main"><p>@L["Design:FilesDisplayLabel"]</p>
+        @{ var parts = Size(Total).Split(' ',2); }
+        <MoDisplayValue Value="@(Available ? parts[0] : "—")" Unit="@(Available ? $"{parts[1]} · {L["Design:FilesDisplayUnit",Files.Count,_folders.Length]}" : null)" /></div>
+        <p class="lm-finding">@if (!Available) { @L["Design:FilesFindingUnavailable"] } else if (Files.Count == 0) { @L["Design:FilesFindingEmpty"] }
+            else { <span>@L["LogChart:Largest"]</span> <a class="mo-vl-link" href="@OpenUrl(_largest!.RelativePath)">@_largest.RelativePath</a> <b>@Size(_largest.Size)</b>
+                if (_near is { } near) { <a class="mo-vl-link" href="@OpenUrl(near.RelativePath)">@near.RelativePath</a> <span>@L["LogChart:LimitShare", (near.Size/(double)Options.Value.FileSizeLimitBytes!.Value).ToString("P1")]</span> } }</p></div>
+    <div class="lm-policy">
+        <div><small>@L["Design:FilesFactDir"]</small><code>@DirectoryName</code></div>
+        <div><small>@L["Design:FilesFactSink"]</small><code>@(DefaultWriter ? LogFileLocation.Resolve(Options.Value) : L["LogChart:NoDefaultWriter"].Value)</code></div>
+        <div><small>@L["Design:FilesFactPolicy"]</small><b>@(DefaultWriter && Options.Value.FileSizeLimitBytes is { } limit ? Size(limit) : "—")</b>
+            @if (DefaultWriter) { <small>@L["LogChart:Rolling",Options.Value.RollingInterval,Options.Value.RetainedFileCountLimit?.ToString() ?? "∞"]</small> }</div>
+        <div><small>@L["Design:FilesFactCurrent"]</small><code>@(Current ?? "—")</code><small>@L[Following ? "Design:FilesFactCurrentFollowing" : "Design:FilesFactCurrentPaused"]</small></div>
+    </div>
+    @if (Files.Count > 0)
+    {
+        <div class="lm-fp"><div class="lm-fp-head"><h2>@L["Design:FilesFootprintTitle"]</h2><p>@L["Design:FilesFootprintDesc"]</p></div>
+            <div class="lm-fp-bar" aria-label="@L["Design:FilesFootprintTitle"]">
+            @for (var i=0;i<_segments.Length;i++)
+            {
+                var index=i; var f=_segments[i];
+                <a class="lm-fp-seg mo-vl-role--@SegmentRole(f) @(i%2==1 ? "is-alt" : null) @(Folder is not null && FolderOf(f)!=Folder ? "is-dimmed" : null)" href="@OpenUrl(f.RelativePath)" style="@FormattableString.Invariant($"width:{(Total>0 ? f.Size*100d/Total : 0):0.######}%")"
+                    @ref="_elements[index]" @onfocus="@(() => _active=f)" @onmouseenter="@(() => _active=f)" @onkeydown="@(e => Move(e,index))" aria-label="@($"{f.RelativePath} · {Size(f.Size)}")"></a>
+            }</div>
+            <div class="lm-fp-folders"><button class="lm-fp-folder mo-vl-role--primary @(Folder is null ? "is-active" : null)" @onclick="@(() => SelectFolder.InvokeAsync(null))">@L["Design:FilesFootprintAll"] <b>@Size(Total)</b></button>
+                @foreach (var group in _folders) { <button class="lm-fp-folder mo-vl-role--@FolderRole(group.Key) @(Folder == group.Key ? "is-active" : null)" @onclick="@(() => SelectFolder.InvokeAsync(Folder == group.Key ? null : group.Key))">@(group.Key == "" ? L["Design:FilesFootprintRoot"].Value : group.Key) <b>@Size(group.Sum(f => f.Size))</b> <small>@group.Count()</small></button> }</div>
+            <p class="lm-caption" aria-live="polite">@(_active is { } current ? L["Design:FilesFootprintReadout",current.RelativePath,Size(current.Size),current.Size,Total==0 ? "0" : (current.Size*100d/Total).ToString("0.##")] : L["Design:FilesFootprintHint"])</p>
+        </div>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LogFileDescriptor> Files { get; set; }=[];
+    [Parameter, EditorRequired] public string DirectoryName { get; set; }=string.Empty;
+    [Parameter, EditorRequired] public Func<string,string> OpenUrl { get; set; }=default!;
+    [Parameter] public string? Current { get; set; }
+    [Parameter] public bool Following { get; set; }
+    [Parameter] public bool Available { get; set; }
+    [Parameter] public string? Folder { get; set; }
+    [Parameter] public EventCallback<string?> SelectFolder { get; set; }
+    private static string Size(long value) => Pages.UILoggingFilesPage.FormatSize(value);
+    internal static string FolderOf(LogFileDescriptor f) => Path.GetDirectoryName(f.RelativePath)?.Replace('\\','/') ?? "";
+    private bool DefaultWriter => Options.Value.EnableFileSink && Options.Value.CustomLoggerFactory is null;
+    private long Total;
+    private IGrouping<string,LogFileDescriptor>[] _folders=[];
+    private LogFileDescriptor[] _segments=[];
+    private LogFileDescriptor? _active,_largest,_near;
+    private readonly Dictionary<int,ElementReference> _elements=[];
+    protected override void OnParametersSet()
+    {
+        Total=Files.Sum(f=>f.Size); _folders=Files.GroupBy(FolderOf).OrderBy(g=>g.Key,StringComparer.Ordinal).ToArray();
+        _segments=_folders.SelectMany(g=>g.OrderByDescending(f=>f.Size)).Where(f=>f.Size>0).ToArray();
+        _largest=Files.MaxBy(f=>f.Size); _near=_largest is { } f && NearLimit(f) ? f : null;
+        _active=Files.FirstOrDefault(f=>f.RelativePath==_active?.RelativePath);
+    }
+    private bool NearLimit(LogFileDescriptor f) => DefaultWriter && Options.Value.FileSizeLimitBytes is >0 and var limit && f.Size>=limit*.75;
+    private string SegmentRole(LogFileDescriptor f) => NearLimit(f) ? "warning" : FolderRole(FolderOf(f));
+    private static string FolderRole(string folder) => folder switch
+    {
+        "" => "primary",
+        var name when name.StartsWith("archive",StringComparison.OrdinalIgnoreCase) => "neutral",
+        _ => "info"
+    };
+    private async Task Move(KeyboardEventArgs e,int i)
+    {
+        var target=e.Key switch { "ArrowLeft" => Math.Max(0,i-1),"ArrowRight" => Math.Min(_segments.Length-1,i+1),"Home"=>0,"End"=>_segments.Length-1,_=>i };
+        if (i!=target) await _elements[target].FocusAsync();
+    }
+}

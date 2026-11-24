@@ -1,41 +1,22 @@
+@inject NavigationManager Nav
 @inject IStringLocalizer<HealthCheckResource> L
-
-<div class="health-filters" aria-label="@L["Filters:AriaLabel"]">
-    <div class="health-filter-controls">
-        <MudTextField T="string" Value="@Session.NameFilter" ValueChanged="@Session.SetNameFilterAsync"
-                      Placeholder="@L["Filters:NamePlaceholder"]" aria-label="@L["Filters:NameLabel"]"
-                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true"
-                      Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Class="health-search" ClearIcon="@MoIcons.Close" />
-        <div class="health-tag-control">
-            <MudSelect T="string" Value="@Session.TagFilter" ValueChanged="@Session.SetTagFilterAsync"
-                   Label="@L["Filters:TagLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-                   Clearable="true" Class="health-tag-filter" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" ClearIcon="@MoIcons.Close">
-            @foreach (var tag in Session.AvailableTags)
-            {
-                <MudSelectItem T="string" Value="@tag">@tag</MudSelectItem>
-            }
-            </MudSelect>
-        </div>
+<div class="hc-toolbar">
+    <div class="hc-fields">
+        <MudTextField T="string" Value="@Session.NameFilter" ValueChanged="@(v => Set("q",v))" Immediate="true" DebounceInterval="150" Placeholder="@L["Design:SearchPlaceholder"]" aria-label="@L["Design:SearchLabel"]" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Margin="Margin.Dense" Variant="Variant.Outlined" />
+        <MudSelect T="string" Value="@Session.TagFilter" ValueChanged="@(v => Set("tag",v))" Label="@L["Filters:TagLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            @foreach (var tag in Session.AvailableTags) { <MudSelectItem Value="@tag">@tag</MudSelectItem> }
+        </MudSelect>
+        <MudSelect T="string" Value="@(Session.Sort ?? "severity")" ValueChanged="@(v => Set("sort",v))" Label="@L["Design:SortLabel"]" Margin="Margin.Dense" Variant="Variant.Outlined">
+            <MudSelectItem Value="@("severity")">@L["Design:Sorts:Severity"]</MudSelectItem><MudSelectItem Value="@("duration")">@L["Design:Sorts:Duration"]</MudSelectItem><MudSelectItem Value="@("name")">@L["Design:Sorts:Name"]</MudSelectItem>
+        </MudSelect>
     </div>
-    <div class="health-filter-bottom">
-        <div class="health-status-filters" role="group" aria-label="@L["Filters:StatusLabel"]">
-            <button type="button" class="status-filter @(Session.StatusFilter is null ? "is-selected" : null)" aria-pressed="@(Session.StatusFilter is null ? "true" : "false")" @onclick="@(() => Session.SetStatusFilterAsync(null))">@L["Filters:AnyStatus"]<span>@(Session.Snapshot?.Entries.Count ?? 0)</span></button>
-            @foreach (var status in States)
-            {
-                <button type="button" class="status-filter state-@status.ToString().ToLowerInvariant() @(Session.StatusFilter == status ? "is-selected" : null)" aria-pressed="@(Session.StatusFilter == status ? "true" : "false")" @onclick="@(() => Session.SetStatusFilterAsync(status))"><i></i>@L.GetStatusText(status)<span>@Count(status)</span></button>
-            }
-        </div>
-        <span class="filter-result-count" aria-live="polite">@L["Filters:Results", Session.FilteredEntries.Count, Session.Snapshot?.Entries.Count ?? 0]</span>
+    <div class="hc-facets"><MoFilterChip Label="@L["Filters:AnyStatus"]" Selected="@(Session.StatusFilter is null)" Count="@Session.FacetEntries.Count()" Pill="true" SelectedChanged="@(() => Set("status",null))" />
+        @foreach (var status in Enum.GetValues<HealthCheckState>().Reverse()) {
+            <MoFilterChip Label="@L.GetStatusText(status)" Selected="@(Session.StatusFilter == status)" Count="@Session.FacetEntries.Count(e => e.Status == status)" Role="@(status == HealthCheckState.Healthy ? MoVisualRole.Success : status == HealthCheckState.Degraded ? MoVisualRole.Warning : MoVisualRole.Error)" ShowDot="true" Pill="true" SelectedChanged="@(() => Set("status",status.ToString()))" /> }
+        @if (Session.Probe is not null) { <button class="mo-vl-id-chip" @onclick="@(() => Set("probe",null))">@L[Session.Probe switch { "ready" => "Design:ReadinessLabel", "live" => "Design:LivenessLabel", _ => "Design:AuxiliaryLabel" }] ×</button> }
     </div>
 </div>
-
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-    private static readonly HealthCheckState[] States = [HealthCheckState.Unhealthy, HealthCheckState.Degraded, HealthCheckState.Healthy];
-    private int Count(HealthCheckState status) => status switch
-    {
-        HealthCheckState.Healthy => Session.Snapshot?.HealthyCount ?? 0,
-        HealthCheckState.Degraded => Session.Snapshot?.DegradedCount ?? 0,
-        _ => Session.Snapshot?.UnhealthyCount ?? 0
-    };
+    private void Set(string name, string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter(name,string.IsNullOrWhiteSpace(value) ? null : value),replace:true);
 }
