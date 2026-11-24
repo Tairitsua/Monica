@@ -4,27 +4,42 @@
 {
     <section class="seeder-configuration" aria-labelledby="seeder-configuration-title">
         <header class="seeder-configuration-heading">
-            <div>
+            <span class="seeder-policy-icon" aria-hidden="true"><MoIcon Icon="@MoIcons.Sliders" Size="16px" /></span>
+            <div class="seeder-configuration-title">
                 <h2 id="seeder-configuration-title">@L["Configuration:Title"]</h2>
                 <p>@L["Configuration:Subtitle"]</p>
             </div>
-            <span>@L["Configuration:Overrides", graph.OverrideCount, graph.Run.TotalCount]</span>
+            @if (graph.Run.TotalCount > 0)
+            {
+                <span class="seeder-configuration-overrides" data-outline="@(graph.OverrideCount == 0 ? "true" : null)">
+                    @L["Configuration:Overrides", graph.OverrideCount, graph.Run.TotalCount]
+                </span>
+            }
         </header>
 
         <div class="seeder-policy-groups">
             <section aria-labelledby="seeder-scheduling-policy-title">
-                <h3 id="seeder-scheduling-policy-title"><MoIcon Icon="@MoIcons.Workflow" Size="14px" />@L["Configuration:Groups:Scheduling"]</h3>
+                <h3 id="seeder-scheduling-policy-title">
+                    <span class="seeder-policy-icon seeder-policy-icon--scheduling" aria-hidden="true"><MoIcon Icon="@MoIcons.Layers" Size="14px" /></span>
+                    @L["Configuration:Groups:Scheduling"]
+                </h3>
                 <dl>
                     <div><dt>@L["Configuration:ExecutionMode"]</dt><dd>@L.GetText(configuration.DefaultExecutionMode)</dd></div>
                     <div><dt>@L["Configuration:MaxConcurrency"]</dt><dd><code>@configuration.MaxConcurrency</code></dd></div>
                 </dl>
             </section>
             <section aria-labelledby="seeder-readiness-policy-title">
-                <h3 id="seeder-readiness-policy-title"><MoIcon Icon="@MoIcons.Success" Size="14px" />@L["Configuration:Groups:Readiness"]</h3>
+                <h3 id="seeder-readiness-policy-title">
+                    <span class="seeder-policy-icon seeder-policy-icon--readiness" aria-hidden="true"><MoIcon Icon="@MoIcons.ShieldCheck" Size="14px" /></span>
+                    @L["Configuration:Groups:Readiness"]
+                </h3>
                 <dl><div><dt>@L["Configuration:Criticality"]</dt><dd>@L.GetText(configuration.DefaultCriticality)</dd></div></dl>
             </section>
             <section aria-labelledby="seeder-retry-policy-title">
-                <h3 id="seeder-retry-policy-title"><MoIcon Icon="@MoIcons.Refresh" Size="14px" />@L["Configuration:Groups:Retries"]</h3>
+                <h3 id="seeder-retry-policy-title">
+                    <span class="seeder-policy-icon seeder-policy-icon--retry" aria-hidden="true"><MoIcon Icon="@MoIcons.History" Size="14px" /></span>
+                    @L["Configuration:Groups:Retries"]
+                </h3>
                 <dl>
                     <div><dt>@L["Configuration:MaxAttempts"]</dt><dd><code>@configuration.DefaultMaxAttempts</code></dd></div>
                     <div><dt>@L["Configuration:RetryBaseDelay"]</dt><dd><code>@L.FormatSeederDuration(configuration.RetryBaseDelay)</code></dd></div>
@@ -32,7 +47,10 @@
                 </dl>
             </section>
             <section aria-labelledby="seeder-failure-policy-title">
-                <h3 id="seeder-failure-policy-title"><MoIcon Icon="@MoIcons.Warning" Size="14px" />@L["Configuration:Groups:Failure"]</h3>
+                <h3 id="seeder-failure-policy-title">
+                    <span class="seeder-policy-icon" aria-hidden="true"><MoIcon Icon="@MoIcons.Warning" Size="14px" /></span>
+                    @L["Configuration:Groups:Failure"]
+                </h3>
                 <dl><div><dt>@L["Configuration:FailureBehavior"]</dt><dd>@L.GetText(configuration.DefaultFailureBehavior)</dd></div></dl>
             </section>
         </div>

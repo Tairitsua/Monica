@@ -58,8 +58,8 @@
     "FailFast": "Fail-fast cancellation"
   },
   "Configuration": {
-    "Title": "Host execution defaults",
-    "Subtitle": "Inherited policy for seeders without an override. Individual sources appear in seeder evidence.",
+    "Title": "Effective host defaults",
+    "Subtitle": "Host-wide ModuleSeederOption defaults. Seeders marked Override replace individual policies via [SeederPolicy].",
     "MaxConcurrency": "Max concurrency",
     "ExecutionMode": "Execution mode",
     "Criticality": "Criticality",
@@ -73,7 +73,7 @@
       "Failure": "On failure",
       "Readiness": "Readiness"
     },
-    "Overrides": "{0} of {1} seeders override host defaults"
+    "Overrides": "{0} of {1} seeders override defaults"
   },
   "Filters": {
     "AriaLabel": "Seeder filters",

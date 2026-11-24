@@ -232,7 +232,7 @@
         var tone = SeederDisplay.Tone(seeder.Status);
 
         return @<button type="button" @key="typeName" @ref="_buttons[typeName]"
-                        class="seeder-lane" data-trace="@relation"
+                        class="seeder-lane" data-trace="@relation" data-selected="@(typeName == SelectedType ? "true" : null)"
                         tabindex="@(typeName == _tabType ? 0 : -1)"
                         aria-label="@L["Waterfall:LaneLabel", seeder.SeederName, wave, L.GetText(seeder.Status), duration]"
                         @onpointerenter="@(() => _pointerType = typeName)"

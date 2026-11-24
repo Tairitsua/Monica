@@ -162,8 +162,11 @@
 }
 .seeder-lane:hover,
 .seeder-lane[data-trace="self"] {
+    background: color-mix(in srgb, var(--mud-palette-text-primary) 3.5%, transparent);
+}
+.seeder-lane[data-selected="true"] {
     background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
-    box-shadow: inset 2px 0 var(--mud-palette-primary);
+    box-shadow: inset 3px 0 var(--mud-palette-primary);
 }
 .seeder-lane[data-trace="upstream"] {
     background: color-mix(in srgb, var(--mud-palette-info) 6%, transparent);
@@ -203,10 +206,14 @@
     line-height: 1.3;
 }
 .seeder-lane-identity strong {
-    font-weight: 600;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.seeder-lane:hover .seeder-lane-identity strong,
+.seeder-lane[data-selected="true"] .seeder-lane-identity strong {
+    color: color-mix(in srgb, var(--mud-palette-primary) 78%, var(--mud-palette-text-primary));
 }
 .seeder-lane-identity code {
     min-width: 0;

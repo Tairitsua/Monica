@@ -58,22 +58,22 @@
     "FailFast": "快速失败取消"
   },
   "Configuration": {
-    "Title": "主机默认执行策略",
-    "Subtitle": "未声明覆盖项的 Seeder 继承这些策略。可在证据中查看每项配置的来源。",
+    "Title": "主机执行默认策略",
+    "Subtitle": "来自 ModuleSeederOption 的主机级有效默认值。带有“覆盖”标记的 Seeder 通过注解覆盖对应项。",
     "MaxConcurrency": "最大并发数",
-    "ExecutionMode": "执行模式",
-    "Criticality": "关键性",
-    "MaxAttempts": "最大尝试次数",
+    "ExecutionMode": "默认执行模式",
+    "Criticality": "默认关键性",
+    "MaxAttempts": "默认最大尝试",
     "RetryBaseDelay": "初始重试延迟",
     "RetryMaxDelay": "最大重试延迟",
-    "FailureBehavior": "失败策略",
+    "FailureBehavior": "默认失败策略",
     "Groups": {
       "Scheduling": "调度方式",
       "Retries": "重试策略",
       "Failure": "失败处理",
       "Readiness": "就绪要求"
     },
-    "Overrides": "{1} 项中有 {0} 项覆盖默认策略"
+    "Overrides": "{0} / {1} 个 Seeder 覆盖了默认策略"
   },
   "Filters": {
     "AriaLabel": "Seeder 筛选条件",
