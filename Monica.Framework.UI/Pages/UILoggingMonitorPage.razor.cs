@@ -341,6 +341,21 @@ public partial class UILoggingMonitorPage
         Navigate(new Dictionary<string, object?> { ["context"] = number, ["generation"] = source.Generation });
     }
 
+    private void ShowContextFromEvidence(LogLineEvidence evidence)
+    {
+        if (evidence.Source is not { } source || evidence.Line.AbsoluteLineNumber is not { } number) return;
+        _contextRequest = new LogLineRequest(source, number, evidence.Line.Raw);
+        Navigate(new Dictionary<string, object?> {
+            ["file"] = source.RelativePath, ["line"] = null, ["context"] = number, ["generation"] = source.Generation
+        });
+    }
+
+    private void FilterFromEvidence(LogSeverity severity)
+    {
+        _severity = severity;
+        Navigate(new Dictionary<string, object?> { ["line"] = null, ["context"] = null, ["generation"] = null, ["severity"] = severity.ToString() });
+    }
+
     private async Task ReadContextAsync(LogLineRequest request)
     {
         var result = await _session!.ReadContextAsync(request, 50, _retirement.Token);

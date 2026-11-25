@@ -3,6 +3,7 @@ using Monica.Core.Results;
 using Monica.Framework.UI.UILogging.Models;
 using Monica.Framework.UI.UILogging.Components;
 using Monica.Framework.UI.UILogging.Support;
+using Monica.Logging.Services.Support;
 
 namespace Monica.Framework.UI.Pages;
 
@@ -23,9 +24,9 @@ public partial class UILoggingFilesPage
     private ScreenLogSnapshot? _reader;
     private long _total;
     private static readonly (string,string)[] Orders = [("modified","Design:FilesOrderModified"),("size","Design:FilesOrderSize"),("name","Design:FilesOrderName")];
-    protected override void OnParametersSet() { _keyword=Search; _order=Sort ?? "modified"; _page=Math.Clamp(RequestedPage,0,PageCount-1); }
+    protected override void OnParametersSet() { _keyword=Search; _order=Sort is "size" or "name" ? Sort : "modified"; _page=Math.Clamp(RequestedPage,0,PageCount-1); }
     private void SetFolder(string? folder) { _page=0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["folder"] = folder=="" ? "." : folder, ["page"] = null }),replace:true); }
-    private void SetOrder(string order) { _page=0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["sort"] = order, ["page"] = null }),replace:true); }
+    private void SetOrder(string order) { _page=0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["sort"] = order == "modified" ? null : order, ["page"] = null }),replace:true); }
     private readonly object _ownership = new();
     private readonly CancellationTokenSource _retirement = new();
     private readonly HashSet<Task> _operations = [];
@@ -39,6 +40,31 @@ public partial class UILoggingFilesPage
     private int _page;
     private bool _busy;
     private volatile bool _disposed;
+
+    private string DirectoryLabel => Path.GetFileName(Path.TrimEndingDirectorySeparator(FileQuery.LogDirectory));
+    private bool DefaultWriter => LoggingOptions.Value.EnableFileSink && LoggingOptions.Value.CustomLoggerFactory is null;
+    private long? SizeLimit => DefaultWriter ? LoggingOptions.Value.FileSizeLimitBytes : null;
+    private string? DefaultSinkPath => DefaultWriter ? LogFileLocation.Resolve(LoggingOptions.Value) : null;
+    private string? DefaultSink => DefaultSinkPath is { } path ? Path.GetFileName(path) : null;
+    private string? DefaultSinkRelative => DefaultSinkPath is { } path
+        ? Path.GetRelativePath(FileQuery.LogDirectory, path).Replace(Path.DirectorySeparatorChar, '/')
+        : null;
+
+    private bool IsDefaultSink(LogFileDescriptor file) => string.Equals(DefaultSinkRelative, file.RelativePath,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    private string ModifiedAge(LogFileDescriptor file)
+    {
+        if (_readAt is null) return "—";
+        var seconds = Math.Max(0, (_readAt.Value - new DateTimeOffset(file.LastModified)).TotalSeconds);
+        return seconds < 10 ? L["LogChart:AgeNow"] : seconds < 60 ? L["LogChart:AgeSeconds", (int)seconds] :
+            seconds < 3600 ? L["LogChart:AgeMinutes", (int)(seconds / 60)] :
+            seconds < 86400 ? L["LogChart:AgeHours", (int)(seconds / 3600)] : L["LogChart:AgeDays", (int)(seconds / 86400)];
+    }
+
+    private void ClearFilters() => NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?>
+    {
+        ["q"] = null, ["folder"] = null, ["page"] = null
+    }), replace: true);
 
     private string Query => string.IsNullOrEmpty(File) ? string.Empty : "?file=" + Uri.EscapeDataString(File);
     private string ReaderUrl => NavigationManager.ToAbsoluteUri(UILoggingMonitorPage.PAGE_URL.TrimStart('/') + Query).ToString();

@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Visual
 @using Monica.UI.Shared.Components.States
 @using System.Globalization
 @using System.Net
@@ -9,11 +10,12 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<LoggingResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IJSRuntime JsRuntime
 @inject ILogger<LogViewer> Logger
 @implements IAsyncDisposable
 
-<section class="log-viewer-wrapper" aria-label="@L["Workbench:Viewer:Heading"]" data-source-generation="@Source?.Generation" data-position-revision="@_positionRevision.ToString(CultureInfo.InvariantCulture)">
+<section class="log-viewer-wrapper @(Workbench ? "log-workbench-viewer" : null)" aria-label="@L["Workbench:Viewer:Heading"]" data-source-generation="@Source?.Generation" data-position-revision="@_positionRevision.ToString(CultureInfo.InvariantCulture)">
     <header class="log-viewer-header">
         <div class="log-viewer-heading"><h2>@L["Workbench:Viewer:Heading"]</h2><span>@L["Workbench:Viewer:Scope", PageStartDisplay, PageEnd, CurrentLines.Count]</span></div>
         <div class="log-viewer-commands">
@@ -34,7 +36,11 @@
             </div>
         </div>
     }
-    <div class="log-ledger-head" aria-hidden="true"><span>@L["Workbench:Viewer:Line"]</span><span>@L["Workbench:Viewer:Message"]</span><span></span></div>
+    <div class="log-ledger-head" aria-hidden="true">
+        <span>@L["Workbench:Viewer:Line"]</span>
+        @if (Workbench) { <span>@L["LogChart:LedgerLevel"]</span> }
+        <span>@L[Workbench ? "LogChart:LedgerMessage" : "Workbench:Viewer:Message"]</span><span>@(Workbench ? L["Workbench:Actions"].Value : null)</span>
+    </div>
     <div class="log-viewer-scroll" @ref="_scrollContainer" @onscroll="OnNativeScrollAsync">
         @if (CurrentLines.Count == 0)
         {
@@ -47,12 +53,44 @@
                 var line = CurrentLines[i];
                 var reference = new ViewerLineReference(line, i, Source, SnapshotReadAt);
                 var isCurrentMatch = _matchedLineIndices.Count > 0 && _currentMatchIndex < _matchedLineIndices.Count && _matchedLineIndices[_currentMatchIndex] == i;
-                <article @key="(Source, line.AbsoluteLineNumber ?? i)" class="log-entry @GetSeverityClass(line.Severity) @(line.IsContextTarget ? "context-target" : "") @(isCurrentMatch ? "current-match" : "") @(_selectedLineIndex == i ? "selected" : "")" data-line-index="@i" data-absolute-line-number="@line.AbsoluteLineNumber" @oncontextmenu="e => OpenContextMenuAsync(e, reference)" @oncontextmenu:preventDefault="true">
-                    <span class="log-entry__number">@(line.AbsoluteLineNumber?.ToString(CultureInfo.InvariantCulture) ?? "—")</span>
-                    <div class="log-entry__evidence">
-                        <div class="log-entry__metadata"><span class="log-entry__level">@(string.IsNullOrEmpty(line.LevelText) ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)</span>@if (!string.IsNullOrEmpty(line.Header)) { <span class="log-entry__header">@((MarkupString)BuildHeaderMarkup(line.Header))</span> }</div>
-                        <div class="log-entry__message">@((MarkupString)BuildMessageMarkup(line))</div>
-                    </div>
+                <article @key="(Source, line.AbsoluteLineNumber ?? i)" class="log-entry @GetSeverityClass(line.Severity) @(line.Severity == LogSeverity.Critical ? "is-critical" : null) @(line.IsContextTarget ? "context-target" : "") @(isCurrentMatch ? "current-match" : "") @(_selectedLineIndex == i ? "selected" : "")" data-line-index="@i" data-absolute-line-number="@line.AbsoluteLineNumber" @oncontextmenu="e => OpenContextMenuAsync(e, reference)" @oncontextmenu:preventDefault="true">
+                    <span class="log-entry__number">@(line.AbsoluteLineNumber?.ToString(Workbench ? "N0" : null, Workbench ? CultureInfo.CurrentCulture : CultureInfo.InvariantCulture) ?? "—")</span>
+                    @if (Workbench)
+                    {
+                        var role = LogSeverityStrip.Role(line.Severity);
+                        <div class="log-entry__level-cell">
+                            <span class="log-entry__level-tag @role.ToCssClass() @(line.Severity is LogSeverity.Error or LogSeverity.Critical ? "is-solid" : null)">
+                                @if (line.Severity == LogSeverity.Critical) { <i aria-hidden="true"></i> }
+                                @(line.LevelText.Length == 0 ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)
+                            </span>
+                        </div>
+                        <div class="log-entry__evidence">
+                            @if (line.Timestamp is { } timestamp && (!HasKeyword || !line.Header.Contains(Filter!.Keyword!, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <div class="log-entry__metadata">
+                                    <time datetime="@timestamp.ToString("O")" title="@UiTime.Format(timestamp)">@UiTime.Format(timestamp, "HH:mm:ss.fff")</time>
+                                    @if (line.Thread.Length > 0) { <span>@line.Thread</span> }
+                                </div>
+                            }
+                            else if (line.Header.Length > 0)
+                            {
+                                <span class="log-entry__header">@((MarkupString)BuildHeaderMarkup(line.Header))</span>
+                            }
+                            else if (line.Raw.Length > 0)
+                            {
+                                <span class="log-entry__continuation" aria-hidden="true">↳</span>
+                            }
+                            @if (line.Raw.Length == 0) { <small class="log-entry__blank">@L["LogChart:Blank"]</small> }
+                            else { <div class="log-entry__message">@((MarkupString)BuildMessageMarkup(line))</div> }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="log-entry__evidence">
+                            <div class="log-entry__metadata"><span class="log-entry__level">@(string.IsNullOrEmpty(line.LevelText) ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)</span>@if (!string.IsNullOrEmpty(line.Header)) { <span class="log-entry__header">@((MarkupString)BuildHeaderMarkup(line.Header))</span> }</div>
+                            <div class="log-entry__message">@((MarkupString)BuildMessageMarkup(line))</div>
+                        </div>
+                    }
                     <div class="log-entry__actions">
                         <MudIconButton Icon="@MoIcons.ExternalLink" Size="Size.Small" OnClick="@(() => InspectAsync(reference))" title="@InspectLabel(line)" aria-label="@InspectLabel(line)" />
                         <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Workbench:Viewer:Actions"]" Dense="true" DropShadow="false">
@@ -104,6 +142,9 @@
     [Parameter] public long? FirstRetainedLineNumber { get; set; }
     /// <summary>Reports source-qualified positions after native scrolling, navigation, and selection; no callbacks are admitted after retirement.</summary>
     [Parameter] public EventCallback<LogViewerPosition> PositionChanged { get; set; }
+
+    /// <summary>Uses the compact physical-line ledger in the logging workbench. Defaults to false.</summary>
+    [Parameter] public bool Workbench { get; set; }
 
     private const int RowsPerPage = 100;
     private const string JsModulePath = "./_content/Monica.Framework.UI/js/logging-ui.js";
@@ -193,8 +234,17 @@
         if (autoScrollEnabled) _browsingEarlier = false;
         UpdateMatches();
         if (sourceChanged || !_hasView) _page = AutoScroll ? PageCount - 1 : 0;
-        if (filterChanged) { _page = HasKeyword && _matchedLineIndices.Count > 0 ? _matchedLineIndices[0] / RowsPerPage : 0; _pendingScrollBottom = false; }
-        else if (AutoScroll && !_browsingEarlier && !prepended && (revisionChanged || autoScrollEnabled)) { _page = PageCount - 1; _pendingScrollBottom = true; }
+        if (filterChanged && (!Workbench || Filter?.IsActive == true || !sourceChanged && _hasView))
+        {
+            _page = HasKeyword && _matchedLineIndices.Count > 0 ? _matchedLineIndices[0] / RowsPerPage : 0;
+            _pendingScrollBottom = false;
+        }
+        else if (AutoScroll && !_browsingEarlier && !prepended && (revisionChanged || autoScrollEnabled))
+        {
+            _page = PageCount - 1;
+            _pendingScrollBottom = !Workbench || _hasView && !sourceChanged;
+            _pendingScrollTop = !_pendingScrollBottom;
+        }
         _page = Math.Clamp(_page, 0, PageCount - 1);
         if (_pendingHistoryAnchor is { } anchor && Version != _historyVersion)
         {

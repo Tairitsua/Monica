@@ -4,7 +4,11 @@
 @using Monica.Framework.UI.UILogging.Support
 @using Monica.Framework.UI.UILogging.State
 @using Monica.Framework.UI.UILogging.Components
+@using Monica.Logging.Services.Support
+@using Monica.Modules
 @using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Components.States
+@inject Microsoft.Extensions.Options.IOptions<ModuleLoggingOption> LoggingOptions
 @inject LoggingWorkspaceSession Workspace
 @inject LogFileQueryService FileQuery
 @inject NavigationManager NavigationManager
@@ -14,46 +18,113 @@
 
 <PageTitle>@L["Workbench:FilesTitle"]</PageTitle>
 
-<div class="logging-files-workbench mo-page-shell mo-page-shell--full-width">
-    <LoggingWorkspaceHeader Files="true" Count="@(_readAt.HasValue ? _files.Count : null)" FilesUrl="@CatalogUrl" ReaderUrl="@ReaderUrl" Identity="@FileQuery.LogDirectory" ReadAt="@_readAt" Following="@(_reader?.IsRunning == true)">
-        <Commands><MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Design:RefreshFiles"]</MudButton></Commands>
+<div class="mo-workbench-container">
+<div class="logging-files-workbench mo-page-shell mo-page-shell--workbench">
+    <LoggingWorkspaceHeader Files="true" Count="@(_readAt.HasValue ? _files.Count : null)" FolderCount="@_files.Select(LogFootprint.FolderOf).Distinct().Count()"
+                            FilesUrl="@CatalogUrl" ReaderUrl="@ReaderUrl" Identity="@FileQuery.LogDirectory"
+                            IdentityLabel="@DirectoryLabel" ReadAt="@_readAt" Following="@(_reader?.IsRunning == true)" Failed="@(_error is not null)">
+        <Commands>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Design:RefreshFiles"]</MudButton>
+        </Commands>
     </LoggingWorkspaceHeader>
     @if (_error is not null)
     {
-        <div class="files-error" role="alert"><strong>@L["Workbench:FilesFailed"]</strong><p>@_error</p></div>
+        <MoSemanticCallout Severity="@(_readAt is null ? MoVisualRole.Error : MoVisualRole.Warning)" Title="@L["Workbench:FilesFailed"]">@_error</MoSemanticCallout>
     }
-    <LogFootprint Files="@_files" Available="@_readAt.HasValue" DirectoryName="@FileQuery.LogDirectory" OpenUrl="OpenUrl" Current="@_reader?.Source?.RelativePath" Following="@(_reader?.IsRunning == true)" Folder="@FolderKey" SelectFolder="SetFolder" />
-    <section class="files-registry" aria-label="@L["Workbench:FilesTitle"]">
+    <LogFootprint Files="@_files" Available="@_readAt.HasValue" DirectoryName="@FileQuery.LogDirectory" OpenUrl="OpenUrl" Current="@_reader?.Source?.RelativePath"
+                  Following="@(_reader?.IsRunning == true)" Folder="@FolderKey" SelectFolder="SetFolder" DefaultSink="@DefaultSink" DefaultSinkRelative="@DefaultSinkRelative" ModifiedAge="ModifiedAge" SizeLimit="@SizeLimit" />
+    <section class="files-registry mo-vl-surface" aria-label="@L["Workbench:FilesTitle"]">
         <div class="files-controls">
-            <label class="files-search"><MoIcon Icon="@MoIcons.Search" Size="1.25rem" /><input type="search" placeholder="@L["Workbench:FilesSearch"]" aria-label="@L["Workbench:FilesSearch"]" value="@_keyword" @oninput="SearchChanged" /></label>
-            <div class="files-sort" aria-label="@L["Workbench:Order"]">@foreach (var (id,label) in Orders) { <MoFilterChip Label="@L[label]" Selected="@(_order == id)" SelectedChanged="@(() => SetOrder(id))" /> }</div>
+            <label class="files-search">
+                <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" spellcheck="false" autocomplete="off" placeholder="@L["Workbench:FilesSearch"]" aria-label="@L["Workbench:FilesSearch"]" value="@_keyword" @oninput="SearchChanged" />
+            </label>
+            <div class="files-sort">
+                <span>@L["Workbench:Order"]</span>
+                <div class="mo-vl-segment" role="group" aria-label="@L["Workbench:Order"]">
+                    @foreach (var (id, label) in Orders)
+                    {
+                        <button type="button" aria-pressed="@(_order == id ? "true" : "false")" @onclick="@(() => SetOrder(id))">@L[label]</button>
+                    }
+                </div>
+            </div>
         </div>
-        <div class="files-results-summary"><span>@L["Workbench:FileResults", MatchingFiles.Count, _files.Count]</span><span>@L["Workbench:FileReadAt", UiTime.FormatTime(_readAt) ?? "—"]</span></div>
-        <div class="files-table-frame">
-            <table class="files-table"><thead><tr><th scope="col">@L["Workbench:Artifact"]</th><th scope="col">@L["Workbench:Size"]</th><th scope="col">@L["Workbench:Modified"]</th><th scope="col">@L["Workbench:Actions"]</th></tr></thead><tbody>
-            @if (_busy && _files.Count == 0)
-            {
-                <tr><td colspan="4" class="files-empty"><div role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />@L["Workbench:LoadingFiles"]</div></td></tr>
-            }
-            else if (MatchingFiles.Count == 0)
-            {
-                <tr><td colspan="4" class="files-empty"><div role="status"><MoIcon Icon="@MoIcons.FolderOpen" Size="1.5rem" /><strong>@L[_error is not null ? "Workbench:DirectoryUnavailable" : _files.Count == 0 ? "Workbench:NoArtifacts" : "Workbench:NoFileMatches"]</strong><p>@L[_error is not null ? "Workbench:DirectoryRetry" : _files.Count == 0 ? "Workbench:NoArtifactsHelp" : "Workbench:NoFileMatchesHelp"]</p></div></td></tr>
-            }
-            else
-            {
-                @foreach (var file in PageFiles)
-                {
-                    <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(string.Equals(_reader?.Source?.RelativePath, file.RelativePath, StringComparison.Ordinal) ? "is-current" : "")">
-                        <td class="artifact-name"><MoIcon Icon="@MoIcons.FileText" Size="1.25rem" /><div><a href="@OpenUrl(file.RelativePath)">@file.FileName</a><code>@file.RelativePath</code>@if (string.Equals(_reader?.Source?.RelativePath, file.RelativePath, StringComparison.Ordinal)) { <span class="current-source">@L["Workbench:LastSource"]</span> }</div></td>
-                        <td class="artifact-size" data-bytes="@file.Size"><span class="mobile-label">@L["Workbench:Size"]</span><span>@FormatSize(file.Size)</span><span class="file-share"><i style="@FormattableString.Invariant($"width:{(_total==0 ? 0 : file.Size*100d/_total):0.###}%")"></i></span><small>@L["Workbench:ExactBytes", file.Size.ToString("N0")] · @(_total==0 ? "0%" : (file.Size/(double)_total).ToString("P1"))</small></td>
-                        <td class="artifact-modified"><span class="mobile-label">@L["Workbench:Modified"]</span><time datetime="@file.LastModified.ToString("O")">@UiTime.Format(file.LastModified)</time></td>
-                        <td class="artifact-actions"><a href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></a><button type="button" disabled="@_busy" @onclick="() => DownloadAsync(file.RelativePath)" aria-label="@L["Workbench:DownloadFile", file.FileName]"><MoIcon Icon="@MoIcons.Download" Size="1.25rem" /><span>@L["Workbench:Download"]</span></button></td>
-                    </tr>
-                }
-            }
-            </tbody></table>
-            <footer class="files-pager"><span>@L["Workbench:FilePage", _page + 1, PageCount]</span><div><button type="button" @onclick="PreviousPage" disabled="@(_page == 0)" aria-label="@L["Workbench:PreviousPage"]"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.5rem" /></button><button type="button" @onclick="NextPage" disabled="@(_page + 1 >= PageCount)" aria-label="@L["Workbench:NextPage"]"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.5rem" /></button></div></footer>
+        <div class="files-results-summary">
+            <span class="mo-vl-mono" aria-live="polite">@L["Workbench:FileResults", MatchingFiles.Count, _files.Count]</span>
+            <span>@L["LogChart:CatalogScope"]</span>
         </div>
-        <p class="files-download-scope">@L["Workbench:DownloadScope"]</p>
+        @if (_busy && _files.Count == 0)
+        {
+            <MoContentState Loading="true" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" /><p>@L["Workbench:LoadingFiles"]</p></MoContentState>
+        }
+        else if (MatchingFiles.Count == 0)
+        {
+            <MoContentState role="status">
+                <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.FolderOpen" Size="18px" /></span>
+                <h3>@L[_error is not null && _readAt is null ? "Workbench:DirectoryUnavailable" : _files.Count == 0 ? "Workbench:NoArtifacts" : "Workbench:NoFileMatches"]</h3>
+                <p>@L[_error is not null && _readAt is null ? "Workbench:DirectoryRetry" : _files.Count == 0 ? "Workbench:NoArtifactsHelp" : "Workbench:NoFileMatchesHelp"]</p>
+                @if (_files.Count > 0) { <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.FilterOff" OnClick="ClearFilters">@L["Design:ClearFilter"]</MudButton> }
+            </MoContentState>
+        }
+        else
+        {
+            <div class="lm-ftable-wrap">
+                <table class="lm-ftable">
+                    <thead><tr><th scope="col">@L["Workbench:Artifact"]</th><th scope="col" class="is-num">@L["LogChart:SizeAndShare"]</th><th scope="col">@L["Workbench:Modified"]</th><th scope="col" class="is-end">@L["Workbench:Actions"]</th></tr></thead>
+                    <tbody>
+                    @foreach (var file in PageFiles)
+                    {
+                        var current = string.Equals(_reader?.Source?.RelativePath, file.RelativePath, StringComparison.Ordinal);
+                        var writer = IsDefaultSink(file);
+                        var role = LogFootprint.RoleFor(file, SizeLimit);
+                        var ratio = _total > 0 ? file.Size * 100d / _total : 0;
+                        var near = LogFootprint.NearLimit(file, SizeLimit);
+                        <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(current ? "is-current" : null)">
+                            <td class="lm-f-name"><div class="lm-f-ident">
+                                <span class="lm-f-dot @(file.Size == 0 ? "mo-vl-role--neutral" : role.ToCssClass())" aria-hidden="true"></span>
+                                <div class="lm-f-copy">
+                                    <div class="lm-f-title-line">
+                                        <a class="lm-f-link" href="@OpenUrl(file.RelativePath)">@file.FileName</a>
+                                        @if (current) { <span class="mo-vl-capsule mo-vl-role--primary">@L["Workbench:LastSource"]</span> }
+                                        @if (writer) { <span class="mo-vl-capsule mo-vl-role--info">@L["LogChart:DefaultSinkTag"]</span> }
+                                        @if (near) { <span class="mo-vl-capsule @role.ToCssClass()">@L["LogChart:LimitTag", (file.Size / (double)SizeLimit!.Value).ToString("P0")]</span> }
+                                        @if (file.Size == 0) { <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@L["LogChart:EmptyFileTag"]</span> }
+                                    </div>
+                                    <div class="lm-f-path">
+                                        @if (LogFootprint.FolderOf(file).Length == 0) { @L["LogChart:RootFile"] }
+                                        else { <code>@file.RelativePath</code> }
+                                    </div>
+                                </div>
+                            </div></td>
+                            <td class="lm-f-size is-num" data-label="@L["LogChart:SizeAndShare"]" data-bytes="@file.Size">
+                                <div class="lm-f-size-top"><span>@FormatSize(file.Size)</span><small>@ratio.ToString("0.0")%</small></div>
+                                <div class="lm-f-bar" aria-hidden="true"><span class="@role.ToCssClass()" style="@FormattableString.Invariant($"width:{(ratio > 0 ? Math.Max(1.5, ratio) : 0):0.##}%")"></span></div>
+                                <small class="lm-f-bytes">@L["Workbench:ExactBytes", file.Size.ToString("N0")]</small>
+                            </td>
+                            <td class="lm-f-mod" data-label="@L["Workbench:Modified"]"><time datetime="@file.LastModified.ToString("O")">@UiTime.Format(file.LastModified)</time><small>@ModifiedAge(file)</small></td>
+                            <td class="lm-f-act">
+                                <div class="lm-f-act-wrap">
+                                    <a class="file-open" href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a>
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Download" Disabled="@_busy" OnClick="@(() => DownloadAsync(file.RelativePath))"
+                                               aria-label="@L["Workbench:DownloadFile", file.FileName]">@L["Workbench:Download"]</MudButton>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        <footer class="files-footer">
+            <div class="files-pager">
+                <span>@L["Workbench:FilePage", _page + 1, PageCount]</span>
+                <div>
+                    <MudIconButton Size="Size.Small" Icon="@MoIcons.ChevronLeft" OnClick="PreviousPage" Disabled="@(_page == 0)" aria-label="@L["Workbench:PreviousPage"]" />
+                    <MudIconButton Size="Size.Small" Icon="@MoIcons.ChevronRight" OnClick="NextPage" Disabled="@(_page + 1 >= PageCount)" aria-label="@L["Workbench:NextPage"]" />
+                </div>
+            </div>
+            <p class="files-download-scope">@L["Workbench:DownloadScope"]</p>
+        </footer>
     </section>
+</div>
 </div>

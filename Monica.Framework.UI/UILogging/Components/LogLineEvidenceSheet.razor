@@ -1,32 +1,59 @@
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.Support
 @using Monica.UI.Shared.Components.Dialogs
-@using Monica.UI.Shared.Components.States
+@using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<LoggingResource> L
 @inject IJSRuntime JS
 
-<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:Close"]" Width="36rem">
-    <TitleContent><small>@L["Design:InspEyebrow", Number]</small><h2>@L["Design:InspTitle"]</h2></TitleContent>
+<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:Close"]" Width="560px" Compact="true">
+    <TitleContent>
+        @{
+            var severity = _evidence?.Line.Severity;
+            var role = severity is { } level ? LogSeverityStrip.Role(level) : MoVisualRole.Neutral;
+            var icon = severity is LogSeverity.Error or LogSeverity.Critical ? MoIcons.Error :
+                severity == LogSeverity.Warning ? MoIcons.Warning : _evidence is null ? MoIcons.FileSearch : MoIcons.FileText;
+        }
+        <div class="lm-insp-heading">
+            <span class="mo-vl-tile @role.ToCssClass()"><MoIcon Icon="@icon" Size="16px" /></span>
+            <div class="lm-insp-id">
+                <p>@L["Design:InspEyebrow", Number]</p>
+                <h2>@(_evidence is null ? L["Design:InspNotFoundTitle"].Value : $"L{Number} · {L["Design:InspTitle"]}")</h2>
+                @if (_evidence is { } record)
+                {
+                    <div class="lm-insp-flags">
+                        <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass()"><i class="mo-vl-status-dot" aria-hidden="true"></i>@L[$"Workbench:Levels:{record.Line.Severity}"]</span>
+                        @if (record.Line.Thread.Length > 0) { <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@record.Line.Thread</span> }
+                    </div>
+                }
+            </div>
+            @if (_evidence is not null)
+            {
+                <div class="lm-insp-step">
+                    <MudIconButton Icon="@MoIcons.ChevronUp" Size="Size.Small" aria-label="@L["Design:InspPrevLine"]" title="@L["Design:InspPrevLine"]" Disabled="@(_index <= 0)" OnClick="@(() => Step(-1))" />
+                    <MudIconButton Icon="@MoIcons.ChevronDown" Size="Size.Small" aria-label="@L["Design:InspNextLine"]" title="@L["Design:InspNextLine"]" Disabled="@(_index < 0 || _index >= _frozen.Count - 1)" OnClick="@(() => Step(1))" />
+                </div>
+            }
+        </div>
+    </TitleContent>
     <ChildContent>
-        @if (_evidence is null)
+        @if (_evidence is { } evidence)
         {
-            <MoContentState><h3>@L["Design:InspNotFoundTitle"]</h3><p>@L["Design:InspNotFoundBody",Number]</p></MoContentState>
+            <div class="lm-insp-work">
+                <p class="lm-insp-frozen"><MoIcon Icon="@MoIcons.Lock" Size="16px" />@L["Workbench:Inspector:Frozen"]</p>
+                <div class="lm-insp-actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@MoIcons.Copy" OnClick="@(() => Copy(evidence.Line.Raw))">@L["Design:CopyRaw"]</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Layers" Disabled="@(evidence.Source is null || evidence.Line.AbsoluteLineNumber is null)"
+                               OnClick="@(() => ShowContext.InvokeAsync(evidence))">@L["Page:Components:Viewer:ContextMenu:ShowContext"]</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Filter" OnClick="@(() => FilterSeverity.InvokeAsync(evidence.Line.Severity))">@L["Page:Components:Viewer:ContextMenu:FilterSeverity"]</MudButton>
+                </div>
+                <LogLineEvidenceContent Evidence="@evidence" CopyFormattedRequested="CopyFormat" />
+            </div>
         }
         else
         {
-            <LogLineEvidenceContent Evidence="@_evidence" CopyRawRequested="Copy" />
-            <MudMenu Label="@L["Page:Components:Viewer:ContextMenu:Copy"]" StartIcon="@MoIcons.Copy">
-                @foreach (var (format,label) in Formats)
-                {
-                    <MudMenuItem OnClick="@(() => Copy(_evidence.Line.GetCopyText(format)))">@L[label]</MudMenuItem>
-                }
-            </MudMenu>
+            <MoSemanticCallout Severity="MoVisualRole.Warning" Icon="@MoIcons.FileSearch" Title="@L["Design:InspNotFoundTitle"]">@L["Design:InspNotFoundBody", Number]</MoSemanticCallout>
         }
     </ChildContent>
-    <FooterContent>
-        <MudButton StartIcon="@MoIcons.ChevronLeft" Disabled="@(_index <= 0)" OnClick="@(() => Step(-1))">@L["Design:InspPrevLine"]</MudButton>
-        <MudButton EndIcon="@MoIcons.ChevronRight" Disabled="@(_index < 0 || _index >= _frozen.Count - 1)" OnClick="@(() => Step(1))">@L["Design:InspNextLine"]</MudButton>
-    </FooterContent>
 </MoSideSheet>
 
 @code {
@@ -37,7 +64,10 @@
     [Parameter] public DateTimeOffset? ReadAt { get; set; }
     [Parameter] public LogLineEvidence? Initial { get; set; }
     [Parameter] public EventCallback<long?> Navigate { get; set; }
-    private static readonly (LogCopyFormat,string)[] Formats = [(LogCopyFormat.Raw,"Design:CopyRaw"),(LogCopyFormat.MessageOnly,"Design:CopyMessage"),(LogCopyFormat.WithTimestamp,"Design:CopyTimestamp"),(LogCopyFormat.WithLineNumber,"Design:CopyLineNumber")];
+    /// <summary>Opens physical neighbors verified against the frozen source and line.</summary>
+    [Parameter] public EventCallback<LogLineEvidence> ShowContext { get; set; }
+    /// <summary>Applies the inspected severity to the working ledger and closes the sheet.</summary>
+    [Parameter] public EventCallback<LogSeverity> FilterSeverity { get; set; }
     private IReadOnlyList<LogLineViewModel> _frozen = [];
     private LogSourceIdentity? _source;
     private DateTimeOffset? _readAt;
@@ -72,5 +102,6 @@
 
     private Task Step(int offset) => Navigate.InvokeAsync(_frozen[_index + offset].AbsoluteLineNumber);
     private Task Close(bool open) => open ? Task.CompletedTask : Navigate.InvokeAsync(null);
+    private Task CopyFormat(LogCopyFormat format) => _evidence is { } evidence ? Copy(evidence.Line.GetCopyText(format)) : Task.CompletedTask;
     private Task Copy(string raw) => JS.InvokeVoidAsync("navigator.clipboard.writeText",raw).AsTask();
 }

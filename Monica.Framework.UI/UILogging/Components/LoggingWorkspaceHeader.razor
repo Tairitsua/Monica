@@ -3,21 +3,52 @@
 @inject IStringLocalizer<LoggingResource> L
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
 @inject IJSRuntime JS
-<MoPageMasthead Icon="@(Files ? MoIcons.FolderOpen : MoIcons.FileText)" Title="@L[Files ? "Workbench:FilesTitle" : "Workbench:ReaderTitle"]" Crumb="@L["Design:Eyebrow"]">
-    <Meta><span class="mo-vl-status mo-vl-role--@(Following ? "info" : "neutral")"><i class="mo-vl-status-dot"></i>@L[Following ? "Workbench:Following" : "Workbench:Paused"]</span>
-        <button class="mo-vl-id-chip" title="@Identity" @onclick="Copy"><MoIcon Icon="@MoIcons.FileText" /><span>@Identity</span><MoIcon Icon="@MoIcons.Copy" /></button><span>@Time.TimeZone.Id</span></Meta>
-    <Actions>@if (ReadAt is { } at) { <div class="log-stamp"><span>@L[Files ? "Design:DirectoryReadAt" : "Design:Captured"]</span><time datetime="@at.ToString("O")">@Time.FormatTime(at)</time></div> } @Commands</Actions>
-</MoPageMasthead>
-<MoWorkbenchNavigation Label="@L["Workbench:Navigation"]"><a href="@ReaderUrl" aria-current="@(!Files ? "page" : null)"><MoIcon Icon="@MoIcons.FileText" Size="1rem" />@L["Workbench:Reader"]</a>
-    <a href="@FilesUrl" aria-current="@(Files ? "page" : null)"><MoIcon Icon="@MoIcons.FolderOpen" Size="1rem" />@L["Workbench:Files"] @if (Count.HasValue) { <small>@Count</small> }</a></MoWorkbenchNavigation>
+
+<div class="log-workspace-header">
+    <MoPageMasthead Icon="@(Files ? MoIcons.FolderOpen : MoIcons.FileText)" Title="@L[Files ? "Workbench:FilesTitle" : "Workbench:ReaderTitle"]" Crumb="@L["Design:Eyebrow"]">
+        <Meta>
+            @{
+                var role = Failed ? MoVisualRole.Warning : Files ? MoVisualRole.Info : Following ? MoVisualRole.Info : MoVisualRole.Neutral;
+            }
+            <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass() @(!Files && Following && !Failed ? "mo-vl-status--live" : null)">
+                <i class="mo-vl-status-dot" aria-hidden="true"></i>
+                @(Failed ? L["Workbench:ReadFailed"] : Files ? L["Design:FilesSummary", Count ?? 0, FolderCount ?? 0] : L[Following ? "Workbench:Following" : "Workbench:Paused"])
+            </span>
+            <button class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral log-path-chip" type="button" title="@Identity" aria-label="@L["Design:CopyIdentity"]" @onclick="Copy">
+                <MoIcon Icon="@(Files ? MoIcons.FolderOpen : MoIcons.FileText)" Size="13px" /><span>@(IdentityLabel ?? Identity)</span><MoIcon Icon="@MoIcons.Copy" Size="13px" />
+            </button>
+            <span title="@Time.TimeZone.Id">@Time.FormatZoneLabel(ReadAt)</span>
+        </Meta>
+        <Actions>
+            @if (ReadAt is { } at)
+            {
+                <div class="log-stamp"><span>@L[Files ? "Design:DirectoryReadAt" : "Design:Captured"]</span><time datetime="@at.ToString("O")" title="@Time.Format(at)">@Time.FormatTime(at)</time></div>
+            }
+            @Commands
+        </Actions>
+    </MoPageMasthead>
+    <MoWorkbenchNavigation Label="@L["Workbench:Navigation"]" Compact="true">
+        <a href="@ReaderUrl" aria-current="@(!Files ? "page" : null)"><MoIcon Icon="@MoIcons.FileText" />@L["Workbench:Reader"]</a>
+        <a href="@FilesUrl" aria-current="@(Files ? "page" : null)"><MoIcon Icon="@MoIcons.FolderOpen" />@L["Workbench:Files"]
+            @if (Count is { } count) { <small class="log-route-count">@count</small> }
+        </a>
+    </MoWorkbenchNavigation>
+</div>
+
 @code {
     [Parameter] public bool Files { get; set; }
     [Parameter] public bool Following { get; set; }
     [Parameter] public int? Count { get; set; }
+    /// <summary>Gets the observed number of distinct directory groups, when available.</summary>
+    [Parameter] public int? FolderCount { get; set; }
+    /// <summary>Gets whether the latest attempted source or directory read failed.</summary>
+    [Parameter] public bool Failed { get; set; }
     [Parameter] public DateTimeOffset? ReadAt { get; set; }
     [Parameter, EditorRequired] public string Identity { get; set; } = string.Empty;
+    /// <summary>Gets a concise identity for the chip. The full identity is copied and shown in its tooltip.</summary>
+    [Parameter] public string? IdentityLabel { get; set; }
     [Parameter, EditorRequired] public string FilesUrl { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string ReaderUrl { get; set; } = string.Empty;
     [Parameter] public RenderFragment? Commands { get; set; }
-    private Task Copy() => JS.InvokeVoidAsync("navigator.clipboard.writeText",Identity).AsTask();
+    private Task Copy() => JS.InvokeVoidAsync("navigator.clipboard.writeText", Identity).AsTask();
 }

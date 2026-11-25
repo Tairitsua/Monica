@@ -1,75 +1,182 @@
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.UI.Shared.Components.Visual
-@using Monica.Logging.Services.Support
 @using Monica.Modules
 @inject Microsoft.Extensions.Options.IOptions<ModuleLoggingOption> Options
 @inject IStringLocalizer<LoggingResource> L
 
-<section class="lm-files-sig">
-    <div class="lm-decision"><div class="lm-decision-main"><p>@L["Design:FilesDisplayLabel"]</p>
-        @{ var parts = Size(Total).Split(' ',2); }
-        <MoDisplayValue Value="@(Available ? parts[0] : "—")" Unit="@(Available ? $"{parts[1]} · {L["Design:FilesDisplayUnit",Files.Count,_folders.Length]}" : null)" /></div>
-        <p class="lm-finding">@if (!Available) { @L["Design:FilesFindingUnavailable"] } else if (Files.Count == 0) { @L["Design:FilesFindingEmpty"] }
-            else { <span>@L["LogChart:Largest"]</span> <a class="mo-vl-link" href="@OpenUrl(_largest!.RelativePath)">@_largest.RelativePath</a> <b>@Size(_largest.Size)</b>
-                if (_near is { } near) { <a class="mo-vl-link" href="@OpenUrl(near.RelativePath)">@near.RelativePath</a> <span>@L["LogChart:LimitShare", (near.Size/(double)Options.Value.FileSizeLimitBytes!.Value).ToString("P1")]</span> } }</p></div>
-    <div class="lm-policy">
-        <div><small>@L["Design:FilesFactDir"]</small><code>@DirectoryName</code></div>
-        <div><small>@L["Design:FilesFactSink"]</small><code>@(DefaultWriter ? LogFileLocation.Resolve(Options.Value) : L["LogChart:NoDefaultWriter"].Value)</code></div>
-        <div><small>@L["Design:FilesFactPolicy"]</small><b>@(DefaultWriter && Options.Value.FileSizeLimitBytes is { } limit ? Size(limit) : "—")</b>
-            @if (DefaultWriter) { <small>@L["LogChart:Rolling",Options.Value.RollingInterval,Options.Value.RetainedFileCountLimit?.ToString() ?? "∞"]</small> }</div>
-        <div><small>@L["Design:FilesFactCurrent"]</small><code>@(Current ?? "—")</code><small>@L[Following ? "Design:FilesFactCurrentFollowing" : "Design:FilesFactCurrentPaused"]</small></div>
-    </div>
-    @if (Files.Count > 0)
-    {
-        <div class="lm-fp"><div class="lm-fp-head"><h2>@L["Design:FilesFootprintTitle"]</h2><p>@L["Design:FilesFootprintDesc"]</p></div>
-            <div class="lm-fp-bar" aria-label="@L["Design:FilesFootprintTitle"]">
-            @for (var i=0;i<_segments.Length;i++)
+<section class="lm-files-sig mo-vl-surface" aria-label="@L["Design:FilesFootprintTitle"]">
+    <div class="lm-decision">
+        <div class="lm-decision-main">
+            <p class="lm-fp-display-label">
+                <i class="mo-vl-swatch mo-vl-swatch--instrument @(Available ? "mo-vl-role--primary" : "mo-vl-role--error")" aria-hidden="true"></i>@L["Design:FilesDisplayLabel"]
+            </p>
+            @{ var parts = Size(_total).Split(' ', 2); }
+            <MoDisplayValue Compact="true" Value="@(Available ? parts[0] : "—")"
+                            Unit="@(Available ? $"{parts[1]} · {L["Design:FilesDisplayUnit", Files.Count, _folders.Length]}" : null)" />
+        </div>
+        <p class="lm-finding">
+            @if (!Available) { @L["Design:FilesFindingUnavailable"] }
+            else if (Files.Count == 0) { @L["Design:FilesFindingEmpty"] }
+            else
             {
-                var index=i; var f=_segments[i];
-                <a class="lm-fp-seg mo-vl-role--@SegmentRole(f) @(i%2==1 ? "is-alt" : null) @(Folder is not null && FolderOf(f)!=Folder ? "is-dimmed" : null)" href="@OpenUrl(f.RelativePath)" style="@FormattableString.Invariant($"width:{(Total>0 ? f.Size*100d/Total : 0):0.######}%")"
-                    @ref="_elements[index]" @onfocus="@(() => _active=f)" @onmouseenter="@(() => _active=f)" @onkeydown="@(e => Move(e,index))" aria-label="@($"{f.RelativePath} · {Size(f.Size)}")"></a>
-            }</div>
-            <div class="lm-fp-folders"><button class="lm-fp-folder mo-vl-role--primary @(Folder is null ? "is-active" : null)" @onclick="@(() => SelectFolder.InvokeAsync(null))">@L["Design:FilesFootprintAll"] <b>@Size(Total)</b></button>
-                @foreach (var group in _folders) { <button class="lm-fp-folder mo-vl-role--@FolderRole(group.Key) @(Folder == group.Key ? "is-active" : null)" @onclick="@(() => SelectFolder.InvokeAsync(Folder == group.Key ? null : group.Key))">@(group.Key == "" ? L["Design:FilesFootprintRoot"].Value : group.Key) <b>@Size(group.Sum(f => f.Size))</b> <small>@group.Count()</small></button> }</div>
-            <p class="lm-caption" aria-live="polite">@(_active is { } current ? L["Design:FilesFootprintReadout",current.RelativePath,Size(current.Size),current.Size,Total==0 ? "0" : (current.Size*100d/Total).ToString("0.##")] : L["Design:FilesFootprintHint"])</p>
+                <MoRichFinding Template="@L["LogChart:FootprintSummary"].Value" Values="@([Mark(Files.Count, MoVisualRole.Primary), Mark(_folders.Length, MoVisualRole.Neutral), Mark(Size(_total), MoVisualRole.Primary)])" />
+                @if (_writer is { } configuredFile)
+                {
+                    var use = SizeLimit is > 0 ? L["LogChart:FootprintWriterLimit", (configuredFile.Size / (double)SizeLimit.Value).ToString("P1")].Value : Size(configuredFile.Size);
+                    @(" ")<MoRichFinding Template="@L["LogChart:FootprintWriter"].Value" Values="@([FileLink(configuredFile, MoVisualRole.Primary), Mark(ModifiedAge(configuredFile), MoVisualRole.Info), Text(use)])" />
+                }
+                else if (_current is { } current)
+                {
+                    @(" ")<MoRichFinding Template="@L["LogChart:FootprintCurrent"].Value" Values="@([FileLink(current, MoVisualRole.Info), Mark(Size(current.Size), MoVisualRole.Info)])" />
+                }
+                else if (_largest is { } largest)
+                {
+                    @(" ")<MoRichFinding Template="@L["LogChart:FootprintLargest"].Value" Values="@([FileLink(largest, MoVisualRole.Primary), Mark(Size(largest.Size), MoVisualRole.Primary)])" />
+                }
+                @if (_near is { } near && SizeLimit is { } sizeLimit)
+                {
+                    @(" ")<MoRichFinding Template="@L["LogChart:FootprintNear"].Value" Values="@([FileLink(near, RoleFor(near, SizeLimit)), Mark(Size(near.Size), RoleFor(near, SizeLimit)), Text((near.Size / (double)sizeLimit).ToString("P1")), Text(Size(sizeLimit))])" />
+                }
+            }
+        </p>
+    </div>
+    <dl class="lm-policy">
+        <div>
+            <dt><i class="mo-vl-swatch mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFactDir"]</dt>
+            <dd>@Path.GetFileName(Path.TrimEndingDirectorySeparator(DirectoryName))</dd>
+            <small title="@DirectoryName">@DirectoryName</small>
+        </div>
+        <div>
+            <dt><i class="mo-vl-swatch mo-vl-role--info" aria-hidden="true"></i>@L["Design:FilesFactSink"]</dt>
+            <dd>@(DefaultSink ?? L["LogChart:NoDefaultWriter"].Value)</dd>
+            @if (_writer is { } writer) { <small>@Size(writer.Size)</small> }
+        </div>
+        <div>
+            <dt><i class="mo-vl-swatch @(_near is null ? "mo-vl-role--neutral" : "mo-vl-role--warning")" aria-hidden="true"></i>@L["Design:FilesFactPolicy"]</dt>
+            <dd>@(SizeLimit is { } limit ? Size(limit) : "—")</dd>
+            @if (DefaultSink is not null) { <small>@L["LogChart:Rolling", Options.Value.RollingInterval, Options.Value.RetainedFileCountLimit?.ToString() ?? "∞"]</small> }
+        </div>
+        <div>
+            <dt><i class="mo-vl-swatch @(Following ? "mo-vl-role--info" : "mo-vl-role--neutral")" aria-hidden="true"></i>@L["Design:FilesFactCurrent"]</dt>
+            <dd>@(Current is null ? "—" : Path.GetFileName(Current))</dd>
+            <small>@L[Following ? "Design:FilesFactCurrentFollowing" : "Design:FilesFactCurrentPaused"]</small>
+        </div>
+    </dl>
+    @if (_segments.Length > 0)
+    {
+        <div class="lm-fp">
+            <div class="lm-fp-head">
+                <div><h2>@L["Design:FilesFootprintTitle"]</h2><p>@L["Design:FilesFootprintDesc"]</p></div>
+                <div class="mo-vl-legend">
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:FootprintRootLegend"]</span>
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--info" aria-hidden="true"></i>@L["LogChart:FootprintOtherLegend"]</span>
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--secondary" aria-hidden="true"></i>@L["LogChart:FootprintArchiveLegend"]</span>
+                    @if (_near is not null) { <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--warning" aria-hidden="true"></i>@L["LogChart:FootprintLimitLegend"]</span> }
+                </div>
+            </div>
+            <div class="lm-fp-bar" role="group" aria-label="@L["Design:FilesFootprintTitle"]" @onpointerleave="@(() => _hover = null)">
+                @for (var i = 0; i < _segments.Length; i++)
+                {
+                    var index = i;
+                    var file = _segments[index];
+                    var role = RoleFor(file, SizeLimit);
+                    var alt = i % 2 == 1 && role is not (MoVisualRole.Warning or MoVisualRole.Error);
+                    var active = string.Equals(Current, file.RelativePath, StringComparison.Ordinal);
+                    <a @key="file.RelativePath" class="lm-fp-seg @role.ToCssClass() @(alt ? "is-alt" : null) @(active ? "is-current" : null) @(Folder is not null && FolderOf(file) != Folder ? "is-dimmed" : null)"
+                       href="@OpenUrl(file.RelativePath)" style="@FormattableString.Invariant($"flex-grow:{Math.Max(.25, Share(file.Size)):0.###}")"
+                       @ref="_elements[file.RelativePath]" tabindex="@(i == _focusIndex ? 0 : -1)"
+                       @onfocus="@(() => Focus(index, file))" @onblur="@(() => _focused = null)" @onpointerenter="@(() => _hover = file)" @onkeydown="@(args => Move(args, index))"
+                       aria-label="@Describe(file)"></a>
+                }
+            </div>
+            <div class="lm-fp-folders">
+                <button type="button" class="lm-fp-folder mo-vl-role--primary @(Folder is null ? "is-active" : null)"
+                        aria-pressed="@(Folder is null ? "true" : "false")" @onclick="@(() => SelectFolder.InvokeAsync(null))">
+                    <i class="mo-vl-swatch mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFootprintAll"] <b class="mo-vl-mono">@Size(_total)</b><small class="mo-vl-mono">(@Files.Count)</small>
+                </button>
+                @foreach (var group in _folders)
+                {
+                    var role = FolderRole(group.Key);
+                    var bytes = group.Sum(file => file.Size);
+                    <button type="button" class="lm-fp-folder @role.ToCssClass() @(Folder == group.Key ? "is-active" : null)"
+                            aria-pressed="@(Folder == group.Key ? "true" : "false")" @onclick="@(() => SelectFolder.InvokeAsync(Folder == group.Key ? null : group.Key))">
+                        <i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>
+                        @(group.Key == "" ? L["Design:FilesFootprintRoot"].Value : group.Key)<b class="mo-vl-mono">@Size(bytes)</b><small class="mo-vl-mono">@Share(bytes).ToString("0.0")% · @group.Count()</small>
+                    </button>
+                }
+            </div>
+            @{ var selected = _hover ?? _focused; }
+            <div class="lm-caption @(selected is not null ? "is-active" : null)" aria-live="polite">
+                <i class="lm-caption-dot" aria-hidden="true"></i><span class="lm-caption-text">@(selected is null ? L["Design:FilesFootprintHint"].Value : Describe(selected))</span>
+            </div>
         </div>
     }
 </section>
+
 @code {
-    [Parameter, EditorRequired] public IReadOnlyList<LogFileDescriptor> Files { get; set; }=[];
-    [Parameter, EditorRequired] public string DirectoryName { get; set; }=string.Empty;
-    [Parameter, EditorRequired] public Func<string,string> OpenUrl { get; set; }=default!;
+    [Parameter, EditorRequired] public IReadOnlyList<LogFileDescriptor> Files { get; set; } = [];
+    [Parameter, EditorRequired] public string DirectoryName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public Func<string, string> OpenUrl { get; set; } = default!;
     [Parameter] public string? Current { get; set; }
     [Parameter] public bool Following { get; set; }
     [Parameter] public bool Available { get; set; }
     [Parameter] public string? Folder { get; set; }
     [Parameter] public EventCallback<string?> SelectFolder { get; set; }
+    /// <summary>Gets the exact relative path of the configured default file sink within the inspected directory.</summary>
+    [Parameter] public string? DefaultSink { get; set; }
+    [Parameter] public string? DefaultSinkRelative { get; set; }
+    [Parameter, EditorRequired] public Func<LogFileDescriptor, string> ModifiedAge { get; set; } = default!;
+    /// <summary>Gets the configured file-size comparison limit. Null leaves policy comparisons unavailable.</summary>
+    [Parameter] public long? SizeLimit { get; set; }
+
     private static string Size(long value) => Pages.UILoggingFilesPage.FormatSize(value);
-    internal static string FolderOf(LogFileDescriptor f) => Path.GetDirectoryName(f.RelativePath)?.Replace('\\','/') ?? "";
-    private bool DefaultWriter => Options.Value.EnableFileSink && Options.Value.CustomLoggerFactory is null;
-    private long Total;
-    private IGrouping<string,LogFileDescriptor>[] _folders=[];
-    private LogFileDescriptor[] _segments=[];
-    private LogFileDescriptor? _active,_largest,_near;
-    private readonly Dictionary<int,ElementReference> _elements=[];
+    internal static string FolderOf(LogFileDescriptor file) => Path.GetDirectoryName(file.RelativePath)?.Replace('\\', '/') ?? "";
+    private long _total;
+    private int _focusIndex;
+    private IReadOnlyList<LogFileDescriptor>? _lastFiles;
+    private IGrouping<string, LogFileDescriptor>[] _folders = [];
+    private LogFileDescriptor[] _segments = [];
+    private LogFileDescriptor? _hover, _focused, _current, _writer, _largest, _near;
+    private readonly Dictionary<string, ElementReference> _elements = new(StringComparer.Ordinal);
     protected override void OnParametersSet()
     {
-        Total=Files.Sum(f=>f.Size); _folders=Files.GroupBy(FolderOf).OrderBy(g=>g.Key,StringComparer.Ordinal).ToArray();
-        _segments=_folders.SelectMany(g=>g.OrderByDescending(f=>f.Size)).Where(f=>f.Size>0).ToArray();
-        _largest=Files.MaxBy(f=>f.Size); _near=_largest is { } f && NearLimit(f) ? f : null;
-        _active=Files.FirstOrDefault(f=>f.RelativePath==_active?.RelativePath);
+        _current = Files.FirstOrDefault(file => string.Equals(file.RelativePath, Current, StringComparison.Ordinal));
+        _writer = Files.FirstOrDefault(file => string.Equals(file.RelativePath, DefaultSinkRelative, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+        if (ReferenceEquals(_lastFiles, Files)) return;
+        _lastFiles = Files;
+        _total = Files.Sum(file => file.Size);
+        _folders = Files.GroupBy(FolderOf).OrderBy(group => group.Key, StringComparer.Ordinal).ToArray();
+        _segments = _folders.SelectMany(group => group.OrderByDescending(file => file.Size)).Where(file => file.Size > 0).ToArray();
+        _largest = Files.MaxBy(file => file.Size);
+        _near = _largest is { } largest && NearLimit(largest, SizeLimit) ? largest : null;
+        _focusIndex = Math.Clamp(_focusIndex, 0, Math.Max(0, _segments.Length - 1));
+        _hover = null;
+        _focused = null;
+        var names = _segments.Select(file => file.RelativePath).ToHashSet(StringComparer.Ordinal);
+        foreach (var name in _elements.Keys.Where(name => !names.Contains(name)).ToArray()) _elements.Remove(name);
     }
-    private bool NearLimit(LogFileDescriptor f) => DefaultWriter && Options.Value.FileSizeLimitBytes is >0 and var limit && f.Size>=limit*.75;
-    private string SegmentRole(LogFileDescriptor f) => NearLimit(f) ? "warning" : FolderRole(FolderOf(f));
-    private static string FolderRole(string folder) => folder switch
+    internal static bool NearLimit(LogFileDescriptor file, long? limit) => limit is > 0 && file.Size >= limit * .75;
+    internal static MoVisualRole RoleFor(LogFileDescriptor file, long? limit) =>
+        limit is > 0 && file.Size >= limit * .95 ? MoVisualRole.Error :
+        NearLimit(file, limit) ? MoVisualRole.Warning : FolderRole(FolderOf(file));
+    private static MoVisualRole FolderRole(string folder) => folder.Length == 0 ? MoVisualRole.Primary :
+        (folder.Equals("archive", StringComparison.OrdinalIgnoreCase) || folder.StartsWith("archive/", StringComparison.OrdinalIgnoreCase)) ? MoVisualRole.Secondary : MoVisualRole.Info;
+
+    private double Share(long bytes) => _total > 0 ? bytes * 100d / _total : 0;
+    private string Describe(LogFileDescriptor file) => L["Design:FilesFootprintReadout", file.RelativePath, Size(file.Size), file.Size.ToString("N0"), Share(file.Size).ToString("0.0")];
+    private void Focus(int index, LogFileDescriptor file) { _focusIndex = index; _focused = file; }
+    private async Task Move(KeyboardEventArgs args, int index)
     {
-        "" => "primary",
-        var name when name.StartsWith("archive",StringComparison.OrdinalIgnoreCase) => "neutral",
-        _ => "info"
-    };
-    private async Task Move(KeyboardEventArgs e,int i)
-    {
-        var target=e.Key switch { "ArrowLeft" => Math.Max(0,i-1),"ArrowRight" => Math.Min(_segments.Length-1,i+1),"Home"=>0,"End"=>_segments.Length-1,_=>i };
-        if (i!=target) await _elements[target].FocusAsync();
+        if (args.Key == "Escape") { _hover = null; _focused = null; }
+        var target = args.Key switch
+        {
+            "ArrowLeft" => Math.Max(0, index - 1), "ArrowRight" => Math.Min(_segments.Length - 1, index + 1),
+            "Home" => 0, "End" => _segments.Length - 1, _ => index
+        };
+        if (index != target && _elements.TryGetValue(_segments[target].RelativePath, out var element)) await element.FocusAsync();
     }
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="@role">@value</MoValueMark>;
+    private static RenderFragment Text(string value) => builder => builder.AddContent(0, value);
+    private RenderFragment FileLink(LogFileDescriptor file, MoVisualRole role) =>
+        @<MoValueMark Href="@OpenUrl(file.RelativePath)" Role="@role"><code>@file.RelativePath</code></MoValueMark>;
 }

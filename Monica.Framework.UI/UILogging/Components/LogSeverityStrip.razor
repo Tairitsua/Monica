@@ -2,124 +2,392 @@
 @using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<LoggingResource> L
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
-<section class="lm-sig">
-    <header class="lm-source-bar"><MoIcon Icon="@MoIcons.FileText" Size="1rem" /><code>@Snapshot.Source?.RelativePath</code><span>@L["Design:SourceEncoding"]</span>
-        <code>@L["LogChart:Generation",Snapshot.Source?.Generation ?? "—"]</code><a href="@FilesUrl">@L["Design:SwitchFile"] ↗</a></header>
-    <div class="lm-decision"><div class="lm-decision-main @(Attention > 0 ? "lm-alert" : null)"><p>@L["Design:DisplayLabel"]</p>
-        <MoDisplayValue Class="lm-attention" Value="@(_available ? Attention.ToString("N0") : "—")" Unit="@L["Design:DisplayUnit",Snapshot.RetainedLines.Count]" />
-        <div class="lm-pills">@foreach (var severity in Levels) { <MoFilterChip Label="@L[$"Workbench:Levels:{severity}"]" ShowDot="true" Pill="true" Role="@Role(severity)" Count="@_counts.GetValueOrDefault(severity)" Selected="@(Snapshot.Filter.Severity == severity)" SelectedChanged="@(() => OnSeverity.InvokeAsync(severity))" /> }</div>
-    </div><p class="lm-finding">
-        @if (!_available) { @L["Design:FindingMissing"] }
-        else if (_buckets.Length == 0) { @L["Design:FindingEmpty"] }
-        else {
-            @L["LogChart:Summary",Snapshot.FirstRetainedLineNumber!,Snapshot.LastRetainedLineNumber!,_counts.GetValueOrDefault(LogSeverity.Warning),_counts.GetValueOrDefault(LogSeverity.Unknown)]
-            @if (Attention > 0 && _peakBucket is { } peak) { <button type="button" class="mo-vl-link" @onclick="@(() => OnSpan.InvokeAsync($"{peak.First}-{peak.Last}"))">@L["LogChart:Peak",peak.First,peak.Last,peak.Errors]</button> }
-            @if (_lastError is { } error) { <button class="mo-vl-link" @onclick="@(() => OnInspect.InvokeAsync(error))">@L["LogChart:Latest",error.AbsoluteLineNumber!]</button> }
-            @if (Attention == 0) { <strong>@L["LogChart:Calm"]</strong> }
-        }</p></div>
+
+<section class="lm-sig mo-vl-surface">
+    <header class="lm-source-bar">
+        <div class="lm-source-path">
+            <MoIcon Icon="@MoIcons.FileText" Size="15px" />
+            <code>@Snapshot.Source?.RelativePath</code><i class="mo-vl-sep" aria-hidden="true"></i><span class="lm-source-tag">@L["Design:SourceEncoding"]</span>
+            @if (Snapshot.Source is { } source)
+            {
+                <i class="mo-vl-sep" aria-hidden="true"></i><code class="lm-source-gen">@L["LogChart:Generation", source.Generation]</code>
+            }
+        </div>
+        <a class="lm-switch-link" href="@FilesUrl"><MoIcon Icon="@MoIcons.FolderOpen" Size="15px" />@L["Design:SwitchFile"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="13px" /></a>
+    </header>
+    <div class="lm-decision">
+        <div class="lm-decision-main @(Attention > 0 ? "lm-alert" : null)">
+            <p class="lm-display-label">
+                <i class="mo-vl-swatch mo-vl-swatch--instrument @(_available ? Attention == 0 ? "mo-vl-role--success" : "mo-vl-role--error" : "mo-vl-role--neutral")" aria-hidden="true"></i>
+                @L["Design:DisplayLabel"]
+                @if (_available && _buckets.Length > 0 && Attention == 0)
+                {
+                    <span class="mo-vl-status mo-vl-status--pill mo-vl-role--success"><i class="mo-vl-status-dot" aria-hidden="true"></i>@L["LogChart:Calm"]</span>
+                }
+            </p>
+            <MoDisplayValue Compact="true" Class="lm-attention" Value="@(_available ? Attention.ToString("N0") : "—")" Unit="@L["Design:DisplayUnit", Snapshot.RetainedLines.Count]" />
+            @if (_available)
+            {
+                <div class="lm-reasons" role="group" aria-label="@L["Design:StripAllLevels"]">
+                    @foreach (var severity in Levels)
+                    {
+                        var count = Count(severity);
+                        var selected = Snapshot.Filter.Severity == severity;
+                        <button class="lm-reason @Role(severity).ToCssClass() @(selected ? "is-active" : null) @(count == 0 ? "is-zero" : null)" type="button"
+                                aria-pressed="@(selected ? "true" : "false")" @onclick="@(() => OnSeverity.InvokeAsync(severity))">
+                            <i class="mo-vl-swatch @(severity == LogSeverity.Critical ? "mo-vl-swatch--diamond" : null) @(count == 0 ? "mo-vl-swatch--empty" : null) @Role(severity).ToCssClass()" aria-hidden="true"></i>
+                            <span>@L[$"Workbench:Levels:{severity}"]</span><b class="mo-vl-mono">@count.ToString("N0")</b>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+        <p class="lm-finding">
+            @if (!_available) { @L["Design:FindingMissing"] }
+            else if (_buckets.Length == 0) { @L["Design:FindingEmpty"] }
+            else
+            {
+                <MoRichFinding Template="@L["LogChart:FindingCounts"].Value" Values="@([
+                    Text(LineSpan(_buckets[0].First, _buckets[^1].Last)),
+                    Mark(L["LogChart:CriticalCount", Count(LogSeverity.Critical)].Value, MoVisualRole.Error),
+                    Mark(L["LogChart:ErrorCount", Count(LogSeverity.Error)].Value, MoVisualRole.Error),
+                    Mark(L["LogChart:WarningCount", Count(LogSeverity.Warning)].Value, MoVisualRole.Warning),
+                    Mark(L["LogChart:UnparsedCount", Count(LogSeverity.Unknown)].Value, MoVisualRole.Secondary)])" />
+                @if (Attention > 0 && _peakBucket is { } peak)
+                {
+                    @(" ")<MoRichFinding Template="@L["LogChart:FindingPeak"].Value" Values="@([PeakLink(peak), Mark(peak.Errors, MoVisualRole.Error)])" />
+                }
+                @if (_lastError?.AbsoluteLineNumber is { } number)
+                {
+                    @(" ")<MoRichFinding Template="@L["LogChart:FindingLatest"].Value" Values="@([LatestLink(number)])" />
+                }
+            }
+        </p>
+    </div>
+
     @if (_buckets.Length > 0)
     {
-        <div class="lm-tape"><div class="lm-tape-head"><strong>@L["Design:TapeTitle"]</strong><span>@L["Design:TapeRetained",Snapshot.FirstRetainedLineNumber!,Snapshot.LastRetainedLineNumber!,Snapshot.TotalStoredLines]</span>
-            <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(Snapshot.FirstRetainedLineNumber <= 1 || Frozen)" OnClick="@(() => Earlier.InvokeAsync())">@L["Workbench:Viewer:Earlier"]</MudButton></div>
-            <div class="lm-extent">
-                @foreach (var extent in _extents) { <i style="@RangeStyle(extent.First,extent.Last)"></i> }
-                @if (Visible.Count > 0 && Visible[0].AbsoluteLineNumber is { } from && Visible[^1].AbsoluteLineNumber is { } to)
-                { <span class="lm-tape-vp" style="@RangeStyle(from,to)"></span> }
-                @foreach (var bucket in _buckets.Where(b => b.Errors > 0 || b.Warning > 0))
-                { <b class="lm-tick @(bucket.Errors > 0 ? "err" : "warn")" style="left:@Percent(bucket.First-1,Snapshot.TotalFileLineCount)"></b> }
-            </div><div class="lm-tape-axis"><span>L1</span><span>L@(Snapshot.TotalFileLineCount)</span></div>
-        </div>
-        <div class="lm-strip"><header><h2>@L["Design:StripTitle"]</h2><p>@L["Design:StripDesc"]</p></header>
-            <div class="lm-legend">@foreach (var key in Legend) { <span>@L[key]</span> }<code>@L["Design:StripPer",_size]</code></div>
-            <div class="lm-plot" @onpointercancel="@(() => _start = null)" @onpointerleave="@(() => _start = null)">
-                <div class="lm-labels">@foreach (var (name,peak) in new[] {("Design:StripLaneError",_errorMax),("Design:StripLaneWarn",_warnMax),("Design:StripLaneNormal",_normalMax)})
-                    { <div><b>@L[name]</b><small>@L["LogChart:BucketMax",peak]</small></div> }
-                    @if (Snapshot.Filter.HasKeyword) { <div><b>@L["LogChart:Matches"]</b><small>@L["LogChart:BucketMax",_matchMax]</small></div> }</div>
-                <div class="lm-buckets">@for (var i = 0; i < _buckets.Length; i++)
-                {
-                    var index = i; var b = _buckets[i];
-                    <button type="button" class="lm-bucket @(_selected == index ? "is-current" : null)" @ref="_elements[index]" tabindex="@(index == _selected ? 0 : -1)" aria-label="@L["LogChart:Bucket",b.First,b.Last,b.Errors,b.Warning,b.Normal]"
-                        @onfocus="@(() => _selected=index)" @onpointerenter="@(() => _selected=index)" @onpointerdown="@(() => _start = index)" @onpointerup="@(() => EndBrush(index))" @onkeydown="@(e => Key(e,index))" @onclick="@(e => Activate(e,index))">
-                        <span class="lm-lane err"><i style="height:@Percent(b.Errors,_errorMax)">@if (b.Critical > 0) { <em>◆</em> }</i></span>
-                        <span class="lm-lane warn"><i style="height:@Percent(b.Warning,_warnMax)"></i></span>
-                        <span class="lm-lane normal"><i style="height:@Percent(b.Normal,_normalMax)"><u style="height:@Percent(b.Unknown,b.Normal)"></u></i></span>
-                        @if (Snapshot.Filter.HasKeyword) { <span class="lm-lane matches"><i style="height:@Percent(b.Matches,_matchMax)"></i></span> }
-                    </button>
-                }</div>
+        var first = _buckets[0].First;
+        var last = _buckets[^1].Last;
+        var rawCount = Snapshot.TotalFileLineCount;
+        var before = Math.Max(0, first - 1);
+        var after = Math.Max(0, rawCount - last);
+        var unretainedInside = last - first + 1 - Snapshot.TotalStoredLines;
+        var retainedPct = Math.Clamp((last - first + 1d) / Math.Max(1, rawCount) * 100, 0, 100);
+        if (before > 0) retainedPct = Math.Max(24, retainedPct);
+        var beforePct = (100 - retainedPct) * before / Math.Max(1d, before + after);
+        var displayed = _hover ?? _focus;
+        var spanStart = Range is { } selected ? Array.FindIndex(_buckets, bucket => bucket.Last >= selected.From) : -1;
+        var spanEnd = Range is { } selectedRange ? Array.FindLastIndex(_buckets, bucket => bucket.First <= selectedRange.To) : -1;
+        <div class="lm-seismo">
+            <div class="lm-tape">
+                <div class="lm-tape-head">
+                    <strong class="lm-tape-title">@L["Design:TapeTitle"]</strong>
+                    <div class="lm-tape-meta">
+                        @if (before == 0 && after == 0 && unretainedInside == 0)
+                        {
+                            <span>@L["LogChart:TapeFull", rawCount.ToString("N0")]</span>
+                        }
+                        else
+                        {
+                            @if (before > 0) { <span>@L["LogChart:TapeUnretained", before.ToString("N0")]</span> }
+                            <span class="lm-tape-ret-txt">@L["Design:TapeRetained", first.ToString("N0"), last.ToString("N0"), Snapshot.TotalStoredLines.ToString("N0")]</span>
+                            @if (after + unretainedInside > 0) { <span>@L["LogChart:TapeGaps", (after + unretainedInside).ToString("N0")]</span> }
+                        }
+                    </div>
+                    <MudButton Class="lm-tape-btn" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.ChevronLeft" Disabled="@(first <= 1 || Frozen)"
+                               OnClick="@(() => Earlier.InvokeAsync())">@L[Frozen ? "LogChart:TapeFrozen" : first <= 1 ? "LogChart:TapeNoEarlier" : "LogChart:TapeLoadEarlier"]</MudButton>
+                </div>
+                <div class="lm-tape-bar" aria-hidden="true">
+                    <div class="lm-tape-window" style="@Geometry(beforePct, retainedPct)">
+                        @foreach (var extent in _extents)
+                        {
+                            <span class="lm-tape-seg is-retained" style="@FileRange(extent.First, extent.Last, first, last)"></span>
+                        }
+                        @if (Visible.Count > 0 && Visible[0].AbsoluteLineNumber is { } from && Visible[^1].AbsoluteLineNumber is { } to)
+                        {
+                            <span class="lm-tape-vp" style="@FileRange(from, to, first, last, 4)"></span>
+                        }
+                        @foreach (var bucket in _buckets.Where(bucket => bucket.Errors > 0 || bucket.Warning > 0))
+                        {
+                            <i class="lm-tape-tick @(bucket.Errors > 0 ? "is-error" : "is-warn")" style="left:@Fraction(bucket.First - first, last - first)"></i>
+                        }
+                    </div>
+                </div>
+                <div class="lm-tape-axis mo-vl-mono">
+                    <span>L1</span>
+                    @if (before > 0 && beforePct is > 8 and < 86) { <span class="lm-tape-mark" style="left:@Percent(beforePct)">L@(first.ToString("N0"))</span> }
+                    <span>L@(rawCount.ToString("N0"))</span>
+                </div>
             </div>
-            <div class="lm-chart-axis">@foreach (var i in new[] {0, _buckets.Length/3, 2*_buckets.Length/3, _buckets.Length-1}.Distinct())
-                { <span>L@(_buckets[i].First)<small>@Time.FormatTime(_buckets[i].Timestamp)</small></span> }</div>
-            @{ var selected = _buckets[_selected]; }
-            <div class="lm-caption" aria-live="polite"><span>@L["LogChart:Bucket",selected.First,selected.Last,selected.Errors,selected.Warning,selected.Normal]</span>
-                <button @onclick="@(() => _table = !_table)" aria-expanded="@_table">@L[_table ? "Design:StripHideTable" : "Design:StripShowTable"]</button></div>
-            @if (_table) { <div class="lm-bucket-table"><table><thead><tr>@foreach (var column in Columns) { <th>@L[column]</th> }</tr></thead><tbody>
-                @foreach (var b in _buckets) { <tr><td><button class="mo-vl-link" @onclick="@(() => Jump.InvokeAsync(b.First))">L@(b.First)–L@(b.Last)</button></td><td>@b.Critical</td><td>@(b.Errors-b.Critical)</td><td>@b.Warning</td><td>@b.Unknown</td><td>@(b.Normal-b.Unknown)</td><td>@b.Matches</td></tr> }
-            </tbody></table></div> }
+
+            <div class="lm-strip">
+                <header class="lm-strip-head">
+                    <div class="lm-strip-title"><h2>@L["Design:StripTitle"]</h2><p>@L["Design:StripDesc"]</p></div>
+                    <div class="lm-strip-right">
+                        <div class="mo-vl-legend">
+                            @foreach (var (key, role, diamond) in Legend)
+                            {
+                                <span><i class="mo-vl-swatch @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @role.ToCssClass()" aria-hidden="true"></i>@L[key]</span>
+                            }
+                            @if (Snapshot.Filter.HasKeyword) { <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:Matches"]</span> }
+                        </div>
+                        <code class="lm-per">@L["Design:StripPer", _size]</code>
+                    </div>
+                </header>
+                <div class="lm-plot-grid">
+                    <div class="lm-labels" aria-hidden="true">
+                        @LaneLabel("Design:StripLaneError", Attention, _errorMax, "err", MoVisualRole.Error)
+                        @LaneLabel("Design:StripLaneWarn", Count(LogSeverity.Warning), _warnMax, "warn", MoVisualRole.Warning)
+                        @LaneLabel("Design:StripLaneNormal", Snapshot.TotalStoredLines - Attention - Count(LogSeverity.Warning), _normalMax, "normal", MoVisualRole.Info)
+                        @if (Snapshot.Filter.HasKeyword) { @LaneLabel("LogChart:Matches", _buckets.Sum(bucket => bucket.Matches), null, "matches", MoVisualRole.Primary) }
+                    </div>
+                    <div class="lm-plot" @onpointerleave="ResetPointer" @onpointercancel="ResetPointer">
+                        @if (spanStart >= 0 && spanEnd >= spanStart)
+                        {
+                            <span class="lm-span-lens" style="@Slots(spanStart, spanEnd)" aria-hidden="true"></span>
+                        }
+                        @if (displayed is { } hoverIndex)
+                        {
+                            <span class="lm-hover-band" style="@Slots(hoverIndex, hoverIndex)" aria-hidden="true"></span>
+                        }
+                        @if (_start is { } dragStart && _hover is { } dragEnd && dragStart != dragEnd)
+                        {
+                            <span class="lm-brush" style="@Slots(Math.Min(dragStart, dragEnd), Math.Max(dragStart, dragEnd))" aria-hidden="true"></span>
+                        }
+                        <div class="lm-lanes" aria-hidden="true">
+                            @Lane("err", MoVisualRole.Error, 22, _errorMax, bucket => bucket.Errors)
+                            @Lane("warn", MoVisualRole.Warning, 18, _warnMax, bucket => bucket.Warning)
+                            @Lane("normal", MoVisualRole.Info, 22, _normalMax, bucket => bucket.Normal)
+                            @if (Snapshot.Filter.HasKeyword)
+                            {
+                                <div class="lm-art matches">
+                                    @for (var i = 0; i < _buckets.Length; i++)
+                                    {
+                                        var bucket = _buckets[i];
+                                        if (bucket.Matches > 0)
+                                        {
+                                            var size = 5 + 7d * bucket.Matches / _matchMax;
+                                            <i class="lm-match-dot" style="left:@BucketCenter(i);width:@Pixels(size);height:@Pixels(size)"></i>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <div class="lm-buckets" role="group" aria-label="@L["Design:StripTitle"]">
+                            @for (var i = 0; i < _buckets.Length; i++)
+                            {
+                                var index = i;
+                                var bucket = _buckets[i];
+                                <button type="button" class="lm-bucket" @ref="_elements[index]"
+                                        tabindex="@(index == (_focus ?? _buckets.Length - 1) ? 0 : -1)" aria-label="@BucketDescription(bucket)"
+                                        @onfocus="@(() => _focus = index)" @onblur="@(() => _focus = null)" @onpointerenter="@(() => _hover = index)"
+                                        @onpointerdown="@(args => StartBrush(args, index))" @onpointerup="@(() => EndBrush(index))"
+                                        @onkeydown="@(args => Key(args, index))" @onclick="@(args => Activate(args, index))"></button>
+                            }
+                        </div>
+                    </div>
+                    <span></span>
+                    <div class="lm-axis" aria-hidden="true">
+                        @foreach (var i in new[] { 0, _buckets.Length / 3, 2 * _buckets.Length / 3, _buckets.Length - 1 }.Distinct())
+                        {
+                            var start = i == 0;
+                            var end = i == _buckets.Length - 1;
+                            var timestamp = end ? _buckets[i].LastTime : _buckets[i].FirstTime;
+                            <span class="lm-tick @(start ? "is-start" : end ? "is-end" : null)" style="left:@(start ? "0%" : end ? "100%" : BucketCenter(i))">
+                                <b>L@(end ? _buckets[i].Last.ToString("N0") : _buckets[i].First.ToString("N0"))</b>
+                                @if (timestamp is not null) { <small>@Time.FormatTime(timestamp)</small> }
+                            </span>
+                        }
+                    </div>
+                </div>
+                <div class="lm-caption @(displayed is not null ? "is-active" : null)" aria-live="polite">
+                    <i class="lm-caption-dot" aria-hidden="true"></i>
+                    <span class="lm-caption-text @(displayed is not null ? "mo-vl-mono" : null)">@(displayed is { } active ? BucketDescription(_buckets[active]) : L["LogChart:StripHint"].Value)</span>
+                    <button type="button" class="lm-btoggle" @onclick="@(() => _table = !_table)" aria-expanded="@(_table ? "true" : "false")">
+                        <MoIcon Icon="@MoIcons.Table" Size="14px" />@L[_table ? "Design:StripHideTable" : "Design:StripShowTable"]
+                    </button>
+                </div>
+                @if (_table)
+                {
+                    <div class="lm-btable-wrap">
+                        <table class="lm-btable">
+                            <thead><tr><th scope="col">@L["Design:StripColLines"]</th><th scope="col">@L["LogChart:Times"]</th>
+                                @foreach (var key in Columns) { <th scope="col" class="is-num">@L[key]</th> }
+                                @if (Snapshot.Filter.HasKeyword) { <th scope="col" class="is-num">@L["LogChart:Matches"]</th> }
+                            </tr></thead>
+                            <tbody>
+                                @foreach (var bucket in _buckets)
+                                {
+                                    <tr><td><button class="mo-vl-link" @onclick="@(() => Jump.InvokeAsync(bucket.First))">@LineSpan(bucket.First, bucket.Last)</button></td>
+                                        <td>@BucketTime(bucket)</td>
+                                        <td class="is-num lm-t-err">@bucket.Critical</td><td class="is-num lm-t-err">@(bucket.Errors - bucket.Critical)</td>
+                                        <td class="is-num lm-t-warn">@bucket.Warning</td><td class="is-num">@bucket.Unknown</td>
+                                        <td class="is-num">@(bucket.Normal - bucket.Unknown)</td><td class="is-num">@(bucket.Errors + bucket.Warning + bucket.Normal)</td>
+                                        @if (Snapshot.Filter.HasKeyword) { <td class="is-num">@bucket.Matches</td> }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
         </div>
     }
 </section>
+
 @code {
     [Parameter, EditorRequired] public ScreenLogSnapshot Snapshot { get; set; } = default!;
     [Parameter] public IReadOnlyList<LogLineViewModel> Visible { get; set; } = [];
     [Parameter] public string? FilesUrl { get; set; }
     [Parameter] public bool Frozen { get; set; }
+    /// <summary>Gets the active inclusive physical-line selection, if any.</summary>
+    [Parameter] public (long From, long To)? Range { get; set; }
     [Parameter] public EventCallback<LogSeverity> OnSeverity { get; set; }
-    [Parameter] public EventCallback<string> OnSpan { get; set; }
+    [Parameter] public EventCallback<string?> OnSpan { get; set; }
     [Parameter] public EventCallback<LogLineViewModel> OnInspect { get; set; }
     [Parameter] public EventCallback<long> Jump { get; set; }
     [Parameter] public EventCallback Earlier { get; set; }
-    internal static readonly LogSeverity[] Levels = [LogSeverity.Critical,LogSeverity.Error,LogSeverity.Warning,LogSeverity.Information,LogSeverity.Debug,LogSeverity.Trace,LogSeverity.Unknown];
-    private static readonly string[] Legend = ["Design:StripLegendCrit","Design:StripLegendErr","Design:StripLegendWarn","Design:StripLegendInfo","Design:StripLegendUnparsed"];
-    private static readonly string[] Columns = ["Design:StripColLines","Design:StripColCrit","Design:StripColErr","Design:StripColWarn","Design:StripColUnparsed","Design:StripColNormal","LogChart:Matches"];
-    internal static MoVisualRole Role(LogSeverity level) => level switch { LogSeverity.Critical or LogSeverity.Error => MoVisualRole.Error, LogSeverity.Warning => MoVisualRole.Warning, LogSeverity.Information => MoVisualRole.Info, LogSeverity.Debug => MoVisualRole.Primary, _ => MoVisualRole.Neutral };
-    private sealed record Bucket(long First,long Last,int Critical,int Errors,int Warning,int Normal,int Unknown,int Matches,DateTimeOffset? Timestamp);
+
+    internal static readonly LogSeverity[] Levels = [LogSeverity.Critical, LogSeverity.Error, LogSeverity.Warning, LogSeverity.Information, LogSeverity.Debug, LogSeverity.Trace, LogSeverity.Unknown];
+    private static readonly (string Key, MoVisualRole Role, bool Diamond)[] Legend = [
+        ("Design:StripLegendCrit", MoVisualRole.Error, true), ("Design:StripLegendErr", MoVisualRole.Error, false),
+        ("Design:StripLegendWarn", MoVisualRole.Warning, false), ("Design:StripLegendInfo", MoVisualRole.Info, false),
+        ("Design:StripLegendUnparsed", MoVisualRole.Secondary, false)];
+    private static readonly string[] Columns = ["Design:StripColCrit", "Design:StripColErr", "Design:StripColWarn", "Design:StripColUnparsed", "Design:StripColNormal", "LogChart:Total"];
+    internal static MoVisualRole Role(LogSeverity level) => level switch
+    {
+        LogSeverity.Critical or LogSeverity.Error => MoVisualRole.Error,
+        LogSeverity.Warning => MoVisualRole.Warning,
+        LogSeverity.Information => MoVisualRole.Info,
+        LogSeverity.Debug => MoVisualRole.Primary,
+        LogSeverity.Unknown => MoVisualRole.Secondary,
+        _ => MoVisualRole.Neutral
+    };
+    private sealed record Bucket(long First, long Last, int Critical, int Errors, int Warning, int Normal, int Unknown, int Matches,
+        DateTimeOffset? FirstTime, DateTimeOffset? LastTime);
     private Bucket[] _buckets = [];
     private readonly List<(long First,long Last)> _extents = [];
-    private readonly Dictionary<int,ElementReference> _elements = [];
+    private readonly Dictionary<int, ElementReference> _elements = [];
     private Dictionary<LogSeverity,int> _counts = [];
     private LogLineViewModel? _lastError;
     private Bucket? _peakBucket;
-    private int _selected, _size, _errorMax, _warnMax, _normalMax, _matchMax;
-    private int? _start;
+    private int _size, _errorMax, _warnMax, _normalMax, _matchMax;
+    private int? _start, _hover, _focus;
     private bool _table, _brushed;
     private bool _available => Snapshot.FileExists || Snapshot.TotalStoredLines > 0;
-    private int Attention => _counts.GetValueOrDefault(LogSeverity.Error)+_counts.GetValueOrDefault(LogSeverity.Critical);
+    private int Attention => Count(LogSeverity.Error) + Count(LogSeverity.Critical);
     private ScreenLogSnapshot? _last;
+
     protected override void OnParametersSet()
     {
-        if (ReferenceEquals(_last,Snapshot)) return;
-        _last=Snapshot;
-        var retained = Snapshot.RetainedLines;
-        _counts = retained.CountBy(l => l.Severity).ToDictionary();
-        _lastError = retained.LastOrDefault(l => l.Severity is LogSeverity.Critical or LogSeverity.Error);
-        _size=Math.Max(1,(int)Math.Ceiling(retained.Count/40d));
-        _buckets=retained.Chunk(_size).Select(lines => {
-            var c=lines.CountBy(l => l.Severity).ToDictionary();
-            var errors=c.GetValueOrDefault(LogSeverity.Error)+c.GetValueOrDefault(LogSeverity.Critical);
-            var warnings=c.GetValueOrDefault(LogSeverity.Warning);
-            return new Bucket(lines[0].AbsoluteLineNumber!.Value,lines[^1].AbsoluteLineNumber!.Value,c.GetValueOrDefault(LogSeverity.Critical),errors,warnings,lines.Length-errors-warnings,c.GetValueOrDefault(LogSeverity.Unknown),lines.Count(l => l.IsMatch),lines.FirstOrDefault(l => l.Timestamp.HasValue)?.Timestamp);
+        if (ReferenceEquals(_last, Snapshot)) return;
+        var boundaryChanged = !Equals(_last?.Source, Snapshot.Source) ||
+            _last?.FirstRetainedLineNumber != Snapshot.FirstRetainedLineNumber || _last?.LastRetainedLineNumber != Snapshot.LastRetainedLineNumber;
+        if (boundaryChanged) { ResetPointer(); _focus = null; }
+        _last = Snapshot;
+        var retained = Snapshot.RetainedLines.Where(line => line.AbsoluteLineNumber.HasValue).ToArray();
+        _counts = retained.CountBy(line => line.Severity).ToDictionary();
+        _lastError = retained.LastOrDefault(line => line.Severity is LogSeverity.Critical or LogSeverity.Error);
+        _size = Math.Max(1, (int)Math.Ceiling(retained.Length / 40d));
+        _buckets = retained.Chunk(_size).Select(lines =>
+        {
+            var counts = lines.CountBy(line => line.Severity).ToDictionary();
+            var critical = counts.GetValueOrDefault(LogSeverity.Critical);
+            var errors = critical + counts.GetValueOrDefault(LogSeverity.Error);
+            var warnings = counts.GetValueOrDefault(LogSeverity.Warning);
+            return new Bucket(lines[0].AbsoluteLineNumber!.Value, lines[^1].AbsoluteLineNumber!.Value, critical, errors, warnings,
+                lines.Length - errors - warnings, counts.GetValueOrDefault(LogSeverity.Unknown), lines.Count(line => line.IsMatch),
+                lines.FirstOrDefault(line => line.Timestamp.HasValue)?.Timestamp, lines.LastOrDefault(line => line.Timestamp.HasValue)?.Timestamp);
         }).ToArray();
         _extents.Clear();
-        foreach (var line in retained) { if (line.AbsoluteLineNumber is not { } number) continue;
-            if (_extents.Count>0 && number-_extents[^1].Last==1) _extents[^1]=(_extents[^1].First,number); else _extents.Add((number,number)); }
-        _errorMax=_buckets.Select(b=>b.Errors).DefaultIfEmpty().Max(); _warnMax=_buckets.Select(b=>b.Warning).DefaultIfEmpty().Max(); _normalMax=_buckets.Select(b=>b.Normal).DefaultIfEmpty().Max();
-        _matchMax=_buckets.Select(b=>b.Matches).DefaultIfEmpty().Max();
-        _peakBucket=_buckets.MaxBy(b=>b.Errors); _selected=Math.Clamp(_selected,0,Math.Max(0,_buckets.Length-1));
+        foreach (var line in retained)
+        {
+            var number = line.AbsoluteLineNumber!.Value;
+            if (_extents.Count > 0 && number - _extents[^1].Last == 1) _extents[^1] = (_extents[^1].First, number);
+            else _extents.Add((number, number));
+        }
+        _errorMax = _buckets.Select(bucket => bucket.Errors).DefaultIfEmpty().Max();
+        _warnMax = _buckets.Select(bucket => bucket.Warning).DefaultIfEmpty().Max();
+        _normalMax = _buckets.Select(bucket => bucket.Normal).DefaultIfEmpty().Max();
+        _matchMax = _buckets.Select(bucket => bucket.Matches).DefaultIfEmpty().Max();
+        _peakBucket = _buckets.MaxBy(bucket => bucket.Errors);
     }
-    private string RangeStyle(long from,long to) => $"left:{Percent(from-1,Snapshot.TotalFileLineCount)};width:{Percent(to-from+1,Snapshot.TotalFileLineCount)}";
-    private static string Percent(long value,long max) => FormattableString.Invariant($"{(max > 0 ? Math.Clamp(value/(double)max,0,1)*100 : 0):0.###}%");
+
+    private RenderFragment LaneLabel(string key, int count, int? maximum, string lane, MoVisualRole role) => @<div class="lm-lane-label @lane @(IsDimmed(lane) ? "is-dimmed" : null)">
+        <span class="lm-lane-name"><i class="mo-vl-swatch mo-vl-swatch--instrument @role.ToCssClass()" aria-hidden="true"></i>@L[key]<b class="mo-vl-mono">@count.ToString("N0")</b></span>
+        @if (maximum is { } max) { <small>@L["LogChart:BucketMax", max]</small> }
+    </div>;
+
+    private RenderFragment Lane(string name, MoVisualRole role, double room, int peak, Func<Bucket, int> measure) =>
+        @<div class="lm-art @name @role.ToCssClass() @(IsDimmed(name) ? "is-dimmed" : null)">
+            @for (var i = 0; i < _buckets.Length; i++)
+            {
+                var bucket = _buckets[i];
+                var count = measure(bucket);
+                if (count == 0) continue;
+                var height = Math.Max(3, room * count / peak);
+                <span class="lm-bin" style="left:@BucketCenter(i);width:calc(@Fraction(1, _buckets.Length) - 2.5px);height:@Pixels(height)">
+                    <i class="lm-bar"></i>
+                    @if (name == "err" && bucket.Critical > 0) { <i class="lm-crit-pin"></i> }
+                    @if (name == "normal" && bucket.Unknown > 0) { <i class="lm-unparsed-cap" style="height:@Pixels(Math.Max(2, height * bucket.Unknown / count))"></i> }
+                </span>
+            }
+        </div>;
+    private bool IsDimmed(string lane) => Snapshot.Filter.Severity is { } severity && (lane switch
+    {
+        "err" => severity is not (LogSeverity.Critical or LogSeverity.Error),
+        "warn" => severity != LogSeverity.Warning,
+        "normal" => severity is LogSeverity.Critical or LogSeverity.Error or LogSeverity.Warning,
+        _ => false
+    });
+
+    private int Count(LogSeverity severity) => _counts.GetValueOrDefault(severity);
+    private static string LineSpan(long from, long to) => $"L{from:N0}–L{to:N0}";
+    private string BucketCenter(int index) => Fraction(index + .5, _buckets.Length);
+    private string BucketTime(Bucket bucket) => bucket.FirstTime is { } first && bucket.LastTime is { } last && first != last
+        ? $"{Time.FormatTime(first)}–{Time.FormatTime(last)}" : Time.FormatTime(bucket.FirstTime);
+    private string BucketDescription(Bucket bucket) => L["LogChart:BucketReadout", LineSpan(bucket.First, bucket.Last), BucketTime(bucket),
+        bucket.Critical, bucket.Errors - bucket.Critical, bucket.Warning, bucket.Normal, bucket.Unknown, bucket.Matches];
+    private static RenderFragment Text(string value) => builder => builder.AddContent(0, value);
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="@role">@value</MoValueMark>;
+    private RenderFragment PeakLink(Bucket bucket) => @<button class="mo-vl-mark mo-vl-role--error lm-finding-link" @onclick="@(() => OnSpan.InvokeAsync($"{bucket.First}-{bucket.Last}"))">@LineSpan(bucket.First, bucket.Last)</button>;
+    private RenderFragment LatestLink(long number) => @<button class="mo-vl-mark mo-vl-role--error lm-finding-link" @onclick="@(() => OnInspect.InvokeAsync(_lastError!))">L@(number.ToString("N0"))</button>;
+    private static string Percent(double value) => FormattableString.Invariant($"{Math.Clamp(value, 0, 100):0.###}%");
+    private static string Pixels(double value) => FormattableString.Invariant($"{value:0.###}px");
+    private static string Fraction(double value, double total) => Percent(total > 0 ? value / total * 100 : 0);
+    private static string Geometry(double left, double width) => $"left:{Percent(left)};width:{Percent(width)}";
+    private string Slots(int start, int end) => Geometry(start * 100d / _buckets.Length, (end - start + 1) * 100d / _buckets.Length);
+    private static string FileRange(long from, long to, long first, long last, double minimum = 0)
+    {
+        var length = Math.Max(1, last - first + 1d);
+        var left = Math.Clamp((from - first) / length * 100, 0, 100 - minimum);
+        return Geometry(left, Math.Clamp((to - from + 1) / length * 100, minimum, 100 - left));
+    }
+    private void StartBrush(PointerEventArgs args, int index) { if (args.Button == 0 && !Frozen) _start = index; }
+    private void ResetPointer() { _hover = null; _start = null; }
     private async Task EndBrush(int index)
     {
-        _brushed = _start.HasValue && _start != index;
-        if (_brushed && !Frozen) await OnSpan.InvokeAsync($"{_buckets[Math.Min(_start!.Value,index)].First}-{_buckets[Math.Max(_start.Value,index)].Last}");
-        _start=null;
+        var start = _start;
+        _start = null;
+        _brushed = start.HasValue && start != index;
+        if (_brushed && !Frozen)
+            await OnSpan.InvokeAsync($"{_buckets[Math.Min(start!.Value, index)].First}-{_buckets[Math.Max(start.Value, index)].Last}");
     }
-    private Task Activate(MouseEventArgs e,int i) { if (_brushed && e.Detail>0) { _brushed=false; return Task.CompletedTask; } return Jump.InvokeAsync(_buckets[i].First); }
-    private async Task Key(KeyboardEventArgs e,int i)
+    private Task Activate(MouseEventArgs args, int index)
     {
-        var target=e.Key switch { "ArrowLeft" => Math.Max(0,i-1), "ArrowRight" => Math.Min(_buckets.Length-1,i+1), "Home"=>0, "End"=>_buckets.Length-1,_=>i };
-        if (e.ShiftKey && target!=i && !Frozen) { _start??=i; await OnSpan.InvokeAsync($"{_buckets[Math.Min(_start.Value,target)].First}-{_buckets[Math.Max(_start.Value,target)].Last}"); }
-        else _start=null;
-        if (target!=i) await _elements[target].FocusAsync();
+        if (_brushed && args.Detail > 0) { _brushed = false; return Task.CompletedTask; }
+        return Jump.InvokeAsync(_buckets[index].First);
+    }
+    private async Task Key(KeyboardEventArgs args, int index)
+    {
+        if (args.Key == "Escape" && Range is not null) { await OnSpan.InvokeAsync(null); return; }
+        var step = args.ShiftKey ? 5 : 1;
+        var target = args.Key switch
+        {
+            "ArrowLeft" => Math.Max(0, index - step), "ArrowRight" => Math.Min(_buckets.Length - 1, index + step),
+            "Home" => 0, "End" => _buckets.Length - 1, _ => index
+        };
+        if (target != index) await _elements[target].FocusAsync();
     }
 }

@@ -1,92 +1,28 @@
-.log-line-info-dialog {
-    display: grid;
-    gap: 18px;
-    min-width: 0;
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
+.log-line-info-dialog { display: grid; gap: 18px; min-width: 0; color: var(--mud-palette-text-primary); }
+.log-line-info-dialog section { min-width: 0; }
+.log-line-info-dialog h3 { margin: 0 0 6px; color: var(--mud-palette-text-primary); font-size: 13.5px; font-weight: 600; }
+.log-inspector-note { margin: 0; color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.log-inspector-text { display: grid; gap: 6px; }
+.log-inspector-text-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; min-width: 0; }
+.log-inspector-text-heading h3 { margin: 0; }
+.log-inspector-formats { display: flex; flex-wrap: wrap; gap: 2px; }
+.log-inspector-text-heading ::deep .mud-button-root { min-height: 28px; padding: 0 7px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.log-inspector-raw, .log-inspector-message {
+    min-width: 0; margin: 0; padding: 12px 14px; overflow-wrap: anywhere; white-space: pre-wrap; tab-size: 4;
+    border: 1px solid var(--mud-palette-divider); border-radius: 8px; background: var(--mud-palette-background-gray);
+    color: var(--mud-palette-text-primary); font: 12.5px/1.6 var(--mo-font-family-mono);
 }
-
-.log-line-info-dialog h3 {
-    margin: 0;
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mud-typography-default-family, var(--mo-font-family-body));
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1.5;
-}
-
-.log-inspector-note {
-    margin: 0;
-    color: var(--logging-muted-ink);
-    font-size: 12px;
-    line-height: 1.7;
-}
-
-.log-inspector-source {
-    display: grid;
-    gap: 8px;
-    min-width: 0;
-    padding: 20px;
-    border: 1px solid var(--mud-palette-divider);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--mud-palette-primary) 7%, var(--mud-palette-surface));
-}
-
-.log-inspector-source > span {
-    color: var(--logging-muted-ink);
-    font-size: 11px;
-}
-
-.log-inspector-source strong {
-    min-width: 0;
-    overflow-wrap: anywhere;
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mud-typography-h1-family, var(--mo-font-family-display));
-    font-size: 20px;
-    font-weight: 500;
-    line-height: 1.5;
-}
-
-.log-inspector-source code,
-.log-inspector-context code,
-.log-inspector-context time,
-.log-inspector-context dd,
-.log-inspector-raw,
-.log-inspector-message {
-    color: var(--mud-palette-text-primary);
-    font-family: var(--mo-font-family-mono);
-    font-size: 12px;
-    line-height: 1.7;
-}
-
-.log-inspector-source code { min-width: 0; overflow-wrap: anywhere; }
-.log-inspector-context { display: grid; gap: 0; min-width: 0; margin: 0; }
-.log-inspector-context > div { display: grid; grid-template-columns: minmax(8rem, .65fr) minmax(0, 1fr); gap: 12px; min-width: 0; padding: 11px 0; border-bottom: 1px solid var(--mud-palette-divider); }
-.log-inspector-context > div:last-child { border-bottom: 0; }
-.log-inspector-context dt { min-width: 0; color: var(--logging-muted-ink); font-size: 11px; line-height: 1.7; }
-.log-inspector-context dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.log-inspector-context--positions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding: 16px 0; border-block: 1px solid var(--mud-palette-divider); }
-.log-inspector-context--positions > div { display: flex; flex-direction: column; gap: 6px; padding: 0; border-bottom: 0; }
-.log-inspector-context--positions dd { font-size: 18px; }
-.log-inspector-text { display: grid; gap: 10px; min-width: 0; }
-.log-inspector-text-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-.log-inspector-text-heading ::deep .mud-button-root { flex: 0 0 auto; text-transform: none; font-size: 12px; }
-.log-inspector-raw,
-.log-inspector-message { min-width: 0; min-height: 3.5rem; margin: 0; padding: 16px; overflow-wrap: anywhere; white-space: pre-wrap; tab-size: 4; border: 1px solid var(--mud-palette-divider); border-radius: 10px; background: var(--mud-palette-background-gray); }
+.log-inspector-message { background: var(--mud-palette-background); }
 .log-inspector-raw:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
-
-@media (max-width: 600px) {
-    .log-line-info-dialog { gap: 16px; }
-    .log-inspector-source { padding: 16px; }
-    .log-inspector-source strong { font-size: 18px; }
-    .log-inspector-context > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
-    .log-inspector-context--positions { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    .log-inspector-context--positions > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; }
-    .log-inspector-context--positions dd { font-size: 14px; }
-    .log-inspector-text-heading { align-items: flex-start; flex-direction: column; gap: 6px; }
-    .log-inspector-raw,
-    .log-inspector-message { padding: 12px; }
+.log-inspector-context { margin: 0; }
+.log-inspector-context > div {
+    display: grid; grid-template-columns: minmax(100px, 120px) minmax(0, 1fr);
+    gap: 6px 12px; padding: 8px 0; border-bottom: 1px dashed var(--mud-palette-divider); font-size: 12.5px;
 }
-
-.log-line-info-dialog { --logging-accent-ink: color-mix(in srgb, var(--mud-palette-primary) 72%, var(--mud-palette-text-primary)); --logging-muted-ink: color-mix(in srgb, var(--mud-palette-text-secondary) 78%, var(--mud-palette-text-primary)); }
-.log-line-info-dialog ::deep .mud-button-text-primary { color: var(--logging-accent-ink); }
+.log-inspector-context dt { color: var(--mud-palette-text-secondary); overflow-wrap: anywhere; }
+.log-inspector-context dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font: 12px/1.6 var(--mo-font-family-mono); }
+.log-inspector-context dd code { padding: 1px 4px; border-radius: 4px; background: var(--mud-palette-background-gray); }
+@media (max-width: 420px) {
+    .log-inspector-context > div { grid-template-columns: minmax(78px, 30%) minmax(0, 1fr); }
+    .log-inspector-text-heading { align-items: flex-start; }
+}

@@ -14,13 +14,15 @@
 
 <PageTitle>@L["Workbench:ReaderTitle"]</PageTitle>
 
-<div class="logging-workbench mo-page-shell mo-page-shell--full-width">
-    <LoggingWorkspaceHeader Identity="@(Source?.FilePath ?? LoggingService.CurrentLogFilePath)" FilesUrl="@FilesUrl" ReaderUrl="@ReaderUrl" Following="@IsRunning" ReadAt="@_snapshot?.GeneratedAt" Count="@_fileCount">
+<div class="mo-workbench-container">
+<div class="logging-workbench mo-page-shell mo-page-shell--workbench">
+    <LoggingWorkspaceHeader Identity="@(Source?.FilePath ?? LoggingService.CurrentLogFilePath)" IdentityLabel="@(Source?.RelativePath ?? Path.GetFileName(LoggingService.CurrentLogFilePath))"
+                            Failed="@(_error is not null || _snapshot?.Error is not null)" FilesUrl="@FilesUrl" ReaderUrl="@ReaderUrl" Following="@IsRunning" ReadAt="@_snapshot?.GeneratedAt" Count="@_fileCount">
         <Commands>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@(_busy || _initializing)" OnClick="ReadLatestAsync">@L["Workbench:ReadLatest"]</MudButton>
-            <MudMenu Label="@L["Design:ExportShort"]" StartIcon="@MoIcons.Download" Variant="Variant.Outlined" Disabled="@(_busy || _snapshot is null)">
-                <MudMenuItem OnClick="ExportRetainedAsync">@L["Design:ExportRetained"]</MudMenuItem>
-                <MudMenuItem OnClick="ExportVisibleAsync">@L["Design:ExportVisible"]</MudMenuItem>
+            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@(_busy || _initializing)" OnClick="ReadLatestAsync">@L["Workbench:ReadLatest"]</MudButton>
+            <MudMenu Label="@L["Design:ExportShort"]" StartIcon="@MoIcons.Download" EndIcon="@MoIcons.ChevronDown" Variant="Variant.Outlined" Disabled="@(_busy || _snapshot is null)">
+                <MudMenuItem Icon="@MoIcons.Archive" OnClick="ExportRetainedAsync">@L["LogChart:ExportCount", L["Design:ExportRetained"], _snapshot?.RetainedLines.Count ?? 0]</MudMenuItem>
+                <MudMenuItem Icon="@MoIcons.Filter" OnClick="ExportVisibleAsync">@L["LogChart:ExportCount", L["Design:ExportVisible"], ViewLines.Count]</MudMenuItem>
             </MudMenu>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@(IsRunning ? MoIcons.Pause : MoIcons.Play)" Disabled="@(_busy || _initializing)" OnClick="ToggleFollowingAsync">@L[IsRunning ? "Workbench:Pause" : "Workbench:Follow"]</MudButton>
         </Commands>
@@ -36,28 +38,31 @@
 
     @if (!_initializing && _snapshot is { } snapshot)
     {
-        <LogSeverityStrip Snapshot="@snapshot" Visible="@PageLines" FilesUrl="@FilesUrl" Frozen="@(_context is not null)"
+        <LogSeverityStrip Snapshot="@snapshot" Visible="@PageLines" FilesUrl="@FilesUrl" Frozen="@(_context is not null)" Range="@_range"
             OnSeverity="FilterSeverity" OnSpan="SetSpan" OnInspect="InspectRetained" Jump="JumpAsync" Earlier="@(() => LoadEarlierAsync(50))" />
     }
-    <section class="logging-reader" aria-label="@L["Workbench:Reader"]">
+    <section class="logging-reader mo-vl-surface" aria-label="@L["Workbench:Reader"]">
         <div class="logging-search-rail">
             <div class="reader-search"><MoIcon Icon="@MoIcons.Search" Size="1.1rem" /><input aria-label="@L["Design:KeywordLabel"]" placeholder="@L["Design:KeywordPlaceholder"]" @bind="_keyword" @bind:event="oninput" @onkeydown="SearchKeyDown" />
-                <button type="button" @onclick="ApplyFilter" disabled="@_busy">@L["Design:Apply"]</button><button type="button" @onclick="ClearFilter" aria-label="@L["Design:ClearFilter"]" disabled="@_busy"><MoIcon Icon="@MoIcons.Close" Size="1rem" /></button></div>
-            <MudCheckBox T="bool" Value="@_onlyMatches" ValueChanged="ChangeMatchMode" Label="@L["Design:OnlyMatches"]" Dense="true" />
-            <MudSelect T="int" Value="@_lineLimit" ValueChanged="ChangeLineLimitAsync" Label="@L["Design:ReadWindow"]" Margin="Margin.Dense" Variant="Variant.Outlined" Disabled="@_busy">
-                @foreach (var count in LineCounts) { <MudSelectItem Value="@count">@count.ToString("N0")</MudSelectItem> }
-            </MudSelect>
-            <MudCheckBox T="bool" @bind-Value="_autoScroll" Label="@L["Design:KeepNewest"]" Dense="true" />
+                <button type="button" class="reader-apply" @onclick="ApplyFilter" disabled="@_busy">@L["Design:Apply"]</button><button type="button" @onclick="ClearFilter" aria-label="@L["Design:ClearFilter"]" disabled="@_busy"><MoIcon Icon="@MoIcons.Close" Size="1rem" /></button></div>
+            <MudCheckBox T="bool" Color="Color.Primary" Value="@_onlyMatches" ValueChanged="ChangeMatchMode" Label="@L["Design:OnlyMatches"]" Dense="true" />
+            <div class="reader-window">
+                <span>@L["Design:ReadWindow"]</span>
+                <MudSelect T="int" Value="@_lineLimit" ValueChanged="ChangeLineLimitAsync" aria-label="@L["Design:ReadWindow"]" Margin="Margin.Dense" Variant="Variant.Outlined" Disabled="@_busy">
+                    @foreach (var count in LineCounts) { <MudSelectItem Value="@count">@count.ToString("N0")</MudSelectItem> }
+                </MudSelect>
+            </div>
+            <MudCheckBox T="bool" Color="Color.Primary" @bind-Value="_autoScroll" Label="@L["Design:KeepNewest"]" Dense="true" />
         </div>
         <div class="reader-levels">
             @{ var levels = FacetLines.CountBy(l => l.Severity).ToDictionary(); }
-            <MoFilterChip Label="@L["Design:StripAllLevels"]" Count="@levels.Values.Sum()" Selected="@(!_severity.HasValue)" SelectedChanged="@(() => { _severity = null; ApplyFilter(); })" Pill="true" />
-            @foreach (var level in LogSeverityStrip.Levels) { <MoFilterChip Label="@L[$"Workbench:Levels:{level}"]" Count="@levels.GetValueOrDefault(level)" ShowDot="true" Selected="@(_severity == level)" Role="@LogSeverityStrip.Role(level)" SelectedChanged="@(() => FilterSeverity(level))" Pill="true" /> }
+            <MoFilterChip Label="@L["Design:StripAllLevels"]" Count="@levels.Values.Sum()" Role="MoVisualRole.Primary" Selected="@(!_severity.HasValue)" SelectedChanged="@(() => { _severity = null; ApplyFilter(); })" Pill="true" Class="mo-vl-chip--instrument" />
+            @foreach (var level in LogSeverityStrip.Levels) { <MoFilterChip Label="@L[$"Workbench:Levels:{level}"]" Count="@levels.GetValueOrDefault(level)" ShowDot="true" Selected="@(_severity == level)" Role="@LogSeverityStrip.Role(level)" SelectedChanged="@(() => FilterSeverity(level))" Pill="true" Class="mo-vl-chip--instrument" /> }
             @if (_range is { } range) { <MudButton Size="Size.Small" StartIcon="@MoIcons.Close" OnClick="@(() => SetSpan(null))" title="@L["Design:ClearSpan"]">@L["Design:SpanLensLabel",range.From,range.To]</MudButton> }
         </div>
         @if (_context is { } context)
         {
-            <div class="logging-context-banner" role="status"><div><strong>@L["Workbench:FrozenContext", context.TargetLineNumber]</strong><span>@L["Workbench:ContextScope", context.StartLineNumber, context.EndLineNumber]</span><code>@context.Source?.RelativePath</code></div><MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.ArrowLeft" OnClick="ExitContext">@L["Workbench:BackToReader"]</MudButton></div>
+            <div class="logging-context-banner" role="status"><span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Lock" Size="16px" /></span><div><strong>@L["Workbench:FrozenContext", context.TargetLineNumber]</strong><span>@L["Workbench:ContextScope", context.StartLineNumber, context.EndLineNumber]</span><code>@context.Source?.RelativePath</code></div><MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.ArrowLeft" OnClick="ExitContext">@L["Workbench:BackToReader"]</MudButton></div>
         }
         @if (_initializing)
         {
@@ -65,13 +70,14 @@
         }
         else
         {
-            <LogViewer @ref="_viewer" Lines="@ViewLines" Version="@ViewVersion" Source="@ViewSource" SnapshotReadAt="@ViewReadAt" FirstRetainedLineNumber="@(_context is null ? _snapshot?.FirstRetainedLineNumber : null)" AutoScroll="@(_autoScroll && _context is null)" Filter="@(_context is null ? _snapshot?.Filter : null)" OnInspect="Inspect" OnShowContext="ShowContext" OnApplyFilter="ApplySelectedText" OnFilterSeverity="FilterSeverity" LoadMoreRequested="@(_context is null ? LoadEarlierAsync : null)" PositionChanged="PositionChanged" />
+            <LogViewer @ref="_viewer" Workbench="true" Lines="@ViewLines" Version="@ViewVersion" Source="@ViewSource" SnapshotReadAt="@ViewReadAt" FirstRetainedLineNumber="@(_context is null ? _snapshot?.FirstRetainedLineNumber : null)" AutoScroll="@(_autoScroll && _context is null)" Filter="@(_context is null ? _snapshot?.Filter : null)" OnInspect="Inspect" OnShowContext="ShowContext" OnApplyFilter="ApplySelectedText" OnFilterSeverity="FilterSeverity" LoadMoreRequested="@(_context is null ? LoadEarlierAsync : null)" PositionChanged="PositionChanged" />
         }
         <footer class="reader-footnote"><span>@L["Workbench:RetentionScope", _snapshot?.TotalStoredLines ?? 0, Math.Max(1, LoggingService.UIOption.MaxDisplayLines)]</span><span>@L["Workbench:PhysicalLineHelp"]</span></footer>
     </section>
 </div>
+</div>
 
 @if (!_initializing && Line is not null)
 {
-    <LogLineEvidenceSheet @key="(File, Generation)" Number="@Line" Generation="@Generation" Lines="@(_context?.Lines ?? _snapshot?.RetainedLines ?? [])" Source="@ViewSource" ReadAt="@ViewReadAt" Initial="@_initialEvidence" Navigate="NavigateLine" />
+    <LogLineEvidenceSheet @key="(File, Generation)" Number="@Line" Generation="@Generation" Lines="@(_context?.Lines ?? _snapshot?.RetainedLines ?? [])" Source="@ViewSource" ReadAt="@ViewReadAt" Initial="@_initialEvidence" Navigate="NavigateLine" ShowContext="ShowContextFromEvidence" FilterSeverity="FilterFromEvidence" />
 }
