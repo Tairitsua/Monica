@@ -194,7 +194,8 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         services.TryAddSingleton<ConfigurationEffectiveValuePatchEngine>();
         services.TryAddSingleton<ConfigurationEffectiveValueDocumentEditor>();
         services.TryAddSingleton(provider => new ConfigurationEffectiveValueSeedFactory(
-            _runtimeContext, _localDefinitionRegistry, provider.GetRequiredService<ConfigurationObjectMaterializer>()));
+            _runtimeContext, _localDefinitionRegistry, provider.GetRequiredService<ConfigurationObjectMaterializer>(),
+            provider.GetService<ManagedConfigurationSeedInput>()?.Snapshot));
         services.TryAddSingleton<IConfigurationSourceInspector, ConfigurationSourceInspector>();
         services.TryAddSingleton<IConfigurationRuntimeValidationService, ConfigurationRuntimeValidationService>();
         services.TryAddSingleton<IConfigurationRuntimeReloadService, ConfigurationRuntimeReloadService>();

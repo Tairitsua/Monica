@@ -457,6 +457,9 @@ public sealed class ModuleEventBusKafkaOption : MinimalApiModuleOptions<ModuleEv
     /// </remarks>
     public List<KafkaClusterConfig> ConfiguredClusters { get; } = [];
 
+    /// <summary>Resolves additional console clusters on demand. Transport ownership remains with the direct EventBus cluster.</summary>
+    public Func<IServiceProvider, IEnumerable<KafkaClusterConfig>>? ResolveConfiguredClusters { get; set; }
+
     /// <summary>
     /// Gets or sets the cluster used by the native Kafka EventBus provider.
     /// </summary>

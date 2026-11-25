@@ -249,7 +249,8 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
         if (accessor.ServiceProvider!.GetRequiredService<ConfigurationRuntimeContext>().AutonomousWork)
         {
             var documents = await store.EnsureCreatedAsync(definitions.Select(definition =>
-                new ConfigurationEffectiveValueSeed(definition, () => CreateValidatedSeed(definition, seedFactory))).ToArray(), cancellationToken);
+                new ConfigurationEffectiveValueSeed(definition,
+                    () => CreateValidatedSeed(definition, seedFactory, includeProvisioningSeed: true))).ToArray(), cancellationToken);
             return documents.Select(document => new ProjectionValue(document.Json, document.Version)).ToArray();
         }
 
@@ -270,10 +271,12 @@ internal sealed class MonicaConfigurationProvider(MonicaConfigurationProviderAcc
     }
 
     private string CreateValidatedSeed(ConfigurationDefinition definition, ConfigurationEffectiveValueSeedFactory seedFactory,
-        bool requireValid = false)
+        bool requireValid = false, bool includeProvisioningSeed = false)
     {
         var provider = accessor.ServiceProvider!;
-        var json = seedFactory.CreateSeedJson(definition);
+        var hasProvisioningSeed = includeProvisioningSeed && seedFactory.HasProvisioningSeed(definition);
+        requireValid |= hasProvisioningSeed;
+        var json = seedFactory.CreateSeedJson(definition, hasProvisioningSeed);
         var result = provider.GetRequiredService<ConfigurationValidationCoordinator>().ValidateCompleteValue(
             definition, json, ConfigurationValidationProfile.Seed);
         if (result.Coverage == ConfigurationValidationCoverage.Failed

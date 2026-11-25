@@ -28,6 +28,30 @@ public sealed class ManualConfigurationTests : IDisposable
     private readonly Assembly _assembly = CreateDiscoveryAssembly();
 
     [Fact]
+    public async Task ProvisioningSeed_ShouldInitializeOnlyMissingDocumentsWithoutBecomingAnInputSource()
+    {
+        Directory.CreateDirectory(_directory);
+        var seedFile = Path.Combine(_directory, "provisioning.json");
+        var storeDirectory = Path.Combine(_directory, "store");
+        var token = TestContext.Current.CancellationToken;
+        await File.WriteAllTextAsync(seedFile, """{"ManualValues":{"Maximum":41},"UnownedValue":"seed-only"}""", token);
+        await using (var first = await new ManualApplicationFactory(storeDirectory, _assembly, autonomous: true, seedFile: seedFile)
+                         .CreateAsync(cancellationToken: token))
+        {
+            var store = first.Services.GetRequiredService<IConfigurationEffectiveValueStore>();
+            var document = await store.GetAsync(KEY, token);
+            document.Should().NotBeNull();
+            document!.Json.Should().Contain("41");
+            first.Services.GetRequiredService<IConfiguration>()["UnownedValue"].Should().BeNull();
+        }
+
+        await File.WriteAllTextAsync(seedFile, """{"ManualValues":{"Maximum":62}}""", token);
+        await using var second = await new ManualApplicationFactory(storeDirectory, _assembly, autonomous: true, seedFile: seedFile)
+            .CreateAsync(cancellationToken: token);
+        second.Services.GetRequiredService<IConfiguration>()["ManualValues:Maximum"].Should().Be("41");
+    }
+
+    [Fact]
     public async Task MissingDocument_ShouldProjectValidatedTemporaryValuesWithoutCreatingAnyStoreFiles()
     {
         var factory = new ManualApplicationFactory(_directory, _assembly);
@@ -216,7 +240,7 @@ public sealed class ManualConfigurationTests : IDisposable
     }
 
     private sealed class ManualApplicationFactory(string directory, Assembly assembly, bool autonomous = false,
-        int maximum = 20, string? jsonPath = null) : MonicaTestApplicationFactory<ManualValues>
+        int maximum = 20, string? jsonPath = null, string? seedFile = null) : MonicaTestApplicationFactory<ManualValues>
     {
         protected override IEnumerable<Assembly> TypeDiscoveryAssemblies => [assembly];
         protected override void ConfigureHost(WebApplicationBuilder builder)
@@ -232,7 +256,10 @@ public sealed class ManualConfigurationTests : IDisposable
         {
             builder.ConfigureApplication(options => options.AutonomousWork = autonomous);
             builder.AddConfiguration(MonicaConfigurationInputPlan.Create(inputs =>
-                inputs.UseFileConfigurationStore(options => options.RootDirectory = directory)),
+            {
+                inputs.UseFileConfigurationStore(options => options.RootDirectory = directory);
+                if (seedFile is not null) inputs.AddManagedSeedJsonFile(seedFile);
+            }),
                 options => options.RuntimeValidationBehavior = ConfigurationRuntimeValidationBehavior.DiagnosticOnly);
         }
     }

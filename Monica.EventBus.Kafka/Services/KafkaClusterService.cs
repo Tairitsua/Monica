@@ -13,7 +13,8 @@ public sealed class KafkaClusterService(
     IKafkaConsoleRepository repository,
     IKafkaAdminProvider adminProvider,
     KafkaBootstrapEndpointProbe bootstrapEndpointProbe,
-    IOptions<ModuleEventBusKafkaOption> options)
+    IOptions<ModuleEventBusKafkaOption> options,
+    IServiceProvider? services = null)
 {
     private readonly Func<KafkaClusterConfig, CancellationToken, Task<KafkaBootstrapEndpointProbeResult>> _probeBootstrap
         = bootstrapEndpointProbe.ProbeAsync;
@@ -142,7 +143,11 @@ public sealed class KafkaClusterService(
     {
         var clusters = new Dictionary<string, KafkaClusterConfig>(StringComparer.Ordinal);
 
-        foreach (var configuredCluster in options.Value.ConfiguredClusters)
+        var configuration = options.Value;
+        var additionalClusters = services is not null && configuration.ResolveConfiguredClusters is { } resolve
+            ? resolve(services)
+            : [];
+        foreach (var configuredCluster in configuration.ConfiguredClusters.Concat(additionalClusters))
         {
             var normalized = configuredCluster.Clone().Normalize();
             clusters[normalized.ClusterId] = normalized;

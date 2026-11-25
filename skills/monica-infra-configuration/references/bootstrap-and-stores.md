@@ -90,3 +90,8 @@ Behavioral checks:
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationManualWriteTests.cs`: transactional active-publication checks before value and audit writes.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationInputPlanTests.cs`: frozen Startup access remains independent of relational Managed activation and seeding.
 - `tests/Test.Monica.Configuration.EfCore/DatabaseConfigurationStorePublishTests.InitialPublication.cs`: migrated-store initial null prior snapshots, narrowly gated legacy empty-value projection without stored-row changes, and preservation of nonempty and later-schema history.
+
+
+### Provisioning existing values
+
+Use `AddManagedSeedJsonFile(path)` when adopting existing deployment settings into a managed store. The optional file is captured once from the host content root. An Automatic host uses the file while validating and creating a missing definition document. Existing documents win, and the file never enters the runtime configuration provider stack. Manual hosts ignore it. Remove the provisioning artifact after the rollout has verified that the store is available.

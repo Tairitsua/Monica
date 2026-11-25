@@ -70,7 +70,8 @@ public class ModuleAI : MonicaModule<ModuleAIOption>
             var catalog = new AIModelCatalog();
             catalog.AddReservedModels(ModuleAIOption.GetReservedModels());
 
-            foreach (var model in Option.ModelRegistrations)
+            var hostModels = Option.ResolveHostModels?.Invoke(sp) ?? [];
+            foreach (var model in Option.ModelRegistrations.Concat(hostModels))
             {
                 catalog.AddModel(model);
             }
@@ -349,6 +350,12 @@ public class ModuleAIOption : ModuleOptions<ModuleAI>
     /// the limit are rejected rather than truncated. Increase only when the configured model can accept the text.
     /// </summary>
     public int MaxExtractedDocumentCharacters { get; set; } = 200_000;
+
+    /// <summary>Supplies host-owned model registrations when the model catalog is first resolved.</summary>
+    public Func<IServiceProvider, IEnumerable<AIModelInfo>>? ResolveHostModels { get; set; }
+
+    /// <summary>Supplies host-owned OpenAI-compatible provider defaults after host services are available.</summary>
+    public Func<IServiceProvider, IEnumerable<OpenAIProviderOptions>>? ResolveHostOpenAiProviders { get; set; }
 
     internal List<AIModelInfo> ModelRegistrations { get; } = [];
 

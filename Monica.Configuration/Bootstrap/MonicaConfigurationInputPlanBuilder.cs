@@ -11,6 +11,7 @@ public sealed class MonicaConfigurationInputPlanBuilder
 {
     private readonly List<ManagedJsonConfigurationSourceRegistration> _managedJsonSources = [];
     private IMonicaConfigurationStoreComposition? _storeComposition;
+    private string? _managedSeedJsonFile;
     private ConfigurationSectionPathConvention _sectionPathConvention =
         ConfigurationSectionPathConvention.ShortTypeName;
     private bool _sectionPathConventionConfigured;
@@ -114,6 +115,21 @@ public sealed class MonicaConfigurationInputPlanBuilder
                 configure));
     }
 
+    /// <summary>
+    /// Supplies an optional JSON file used exclusively to initialize missing managed documents.
+    /// </summary>
+    /// <remarks>The path is resolved from the content root. Existing documents and the runtime source stack are preserved.</remarks>
+    public MonicaConfigurationInputPlanBuilder AddManagedSeedJsonFile(string path)
+    {
+        EnsureOpen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (_managedSeedJsonFile is not null)
+            throw new InvalidOperationException("A managed configuration seed file was already declared.");
+
+        _managedSeedJsonFile = path;
+        return this;
+    }
+
     internal MonicaConfigurationInputPlan Build()
     {
         EnsureOpen();
@@ -125,6 +141,7 @@ public sealed class MonicaConfigurationInputPlanBuilder
         return new MonicaConfigurationInputPlan(
             storeComposition,
             _managedJsonSources.ToImmutableArray(),
+            _managedSeedJsonFile,
             _sectionPathConvention);
     }
 

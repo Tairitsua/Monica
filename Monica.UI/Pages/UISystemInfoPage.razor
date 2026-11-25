@@ -15,6 +15,7 @@
 @inject SystemInfoPageSessionFactory SessionFactory
 @inject ISnackbar Snackbar
 @inject IOptions<ModuleSystemInfoUIOption> SystemInfoUIOptions
+@inject IServiceProvider Services
 @inject IStringLocalizer<SystemInfoResource> L
 
 <PageTitle>@L["Page:Title"]</PageTitle>
@@ -52,7 +53,7 @@
         <div class="system-info-lower">
             <SystemInfoDossier Snapshot="@snapshot" RoleHealthUrl="@_roleHealthUrl" />
             <div class="system-info-side">
-                <SystemInfoCustomLinkPanel Links="@SystemInfoUIOptions.Value.CustomLinks" />
+                <SystemInfoCustomLinkPanel Links="@CustomLinks" />
                 <SystemInfoEndpoints Snapshot="@snapshot" />
             </div>
         </div>
@@ -60,6 +61,16 @@
 </div>
 
 @code {
+    private List<SystemInfoCustomLink> CustomLinks
+    {
+        get
+        {
+            var options = SystemInfoUIOptions.Value;
+            return options.ResolveCustomLinks is { } resolve
+                ? options.CustomLinks.Concat(resolve(Services)).ToList()
+                : options.CustomLinks;
+        }
+    }
     public const string PAGE_URL = "/system-info";
 
     [SupplyParameterFromQuery(Name = "restore")] public string? Restore { get; set; }

@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Models;
 using Monica.Configuration.Services.Support;
@@ -19,14 +21,17 @@ public sealed class MonicaConfigurationInputPlan
 {
     private readonly IMonicaConfigurationStoreComposition _storeComposition;
     private readonly ImmutableArray<ManagedJsonConfigurationSourceRegistration> _managedJsonSources;
+    private readonly string? _managedSeedJsonFile;
 
     internal MonicaConfigurationInputPlan(
         IMonicaConfigurationStoreComposition storeComposition,
         ImmutableArray<ManagedJsonConfigurationSourceRegistration> managedJsonSources,
+        string? managedSeedJsonFile,
         ConfigurationSectionPathConvention sectionPathConvention)
     {
         _storeComposition = storeComposition;
         _managedJsonSources = managedJsonSources;
+        _managedSeedJsonFile = managedSeedJsonFile;
         SectionPathConvention = sectionPathConvention;
     }
 
@@ -57,6 +62,19 @@ public sealed class MonicaConfigurationInputPlan
         ArgumentNullException.ThrowIfNull(module);
 
         _storeComposition.ConfigureRuntime(module);
+        if (_managedSeedJsonFile is { } seedFile)
+        {
+            module.ConfigureBuilder(context =>
+            {
+                var host = context.HostApplicationBuilder;
+                using var input = (ConfigurationRoot)new ConfigurationBuilder()
+                    .SetBasePath(host.Environment.ContentRootPath)
+                    .AddShapeAwareJsonFile(seedFile, optional: true, reloadOnChange: false)
+                    .Build();
+                host.Services.AddSingleton(new ManagedConfigurationSeedInput(ConfigurationSnapshot.Capture(input)));
+            }, ModuleRegistrationOrder.AfterModule);
+        }
+
         foreach (var source in _managedJsonSources)
         {
             module.ConfigureBuilder(context =>
@@ -72,3 +90,5 @@ public sealed class MonicaConfigurationInputPlan
         }
     }
 }
+
+internal sealed record ManagedConfigurationSeedInput(ConfigurationSnapshot Snapshot);

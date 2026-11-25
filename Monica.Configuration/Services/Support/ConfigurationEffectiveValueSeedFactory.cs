@@ -14,19 +14,27 @@ public sealed class ConfigurationEffectiveValueSeedFactory
     private readonly ConfigurationRuntimeContext _runtimeContext;
     private readonly ConfigurationLocalDefinitionRegistry _localRegistry;
     private readonly ConfigurationObjectMaterializer _materializer;
+    private readonly ConfigurationSnapshot? _managedSeed;
 
     internal ConfigurationEffectiveValueSeedFactory(ConfigurationRuntimeContext runtimeContext,
-        ConfigurationLocalDefinitionRegistry localRegistry, ConfigurationObjectMaterializer materializer)
+        ConfigurationLocalDefinitionRegistry localRegistry, ConfigurationObjectMaterializer materializer,
+        ConfigurationSnapshot? managedSeed = null)
     {
         _runtimeContext = runtimeContext;
         _localRegistry = localRegistry;
         _materializer = materializer;
+        _managedSeed = managedSeed;
     }
 
     /// <summary>Creates complete seed JSON through production binding and declared configuration aliases.</summary>
     /// <param name="definition">The locally discovered owner.</param>
     /// <returns>The full bound value, including constructor defaults and explicit empty or null values.</returns>
-    public string CreateSeedJson(ConfigurationDefinition definition)
+    public string CreateSeedJson(ConfigurationDefinition definition) => CreateSeedJson(definition, includeProvisioningSeed: false);
+
+    internal bool HasProvisioningSeed(ConfigurationDefinition definition)
+        => _managedSeed?.GetSection(definition.SectionPath).Exists() is true;
+
+    internal string CreateSeedJson(ConfigurationDefinition definition, bool includeProvisioningSeed)
     {
         if (definition.Kind == ConfigurationKind.Startup)
             throw new InvalidOperationException($"Startup configuration '{definition.DefinitionKey}' cannot be captured as managed effective state.");
@@ -35,6 +43,9 @@ public sealed class ConfigurationEffectiveValueSeedFactory
         // from a stale persisted or temporary value retained by this provider during reload.
         var sources = ConfigurationSnapshot.Capture(root).Contributions
             .Where(source => source.Origin.ProviderType != typeof(MonicaConfigurationProvider));
+        if (includeProvisioningSeed && _managedSeed is not null)
+            sources = sources.Concat(_managedSeed.Contributions);
+
         var builder = new ConfigurationBuilder();
         foreach (var source in sources)
             builder.Add(new ConfigurationValueProjectionSource(new ConfigurationValueProjection(source.Values, source.Shapes)));

@@ -4,6 +4,8 @@
 
 Register `monica.AddEventBusKafkaUI()` in an ASP.NET Core host with the Monica shell. The UI requires the Kafka backend and contributes its localization resource and five shell/search pages. Configure cluster access with `AddEventBusKafka().AddConfiguredCluster(cluster)` for console visibility, or `UseKafkaProvider(cluster)` when Kafka also supplies the distributed EventBus transport. Console configuration alone does not select that transport. Direct administration requires broker addresses and Monica-owned credentials; externally managed credentials permit configuration visibility without enabling native broker actions.
 
+Set `ModuleEventBusKafkaOption.ResolveConfiguredClusters` to read additional host-owned console clusters on demand. Use unique cluster IDs and keep the EventBus transport cluster in its dedicated transport configuration.
+
 When the backend's Minimal API is enabled, its endpoints use Monica's normal result-envelope serialization and message policy. The Kafka backend declares `ModuleResultEnvelope` as a dependency; a host does not need to add it separately to make these responses work. The browser workspace and HTTP API consume the same facade, while the shell's operational-page access policy still controls page access.
 
 The cluster selected by `UseKafkaProvider(...)` is owned by startup configuration. Its identity takes precedence over configured or persisted console records, and console upsert/delete operations reject that identity. Change its connection through the host's startup configuration and restart the host. Broker administration still targets the actual runtime cluster.

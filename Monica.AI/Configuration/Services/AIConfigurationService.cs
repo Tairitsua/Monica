@@ -17,16 +17,23 @@ internal sealed class AIConfigurationService(
     AIModelCatalog catalog,
     IDataProtectionProvider dataProtection,
     IOptions<ModuleAIOption> moduleOptions,
-    IEnumerable<IAIProvider>? customProviders = null)
+    IEnumerable<IAIProvider>? customProviders = null,
+    IServiceProvider? services = null)
 {
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NO_VALIDATION_ERRORS =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
 
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly AIConfigurationValidationMode _validationMode = moduleOptions.Value.ConfigurationValidationMode;
-    private readonly ValidatedDefaults _defaults = LoadDefaults(definitions, catalog, moduleOptions.Value.ConfigurationValidationMode);
+    private readonly ValidatedDefaults _defaults = LoadDefaults(
+        definitions.Concat(ResolveHostProviders(moduleOptions.Value, services)), catalog, moduleOptions.Value.ConfigurationValidationMode);
     private readonly IReadOnlyList<IAIProvider> _customProviders = customProviders?.ToArray() ?? [];
     private ValidatedSettings _settings = LoadSettings(store, moduleOptions.Value.ConfigurationValidationMode);
+
+    private static IEnumerable<AIProviderDefinition> ResolveHostProviders(ModuleAIOption options, IServiceProvider? services)
+        => services is not null && options.ResolveHostOpenAiProviders is { } resolve
+            ? resolve(services).Select(provider => new AIProviderDefinition(EAIProviderType.OpenAI, provider))
+            : [];
 
     public long CurrentRevision => Volatile.Read(ref _settings).Document.Revision;
 

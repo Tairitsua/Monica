@@ -238,4 +238,7 @@ public class ModuleSystemInfoUIOption : MinimalApiModuleOptions<ModuleSystemInfo
     /// Gets the custom shortcut links displayed on the system information page.
     /// </summary>
     public List<SystemInfoCustomLink> CustomLinks { get; set; } = new();
+
+    /// <summary>Resolves additional shortcut links when the system information page renders.</summary>
+    public Func<IServiceProvider, IEnumerable<SystemInfoCustomLink>>? ResolveCustomLinks { get; set; }
 }
