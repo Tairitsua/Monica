@@ -1,22 +1,70 @@
 @inject NavigationManager Nav
 @inject IStringLocalizer<HealthCheckResource> L
-<div class="hc-toolbar">
-    <div class="hc-fields">
-        <MudTextField T="string" Value="@Session.NameFilter" ValueChanged="@(v => Set("q",v))" Immediate="true" DebounceInterval="150" Placeholder="@L["Design:SearchPlaceholder"]" aria-label="@L["Design:SearchLabel"]" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Margin="Margin.Dense" Variant="Variant.Outlined" />
-        <MudSelect T="string" Value="@Session.TagFilter" ValueChanged="@(v => Set("tag",v))" Label="@L["Filters:TagLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-            @foreach (var tag in Session.AvailableTags) { <MudSelectItem Value="@tag">@tag</MudSelectItem> }
-        </MudSelect>
-        <MudSelect T="string" Value="@(Session.Sort ?? "severity")" ValueChanged="@(v => Set("sort",v))" Label="@L["Design:SortLabel"]" Margin="Margin.Dense" Variant="Variant.Outlined">
-            <MudSelectItem Value="@("severity")">@L["Design:Sorts:Severity"]</MudSelectItem><MudSelectItem Value="@("duration")">@L["Design:Sorts:Duration"]</MudSelectItem><MudSelectItem Value="@("name")">@L["Design:Sorts:Name"]</MudSelectItem>
-        </MudSelect>
+
+<div class="hc-toolbar" role="group" aria-label="@L["Design:RegistryTitle"]">
+    <div class="hc-toolbar-top">
+        <label class="hc-search">
+            <MoIcon Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" spellcheck="false" autocomplete="off" value="@Session.NameFilter" @oninput="@(e => Set("q", e.Value?.ToString()))"
+                   aria-label="@L["Design:SearchLabel"]" placeholder="@L["Design:SearchPlaceholder"]" />
+        </label>
+        <div class="hc-selects">
+            <div class="hc-select-wrap">
+                <span>@L["Filters:TagLabel"]</span>
+                <MudSelect T="string" Value="@(Session.TagFilter ?? string.Empty)" ValueChanged="@(value => Set("tag", value))" aria-label="@L["Filters:TagLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@string.Empty">@L["Filters:AllTags"]</MudSelectItem>
+                    @foreach (var tag in Session.AvailableTags) { <MudSelectItem Value="@tag">@tag</MudSelectItem> }
+                </MudSelect>
+            </div>
+            <div class="hc-select-wrap">
+                <span>@L["Design:SortLabel"]</span>
+                <MudSelect T="string" Value="@(Session.Sort ?? "severity")" ValueChanged="@(value => Set("sort", value == "severity" ? null : value))" aria-label="@L["Design:SortLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("severity")">@L["Design:Sorts:Severity"]</MudSelectItem>
+                    <MudSelectItem Value="@("duration")">@L["Design:Sorts:Duration"]</MudSelectItem>
+                    <MudSelectItem Value="@("name")">@L["Design:Sorts:Name"]</MudSelectItem>
+                </MudSelect>
+            </div>
+        </div>
     </div>
-    <div class="hc-facets"><MoFilterChip Label="@L["Filters:AnyStatus"]" Selected="@(Session.StatusFilter is null)" Count="@Session.FacetEntries.Count()" Pill="true" SelectedChanged="@(() => Set("status",null))" />
-        @foreach (var status in Enum.GetValues<HealthCheckState>().Reverse()) {
-            <MoFilterChip Label="@L.GetStatusText(status)" Selected="@(Session.StatusFilter == status)" Count="@Session.FacetEntries.Count(e => e.Status == status)" Role="@(status == HealthCheckState.Healthy ? MoVisualRole.Success : status == HealthCheckState.Degraded ? MoVisualRole.Warning : MoVisualRole.Error)" ShowDot="true" Pill="true" SelectedChanged="@(() => Set("status",status.ToString()))" /> }
-        @if (Session.Probe is not null) { <button class="mo-vl-id-chip" @onclick="@(() => Set("probe",null))">@L[Session.Probe switch { "ready" => "Design:ReadinessLabel", "live" => "Design:LivenessLabel", _ => "Design:AuxiliaryLabel" }] ×</button> }
+    <div class="hc-status-bar">
+        <div class="hc-facets" role="group" aria-label="@L["Design:Cols:Status"]">
+            @{
+                var entries = Session.FacetEntries.ToArray();
+            }
+            <MoFilterChip Label="@L["Filters:AnyStatus"]" Role="MoVisualRole.Primary" Selected="@(Session.StatusFilter is null)" Count="@entries.Length" Pill="true"
+                          Class="mo-vl-chip--instrument" SelectedChanged="@(() => Set("status", null))" />
+            @foreach (var status in Enum.GetValues<HealthCheckState>().Reverse())
+            {
+                <MoFilterChip Label="@L.GetStatusText(status)" Selected="@(Session.StatusFilter == status)" Count="@entries.Count(entry => entry.Status == status)"
+                              Role="@HealthCheckDisplay.Role(status)" ShowDot="true" Pill="true"
+                              Class="@(status == HealthCheckState.Degraded ? "mo-vl-chip--instrument mo-vl-chip--diamond" : "mo-vl-chip--instrument")"
+                              SelectedChanged="@(() => Set("status", Session.StatusFilter == status ? null : status.ToString()))" />
+            }
+        </div>
+        <div class="hc-active-pills">
+            @if (Session.Probe is { } probe)
+            {
+                var (label, role) = probe switch
+                {
+                    "ready" => ("Design:ReadinessLabel", MoVisualRole.Primary),
+                    "live" => ("Design:LivenessLabel", MoVisualRole.Info),
+                    _ => ("Design:AuxiliaryLabel", MoVisualRole.Neutral)
+                };
+                <button class="mo-vl-capsule @role.ToCssClass()" type="button" @onclick="@(() => Set("probe", null))">
+                    @L["Filters:Probe", L[label]]<MoIcon Icon="@MoIcons.Close" Size="12px" />
+                </button>
+            }
+            @if (Session.Probe is not null || Session.StatusFilter is not null || Session.TagFilter is not null || Session.NameFilter.Length > 0)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" Href="@ClearUrl">@L["Actions:ClearFilters"]</MudButton>
+            }
+        </div>
     </div>
 </div>
+
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-    private void Set(string name, string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter(name,string.IsNullOrWhiteSpace(value) ? null : value),replace:true);
+    internal static string Clear(NavigationManager nav) => nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = null, ["tag"] = null, ["status"] = null, ["probe"] = null });
+    private string ClearUrl => Clear(Nav);
+    private void Set(string name, string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter(name, string.IsNullOrWhiteSpace(value) ? null : value), replace: true);
 }

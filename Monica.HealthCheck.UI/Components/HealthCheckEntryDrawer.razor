@@ -1,48 +1,169 @@
+@using Microsoft.Extensions.Options
 @using Microsoft.JSInterop
 @using System.Text.Json
+@using Monica.Modules
 @using Monica.UI.Shared.Components.Dialogs
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ISnackbar Notifications
+@inject IOptions<ModuleHealthCheckOption> Options
 @inject IStringLocalizer<HealthCheckResource> L
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
+
 @if (!string.IsNullOrWhiteSpace(EntryName) && Session.Snapshot is { } snapshot)
 {
-    var entry = snapshot.Entries.FirstOrDefault(e => string.Equals(e.Name,EntryName,StringComparison.OrdinalIgnoreCase));
-    <MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Actions:Close"]" Width="36rem">
-        <TitleContent><header class="health-detail-header"><small>@L["Details:Eyebrow"]</small><h2>@EntryName</h2><time datetime="@snapshot.CheckedAt.ToString("O")">@Time.Format(snapshot.CheckedAt)</time></header></TitleContent>
+    var entry = snapshot.Entries.FirstOrDefault(item => string.Equals(item.Name, EntryName, StringComparison.OrdinalIgnoreCase));
+    <MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Actions:Close"]" Width="520px" Compact="true">
+        <TitleContent>
+            @if (entry is null)
+            {
+                <div class="hc-sheet-id-wrap"><span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Search" Size="16px" /></span>
+                    <div class="hc-sheet-id"><small>@L["Details:Eyebrow"]</small><h2>@L["Design:Inspector:MissingTitle"]</h2></div>
+                </div>
+            }
+            else
+            {
+                var role = HealthCheckDisplay.Role(entry.Status);
+                var impact = HealthCheckDisplay.Impact(entry, Options.Value, L);
+                <div class="hc-sheet-id-wrap">
+                    <span class="mo-vl-tile @role.ToCssClass()"><MoIcon Icon="@HealthCheckDisplay.Icon(entry.Status)" Size="16px" /></span>
+                    <div class="hc-sheet-id">
+                        <small>@L["Details:Eyebrow"] · <time datetime="@snapshot.CheckedAt.ToString("O")" title="@Time.Format(snapshot.CheckedAt)">@L["Design:Inspector:Captured", Time.FormatTime(snapshot.CheckedAt)]</time></small>
+                        <div class="hc-sheet-name-row"><h2>@entry.Name</h2>@CopyControl(entry.Name, L["Design:Inspector:CopyName"])</div>
+                        <div class="hc-sheet-flags">
+                            <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass()"><i class="mo-vl-status-dot" aria-hidden="true"></i>@L.GetStatusText(entry.Status)</span>
+                            <span class="hc-impact-pill @impact.Role.ToCssClass()">@impact.Label</span>
+                            <span class="hc-sheet-time">@Duration(entry.Duration)</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </TitleContent>
+
         <ChildContent>
-        @if (entry is null) { <MoContentState><h3>@L["Design:Inspector:MissingTitle"]</h3><p>@L["Design:Inspector:MissingDesc",EntryName]</p></MoContentState> }
-        else
-        {
-            <div class="health-detail-content">
-                @if (entry.Error is { } error) { <MudAlert Severity="Severity.Error" Dense="true"><b>@L["Details:Error"]</b><p>@error.Type</p><p>@error.Message</p></MudAlert> }
-                <section class="health-detail-section"><h3>@L["Details:Description"]</h3><p>@(entry.Description ?? L["Details:NoDescription"])</p></section>
-                <section class="health-detail-section"><h3>@L["Design:Inspector:TimingTitle"]</h3><dl class="health-detail-facts">
-                    <div><dt>@L["Design:Cols:Status"]</dt><dd>@L.GetStatusText(entry.Status)</dd></div>
-                    <div><dt>@L["Details:Duration"]</dt><dd>@L["Common:DurationMilliseconds",entry.Duration.TotalMilliseconds]</dd></div>
-                    <div><dt>@L["Design:Inspector:WallShareLabel"]</dt><dd>@(snapshot.Duration > TimeSpan.Zero ? (entry.Duration/snapshot.Duration).ToString("P1") : "—")</dd></div>
-                    <div><dt>@L["Design:Inspector:ProbeParticipation"]</dt><dd>@string.Join(" + ",HealthCheckEntryTable.Probes.Where(p => HealthCheckPageSession.MatchesProbe(entry,p.Id)).Select(p => L[p.Label].Value))</dd></div>
-                    <div><dt>@L["Design:Inspector:OriginLabel"]</dt><dd>@L[entry.Tags.Contains("monica",StringComparer.OrdinalIgnoreCase) ? "Design:Inspector:OriginMonica" : "Design:Inspector:OriginHost"]</dd></div>
-                </dl></section>
-                <section class="health-detail-section"><h3>@L["Details:Tags"]</h3><div class="health-detail-tags">@foreach (var tag in entry.Tags) { <a class="mo-vl-id-chip" href="@FilterUrl("tag",tag)">@tag</a> }</div></section>
-                <section class="health-detail-section"><h3>@L["Details:Data"]</h3>
-                    @if (entry.Data.Count == 0) { <p>@L["Details:NoData"]</p> }
-                    else { <dl class="health-detail-data">@foreach (var pair in entry.Data.OrderBy(p => p.Key,StringComparer.OrdinalIgnoreCase))
-                        { <div><dt>@pair.Key</dt><dd>@if (pair.Value == "[redacted]") { <MoIcon Icon="@MoIcons.Lock" Size="0.85rem" /> }<code>@pair.Value</code></dd></div> }</dl> }</section>
+            <div class="hc-sheet-body">
+                @if (entry is null)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:Inspector:MissingTitle"]">@L["Design:Inspector:MissingDesc", EntryName]</MoSemanticCallout>
+                    <div><MudButton Variant="Variant.Outlined" OnClick="@(() => Close(false))">@L["Design:Inspector:BackToRegistry"]</MudButton></div>
+                }
+                else
+                {
+                    var wall = HealthCheckDisplay.Wall(snapshot);
+                    var share = HealthCheckDisplay.Share(entry.Duration, wall);
+                    var shareText = HealthCheckDisplay.ShareText(entry.Duration, wall, L);
+                    var match = HealthCheckEntryTable.Probes.Where(probe => HealthCheckPageSession.MatchesProbe(entry, probe.Id)).ToArray();
+                    var redacted = HealthCheckDisplay.RedactedCount(entry);
+                    @if (entry.Error is { } error)
+                    {
+                        <section class="hc-err-card mo-vl-role--error" role="alert">
+                            <div class="hc-err-head"><span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.Error" Size="15px" /></span><h3>@L["Details:Error"]</h3></div>
+                            <dl class="hc-err-dl">
+                                <div><dt>@L["Details:ErrorType"]</dt><dd><code>@error.Type</code>@CopyControl(error.Type, L["Details:CopyValue"])</dd></div>
+                                <div><dt>@L["Details:ErrorMessage"]</dt><dd class="hc-err-msg-wrap"><p class="hc-err-msg">@error.Message</p>@CopyControl(error.Message, L["Details:CopyValue"])</dd></div>
+                            </dl>
+                            <p class="hc-err-note">@L["Details:ErrorSanitized"]</p>
+                        </section>
+                    }
+                    <section class="hc-sheet-sec">
+                        <h3>@L["Details:Description"]</h3><p class="hc-sheet-desc @(entry.Description is null ? "is-empty" : null)">@(entry.Description ?? L["Details:NoDescription"].Value)</p>
+                    </section>
+                    <section class="hc-sheet-sec">
+                        <div class="hc-sheet-sec-head"><h3>@L["Design:Inspector:TimingTitle"]</h3><span class="hc-sheet-pct">@shareText</span></div>
+                        <div class="hc-sheet-meter" aria-hidden="true"><span class="@HealthCheckDisplay.Role(entry.Status).ToCssClass()" style="@HealthCheckDisplay.BarWidth(share, 2)"></span></div>
+                        <dl class="hc-sheet-facts">
+                            <div><dt>@L["Details:Duration"]</dt><dd><code>@Duration(entry.Duration)</code></dd></div>
+                            <div><dt>@L["Design:Inspector:WallShareLabel"]</dt><dd><code>@L["Design:Inspector:ShareValue", shareText, Duration(snapshot.Duration)]</code></dd></div>
+                            <div><dt>@L["Design:Inspector:ProbeParticipation"]</dt><dd class="hc-sheet-probes">
+                                @foreach (var (id, label) in match)
+                                {
+                                    var role = id == "ready" ? MoVisualRole.Primary : id == "live" ? MoVisualRole.Info : MoVisualRole.Neutral;
+                                    var path = id == "ready" && Options.Value.EnableReadinessEndpoint ? Options.Value.ReadinessPath :
+                                        id == "live" && Options.Value.EnableLivenessEndpoint ? Options.Value.LivenessPath : null;
+                                    <span class="mo-vl-capsule @role.ToCssClass()">@(path is null ? L[label].Value : $"{path} · {id}")</span>
+                                }
+                            </dd></div>
+                            <div><dt>@L["Design:Inspector:OriginLabel"]</dt><dd>@L[entry.Tags.Contains("monica", StringComparer.OrdinalIgnoreCase) ? "Design:Inspector:OriginMonica" : "Design:Inspector:OriginHost"]</dd></div>
+                        </dl>
+                    </section>
+                    <section class="hc-sheet-sec">
+                        <h3>@L["Details:Tags"]</h3>
+                        @if (entry.Tags.Count == 0) { <p class="hc-sheet-empty">@L["Design:NoTags"]</p> }
+                        else
+                        {
+                            <div class="hc-sheet-tags">
+                                @foreach (var tag in entry.Tags)
+                                {
+                                    <button type="button" class="mo-vl-capsule @HealthCheckDisplay.TagRole(tag).ToCssClass()" @onclick="@(() => NavigateFilter("tag", tag))">@tag</button>
+                                }
+                            </div>
+                        }
+                    </section>
+                    <section class="hc-sheet-sec">
+                        <div class="hc-sheet-sec-head"><h3>@L["Details:Data"]</h3>
+                            @if (entry.Data.Count > 0) { <small>@L[redacted == 0 ? "Design:Inspector:DataCount" : "Design:Inspector:DataRedactedCount", entry.Data.Count, redacted]</small> }
+                        </div>
+                        @if (entry.Data.Count == 0) { <p class="hc-sheet-empty">@L["Details:NoData"]</p> }
+                        else
+                        {
+                            <dl class="hc-data-list">
+                                @foreach (var pair in entry.Data.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    var hidden = pair.Value == "[redacted]";
+                                    <div class="hc-data-row @(hidden ? "is-redacted" : null)">
+                                        <dt>@pair.Key</dt>
+                                        <dd>
+                                            @if (hidden)
+                                            {
+                                                <span class="hc-redacted-pill" title="@L["Design:Inspector:RedactedHint"]"><MoIcon Icon="@MoIcons.Lock" Size="12px" /><code>@pair.Value</code></span>
+                                            }
+                                            else
+                                            {
+                                                <code>@pair.Value</code>@CopyControl(pair.Value, L["Details:CopyValue"])
+                                            }
+                                        </dd>
+                                    </div>
+                                }
+                            </dl>
+                        }
+                    </section>
+                }
             </div>
-        }
         </ChildContent>
-        <FooterContent>@if (entry is not null) {
-            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="@(() => Copy(entry))">@L["Design:CopyJson"]</MudButton>
-            var gate = HealthCheckEntryTable.Probes.First(p => HealthCheckPageSession.MatchesProbe(entry,p.Id));
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="@FilterUrl("probe",gate.Id)">@L["Design:Inspector:FilterByGate",L[gate.Label]]</MudButton>
-        }</FooterContent>
+        <FooterContent>
+            @if (entry is not null)
+            {
+                var gate = HealthCheckEntryTable.Probes.First(probe => HealthCheckPageSession.MatchesProbe(entry, probe.Id));
+                <div class="hc-sheet-actions">
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Copy" OnClick="@(() => CopySnapshotAsync(snapshot, entry))">@L["Design:CopyJson"]</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Filter" OnClick="@(() => NavigateFilter("probe", gate.Id))">
+                        @L["Design:Inspector:FilterByGate", L[gate.Label]]
+                    </MudButton>
+                </div>
+            }
+        </FooterContent>
     </MoSideSheet>
 }
+
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
     [Parameter] public string? EntryName { get; set; }
-    private void Close(bool open) { if (!open) Nav.NavigateTo(Nav.GetUriWithQueryParameter("entry",(string?)null)); }
-    private string FilterUrl(string name,string value) => Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["entry"] = null, [name] = value });
-    private Task Copy(HealthCheckEntrySnapshot entry) => JS.InvokeVoidAsync("navigator.clipboard.writeText",JsonSerializer.Serialize(entry,new JsonSerializerOptions(JsonSerializerOptions.Web) { WriteIndented = true })).AsTask();
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web) { WriteIndented = true };
+    private void Close(bool open) { if (!open) Nav.NavigateTo(Nav.GetUriWithQueryParameter("entry", (string?)null)); }
+    private void NavigateFilter(string name, string value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["entry"] = null, [name] = value }));
+    private string Duration(TimeSpan time) => HealthCheckDisplay.Duration(time, L);
+    private Task CopySnapshotAsync(HealthCheckSnapshot snapshot, HealthCheckEntrySnapshot entry) => CopyAsync(JsonSerializer.Serialize(new
+    {
+        host = Session.HostName,
+        checkedAtUtc = snapshot.CheckedAt,
+        snapshotDurationMs = snapshot.Duration.TotalMilliseconds,
+        entry = new { entry.Name, status = entry.Status.ToString(), entry.Description, durationMs = entry.Duration.TotalMilliseconds, entry.Tags, entry.Data, entry.Error }
+    }, JsonOptions));
+    private RenderFragment CopyControl(string value, string label) =>
+        @<MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@label" OnClick="@(() => CopyAsync(value))" />;
+    private async Task CopyAsync(string value)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
+        Notifications.Add(L["Design:Copied"], Severity.Success);
+    }
 }

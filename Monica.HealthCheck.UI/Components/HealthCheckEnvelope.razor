@@ -1,0 +1,149 @@
+@using Microsoft.Extensions.Options
+@using Monica.Modules
+@inject IOptions<ModuleHealthCheckOption> Options
+@inject IStringLocalizer<HealthCheckResource> L
+@inject NavigationManager Nav
+
+@if (_rows.Length > 0)
+{
+    var title = L[_attention ? "Design:EnvelopeTitleAttention" : "Design:EnvelopeTitleCalm"];
+    var activeIndex = Math.Clamp(_hoveredIndex ?? _activeIndex, 0, _rows.Length - 1);
+    var active = _rows[activeIndex];
+    var activeImpact = HealthCheckDisplay.Impact(active, Options.Value, L);
+    var activeRedacted = HealthCheckDisplay.RedactedCount(active);
+    <div class="hc-env">
+        <header class="hc-env-head">
+            <div class="hc-env-copy">
+                <h3>@title</h3>
+                <p>@L[_attention ? "Design:EnvelopeDescAttention" : "Design:EnvelopeDescCalm", _rows.Length, Snapshot.Entries.Count]</p>
+            </div>
+            @if (!_attention)
+            {
+                <span class="mo-vl-status mo-vl-status--pill mo-vl-role--success"><i class="mo-vl-status-dot" aria-hidden="true"></i>@L["Design:EnvelopeCalmPill", Snapshot.Entries.Count]</span>
+            }
+        </header>
+        <div class="hc-env-axis" aria-hidden="true">
+            <span class="hc-env-axis-left">@L["Design:EnvelopeAxisLeft"]</span>
+            <div class="hc-env-axis-track">
+                @for (var i = 0; i <= 3; i++)
+                {
+                    <span class="hc-env-tick @(i == 0 ? "is-start" : i == 3 ? "is-end" : null)" style="@AxisPosition(i)">@AxisLabel(i)</span>
+                }
+                <span class="hc-env-flag @(Stale ? "is-stale" : null)">@L["Design:EnvelopeWallFlag", Duration(Snapshot.Duration)]</span>
+            </div>
+            <span class="hc-env-axis-right">@L["Design:EnvelopeAxisRight"]</span>
+        </div>
+        <div class="hc-env-body" role="listbox" aria-label="@title" @onpointerleave="@(() => _hoveredIndex = null)">
+            <div class="hc-env-grid" aria-hidden="true">
+                <span></span>
+                <div class="hc-env-grid-track">
+                    @for (var i = 0; i <= 3; i++)
+                    {
+                        <i class="hc-env-gridline @(i == 3 ? "is-wall" : null)" style="@AxisPosition(i)"></i>
+                    }
+                </div>
+                <span></span>
+            </div>
+            @for (var i = 0; i < _rows.Length; i++)
+            {
+                var index = i;
+                var entry = _rows[index];
+                var role = HealthCheckDisplay.Role(entry.Status);
+                var impact = HealthCheckDisplay.Impact(entry, Options.Value, L);
+                var share = HealthCheckDisplay.Share(entry.Duration, _wall);
+                var selected = string.Equals(entry.Name, EntryName, StringComparison.OrdinalIgnoreCase);
+                var reason = entry.Error is { } error ? $"{error.Type[(error.Type.LastIndexOf('.') + 1)..]}: {error.Message}" :
+                    entry.Description ?? L["Details:NoDescription"].Value;
+                <button @key="entry.Name" type="button" role="option" aria-selected="@(selected ? "true" : "false")"
+                        tabindex="@(index == _activeIndex ? 0 : -1)"
+                        class="hc-env-row @role.ToCssClass() @(selected ? "is-selected" : index == activeIndex ? "is-active" : null)"
+                        @ref="_rowRefs[entry.Name]" @onfocus="@(() => Focused(index))" @onpointerenter="@(() => _hoveredIndex = index)"
+                        @onkeydown="@(args => MoveAsync(args, index))" @onclick="@(() => Open(index, entry.Name))">
+                    <span class="hc-env-id">
+                        <span class="hc-env-top">
+                            <span class="hc-env-glyph" aria-hidden="true"><MoIcon Icon="@HealthCheckDisplay.Icon(entry.Status)" Size="14px" /></span>
+                            <b class="hc-env-name mo-vl-mono">@entry.Name</b>
+                            <span class="hc-impact-pill @impact.Role.ToCssClass()">@impact.Label</span>
+                        </span>
+                        <small class="hc-env-reason" title="@reason">@reason</small>
+                    </span>
+                    <span class="hc-env-track" aria-hidden="true">
+                        <span class="hc-env-bar @(entry.Status == HealthCheckState.Degraded ? "is-degraded" : null)" style="@HealthCheckDisplay.BarWidth(share, 1.2)">
+                            @if (entry.Status == HealthCheckState.Degraded) { <i class="hc-env-bar-cap"></i> }
+                        </span>
+                    </span>
+                    <span class="hc-env-dur mo-vl-mono">
+                        <b>@Duration(entry.Duration)</b><small>@HealthCheckDisplay.ShareText(entry.Duration, _wall, L)</small>
+                    </span>
+                </button>
+            }
+        </div>
+        <div class="hc-env-readout" aria-live="polite">
+            <span class="hc-env-readout-text">
+                <i class="mo-vl-swatch @HealthCheckDisplay.Role(active.Status).ToCssClass()" aria-hidden="true"></i>
+                <span>@L["Design:EnvelopeReadout", active.Name, activeImpact.Label, Duration(active.Duration), HealthCheckDisplay.ShareText(active.Duration, _wall, L)]
+                    @if (active.Data.Count != 0) { <span> · @L["Design:DataCountBadge", active.Data.Count]</span> }
+                    @if (activeRedacted > 0) { <span> (@L["Design:RedactedBadge", activeRedacted])</span> }
+                </span>
+            </span>
+            <span class="hc-env-hint">@L["Design:EnvelopeKeyboardHint"]</span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public HealthCheckSnapshot Snapshot { get; set; } = default!;
+    [Parameter] public string? EntryName { get; set; }
+    [Parameter] public bool Stale { get; set; }
+    private readonly Dictionary<string, ElementReference> _rowRefs = new(StringComparer.OrdinalIgnoreCase);
+    private HealthCheckSnapshot? _current;
+    private HealthCheckEntrySnapshot[] _rows = [];
+    private TimeSpan _wall;
+    private int _activeIndex;
+    private int? _hoveredIndex;
+    private bool _attention;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_current, Snapshot)) return;
+        var activeName = _rows.ElementAtOrDefault(_activeIndex)?.Name;
+        _current = Snapshot;
+        _wall = HealthCheckDisplay.Wall(Snapshot);
+        var issues = Snapshot.Entries.Where(entry => entry.Status != HealthCheckState.Healthy)
+            .OrderBy(ImpactRank).ThenByDescending(entry => entry.Duration).ToArray();
+        _attention = issues.Length != 0;
+        _rows = _attention ? issues : Snapshot.Entries.OrderByDescending(entry => entry.Duration).Take(5).ToArray();
+        _activeIndex = Math.Max(0, Array.FindIndex(_rows, entry => entry.Name == activeName));
+        _hoveredIndex = null;
+        var names = _rows.Select(entry => entry.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in _rowRefs.Keys.Where(name => !names.Contains(name)).ToArray())
+            _rowRefs.Remove(name);
+    }
+
+    private static int ImpactRank(HealthCheckEntrySnapshot entry) =>
+        (HealthCheckPageSession.MatchesProbe(entry, "other") ? 4 : 0) + (entry.Status == HealthCheckState.Unhealthy ? 0 : 1);
+    private string Duration(TimeSpan duration) => HealthCheckDisplay.Duration(duration, L);
+    private static string AxisPosition(int index) => FormattableString.Invariant($"left:{index * 100d / 3:0.###}%");
+    private string AxisLabel(int index)
+    {
+        var value = _wall.TotalMilliseconds * index / 3;
+        if (index == 0) return "0 ms";
+        return _wall.TotalSeconds >= 1 ? $"{value / 1000:0.##} s" : $"{value:0.#} ms";
+    }
+    private void Focused(int index) { _activeIndex = index; _hoveredIndex = null; }
+    private void Open(int index, string name) { Focused(index); Nav.NavigateTo(Nav.GetUriWithQueryParameter("entry", name)); }
+
+    private async Task MoveAsync(KeyboardEventArgs args, int index)
+    {
+        var target = args.Key switch
+        {
+            "ArrowDown" => Math.Min(_rows.Length - 1, index + 1),
+            "ArrowUp" => Math.Max(0, index - 1),
+            "Home" => 0,
+            "End" => _rows.Length - 1,
+            _ => index
+        };
+        if (target != index && _rowRefs.TryGetValue(_rows[target].Name, out var row))
+            await row.FocusAsync(preventScroll: false);
+    }
+}

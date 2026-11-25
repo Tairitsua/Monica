@@ -1,0 +1,43 @@
+@implements IAsyncDisposable
+@inject IStringLocalizer<HealthCheckResource> L
+
+<span class="mo-vl-status mo-vl-status--pill mo-vl-status--live mo-vl-role--info hc-refresh-countdown">
+    <i class="mo-vl-status-dot" aria-hidden="true"></i>@L["Overview:AutoRefresh", Session.RefreshIntervalSeconds, Session.SecondsUntilRefresh]
+</span>
+
+@code {
+    [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
+
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _updates;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _updates = UpdateAsync(_lifetime.Token);
+    }
+
+    private async Task UpdateAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(() =>
+                {
+                    if (!cancellationToken.IsCancellationRequested) StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _lifetime.CancelAsync();
+        if (_updates is not null) await _updates;
+        _lifetime.Dispose();
+    }
+}

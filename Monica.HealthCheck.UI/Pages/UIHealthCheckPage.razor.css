@@ -1,5 +1,16 @@
-.health-workspace { container: page / inline-size; display: grid; gap: 20px; min-width: 0; }
-.health-page-content { display: grid; gap: 20px; min-width: 0; }
-.health-last-check { display: grid; text-align: end; font-size: 12px; color: var(--mud-palette-text-secondary); }
-.health-last-check time { font-family: var(--mo-font-family-mono); }
+.health-workspace, .health-page-content { display: grid; gap: 22px; min-width: 0; }
+.health-last-check { display: grid; text-align: end; margin-inline-end: 10px; font-size: 11.5px; line-height: 1.35; color: var(--mud-palette-text-secondary); }
+.health-last-check time { color: var(--mud-palette-text-primary); font: 500 13px var(--mo-font-family-mono); }
 .health-page-state { display: grid; min-height: 18rem; align-content: center; justify-items: center; gap: .7rem; text-align: center; }
+.health-host { min-width: 0; font: 500 11.5px var(--mo-font-family-mono); }
+.health-host > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.health-host ::deep .mo-icon { flex: none; }
+.health-workspace ::deep .mo-vl-actions .mud-button-root { min-height: 34px; padding: 0 13px; border-radius: 6px; font-size: 13px; }
+.health-workspace ::deep .mo-vl-actions .mud-button-outlined { background: var(--mud-palette-surface); border-color: var(--mud-palette-lines-inputs); }
+.health-workspace ::deep .mo-vl-actions .mud-button-icon-start svg { width: 15px; height: 15px; }
+@container page (max-width: 720px) {
+    .health-workspace, .health-page-content { gap: 18px; }
+    .health-workspace ::deep .hc-pause-button { min-width: 34px; padding: 0; }
+    .health-workspace ::deep .hc-pause-button .mud-button-icon-start { margin: 0; }
+    .health-workspace ::deep .hc-pause-button .mud-button-label > span:not(.mud-button-icon-start) { display: none; }
+}

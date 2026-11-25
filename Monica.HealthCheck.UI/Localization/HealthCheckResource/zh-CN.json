@@ -5,7 +5,8 @@
   },
   "Page": {
     "Title": "健康检查",
-    "LastChecked": "最近更新"
+    "LastChecked": "最近更新",
+    "StaleChecked": "上次采集（已过时）"
   },
   "Access": {
     "Checking": "正在检查看板访问权限…",
@@ -29,8 +30,14 @@
     "Ready": "必要检查已通过，主机可以接收流量。",
     "ReadyDegraded": "主机可以接收流量，但部分必要检查处于降级状态。",
     "NotReady": "必要检查通过前，主机暂时无法接收流量。",
-    "AutoRefresh": "每 10 秒更新",
-    "CoverageMissingDescription": "当前没有已注册的就绪检查，无法根据这份快照判断主机是否可以接收流量。"
+    "AutoRefresh": "每 {0} 秒更新 · {1}s",
+    "CoverageMissingDescription": "当前没有已注册的就绪检查，无法根据这份快照判断主机是否可以接收流量。",
+    "BlockingFinding": "就绪探针被 {0} 阻断（不健康，用时 {1}，占并行总耗时的 {2}）。",
+    "LivenessFinding": "存活探针 {0} 返回 HTTP 503。{1} 不健康（{2}）。就绪状态为 {3}。",
+    "CalmFinding": "{0} 项就绪检查和 {1} 项存活检查均通过，总耗时 {2}（最慢为 {3}，耗时 {4}）。",
+    "DegradesFinding": "就绪检查降级：{0}。",
+    "LivenessPassFinding": "存活探针通过（{0} 项健康）。",
+    "AuxFinding": "探针范围外的 {0} 需要关注。"
   },
   "Status": {
     "Healthy": "健康",
@@ -40,25 +47,38 @@
   "Filters": {
     "AnyStatus": "全部检查",
     "TagLabel": "标签",
-    "Results": "显示 {0} / {1} 项"
+    "Results": "显示 {0} / {1} 项",
+    "AllTags": "全部标签",
+    "Probe": "探针：{0}"
   },
   "Common": {
-    "DurationMilliseconds": "{0:0.##} 毫秒"
+    "DurationMilliseconds": "{0} 毫秒",
+    "DurationSeconds": "{0:0.00} 秒",
+    "ListSeparator": "、",
+    "LessThanOnePercent": "<1%"
   },
   "Details": {
     "Eyebrow": "健康检查证据",
     "Description": "描述",
     "NoDescription": "该检查未报告描述信息。",
-    "Duration": "耗时",
-    "Tags": "标签",
+    "Duration": "检查耗时",
+    "Tags": "注册标签",
     "Data": "诊断数据",
     "NoData": "该检查未报告诊断数据。",
-    "Error": "检查报告的错误"
+    "Error": "检查报告的错误",
+    "ErrorType": "类型",
+    "ErrorMessage": "消息",
+    "ErrorSanitized": "健康检查快照保留经脱敏且有长度限制的异常类型和消息。快照省略堆栈跟踪。",
+    "CopyValue": "复制值"
   },
   "Gates": {
     "Population": "{0} / {1} 个就绪检查健康 · 共注册 {2} 项",
-    "Overlap": "{0} 同时参与两个探针 · 共 {1} 个独立检查",
-    "Impact": "{0} · {1}"
+    "Overlap": "注：{0} 同时带有 ready 和 live 标签，在两个探针中各计一次。去重后共 {1} 项。",
+    "Both": "{0} 与 {1}",
+    "BothProbes": "就绪和存活",
+    "Blocks": "阻断 {0}",
+    "Degrades": "降级 {0}",
+    "Summary": "{0} / {1} 项健康"
   },
   "Design": {
     "AllParallelCaption": "{0} 项并行",
@@ -70,7 +90,8 @@
       "Duration": "耗时",
       "Name": "检查项",
       "Probe": "探针归属",
-      "Status": "状态"
+      "Status": "状态",
+      "Actions": "操作"
     },
     "CopyJson": "复制脱敏 JSON",
     "DataCountBadge": "{0} 项数据",
@@ -94,7 +115,14 @@
       "OriginMonica": "Monica 框架模块（含 monica 标签）",
       "ProbeParticipation": "探针归属",
       "TimingTitle": "执行耗时与探针契约",
-      "WallShareLabel": "占并行快照"
+      "WallShareLabel": "占并行快照",
+      "CopyName": "复制检查名称",
+      "Captured": "采集于 {0}",
+      "ShareValue": "占 {1} 快照的 {0}",
+      "BackToRegistry": "关闭并返回检查清单",
+      "DataCount": "{0} 个键",
+      "DataRedactedCount": "{0} 个键（{1} 个已脱敏）",
+      "RedactedHint": "宿主已将此敏感值替换为 [redacted]。"
     },
     "LivenessLabel": "存活探针",
     "NoMatchDesc": "尝试调整搜索关键词、状态芯片、标签或探针范围筛选；上方汇总始终反映当前完整主机快照。",
@@ -127,6 +155,15 @@
       "Degraded": "存活降级",
       "Healthy": "存活正常",
       "Unhealthy": "存活异常"
-    }
+    },
+    "PointInTime": "即时快照 · 不保留历史",
+    "EnvelopeCalmPill": "{0} 项均健康 · 无阻断",
+    "EnvelopeWallFlag": "快照 {0}",
+    "EnvelopeReadout": "{0} · {1} · {2}（占并行总耗时的 {3}）",
+    "EndpointDisabled": "端点已禁用",
+    "CopyHost": "复制宿主名称 {0}",
+    "ErrorBadge": "错误",
+    "NoTags": "无标签",
+    "Copied": "已复制到剪贴板"
   }
 }

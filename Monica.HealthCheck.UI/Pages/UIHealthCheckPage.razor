@@ -9,7 +9,8 @@
 
 <PageTitle>@L["Page:Title"]</PageTitle>
 
-<div class="health-page mo-page-shell mo-page-shell--full-width">
+<div class="mo-workbench-container">
+<div class="health-page mo-page-shell mo-page-shell--workbench">
     @if (!_accessChecked)
     {
         <div class="health-page-state" role="status">
@@ -33,8 +34,11 @@
                 <Actions>
                     @if (session.Snapshot is { } snapshot)
                     {
-                        <div class="health-last-check"><span>@L["Page:LastChecked"]</span><time datetime="@snapshot.CheckedAt.ToString("O")">@UiTime.FormatTime(snapshot.CheckedAt)</time></div>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@(session.Paused ? MoIcons.Play : MoIcons.Pause)" OnClick="@(() => session.SetPausedAsync(!session.Paused))">@L[session.Paused ? "Design:ResumeAuto" : "Design:PauseAuto"]</MudButton>
+                        <div class="health-last-check"><span>@L[session.RefreshError is null ? "Page:LastChecked" : "Page:StaleChecked"]</span><time datetime="@snapshot.CheckedAt.ToString("O")" title="@UiTime.Format(snapshot.CheckedAt)">@UiTime.FormatTime(snapshot.CheckedAt)</time></div>
+                        var pauseLabel = L[session.Paused ? "Design:ResumeAuto" : "Design:PauseAuto"];
+                        <MudButton Class="hc-pause-button" Variant="Variant.Outlined" StartIcon="@(session.Paused ? MoIcons.Play : MoIcons.Pause)"
+                                   aria-pressed="@(session.Paused ? "true" : "false")" aria-label="@pauseLabel" title="@pauseLabel"
+                                   OnClick="@(() => session.SetPausedAsync(!session.Paused))"><span>@pauseLabel</span></MudButton>
                     }
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@session.IsRefreshing" OnClick="@(() => RefreshAsync(session))">@L["Actions:Refresh"]</MudButton>
                 </Actions>
@@ -71,8 +75,8 @@
                     break;
                 case HealthCheckPageLoadState.Ready when session.Snapshot is not null:
                     <div class="health-page-content">
-                        <HealthCheckOverview Session="@session" />
-                        <HealthCheckEntryTable Session="@session" />
+                        <HealthCheckOverview Session="@session" EntryName="@Entry" />
+                        <HealthCheckEntryTable Session="@session" EntryName="@Entry" />
                     </div>
                     break;
             }
@@ -80,6 +84,7 @@
             <HealthCheckEntryDrawer Session="@session" EntryName="@Entry" />
         </div>
     }
+</div>
 </div>
 
 @code {
@@ -93,10 +98,25 @@
     [SupplyParameterFromQuery] public string? Entry { get; set; }
 
     private RenderFragment Metadata(HealthCheckPageSession session) => @<text>
-                    <span class="mo-vl-status mo-vl-role--info"><i class="mo-vl-status-dot"></i>@L[session.Paused ? "Design:AutoRefreshPaused" : session.RefreshError is null ? "Overview:AutoRefresh" : "Design:AutoRefreshStale"]</span>
-                    <button class="mo-vl-id-chip" @onclick="@(() => CopyHostAsync(session.HostName))"><MoIcon Icon="@MoIcons.Server" />@session.HostName<MoIcon Icon="@MoIcons.Copy" /></button>
-                    <span>@UiTime.TimeZone.Id</span>
-
+        @if (session.Snapshot is { } snapshot)
+        {
+            @if (session.RefreshError is not null || session.Paused)
+            {
+                var role = session.RefreshError is not null ? MoVisualRole.Warning : MoVisualRole.Neutral;
+                <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass()">
+                    <i class="mo-vl-status-dot" aria-hidden="true"></i>@L[session.RefreshError is not null ? "Design:AutoRefreshStale" : "Design:AutoRefreshPaused"]
+                </span>
+            }
+            else
+            {
+                <HealthCheckRefreshCountdown Session="@session" />
+            }
+            <button class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral health-host" type="button"
+                    title="@session.HostName" aria-label="@L["Design:CopyHost", session.HostName]" @onclick="@(() => CopyHostAsync(session.HostName))">
+                <MoIcon Icon="@MoIcons.Server" Size="13px" /><span>@session.HostName</span><MoIcon Icon="@MoIcons.Copy" Size="13px" />
+            </button>
+            <span title="@UiTime.TimeZone.Id">@UiTime.FormatZoneLabel(snapshot.CheckedAt)</span>
+        }
     </text>;
     protected override void OnParametersSet() => _session?.ApplyRoute(Search, Status, Tag, Probe, Sort);
     private Task CopyHostAsync(string value) => JS.InvokeVoidAsync("navigator.clipboard.writeText", value).AsTask();

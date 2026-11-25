@@ -5,7 +5,8 @@
   },
   "Page": {
     "Title": "Health checks",
-    "LastChecked": "Last updated"
+    "LastChecked": "Last updated",
+    "StaleChecked": "Captured (stale)"
   },
   "Access": {
     "Checking": "Checking dashboard access…",
@@ -29,8 +30,14 @@
     "Ready": "Required checks passed. This host can receive traffic.",
     "ReadyDegraded": "This host can receive traffic, but some required checks are degraded.",
     "NotReady": "This host cannot receive traffic until the required checks pass.",
-    "AutoRefresh": "Refreshes every 10s",
-    "CoverageMissingDescription": "No readiness checks are registered. Traffic readiness cannot be established from this snapshot."
+    "AutoRefresh": "Auto {0}s · {1}s",
+    "CoverageMissingDescription": "No readiness checks are registered. Traffic readiness cannot be established from this snapshot.",
+    "BlockingFinding": "Readiness is blocked by {0} (Unhealthy, {1} · {2} of parallel wall time).",
+    "LivenessFinding": "Liveness probe {0} returns HTTP 503. {1} is unhealthy ({2}). Readiness is {3}.",
+    "CalmFinding": "All {0} readiness checks and {1} liveness checks passed in {2} (slowest {3} at {4}).",
+    "DegradesFinding": "Degraded readiness checks: {0}.",
+    "LivenessPassFinding": "Liveness passes ({0} healthy).",
+    "AuxFinding": "Outside both probes, {0} requires attention."
   },
   "Status": {
     "Healthy": "Healthy",
@@ -40,25 +47,38 @@
   "Filters": {
     "AnyStatus": "All checks",
     "TagLabel": "Tag",
-    "Results": "Showing {0} of {1}"
+    "Results": "Showing {0} of {1}",
+    "AllTags": "All tags",
+    "Probe": "Probe: {0}"
   },
   "Common": {
-    "DurationMilliseconds": "{0:0.##} ms"
+    "DurationMilliseconds": "{0} ms",
+    "DurationSeconds": "{0:0.00} s",
+    "ListSeparator": ", ",
+    "LessThanOnePercent": "<1%"
   },
   "Details": {
     "Eyebrow": "Health-check evidence",
     "Description": "Description",
     "NoDescription": "No description was reported.",
-    "Duration": "Duration",
-    "Tags": "Tags",
+    "Duration": "Check duration",
+    "Tags": "Registration tags",
     "Data": "Diagnostic data",
     "NoData": "No diagnostic data was reported.",
-    "Error": "Reported error"
+    "Error": "Reported error",
+    "ErrorType": "Type",
+    "ErrorMessage": "Message",
+    "ErrorSanitized": "The Health Check snapshot keeps a bounded, sanitized exception type and message. Stack traces are omitted.",
+    "CopyValue": "Copy value"
   },
   "Gates": {
     "Population": "{0} / {1} readiness checks healthy · {2} registered",
-    "Overlap": "{0} participates in both probes · {1} unique checks",
-    "Impact": "{0} · {1}"
+    "Overlap": "Note: {0} carries both ready and live tags and counts in both gates; total unique checks: {1}.",
+    "Both": "{0} & {1}",
+    "BothProbes": "Readiness + Liveness",
+    "Blocks": "Blocks {0}",
+    "Degrades": "Degrades {0}",
+    "Summary": "{0} / {1} healthy"
   },
   "Design": {
     "AllParallelCaption": "{0} parallel",
@@ -70,7 +90,8 @@
       "Duration": "Duration",
       "Name": "Check",
       "Probe": "Probe gate",
-      "Status": "Status"
+      "Status": "Status",
+      "Actions": "Actions"
     },
     "CopyJson": "Copy sanitized JSON",
     "DataCountBadge": "{0} data",
@@ -94,7 +115,14 @@
       "OriginMonica": "Monica framework module (monica tag)",
       "ProbeParticipation": "Probe gates",
       "TimingTitle": "Execution timing & probe contract",
-      "WallShareLabel": "Parallel wall share"
+      "WallShareLabel": "Parallel wall share",
+      "CopyName": "Copy check name",
+      "Captured": "Snapshot at {0}",
+      "ShareValue": "{0} of {1} snapshot",
+      "BackToRegistry": "Close and return to registry",
+      "DataCount": "{0} keys",
+      "DataRedactedCount": "{0} keys ({1} redacted)",
+      "RedactedHint": "The host replaced this sensitive value with [redacted]."
     },
     "LivenessLabel": "Liveness",
     "NoMatchDesc": "Adjust search, status, tag, or probe filters to view entries. The summary above always reflects the complete host snapshot.",
@@ -127,6 +155,15 @@
       "Degraded": "Alive, degraded",
       "Healthy": "Alive",
       "Unhealthy": "Liveness failing"
-    }
+    },
+    "PointInTime": "Point-in-time · no history stored",
+    "EnvelopeCalmPill": "All {0} healthy · no blockers",
+    "EnvelopeWallFlag": "Snapshot {0}",
+    "EnvelopeReadout": "{0} · {1} · {2} ({3} of wall time)",
+    "EndpointDisabled": "Endpoint disabled",
+    "CopyHost": "Copy host name {0}",
+    "ErrorBadge": "Error",
+    "NoTags": "No tags",
+    "Copied": "Copied to clipboard"
   }
 }

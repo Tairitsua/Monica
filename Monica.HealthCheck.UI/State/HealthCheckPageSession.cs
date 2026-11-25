@@ -36,6 +36,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
     private PeriodicTimer? _refreshTimer;
     private Task? _refreshLoopTask;
     private Task<bool>? _refreshTask;
+    private long _lastPollTimestamp;
     private bool _disposed;
 
     internal HealthCheckPageSession(
@@ -50,6 +51,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         _authorize = authorize ?? throw new ArgumentNullException(nameof(authorize));
         HostName = hostName;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _lastPollTimestamp = _timeProvider.GetTimestamp();
         _refreshInterval = refreshInterval ?? DEFAULT_REFRESH_INTERVAL;
         if (_refreshInterval <= TimeSpan.Zero)
         {
@@ -106,6 +108,9 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         .ToArray() ?? [];
 
     internal bool Paused => _state.Paused;
+    internal int RefreshIntervalSeconds => (int)Math.Ceiling(_refreshInterval.TotalSeconds);
+    internal int SecondsUntilRefresh => (int)Math.Ceiling(Math.Max(0,
+        (_refreshInterval - _timeProvider.GetElapsedTime(Volatile.Read(ref _lastPollTimestamp))).TotalSeconds));
     internal string? Probe => _state.Probe;
     internal string? Sort => _state.Sort;
 
@@ -114,6 +119,8 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
             && (string.IsNullOrEmpty(TagFilter) || entry.Tags.Contains(TagFilter, StringComparer.OrdinalIgnoreCase))
             && (string.IsNullOrEmpty(NameFilter) || entry.Name.Contains(NameFilter, StringComparison.OrdinalIgnoreCase)
                 || entry.Description?.Contains(NameFilter, StringComparison.OrdinalIgnoreCase) == true
+                || entry.Error?.Message.Contains(NameFilter, StringComparison.OrdinalIgnoreCase) == true
+                || entry.Error?.Type.Contains(NameFilter, StringComparison.OrdinalIgnoreCase) == true
                 || entry.Tags.Any(tag => tag.Contains(NameFilter, StringComparison.OrdinalIgnoreCase))));
 
     /// <summary>Gets the sorted entries matching the current registry filters.</summary>
@@ -126,7 +133,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
             {
                 "duration" => entries.OrderByDescending(e => e.Duration).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase),
                 "name" => entries.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase),
-                _ => entries.OrderByDescending(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                _ => entries.OrderByDescending(e => e.Status).ThenBy(e => MatchesProbe(e, "other")).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             }).ToArray();
         }
     }
@@ -148,8 +155,8 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
             {
                 NameFilter = query?.Trim() ?? string.Empty,
                 TagFilter = tag,
-                Probe = probe,
-                Sort = sort,
+                Probe = probe is "ready" or "live" or "other" ? probe : null,
+                Sort = sort is "duration" or "name" ? sort : null,
                 StatusFilter = Enum.TryParse<HealthCheckState>(status, true, out var value) && Enum.IsDefined(value) ? value : null
             };
         }
@@ -392,6 +399,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
                 return;
             }
 
+            Volatile.Write(ref _lastPollTimestamp, _timeProvider.GetTimestamp());
             _refreshTimer = new PeriodicTimer(_refreshInterval, _timeProvider);
             _refreshLoopTask = RunRefreshLoopAsync(_refreshTimer, _lifetimeCancellation.Token);
         }
@@ -403,6 +411,7 @@ public sealed class HealthCheckPageSession : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
+                Volatile.Write(ref _lastPollTimestamp, _timeProvider.GetTimestamp());
                 if (!Paused) await RefreshAsync();
             }
         }

@@ -1,31 +1,106 @@
+@using Microsoft.Extensions.Options
+@using Monica.Modules
+@inject IOptions<ModuleHealthCheckOption> Options
 @inject IStringLocalizer<HealthCheckResource> L
 @inject NavigationManager Nav
-<section class="hc-registry">
-    <header><div><h2>@L["Design:RegistryTitle"]</h2><p>@L["Design:RegistryDesc"]</p></div><small>@L["Filters:Results", Session.FilteredEntries.Count, Session.Snapshot?.Entries.Count ?? 0]</small></header>
+
+@{
+    var entries = Session.FilteredEntries;
+    var total = Session.Snapshot?.Entries.Count ?? 0;
+    var shown = L["Filters:Results", entries.Count, total];
+    var wall = Session.Snapshot is { } snapshot ? HealthCheckDisplay.Wall(snapshot) : TimeSpan.Zero;
+}
+<section class="hc-registry mo-vl-surface" aria-label="@L["Design:RegistryTitle"]">
+    <header class="mo-vl-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.ListChecks" Size="16px" /></span>
+        <div><h2>@L["Design:RegistryTitle"]</h2><p>@L["Design:RegistryDesc"]</p></div>
+        <span class="hc-reg-total mo-vl-mono">@total</span>
+        <span class="hc-reg-count" aria-live="polite">@shown</span>
+    </header>
     <HealthCheckFilters Session="@Session" />
-    @if (Session.FilteredEntries.Count == 0)
+    @if (entries.Count == 0)
     {
-        <MoContentState><h3>@L["Design:NoMatchTitle"]</h3><p>@L["Design:NoMatchDesc"]</p><MudButton Href="@Nav.ToAbsoluteUri("health-checks").ToString()">@L["Actions:ClearFilters"]</MudButton></MoContentState>
+        <MoContentState>
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Search" Size="18px" /></span>
+            <h3>@L["Design:NoMatchTitle"]</h3><p>@L["Design:NoMatchDesc"]</p>
+            <MudButton Variant="Variant.Outlined" Href="@HealthCheckFilters.Clear(Nav)">@L["Actions:ClearFilters"]</MudButton>
+        </MoContentState>
     }
     else
     {
-        <div class="hc-table-wrap"><table class="hc-table"><thead><tr><th>@L["Design:Cols:Name"]</th><th>@L["Design:Cols:Probe"]</th><th>@L["Design:Cols:Status"]</th><th>@L["Design:Cols:Duration"]</th><th></th></tr></thead><tbody>
-        @foreach (var item in Session.FilteredEntries)
-        {
-            var url = Nav.GetUriWithQueryParameter("entry",item.Name);
-            var share = Session.Snapshot!.Duration > TimeSpan.Zero ? item.Duration / Session.Snapshot.Duration : (double?)null;
-            <tr><td><a class="hc-name" href="@url">@item.Name</a><p>@item.Description</p><div class="hc-tags">@foreach (var tag in item.Tags) { <a class="mo-vl-id-chip" href="@Nav.GetUriWithQueryParameter("tag",tag)">@tag</a> }
-                @if (item.Data.Count > 0) { <small>@L["Design:DataCountBadge",item.Data.Count]</small> }
-                @if (item.Data.Values.Count(v => v == "[redacted]") is > 0 and var n) { <small>@L["Design:RedactedBadge",n]</small> }</div></td>
-                <td>@foreach (var (id, label) in Probes.Where(p => HealthCheckPageSession.MatchesProbe(item,p.Id))) { <span class="hc-probe">@L[label]</span> }</td>
-                <td><span class="hc-status" style="@HealthCheckDisplay.IconStyle(item.Status)">@L.GetStatusText(item.Status)</span></td>
-                <td><b>@L["Common:DurationMilliseconds",item.Duration.TotalMilliseconds]</b><div class="hc-meter"><i style="@FormattableString.Invariant($"width:{Math.Clamp(share ?? 0,0,1)*100:0.###}%")"></i></div><small>@L["Design:WallShareSub",share?.ToString("P1") ?? "—"]</small></td>
-                <td><a href="@url" aria-label="@L["Actions:DetailsFor",item.Name]"><MoIcon Icon="@MoIcons.ChevronRight" Size="1rem" /></a></td></tr>
-        }</tbody></table></div>
+        <div class="hc-table-wrap">
+            <table class="hc-table" aria-label="@L["Design:RegistryTitle"]">
+                <thead><tr>
+                    <th scope="col">@L["Design:Cols:Name"]</th><th scope="col">@L["Design:Cols:Probe"]</th>
+                    <th scope="col">@L["Design:Cols:Status"]</th><th class="is-num" scope="col">@L["Design:Cols:Duration"]</th>
+                    <th class="hc-col-act" scope="col"><span class="hc-visually-hidden">@L["Design:Cols:Actions"]</span></th>
+                </tr></thead>
+                <tbody>
+                @foreach (var entry in entries)
+                {
+                    var url = Nav.GetUriWithQueryParameter("entry", entry.Name);
+                    var share = HealthCheckDisplay.Share(entry.Duration, wall);
+                    var shareText = HealthCheckDisplay.ShareText(entry.Duration, wall, L);
+                    var role = HealthCheckDisplay.Role(entry.Status);
+                    var impact = HealthCheckDisplay.Impact(entry, Options.Value, L);
+                    var redacted = HealthCheckDisplay.RedactedCount(entry);
+                    var selected = string.Equals(EntryName, entry.Name, StringComparison.OrdinalIgnoreCase);
+                    <tr @key="entry.Name" class="@(selected ? "is-selected" : null) @(entry.Status == HealthCheckState.Unhealthy ? "is-unhealthy-row" : null)">
+                        <td class="hc-cell-id">
+                            <div class="hc-row-id">
+                                <div class="hc-row-head">
+                                    <a class="hc-row-name" aria-haspopup="dialog" href="@url">@entry.Name</a>
+                                    @if (entry.Error is not null)
+                                    {
+                                        <span class="hc-err-chip mo-vl-role--error"><MoIcon Icon="@MoIcons.Error" Size="12px" />@L["Design:ErrorBadge"]</span>
+                                    }
+                                </div>
+                                <p class="hc-row-desc @(entry.Description is null ? "is-empty" : null)">@(entry.Description ?? L["Details:NoDescription"].Value)</p>
+                                <div class="hc-row-meta">
+                                    @if (entry.Tags.Count == 0) { <span class="hc-tag-empty">@L["Design:NoTags"]</span> }
+                                    @foreach (var tag in entry.Tags)
+                                    {
+                                        var active = string.Equals(Session.TagFilter, tag, StringComparison.OrdinalIgnoreCase);
+                                        <button type="button" class="hc-tag-pill @HealthCheckDisplay.TagRole(tag).ToCssClass() @(active ? "is-active" : null)"
+                                                aria-pressed="@(active ? "true" : "false")" @onclick="@(() => ToggleTag(active ? null : tag))">@tag</button>
+                                    }
+                                    @if (entry.Data.Count > 0)
+                                    {
+                                        <i class="hc-meta-sep" aria-hidden="true"></i><span class="hc-meta-fact">@L["Design:DataCountBadge", entry.Data.Count]</span>
+                                    }
+                                    @if (redacted > 0)
+                                    {
+                                        <span class="hc-meta-fact is-redacted"><MoIcon Icon="@MoIcons.Lock" Size="11px" />@L["Design:RedactedBadge", redacted]</span>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td class="hc-cell-probe" data-label="@L["Design:Cols:Probe"]"><span class="hc-impact-pill @impact.Role.ToCssClass()">@impact.Label</span></td>
+                        <td class="hc-cell-status" data-label="@L["Design:Cols:Status"]">
+                            <span class="hc-state-pill @role.ToCssClass()"><MoIcon Icon="@HealthCheckDisplay.Icon(entry.Status)" Size="13px" />@L.GetStatusText(entry.Status)</span>
+                        </td>
+                        <td class="is-num hc-cell-dur" data-label="@L["Design:Cols:Duration"]">
+                            <span class="hc-dur-stack">
+                                <span class="hc-dur-val">@HealthCheckDisplay.Duration(entry.Duration, L)</span>
+                                <span class="hc-dur-bar" aria-hidden="true"><i class="@role.ToCssClass()" style="@HealthCheckDisplay.BarWidth(share, 2)"></i></span>
+                                <span class="hc-dur-share">@L["Design:WallShareSub", shareText]</span>
+                            </span>
+                        </td>
+                        <td class="hc-cell-act" data-label="@L["Design:Cols:Actions"]">
+                            <a class="hc-action-link" href="@url" aria-label="@L["Actions:DetailsFor", entry.Name]" aria-haspopup="dialog" aria-expanded="@(selected ? "true" : "false")"><MoIcon Icon="@MoIcons.ChevronRight" Size="16px" /></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     }
-    <footer>@L[Session.Paused ? "Design:FooterAutoPaused" : "Design:FooterAutoActive"]</footer>
+    <footer class="hc-reg-foot"><span class="hc-reg-foot-left"><MoIcon Icon="@MoIcons.Clock" Size="13px" />@L[Session.Paused ? "Design:FooterAutoPaused" : "Design:FooterAutoActive"]</span><span class="hc-reg-foot-right">@shown</span></footer>
 </section>
+
 @code {
     [Parameter, EditorRequired] public HealthCheckPageSession Session { get; set; } = default!;
-    internal static readonly (string Id,string Label)[] Probes = [("ready","Design:ReadinessLabel"),("live","Design:LivenessLabel"),("other","Design:AuxiliaryLabel")];
+    [Parameter] public string? EntryName { get; set; }
+    internal static readonly (string Id, string Label)[] Probes = [("ready", "Design:ReadinessLabel"), ("live", "Design:LivenessLabel"), ("other", "Design:AuxiliaryLabel")];
+    private void ToggleTag(string? tag) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("tag", tag), replace: true);
 }
