@@ -93,6 +93,7 @@
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-divider {
+    inline-size: auto;
     margin: 5px 4px;
 }
 
