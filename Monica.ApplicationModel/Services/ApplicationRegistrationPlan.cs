@@ -6,7 +6,7 @@ using Monica.Core.TypeDiscovery.Abstractions;
 namespace Monica.ApplicationModel.Services;
 
 /// <summary>Validates local registration declarations before any user registration callback executes.</summary>
-internal sealed record ApplicationRegistrationPlan(string OwnerId, Type RegistrationType, bool IsActive)
+internal sealed record ApplicationRegistrationPlan(string OwnerId, Type RegistrationType, string? ActiveRoleId, bool IsActive)
 {
     internal static IReadOnlyList<ApplicationRegistrationPlan> Create(IApplicationManifest manifest,
         IApplicationModel model, ITypeFinder finder)
@@ -29,7 +29,7 @@ internal sealed record ApplicationRegistrationPlan(string OwnerId, Type Registra
                 && registration.GetMethod(nameof(ApplicationRegistration.ConfigureActive), [typeof(ApplicationRegistrationContext)])!.DeclaringType != typeof(ApplicationRegistration))
                 throw new InvalidOperationException($"Domain '{ownerId}' must declare BackgroundRole to own its ConfigureActive registration.");
             var activeRole = domain?.BackgroundRole ?? role?.RoleId;
-            plans.Add(new ApplicationRegistrationPlan(ownerId, registration,
+            plans.Add(new ApplicationRegistrationPlan(ownerId, registration, activeRole,
                 activeRole is not null && model.IsRoleActive(activeRole)));
         }
         return plans.OrderBy(static plan => plan.OwnerId, StringComparer.Ordinal)

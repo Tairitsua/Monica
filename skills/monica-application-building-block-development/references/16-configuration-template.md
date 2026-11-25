@@ -73,7 +73,7 @@ var database = context.GetStartupOptions<OptionsOrderingDatabase>();
 // Use database.ConnectionString in this domain's existing provider registration.
 ```
 
-The value is validated immediately and shared with later default-name options injection. Consumers must not mutate it. Every discovered Startup definition is validated before composition completes, even when not explicitly read there. File reloads produce candidates for inspection, not a new running connection object. Keep current-process selection in `Application` and canonical AppId, AppName, scope and role placement in `Deployment.Applications` / `Deployment.Scope` rather than duplicating them in an options class.
+The host-wide value is validated immediately and shared with later default-name options injection. Consumers must treat it as read-only. Discovered host-wide Startup owners are validated even without an explicit read. A role-exclusive integration can opt into [role-scoped preflight](../../monica-infra-configuration/references/options-and-validation.md) and bind only where its owner is assigned. File reloads expose candidates for inspection. Keep current-process selection in `Application` and canonical AppId, AppName, scope and role placement in `Deployment.Applications` / `Deployment.Scope`.
 
 ## Choose the persisted identity migration explicitly
 

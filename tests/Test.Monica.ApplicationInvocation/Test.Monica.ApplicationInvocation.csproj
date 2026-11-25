@@ -3,6 +3,7 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../Monica.Configuration/Monica.Configuration.csproj" />
     <ProjectReference Include="../../Monica.Testing/Monica.Testing.csproj" />
     <ProjectReference Include="../Fixtures/ApplicationModel.Role/ApplicationModel.Role.csproj" />
     <ProjectReference Include="../Fixtures/ApplicationInvocation.Role/ApplicationInvocation.Role.csproj" />

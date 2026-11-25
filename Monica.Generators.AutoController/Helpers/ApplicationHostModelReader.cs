@@ -51,6 +51,12 @@ internal static class ApplicationHostModelReader
                 ? NormalizeDomain(attribute.ConstructorArguments[domainIndex]) : null;
             var roleId = role?.ConstructorArguments.FirstOrDefault().Value as string;
             var workloadOwner = role?.NamedArguments.FirstOrDefault(static argument => argument.Key == "WorkloadOwner").Value.Value as string;
+            var criticality = role?.NamedArguments.FirstOrDefault(static argument => argument.Key == "Criticality").Value.Value as int? ?? 0;
+            if (criticality is not (0 or 1))
+            {
+                InvalidDeclaration(assembly, "Criticality must be Required or Optional.");
+                continue;
+            }
             var backgroundRole = domain?.NamedArguments.FirstOrDefault(static argument => argument.Key == "BackgroundRole").Value.Value as string;
             if (string.IsNullOrWhiteSpace(domainId) || domainId != domainId!.Trim() ||
                 (role is not null && (string.IsNullOrWhiteSpace(roleId) || roleId != roleId!.Trim())))
@@ -74,7 +80,7 @@ internal static class ApplicationHostModelReader
                 InvalidDeclaration(assembly, registrationError);
                 continue;
             }
-            declarations.Add(assembly, new ApplicationAssemblyModel(assembly.Name, domainId!, roleId, workloadOwner, backgroundRole));
+            declarations.Add(assembly, new ApplicationAssemblyModel(assembly.Name, domainId!, roleId, workloadOwner, backgroundRole, criticality == 1));
         }
 
         foreach (var duplicate in declarations.Values.GroupBy(static declaration =>

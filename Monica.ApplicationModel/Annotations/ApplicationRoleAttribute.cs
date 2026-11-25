@@ -15,6 +15,9 @@ public sealed class ApplicationRoleAttribute(string roleId, object domain) : Att
     /// <remarks>Null uses RoleId. This value does not change when a role moves between logical applications.</remarks>
     public string? WorkloadOwner { get; set; }
 
+    /// <summary>Default startup criticality. Required roles keep host fail-fast under the automatic policy.</summary>
+    public Monica.Core.ApplicationRoles.RoleCriticality Criticality { get; set; }
+
     /// <summary>Names this assembly's optional concrete application registration with a public parameterless constructor.</summary>
     public Type? Registration { get; set; }
 }

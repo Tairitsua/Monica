@@ -4,7 +4,11 @@ namespace Monica.ApplicationModel.Models;
 public sealed record ApplicationDomainDefinition(string Id, string AssemblyName, string? BackgroundRole = null);
 
 /// <summary>Describes one role's stable identity, business ownership, and implementation assembly.</summary>
-public sealed record ApplicationRoleDefinition(string Id, string DomainId, string AssemblyName, string? WorkloadOwner = null);
+public sealed record ApplicationRoleDefinition(string Id, string DomainId, string AssemblyName, string? WorkloadOwner = null)
+{
+    /// <summary>Gets the role's startup criticality. Existing and unannotated manifests default to Required.</summary>
+    public Monica.Core.ApplicationRoles.RoleCriticality Criticality { get; init; } = Monica.Core.ApplicationRoles.RoleCriticality.Required;
+}
 
 /// <summary>Describes an application operation independently of its HTTP route or deployment address.</summary>
 /// <remarks>Handler names identify the producer's implementation without loading it. Only local bindings resolve them to runtime types.</remarks>

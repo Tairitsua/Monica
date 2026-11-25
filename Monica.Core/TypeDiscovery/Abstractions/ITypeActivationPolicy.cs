@@ -46,6 +46,9 @@ public interface ITypeActivationPolicy
     /// <remarks>Schedulers publish empty snapshots for selected owners whose last job was removed. Null means no application-owned inventory; an empty collection means the known inventory selects no owners.</remarks>
     IReadOnlyCollection<string>? ActiveWorkloadOwners => null;
 
+    /// <summary>Assigned owners quarantined on this instance. No work or durable manifest reconciliation is admitted for them.</summary>
+    IReadOnlyCollection<string> SuspendedWorkloadOwners => [];
+
     /// <summary>Gets local eligibility and automatic-execution permission for a resource.</summary>
     /// <param name="implementationType">The actual implementation; its initializer attributes are never read from the owner.</param>
     /// <param name="kind">The resource boundary being evaluated.</param>
@@ -55,6 +58,10 @@ public interface ITypeActivationPolicy
 
     /// <summary>Rejects a local request whose execution requirements are not satisfied, before resolving its handler.</summary>
     void EnsureCanExecuteRequest(Type requestType);
+
+    /// <summary>Gets the quarantined role for a resolved handler registration identity, before activating the implementation.</summary>
+    /// <remarks>Domain-owned handlers remain passive unless they have an explicit role owner. Standalone policies return null.</remarks>
+    string? GetFaultedRequestHandlerRole(Type implementationType, Type? registrationOwner = null) => null;
 
     /// <summary>Gets stable durable-work ownership independent of deployment AppId, or null for ordinary infrastructure.</summary>
     /// <remarks>Applications normally use the role ID; migrations may preserve an existing scheduler namespace.</remarks>

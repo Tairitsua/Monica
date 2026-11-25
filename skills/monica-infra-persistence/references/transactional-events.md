@@ -1,5 +1,7 @@
 # Transactional events and delivery
 
+Application-model hosts admit Outbox workers by the concrete context's execution owner. A quarantined context contributes no automatic store. Explicit `DrainAsync` and `CleanupAsync` on its dispatcher raise `RoleUnavailableException` before taking a lease or claiming rows. Committed pending rows stay available for a future healthy owner. A healthy sibling context can continue dispatching in the same process.
+
 Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores. Use `SharedStoreKey` below to consolidate automatic dispatchers and qualify delivery destinations.
 
 Outbox physical-table discovery and native retry-clock reads execute on the context-owned connection, preserving its active transaction and command timeout. These store operations do not require scalar query-root support from a business model's custom query compiler. Verify worker startup and failed-delivery retry on the real sharding/provider composition as well as ordinary entity queries.

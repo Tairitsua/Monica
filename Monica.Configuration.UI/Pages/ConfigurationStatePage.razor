@@ -394,7 +394,7 @@
 
                                     @if (_selectedDefinition.Kind == ConfigurationKind.Startup)
                                     {
-                                        <ConfigurationStartupStatus Candidate="@_startupCandidate" />
+                                        <ConfigurationStartupStatus Candidate="@_startupCandidate" Admission="@_startupStatus" />
                                     }
 
                                     @if (IsSelectedDefinitionRetired)

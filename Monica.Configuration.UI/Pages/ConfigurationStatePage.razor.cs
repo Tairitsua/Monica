@@ -30,6 +30,7 @@ public partial class ConfigurationStatePage
     private ConfigurationDefinitionSummary? _selectedSummary;
     private ConfigurationDefinition? _selectedDefinition;
     private ConfigurationStartupCandidate? _startupCandidate;
+    private Monica.Configuration.Models.ConfigurationStartupStatus? _startupStatus;
     private bool _isUnpersisted;
     private ConfigurationNodeDefinition? _selectedNode;
     private string _searchText = string.Empty;
@@ -454,6 +455,7 @@ public partial class ConfigurationStatePage
         _selectedSummary = null;
         _selectedDefinition = null;
         _startupCandidate = null;
+        _startupStatus = null;
         _isUnpersisted = false;
         _selectedNode = null;
         _highlightedPath = null;
@@ -688,6 +690,7 @@ public partial class ConfigurationStatePage
         var selectedPath = resetSelection ? LogicalPath.Root : _selectedNode?.RelativePath ?? LogicalPath.Root;
         _selectedDefinition = state.Definition;
         _startupCandidate = state.StartupCandidate;
+        _startupStatus = state.StartupStatus;
         _isUnpersisted = state.IsUnpersisted;
         _definitionDetails[state.Definition.DefinitionKey] = state.Definition;
         _selectedNode = ResolveNodeByPath(state.Definition.Root, selectedPath) ?? state.Definition.Root;

@@ -1,0 +1,42 @@
+@using Microsoft.Extensions.Diagnostics.HealthChecks
+@inject IStringLocalizer<HealthCheckResource> L
+@inject NavigationManager Nav
+
+@{
+    var host = Snapshot.Host;
+    var active = host.Roles.Where(role => role.IsActiveOnCurrentHost).ToArray();
+    var faults = active.Where(role => role.Status == RoleHealthStatus.Faulted).ToArray();
+    var attention = active.Where(role => role.Status is RoleHealthStatus.Faulted or RoleHealthStatus.Degraded).OrderBy(RoleHealthDisplay.Severity).ToArray();
+    var candidates = faults.Where(role => role.Faults.Any(fault => fault.Stage == RoleFaultStage.StartupConfiguration)).ToArray();
+    var gate = Snapshot.RoleReadiness switch { HealthStatus.Healthy => MoVisualRole.Success, HealthStatus.Degraded => MoVisualRole.Warning, _ => MoVisualRole.Error };
+    var http = Snapshot.RoleReadiness == HealthStatus.Unhealthy ? 503 : 200;
+}
+<section class="rh-signature mo-vl-surface @gate.ToCssClass()" aria-label="@L["Roles:Attention"]">
+    <div class="rh-decision">
+        <div>
+            <div class="rh-kicker">@L["Roles:Attention"] <span class="mo-vl-capsule mo-vl-role--primary">@Policy</span> <span class="mo-vl-capsule @gate.ToCssClass()">@L["Roles:Gate"] · HTTP @http</span></div>
+            <div class="rh-display-row"><i class="rh-verdict-bar" aria-hidden="true"></i><strong>@attention.Length</strong><small>@L["Roles:ActiveTotal", active.Length]</small></div>
+            <p class="rh-pop">@L["Roles:Population", active.Count(r => r.Status == RoleHealthStatus.Healthy), active.Count(r => r.Status == RoleHealthStatus.Degraded), faults.Length, host.Roles.Count - active.Length]</p>
+        </div>
+        <p class="rh-finding">
+            @L[active.Length == 0 ? "Roles:Zero" : attention.Length == 0 ? "Roles:Calm" : "Roles:AttentionFinding"]
+            @foreach (var r in attention)
+            {
+                <a class="mo-vl-mark @RoleHealthDisplay.Color(r.Status).ToCssClass()" href="@Nav.GetUriWithQueryParameter("role", r.RoleId)">@r.RoleId</a>
+            }
+        </p>
+    </div>
+    <div class="rh-strip">
+        <div><h3><i class="mo-vl-swatch mo-vl-role--primary"></i>@L["Roles:Policy"]</h3><strong>@Policy</strong><small>@host.DeploymentScope · @L["Roles:PolicyCounts", active.Count(r => r.EffectiveCriticality == RoleCriticality.Required), active.Count(r => r.EffectiveCriticality == RoleCriticality.Optional), active.Count(r => r.OverrideCriticality is not null)]</small></div>
+        <a href="/health-checks?entry=monica.application.roles"><h3><i class="mo-vl-swatch @gate.ToCssClass()"></i>@L["Roles:Gate"]</h3><strong>HTTP @http · @L[$"Status:{Snapshot.RoleReadiness}"]</strong><small>monica.application.roles</small></a>
+        <a href="@Nav.GetUriWithQueryParameter("status", "Faulted")"><h3><i class="mo-vl-swatch mo-vl-role--error"></i>@L["Roles:Quarantine"]</h3><strong>@L["Roles:QuarantinedCount", faults.Length]</strong><small>@L["Roles:ResourcesCount", faults.Sum(r => Snapshot.Resources.GetValueOrDefault(r.RoleId)?.Count ?? 0)]</small></a>
+        <a href="@Nav.GetUriWithQueryParameter("stage", nameof(RoleFaultStage.StartupConfiguration))"><h3><i class="mo-vl-swatch mo-vl-role--info"></i>@L["Roles:Recovery"]</h3><strong>@L["Roles:VerifiedCount", candidates.Count(RoleHealthDisplay.CandidateReady), candidates.Length]</strong><small>@L["Roles:InstanceOnly"]</small></a>
+    </div>
+    <RoleBulkheadBoard Roles="@host.Roles" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RoleHealthDashboardSnapshot Snapshot { get; set; } = default!;
+    private string Policy => Snapshot.Host.ConfiguredPolicyMode == RoleFaultPolicyMode.Auto && Snapshot.Host.Roles.Count(r => r.IsActiveOnCurrentHost) == 1
+        ? L["Roles:AutoSingle"].Value : Snapshot.Host.ConfiguredPolicyMode.ToString();
+}

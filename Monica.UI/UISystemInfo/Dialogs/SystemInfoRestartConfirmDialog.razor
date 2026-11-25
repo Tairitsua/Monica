@@ -1,5 +1,7 @@
 @using Microsoft.Extensions.Localization
 @using Monica.UI.Localization
+@using Monica.UI.UISystemInfo.Models
+@using Monica.UI.UISystemInfo.Components
 @using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<SystemInfoResource> L
 
@@ -13,6 +15,11 @@
     <DialogContent>
         <div class="system-info-restart-dialog">
             <p>@L["Page:Dialogs:Restart:Summary"]</p>
+            @if (Deployment is { } deployment)
+            {
+                <h3>@L["Page:Recovery:Impact"]</h3>
+                <SystemInfoRestartImpact Deployment="@deployment" />
+            }
             <div class="system-info-restart-dialog__delay">
                 <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />
                 @L["Page:Dialogs:Restart:DelayNotice", DelaySeconds]
@@ -37,6 +44,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
     [Parameter] public double DelaySeconds { get; set; }
+    [Parameter] public SystemInfoRoleDeployment? Deployment { get; set; }
 
     private void Cancel() => MudDialog?.Cancel();
     private void Confirm() => MudDialog?.Close(DialogResult.Ok(true));

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Monica.Testing.Localization;
 using Monica.UI.Localization;
+using Monica.UI.Shell.Support;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -21,6 +22,10 @@ internal sealed class SystemInfoUiTestContext : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
         Services.AddOptions();
+        var pages = new PageRegistry();
+        pages.Seal();
+        Services.AddSingleton<IPageCatalog>(pages);
+        Services.AddScoped<PageAccessEvaluator>();
         Services.AddSingleton<global::Monica.UI.Shared.Services.MoTimeFormatter>();
         Services.AddSingleton(localizer ?? new EchoStringLocalizer<SystemInfoResource>());
         configureServices?.Invoke(Services);

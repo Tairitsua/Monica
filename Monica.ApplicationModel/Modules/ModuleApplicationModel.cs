@@ -1,4 +1,5 @@
 using System.Reflection;
+using Monica.Core.ApplicationRoles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.ApplicationModel.Abstractions;
@@ -52,7 +53,8 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
         CompiledApplicationModel model;
         try
         {
-            model = new CompiledApplicationModel(manifest, deployment, Application.TypeFinder, Application.Application.AutonomousWork);
+            model = new CompiledApplicationModel(manifest, deployment, Application.TypeFinder, Application.Application.AutonomousWork,
+                builder.Composition.StartupConfiguration, Application.Application.DeploymentScope);
         }
         catch (InvalidOperationException error)
         {
@@ -78,12 +80,13 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
         if (_model is null || _registered)
             throw new InvalidOperationException("Application registration requires one prepared model and may execute only once.");
         _registered = true;
+        _model.ClosePreflight();
         var registrations = _registrations.Select(plan => (Plan: plan,
             Registration: (ApplicationRegistration)Activator.CreateInstance(plan.RegistrationType)!)).ToArray();
         foreach (var (plan, registration) in registrations)
             builder.Composition.RunRegistration(plan.RegistrationType, () => registration.ConfigurePassive(
                 new ApplicationRegistrationContext(builder, hostBuilder, plan.IsActive, Application.Application.AutonomousWork)));
-        foreach (var (plan, registration) in registrations.Where(static item => item.Plan.IsActive))
+        foreach (var (plan, registration) in registrations.Where(item => item.Plan.IsActive && !_model.IsRoleFaulted(item.Plan.ActiveRoleId!)))
             builder.Composition.RunRegistration(plan.RegistrationType, () => registration.ConfigureActive(
                 new ApplicationRegistrationContext(builder, hostBuilder, isActive: true, Application.Application.AutonomousWork)));
     }
@@ -93,6 +96,8 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
     {
         var model = _model ?? throw new InvalidOperationException("The application model must be prepared before service registration.");
         context.Services.AddSingleton<IApplicationModel>(model);
+        context.Services.AddSingleton<IRoleHealthStateProvider>(model);
+        context.Services.AddSingleton<IRoleProbeStateSink>(model);
         context.Services.AddSingleton<Monica.Core.Domains.Abstractions.IDomainCatalogSource, ApplicationDomainCatalogSource>();
         context.Services.AddSingleton(model.Deployment);
         foreach (var client in _clients)

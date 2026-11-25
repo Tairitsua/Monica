@@ -61,6 +61,10 @@ public sealed class ModuleHealthCheckUI : MonicaModule<ModuleHealthCheckUIOption
                     addToNav: true,
                     navOrder: 10,
                     accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleHealthCheckUIOption>));
+                registry.RegisterLocalizedPage<UIRoleHealthPage, HealthCheckResource>(
+                    UIRoleHealthPage.PAGE_URL, "Roles:Title", MoIcons.ShieldCheck, category,
+                    addToNav: true, navOrder: 20,
+                    accessPolicyType: typeof(OperationalPageAccessPolicy<ModuleHealthCheckUIOption>));
             }));
     }
 

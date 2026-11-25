@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Results;
 using Monica.Modules;
 using Monica.UI.Localization;
@@ -25,6 +26,7 @@ namespace Monica.UI.UISystemInfo.Facades;
 /// <param name="systemInfoOptions">The system-information module options.</param>
 /// <param name="localizer">The host-scoped system-information localizer.</param>
 /// <param name="loggerFactory">The host logger factory.</param>
+/// <param name="roleHealth">The optional application-model source of role placement and recovery evidence.</param>
 public sealed class SystemInfoFacade(
     IServer server,
     MonicaApplication monicaApplication,
@@ -34,14 +36,24 @@ public sealed class SystemInfoFacade(
     IHostApplicationLifetime applicationLifetime,
     IOptions<ModuleSystemInfoUIOption> systemInfoOptions,
     IStringLocalizer<SystemInfoResource> localizer,
-    ILoggerFactory loggerFactory)
+    ILoggerFactory loggerFactory,
+    IRoleHealthStateProvider? roleHealth = null)
 {
+    /// <summary>Creates a facade for a host without an application-model contributor.</summary>
+    public SystemInfoFacade(IServer server, MonicaApplication monicaApplication,
+        IOptions<ModuleShellUIOption> shellOptions, MoTimeFormatter timeFormatter, IHostEnvironment hostEnvironment,
+        IHostApplicationLifetime applicationLifetime, IOptions<ModuleSystemInfoUIOption> systemInfoOptions,
+        IStringLocalizer<SystemInfoResource> localizer, ILoggerFactory loggerFactory)
+        : this(server, monicaApplication, shellOptions, timeFormatter, hostEnvironment, applicationLifetime,
+            systemInfoOptions, localizer, loggerFactory, null) { }
+
     private readonly SystemInfoSnapshotProvider _snapshotProvider = new(
         server,
         monicaApplication,
         shellOptions,
         timeFormatter,
-        hostEnvironment);
+        hostEnvironment,
+        roleHealth);
     private readonly SystemInfoRestartCoordinator _restartCoordinator = new(
         applicationLifetime,
         systemInfoOptions,

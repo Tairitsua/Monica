@@ -1,6 +1,6 @@
 {
   "Navigation": {
-    "Title": "健康检查",
+    "Title": "宿主健康",
     "Category": "健康检查"
   },
   "Page": {
@@ -166,5 +166,119 @@
     "ErrorBadge": "错误",
     "NoTags": "无标签",
     "Copied": "已复制到剪贴板"
+  },
+  "Roles": {
+    "Title": "角色健康",
+    "HostHealth": "宿主健康",
+    "Auto": "实时 · 每 10 秒",
+    "Stale": "刷新失败，当前显示上次采集的快照。",
+    "NoModelTitle": "当前宿主未注册应用模型",
+    "NoModel": "注册 AddApplicationModel() 后可查看部署角色、启动隔离与角色就绪状态。当前实例可查看宿主健康。",
+    "Attention": "待关注角色",
+    "Gate": "角色就绪门控",
+    "ActiveTotal": "/ {0} 个本机角色",
+    "Population": "{0} 个健康 · {1} 个降级 · {2} 个故障 · {3} 个远端角色",
+    "Zero": "此部署未分配角色，角色就绪检查通过。",
+    "Calm": "本机角色均未报告故障或探针降级。",
+    "AttentionFinding": "查看以下受影响角色的诊断依据。",
+    "Policy": "故障策略",
+    "PolicyCounts": "{0} 个必需 · {1} 个可选 · {2} 个覆盖",
+    "Quarantine": "当前隔离",
+    "QuarantinedCount": "已隔离 {0} 个角色",
+    "ResourcesCount": "隔离角色拥有 {0} 个已记录资源",
+    "Recovery": "恢复路径",
+    "VerifiedCount": "{0} / {1} 份候选配置已验证",
+    "InstanceOnly": "本实例可观察的配置输入",
+    "AutoSingle": "Auto · 单角色快速失败",
+    "Board": "角色隔离分区",
+    "BoardDesc": "按领域与生效关键性展示本机角色。",
+    "ChamberEmpty": "此分区没有本机角色。",
+    "Override": "部署覆盖",
+    "Verified": "候选配置已验证",
+    "KeyHint": "方向键切换 · 回车查看",
+    "RemotePlacement": "{0} 个角色未在本机启用 · 已分配至 {1}",
+    "ShowRemote": "显示远端角色",
+    "Registry": "角色清单",
+    "RegistryDesc": "查看角色部署、故障阶段和本实例采集的诊断依据。",
+    "Search": "搜索角色、领域或配置路径",
+    "All": "全部",
+    "Role": "角色",
+    "Criticality": "关键性",
+    "Evidence": "诊断依据",
+    "ProbeEvidence": "就绪检查报告角色降级。",
+    "NoFault": "未记录故障",
+    "RemoteUnknown": "远端健康状态未观测",
+    "Inspector": "角色诊断依据",
+    "Missing": "未找到角色",
+    "MissingDesc": "当前宿主目录中没有名为 {0} 的角色。",
+    "InspectConfig": "查看配置",
+    "Candidate": "候选配置",
+    "CandidateReady": "候选配置已在本实例中通过验证。需重启，并在替换实例上确认恢复。",
+    "CandidateUnknown": "本实例尚未验证新的部署输入。Kubernetes subPath 挂载可能需要替换 Pod 才能读取新输入。",
+    "NonConfigRecovery": "排除已报告的故障，并在监管程序替换此实例后验证角色。",
+    "InspectRecovery": "查看重启影响",
+    "Placement": "角色放置及策略来源",
+    "AssignedApp": "所属应用",
+    "Workload": "工作负载所有者",
+    "Declared": "声明关键性",
+    "Effective": "生效故障动作",
+    "Isolate": "隔离角色",
+    "FailFast": "终止宿主启动",
+    "Resources": "资源激活清单",
+    "JobProtection": "持久调度定义已保留",
+    "JobProtectionDesc": "已隔离的所有者不接收本地作业，对账时保留持久调度定义。",
+    "NoResources": "未记录此角色的资源。",
+    "InspectGate": "查看角色就绪探针",
+    "States": {
+      "Healthy": "健康",
+      "Faulted": "故障",
+      "Degraded": "降级",
+      "Inactive": "未启用",
+      "Initializing": "初始化中"
+    },
+    "Criticalities": {
+      "Required": "必需",
+      "Optional": "可选"
+    },
+    "Chamber": {
+      "Required": "必需核心",
+      "Optional": "可选隔离区"
+    },
+    "ChamberDesc": {
+      "Required": "必需角色故障将阻止就绪。",
+      "Optional": "可按策略在此实例中隔离可选角色。"
+    },
+    "Stages": {
+      "StartupConfiguration": "启动配置",
+      "PipelineSetup": "管道设置",
+      "HostedServiceStartup": "托管服务启动",
+      "SeederExecution": "种子执行",
+      "RuntimeResource": "运行时资源",
+      "Runtime": "运行时"
+    },
+    "Sorts": {
+      "domain": "按领域排序",
+      "severity": "按严重性排序",
+      "criticality": "按关键性排序"
+    },
+    "Select": {
+      "domain": "领域",
+      "stage": "故障阶段",
+      "sort": "排序"
+    },
+    "Kinds": {
+      "Job": "调度作业",
+      "HostedService": "托管服务",
+      "Endpoint": "端点",
+      "ExternalSubscription": "事件订阅",
+      "Seeder": "种子",
+      "Outbox": "发件箱",
+      "DataChannel": "数据通道"
+    },
+    "Modes": {
+      "Automatic": "自动",
+      "Manual": "手动",
+      "Disabled": "已禁用"
+    }
   }
 }

@@ -1,0 +1,94 @@
+@inject IStringLocalizer<HealthCheckResource> L
+@inject NavigationManager Nav
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+
+<section class="rh-registry mo-vl-surface" aria-label="@L["Roles:Registry"]">
+    <header class="mo-vl-surface-heading"><span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.ListChecks" Size="16px" /></span>
+        <div><h2>@L["Roles:Registry"]</h2><p>@L["Roles:RegistryDesc"]</p></div>
+        <small aria-live="polite">@L["Filters:Results", _rows.Length, Snapshot.Host.Roles.Count]</small>
+    </header>
+    <div class="rh-toolbar">
+        <div class="rh-inputs">
+            <label class="rh-search"><MoIcon Icon="@MoIcons.Search" Size="15px" /><input type="search" aria-label="@L["Roles:Search"]" placeholder="@L["Roles:Search"]" value="@Search" @oninput="@(e => Set("q", e.Value?.ToString()))" /></label>
+            @Select("domain", Domain, Snapshot.Host.Roles.Select(r => r.DomainId).Distinct().Order(), v => v)
+            @Select("stage", Stage, Snapshot.Host.Roles.SelectMany(r => r.Faults.Select(f => f.Stage.ToString())).Distinct().Order(), v => L[$"Roles:Stages:{v}"].Value)
+            @Select("sort", Sort ?? "severity", ["severity", "criticality", "domain"], v => L[$"Roles:Sorts:{v}"].Value)
+        </div>
+        <div class="rh-filters" role="group" aria-label="@L["Design:Cols:Status"]">
+            <MoFilterChip Label="@L["Roles:All"]" Role="MoVisualRole.Primary" Selected="@(Status is null)" Count="@_statusFacet.Length" Pill="true" SelectedChanged="@(() => Set("status", null))" />
+            @foreach (var state in new[] { RoleHealthStatus.Faulted, RoleHealthStatus.Degraded, RoleHealthStatus.Healthy, RoleHealthStatus.Initializing, RoleHealthStatus.Inactive })
+            {
+                if (state == RoleHealthStatus.Inactive && Inactive != "1" || state == RoleHealthStatus.Initializing && !_statusFacet.Any(r => r.Status == state)) continue;
+                <MoFilterChip Label="@L[$"Roles:States:{state}"]" Role="@RoleHealthDisplay.Color(state)" Selected="@(Status == state.ToString())" Count="@_statusFacet.Count(r => r.Status == state)" ShowDot="true" Pill="true"
+                    SelectedChanged="@(() => Set("status", Status == state.ToString() ? null : state.ToString()))" />
+            }
+            <span class="rh-separator"></span>
+            @foreach (var criticality in Enum.GetValues<RoleCriticality>())
+            {
+                <MoFilterChip Label="@L[$"Roles:Criticalities:{criticality}"]" Role="@(criticality == RoleCriticality.Required ? MoVisualRole.Primary : MoVisualRole.Info)"
+                    Selected="@(Criticality == criticality.ToString())" Count="@_criticalityFacet.Count(r => r.EffectiveCriticality == criticality)" Pill="true"
+                    SelectedChanged="@(() => Set("criticality", Criticality == criticality.ToString() ? null : criticality.ToString()))" />
+            }
+            <label class="rh-toggle"><input type="checkbox" checked="@(Inactive == "1")" @onchange="@(() => Set("inactive", Inactive == "1" ? null : "1"))" />@L["Roles:ShowRemote"]</label>
+        </div>
+    </div>
+    @if (_rows.Length == 0)
+    {
+        <MoContentState><h3>@L["Design:NoMatchTitle"]</h3><a href="/health-checks/roles">@L["Actions:ClearFilters"]</a></MoContentState>
+    }
+    else
+    {
+        <MudTable T="RoleHealthEntrySnapshot" Items="@_rows" Square="true" Dense="true" Elevation="0" Breakpoint="Breakpoint.Sm" Class="rh-table">
+            <HeaderContent><MudTh>@L["Roles:Role"]</MudTh><MudTh>@L["Roles:Criticality"]</MudTh><MudTh>@L["Design:Cols:Status"]</MudTh><MudTh>@L["Roles:Evidence"]</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="@L["Roles:Role"]"><a class="rh-id" href="@Nav.GetUriWithQueryParameter("role", context.RoleId)" aria-haspopup="dialog">@context.RoleId</a><small>@context.DomainId · @context.AssignedAppId</small></MudTd>
+                <MudTd DataLabel="@L["Roles:Criticality"]"><span class="mo-vl-capsule @(context.EffectiveCriticality == RoleCriticality.Required ? "mo-vl-role--primary" : "mo-vl-role--info")">@L[$"Roles:Criticalities:{context.EffectiveCriticality}"]</span>@if (context.OverrideCriticality.HasValue) { <small>@L["Roles:Override"]</small> }</MudTd>
+                <MudTd DataLabel="@L["Design:Cols:Status"]"><span class="mo-vl-status mo-vl-status--pill @RoleHealthDisplay.Color(context.Status).ToCssClass()"><i class="mo-vl-status-dot"></i>@L[$"Roles:States:{context.Status}"]</span></MudTd>
+                <MudTd DataLabel="@L["Roles:Evidence"]">
+                    @if (context.Faults.FirstOrDefault() is { } fault) { <b>@L[$"Roles:Stages:{fault.Stage}"]</b><small>@(fault.ConfigurationIssues.FirstOrDefault()?.LogicalPath ?? fault.Summary)</small> }
+                    else { <span>@L[context.Status == RoleHealthStatus.Degraded ? "Roles:ProbeEvidence" : context.IsActiveOnCurrentHost ? "Roles:NoFault" : "Roles:RemoteUnknown"]</span> }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    <footer>@L["Page:LastChecked"] · @Time.Format(Snapshot.CheckedAt)</footer>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RoleHealthDashboardSnapshot Snapshot { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery] public string? Status { get; set; }
+    [SupplyParameterFromQuery] public string? Criticality { get; set; }
+    [SupplyParameterFromQuery] public string? Domain { get; set; }
+    [SupplyParameterFromQuery] public string? Stage { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public string? Inactive { get; set; }
+    private RoleHealthEntrySnapshot[] _rows = [], _statusFacet = [], _criticalityFacet = [];
+
+    protected override void OnParametersSet()
+    {
+        var search = Search?.Trim() ?? "";
+        var filtered = Snapshot.Host.Roles.Where(role => (role.IsActiveOnCurrentHost || Inactive == "1")
+            && (string.IsNullOrEmpty(Domain) || role.DomainId == Domain)
+            && (string.IsNullOrEmpty(Stage) || role.Faults.Any(f => f.Stage.ToString() == Stage))
+            && (role.RoleId.Contains(search, StringComparison.OrdinalIgnoreCase) || role.DomainId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || role.AssignedAppId.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || role.Faults.Any(fault => fault.ConfigurationIssues.Any(issue => issue.SectionPath.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || issue.LogicalPath.Contains(search, StringComparison.OrdinalIgnoreCase))))).ToArray();
+        _criticalityFacet = filtered.Where(role => Status is null || role.Status.ToString() == Status).ToArray();
+        _statusFacet = filtered.Where(role => Criticality is null || role.EffectiveCriticality.ToString() == Criticality).ToArray();
+        var visible = _statusFacet.Where(role => Status is null || role.Status.ToString() == Status);
+        var sorted = Sort switch { "criticality" => visible.OrderBy(role => role.EffectiveCriticality),
+            "domain" => visible.OrderBy(role => role.DomainId, StringComparer.OrdinalIgnoreCase), _ => visible.OrderBy(RoleHealthDisplay.Severity) };
+        _rows = sorted.ThenBy(role => role.DomainId, StringComparer.OrdinalIgnoreCase).ThenBy(role => role.RoleId, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private RenderFragment Select(string key, string? selected, IEnumerable<string> values, Func<string, string> label) => @<div class="rh-select">
+        <span>@L[$"Roles:Select:{key}"]</span>
+        <MudSelect T="string" aria-label="@L[$"Roles:Select:{key}"]" Value="@(selected ?? "")" ValueChanged="@(v => Set(key, v))" SelectionOnEnter="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @if (key != "sort") { <MudSelectItem Value="@string.Empty">@L["Roles:All"]</MudSelectItem> }
+            @foreach (var value in values) { <MudSelectItem Value="@value">@label(value)</MudSelectItem> }
+        </MudSelect></div>;
+
+    private void Set(string key, string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter(key, string.IsNullOrWhiteSpace(value) ? null : value), replace: true);
+}

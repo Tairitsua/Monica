@@ -1,0 +1,7 @@
+.role-recovery { --recovery: var(--mud-palette-warning-darken); display: grid; gap: 1rem; min-width: 0; padding: 1.25rem; background: color-mix(in srgb, var(--recovery) 4%, var(--mud-palette-surface)); border: 1px solid color-mix(in srgb, var(--recovery) 40%, var(--mud-palette-divider)); border-inline-start: 4px solid var(--recovery); border-radius: .75rem; }
+.role-recovery.observed { --recovery: var(--mud-palette-success-darken); }
+.role-recovery header, .recovery-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .65rem; }
+.recovery-copy { flex: 1 1 24rem; min-width: 0; }
+.recovery-copy small { display: inline-flex; align-items: center; gap: .4rem; color: var(--recovery); font-family: monospace; }
+.recovery-copy h2 { margin-block: .35rem; font-size: 1.18rem; line-height: 1.35; font-weight: 650; }
+.recovery-copy p { color: var(--mud-palette-text-secondary); font-size: .86rem; }

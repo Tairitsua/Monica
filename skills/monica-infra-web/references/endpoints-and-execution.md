@@ -40,6 +40,12 @@ Declare the public actions for the resource's supported writes. The default verb
 
 See [API documentation](api-documentation-and-visibility.md#crud-collection-responses) for collection schemas and alternate DTO actions. The relational HTTP and repository contracts are exercised in `tests/Test.Monica.WebApi/AutoControllers/ModelQueryCrudIntegrationTests.cs`.
 
+## Role-owned endpoint admission
+
+Application-model HTTP admission keeps generated receiver actions and role-owned MVC routes discoverable on an assigned, quarantined role. Their requests receive the host's configured 503 result envelope after authorization and before model binding or controller activation. Actions in the same generated controller can belong to different roles. Inactive MVC role routes continue to be omitted.
+
+Minimal APIs mapped with the module's `UseEndpoints` helper or marked with `WithMonicaEndpoint()` also gate the role-owned handler before parameter binding. The role comes from the handler type or the owning Monica module contribution. A host with the result-envelope module receives its configured error envelope. See [startup fault policy](../../monica-infra-hosting/references/application-model.md#startup-fault-policy).
+
 ## Transport-independent application calls
 
 Transaction-enabled execution entries attach their descriptor and invocation ID to `ExecutionScopeContext` for [first-failure diagnostics](../../monica-infra-persistence/references/transactions.md#first-failure-diagnostics). Same-provider nested entries restore their parent's metadata; independent scopes start without the caller's operation metadata. This captures operation identity without retaining request inputs or changing rollback policy.

@@ -20,6 +20,9 @@
     }
   },
   "Startup": {
+    "SkippedOnHost": "本实例的已分配角色均不依赖此定义，启动时已跳过验证。",
+    "RoleFaulted": "启动验证失败，依赖此定义的已分配角色已在本实例中隔离。",
+    "RoleCandidateVerified": "本实例可观察的候选配置已通过验证。请在重启后于替换实例确认恢复。",
     "Kind": "启动配置",
     "ReadOnly": "启动配置由部署管理，此处只读。修改启动输入并重启服务后才能生效；当前运行值保持启动时的快照。",
     "CandidateUnavailable": "当前启动候选配置不可用。",
@@ -30,7 +33,8 @@
     "ActualValue": "运行值 · 启动时冻结",
     "CandidateValue": "候选值 · 当前启动输入",
     "ActualUnavailable": "无法获取启动时冻结的运行值。",
-    "ActualSources": "启动时的来源快照",
+    "ActualSources": "启动时采集的输入",
+    "WinningInput": "最高优先级输入",
     "CandidateSources": "当前候选值的来源",
     "SourceContributions": "这些贡献数量描述当前候选配置的提供程序。运行值仍保持启动时的快照；查看字段的来源链可检查其启动来源。"
   },

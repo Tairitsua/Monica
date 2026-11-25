@@ -1,6 +1,6 @@
 {
   "Navigation": {
-    "Title": "Health checks",
+    "Title": "Host health",
     "Category": "Health"
   },
   "Page": {
@@ -166,5 +166,119 @@
     "ErrorBadge": "Error",
     "NoTags": "No tags",
     "Copied": "Copied to clipboard"
+  },
+  "Roles": {
+    "Title": "Role health",
+    "HostHealth": "Host health",
+    "Auto": "Live · every 10s",
+    "Stale": "Refresh failed. Showing the last captured snapshot.",
+    "NoModelTitle": "No application model on this host",
+    "NoModel": "Register AddApplicationModel() to observe deployment roles, startup quarantine and role readiness. Host health is available for this instance.",
+    "Attention": "Roles needing attention",
+    "Gate": "Role readiness gate",
+    "ActiveTotal": "/ {0} active roles",
+    "Population": "{0} healthy · {1} degraded · {2} faulted · {3} remote",
+    "Zero": "This deployment has no assigned roles. The role readiness gate passes.",
+    "Calm": "No active role has reported a fault or degraded probe.",
+    "AttentionFinding": "Inspect the evidence for the affected roles.",
+    "Policy": "Fault policy",
+    "PolicyCounts": "{0} required · {1} optional · {2} overrides",
+    "Quarantine": "Active quarantine",
+    "QuarantinedCount": "{0} isolated roles",
+    "ResourcesCount": "{0} recorded resources owned by isolated roles",
+    "Recovery": "Recovery path",
+    "VerifiedCount": "{0} / {1} candidates verified",
+    "InstanceOnly": "Inputs visible in this instance",
+    "AutoSingle": "Auto · single-role FailFast",
+    "Board": "Role compartments",
+    "BoardDesc": "Active roles grouped by domain and effective criticality.",
+    "ChamberEmpty": "No active roles in this chamber.",
+    "Override": "Deployment override",
+    "Verified": "Candidate verified",
+    "KeyHint": "Arrow keys to navigate · Enter to inspect",
+    "RemotePlacement": "{0} inactive here · assigned to {1}",
+    "ShowRemote": "Include remote roles",
+    "Registry": "Role registry",
+    "RegistryDesc": "Inspect role placement, fault stages and evidence from this instance.",
+    "Search": "Find a role, domain or configuration path",
+    "All": "All",
+    "Role": "Role",
+    "Criticality": "Criticality",
+    "Evidence": "Evidence",
+    "ProbeEvidence": "A readiness check reported degraded health.",
+    "NoFault": "No recorded fault",
+    "RemoteUnknown": "Remote health unobserved",
+    "Inspector": "Role evidence",
+    "Missing": "Role not found",
+    "MissingDesc": "The current host catalog has no role named {0}.",
+    "InspectConfig": "Inspect configuration",
+    "Candidate": "Candidate configuration",
+    "CandidateReady": "The candidate passes validation in this instance. Restart is required. Confirm recovery on the replacement instance.",
+    "CandidateUnknown": "New deployment input is unverified in this instance. Kubernetes subPath mounts may require Pod replacement to expose the new input.",
+    "NonConfigRecovery": "Resolve the reported failure and verify the role after the supervisor replaces this instance.",
+    "InspectRecovery": "Review restart impact",
+    "Placement": "Placement and policy provenance",
+    "AssignedApp": "Assigned application",
+    "Workload": "Workload owner",
+    "Declared": "Declared criticality",
+    "Effective": "Effective fault action",
+    "Isolate": "Isolate the role",
+    "FailFast": "Fail host startup",
+    "Resources": "Activation inventory",
+    "JobProtection": "Durable schedules preserved",
+    "JobProtectionDesc": "The isolated owner cannot admit local work. Its durable schedule definitions are preserved across reconciliation.",
+    "NoResources": "No resources were recorded for this role.",
+    "InspectGate": "Inspect role readiness",
+    "States": {
+      "Healthy": "Healthy",
+      "Faulted": "Faulted",
+      "Degraded": "Degraded",
+      "Inactive": "Inactive",
+      "Initializing": "Initializing"
+    },
+    "Criticalities": {
+      "Required": "Required",
+      "Optional": "Optional"
+    },
+    "Chamber": {
+      "Required": "Required core",
+      "Optional": "Optional roles"
+    },
+    "ChamberDesc": {
+      "Required": "A required fault blocks readiness.",
+      "Optional": "Optional faults can be isolated on this instance."
+    },
+    "Stages": {
+      "StartupConfiguration": "Startup configuration",
+      "PipelineSetup": "Pipeline setup",
+      "HostedServiceStartup": "Hosted service startup",
+      "SeederExecution": "Seeder execution",
+      "RuntimeResource": "Runtime resource",
+      "Runtime": "Runtime"
+    },
+    "Sorts": {
+      "domain": "Domain A–Z",
+      "severity": "Severity first",
+      "criticality": "Criticality"
+    },
+    "Select": {
+      "domain": "Domain",
+      "stage": "Fault stage",
+      "sort": "Sort"
+    },
+    "Kinds": {
+      "Job": "Scheduled job",
+      "HostedService": "Hosted service",
+      "Endpoint": "Endpoint",
+      "ExternalSubscription": "Event subscription",
+      "Seeder": "Seeder",
+      "Outbox": "Outbox",
+      "DataChannel": "Data channel"
+    },
+    "Modes": {
+      "Automatic": "Automatic",
+      "Manual": "Manual",
+      "Disabled": "Disabled"
+    }
   }
 }

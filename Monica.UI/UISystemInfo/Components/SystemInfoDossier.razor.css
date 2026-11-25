@@ -6,3 +6,13 @@
 .evidence-chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border: 1px solid var(--mud-palette-lines-default); border-radius: 999px; color: var(--mud-palette-text-secondary); font: 400 11.5px/1.6 var(--mud-typography-default-family); }
 .evidence-note { display: block; width: 100%; color: var(--mud-palette-text-secondary); font: 400 11.5px/1.5 var(--mud-typography-default-family); }
 @container page (max-width: 620px) { .system-info-evidence { padding-inline: 16px; } .system-info-facts { grid-template-columns: minmax(0, 1fr); } }
+.host-role, .role-summary { display: inline-flex; gap: .35rem; align-items: center; padding: .14rem .5rem; border-radius: 2rem; font-size: .76rem; color: var(--mud-palette-primary); }
+.host-role { border: 1px solid var(--mud-palette-divider); overflow-wrap: anywhere; }
+.host-role i { width: .43rem; height: .43rem; border-radius: 50%; background: var(--mud-palette-text-secondary); }
+.host-role.healthy i { background: var(--mud-palette-success); }
+.host-role.degraded i { background: var(--mud-palette-warning); }
+.host-role.faulted { color: var(--mud-palette-error-darken); border-color: currentColor; }
+.host-role.faulted i { background: var(--mud-palette-error); }
+.host-role b { font-size: .62rem; }
+.role-override { color: var(--mo-color-role-third); font-size: .52rem; }
+.host-role[href]:hover, .role-summary[href]:hover { text-decoration: underline; }

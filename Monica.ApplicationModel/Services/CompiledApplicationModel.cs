@@ -1,4 +1,6 @@
 using System.Collections.Frozen;
+using Microsoft.Extensions.Configuration;
+using Monica.Core.ApplicationRoles;
 using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using Monica.ApplicationModel.Abstractions;
@@ -10,7 +12,7 @@ using Monica.Core.TypeDiscovery.Annotations;
 
 namespace Monica.ApplicationModel.Services;
 
-internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivationPolicy
+internal sealed partial class CompiledApplicationModel : IApplicationModel, ITypeActivationPolicy
 {
     private readonly ApplicationDeployment _deployment;
     private readonly FrozenDictionary<string, ApplicationRoleDefinition> _assemblyRoles;
@@ -21,10 +23,11 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
     private readonly FrozenSet<string> _localAssemblies;
     private readonly bool _autonomousWork;
 
-    public CompiledApplicationModel(IApplicationManifest manifest, ApplicationDeployment deployment, ITypeFinder finder, bool autonomousWork = true)
+    public CompiledApplicationModel(IApplicationManifest manifest, ApplicationDeployment deployment, ITypeFinder finder, bool autonomousWork, IConfiguration startup, string? deploymentScope)
     {
         _autonomousWork = autonomousWork;
         _deployment = deployment;
+        _deploymentScope = deploymentScope;
         Domains = Unique(manifest.Domains, definition => definition.Id, "domain");
         Roles = Unique(manifest.Roles, definition => definition.Id, "role");
         var localAssemblies = new HashSet<string>(StringComparer.Ordinal);
@@ -59,12 +62,14 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
         foreach (var role in Roles.Values)
         {
             ApplicationDeployment.RequireIdentifier(role.AssemblyName, "Role assembly");
+            if (!Enum.IsDefined(role.Criticality))
+                throw new InvalidOperationException($"Role '{role.Id}' declares an unknown startup criticality.");
             if (!Domains.TryGetValue(role.DomainId, out var domain) || !ownedAssemblies.Add(role.AssemblyName))
                 throw new InvalidOperationException($"Role '{role.Id}' does not match a unique compiled domain/assembly declaration.");
             if (localAssemblies.Contains(role.AssemblyName))
             {
                 var declaration = RequireAssembly(role.AssemblyName).GetCustomAttribute<ApplicationRoleAttribute>();
-                if (declaration?.RoleId != role.Id || declaration.DomainId != role.DomainId || declaration.WorkloadOwner != role.WorkloadOwner)
+                if (declaration?.RoleId != role.Id || declaration.DomainId != role.DomainId || declaration.WorkloadOwner != role.WorkloadOwner || declaration.Criticality != role.Criticality)
                     throw new InvalidOperationException($"Role '{role.Id}' does not match its compiled assembly declaration.");
                 if (!localAssemblies.Contains(domain.AssemblyName))
                     throw new InvalidOperationException($"Local role '{role.Id}' requires its domain core '{domain.Id}' in the local inventory.");
@@ -102,8 +107,7 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
         _allAssemblyRoles = Roles.Values.ToFrozenDictionary(role => role.AssemblyName, StringComparer.Ordinal);
         _assemblyDomains = Domains.Values.ToFrozenDictionary(domain => domain.AssemblyName, StringComparer.Ordinal);
         _localAssemblies = localAssemblies.ToFrozenSet(StringComparer.Ordinal);
-        ActiveWorkloadOwners = Array.AsReadOnly(Roles.Values.Where(role => IsRoleActive(role.Id))
-            .Select(role => role.WorkloadOwner ?? role.Id).Order(StringComparer.Ordinal).ToArray());
+        InitializeHealth(startup);
         var operations = new Dictionary<Type, ApplicationOperationDefinition>();
         var handlers = new Dictionary<Type, List<ApplicationOperationDefinition>>();
         var localHandlers = new Dictionary<Type, Type>();
@@ -146,7 +150,8 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
 
     public string AppId => _deployment.AppId;
     public ApplicationDeployment Deployment => _deployment;
-    public IReadOnlyCollection<string> ActiveWorkloadOwners { get; }
+    public IReadOnlyCollection<string> ActiveWorkloadOwners => _activeWorkloadOwners;
+    public IReadOnlyCollection<string> SuspendedWorkloadOwners => _suspendedWorkloadOwners;
     public IReadOnlyDictionary<string, ApplicationDomainDefinition> Domains { get; }
     public IReadOnlyDictionary<string, ApplicationRoleDefinition> Roles { get; }
     public IReadOnlyDictionary<Type, ApplicationOperationDefinition> Operations { get; }
@@ -175,6 +180,9 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
                 || operations.Any(operation => operation.RequiredRole is null || IsRoleActive(operation.RequiredRole))
                 ? ActivationMode.Automatic : ActivationMode.Disabled;
         }
+        if (kind != TypeActivationKind.Endpoint && GetRoleId(implementationType, registrationOwner) is { } admissionRole
+            && IsRoleFaulted(admissionRole))
+            return ActivationMode.Disabled;
         if (kind is TypeActivationKind.Seeder or TypeActivationKind.HostedService
             && implementationType.IsDefined(typeof(ProcessLocalAttribute), inherit: false))
             return ActivationMode.Automatic;
@@ -221,6 +229,15 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
         return Roles[domain.BackgroundRole];
     }
 
+    public string? GetFaultedRequestHandlerRole(Type implementationType, Type? registrationOwner = null)
+    {
+        var implementation = GetOwnership(implementationType);
+        var declared = registrationOwner is null ? default : GetOwnership(registrationOwner);
+        ValidateOwnership(implementation, declared);
+        var role = ResolveOwner(implementation, declared, requireBackgroundRole: false);
+        return role is not null && IsRoleFaulted(role.Id) ? role.Id : null;
+    }
+
     public void EnsureCanExecuteRequest(Type requestType)
     {
         var known = Operations.TryGetValue(requestType, out var operation);
@@ -228,6 +245,8 @@ internal sealed class CompiledApplicationModel : IApplicationModel, ITypeActivat
             throw new InvalidOperationException($"Request '{requestType}' has no local implementation in AppId '{AppId}'. Use its generated application API to reach role '{operation!.RoleId}'.");
         var requirement = known
             ? operation!.RequiredRole : requestType.GetCustomAttribute<RunOnRoleAttribute>()?.RoleId;
+        if ((requirement ?? operation?.RoleId) is { } targetRole && IsRoleFaulted(targetRole))
+            throw new RoleUnavailableException(targetRole);
         if (requirement is not null && !IsRoleActive(requirement))
             throw new InvalidOperationException($"Request '{requestType}' requires role '{requirement}', which is not active in AppId '{AppId}'. Use its generated application API.");
     }

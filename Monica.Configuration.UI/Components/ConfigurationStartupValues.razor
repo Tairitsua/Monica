@@ -4,7 +4,7 @@
 <dl class="configuration-startup-values">
     <div>
         <dt>@L["Startup:ActualValue"]</dt>
-        <dd><pre>@DisplayValue(Value?.DisplayValue)</pre></dd>
+        <dd><pre>@(Value?.StartupStatus is Monica.Configuration.Models.ConfigurationStartupStatus.Faulted or Monica.Configuration.Models.ConfigurationStartupStatus.NotRequiredOnHost ? L["Startup:ActualUnavailable"].Value : DisplayValue(Value?.DisplayValue))</pre></dd>
     </div>
     <div>
         <dt>@L["Startup:CandidateValue"]</dt>

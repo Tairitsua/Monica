@@ -5,10 +5,13 @@
 @using Monica.Core.Results
 @using Monica.Modules
 @using Monica.UI.Localization
+@using Monica.UI.Shell.Support
+@using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Components
 @using Monica.UI.UISystemInfo.Dialogs
 @using Monica.UI.UISystemInfo.State
 @inject IDialogService DialogService
+@inject PageAccessEvaluator PageAccess
 @inject SystemInfoPageSessionFactory SessionFactory
 @inject ISnackbar Snackbar
 @inject IOptions<ModuleSystemInfoUIOption> SystemInfoUIOptions
@@ -18,6 +21,7 @@
 
 <div class="system-info-page">
     <SystemInfoPageHeader Snapshot="@_session?.Snapshot" EnableRestart="@SystemInfoUIOptions.Value.EnableSelfRestartAction"
+                          RoleHealthUrl="@_roleHealthUrl"
                           IsRefreshing="@(_session?.IsRefreshing == true)"
                           RestartRequested="@(_session?.RestartRequested == true)"
                           RefreshRequested="RefreshAsync"
@@ -35,10 +39,18 @@
     {
         var snapshot = _session.Snapshot;
 
+        @if (snapshot.ApplicationModel is { } deployment &&
+            (deployment.Faulted.Any(role => role.StartupCandidateValid == true || role.Id == Restore)))
+        {
+            <SystemInfoRoleRecovery Deployment="@deployment" Scope="@snapshot.MonicaHost?.DeploymentScope"
+                                    FocusRole="@Restore" RoleHealthUrl="@_roleHealthUrl"
+                                    EnableRestart="@SystemInfoUIOptions.Value.EnableSelfRestartAction"
+                                    RestartRequested="@_session.RestartRequested" OnRestart="RequestSelfRestartAsync" />
+        }
         <SystemInfoServiceHero Snapshot="@snapshot" NowUtc="@_session.NowUtc" />
 
         <div class="system-info-lower">
-            <SystemInfoDossier Snapshot="@snapshot" />
+            <SystemInfoDossier Snapshot="@snapshot" RoleHealthUrl="@_roleHealthUrl" />
             <div class="system-info-side">
                 <SystemInfoCustomLinkPanel Links="@SystemInfoUIOptions.Value.CustomLinks" />
                 <SystemInfoEndpoints Snapshot="@snapshot" />
@@ -50,6 +62,8 @@
 @code {
     public const string PAGE_URL = "/system-info";
 
+    [SupplyParameterFromQuery(Name = "restore")] public string? Restore { get; set; }
+    private string? _roleHealthUrl;
     private SystemInfoPageSession? _session;
     private int _disposed;
 
@@ -59,6 +73,7 @@
         _session = session;
         session.Changed += HandleSessionChanged;
         await session.InitializeAsync();
+        await UpdateRoleLinkAsync(session);
     }
 
     private Task HandleSessionChanged() => IsDisposed
@@ -91,7 +106,17 @@
             return;
         }
 
+        await UpdateRoleLinkAsync(session);
+        if (!OwnsSession(session)) return;
         Snackbar.Add(L["Page:Messages:RefreshSucceeded"], Severity.Success);
+    }
+
+    private async Task UpdateRoleLinkAsync(SystemInfoPageSession session)
+    {
+        if (!OwnsSession(session)) return;
+        const string route = "health-checks/roles";
+        var allowed = session.Snapshot?.ApplicationModel is not null && await PageAccess.IsAuthorizedAsync(route);
+        if (OwnsSession(session)) _roleHealthUrl = allowed ? route : null;
     }
 
     private async Task RequestSelfRestartAsync()
@@ -104,7 +129,8 @@
 
         var parameters = new DialogParameters<SystemInfoRestartConfirmDialog>
         {
-            { dialog => dialog.DelaySeconds, Math.Max(0d, SystemInfoUIOptions.Value.SelfRestartDelay.TotalSeconds) }
+            { dialog => dialog.DelaySeconds, Math.Max(0d, SystemInfoUIOptions.Value.SelfRestartDelay.TotalSeconds) },
+            { dialog => dialog.Deployment, session.Snapshot?.ApplicationModel }
         };
         var dialog = await DialogService.ShowAsync<SystemInfoRestartConfirmDialog>(
             L["Page:Dialogs:Restart:Title"],

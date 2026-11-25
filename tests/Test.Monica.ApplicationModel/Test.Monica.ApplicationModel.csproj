@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="../Fixtures/ApplicationModel.Role/ApplicationModel.Role.csproj" />
     <ProjectReference Include="../../Monica.Testing/Monica.Testing.csproj" />
+    <ProjectReference Include="../../Monica.Configuration/Monica.Configuration.csproj" />
     <ProjectReference Include="../../Monica.ServiceDiscovery/Monica.ServiceDiscovery.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />

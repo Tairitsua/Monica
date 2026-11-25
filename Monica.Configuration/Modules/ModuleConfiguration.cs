@@ -1,4 +1,6 @@
 using Monica.Core.Configuration;
+using Monica.Core.ApplicationRoles;
+using Monica.Core.Modularity.Annotations;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -86,7 +88,7 @@ public static class ModuleConfigurationBuilderExtensions
 /// <summary>
 /// Monica configuration module.
 /// </summary>
-public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption>, IWebModule
+public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption>, IWebModule, IRoleStartupPreflight
 {
     private static readonly MethodInfo ADD_OPTIONS_METHOD = GetRequiredGenericMethod(
         typeof(OptionsServiceCollectionExtensions),
@@ -233,7 +235,7 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         var metricsRecorder = app.ApplicationServices.GetRequiredService<ConfigurationMetricsRecorder>();
         var report = metricsRecorder.MeasureStartupStage(
             ConfigurationStartupStage.RuntimeValidation,
-            () => validationService.GetReport());
+            () => validationService.GetEnforcementReport());
         if (report.IsValid)
         {
             return;
@@ -247,6 +249,15 @@ public sealed class ModuleConfiguration : MonicaModule<ModuleConfigurationOption
         Logger.LogWarning(
             "{ConfigurationRuntimeValidationDiagnostic}",
             ConfigurationRuntimeValidationMessageFormatter.FormatDiagnosticReport(report));
+    }
+
+    /// <inheritdoc />
+    public void ValidateRoleStartup(MonicaApplication application, IRoleStartupFaultPolicy policy)
+    {
+        var types = application.TypeFinder.GetTypes().Where(type => type.IsClass && !type.IsAbstract
+            && !type.IsDefined(typeof(ExcludeFromBusinessTypeDiscoveryAttribute), inherit: false)
+            && type.GetCustomAttribute<ConfigurationAttribute>(inherit: false)?.Kind == ConfigurationKind.Startup);
+        ConfigurationStartupOptionsReader.For(application.Composition).Preflight(types, policy);
     }
 
     /// <inheritdoc />

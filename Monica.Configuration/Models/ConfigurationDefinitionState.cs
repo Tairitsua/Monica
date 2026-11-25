@@ -8,6 +8,9 @@ public sealed record ConfigurationDefinitionState
     /// <summary>Whether this Manual process projects a validated temporary seed because the managed document is absent.</summary>
     public bool IsUnpersisted { get; init; }
 
+    /// <summary>Gets the process-local Startup admission outcome, or null for Managed settings.</summary>
+    public ConfigurationStartupStatus? StartupStatus { get; init; }
+
     /// <summary>Gets aggregate deployment candidate validation and restart state for a Startup definition.</summary>
     public ConfigurationStartupCandidate? StartupCandidate { get; init; }
 

@@ -29,7 +29,7 @@
                 <code class="configuration-source-chain-path">@_chain.ConfigurationPath</code>
                 @if (_chain.Kind == ConfigurationKind.Startup)
                 {
-                    <ConfigurationStartupStatus Candidate="@_chain.StartupActualValue?.StartupCandidate" />
+                    <ConfigurationStartupStatus Candidate="@_chain.StartupActualValue?.StartupCandidate" Admission="@_chain.StartupActualValue?.StartupStatus" />
                     <ConfigurationStartupValues Value="@_chain.StartupActualValue" />
                 }
                 @foreach (var group in SourceGroups)
@@ -56,7 +56,7 @@
                                         }
                                         @if (value.IsEffective)
                                         {
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="configuration-source-effective">@L["Sources:Effective"]</MudChip>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="configuration-source-effective">@L[_chain.Kind == ConfigurationKind.Startup ? "Startup:WinningInput" : "Sources:Effective"]</MudChip>
                                         }
                                         <MudChip T="int" Size="Size.Small" Variant="Variant.Outlined">@value.Source.PriorityIndex</MudChip>
                                     </MudStack>

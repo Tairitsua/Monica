@@ -27,6 +27,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
     public async Task<int> DrainAsync(int maximumMessages = 100, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumMessages, 1);
+        EnsureStoreAvailable();
         if (System.Transactions.Transaction.Current is not null)
             throw new InvalidOperationException("Outbox delivery cannot run inside an ambient transaction; claims must commit before sending.");
         await using var scope = scopes.CreateAsyncScope();

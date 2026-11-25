@@ -8,7 +8,9 @@ public enum ConfigurationValidationCoverage
     /// <summary>Only portable schema checks or a fragment were evaluated.</summary>
     SchemaOnly,
     /// <summary>A binding, contract, or execution fault prevented validation.</summary>
-    Failed
+    Failed,
+    /// <summary>Explicit role scoping made the Startup definition unnecessary on this host.</summary>
+    NotApplicable
 }
 
 /// <summary>Identifies the value boundary evaluated by a report.</summary>

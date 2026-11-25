@@ -10,7 +10,8 @@ public static class MonicaStartupOptionsExtensions
     /// <remarks>
     /// The type must declare Startup ownership and an explicit section path. Binding and pure object validation
     /// fail immediately; named options and Configure/PostConfigure contributions are not supported. Treat the
-    /// returned object as read-only. This call does not register or activate a managed configuration store.
+    /// returned object as read-only. Explicitly role-scoped definitions are available only after successful application
+    /// preflight when required by at least one local role. A skipped or faulted definition has no typed value.
     /// </remarks>
     public static TOptions GetStartupOptions<TOptions>(this IMonicaCompositionContext context) where TOptions : class, new()
     {

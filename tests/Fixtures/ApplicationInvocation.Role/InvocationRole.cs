@@ -1,5 +1,7 @@
 using global::ApplicationModel.Domain;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Monica.Application.Abstractions;
 using Monica.Application.Annotations;
 using Monica.ApplicationModel.Annotations;
@@ -43,6 +45,12 @@ public sealed class RoleOwnedController : ControllerBase
 {
     [HttpGet]
     public string Get() => "role-owned";
+}
+
+public static class RoleOwnedMinimalApi
+{
+    public static void Map(IEndpointRouteBuilder endpoints)
+        => endpoints.MapGet("/role-owned/minimal", (int requiredValue) => requiredValue);
 }
 
 public sealed class OrdinaryApiHandler(InvocationLedger calls) : ApplicationRequestHandler<QueryOrdinary, Result<int>>

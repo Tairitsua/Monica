@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -7,11 +8,13 @@ using global::ApplicationModel.Domain;
 using global::ApplicationModel.Role;
 using global::ApplicationInvocation.Fixtures;
 using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Monica.Application.Abstractions;
@@ -19,8 +22,12 @@ using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
 using Monica.ApplicationModel.Models;
 using Monica.Core.Execution.Mvc;
+using Monica.Configuration.Annotations;
+using Monica.Configuration.Models;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Execution;
 using Monica.Core.Mediator;
+using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
 using Monica.Modules;
@@ -338,6 +345,39 @@ public sealed class ApplicationInvocationTests
         }
     }
 
+    [Fact]
+    public async Task QuarantinedRole_RejectsLocalCallsAndOwnedHttpActionsWhileOtherRolesContinueServing()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var host = await new InvocationApplicationFactory(colocated: true, receivers: true, authority: true, remoteOnly: true,
+            faultInvocation: true).CreateAsync(cancellationToken: token);
+        using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
+        foreach (var path in new[] { "/invocation-selection/ordinary", "/invocation-selection/constrained", "/role-owned/manual", "/api/v1/Ordering/ledger", "/role-owned/minimal" })
+        {
+            using var response = await client.GetAsync(path, token);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+            Assert.Equal(503, body.RootElement.GetProperty("code").GetInt32());
+        }
+        using var healthy = await client.GetAsync("/invocation-selection/worker", token);
+        Assert.Equal(HttpStatusCode.OK, healthy.StatusCode);
+        await using var scope = host.CreateScope(token);
+        var invoker = scope.Resolve<IApplicationApiInvoker>();
+        var ordinary = await invoker.InvokeAsync(new QueryOrdinary("local"), OrdinaryEndpoint, token);
+        var constrained = await invoker.InvokeAsync(new CommandConstrained(1), RequiredEndpoint, token);
+        Assert.Equal(ResultStatus.ServiceUnavailable, ordinary.Status);
+        Assert.Equal(ResultStatus.ServiceUnavailable, constrained.Status);
+        Assert.Empty(host.Services.GetRequiredService<RecordingTransport>().Calls);
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => scope.Resolve<IMediator>().Send(new QueryOrdinary("direct"), token));
+        Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().OrdinaryCalls);
+        Assert.Equal(0, host.Services.GetRequiredService<InvocationLedger>().ConstrainedCalls);
+
+        host.Services.GetRequiredService<AuthorityChoice>().Destination = new ApplicationInvocationDestination("external", "primary");
+        var remote = await invoker.InvokeAsync(new QueryOrdinary("authority"), OrdinaryEndpoint, token, ApiTransaction.Independent);
+        Assert.Equal(501, remote.Data);
+        Assert.StartsWith("https://primary.test/external/", Assert.Single(host.Services.GetRequiredService<RecordingTransport>().Calls).Uri);
+    }
+
     private static void PrepareCaller(MonicaTestApplication host)
     {
         var context = new DefaultHttpContext();
@@ -347,14 +387,29 @@ public sealed class ApplicationInvocationTests
 
     private sealed class InvocationApplicationFactory(string appId = "local", bool colocated = false, bool httpProvider = true,
         bool authority = false, bool receivers = false, bool remoteOnly = false, bool multipleHttpContributions = false,
-        bool transactions = false)
+        bool transactions = false, bool faultInvocation = false)
         : MonicaTestApplicationFactory<ApplicationInvocationTests>
     {
         protected override IEnumerable<Assembly> TypeDiscoveryAssemblies =>
             [typeof(ApplicationInvocationTests).Assembly, typeof(DomainDeclaration).Assembly, typeof(OrdinaryHandler).Assembly, typeof(OrdinaryApiHandler).Assembly];
 
+        protected override void ConfigureHost(WebApplicationBuilder builder)
+        {
+            if (faultInvocation)
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["InvocationStartup:Capacity"] = "0",
+                    ["Application:RoleFaultPolicy:RoleCriticalityOverrides:ordering.invocation"] = "Optional"
+                });
+        }
+
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
+            if (faultInvocation)
+            {
+                builder.AddConfiguration();
+                builder.AddModule<PrivateEndpoints, PrivateEndpointOptions>();
+            }
             builder.ConfigureApplication(options => options.AppId = appId);
             builder.AddApplicationModel(options =>
             {
@@ -406,6 +461,14 @@ public sealed class ApplicationInvocationTests
         public void ConfigureHttpClientFactoryOptions(HttpClientFactoryOptions options, string appId) =>
             options.HttpClientActions.Add(client => client.BaseAddress = new Uri($"https://invocation.test/{appId}/"));
     }
+
+    private sealed class PrivateEndpoints : MonicaModule<PrivateEndpointOptions>, IWebHostRequiredModule
+    {
+        public override void ConfigureEndpoints(WebModuleContext<PrivateEndpointOptions> context)
+            => UseEndpoints(context, RoleOwnedMinimalApi.Map);
+    }
+
+    private sealed class PrivateEndpointOptions : ModuleOptions<PrivateEndpoints>;
 
     private sealed class PrimaryHttpProvider : IApiHttpClientRegisterProvider
     {
@@ -469,6 +532,12 @@ public sealed class ApplicationInvocationTests
 }
 
 public sealed record QueryRemoteOnly(int Value) : IQuery<int>;
+
+[Configuration("InvocationStartup", Kind = ConfigurationKind.Startup, RequiredByRoles = ["ordering.invocation"])]
+public sealed class InvocationStartupOptions
+{
+    [Range(1, 10)] public int Capacity { get; set; } = 1;
+}
 
 public sealed class RemoteOnlyInvocationManifest : IApplicationManifest
 {

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Monica.Core.ApplicationRoles;
 using Monica.Repository.Outbox.Models;
 using Monica.Repository.Persistence.Services;
 using Monica.Locker.EfCore;
@@ -35,9 +36,23 @@ internal sealed record OutboxStoreStatus(int PendingCount, DateTime? OldestPendi
 public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory scopes, TimeProvider time,
     OutboxRegistration<TDbContext> registration, ILogger<OutboxDispatcher<TDbContext>> logger,
     IDbContextFactory<TDbContext> contextFactory, IExclusiveLeaseStore? maintenanceLeaseStore = null,
-    IMeterFactory? meterFactory = null) : IOutboxStore
+    IMeterFactory? meterFactory = null, IRoleHealthStateProvider? roleHealth = null) : IOutboxStore
     where TDbContext : RepositoryDbContext<TDbContext>
 {
+    /// <summary>Creates a dispatcher for a store without a role health provider.</summary>
+    public OutboxDispatcher(IServiceScopeFactory scopes, TimeProvider time, OutboxRegistration<TDbContext> registration,
+        ILogger<OutboxDispatcher<TDbContext>> logger, IDbContextFactory<TDbContext> contextFactory,
+        IExclusiveLeaseStore? maintenanceLeaseStore, IMeterFactory? meterFactory)
+        : this(scopes, time, registration, logger, contextFactory, maintenanceLeaseStore, meterFactory, null) { }
+
+    private readonly string? _roleId = roleHealth?.GetRoleId(typeof(TDbContext));
+
+    private void EnsureStoreAvailable()
+    {
+        if (_roleId is not null && roleHealth!.IsRoleFaulted(_roleId))
+            throw new RoleUnavailableException(_roleId);
+    }
+
     private readonly RelationalLeaseStore<TDbContext> _leases = new(contextFactory, time,
         registration.Options.MaintenanceLease.OperationTimeout);
     private readonly IExclusiveLeaseStore? _maintenanceLeases = (registration.Options.MaintenanceLeaseStore, maintenanceLeaseStore) switch
@@ -159,6 +174,7 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
     /// This manual invocation releases its role after completion.</remarks>
     public async Task<int> CleanupAsync(CancellationToken cancellationToken = default)
     {
+        EnsureStoreAvailable();
         await using var coordinator = CreateCoordinator();
         var context = await coordinator.GetAsync(await GetMaintenanceResourceAsync(cancellationToken), cancellationToken);
         if (context is null) return 0;

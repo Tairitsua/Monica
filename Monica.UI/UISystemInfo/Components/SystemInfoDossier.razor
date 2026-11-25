@@ -4,9 +4,65 @@
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Support
+@using Monica.Core.ApplicationRoles
 @inject IStringLocalizer<SystemInfoResource> L
 
 <section class="system-info-dossier">
+    @if (Snapshot.ApplicationModel is { } deployment)
+    {
+        var local = deployment.Local.ToArray();
+        var peers = deployment.Roles.Where(role => role.Status == RoleHealthStatus.Inactive).GroupBy(role => role.AppId);
+        <section class="system-info-evidence" aria-labelledby="system-info-roles-title">
+            <EvidenceHeader Icon="@MoIcons.ShieldCheck" HeadingId="system-info-roles-title" Title="@L["Page:Roles:Title"]" Description="@L["Page:Roles:Description"]">
+                <a class="role-summary" href="@RoleHealthUrl">@L["Page:Roles:Summary", deployment.ServingCount, local.Length] <MoIcon Icon="@MoIcons.ChevronRight" Size="14px" /></a>
+            </EvidenceHeader>
+            <dl class="system-info-facts">
+                <EvidenceRow Label="@L["Page:Roles:AppId"]"><SystemInfoCopyValue Value="@deployment.AppId" /></EvidenceRow>
+                <EvidenceRow Label="@L["Page:Roles:Scope"]" Value="@Display(Snapshot.MonicaHost?.DeploymentScope)" />
+                <EvidenceRow Label="@L["Page:Roles:Topology"]" Value="@L["Page:Roles:TopologyValue", deployment.ApplicationCount, deployment.Roles.Length, local.Length]" Monospace="false" />
+                <EvidenceRow Label="@L["Page:Roles:Policy"]">
+                    <span class="evidence-chip">@(deployment.Policy == RoleFaultPolicyMode.Auto && local.Length > 0
+                        ? L[local.Length == 1 ? "Page:Roles:AutoSingle" : "Page:Roles:AutoMultiple"].Value : deployment.Policy.ToString())</span>
+                    <small class="evidence-note">@L["Page:Roles:Split", local.Count(role => role.Criticality == RoleCriticality.Required), local.Count(role => role.Criticality == RoleCriticality.Optional), local.Count(role => role.HasOverride)]</small>
+                </EvidenceRow>
+                <EvidenceRow Label="@L["Page:Roles:Assigned"]" Wide="true">
+                    @if (local.Length == 0) { <span>—</span> }
+                    @foreach (var role in local)
+                    {
+                        <a class="host-role @role.Status.ToString().ToLowerInvariant()" href="@(RoleHealthUrl is null ? null : $"{RoleHealthUrl}?role={Uri.EscapeDataString(role.Id)}")"
+                           title="@($"{role.DomainId} · {role.Status} · {role.Criticality}")">
+                            <i aria-hidden="true"></i>@role.Id @if (role.Status == RoleHealthStatus.Faulted) { <b>503</b> }
+                            @if (role.HasOverride) { <span class="role-override" title="@L["Page:Roles:Overridden"]" aria-label="@L["Page:Roles:Overridden"]">◆</span> }
+                        </a>
+                    }
+                </EvidenceRow>
+                @if (peers.Any())
+                {
+                    <EvidenceRow Label="@L["Page:Roles:Peers"]" Wide="true">
+                        @foreach (var peer in peers) { <span class="evidence-chip" title="@string.Join(", ", peer.Select(role => role.Id))">@peer.Key · @peer.Count()</span> }
+                        @if (RoleHealthUrl is not null) { <a class="role-summary" href="@($"{RoleHealthUrl}?inactive=1")">@L["Page:Roles:Inactive"]</a> }
+                    </EvidenceRow>
+                }
+            </dl>
+        </section>
+    }
+    @if (Snapshot.MonicaHost is { } host)
+    {
+        <section class="system-info-evidence" aria-labelledby="system-info-monica-title">
+            <EvidenceHeader Icon="@MoIcons.Layers" HeadingId="system-info-monica-title" Title="@L["Page:Policies:Title"]" Description="@L["Page:Policies:Description"]" />
+            <dl class="system-info-facts">
+                <EvidenceRow Label="@L["Page:Policies:Framework"]"><span>@host.FrameworkVersion</span><span class="evidence-chip">@L["Page:Policies:Modules", host.ModuleCount, host.ModuleErrorCount]</span></EvidenceRow>
+                <EvidenceRow Label="@L["Page:Policies:Architecture"]" Monospace="false" Value="@L[Snapshot.ApplicationModel is null ? "Page:Policies:Standalone" : "Page:Policies:Model"]" />
+                <EvidenceRow Label="AutonomousWork" Value="@L[host.AutonomousWork ? "Page:Policies:Enabled" : "Page:Policies:Disabled"]" />
+                <EvidenceRow Label="DebugMode">
+                    <span class="evidence-chip">@L[host.DebugMode.ActualValue ? "Page:Policies:Enabled" : "Page:Policies:Disabled"]</span><span>@host.DebugMode.ActualSource</span>
+                    @if (host.DebugMode.RequiresRestart)
+                    { <small class="evidence-note">@L["Page:Policies:Candidate", host.DebugMode.CandidateValue?.ToString() ?? L["Page:Policies:Invalid"].Value]</small> }
+                </EvidenceRow>
+                @if (Snapshot.ApplicationModel is null) { <EvidenceRow Label="@L["Page:Roles:Scope"]" Value="@Display(host.DeploymentScope)" /> }
+            </dl>
+        </section>
+    }
     <section class="system-info-evidence" aria-labelledby="system-info-runtime-title">
         <EvidenceHeader Icon="@MoIcons.Cpu" HeadingId="system-info-runtime-title" Title="@L["Page:Sections:Runtime:Title"]" Description="@L["Page:Sections:Runtime:Description"]" />
         <dl class="system-info-facts">
@@ -59,6 +115,7 @@
 
 @code {
     [Parameter, EditorRequired] public SystemInfoSnapshot Snapshot { get; set; } = null!;
+    [Parameter] public string? RoleHealthUrl { get; set; }
     private string Privilege => L[Snapshot.Process.IsPrivileged ? "Page:Sections:Runtime:Values:Privileged" : "Page:Sections:Runtime:Values:NotPrivileged"].Value;
     private string Interactive => L[Snapshot.Process.IsInteractive ? "Page:Sections:Runtime:Values:Interactive" : "Page:Sections:Runtime:Values:NonInteractive"].Value;
     private string OperatingSystemBitness => L[Snapshot.Process.Is64BitOperatingSystem ? "Page:Sections:Environment:Values:System64Bit" : "Page:Sections:Environment:Values:System32Bit"].Value;

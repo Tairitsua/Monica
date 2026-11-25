@@ -1,0 +1,27 @@
+@using Microsoft.Extensions.Localization
+@using Monica.UI.Localization
+@using Monica.UI.UISystemInfo.Models
+@inject IStringLocalizer<SystemInfoResource> L
+
+<dl class="restart-impact">
+    @foreach (var valid in new[] { true, false })
+    {
+        var affected = Deployment.Faulted.Where(role => (role.StartupCandidateValid == true) == valid).ToArray();
+        <div>
+            <dt>@L[valid ? "Page:Recovery:Observed" : "Page:Recovery:Missing"]</dt>
+            <dd>
+                @if (affected.Length == 0) { <span>—</span> }
+                @foreach (var role in affected)
+                {
+                    <a class="impact-role @(valid ? "valid" : null)" href="@(RoleHealthUrl is null ? null : $"{RoleHealthUrl}?role={Uri.EscapeDataString(role.Id)}")">@role.Id</a>
+                }
+            </dd>
+        </div>
+    }
+    <div><dt>@L["Page:Recovery:Interrupted"]</dt><dd>@L["Page:Recovery:Serving", Deployment.ServingCount, Deployment.Local.Count()]</dd></div>
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public SystemInfoRoleDeployment Deployment { get; set; } = null!;
+    [Parameter] public string? RoleHealthUrl { get; set; }
+}

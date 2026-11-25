@@ -67,6 +67,10 @@
                     }
                     <section class="hc-sheet-sec">
                         <h3>@L["Details:Description"]</h3><p class="hc-sheet-desc @(entry.Description is null ? "is-empty" : null)">@(entry.Description ?? L["Details:NoDescription"].Value)</p>
+                        @if (entry.Name == "monica.application.roles")
+                        {
+                            <MudButton Href="/health-checks/roles" StartIcon="@MoIcons.ShieldCheck" Color="Color.Primary">@L["Roles:Title"]</MudButton>
+                        }
                     </section>
                     <section class="hc-sheet-sec">
                         <div class="hc-sheet-sec-head"><h3>@L["Design:Inspector:TimingTitle"]</h3><span class="hc-sheet-pct">@shareText</span></div>

@@ -36,6 +36,7 @@ internal sealed class MonicaApplicationLifecycle(
                 {
                     var app = (MonicaApplication)state!;
                     app.Profiling.MarkApplicationReady();
+                    (app.TypeActivation as ApplicationRoles.IRoleStartupFaultPolicy)?.MarkHostStarted();
                     var held = app.ActivationResources.Where(resource => resource.Mode != ActivationMode.Automatic)
                         .Select(resource => $"{resource.Key} [{resource.Kind}, {resource.Mode}]").ToArray();
                     if (held.Length != 0)

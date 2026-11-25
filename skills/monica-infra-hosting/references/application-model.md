@@ -135,6 +135,18 @@ The context exposes `Monica`, `Services`, frozen `Configuration`, `Environment`,
 
 ## Activation boundaries
 
+### Startup fault policy
+
+Role criticality defaults to `RoleCriticality.Required`. Declare an isolatable role with `[assembly: ApplicationRole("ordering.reporting", "Ordering", Criticality = RoleCriticality.Optional)]`. A deployment may override a catalog role at `Application:RoleFaultPolicy:RoleCriticalityOverrides:<roleId>`. Unknown IDs or policy values fail composition. `Application:RoleFaultPolicy:Mode` defaults to `Auto`.
+
+| Mode | When assigned roles fail startup configuration validation |
+| --- | --- |
+| Auto | A required fault fails startup. Optional faults are isolated when another assigned role survives. A single assigned role or the loss of every assigned role fails startup. |
+| FailFast | Any assigned role fault fails startup. |
+| IsolateAll | The host can start for diagnostics with any assigned role isolated. Required isolation or the loss of every assigned role makes readiness unhealthy. |
+
+An explicitly empty placement is valid. The optional `IRoleHealthStateProvider` reports local readiness and remote placement. `IsRoleActive` continues to mean assigned to this host, including quarantined roles. Preflight runs after placement freezes and before registration callbacks. Each included owner still registers passive services. A faulted role skips its active callback. Code in passive registration must be safe to run on every placement. Read [Startup validation](../../monica-infra-configuration/references/options-and-validation.md) for configuration ownership and early reads.
+
 `IApplicationModel` exposes domains, roles, operations, placement, and exact role lookup. `LocalHandlers` is an `IReadOnlyDictionary<Type, Type>` from request type to verified local handler type; remote-only operations have no entry. `IsRoleAvailable(roleId)` reports whether the artifact includes that exact role's implementation, while `IsRoleActive(roleId)` reports whether the current AppId selects it. A local binding alone does not bypass a request's required active role. Core receives the same immutable instance as `ITypeActivationPolicy` before registration commits. Module callbacks and finalizers cannot remove, replace, or duplicate its runtime singleton registration; composition rejects these changes before any replacement factory executes.
 
 | Entry | Behavior for implementations included in this artifact |
@@ -148,7 +160,7 @@ The context exposes `Monica`, `Services`, frozen `Configuration`, `Environment`,
 | DataChannel setup, hubs, actor runtime integrations | Declare eligible integrations in ConfigureActive; each native capability must gate unsolicited work rather than treating callback invocation as automatic permission |
 | Generated HTTP receivers | Selected per operation, including mixed-role interfaces/controllers |
 
-Multiple selected DataChannel setup contributors run before materialization. Each setup type is registered once, and channel IDs must remain unique. A selected role with no remaining jobs publishes an empty owner snapshot to retire removed definitions; an inactive role never retires another deployment's jobs.
+Multiple selected DataChannel setup contributors run before materialization. Each setup type is registered once, and channel IDs must remain unique. A healthy selected role with no remaining jobs publishes an empty owner snapshot to retire removed definitions. Inactive and quarantined owners publish no snapshot and claim no work.
 
 When an operation truly requires an active integration or process-owned state, declare `[RunOnRole("ordering.reporting")]` on its request. That role must be the operation's code owner. Generated invocation uses Local only when the implementation is present and the role is active, and otherwise resolves its remote owner. Direct mediator execution is guarded before constructing the handler. Ordinary calls prefer Local when their implementation is included; omitted published operations use their known catalog owner and placement through HTTP. Receivers require an included implementation and an active role. A receiver never forwards recursively. A role is an execution/composition boundary, not an authorization or database isolation boundary.
 

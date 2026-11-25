@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity.Extensions;
 using Monica.Core.Results;
 using Monica.Modules;
@@ -64,6 +65,8 @@ public sealed class SystemInfoFacadeTests
             var snapshot = result.Data;
             snapshot.Should().NotBeNull();
             snapshot!.Startup.Should().BeNull();
+            snapshot.ApplicationModel.Should().BeNull();
+            snapshot.MonicaHost!.ModuleCount.Should().Be(host.Services.GetRequiredService<MonicaApplication>().Modules.RuntimeSnapshots.Count);
         }
         finally
         {
@@ -112,10 +115,19 @@ public sealed class SystemInfoFacadeTests
                     nameof(SystemInfoSnapshot.Application),
                     nameof(SystemInfoSnapshot.Process),
                     nameof(SystemInfoSnapshot.Host),
+                    nameof(SystemInfoSnapshot.MonicaHost),
+                    nameof(SystemInfoSnapshot.ApplicationModel),
                     nameof(SystemInfoSnapshot.Artifact),
                     nameof(SystemInfoSnapshot.Startup),
                     nameof(SystemInfoSnapshot.Endpoints)
                 ],
+                [typeof(SystemInfoRoleDeployment)] = [nameof(SystemInfoRoleDeployment.AppId), nameof(SystemInfoRoleDeployment.ApplicationCount),
+                    nameof(SystemInfoRoleDeployment.Policy), nameof(SystemInfoRoleDeployment.Roles)],
+                [typeof(SystemInfoRole)] = [nameof(SystemInfoRole.Id), nameof(SystemInfoRole.DomainId), nameof(SystemInfoRole.AppId),
+                    nameof(SystemInfoRole.Status), nameof(SystemInfoRole.Criticality), nameof(SystemInfoRole.HasOverride), nameof(SystemInfoRole.StartupCandidateValid)],
+                [typeof(SystemInfoMonicaHost)] = [nameof(SystemInfoMonicaHost.FrameworkVersion), nameof(SystemInfoMonicaHost.ModuleCount),
+                    nameof(SystemInfoMonicaHost.ModuleErrorCount),
+                    nameof(SystemInfoMonicaHost.DeploymentScope), nameof(SystemInfoMonicaHost.AutonomousWork), nameof(SystemInfoMonicaHost.DebugMode)],
                 [typeof(SystemInfoApplication)] =
                 [
                     nameof(SystemInfoApplication.Name),
@@ -185,6 +197,23 @@ public sealed class SystemInfoFacadeTests
         {
             await host.StopAsync(TestContext.Current.CancellationToken);
         }
+    }
+
+    [Fact]
+    public void RoleDeployment_RequiresVisibleValidCandidatesForEveryStartupFault()
+    {
+        var now = DateTimeOffset.UtcNow;
+        RoleFaultRecord Fault(bool valid) => new(RoleFaultStage.StartupConfiguration, "Validation", now,
+            [new("input", "Integration", "Endpoint", "Invalid", valid)]);
+        RoleHealthEntrySnapshot Role(string id, params RoleFaultRecord[] faults) => new(id, "Reporting", id, "host",
+            RoleCriticality.Optional, null, RoleHealthStatus.Faulted, now, faults);
+        var deployment = SystemInfoRoleDeployment.Capture(new RoleHealthSnapshot("host", "Host", null, RoleFaultPolicyMode.Auto, true,
+            [Role("ready", Fault(true), Fault(true)), Role("pending", Fault(true), Fault(false)), Role("unknown")]));
+
+        deployment.Roles.Single(role => role.Id == "ready").StartupCandidateValid.Should().BeTrue();
+        deployment.Roles.Single(role => role.Id == "pending").StartupCandidateValid.Should().BeFalse();
+        deployment.Roles.Single(role => role.Id == "unknown").StartupCandidateValid.Should().BeNull();
+        deployment.ServingCount.Should().Be(0);
     }
 
     private static async Task<IHost> StartHostAsync(MonicaStartup? startup = null)

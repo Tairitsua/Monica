@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using Monica.Core.ApplicationRoles;
+using Monica.Core.Configuration;
 
 namespace Monica.UI.UISystemInfo.Models;
 
@@ -19,6 +21,12 @@ public sealed record SystemInfoSnapshot
     /// <summary>Gets operating-system and host-environment evidence.</summary>
     public required SystemInfoHost Host { get; init; }
 
+    /// <summary>Gets frozen host policies and the observed diagnostic-policy candidate.</summary>
+    public SystemInfoMonicaHost? MonicaHost { get; init; }
+
+    /// <summary>Gets the placement and role recovery summary when the application model is enabled.</summary>
+    public SystemInfoRoleDeployment? ApplicationModel { get; init; }
+
     /// <summary>Gets metadata for the executable artifact that hosts the application.</summary>
     public required SystemInfoArtifact Artifact { get; init; }
 
@@ -30,6 +38,28 @@ public sealed record SystemInfoSnapshot
 
     /// <summary>Gets the normalized addresses currently published by the ASP.NET Core server.</summary>
     public required ImmutableArray<SystemInfoEndpoint> Endpoints { get; init; }
+}
+
+/// <summary>Host-wide Monica policies and the count of successfully composed modules.</summary>
+public sealed record SystemInfoMonicaHost(string FrameworkVersion, int ModuleCount, int ModuleErrorCount, string? DeploymentScope,
+    bool AutonomousWork, ApplicationDebugModeState DebugMode);
+
+/// <summary>Role identity, placement and recovery evidence without configuration values or exception details.</summary>
+public sealed record SystemInfoRole(string Id, string DomainId, string AppId, RoleHealthStatus Status,
+    RoleCriticality Criticality, bool HasOverride, bool? StartupCandidateValid);
+
+/// <summary>Catalog placement and process-local restart impact captured at the same instant as the host dossier.</summary>
+public sealed record SystemInfoRoleDeployment(string AppId, int ApplicationCount, RoleFaultPolicyMode Policy, ImmutableArray<SystemInfoRole> Roles)
+{
+    internal IEnumerable<SystemInfoRole> Local => Roles.Where(role => role.Status != RoleHealthStatus.Inactive);
+    internal IEnumerable<SystemInfoRole> Faulted => Local.Where(role => role.Status == RoleHealthStatus.Faulted);
+    internal int ServingCount => Local.Count(role => role.Status is RoleHealthStatus.Healthy or RoleHealthStatus.Degraded);
+    internal int AttentionCount => Local.Count(role => role.Status is RoleHealthStatus.Degraded or RoleHealthStatus.Faulted);
+
+    internal static SystemInfoRoleDeployment Capture(RoleHealthSnapshot snapshot) => new(
+        snapshot.AppId, snapshot.ApplicationCount, snapshot.ConfiguredPolicyMode, snapshot.Roles.Select(role =>
+            new SystemInfoRole(role.RoleId, role.DomainId, role.AssignedAppId, role.Status, role.EffectiveCriticality,
+                role.OverrideCriticality.HasValue, role.StartupCandidateObservedValid)).ToImmutableArray());
 }
 
 /// <summary>

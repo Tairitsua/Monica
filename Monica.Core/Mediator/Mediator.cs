@@ -61,7 +61,10 @@ public sealed class Mediator(IServiceProvider serviceProvider) : IMediator
     private async Task<TResponse> Execute<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         where TRequest : IRequest<TResponse>
     {
-        serviceProvider.GetService<ITypeActivationPolicy>()?.EnsureCanExecuteRequest(typeof(TRequest));
+        var activation = serviceProvider.GetService<ITypeActivationPolicy>();
+        activation?.EnsureCanExecuteRequest(typeof(TRequest));
+        if (activation is { SuspendedWorkloadOwners.Count: > 0 })
+            serviceProvider.GetRequiredService<MediatorHandlerAdmission>().EnsureAvailable(typeof(IRequestHandler<TRequest, TResponse>));
         var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
         var handlerType = handler.GetType();
         var readOnly = request is IQueryRequest;

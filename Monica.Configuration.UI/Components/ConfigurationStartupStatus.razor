@@ -2,11 +2,23 @@
 
 <MudStack Spacing="2">
     <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:ReadOnly"]</MudAlert>
-    @if (Candidate is null)
+    @if (Admission == Monica.Configuration.Models.ConfigurationStartupStatus.NotRequiredOnHost)
+    {
+        <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:SkippedOnHost"]</MudAlert>
+    }
+    else if (Admission == Monica.Configuration.Models.ConfigurationStartupStatus.Faulted)
+    {
+        <MudAlert Icon="@MoIcons.Warning" Severity="Severity.Warning" Dense="true">@L["Startup:RoleFaulted"]</MudAlert>
+    }
+    @if (Admission == Monica.Configuration.Models.ConfigurationStartupStatus.Faulted && Candidate?.ValidationReport.IsValid is true)
+    {
+        <MudAlert Icon="@MoIcons.Success" Severity="Severity.Success" Dense="true">@L["Startup:RoleCandidateVerified"]</MudAlert>
+    }
+    else if (Candidate is null && Admission != Monica.Configuration.Models.ConfigurationStartupStatus.NotRequiredOnHost)
     {
         <MudAlert Icon="@MoIcons.Info" Severity="Severity.Info" Dense="true">@L["Startup:CandidateUnavailable"]</MudAlert>
     }
-    else
+    else if (Candidate is not null)
     {
         <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="1">
             @if (Candidate.RequiresRestart)
@@ -33,6 +45,8 @@
 </MudStack>
 
 @code {
+    /// <summary>Gets the current process's initial admission decision, independent of candidate validation.</summary>
+    [Parameter] public Monica.Configuration.Models.ConfigurationStartupStatus? Admission { get; set; }
     /// <summary>Gets the runtime's candidate assessment; presentation never compares masked values or applies candidates.</summary>
     [Parameter] public ConfigurationStartupCandidate? Candidate { get; set; }
 }

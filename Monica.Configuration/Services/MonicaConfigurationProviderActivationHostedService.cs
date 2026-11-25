@@ -24,7 +24,7 @@ internal sealed class MonicaConfigurationProviderActivationHostedService(
     {
         if (MonicaConfigurationProviderActivationCoordinator.ShouldActivate(definitions, serviceProvider))
             await serviceProvider.GetRequiredService<MonicaConfigurationProviderActivationCoordinator>().ActivateAsync(cancellationToken);
-        var report = validationService.GetReport();
+        var report = validationService.GetEnforcementReport();
         if (report.IsValid) return;
         if (policy.Behavior == ConfigurationRuntimeValidationBehavior.FailFast)
             throw new ConfigurationRuntimeValidationException(report);

@@ -240,6 +240,19 @@ public sealed class ApplicationHostSourceGeneratorTests
             .Should().Contain("api/v2/Ordering/queries/Total");
     }
 
+    [Fact]
+    public void Run_WhenRoleIsOptional_ShouldPreserveCriticalityInHostManifest()
+    {
+        var role = OrdinaryRole.Replace("Scenario.ProductDomain.Ordering)]",
+            "Scenario.ProductDomain.Ordering, Criticality = Monica.Core.ApplicationRoles.RoleCriticality.Optional)]");
+        var run = RunHost(CompileApplication(ordinary: role));
+
+        run.OutputErrors.Should().BeEmpty();
+        run.RunResult.Diagnostics.Should().BeEmpty();
+        run.GeneratedSources["GeneratedApplicationManifest.g.cs"].Should()
+            .Contain("Criticality = global::Monica.Core.ApplicationRoles.RoleCriticality.Optional");
+    }
+
     [Theory]
     [InlineData("Ordering.Chat")]
     [InlineData("Legacy.Ordering.Api")]

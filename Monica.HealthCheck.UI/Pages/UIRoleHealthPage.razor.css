@@ -1,0 +1,6 @@
+.role-page { display: grid; gap: 22px; min-width: 0; }
+.rh-time { display: grid; text-align: end; line-height: 1.35; margin-inline-end: 10px; }
+.rh-time small { color: var(--mud-palette-text-secondary); }
+.rh-time time { font: 500 13px var(--mo-font-family-mono); }
+.role-page ::deep .mo-vl-actions .mud-button-root { min-height: 34px; padding: 0 13px; border-radius: 6px; font-size: 13px; }
+@container page (max-width: 720px) { .role-page { gap: 16px; } }

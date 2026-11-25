@@ -18,3 +18,6 @@
 .system-info-masthead__actions ::deep .mud-button-outlined { border-color: var(--mud-palette-lines-inputs); background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); }
 .system-info-masthead__actions ::deep .mud-button-icon-start :is(.mud-icon-root, .mo-icon) { width: 15px; height: 15px; }
 @container page (max-width: 620px) { .system-info-masthead__identity { gap: 12px; } .system-info-seal { width: 44px; height: 44px; font-size: 24px; border-radius: 12px; } .system-info-masthead h1 { font-size: 25px; } .system-info-masthead__actions { width: 100%; } .system-info-capture { margin-right: auto; text-align: start; } }
+.system-info-role-badge { display: inline-flex; align-items: center; gap: .35rem; padding: .12rem .5rem; border: 1px solid var(--mud-palette-lines-default); border-radius: 2rem; color: var(--mud-palette-primary); font-size: .75rem; }
+.system-info-role-badge.needs-attention { color: var(--mud-palette-warning-darken); }
+.system-info-role-badge[href]:hover { text-decoration: underline; }

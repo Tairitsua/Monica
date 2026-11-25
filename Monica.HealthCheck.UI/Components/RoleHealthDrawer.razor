@@ -1,0 +1,115 @@
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Microsoft.JSInterop
+@using Monica.Core.TypeDiscovery.Abstractions
+@using Monica.UI.Shared.Components.Dialogs
+@inject IStringLocalizer<HealthCheckResource> L
+@inject NavigationManager Nav
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+@inject IJSRuntime JS
+@inject ISnackbar Notifications
+
+@if (!string.IsNullOrWhiteSpace(RoleId))
+{
+    var role = Snapshot.Host.Roles.FirstOrDefault(r => string.Equals(RoleId, r.RoleId, StringComparison.OrdinalIgnoreCase));
+    <MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Actions:Close"]" Compact="true" Width="520px">
+        <TitleContent>
+            <div class="rh-sheet-head"><span class="mo-vl-tile @(role is null ? "mo-vl-role--neutral" : RoleHealthDisplay.Color(role.Status).ToCssClass())"><MoIcon Icon="@MoIcons.ShieldCheck" Size="18px" /></span>
+                <div><small>@L["Roles:Inspector"]</small><h2>@(role?.RoleId ?? RoleId)</h2>
+                @if (role is not null) { <span class="mo-vl-status mo-vl-status--pill @RoleHealthDisplay.Color(role.Status).ToCssClass()"><i class="mo-vl-status-dot"></i>@L[$"Roles:States:{role.Status}"]</span> }
+                </div>
+            </div>
+        </TitleContent>
+        <ChildContent>
+            <div class="rh-sheet-body">
+            @if (role is null)
+            {
+                <MoSemanticCallout Title="@L["Roles:Missing"]" Severity="MoVisualRole.Warning">@L["Roles:MissingDesc", RoleId]</MoSemanticCallout>
+            }
+            else
+            {
+                @foreach (var fault in role.Faults)
+                {
+                    <section class="rh-fault"><h3>@L[$"Roles:Stages:{fault.Stage}"]</h3><time datetime="@fault.OccurredAt.ToString("O")">@Time.Format(fault.OccurredAt)</time><p>@fault.Summary</p>
+                        @foreach (var issue in fault.ConfigurationIssues)
+                        {
+                            <div class="rh-issue"><code>@issue.SectionPath · @issue.LogicalPath</code><p>@issue.Problem</p>
+                                @if (CanInspectConfig)
+                                {
+                                    <a href="@($"/configuration/state?definitionKey={Uri.EscapeDataString(issue.DefinitionKey)}")">@L["Roles:InspectConfig"] · @issue.DefinitionKey</a>
+                                }
+                                else { <code>@issue.DefinitionKey</code> }
+                            </div>
+                        }
+                    </section>
+                }
+                @if (role.Status == RoleHealthStatus.Faulted)
+                {
+                    var configFault = role.Faults.Any(fault => fault.Stage == RoleFaultStage.StartupConfiguration);
+                    var ready = RoleHealthDisplay.CandidateReady(role);
+                    <MoSemanticCallout Severity="@(ready ? MoVisualRole.Success : MoVisualRole.Warning)" Title="@L[configFault ? "Roles:Candidate" : "Roles:Recovery"]">
+                        @L[configFault ? ready ? "Roles:CandidateReady" : "Roles:CandidateUnknown" : "Roles:NonConfigRecovery"]
+                    </MoSemanticCallout>
+                    @if (CanInspectSystem)
+                    {
+                        <MudButton Href="@($"/system-info?restore={Uri.EscapeDataString(role.RoleId)}")" Variant="Variant.Outlined" StartIcon="@MoIcons.Server">@L["Roles:InspectRecovery"]</MudButton>
+                    }
+                }
+                else if (role.Status == RoleHealthStatus.Degraded)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Roles:ProbeEvidence"]"><a href="/health-checks">@L["Roles:HostHealth"]</a></MoSemanticCallout>
+                }
+                <section><h3>@L["Roles:Placement"]</h3><dl>
+                    <div><dt>@L["Roles:Select:domain"]</dt><dd>@role.DomainId</dd></div>
+                    <div><dt>@L["Roles:AssignedApp"]</dt><dd>@role.AssignedAppId</dd></div>
+                    <div><dt>@L["Roles:Workload"]</dt><dd>@role.WorkloadOwner</dd></div>
+                    <div><dt>@L["Roles:Policy"]</dt><dd>@Snapshot.Host.ConfiguredPolicyMode</dd></div>
+                    <div><dt>@L["Roles:Declared"]</dt><dd>@L[$"Roles:Criticalities:{role.DeclaredCriticality}"]</dd></div>
+                    <div><dt>@L["Roles:Override"]</dt><dd>@(role.OverrideCriticality is { } value ? L[$"Roles:Criticalities:{value}"].Value : "—")</dd></div>
+                    <div><dt>@L["Roles:Effective"]</dt><dd>@L[$"Roles:Criticalities:{role.EffectiveCriticality}"] · @L[ActionKey(role)]</dd></div>
+                </dl></section>
+                <section><h3>@L["Roles:Resources"]</h3>
+                    @if (Snapshot.Resources.TryGetValue(role.RoleId, out var resources))
+                    {
+                        <ul>@foreach (var resource in resources) { <li><b>@L[$"Roles:Kinds:{resource.Kind}"]</b><code>@resource.Key</code><small>@L[$"Roles:Modes:{resource.Mode}"]</small></li> }</ul>
+                        @if (role.Status == RoleHealthStatus.Faulted && resources.Any(resource => resource.Kind == TypeActivationKind.Job))
+                        {
+                            <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Roles:JobProtection"]">@L["Roles:JobProtectionDesc"]</MoSemanticCallout>
+                        }
+                    }
+                    else { <p>@L["Roles:NoResources"]</p> }
+                </section>
+            }
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <div class="rh-footer">
+                @if (role is not null) { <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" Size="Size.Small" OnClick="@(() => CopyAsync(role))">@L["Design:CopyJson"]</MudButton> }
+                <MudButton Href="/health-checks?entry=monica.application.roles" StartIcon="@MoIcons.HeartPulse" Size="Size.Small">@L["Roles:InspectGate"]</MudButton>
+            </div>
+        </FooterContent>
+    </MoSideSheet>
+}
+
+@code {
+    [Parameter, EditorRequired] public RoleHealthDashboardSnapshot Snapshot { get; set; } = default!;
+    [Parameter] public string? RoleId { get; set; }
+    [Parameter] public bool CanInspectConfig { get; set; }
+    [Parameter] public bool CanInspectSystem { get; set; }
+
+    private string ActionKey(RoleHealthEntrySnapshot role) => !role.IsActiveOnCurrentHost ? "Roles:RemoteUnknown" :
+        Snapshot.Host.ConfiguredPolicyMode == RoleFaultPolicyMode.IsolateAll
+        || Snapshot.Host.ConfiguredPolicyMode == RoleFaultPolicyMode.Auto && role.EffectiveCriticality == RoleCriticality.Optional
+            && Snapshot.Host.Roles.Count(r => r.IsActiveOnCurrentHost) > 1 ? "Roles:Isolate" : "Roles:FailFast";
+
+    private void Close(bool open) { if (!open) Nav.NavigateTo(Nav.GetUriWithQueryParameter("role", (string?)null)); }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
+
+    private async Task CopyAsync(RoleHealthEntrySnapshot role)
+    {
+        var json = JsonSerializer.Serialize(new { Snapshot.CheckedAt, Snapshot.Host.AppId, Role = role, Resources = Snapshot.Resources.GetValueOrDefault(role.RoleId) }, JsonOptions);
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", json);
+        Notifications.Add(L["Design:Copied"], Severity.Success);
+    }
+}

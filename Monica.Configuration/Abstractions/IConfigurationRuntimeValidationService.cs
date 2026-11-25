@@ -8,10 +8,13 @@ namespace Monica.Configuration.Abstractions;
 public interface IConfigurationRuntimeValidationService
 {
     /// <summary>
-    /// Builds a validation report for every local configuration definition.
+    /// Builds a report for all applicable definitions, including failures isolated to an assigned role.
     /// </summary>
     /// <returns>The validation report.</returns>
     ConfigurationValidationReport GetReport();
+
+    /// <summary>Builds the host enforcement report, excluding Startup definitions already quarantined during role preflight.</summary>
+    ConfigurationValidationReport GetEnforcementReport() => GetReport();
 
     /// <summary>
     /// Builds a validation report for one local configuration definition.

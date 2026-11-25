@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Monica.HealthCheck.Services;
 
 namespace Monica.HealthCheck.Extensions;
 
@@ -38,6 +39,10 @@ public static class HealthCheckBuilderExtensions
     /// <summary>
     /// Registers a typed readiness check and adds the stable <c>ready</c> and <c>monica</c> tags.
     /// </summary>
+    /// <remarks>With an application model, Monica resolves ownership from the check type and its registration owner.
+    /// Assigned quarantined roles are short-circuited before constructing the check. Optional multi-role checks
+    /// may cap failures at Degraded according to the deployment policy. A check explicitly tagged for liveness as
+    /// well keeps a separate native live entry and its original failure semantics.</remarks>
     /// <typeparam name="THealthCheck">The health-check implementation activated by ASP.NET Core.</typeparam>
     /// <param name="builder">The host health-check builder.</param>
     /// <param name="name">A unique, stable registration name.</param>
@@ -88,6 +93,7 @@ public static class HealthCheckBuilderExtensions
             }
         }
 
-        return builder.AddCheck<THealthCheck>(name, failureStatus, normalizedTags, timeout);
+        return builder.Add(new HealthCheckRegistration(name, new TypedHealthCheckFactory(typeof(THealthCheck)).Create,
+            failureStatus, normalizedTags, timeout));
     }
 }

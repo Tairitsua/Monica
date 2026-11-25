@@ -58,6 +58,11 @@ public sealed class ConfigurationAttribute : Attribute
     /// </remarks>
     public string? DefinitionKey { get; set; }
 
+    /// <summary>Explicit application role IDs requiring this Startup definition. Omit for unconditional host validation.</summary>
+    /// <remarks>Role scoping requires the application model and configuration module at host composition. Role assembly placement
+    /// never implicitly scopes a definition. Passive callers must retain their independently required configuration.</remarks>
+    public string[]? RequiredByRoles { get; set; }
+
     /// <summary>
     /// Gets or sets the display name shown in management tools.
     /// </summary>

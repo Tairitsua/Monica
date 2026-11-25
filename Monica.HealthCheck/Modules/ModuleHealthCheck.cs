@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Extensions;
@@ -77,6 +78,16 @@ public sealed class ModuleHealthCheck : MonicaModule<ModuleHealthCheckOption>, I
                 SELF_CHECK_NAME,
                 static () => HealthCheckResult.Healthy("The Monica host process is responsive."),
                 tags: [HealthCheckTags.Live, HealthCheckTags.Ready, HealthCheckTags.Monica]);
+
+        context.Services.TryAddSingleton<RoleHealthFacade>(provider => new RoleHealthFacade(
+            provider.GetRequiredService<MonicaApplication>(), provider.GetService<IRoleHealthStateProvider>()));
+        context.Application.Composition.OnServicesFinalized(services =>
+        {
+            if (!services.Any(descriptor => descriptor.ServiceType == typeof(IRoleHealthStateProvider))) return;
+            RoleHealthCheckRegistration.Attach(context.Application, services);
+            services.AddHealthChecks().AddCheck<ApplicationRolesHealthCheck>(ApplicationRolesHealthCheck.Name,
+                tags: [HealthCheckTags.Monica, HealthCheckTags.Ready, "roles"]);
+        });
 
         context.Services.TryAddSingleton<HealthCheckSnapshotService>(static provider =>
             new HealthCheckSnapshotService(provider.GetRequiredService<HealthCheckService>()));

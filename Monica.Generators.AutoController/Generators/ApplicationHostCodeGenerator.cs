@@ -45,25 +45,26 @@ internal static class ApplicationHostCodeGenerator
             .Append(string.Join(", ", model.LocalAssemblies.Select(Literal))).AppendLine(" });");
         AppendList(builder, "ApplicationDomainDefinition", "Domains", model.Assemblies
             .Where(static assembly => assembly.RoleId is null)
-            .Select(static assembly => $"{Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +
-                (assembly.BackgroundRole is null ? string.Empty : $", {Literal(assembly.BackgroundRole)}")));
+            .Select(static assembly => $"({Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +
+                (assembly.BackgroundRole is null ? string.Empty : $", {Literal(assembly.BackgroundRole)}") + ")"));
         AppendList(builder, "ApplicationRoleDefinition", "Roles", model.Assemblies
             .Where(static assembly => assembly.RoleId is not null)
-            .Select(static assembly => $"{Literal(assembly.RoleId!)}, {Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +
-                (assembly.WorkloadOwner is null ? string.Empty : $", {Literal(assembly.WorkloadOwner)}")));
+            .Select(static assembly => $"({Literal(assembly.RoleId!)}, {Literal(assembly.DomainId)}, {Literal(assembly.AssemblyName)}" +
+                (assembly.WorkloadOwner is null ? string.Empty : $", {Literal(assembly.WorkloadOwner)}") + ")" +
+                (assembly.OptionalRole ? " { Criticality = global::Monica.Core.ApplicationRoles.RoleCriticality.Optional }" : string.Empty)));
         AppendList(builder, "ApplicationOperationDefinition", "Operations", model.Operations
-            .Select(static operation => $"typeof({operation.RequestTypeName}), {Literal(operation.HandlerTypeName)}, " +
+            .Select(static operation => $"(typeof({operation.RequestTypeName}), {Literal(operation.HandlerTypeName)}, " +
                 $"{Literal(operation.HandlerAssemblyName)}, {Literal(operation.DomainId)}, {Literal(operation.RoleId)}, " +
-                (operation.RequiredRole is null ? "null" : Literal(operation.RequiredRole))));
+                (operation.RequiredRole is null ? "null" : Literal(operation.RequiredRole)) + ")"));
         AppendList(builder, "ApplicationApiClientDefinition", "ApiClients", clients
-            .Select(static group => $"typeof({group.Key}), typeof({group.First().ImplementationTypeName})"));
+            .Select(static group => $"(typeof({group.Key}), typeof({group.First().ImplementationTypeName}))"));
         AppendList(builder, "ApplicationDependencyDefinition", "Dependencies", model.Dependencies
-            .Select(static dependency => $"{Literal(dependency.SourceAssembly)}, {Literal(dependency.SourceType)}, typeof({dependency.RequestType})"));
+            .Select(static dependency => $"({Literal(dependency.SourceAssembly)}, {Literal(dependency.SourceType)}, typeof({dependency.RequestType}))"));
         builder.AppendLine("}");
         return builder.ToString();
     }
 
-    private static void AppendList(StringBuilder builder, string definition, string property, IEnumerable<string> arguments)
+    private static void AppendList(StringBuilder builder, string definition, string property, IEnumerable<string> initializers)
     {
         var type = "global::Monica.ApplicationModel.Models." + definition;
         builder.AppendLine("    /// <inheritdoc />");
@@ -71,8 +72,8 @@ internal static class ApplicationHostCodeGenerator
             .Append(property).AppendLine(" { get; } =");
         builder.Append("        global::System.Array.AsReadOnly(new ").Append(type).AppendLine("[]");
         builder.AppendLine("        {");
-        foreach (var argument in arguments)
-            builder.Append("            new ").Append(type).Append('(').Append(argument).AppendLine("),");
+        foreach (var initializer in initializers)
+            builder.Append("            new ").Append(type).Append(initializer).AppendLine(",");
         builder.AppendLine("        });");
         builder.AppendLine();
     }

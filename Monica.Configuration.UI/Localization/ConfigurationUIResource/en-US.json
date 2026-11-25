@@ -20,6 +20,9 @@
     }
   },
   "Startup": {
+    "SkippedOnHost": "No role assigned to this instance requires this definition. Startup validation was skipped.",
+    "RoleFaulted": "Startup validation failed. The assigned roles that require this definition are quarantined on this instance.",
+    "RoleCandidateVerified": "The candidate visible in this instance now passes validation. Restart and confirm recovery on the replacement instance.",
     "Kind": "Startup",
     "ReadOnly": "Startup configuration is owned by deployment and is read-only here. Update its startup input and restart the service to apply changes; running values remain frozen.",
     "CandidateUnavailable": "The current startup candidate is unavailable.",
@@ -30,7 +33,8 @@
     "ActualValue": "Running value · frozen at startup",
     "CandidateValue": "Candidate value · current startup input",
     "ActualUnavailable": "The frozen running value is unavailable.",
-    "ActualSources": "Sources captured at startup",
+    "ActualSources": "Inputs captured at startup",
+    "WinningInput": "Highest-priority input",
     "CandidateSources": "Current candidate sources",
     "SourceContributions": "These contribution counts describe the current candidate providers. Running values remain frozen; inspect a field's source chain to see its startup sources."
   },

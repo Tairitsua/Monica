@@ -124,6 +124,7 @@ public sealed class ConfigurationEffectiveStateReader(
         {
             Definition = definition,
             StartupCandidate = chains[0].StartupActualValue?.StartupCandidate,
+            StartupStatus = chains[0].StartupActualValue?.StartupStatus,
             EffectiveValues = chains.Skip(1).Select(chain => chain.StartupActualValue
                 ?? throw new InvalidOperationException("Startup configuration diagnostics are unavailable.")).ToArray()
         };

@@ -31,6 +31,8 @@ internal sealed class ConfigurationDefinitionScanner(
         var definitionKey = attribute.DefinitionKey ?? optionsType.FullName ?? optionsType.Name;
         if (!Enum.IsDefined(attribute.Kind))
             throw new InvalidOperationException($"Configuration definition '{definitionKey}' has an unsupported ownership kind.");
+        if (attribute.RequiredByRoles is not null && attribute.Kind != ConfigurationKind.Startup)
+            throw new InvalidOperationException($"Only Startup configuration '{definitionKey}' may declare RequiredByRoles.");
         if (attribute.Kind == ConfigurationKind.Startup && string.IsNullOrWhiteSpace(attribute.SectionPath))
             throw new InvalidOperationException($"Startup configuration definition '{definitionKey}' requires an explicit section path.");
         if (attribute.Kind == ConfigurationKind.Startup && attribute.ReloadBehavior is not

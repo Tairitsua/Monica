@@ -20,4 +20,8 @@ Application identity, machine name, paths, build metadata and endpoint details p
 
 The opt-in `EnableSelfRestartAction(...)` registration helper exposes a confirmation action that requests delayed graceful shutdown. An external supervisor owns starting the process again. Canceling the confirmation leaves the host running. Do not enable or exercise shutdown merely to inspect the visual interface.
 
+The host dossier includes the framework version, loaded module count, deployment scope, autonomous-work policy, and frozen DebugMode with its observed candidate. Application-model hosts also display local roles, effective criticality, overrides and peer assignments. The role-health shortcut follows the destination page's configured access policy. Standalone hosts show only the host policies and evidence.
+
+Opening `/system-info?restore=<roleId>` for an isolated local role shows the restart impact. Refresh samples candidate validation again. The preview identifies candidates validated here, roles without a validated candidate, and currently serving roles that a whole-process shutdown would interrupt. A volume mounted with Kubernetes `subPath` can continue to expose the old file. Confirm recovery from the new instance's readiness and role state.
+
 Source: `Monica.UI/Modules/ModuleSystemInfoUI.cs`, `UISystemInfo/Models/SystemInfoSnapshot.cs`, `UISystemInfo/State/SystemInfoPageSession.cs`, and `Pages/UISystemInfoPage.razor`.

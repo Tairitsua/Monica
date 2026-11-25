@@ -35,6 +35,7 @@ internal static class ApplicationCatalogMetadata
             .Select(static assembly => new XElement("Assembly", new XAttribute("Name", assembly.AssemblyName),
                 new XAttribute("Domain", assembly.DomainId),
                 assembly.RoleId is null ? null : new XAttribute("Role", assembly.RoleId),
+                assembly.OptionalRole ? new XAttribute("OptionalRole", true) : null,
                 assembly.WorkloadOwner is null ? null : new XAttribute("WorkloadOwner", assembly.WorkloadOwner),
                 assembly.BackgroundRole is null ? null : new XAttribute("BackgroundRole", assembly.BackgroundRole)))),
         new XElement("Operations", model.Operations.Where(static operation => operation.Published)
@@ -90,7 +91,8 @@ internal static class ApplicationCatalogMetadata
                 dependencies.AddRange(ReadDependencies(document));
                 foreach (var item in document.Element("Assemblies")?.Elements("Assembly") ?? [])
                     assemblies.Add(new ApplicationAssemblyModel(Required(item, "Name"), Required(item, "Domain"),
-                        Optional(item, "Role"), Optional(item, "WorkloadOwner"), Optional(item, "BackgroundRole")));
+                        Optional(item, "Role"), Optional(item, "WorkloadOwner"), Optional(item, "BackgroundRole"),
+                        (bool?)item.Attribute("OptionalRole") ?? false));
                 foreach (var item in document.Element("Operations")?.Elements("Operation") ?? [])
                 {
                     var requestName = Required(item, "Request");

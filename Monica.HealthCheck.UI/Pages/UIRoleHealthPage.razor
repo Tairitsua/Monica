@@ -1,0 +1,129 @@
+@attribute [Route(PAGE_URL)]
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
+@using Microsoft.Extensions.Logging
+@inject RoleHealthFacade Facade
+@inject PageAccessEvaluator PageAccess
+@inject IStringLocalizer<HealthCheckResource> L
+@inject ILogger<UIRoleHealthPage> Logger
+@inject Monica.UI.Shared.Services.MoTimeFormatter Time
+@inject IJSRuntime JS
+
+<PageTitle>@L["Roles:Title"]</PageTitle>
+<div class="mo-workbench-container"><div class="mo-page-shell mo-page-shell--workbench role-page">
+@if (!_checked)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" aria-label="@L["Access:Checking"]" />
+}
+else if (!_authorized)
+{
+    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Access:DeniedTitle"]">@L["Access:DeniedDescription"]</MoSemanticCallout>
+}
+else
+{
+    <MoPageMasthead Icon="@MoIcons.ShieldCheck" Crumb="@L["Design:Eyebrow"]" Title="@L["Roles:Title"]" Meta="@Metadata">
+
+        <Actions>
+            @if (_snapshot is { } captured)
+            {
+                <div class="rh-time"><small>@L[_failed ? "Page:StaleChecked" : "Page:LastChecked"]</small><time datetime="@captured.CheckedAt.ToString("O")">@Time.FormatTime(captured.CheckedAt)</time></div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@(_paused ? MoIcons.Play : MoIcons.Pause)" aria-pressed="@_paused.ToString().ToLowerInvariant()" OnClick="@(() => _paused = !_paused)">@L[_paused ? "Design:ResumeAuto" : "Design:PauseAuto"]</MudButton>
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="Refresh">@L["Actions:Refresh"]</MudButton>
+        </Actions>
+    </MoPageMasthead>
+    <HealthWorkbenchNav RolesActive="true" Attention="@(_snapshot?.Host.Roles.Count(r => r.Status is RoleHealthStatus.Faulted or RoleHealthStatus.Degraded) ?? 0)" />
+    @if (_failed) { <MudAlert Severity="Severity.Warning" Dense="true">@L[_snapshot is null ? "State:LoadFailed" : "Roles:Stale"]</MudAlert> }
+    @if (_snapshot is { } current)
+    {
+        <RoleHealthOverview Snapshot="@current" />
+        <RoleHealthRegistry Snapshot="@current" />
+        <RoleHealthDrawer Snapshot="@current" RoleId="@Role" CanInspectConfig="@_canInspectConfig" CanInspectSystem="@_canInspectSystem" />
+    }
+    else if (!_failed)
+    {
+        <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Roles:NoModelTitle"]">
+            @L["Roles:NoModel"] <MudLink Href="/health-checks">@L["Roles:HostHealth"]</MudLink>
+        </MoSemanticCallout>
+    }
+}
+</div></div>
+
+@code {
+    private RenderFragment Metadata => @<text>
+            @if (_snapshot is { } snapshot)
+            {
+                <span class="mo-vl-status mo-vl-status--pill @((_failed ? MoVisualRole.Warning : _paused ? MoVisualRole.Neutral : MoVisualRole.Info).ToCssClass())">
+                    <i class="mo-vl-status-dot" aria-hidden="true"></i>@L[_failed ? "Design:AutoRefreshStale" : _paused ? "Design:AutoRefreshPaused" : "Roles:Auto"]
+                </span>
+                <button type="button" class="mo-vl-capsule mo-vl-capsule--outline" title="@L["Design:CopyHost", HostName]" @onclick="CopyHost"><MoIcon Icon="@MoIcons.Server" Size="13px" /> @HostName <MoIcon Icon="@MoIcons.Copy" Size="13px" /></button>
+                <span title="@Time.TimeZone.Id">@Time.FormatZoneLabel(snapshot.CheckedAt)</span>
+            }
+    </text>;
+    public const string PAGE_URL = "/health-checks/roles";
+    [SupplyParameterFromQuery] public string? Role { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _poll;
+    private RoleHealthDashboardSnapshot? _snapshot;
+    private bool _checked, _authorized, _paused, _busy, _failed;
+    private bool _canInspectConfig, _canInspectSystem;
+    private string HostName => $"{_snapshot?.Host.AppId} · {Environment.MachineName}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        if (_authorized && !_lifetime.IsCancellationRequested) _poll = PollAsync(_lifetime.Token);
+    }
+
+    private async Task Refresh()
+    {
+        if (_busy || _lifetime.IsCancellationRequested) return;
+        _busy = true;
+        try
+        {
+            _authorized = await PageAccess.IsAuthorizedAsync(PAGE_URL, _lifetime.Token);
+            if (_lifetime.IsCancellationRequested) return;
+            _checked = true;
+            _snapshot = _authorized ? Facade.GetSnapshot() : null;
+            if (_authorized)
+            {
+                _canInspectConfig = await PageAccess.IsAuthorizedAsync("/configuration/state", _lifetime.Token);
+                _canInspectSystem = await PageAccess.IsAuthorizedAsync("/system-info", _lifetime.Token);
+            }
+            _failed = false;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            Logger.LogWarning(error, "Role health refresh failed");
+            _checked = true;
+            _failed = true;
+        }
+        finally { _busy = false; }
+    }
+
+    private Task CopyHost() => JS.InvokeVoidAsync("navigator.clipboard.writeText", HostName).AsTask();
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+                await InvokeAsync(async () =>
+                {
+                    if (token.IsCancellationRequested) return;
+                    if (!_paused) await Refresh();
+                    StateHasChanged();
+                });
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _lifetime.CancelAsync();
+        if (_poll is not null) await _poll;
+        _lifetime.Dispose();
+    }
+}

@@ -21,25 +21,33 @@ internal sealed class ConfigurationRuntimeValidationService(
     private readonly Dictionary<string, ConfigurationValidationReport> _definitionReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimeReloadRevisionTracker _runtimeReloadRevisionTracker = new(runtimeContext);
     private ValidationCacheRevision _cachedRevision = ValidationCacheRevision.Empty;
-    private ConfigurationValidationReport? _fullReport;
+    private readonly Dictionary<bool, ConfigurationValidationReport> _aggregateReports = [];
 
     /// <summary>
     /// Builds a validation report for every local configuration definition.
     /// </summary>
     /// <returns>The validation report.</returns>
-    public ConfigurationValidationReport GetReport()
+    public ConfigurationValidationReport GetReport() => GetAggregateReport(forEnforcement: false);
+
+    /// <inheritdoc />
+    public ConfigurationValidationReport GetEnforcementReport() => GetAggregateReport(forEnforcement: true);
+
+    private ConfigurationValidationReport GetAggregateReport(bool forEnforcement)
     {
         lock (_cacheLock)
         {
             while (true)
             {
                 var revision = PrepareCache();
-                if (_fullReport is not null)
-                {
-                    return _fullReport;
-                }
-
+                if (_aggregateReports.TryGetValue(forEnforcement, out var cached)) return cached;
                 var definitionReports = definitionRegistry.GetAll()
+                    .Where(definition => definition.Kind != ConfigurationKind.Startup
+                        || runtimeContext.StartupOptions!.GetRequired(definition).Status switch
+                        {
+                            ConfigurationStartupStatus.Valid => true,
+                            ConfigurationStartupStatus.Faulted => !forEnforcement,
+                            _ => false
+                        })
                     .Select(GetOrBuildDefinitionReport)
                     .ToArray();
                 if (GetCurrentRevision() != revision)
@@ -48,7 +56,7 @@ internal sealed class ConfigurationRuntimeValidationService(
                     continue;
                 }
 
-                _fullReport = new ConfigurationValidationReport
+                var aggregate = new ConfigurationValidationReport
                 {
                     Coverage = definitionReports.All(report => report.Coverage == ConfigurationValidationCoverage.Complete)
                         ? ConfigurationValidationCoverage.Complete : definitionReports.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed)
@@ -56,7 +64,8 @@ internal sealed class ConfigurationRuntimeValidationService(
                     Issues = Array.AsReadOnly(definitionReports.SelectMany(report => report.Issues).ToArray()),
                     DefinitionReports = Array.AsReadOnly(definitionReports.SelectMany(report => report.DefinitionReports).ToArray())
                 };
-                return _fullReport;
+                _aggregateReports.Add(forEnforcement, aggregate);
+                return aggregate;
             }
         }
     }
@@ -107,7 +116,7 @@ internal sealed class ConfigurationRuntimeValidationService(
     {
         _cachedRevision = revision;
         _definitionReports.Clear();
-        _fullReport = null;
+        _aggregateReports.Clear();
     }
 
     private ConfigurationValidationReport GetOrBuildDefinitionReport(ConfigurationDefinition definition)

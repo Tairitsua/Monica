@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity.Models;
 using Monica.Modules;
 using Monica.UI.UISystemInfo.Models;
@@ -32,7 +33,8 @@ internal sealed class SystemInfoSnapshotProvider(
     MonicaApplication monicaApplication,
     IOptions<ModuleShellUIOption> shellOptions,
     MoTimeFormatter timeFormatter,
-    IHostEnvironment hostEnvironment)
+    IHostEnvironment hostEnvironment,
+    IRoleHealthStateProvider? roleHealth = null)
 {
     internal SystemInfoSnapshot Capture()
     {
@@ -58,6 +60,12 @@ internal sealed class SystemInfoSnapshotProvider(
         return new SystemInfoSnapshot
         {
             CapturedAtUtc = capturedAtUtc,
+            MonicaHost = new SystemInfoMonicaHost(
+                typeof(MonicaApplication).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+                    ?? typeof(MonicaApplication).Assembly.GetName().Version?.ToString() ?? string.Empty,
+                monicaApplication.Modules.RuntimeSnapshots.Count, monicaApplication.Modules.RegistrationErrorCount, monicaApplication.Application.DeploymentScope,
+                monicaApplication.Application.AutonomousWork, monicaApplication.GetDebugModeState()),
+            ApplicationModel = roleHealth is null ? null : SystemInfoRoleDeployment.Capture(roleHealth.GetSnapshot(includeCandidateValidation: true)),
             Application = new SystemInfoApplication
             {
                 Name = identity.GetAppName(),

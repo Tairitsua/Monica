@@ -317,7 +317,8 @@ public abstract class MonicaModule<TOptions> : MonicaModule
 
         context.ApplicationBuilder.UseEndpoints(endpoints =>
         {
-            var monicaEndpoints = endpoints.MapGroup(string.Empty).WithMonicaEndpoint();
+            var monicaEndpoints = endpoints.MapGroup(string.Empty).WithMonicaEndpoint()
+                .WithMetadata(new MonicaEndpointOwner(GetType(), context.RegistrationOwner));
             configure(monicaEndpoints);
         });
     }

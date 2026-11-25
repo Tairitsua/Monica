@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
@@ -208,7 +209,7 @@ public static class ModuleRepositoryRegistrationExtensions
                 sp.GetRequiredService<IDbContextFactory<TDbContext>>(),
                 options.MaintenanceLeaseStore is { } selection
                     ? sp.GetRequiredKeyedService<IExclusiveLeaseStore>(selection.ServiceKey) : null,
-                sp.GetService<IMeterFactory>()));
+                sp.GetService<IMeterFactory>(), sp.GetService<IRoleHealthStateProvider>()));
             var mode = options.EnableWorker
                 ? context.Application.TypeActivation!.GetActivation(typeof(TDbContext), TypeActivationKind.Outbox)
                 : ActivationMode.Disabled;

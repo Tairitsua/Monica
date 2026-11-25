@@ -7,6 +7,7 @@ using Monica.Configuration.Exceptions;
 using Monica.Configuration.Models;
 using Monica.Core;
 using Monica.Core.Configuration;
+using Monica.Core.ApplicationRoles;
 
 namespace Monica.Configuration.Services.Support;
 
@@ -37,37 +38,94 @@ internal sealed class ConfigurationStartupOptionsReader
 
     internal IConfigurationRoot Snapshot => _composition.StartupConfiguration;
 
-    internal TOptions Get<TOptions>() where TOptions : class, new() => (TOptions)Get(typeof(TOptions)).Instance;
+    internal TOptions Get<TOptions>() where TOptions : class, new()
+    {
+        var entry = Get(typeof(TOptions));
+        if (entry.Status == ConfigurationStartupStatus.Faulted && entry.OptionsType
+            .GetCustomAttribute<ConfigurationAttribute>(inherit: false)!.RequiredByRoles is null)
+            throw new ConfigurationRuntimeValidationException(entry.ValidationReport, startup: true);
+        return entry.Instance is TOptions value ? value :
+            throw new StartupConfigurationUnavailableException(entry.Definition.DefinitionKey, entry.Status);
+    }
 
-    private ConfigurationStartupEntry Get(Type optionsType)
+    internal void Preflight(IEnumerable<Type> optionsTypes, IRoleStartupFaultPolicy policy)
+    {
+        var faults = new List<ConfigurationValidationReport>();
+        var mustStop = false;
+        foreach (var type in optionsTypes.OrderBy(type => type.FullName, StringComparer.Ordinal))
+        {
+            var declared = type.GetCustomAttribute<ConfigurationAttribute>(inherit: false)!.RequiredByRoles;
+            var assigned = declared is null ? null : policy.GetAssignedRoles(declared);
+            var entry = Get(type, assigned);
+            if (entry.Status != ConfigurationStartupStatus.Faulted) continue;
+            faults.Add(entry.ValidationReport);
+            if (assigned is null)
+            {
+                mustStop = true;
+                continue;
+            }
+
+            var issues = entry.ValidationReport.Issues.Select(issue => new RoleConfigValidationIssueRef(
+                entry.Definition.DefinitionKey, entry.Definition.SectionPath, issue.LogicalPath.ToCanonicalString(), issue.Problem)).ToArray();
+            var fault = new RoleFaultRecord(RoleFaultStage.StartupConfiguration,
+                $"Startup validation failed for '{entry.Definition.DefinitionKey}'.", DateTimeOffset.UtcNow, Array.AsReadOnly(issues));
+            Func<bool> validateCandidate = () => ReadCandidate(entry.Definition).ValidationReport.IsValid;
+            foreach (var roleId in assigned)
+                if (!policy.RecordConfigurationFault(roleId, fault, validateCandidate)) mustStop = true;
+        }
+        if (mustStop)
+            throw new ConfigurationRuntimeValidationException(new ConfigurationValidationReport
+            {
+                Coverage = faults.Any(report => report.Coverage == ConfigurationValidationCoverage.Failed)
+                    ? ConfigurationValidationCoverage.Failed : ConfigurationValidationCoverage.Complete,
+                Issues = faults.SelectMany(report => report.Issues).ToArray(),
+                DefinitionReports = faults.SelectMany(report => report.DefinitionReports).ToArray()
+            }, startup: true);
+    }
+
+    private ConfigurationStartupEntry Get(Type optionsType, IReadOnlyList<string>? assigned = null)
     {
         lock (_gate)
         {
             if (_entries.TryGetValue(optionsType, out var existing)) return existing;
             if (_finalized)
                 throw new InvalidOperationException("Startup options must be read or discovered before service registration completes.");
-            if (optionsType.GetCustomAttribute<ConfigurationAttribute>(inherit: false)?.Kind != ConfigurationKind.Startup)
+            var attribute = optionsType.GetCustomAttribute<ConfigurationAttribute>(inherit: false);
+            if (attribute?.Kind != ConfigurationKind.Startup)
                 throw new InvalidOperationException($"Options type '{optionsType.FullName}' must declare Startup configuration ownership.");
+            if (attribute.RequiredByRoles is not null && assigned is null)
+                throw new InvalidOperationException($"Role-scoped Startup configuration '{optionsType.FullName}' requires application-model preflight before it may be read. Register AddConfiguration and AddApplicationModel in host composition.");
             var definition = _scanner.Scan(optionsType);
             if (_entries.Values.Any(entry => string.Equals(entry.Definition.DefinitionKey, definition.DefinitionKey,
                     StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException($"Startup configuration key '{definition.DefinitionKey}' has more than one CLR owner.");
             _localRegistry.RegisterRange([new ConfigurationDefinitionRegistration(optionsType, definition)]);
-            object instance;
-            ConfigurationCompleteValidationResult validation;
-            try { (instance, validation) = _validation.MaterializeAndValidate(definition, Snapshot); }
-            catch (ConfigurationValidationExecutionException fault)
-            {
-                throw new ConfigurationRuntimeValidationException(CreateFailureReport(definition, fault,
-                    "The Startup input could not be bound or validated."), startup: true);
-            }
-            var report = ConfigurationValidationReportFactory.Create(definition, validation);
-            if (!report.IsValid) throw new ConfigurationRuntimeValidationException(report, startup: true);
-            var entry = new ConfigurationStartupEntry(optionsType, definition, instance,
-                _materializer.Snapshot(definition, instance), report);
+            var entry = assigned is { Count: 0 }
+                ? new ConfigurationStartupEntry(optionsType, definition, null, null, new ConfigurationValidationReport
+                {
+                    Coverage = ConfigurationValidationCoverage.NotApplicable
+                }, ConfigurationStartupStatus.NotRequiredOnHost)
+                : BindStartup(optionsType, definition);
             _entries.Add(optionsType, entry);
             return entry;
         }
+    }
+
+    private ConfigurationStartupEntry BindStartup(Type optionsType, ConfigurationDefinition definition)
+    {
+        ConfigurationValidationReport report;
+        try
+        {
+            var (instance, validation) = _validation.MaterializeAndValidate(definition, Snapshot);
+            report = CreateStartupReport(definition, validation);
+            if (report.IsValid)
+                return new(optionsType, definition, instance, _materializer.Snapshot(definition, instance), report, ConfigurationStartupStatus.Valid);
+        }
+        catch (ConfigurationValidationExecutionException fault)
+        {
+            report = CreateFailureReport(definition, fault, "The Startup input could not be bound or validated.");
+        }
+        return new(optionsType, definition, null, null, report, ConfigurationStartupStatus.Faulted);
     }
 
     internal void RegisterDefinitions(IReadOnlyList<ConfigurationDefinitionRegistration> registrations)
@@ -78,6 +136,9 @@ internal sealed class ConfigurationStartupOptionsReader
             foreach (var registration in registrations.Where(registration => registration.Definition.Kind == ConfigurationKind.Startup))
             {
                 var entry = Get(registration.OptionsType);
+                if (entry.Status == ConfigurationStartupStatus.Faulted && registration.OptionsType
+                    .GetCustomAttribute<ConfigurationAttribute>(inherit: false)!.RequiredByRoles is null)
+                    throw new ConfigurationRuntimeValidationException(entry.ValidationReport, startup: true);
                 EnsureSameDefinition(entry.Definition, registration.Definition);
             }
         }
@@ -102,27 +163,53 @@ internal sealed class ConfigurationStartupOptionsReader
         try
         {
             source = ConfigurationSnapshot.Capture((IConfigurationRoot)_composition.LiveConfiguration);
+            if (actual.Status == ConfigurationStartupStatus.NotRequiredOnHost)
+                return new(_materializer.ReadConfigurationJson(definition, source), actual.ValidationReport, source);
             var (instance, validation) = _validation.MaterializeAndValidate(definition, source);
             var json = _materializer.Snapshot(definition, instance);
-            var report = ConfigurationValidationReportFactory.Create(definition, validation);
-            return new(json, report, !report.IsValid || !ConfigurationJsonSemanticComparer.Equals(actual.Json, json), source);
+            var report = CreateStartupReport(definition, validation);
+            return new(json, report, source);
         }
         catch (Exception exception)
         {
-            var report = CreateFailureReport(definition, exception as ConfigurationValidationExecutionException,
-                "The deployment candidate could not be bound or validated. The running startup value is unchanged.");
+            var report = actual.Status == ConfigurationStartupStatus.NotRequiredOnHost ? actual.ValidationReport
+                : CreateFailureReport(definition, exception as ConfigurationValidationExecutionException,
+                    "The deployment candidate could not be bound or validated.");
             string json;
             try { json = source is null ? "null" : _materializer.ReadConfigurationJson(definition, source); }
             catch { json = "null"; }
-            return new(json, report, true, source ?? ConfigurationSnapshot.Capture(new ConfigurationBuilder().Build()));
+            return new(json, report, source ?? ConfigurationSnapshot.Capture(new ConfigurationBuilder().Build()));
         }
+    }
+
+    // Startup issues can cross the configuration disclosure boundary into health snapshots and boot logs.
+    // Use schema-owned paths, never dynamic dictionary/list keys, unknown keys or user-written validation messages.
+    private static ConfigurationValidationReport CreateStartupReport(ConfigurationDefinition definition,
+        ConfigurationCompleteValidationResult validation)
+    {
+        var safeIssues = validation.Issues.Select(issue =>
+        {
+            var node = ConfigurationSchemaNavigator.ResolveNode(definition.Root, issue.LogicalPath);
+            var path = node?.RelativePath ?? definition.Root.RelativePath;
+            return issue with
+            {
+                Node = node ?? definition.Root,
+                LogicalPath = path,
+                LogicalPaths = issue.LogicalPaths.Select(location => ConfigurationSchemaNavigator.ResolveNode(
+                    definition.Root, location)?.RelativePath ?? LogicalPath.Root).ToArray(),
+                IsSensitive = issue.IsSensitive || node is null,
+                Message = issue.Kind == ConfigurationValidationIssueKind.Code
+                    ? "A configuration object rule failed." : issue.Message
+            };
+        }).ToArray();
+        return ConfigurationValidationReportFactory.Create(definition, validation with { Issues = safeIssues });
     }
 
     private static ConfigurationValidationReport CreateFailureReport(ConfigurationDefinition definition,
         ConfigurationValidationExecutionException? fault, string message)
     {
         var path = fault?.LogicalPath ?? LogicalPath.Root;
-        return ConfigurationValidationReportFactory.Create(definition, new ConfigurationCompleteValidationResult
+        return CreateStartupReport(definition, new ConfigurationCompleteValidationResult
         {
             Coverage = ConfigurationValidationCoverage.Failed,
             ValidationRevision = definition.ValidationContract.Revision,
@@ -145,17 +232,18 @@ internal sealed class ConfigurationStartupOptionsReader
         var sensitive = ConfigurationSchemaNavigator.IsSensitivePath(definition.Root, path)
             || node is not null && ConfigurationEffectiveStateReader.ContainsSensitiveValue(node);
         var editor = new ConfigurationEffectiveValueDocumentEditor(new ConfigurationEffectiveValuePatchEngine(), new ConfigurationStoredValueCodec());
-        var actualValue = editor.ReadValue(definition, actual.Json, path);
+        var actualValue = actual.Json is null ? null : editor.ReadValue(definition, actual.Json, path);
         ConfigurationStoredValue? candidateValue;
         try { candidateValue = editor.ReadValue(definition, candidate.Json, path); }
         catch { candidateValue = null; }
-        var actualSource = node?.NodeKind == ConfigurationNodeKind.Scalar
+        var actualSource = actual.Json is not null && node?.NodeKind == ConfigurationNodeKind.Scalar
             ? actualChain.Values.FirstOrDefault(value => value.IsEffective)?.Source : null;
         var candidateSource = node?.NodeKind == ConfigurationNodeKind.Scalar
             ? candidateChain.Values.FirstOrDefault(value => value.IsEffective)?.Source : null;
         return new ConfigurationEffectiveValue
         {
             DefinitionKey = definition.DefinitionKey,
+            StartupStatus = actual.Status,
             LogicalPath = path,
             ConfigurationPath = actualChain.ConfigurationPath,
             DisplayValue = sensitive && !includeSensitive ? null : ConfigurationEffectiveStateReader.ToDisplayValue(actualValue, node),
@@ -165,8 +253,8 @@ internal sealed class ConfigurationStartupOptionsReader
             {
                 DisplayValue = sensitive && !includeSensitive ? null : ConfigurationEffectiveStateReader.ToDisplayValue(candidateValue, node),
                 EffectiveSource = candidateSource,
-                RequiresRestart = !candidate.ValidationReport.IsValid
-                    || !ConfigurationJsonSemanticComparer.Equals(actualValue?.Json ?? "null", candidateValue?.Json ?? "null"),
+                RequiresRestart = actual.Status != ConfigurationStartupStatus.NotRequiredOnHost && (actual.Json is null || !candidate.ValidationReport.IsValid
+                    || !ConfigurationJsonSemanticComparer.Equals(actualValue?.Json ?? "null", candidateValue?.Json ?? "null")),
                 ValidationReport = candidate.ValidationReport
             }
         };
@@ -187,7 +275,7 @@ internal sealed class ConfigurationStartupOptionsReader
             foreach (var entry in _entries.Values)
             {
                 typeof(ConfigurationStartupOptionsReader).GetMethod(nameof(RegisterFrozenOptions), BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(entry.OptionsType).Invoke(null, [services, entry.Instance]);
+                    .MakeGenericMethod(entry.OptionsType).Invoke(null, [services, entry]);
             }
             _finalized = true;
         }
@@ -229,7 +317,7 @@ internal sealed class ConfigurationStartupOptionsReader
 
     private static bool IsFrozenOptionsService(ServiceDescriptor descriptor, ConfigurationStartupEntry entry)
         => !descriptor.IsKeyedService && descriptor.ImplementationInstance is IFrozenStartupOptions frozen
-            && frozen.OptionsType == entry.OptionsType && ReferenceEquals(frozen.Instance, entry.Instance);
+            && frozen.OptionsType == entry.OptionsType && ReferenceEquals(frozen.Entry, entry);
 
     private static bool IsDefaultOptionsService(ServiceDescriptor descriptor)
     {
@@ -245,9 +333,9 @@ internal sealed class ConfigurationStartupOptionsReader
             && implementation.FullName == $"Microsoft.Extensions.Options.{expectedName}";
     }
 
-    private static void RegisterFrozenOptions<TOptions>(IServiceCollection services, object instance) where TOptions : class
+    private static void RegisterFrozenOptions<TOptions>(IServiceCollection services, ConfigurationStartupEntry entry) where TOptions : class
     {
-        var frozen = new FrozenStartupOptions<TOptions>((TOptions)instance);
+        var frozen = new FrozenStartupOptions<TOptions>(entry);
         services.AddSingleton<IOptions<TOptions>>(frozen);
         services.AddSingleton<IOptionsSnapshot<TOptions>>(frozen);
         services.AddSingleton<IOptionsMonitor<TOptions>>(frozen);
@@ -272,17 +360,18 @@ internal sealed class ConfigurationStartupOptionsReader
     private interface IFrozenStartupOptions
     {
         Type OptionsType { get; }
-        object Instance { get; }
+        ConfigurationStartupEntry Entry { get; }
     }
 
-    private sealed class FrozenStartupOptions<TOptions>(TOptions value) : IOptions<TOptions>, IOptionsSnapshot<TOptions>,
+    private sealed class FrozenStartupOptions<TOptions>(ConfigurationStartupEntry entry) : IOptions<TOptions>, IOptionsSnapshot<TOptions>,
         IOptionsMonitor<TOptions>, IOptionsFactory<TOptions>, IFrozenStartupOptions where TOptions : class
     {
         public Type OptionsType => typeof(TOptions);
-        object IFrozenStartupOptions.Instance => value;
-        public TOptions Value => value;
-        public TOptions CurrentValue => value;
-        public TOptions Get(string? name) => string.IsNullOrEmpty(name) ? value
+        ConfigurationStartupEntry IFrozenStartupOptions.Entry => entry;
+        public TOptions Value => entry.Instance is TOptions value ? value
+            : throw new StartupConfigurationUnavailableException(entry.Definition.DefinitionKey, entry.Status);
+        public TOptions CurrentValue => Value;
+        public TOptions Get(string? name) => string.IsNullOrEmpty(name) ? Value
             : throw new InvalidOperationException("Startup configuration does not support named options.");
         public TOptions Create(string name) => Get(name);
         public IDisposable OnChange(Action<TOptions, string?> listener)
@@ -300,7 +389,7 @@ internal sealed class ConfigurationStartupOptionsReader
 }
 
 internal sealed record ConfigurationStartupEntry(Type OptionsType, ConfigurationDefinition Definition,
-    object Instance, string Json, ConfigurationValidationReport ValidationReport);
+    object? Instance, string? Json, ConfigurationValidationReport ValidationReport, ConfigurationStartupStatus Status);
 
 internal sealed record ConfigurationStartupCandidateSnapshot(string Json, ConfigurationValidationReport ValidationReport,
-    bool RequiresRestart, ConfigurationSnapshot Sources);
+    ConfigurationSnapshot Sources);

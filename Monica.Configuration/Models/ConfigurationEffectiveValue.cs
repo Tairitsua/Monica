@@ -8,6 +8,9 @@ public sealed record ConfigurationEffectiveValue
     /// <summary>Whether the effective contribution is a validated temporary seed, with no stored version.</summary>
     public bool IsUnpersisted { get; init; }
 
+    /// <summary>Gets the process-local Startup admission outcome, or null for Managed settings.</summary>
+    public ConfigurationStartupStatus? StartupStatus { get; init; }
+
     /// <summary>Gets deployment candidate diagnostics for Startup values; the ordinary value remains frozen actual state.</summary>
     public ConfigurationStartupCandidate? StartupCandidate { get; init; }
 

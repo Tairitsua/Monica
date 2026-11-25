@@ -1,8 +1,10 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 using Monica.ApplicationModel.Abstractions;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Mediator;
+using Monica.Core.Results;
 using Monica.Core.Results.Abstractions;
 using Monica.Modules;
 using Monica.Invocation.Abstractions;
@@ -20,7 +22,8 @@ internal sealed class ApplicationApiInvoker(
     IJsonSerializerOptionsProvider serializer,
     IOptions<ModuleApiClientOption> apiClientOptions,
     IEnumerable<IApplicationInvocationAuthorityPolicy> authorities,
-    IServiceProvider services) : IApplicationApiInvoker
+    IServiceProvider services,
+    IRoleHealthStateProvider? roleHealth = null) : IApplicationApiInvoker
 {
     private readonly IApplicationInvocationAuthorityPolicy? _authority = authorities.SingleOrDefault();
 
@@ -45,7 +48,12 @@ internal sealed class ApplicationApiInvoker(
         if (destination is null)
         {
             if (localHandler is not null && (operation.RequiredRole is null || model.IsRoleActive(operation.RequiredRole)))
+            {
+                var roleId = operation.RequiredRole ?? operation.RoleId;
+                if (roleHealth?.IsRoleFaulted(roleId) == true)
+                    return TResponse.CreateRemoteFailure(ResultStatus.ServiceUnavailable, RoleUnavailableException.MessageForRole(roleId));
                 return await local.InvokeAsync(request, cancellationToken, transaction);
+            }
             destination = new ApplicationInvocationDestination(model.ResolveRoleAppId(operation.RequiredRole ?? operation.RoleId));
         }
         else if (operation.RequiredRole is { } required && model.ResolveRoleAppId(required) != destination.AppId)

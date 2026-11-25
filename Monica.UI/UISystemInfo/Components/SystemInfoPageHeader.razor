@@ -19,6 +19,14 @@
                     <span class="system-info-version" title="@identity.Application.Version">@identity.Application.Version.Split('+')[0]</span>
                     <span class="system-info-dot" aria-hidden="true"></span>
                     <SystemInfoCopyValue Value="@identity.Application.Id" />
+                    @if (identity.ApplicationModel is { } deployment)
+                    {
+                        <a href="@RoleHealthUrl" class="system-info-role-badge @(deployment.AttentionCount > 0 ? "needs-attention" : null)">
+                            <MoIcon Icon="@MoIcons.ShieldCheck" Size="14px" />
+                            @L["Page:Roles:Badge", deployment.Local.Count(), deployment.Roles.Length]
+                            @if (deployment.AttentionCount > 0) { <b>@L["Page:Roles:Attention", deployment.AttentionCount]</b> }
+                        </a>
+                    }
                 </div>
             </div>
         }
@@ -51,6 +59,7 @@
 
 @code {
     [Parameter] public SystemInfoSnapshot? Snapshot { get; set; }
+    [Parameter] public string? RoleHealthUrl { get; set; }
     [Parameter] public bool EnableRestart { get; set; }
     [Parameter] public bool IsRefreshing { get; set; }
     [Parameter] public bool RestartRequested { get; set; }

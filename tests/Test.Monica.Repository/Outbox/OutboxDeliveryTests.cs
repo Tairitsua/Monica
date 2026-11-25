@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 using Monica.Repository.Outbox.Models;
@@ -16,6 +17,34 @@ namespace Test.Monica.Repository.Outbox;
 public sealed class OutboxDeliveryTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task ExplicitPasses_WhenContextOwnerIsQuarantined_LeaveCommittedRowsUnclaimed()
+    {
+        var clock = new OutboxTestTimeProvider();
+        var probe = new SendProbe(blockFirst: false);
+        await using var app = await CreateAsync(clock, probe, new FaultedStoreOwner());
+        await SeedAsync(app, clock, 1);
+        var dispatcher = app.Services.GetRequiredService<OutboxDispatcher<TestRepositoryDbContext>>();
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => dispatcher.DrainAsync(1, Token));
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => dispatcher.CleanupAsync(Token));
+        await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+        {
+            var row = await db.Set<OutboxMessage>().SingleAsync(ct);
+            Assert.Equal(0, row.Attempts);
+            Assert.Null(row.LeaseId);
+            Assert.Null(row.DeliveredAtUtc);
+        }, Token);
+        Assert.Equal(0, probe.Sends);
+    }
+
+    private sealed class FaultedStoreOwner : IRoleHealthStateProvider
+    {
+        public bool IsRoleFaulted(string roleId) => roleId == "delivery";
+        public string? GetRoleId(Type implementationType, Type? registrationOwner = null)
+            => implementationType == typeof(TestRepositoryDbContext) ? "delivery" : null;
+        public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();
+    }
 
     [Theory]
     [InlineData(false, false)]
@@ -112,10 +141,11 @@ public sealed class OutboxDeliveryTests
         }
     }
 
-    private static Task<MonicaTestApplication> CreateAsync(OutboxTestTimeProvider time, SendProbe probe) =>
+    private static Task<MonicaTestApplication> CreateAsync(OutboxTestTimeProvider time, SendProbe probe, IRoleHealthStateProvider? roles = null) =>
         new RepositoryScenarioFactory(configure: services =>
         {
             services.AddSingleton<TimeProvider>(time);
+            if (roles is not null) services.AddSingleton(roles);
             services.RemoveAll<IEventTransport>();
             services.AddScoped<IEventTransport>(_ => new ScopedTransport(probe));
         }, configureOutbox: options => options.DeliveryLease = TimeSpan.FromSeconds(30))

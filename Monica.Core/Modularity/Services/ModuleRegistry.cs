@@ -59,6 +59,12 @@ public sealed class ModuleRegistry(MonicaApplication application)
     /// </remarks>
     internal IReadOnlyList<ModuleRegistrationError> RegistrationErrors => _state.RegistrationErrors;
 
+    /// <summary>Gets the number of recorded module registration errors without capturing the full diagnostics graph.</summary>
+    public int RegistrationErrorCount
+    {
+        get { lock (_diagnosticsGate) return _state.RegistrationErrors.Count; }
+    }
+
     public ILogger Logger => application.CreateLogger(typeof(ModuleRegistry));
 
     /// <summary>
@@ -525,6 +531,12 @@ public sealed class ModuleRegistry(MonicaApplication application)
         var authority = (IApplicationCompositionModule)registration.ModuleSingleton;
         application.PrepareApplication(() => authority.PrepareApplication(monica, builder));
         application.FreezeApplicationInputs();
+        if (application.TypeActivation is Monica.Core.ApplicationRoles.IRoleStartupFaultPolicy policy)
+        {
+            foreach (var preflight in Registrations.Values.Where(item => item.DisabledReason is null)
+                         .Select(item => item.ModuleSingleton).OfType<Monica.Core.ApplicationRoles.IRoleStartupPreflight>())
+                preflight.ValidateRoleStartup(application, policy);
+        }
         _hasMutatedHost = true;
         application.Composition.RegisterApplication(() => authority.RegisterApplication(monica, builder));
         DescribeModules();

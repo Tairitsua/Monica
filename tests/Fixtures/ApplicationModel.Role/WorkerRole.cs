@@ -28,3 +28,12 @@ public sealed class Worker : IHostedService
 
 [ProcessLocal]
 public sealed class WorkerLocalInitialization;
+
+/// <summary>Local-only mediator request intentionally omitted from the published operation manifest.</summary>
+public sealed record PrivateWorkerQuery : IRequest<object>;
+
+public sealed class PrivateWorkerHandler : IRequestHandler<PrivateWorkerQuery, object>
+{
+    public PrivateWorkerHandler() => throw new InvalidOperationException("Admission must precede handler construction.");
+    public Task<object> Handle(PrivateWorkerQuery request, CancellationToken cancellationToken) => throw new NotSupportedException();
+}

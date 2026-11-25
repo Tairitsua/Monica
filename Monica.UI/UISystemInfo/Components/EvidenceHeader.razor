@@ -10,6 +10,7 @@
     {
         <span class="system-info-evidence-header__count" title="@CountLabel" aria-label="@CountLabel">@Count</span>
     }
+    @ChildContent
 </header>
 
 @code {
@@ -23,4 +24,5 @@
     [Parameter] public string? HeadingId { get; set; }
     [Parameter] public int? Count { get; set; }
     [Parameter] public string? CountLabel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
 }

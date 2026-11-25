@@ -1,0 +1,38 @@
+@using Microsoft.Extensions.Localization
+@using Monica.UI.Localization
+@using Monica.UI.UISystemInfo.Models
+@inject IStringLocalizer<SystemInfoResource> L
+
+<section class="role-recovery @(HasCandidate ? "observed" : null)" aria-labelledby="role-recovery-title">
+    <header>
+        <div class="recovery-copy">
+            <small><MoIcon Icon="@MoIcons.ShieldCheck" Size="16px" /> @Deployment.AppId @if (!string.IsNullOrEmpty(Scope)) { <span>· @Scope</span> }</small>
+            <h2 id="role-recovery-title">@L[HasCandidate ? "Page:Recovery:ReadyTitle" : "Page:Recovery:PendingTitle"]</h2>
+            <p>@L["Page:Recovery:Evidence"]</p>
+        </div>
+        <div class="recovery-actions">
+            @if (EnableRestart)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Power" Disabled="@RestartRequested" OnClick="OnRestart">@L["Page:Actions:Restart"]</MudButton>
+            }
+            @if (RoleHealthUrl is not null)
+            {
+                <MudButton Variant="Variant.Text" StartIcon="@MoIcons.ShieldCheck" Href="@BackUrl">@L["Page:Roles:Open"]</MudButton>
+            }
+        </div>
+    </header>
+    <SystemInfoRestartImpact Deployment="@Deployment" RoleHealthUrl="@RoleHealthUrl" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SystemInfoRoleDeployment Deployment { get; set; } = null!;
+    [Parameter] public string? Scope { get; set; }
+    [Parameter] public string? FocusRole { get; set; }
+    [Parameter] public string? RoleHealthUrl { get; set; }
+    [Parameter] public bool EnableRestart { get; set; }
+    [Parameter] public bool RestartRequested { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+    private bool HasCandidate => Deployment.Faulted.Any(role => role.StartupCandidateValid == true);
+    private string? BackUrl => Deployment.Faulted.FirstOrDefault(role => role.Id == FocusRole) is { } role
+        ? $"{RoleHealthUrl}?role={Uri.EscapeDataString(role.Id)}" : RoleHealthUrl;
+}

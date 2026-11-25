@@ -159,7 +159,9 @@ public sealed class RoleRegistration : ApplicationRegistration
 }
 ```
 
-The registration and context are in `Monica.ApplicationModel.Abstractions`; the assembly annotation is in `Monica.ApplicationModel.Annotations`. The registration belongs to its declaring assembly, is concrete and has a public parameterless constructor. A domain uses `ApplicationDomain.Registration` the same way. Its optional BackgroundRole must name a declared role in that domain; a domain overriding ConfigureActive must supply that owner. A passive-only domain needs no BackgroundRole.
+The registration and context are in `Monica.ApplicationModel.Abstractions`. The assembly annotation is in `Monica.ApplicationModel.Annotations`. A registration belongs to its declaring assembly, is concrete and has a public parameterless constructor. A domain uses `ApplicationDomain.Registration` the same way. Its optional BackgroundRole must name a declared role in that domain. A domain overriding ConfigureActive must supply that owner.
+
+Use `Criticality = RoleCriticality.Optional` for a role that can be isolated while a sibling keeps serving. Explicitly scope the integrations' Startup options with `RequiredByRoles` and read them in the active registration. Startup validation precedes registration, and a quarantined role skips its active callback. Register passive services needed by ordinary cross-domain callers independently. See [startup fault policy](../../monica-infra-hosting/references/application-model.md#startup-fault-policy).
 
 After the host's AddMonica callback finishes, Monica finalizes application-model contributions once, validates the complete model and projects identity. It freezes identity, discovery and topology before running registrations. All included registrations run ConfigurePassive first, followed by eligible ConfigureActive callbacks in deterministic owner-ID order. Passive registration is independent of role placement. Active registration requires local placement of the role or the domain's BackgroundRole. Catalog-only remote owners never execute registration code.
 

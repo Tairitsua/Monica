@@ -43,6 +43,7 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@session.IsRefreshing" OnClick="@(() => RefreshAsync(session))">@L["Actions:Refresh"]</MudButton>
                 </Actions>
             </MoPageMasthead>
+            <HealthWorkbenchNav Attention="@RoleAttention(session)" />
 
             @if (session.RefreshError is { } refreshError)
             {
@@ -89,6 +90,12 @@
 
 @code {
     public const string PAGE_URL = "/health-checks";
+
+    private static int RoleAttention(HealthCheckPageSession session)
+    {
+        var gate = session.Snapshot?.Entries.FirstOrDefault(entry => entry.Name == "monica.application.roles");
+        return int.TryParse(gate?.Data.GetValueOrDefault("attentionCount"), out var count) ? count : 0;
+    }
 
     [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
     [SupplyParameterFromQuery] public string? Status { get; set; }

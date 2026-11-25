@@ -28,9 +28,28 @@ public static class ModuleMediatorBuilderExtensions
 
 public class ModuleMediator : MonicaModule<ModuleMediatorOption>
 {
+    private readonly Dictionary<ServiceDescriptor, Type> _handlerAliases = new(ReferenceEqualityComparer.Instance);
+
     public override void ConfigureServices(ModuleContext<ModuleMediatorOption> context)
     {
         context.Services.TryAddTransient<IMediator, Mediator>();
+        if (Application.TypeActivation is not { SuspendedWorkloadOwners.Count: > 0 } activation) return;
+        var admission = new MediatorHandlerAdmission();
+        context.Services.AddSingleton(admission);
+        context.Composition.OnServicesFinalized(_ => { }, descriptors =>
+        {
+            foreach (var descriptor in descriptors)
+            {
+                var service = descriptor.ServiceType;
+                if (descriptor.IsKeyedService || !service.IsGenericType
+                    || service.GetGenericTypeDefinition() != typeof(IRequestHandler<,>)) continue;
+                var implementation = descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType()
+                    ?? _handlerAliases.GetValueOrDefault(descriptor) ?? typeof(object);
+                admission.Record(service, activation.GetFaultedRequestHandlerRole(implementation,
+                    context.Composition.GetServiceRegistrationOwner(descriptor)));
+            }
+            _handlerAliases.Clear();
+        });
     }
 
     public override void Describe(ModuleDescriptor module)
@@ -52,7 +71,7 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
             });
     }
 
-    private static void RegisterRequestHandlers(
+    private void RegisterRequestHandlers(
         ModuleServiceRegistrationWriter registrations,
         BusinessTypeMatch match)
     {
@@ -75,9 +94,9 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
         registrations.TryAdd(ServiceDescriptor.Transient(implementationType, implementationType));
         foreach (var serviceType in match.OpenGenericInterfaces)
         {
-            registrations.TryAdd(ServiceDescriptor.Transient(
-                serviceType.ClosedInterface,
-                provider => provider.GetRequiredService(implementationType)));
+            var alias = ServiceDescriptor.Transient(serviceType.ClosedInterface, provider => provider.GetRequiredService(implementationType));
+            if (registrations.TryAdd(alias) && Application.TypeActivation is { SuspendedWorkloadOwners.Count: > 0 })
+                _handlerAliases.Add(alias, implementationType);
         }
     }
 }
