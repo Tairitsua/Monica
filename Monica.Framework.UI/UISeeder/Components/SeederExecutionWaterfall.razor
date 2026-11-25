@@ -382,13 +382,20 @@
     {
         var ideal = Math.Max(1, span / 4);
         var magnitude = Math.Pow(10, Math.Floor(Math.Log10(ideal)));
-        var step = (ideal / magnitude) switch
+        var ratio = ideal / magnitude;
+        var step = 10 * magnitude;
+        if (ratio < 1.5)
         {
-            < 1.5 => magnitude,
-            < 3 => 2 * magnitude,
-            < 7 => 5 * magnitude,
-            _ => 10 * magnitude
-        };
+            step = magnitude;
+        }
+        else if (ratio < 3)
+        {
+            step = 2 * magnitude;
+        }
+        else if (ratio < 7)
+        {
+            step = 5 * magnitude;
+        }
         return Enumerable.Range(0, (int)(span * .94 / step) + 1).Select(index => index * step).ToArray();
     }
 
