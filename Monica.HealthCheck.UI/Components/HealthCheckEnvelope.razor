@@ -80,7 +80,7 @@
         </div>
         <div class="hc-env-readout" aria-live="polite">
             <span class="hc-env-readout-text">
-                <i class="mo-vl-swatch @HealthCheckDisplay.Role(active.Status).ToCssClass()" aria-hidden="true"></i>
+                <i class="mo-vl-swatch mo-vl-swatch--label @HealthCheckDisplay.Role(active.Status).ToCssClass()" aria-hidden="true"></i>
                 <span>@L["Design:EnvelopeReadout", active.Name, activeImpact.Label, Duration(active.Duration), HealthCheckDisplay.ShareText(active.Duration, _wall, L)]
                     @if (active.Data.Count != 0) { <span> · @L["Design:DataCountBadge", active.Data.Count]</span> }
                     @if (activeRedacted > 0) { <span> (@L["Design:RedactedBadge", activeRedacted])</span> }

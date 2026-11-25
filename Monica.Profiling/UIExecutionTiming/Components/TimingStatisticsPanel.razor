@@ -16,7 +16,7 @@
         <div class="timing-ledger-controls">
             <div><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true" DebounceInterval="180"
                               aria-label="@L["Statistics:Search"]" Placeholder="@L["Design:LedgerSearchPlaceholder"]" Variant="Variant.Outlined"
-                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" /></div>
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" /></div>
             <label class="timing-order">
                 <span>@L["Common:Order"]</span>
                 <select aria-label="@L["Common:Order"]" value="@(Sort ?? "mean")" @onchange="@((ChangeEventArgs args) => OrderChanged(args.Value?.ToString()))">

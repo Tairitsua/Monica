@@ -60,7 +60,7 @@
                             var role = GetRole(info.Kind, field);
                             <div class="ls-guarantee @role.ToCssClass()">
                                 <span class="ls-g-label">@L[$"Locks:{field}"]</span>
-                                <strong class="ls-guarantee-status"><i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>@L[$"Locks:Mechanisms:{info.Kind}:{field}"]</strong>
+                                <strong class="ls-guarantee-status"><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @role.ToCssClass()" aria-hidden="true"></i>@L[$"Locks:Mechanisms:{info.Kind}:{field}"]</strong>
                                 <p>@L[$"Locks:Mechanisms:{info.Kind}:{NoteKey(field)}"]</p>
                             </div>
                         }

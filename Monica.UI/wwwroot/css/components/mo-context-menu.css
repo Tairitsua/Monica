@@ -1,4 +1,4 @@
-/* MudMenu-backed context menus share overlay behavior, focus management, and nested-menu timing. */
+/* MudMenu owns placement, keyboard navigation, focus and nested-menu timing. */
 .mo-context-menu-root {
     /* MudPopover checks the anchor's viewport rect before applying cursor coordinates. */
     display: block;
@@ -10,18 +10,20 @@
 }
 
 .mud-popover.mo-context-menu-popover {
-    min-width: 13.75rem;
-    max-width: min(24rem, calc(100vw - 20px));
-    overflow: hidden;
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: var(--mo-nav-menu-border-radius, var(--mud-default-borderradius));
+    min-inline-size: min(224px, calc(100vw - 24px));
+    max-inline-size: min(280px, calc(100vw - 24px));
+    overflow-x: hidden;
+    border-radius: 12px;
     background: var(--mud-palette-surface);
-    box-shadow: var(--mud-elevation-8);
+    color: var(--mud-palette-text-primary);
+    box-shadow: 0 0 0 1px var(--mud-palette-lines-default),
+        0 12px 32px -8px color-mix(in srgb, var(--mud-palette-overlay-dark) 40%, transparent),
+        0 4px 10px -4px color-mix(in srgb, var(--mud-palette-overlay-dark) 18%, transparent);
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-list {
-    min-width: 13.75rem;
-    padding-block: 4px;
+    min-width: 0;
+    padding: 6px;
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-list .mud-menu {
@@ -30,45 +32,68 @@
     max-width: 100%;
 }
 
-.mud-popover.mo-context-menu-popover .mo-context-menu-item {
-    width: calc(100% - 8px);
-}
-
 .mud-popover.mo-context-menu-popover .mo-context-menu-item,
 .mud-popover.mo-context-menu-popover .mud-menu-sub-menu-activator {
-    min-height: 38px;
-    margin: 2px 4px;
-    padding: 8px 10px;
-    border-radius: var(--mo-button-border-radius, var(--mud-default-borderradius));
+    width: 100%;
+    min-height: 32px;
+    margin: 0;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font: 400 12.5px/1.5 var(--mo-font-family-body);
+    transition: background-color var(--mo-duration-fast, 120ms) var(--mo-ease, ease);
+}
+
+.mud-popover.mo-context-menu-popover :is(.mo-context-menu-item, .mud-menu-sub-menu-activator):not([aria-disabled="true"]):is(:hover, :focus-visible) {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.mud-popover.mo-context-menu-popover :is(.mo-context-menu-item, .mud-menu-sub-menu-activator):focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -2px;
+}
+
+.mud-popover.mo-context-menu-popover .mud-menu-item-icon {
+    flex: none;
+    min-width: auto;
+    margin-inline-end: 9px;
+}
+
+.mud-popover.mo-context-menu-popover :is(.mo-context-menu-item, .mud-menu-sub-menu-activator) .mud-svg-icon {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    color: var(--mud-palette-text-secondary);
 }
 
 .mud-popover.mo-context-menu-popover .mud-menu-item-text {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     min-width: 0;
-    gap: 12px;
+    margin: 0;
+    gap: 10px;
+    font: inherit;
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-label {
     flex: 1 1 auto;
-    overflow: hidden;
     color: var(--mud-palette-text-primary);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-shortcut {
     flex: 0 0 auto;
     padding: 0;
     border: 0;
-    color: var(--mud-palette-text-primary);
+    color: var(--mud-palette-text-secondary);
     background: transparent;
     font-family: var(--mo-font-family-mono);
-    font-size: 0.6875rem;
+    font-size: 11px;
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-divider {
-    margin-block: 4px;
+    margin: 5px 4px;
 }
 
 .mud-popover.mo-context-menu-popover .mo-context-menu-item[aria-disabled="true"] {
@@ -76,19 +101,17 @@
     pointer-events: auto !important;
 }
 
-.mud-popover.mo-context-menu-popover .mo-context-menu-item[aria-disabled="true"] .mo-context-menu-label,
-.mud-popover.mo-context-menu-popover .mo-context-menu-item[aria-disabled="true"] .mo-context-menu-shortcut {
+.mud-popover.mo-context-menu-popover .mo-context-menu-item[aria-disabled="true"] :is(.mo-context-menu-label, .mo-context-menu-shortcut, .mud-svg-icon) {
     color: var(--mud-palette-action-disabled);
 }
 
 @media (max-width: 600px) {
     .mud-popover.mo-context-menu-root-popover {
-        /* Native cursor flipping cannot fit a wide menu on either side of a central phone target. */
-        /* Keep native vertical placement and child-menu anchors; inset only the root's horizontal bounds. */
-        left: 10px !important;
-        right: 10px !important;
-        width: calc(100vw - 20px);
+        /* Keep native vertical placement and child-menu anchors. Inset the root on narrow screens. */
+        left: 12px !important;
+        right: 12px !important;
+        width: calc(100vw - 24px);
         min-width: 0 !important;
-        max-width: calc(100vw - 20px) !important;
+        max-width: calc(100vw - 24px) !important;
     }
 }

@@ -75,7 +75,7 @@
                 @Gate("other", "Design:AuxiliaryLabel", other, MoVisualRole.Neutral)
                 <div class="hc-gate hc-gate-wall">
                     <span class="hc-gate-top">
-                        <span class="hc-gate-head"><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--info" aria-hidden="true"></i><strong>@L["Design:EnvelopeLabel"]</strong></span>
+                        <span class="hc-gate-head"><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--info" aria-hidden="true"></i><strong>@L["Design:EnvelopeLabel"]</strong></span>
                         <span class="hc-gate-badge mo-vl-role--info">@L["Design:AllParallelCaption", snapshot.Entries.Count]</span>
                     </span>
                     <span class="hc-wall-value">@Duration(snapshot.Duration)</span>
@@ -121,7 +121,7 @@
         return @<button type="button" class="hc-gate @category.ToCssClass() @(selected ? "is-selected" : null) @(unconfigured ? "is-unconfigured" : null)"
                         aria-pressed="@(selected ? "true" : "false")" @onclick="@(() => Filter(key))">
             <span class="hc-gate-top">
-                <span class="hc-gate-head"><i class="mo-vl-swatch mo-vl-swatch--instrument @(unconfigured ? "is-hatch" : null) @category.ToCssClass()" aria-hidden="true"></i><strong>@L[title]</strong></span>
+                <span class="hc-gate-head"><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument @(unconfigured ? "is-hatch" : null) @category.ToCssClass()" aria-hidden="true"></i><strong>@L[title]</strong></span>
                 <span class="hc-gate-badge @role.ToCssClass() @(unconfigured ? "is-unconfigured" : null)">@Http(entries, key)</span>
             </span>
             <span class="hc-gate-mid"><span class="hc-gate-verdict @role.ToCssClass()">@Verdict(entries, key)</span><code class="hc-gate-sub" title="@sub">@sub</code></span>
@@ -140,7 +140,7 @@
                 {
                     var count = entries.Count(entry => entry.Status == status);
                     <span class="hc-gate-count @(count == 0 ? "is-zero" : null)">
-                        <i class="mo-vl-swatch @(status == HealthCheckState.Degraded ? "mo-vl-swatch--diamond" : null) @(count == 0 ? "mo-vl-swatch--empty" : null) @HealthCheckDisplay.Role(status).ToCssClass()" aria-hidden="true"></i>
+                        <i class="mo-vl-swatch mo-vl-swatch--label @(status == HealthCheckState.Degraded ? "mo-vl-swatch--diamond" : null) @(count == 0 ? "mo-vl-swatch--empty" : null) @HealthCheckDisplay.Role(status).ToCssClass()" aria-hidden="true"></i>
                         <b class="mo-vl-mono">@count</b><span>@L.GetStatusText(status)</span>
                     </span>
                 }

@@ -137,7 +137,7 @@
                                     aria-haspopup="dialog" @onfocus="@(() => _active = row)" @onmouseenter="@(() => _active = row)" @onclick="@(() => Inspect.InvokeAsync(row))">
                                 <span class="lh-cell-role">
                                     <span class="lh-role-head">
-                                        <i class="mo-vl-swatch mo-vl-swatch--instrument @(row.Expired ? "mo-vl-role--warning" : "mo-vl-role--success")" aria-hidden="true"></i>
+                                        <i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument @(row.Expired ? "mo-vl-role--warning" : "mo-vl-role--success")" aria-hidden="true"></i>
                                         <strong class="lh-role-title">@title</strong>
                                         @if (ByHolder) { <span class="mo-vl-capsule @LeasePresentation.Role(row.Authority.Kind).ToCssClass()">@L[$"Providers:{row.Authority.Kind}"]</span> }
                                     </span>
@@ -220,8 +220,8 @@
                     <div class="lh-legend-bar">
                         <div class="mo-vl-legend">
                             <span><i class="lh-leg-dot" aria-hidden="true"></i>@L["Design:LegendConfirmed"]</span>
-                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--success" aria-hidden="true"></i>@L["Design:LegendActive"]</span>
-                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--warning" aria-hidden="true"></i>@L["Design:LegendExpired"]</span>
+                            <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--success" aria-hidden="true"></i>@L["Design:LegendActive"]</span>
+                            <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--warning" aria-hidden="true"></i>@L["Design:LegendExpired"]</span>
                             <span><i class="lh-leg-zero" aria-hidden="true"></i>@L["Design:LegendZero"]</span>
                         </div>
                         <span class="lh-readout-hint">@L["Design:ReadoutIdle"]</span>

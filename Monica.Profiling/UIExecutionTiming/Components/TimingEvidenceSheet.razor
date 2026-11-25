@@ -74,7 +74,7 @@
                                 @foreach (var run in _related)
                                 {
                                     <a href="@Url(null, run.InvocationId)" class="mo-vl-role--@(IsLingering(run) ? "warning" : "info")">
-                                        <span class="timing-related-label"><i class="mo-vl-swatch"></i>@RunningLabel(run, item)</span>
+                                        <span class="timing-related-label"><i class="mo-vl-swatch mo-vl-swatch--label" aria-hidden="true"></i>@RunningLabel(run, item)</span>
                                         <code>@TimingAssessment.ShortInvocation(run.InvocationId, _capturedRuns)</code>
                                         <strong>@TimingAssessment.RunningAge(TimingAssessment.Age(run, _at))</strong><MoIcon Icon="@MoIcons.ChevronRight" Size=".9rem" />
                                     </a>

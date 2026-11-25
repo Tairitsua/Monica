@@ -69,6 +69,21 @@ export function getSelectedText() {
     }
 }
 
+export function getRowMenuContext(container, lineIndex) {
+    const row = container?.querySelector('[data-line-index="' + lineIndex + '"]');
+    const trigger = row?.querySelector(".log-row-menu-trigger");
+    if (!trigger) {
+        return null;
+    }
+
+    const bounds = trigger.getBoundingClientRect();
+    const selection = window.getSelection();
+    const selectedText = selection?.rangeCount > 0 && row.contains(selection.getRangeAt(0).commonAncestorContainer)
+        ? selection.toString().trim()
+        : "";
+    return { pageX: bounds.right + window.scrollX, pageY: bounds.bottom + window.scrollY + 4, selection: selectedText };
+}
+
 export function scrollToTop(element) {
     if (!element) {
         return;

@@ -128,7 +128,8 @@ public sealed record LogLineViewModel
         string levelText,
         LogSeverity severity,
         string thread,
-        DateTimeOffset? timestamp)
+        DateTimeOffset? timestamp,
+        string rawTimestamp)
     {
         Raw = raw;
         Message = message;
@@ -137,6 +138,7 @@ public sealed record LogLineViewModel
         Severity = severity;
         Thread = thread;
         Timestamp = timestamp;
+        RawTimestamp = rawTimestamp;
     }
 
     public string Raw { get; }
@@ -152,6 +154,9 @@ public sealed record LogLineViewModel
     public string Thread { get; }
 
     public DateTimeOffset? Timestamp { get; }
+
+    /// <summary>Gets the timestamp text captured from the physical log header, or an empty string for an unparsed line.</summary>
+    public string RawTimestamp { get; }
 
     public IReadOnlyList<LogMatchSegment>? MatchSegments { get; private init; }
 
@@ -182,7 +187,7 @@ public sealed record LogLineViewModel
         ArgumentNullException.ThrowIfNull(rawLine);
         if (string.IsNullOrWhiteSpace(rawLine))
         {
-            return new LogLineViewModel(rawLine, rawLine, string.Empty, string.Empty, LogSeverity.Unknown, string.Empty, null);
+            return new LogLineViewModel(rawLine, rawLine, string.Empty, string.Empty, LogSeverity.Unknown, string.Empty, null, string.Empty);
         }
 
         var parsed = LogLineParser.Parse(rawLine);
@@ -193,7 +198,8 @@ public sealed record LogLineViewModel
             parsed.LevelText,
             parsed.Severity,
             parsed.Thread,
-            parsed.Timestamp);
+            parsed.Timestamp,
+            parsed.RawTimestamp);
     }
 
     /// <summary>Returns an immutable copy with keyword match state. Keyword matching uses the verbatim physical line.</summary>
@@ -345,13 +351,13 @@ internal static class LogLineParser
     {
         if (string.IsNullOrWhiteSpace(rawLine))
         {
-            return new ParsedLogLine(rawLine, string.Empty, string.Empty, LogSeverity.Unknown, string.Empty, null, string.Empty);
+            return new ParsedLogLine(rawLine, string.Empty, string.Empty, LogSeverity.Unknown, string.Empty, null, string.Empty, string.Empty);
         }
 
         var match = LogRegex.Match(rawLine);
         if (!match.Success)
         {
-            return new ParsedLogLine(rawLine, string.Empty, rawLine, LogSeverity.Unknown, string.Empty, null, rawLine);
+            return new ParsedLogLine(rawLine, string.Empty, rawLine, LogSeverity.Unknown, string.Empty, null, rawLine, string.Empty);
         }
 
         var timestampText = match.Groups["timestamp"].Value;
@@ -372,7 +378,8 @@ internal static class LogLineParser
             MapSeverity(levelText),
             levelText,
             timestamp,
-            thread);
+            thread,
+            timestampText);
     }
 
     private static LogSeverity MapSeverity(string? levelText)
@@ -402,4 +409,5 @@ internal readonly record struct ParsedLogLine(
     LogSeverity Severity,
     string LevelText,
     DateTimeOffset? Timestamp,
-    string Thread);
+    string Thread,
+    string RawTimestamp);

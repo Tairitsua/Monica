@@ -93,17 +93,27 @@
                     }
                     <div class="log-entry__actions">
                         <MudIconButton Icon="@MoIcons.ExternalLink" Size="Size.Small" OnClick="@(() => InspectAsync(reference))" title="@InspectLabel(line)" aria-label="@InspectLabel(line)" />
-                        <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Workbench:Viewer:Actions"]" Dense="true" DropShadow="false">
-                            <MudMenuItem Icon="@MoIcons.FileText" OnClick="@(() => ShowContextAsync(reference))" Disabled="@(!OnShowContext.HasDelegate || !line.AbsoluteLineNumber.HasValue)">@L["Page:Components:Viewer:ContextMenu:ShowContext"]</MudMenuItem>
-                            <MudMenuItem Icon="@MoIcons.Filter" OnClick="@(() => FilterSeverityAsync(reference))" Disabled="@(!OnFilterSeverity.HasDelegate)">@L["Page:Components:Viewer:ContextMenu:FilterSeverity"]</MudMenuItem>
-                            <MudMenuItem Icon="@MoIcons.Search" OnClick="@(() => FindSelectionAsync(reference))" Disabled="@(!OnApplyFilter.HasDelegate)">@L["Page:Components:Viewer:ContextMenu:FindSelection"]</MudMenuItem>
-                            <MudMenu Label="@L["Page:Components:Viewer:ContextMenu:Copy"]" AriaLabel="@L["Page:Components:Viewer:ContextMenu:Copy"]" StartIcon="@MoIcons.Copy" Dense="true" DropShadow="false">
-                                <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.Raw))">@L["Page:Components:Viewer:ContextMenu:CopyRaw"]</MudMenuItem>
-                                <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.MessageOnly))">@L["Page:Components:Viewer:ContextMenu:CopyMessage"]</MudMenuItem>
-                                <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.WithTimestamp))">@L["Page:Components:Viewer:ContextMenu:CopyTimestamp"]</MudMenuItem>
-                                <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.WithLineNumber))">@L["Page:Components:Viewer:ContextMenu:CopyLineNumber"]</MudMenuItem>
+                        @if (Workbench)
+                        {
+                            <MudIconButton Class="log-row-menu-trigger" Icon="@MoIcons.MoreHorizontal" Size="Size.Small"
+                                           aria-label="@L["Workbench:Viewer:Actions"]" aria-haspopup="menu"
+                                           aria-expanded="@(_contextMenuVisible && _contextReference == reference ? "true" : "false")"
+                                           OnClick="@(() => OpenContextMenuAsync(null, reference))" />
+                        }
+                        else
+                        {
+                            <MudMenu Icon="@MoIcons.MoreHorizontal" Size="Size.Small" AriaLabel="@L["Workbench:Viewer:Actions"]" Dense="true" DropShadow="false">
+                                <MudMenuItem Icon="@MoIcons.FileText" OnClick="@(() => ShowContextAsync(reference))" Disabled="@(!OnShowContext.HasDelegate || !line.AbsoluteLineNumber.HasValue)">@L["Page:Components:Viewer:ContextMenu:ShowContext"]</MudMenuItem>
+                                <MudMenuItem Icon="@MoIcons.Filter" OnClick="@(() => FilterSeverityAsync(reference))" Disabled="@(!OnFilterSeverity.HasDelegate)">@L["Page:Components:Viewer:ContextMenu:FilterSeverity"]</MudMenuItem>
+                                <MudMenuItem Icon="@MoIcons.Search" OnClick="@(() => FindSelectionAsync(reference))" Disabled="@(!OnApplyFilter.HasDelegate)">@L["Page:Components:Viewer:ContextMenu:FindSelection"]</MudMenuItem>
+                                <MudMenu Label="@L["Page:Components:Viewer:ContextMenu:Copy"]" AriaLabel="@L["Page:Components:Viewer:ContextMenu:Copy"]" StartIcon="@MoIcons.Copy" Dense="true" DropShadow="false">
+                                    <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.Raw))">@L["Page:Components:Viewer:ContextMenu:CopyRaw"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.MessageOnly))">@L["Page:Components:Viewer:ContextMenu:CopyMessage"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.WithTimestamp))">@L["Page:Components:Viewer:ContextMenu:CopyTimestamp"]</MudMenuItem>
+                                    <MudMenuItem OnClick="@(() => CopyLineAsync(reference, LogCopyFormat.WithLineNumber))">@L["Page:Components:Viewer:ContextMenu:CopyLineNumber"]</MudMenuItem>
+                                </MudMenu>
                             </MudMenu>
-                        </MudMenu>
+                        }
                     </div>
                 </article>
             }
@@ -201,7 +211,7 @@
     private double _contextMenuX;
     private double _contextMenuY;
     private ViewerLineReference? _contextReference;
-    private string? _menuCulture;
+    private long _menuRequest;
     private List<ContextMenuItem<ViewerLineReference>> _contextMenuItems = [];
 
     private IReadOnlyList<LogLineViewModel> CurrentLines => Lines ?? Array.Empty<LogLineViewModel>();
@@ -213,12 +223,9 @@
     private int PageStartDisplay => CurrentLines.Count == 0 ? 0 : PageStart + 1;
     private int PageEnd => Math.Min(CurrentLines.Count, PageStart + RowsPerPage);
     private bool CanLoadEarlier => LoadMoreRequested is not null && (FirstRetainedLineNumber ?? CurrentLines.FirstOrDefault()?.AbsoluteLineNumber) is > 1;
-    protected override void OnInitialized() => BuildContextMenu();
-
     protected override void OnParametersSet()
     {
         if (_disposed) return;
-        if (!StringComparer.Ordinal.Equals(_menuCulture, CultureInfo.CurrentUICulture.Name)) BuildContextMenu();
         var sourceChanged = !Equals(Source, _lastSource);
         var filterChanged = !StringComparer.Ordinal.Equals(Filter?.Keyword, _lastKeyword) || (Filter?.OnlyCapture ?? false) != _lastOnlyCapture || Filter?.Severity != _lastSeverity;
         var revisionChanged = Version != _lastVersion;
@@ -524,7 +531,8 @@
         return position;
     }
 
-    private string InspectLabel(LogLineViewModel line) => L["Workbench:Viewer:Inspect", line.AbsoluteLineNumber?.ToString(CultureInfo.InvariantCulture) ?? "—"].Value;
+    private string InspectLabel(LogLineViewModel line) => L["Workbench:Viewer:Inspect",
+        line.AbsoluteLineNumber?.ToString(Workbench ? "N0" : null, Workbench ? CultureInfo.CurrentCulture : CultureInfo.InvariantCulture) ?? "—"].Value;
     private Task InspectAsync(ViewerLineReference? reference) => RunOwned(async () =>
     {
         if (reference is null || _openingDialog) return;
@@ -562,13 +570,11 @@
         }
     });
 
-    private void BuildContextMenu()
-    {
-        _menuCulture = CultureInfo.CurrentUICulture.Name;
-        _contextMenuItems = ContextMenuBuilder<ViewerLineReference>.Create()
+    private List<ContextMenuItem<ViewerLineReference>> BuildLegacyContextMenu() =>
+        ContextMenuBuilder<ViewerLineReference>.Create()
             .AddItem(L["Page:Components:Viewer:ContextMenu:LineInfo"], MoIcons.Info, InspectAsync)
             .AddItem(L["Page:Components:Viewer:ContextMenu:FilterSeverity"], MoIcons.Filter, FilterSeverityAsync)
-            .AddItem(L["Page:Components:Viewer:ContextMenu:FindSelection"], MoIcons.Search, FindSelectionAsync)
+            .AddItem(L["Page:Components:Viewer:ContextMenu:FindSelection"], MoIcons.Search, item => FindSelectionAsync(item))
             .AddItem(L["Page:Components:Viewer:ContextMenu:ShowContext"], MoIcons.FileText, ShowContextAsync)
             .AddDivider()
             .AddSubMenu(L["Page:Components:Viewer:ContextMenu:Copy"], MoIcons.Copy, builder => builder
@@ -580,26 +586,71 @@
                 .AddItem(L["Page:Components:Viewer:ContextMenu:Top"], onClick: _ => ChangePageAsync(0))
                 .AddItem(L["Page:Components:Viewer:ContextMenu:Bottom"], onClick: _ => GoToNewestAsync()))
             .Build();
-    }
-    private Task OpenContextMenuAsync(MouseEventArgs args, ViewerLineReference reference) => RunOwned(async () =>
+
+    private List<ContextMenuItem<ViewerLineReference>> BuildWorkbenchContextMenu(LogLineViewModel line, string? selection)
     {
-        if (_disposed) return;
-        _contextReference = reference; _selectedReference = reference; _selectedLineIndex = reference.Index; _contextMenuX = args.PageX; _contextMenuY = args.PageY; ++_contextMenuOpeningRevision; _contextMenuVisible = true;
+        const string menu = "Page:Components:Viewer:ContextMenu:";
+        return ContextMenuBuilder<ViewerLineReference>.Create()
+            .AddItem(InspectLabel(line), MoIcons.Info, InspectAsync)
+            .AddItemIf(OnShowContext.HasDelegate && line.AbsoluteLineNumber.HasValue,
+                L["LogChart:ShowContextWindow"], MoIcons.UnfoldVertical, ShowContextAsync)
+            .AddItemIf(OnFilterSeverity.HasDelegate,
+                L["LogChart:FilterBySeverity", L[$"Workbench:Levels:{line.Severity}"]], MoIcons.Filter, FilterSeverityAsync)
+            .AddItemIf(OnApplyFilter.HasDelegate && !string.IsNullOrWhiteSpace(selection),
+                L[menu + "FindSelection"], MoIcons.Search, item => FindSelectionAsync(item, selection))
+            .AddDivider()
+            .AddItem(L["Design:CopyRaw"], MoIcons.Copy, item => CopyLineAsync(item, LogCopyFormat.Raw))
+            .AddItem(L["Design:CopyMessage"], MoIcons.Text, item => CopyLineAsync(item, LogCopyFormat.MessageOnly))
+            .AddItem(L["Design:CopyTimestamp"], MoIcons.Clock, item => CopyLineAsync(item, LogCopyFormat.WithTimestamp))
+            .AddItem(L["Design:CopyLineNumber"], MoIcons.Hash, item => CopyLineAsync(item, LogCopyFormat.WithLineNumber))
+            .AddDivider()
+            .AddItem(L[menu + "Top"], MoIcons.ArrowUp, _ => ChangePageAsync(0))
+            .AddItem(L["LogChart:JumpToNewest"], MoIcons.ArrowDown, _ => GoToNewestAsync())
+            .Build();
+    }
+
+    private Task OpenContextMenuAsync(MouseEventArgs? cursor, ViewerLineReference reference) => RunOwned(async () =>
+    {
+        var request = ++_menuRequest;
+        var row = Workbench
+            ? await InvokeJsAsync<RowMenuContext>("getRowMenuContext", _scrollContainer, reference.Index)
+            : null;
+        if (_disposed || request != _menuRequest || FindCurrentIndex(reference) != reference.Index ||
+            (cursor is null && row is null)) return;
+
+        _contextMenuItems = Workbench ? BuildWorkbenchContextMenu(reference.Line, row?.Selection) : BuildLegacyContextMenu();
+        _contextReference = reference;
+        _selectedReference = reference;
+        _selectedLineIndex = reference.Index;
+        _contextMenuX = cursor?.PageX ?? row!.PageX;
+        _contextMenuY = cursor?.PageY ?? row!.PageY;
+        ++_contextMenuOpeningRevision;
+        _contextMenuVisible = true;
         StateHasChanged();
         await CapturePositionCoreAsync();
     });
-    private void CloseContextMenu() { _contextMenuVisible = false; if (!_disposed) StateHasChanged(); }
+
+    private void CloseContextMenu()
+    {
+        if (_disposed) return;
+        ++_menuRequest;
+        _contextMenuVisible = false;
+        StateHasChanged();
+    }
+
     private Task ShowContextAsync(ViewerLineReference? reference) => RunOwned(async () =>
     {
         if (reference is null || !OnShowContext.HasDelegate || !reference.Line.AbsoluteLineNumber.HasValue) return;
         var index = FindCurrentIndex(reference);
         if (index < 0) { Snackbar.Add(L["Workbench:Viewer:ContextStale"], Severity.Info); return; }
         _selectedReference = reference; _selectedLineIndex = index;
+        var menuRequest = _menuRequest;
         await CapturePositionCoreAsync();
         if (_disposed) return;
         index = FindCurrentIndex(reference);
         if (index < 0) return;
-        CloseContextMenu(); await OnShowContext.InvokeAsync((LogLineEvidence.Capture(reference.Line, reference.Source, reference.ReadAt, reference.Index).Line, index));
+        if (_menuRequest == menuRequest) CloseContextMenu();
+        await OnShowContext.InvokeAsync((LogLineEvidence.Capture(reference.Line, reference.Source, reference.ReadAt, reference.Index).Line, index));
     });
     private Task FilterSeverityAsync(ViewerLineReference? reference) => RunOwned(async () =>
     {
@@ -607,14 +658,16 @@
         if (FindCurrentIndex(reference) < 0) { Snackbar.Add(L["Workbench:Viewer:ContextStale"], Severity.Info); return; }
         CloseContextMenu(); await OnFilterSeverity.InvokeAsync(reference.Line.Severity);
     });
-    private Task FindSelectionAsync(ViewerLineReference? reference) => RunOwned(async () =>
+    private Task FindSelectionAsync(ViewerLineReference? reference, string? selection = null) => RunOwned(async () =>
     {
         if (reference is null || !OnApplyFilter.HasDelegate) return;
-        var text = await InvokeJsAsync<string>("getSelectedText");
+        var menuRequest = _menuRequest;
+        var text = selection ?? await InvokeJsAsync<string>("getSelectedText");
         if (_disposed) return;
         if (string.IsNullOrWhiteSpace(text)) { Snackbar.Add(L["Page:Components:Viewer:Messages:SelectText"], Severity.Info); return; }
         if (FindCurrentIndex(reference) < 0) { Snackbar.Add(L["Workbench:Viewer:ContextStale"], Severity.Info); return; }
-        CloseContextMenu(); await OnApplyFilter.InvokeAsync((reference.Line, text));
+        if (_menuRequest == menuRequest) CloseContextMenu();
+        await OnApplyFilter.InvokeAsync((reference.Line, text));
     });
     private Task CopyLineAsync(ViewerLineReference? reference, LogCopyFormat format) => reference is null ? Task.CompletedTask : CopyRawTextAsync(reference.Line.GetCopyText(format));
     private Task CopyRawTextAsync(string text) => RunOwned(async () =>
@@ -727,6 +780,8 @@
         catch (JSDisconnectedException) { }
         catch (JSException) { }
     }
+    private sealed record RowMenuContext(double PageX, double PageY, string Selection);
+
     private sealed record ViewerLineReference(LogLineViewModel Line, int Index, LogSourceIdentity? Source, DateTimeOffset? ReadAt);
     private sealed record ScrollAnchor(int LineIndex, long? AbsoluteLineNumber, double Offset);
     private sealed record ViewerDomPosition(int LineIndex, string? AbsoluteLineNumber, double Offset, string? Generation, string? Revision);

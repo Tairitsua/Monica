@@ -178,7 +178,7 @@
   "Design": {
     "Apply": "应用",
     "Captured": "最近文件读取",
-    "ClearFilter": "清除筛选",
+    "ClearFilter": "清除搜索",
     "ClearSpan": "清除区间框选",
     "Close": "关闭",
     "ContextStaleToast": "所选物理行已不在当前观测世代中，请重新读取后再查看上下文。",
@@ -304,6 +304,13 @@
     "AgeDays": "{0} 天前",
     "AgeSeconds": "{0} 秒前",
     "FootprintWriter": "默认写入目标 {0} 于 {1} 更新（{2}）。",
-    "FootprintWriterLimit": "占文件上限的 {0}"
+    "FootprintWriterLimit": "占文件上限的 {0}",
+    "JumpToNewest": "跳到最新行",
+    "ShowContextWindow": "查看前后各 50 行",
+    "FilterBySeverity": "按此级别筛选（{0}）",
+    "ParsedTimestamp": "日志时间戳",
+    "RawTimestamp": "原始时间戳",
+    "ParsedSeverity": "解析级别",
+    "SeverityWithToken": "{0}（{1}）"
   }
 }

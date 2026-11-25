@@ -117,6 +117,9 @@ Indicators:
 - A rate, score, trend, or percentile has no domain definition, population, or window, or a judgment such as "overrunning" has no written rule; see the [design method](../../monica-ui-design/references/design-method.md#3-define-every-judgment)
 - A uniformly neutral composition erases useful identity and hierarchy even though its geometry and token usage are correct
 - Actionable controls, rows, or cards lack visible hover, focus, pressed, or selected feedback
+- A compound search exposes Clear in an empty field, puts it beyond Apply, or clears unrelated filters when the user clears its text
+- Equal-role swatches have unequal dimensions or sit off the visible text center, or a severity marker changes shape between a legend, filter and evidence badge
+- A shared cursor menu retains a different row height, icon scale or separator layout when opened through right click and the row action button
 - Informational surfaces translate, scale, change the cursor, or use strong lift on hover, falsely implying an unavailable action; subtle border, tonal, or low-shadow spatial-focus feedback is valid
 - Motion uses large travel, bouncing, repeated flourishes, continuous ambient effects, or ignores `prefers-reduced-motion`
 - A surface stacks unrelated decorative cues, or repeated strong treatments give every region equal prominence without serving the page's hierarchy

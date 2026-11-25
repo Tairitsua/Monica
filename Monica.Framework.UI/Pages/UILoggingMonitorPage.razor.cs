@@ -280,10 +280,30 @@ public partial class UILoggingMonitorPage
         ["context"] = null, ["generation"] = null
     }, replace:true);
 
-    private void ClearFilter() { _keyword = null; _severity = null; ApplyFilter(); }
-    private void SearchKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter") ApplyFilter(); }
+    private bool CanChangeFilters => !_busy && !_initializing && _context is null && _snapshot?.FileExists == true;
+
+    private void SubmitKeyword()
+    {
+        if (CanChangeFilters) ApplyFilter();
+    }
+
+    private void ClearKeyword()
+    {
+        if (!CanChangeFilters) return;
+        _keyword = null;
+        ApplyFilter();
+    }
     private void FilterSeverity(LogSeverity severity) { _severity = _severity == severity ? null : severity; ApplyFilter(); }
+    private void ApplyRowSeverity(LogSeverity severity)
+    {
+        _severity = severity;
+        ApplyFilter();
+    }
+
     private void ChangeMatchMode(bool only) { _onlyMatches = only; ApplyFilter(); }
+    private EventCallback<T> LiveReaderAction<T>(Action<T> action) =>
+        _context is null ? EventCallback.Factory.Create(this, action) : default;
+
     private void ApplySelectedText((LogLineViewModel line, string keyword) request) { _keyword = request.keyword; ApplyFilter(); }
     private Task ChangeLineLimitAsync(int count) => RunCommandAsync(async () =>
     {

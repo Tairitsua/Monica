@@ -178,7 +178,7 @@
   "Design": {
     "Apply": "Apply",
     "Captured": "Last file read",
-    "ClearFilter": "Clear filters",
+    "ClearFilter": "Clear search",
     "ClearSpan": "Clear line span",
     "Close": "Close",
     "ContextStaleToast": "The selected physical line is no longer in this observed generation. Read again and reselect.",
@@ -304,6 +304,13 @@
     "AgeDays": "{0} d ago",
     "AgeSeconds": "{0} s ago",
     "FootprintWriter": "The default sink {0} was updated {1} ({2}).",
-    "FootprintWriterLimit": "{0} of the file limit"
+    "FootprintWriterLimit": "{0} of the file limit",
+    "JumpToNewest": "Jump to newest",
+    "ShowContextWindow": "Show ±50 lines context",
+    "FilterBySeverity": "Filter by this severity ({0})",
+    "ParsedTimestamp": "Parsed timestamp",
+    "RawTimestamp": "Verbatim timestamp",
+    "ParsedSeverity": "Parsed severity",
+    "SeverityWithToken": "{0} ({1})"
   }
 }

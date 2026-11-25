@@ -1,5 +1,6 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using System.Globalization
+@using Monica.UI.Shared.Components.Visual
 @using Monica.Framework.UI.UILogging.Models
 @using Monica.Framework.UI.UILogging.Support
 @inject IStringLocalizer<LoggingResource> L
@@ -7,7 +8,8 @@
 @if (Evidence is { } evidence)
 {
     var line = evidence.Line;
-    <div class="log-line-info-dialog @(CopyFormattedRequested.HasDelegate ? "is-workspace" : null)" data-source-generation="@evidence.Source?.Generation" data-absolute-line-number="@line.AbsoluteLineNumber">
+    var workbench = CopyFormattedRequested.HasDelegate;
+    <div class="log-line-info-dialog @(workbench ? "is-workspace" : null)" data-source-generation="@evidence.Source?.Generation" data-absolute-line-number="@line.AbsoluteLineNumber">
         @if (!CopyFormattedRequested.HasDelegate) { <p class="log-inspector-note">@L["Workbench:Inspector:Frozen"]</p> }
         <section class="log-inspector-text">
             <div class="log-inspector-text-heading">
@@ -40,8 +42,33 @@
             else
             {
                 <dl class="log-inspector-context">
-                    <div><dt>@L["Page:Components:LineInfo:Timestamp"]</dt><dd><time data-field="Timestamp" datetime="@line.Timestamp?.ToString("O", CultureInfo.InvariantCulture)">@(line.Timestamp is { } timestamp ? UiTime.Format(timestamp) : L["Workbench:Inspector:Missing"].Value)</time></dd></div>
-                    <div><dt>@L["Page:Components:LineInfo:Severity"]</dt><dd data-field="Severity">@(line.LevelText.Length == 0 ? L["Workbench:Viewer:Unknown"].Value : line.LevelText)</dd></div>
+                    <div>
+                        <dt>@L[workbench ? "LogChart:ParsedTimestamp" : "Page:Components:LineInfo:Timestamp"]</dt>
+                        <dd>
+                            @if (line.Timestamp is { } timestamp)
+                            {
+                                <time data-field="Timestamp" datetime="@timestamp.ToString("O", CultureInfo.InvariantCulture)">@UiTime.Format(timestamp, workbench ? "yyyy-MM-dd HH:mm:ss.fff" : null)</time>
+                            }
+                            else { @L["Workbench:Inspector:Missing"] }
+                        </dd>
+                    </div>
+                    @if (workbench)
+                    {
+                        <div><dt>@L["LogChart:RawTimestamp"]</dt><dd><code data-field="RawTimestamp">@line.RawTimestamp</code></dd></div>
+                    }
+                    <div>
+                        <dt>@L[workbench ? "LogChart:ParsedSeverity" : "Page:Components:LineInfo:Severity"]</dt>
+                        <dd data-field="Severity">
+                            @if (workbench)
+                            {
+                                <span class="log-inspector-severity mo-vl-status mo-vl-status--pill @LogSeverityStrip.Role(line.Severity).ToCssClass()">
+                                    <i class="mo-vl-status-dot @(line.Severity == LogSeverity.Critical ? "is-critical" : null)" aria-hidden="true"></i>
+                                    @L["LogChart:SeverityWithToken", L[$"Workbench:Levels:{line.Severity}"], line.LevelText]
+                                </span>
+                            }
+                            else { @(line.LevelText.Length == 0 ? L["Workbench:Viewer:Unknown"].Value : line.LevelText) }
+                        </dd>
+                    </div>
                     <div><dt>@L["Page:Components:LineInfo:Thread"]</dt><dd data-field="Thread">@(line.Thread.Length == 0 ? L["Workbench:Inspector:Missing"].Value : line.Thread)</dd></div>
                 </dl>
             }

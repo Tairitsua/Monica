@@ -31,7 +31,8 @@
 .lm-caption-text { min-width: 0; overflow-wrap: anywhere; }
 
 .lm-fp { padding: 18px 26px 20px; box-shadow: inset 0 1px 0 var(--mud-palette-divider); }
-.lm-fp-head { display: grid; justify-items: start; gap: 10px; margin-bottom: 14px; }
+.lm-fp-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 24px; margin-bottom: 14px; }
+.lm-fp-head > .mo-vl-legend { justify-content: flex-end; margin-inline-start: auto; padding-top: 0; }
 .lm-fp-head p { margin-top: 4px; color: var(--mud-palette-text-secondary); font-size: 12.5px; max-width: 72ch; }
 
 .lm-fp-bar {
@@ -111,4 +112,5 @@
 @container page (max-width: 720px) {
     .lm-decision, .lm-fp { padding-inline: 16px; }
     .lm-policy > div { padding-inline: 16px 12px; }
+    .lm-fp-head > .mo-vl-legend { justify-content: flex-start; margin-inline-start: 0; }
 }

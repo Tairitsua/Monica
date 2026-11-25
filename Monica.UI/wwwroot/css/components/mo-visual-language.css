@@ -93,6 +93,41 @@ a.mo-vl-mark:focus-visible { outline: 2px solid var(--mo-vl-role); outline-offse
 .mo-vl-capsule--outline { background: var(--mud-palette-surface); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default); color: var(--mud-palette-text-secondary); }
 button.mo-vl-capsule:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mo-vl-role) 35%, var(--mud-palette-divider)); }
 button.mo-vl-capsule:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: -2px; }
+/* Compound search controls keep the clear command inside the field. */
+.mo-vl-search-clear {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--mud-palette-text-secondary);
+}
+.mo-vl-search-clear:hover:not(:disabled) { background: var(--mud-palette-action-default-hover); color: var(--mud-palette-text-primary); }
+.mo-vl-search-clear:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: -2px; }
+.mo-vl-search-clear:disabled { opacity: .5; }
+.mo-vl-search-clearable input[type="search"]::-webkit-search-cancel-button { appearance: none; }
+
+.mo-vl-soft-action {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mo-vl-role) 12%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mo-vl-role) 72%, var(--mud-palette-text-primary));
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color var(--mo-duration-fast, 120ms) var(--mo-ease, ease);
+}
+.mo-vl-soft-action:hover:not(:disabled) { background: color-mix(in srgb, var(--mo-vl-role) 19%, var(--mud-palette-surface)); }
+.mo-vl-soft-action:active:not(:disabled) { transform: translateY(.5px); }
+.mo-vl-soft-action:disabled { opacity: .5; }
+.mo-vl-soft-action:focus-visible { outline: 2px solid var(--mo-vl-role); outline-offset: 2px; }
 .mo-vl-segment { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 9px; background: var(--mud-palette-background-gray); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default); }
 .mo-vl-segment button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 30px; padding: 0 13px; border-radius: 7px; color: var(--mud-palette-text-secondary); font-size: 13px; font-weight: 500; }
 .mo-vl-segment button:hover { color: var(--mud-palette-text-primary); }
@@ -110,6 +145,8 @@ button.mo-vl-capsule:focus-visible { outline: 2px solid var(--mud-palette-primar
 .mo-vl-swatch--instrument { width: 10px; height: 10px; border-radius: 3px; }
 .mo-vl-swatch--diamond { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg) scale(.9); }
 .mo-vl-swatch--empty { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--mo-vl-role) 55%, var(--mud-palette-lines-inputs)); }
+
+.mo-vl-swatch--label { translate: 0 -1px; }
 
 /* Full record names and comparable measurements; reflow at the owner width. */
 .mo-vl-ledger { min-width: 0; container: mo-ledger / inline-size; }

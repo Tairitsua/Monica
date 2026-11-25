@@ -3,11 +3,17 @@
 
 <div class="hc-toolbar" role="group" aria-label="@L["Design:RegistryTitle"]">
     <div class="hc-toolbar-top">
-        <label class="hc-search">
+        <div class="hc-search mo-vl-search-clearable">
             <MoIcon Icon="@MoIcons.Search" Size="15px" />
             <input type="search" spellcheck="false" autocomplete="off" value="@Session.NameFilter" @oninput="@(e => Set("q", e.Value?.ToString()))"
                    aria-label="@L["Design:SearchLabel"]" placeholder="@L["Design:SearchPlaceholder"]" />
-        </label>
+            @if (Session.NameFilter.Length > 0)
+            {
+                <button class="mo-vl-search-clear" type="button" aria-label="@L["Filters:ClearSearch"]" @onclick="@(() => Set("q", null))">
+                    <MoIcon Icon="@MoIcons.Close" Size="14px" />
+                </button>
+            }
+        </div>
         <div class="hc-selects">
             <div class="hc-select-wrap">
                 <span>@L["Filters:TagLabel"]</span>

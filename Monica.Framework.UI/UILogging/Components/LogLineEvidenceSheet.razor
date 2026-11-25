@@ -42,9 +42,12 @@
                 <p class="lm-insp-frozen"><MoIcon Icon="@MoIcons.Lock" Size="16px" />@L["Workbench:Inspector:Frozen"]</p>
                 <div class="lm-insp-actions">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@MoIcons.Copy" OnClick="@(() => Copy(evidence.Line.Raw))">@L["Design:CopyRaw"]</MudButton>
-                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Layers" Disabled="@(evidence.Source is null || evidence.Line.AbsoluteLineNumber is null)"
-                               OnClick="@(() => ShowContext.InvokeAsync(evidence))">@L["Page:Components:Viewer:ContextMenu:ShowContext"]</MudButton>
-                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Filter" OnClick="@(() => FilterSeverity.InvokeAsync(evidence.Line.Severity))">@L["Page:Components:Viewer:ContextMenu:FilterSeverity"]</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.UnfoldVertical" Disabled="@(evidence.Source is null || evidence.Line.AbsoluteLineNumber is null)"
+                               OnClick="@(() => ShowContext.InvokeAsync(evidence))">@L["LogChart:ShowContextWindow"]</MudButton>
+                    <button type="button" class="mo-vl-soft-action @LogSeverityStrip.Role(evidence.Line.Severity).ToCssClass()"
+                            @onclick="@(() => FilterSeverity.InvokeAsync(evidence.Line.Severity))">
+                        <MoIcon Icon="@MoIcons.Filter" Size="15px" />@L["Page:Components:Viewer:ContextMenu:FilterSeverity"]
+                    </button>
                 </div>
                 <LogLineEvidenceContent Evidence="@evidence" CopyFormattedRequested="CopyFormat" />
             </div>

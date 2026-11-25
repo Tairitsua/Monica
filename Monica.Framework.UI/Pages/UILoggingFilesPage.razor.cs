@@ -133,7 +133,17 @@ public partial class UILoggingFilesPage
     });
 
     private Task DownloadAsync(string path) => Admit(() => _transfer!.DownloadAsync(NavigationManager.ToAbsoluteUri(LogBrowserTransfer.FileUrl(path)).ToString()));
-    private void SearchChanged(ChangeEventArgs args) { _page = 0; NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = args.Value?.ToString(), ["page"] = null }),replace:true); }
+    private void SearchChanged(ChangeEventArgs args) => SetSearch(args.Value?.ToString());
+
+    private void SetSearch(string? keyword)
+    {
+        _page = 0;
+        NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = string.IsNullOrEmpty(keyword) ? null : keyword,
+            ["page"] = null
+        }), replace: true);
+    }
     private void PreviousPage() { if (_page > 0) SetPage(_page - 1); }
     private void NextPage() { if (_page + 1 < PageCount) SetPage(_page + 1); }
 

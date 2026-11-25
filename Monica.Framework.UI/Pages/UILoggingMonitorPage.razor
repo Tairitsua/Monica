@@ -43,8 +43,18 @@
     }
     <section class="logging-reader mo-vl-surface" aria-label="@L["Workbench:Reader"]">
         <div class="logging-search-rail">
-            <div class="reader-search"><MoIcon Icon="@MoIcons.Search" Size="1.1rem" /><input aria-label="@L["Design:KeywordLabel"]" placeholder="@L["Design:KeywordPlaceholder"]" @bind="_keyword" @bind:event="oninput" @onkeydown="SearchKeyDown" />
-                <button type="button" class="reader-apply" @onclick="ApplyFilter" disabled="@_busy">@L["Design:Apply"]</button><button type="button" @onclick="ClearFilter" aria-label="@L["Design:ClearFilter"]" disabled="@_busy"><MoIcon Icon="@MoIcons.Close" Size="1rem" /></button></div>
+            <form class="reader-search mo-vl-search-clearable" @onsubmit="SubmitKeyword" @onsubmit:preventDefault>
+                <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" spellcheck="false" autocomplete="off" aria-label="@L["Design:KeywordLabel"]"
+                       placeholder="@L["Design:KeywordPlaceholder"]" @bind="_keyword" @bind:event="oninput" disabled="@(!CanChangeFilters)" />
+                @if (!string.IsNullOrEmpty(_keyword) || _snapshot?.Filter.HasKeyword == true)
+                {
+                    <button type="button" class="reader-clear mo-vl-search-clear" @onclick="ClearKeyword" aria-label="@L["Design:ClearFilter"]" disabled="@(!CanChangeFilters)">
+                        <MoIcon Icon="@MoIcons.Close" Size="14px" />
+                    </button>
+                }
+                <button type="submit" class="reader-apply mo-vl-soft-action mo-vl-role--primary" disabled="@(!CanChangeFilters)">@L["Design:Apply"]</button>
+            </form>
             <MudCheckBox T="bool" Color="Color.Primary" Value="@_onlyMatches" ValueChanged="ChangeMatchMode" Label="@L["Design:OnlyMatches"]" Dense="true" />
             <div class="reader-window">
                 <span>@L["Design:ReadWindow"]</span>
@@ -57,7 +67,8 @@
         <div class="reader-levels">
             @{ var levels = FacetLines.CountBy(l => l.Severity).ToDictionary(); }
             <MoFilterChip Label="@L["Design:StripAllLevels"]" Count="@levels.Values.Sum()" Role="MoVisualRole.Primary" Selected="@(!_severity.HasValue)" SelectedChanged="@(() => { _severity = null; ApplyFilter(); })" Pill="true" Class="mo-vl-chip--instrument" />
-            @foreach (var level in LogSeverityStrip.Levels) { <MoFilterChip Label="@L[$"Workbench:Levels:{level}"]" Count="@levels.GetValueOrDefault(level)" ShowDot="true" Selected="@(_severity == level)" Role="@LogSeverityStrip.Role(level)" SelectedChanged="@(() => FilterSeverity(level))" Pill="true" Class="mo-vl-chip--instrument" /> }
+            @foreach (var level in LogSeverityStrip.Levels) { <MoFilterChip Label="@L[$"Workbench:Levels:{level}"]" Count="@levels.GetValueOrDefault(level)" ShowDot="true" Selected="@(_severity == level)" Role="@LogSeverityStrip.Role(level)" SelectedChanged="@(() => FilterSeverity(level))" Pill="true"
+                              Class="@(level == LogSeverity.Critical ? "mo-vl-chip--instrument mo-vl-chip--diamond" : "mo-vl-chip--instrument")" /> }
             @if (_range is { } range) { <MudButton Size="Size.Small" StartIcon="@MoIcons.Close" OnClick="@(() => SetSpan(null))" title="@L["Design:ClearSpan"]">@L["Design:SpanLensLabel",range.From,range.To]</MudButton> }
         </div>
         @if (_context is { } context)
@@ -70,7 +81,15 @@
         }
         else
         {
-            <LogViewer @ref="_viewer" Workbench="true" Lines="@ViewLines" Version="@ViewVersion" Source="@ViewSource" SnapshotReadAt="@ViewReadAt" FirstRetainedLineNumber="@(_context is null ? _snapshot?.FirstRetainedLineNumber : null)" AutoScroll="@(_autoScroll && _context is null)" Filter="@(_context is null ? _snapshot?.Filter : null)" OnInspect="Inspect" OnShowContext="ShowContext" OnApplyFilter="ApplySelectedText" OnFilterSeverity="FilterSeverity" LoadMoreRequested="@(_context is null ? LoadEarlierAsync : null)" PositionChanged="PositionChanged" />
+            <LogViewer @ref="_viewer" Workbench="true" Lines="@ViewLines" Version="@ViewVersion"
+                       Source="@ViewSource" SnapshotReadAt="@ViewReadAt"
+                       FirstRetainedLineNumber="@(_context is null ? _snapshot?.FirstRetainedLineNumber : null)"
+                       AutoScroll="@(_autoScroll && _context is null)" Filter="@(_context is null ? _snapshot?.Filter : null)"
+                       OnInspect="Inspect"
+                       OnShowContext="@(LiveReaderAction<(LogLineViewModel line, int lineIndex)>(ShowContext))"
+                       OnApplyFilter="@(LiveReaderAction<(LogLineViewModel line, string keyword)>(ApplySelectedText))"
+                       OnFilterSeverity="@(LiveReaderAction<LogSeverity>(ApplyRowSeverity))"
+                       LoadMoreRequested="@(_context is null ? LoadEarlierAsync : null)" PositionChanged="PositionChanged" />
         }
         <footer class="reader-footnote"><span>@L["Workbench:RetentionScope", _snapshot?.TotalStoredLines ?? 0, Math.Max(1, LoggingService.UIOption.MaxDisplayLines)]</span><span>@L["Workbench:PhysicalLineHelp"]</span></footer>
     </section>

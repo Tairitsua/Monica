@@ -8,7 +8,7 @@
     <div class="lm-decision">
         <div class="lm-decision-main">
             <p class="lm-fp-display-label">
-                <i class="mo-vl-swatch mo-vl-swatch--instrument @(Available ? "mo-vl-role--primary" : "mo-vl-role--error")" aria-hidden="true"></i>@L["Design:FilesDisplayLabel"]
+                <i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @(Available ? "mo-vl-role--primary" : "mo-vl-role--error")" aria-hidden="true"></i>@L["Design:FilesDisplayLabel"]
             </p>
             @{ var parts = Size(_total).Split(' ', 2); }
             <MoDisplayValue Compact="true" Value="@(Available ? parts[0] : "—")"
@@ -42,22 +42,22 @@
     </div>
     <dl class="lm-policy">
         <div>
-            <dt><i class="mo-vl-swatch mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFactDir"]</dt>
+            <dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFactDir"]</dt>
             <dd>@Path.GetFileName(Path.TrimEndingDirectorySeparator(DirectoryName))</dd>
             <small title="@DirectoryName">@DirectoryName</small>
         </div>
         <div>
-            <dt><i class="mo-vl-swatch mo-vl-role--info" aria-hidden="true"></i>@L["Design:FilesFactSink"]</dt>
+            <dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--info" aria-hidden="true"></i>@L["Design:FilesFactSink"]</dt>
             <dd>@(DefaultSink ?? L["LogChart:NoDefaultWriter"].Value)</dd>
             @if (_writer is { } writer) { <small>@Size(writer.Size)</small> }
         </div>
         <div>
-            <dt><i class="mo-vl-swatch @(_near is null ? "mo-vl-role--neutral" : "mo-vl-role--warning")" aria-hidden="true"></i>@L["Design:FilesFactPolicy"]</dt>
+            <dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @(_near is null ? "mo-vl-role--neutral" : "mo-vl-role--warning")" aria-hidden="true"></i>@L["Design:FilesFactPolicy"]</dt>
             <dd>@(SizeLimit is { } limit ? Size(limit) : "—")</dd>
             @if (DefaultSink is not null) { <small>@L["LogChart:Rolling", Options.Value.RollingInterval, Options.Value.RetainedFileCountLimit?.ToString() ?? "∞"]</small> }
         </div>
         <div>
-            <dt><i class="mo-vl-swatch @(Following ? "mo-vl-role--info" : "mo-vl-role--neutral")" aria-hidden="true"></i>@L["Design:FilesFactCurrent"]</dt>
+            <dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @(Following ? "mo-vl-role--info" : "mo-vl-role--neutral")" aria-hidden="true"></i>@L["Design:FilesFactCurrent"]</dt>
             <dd>@(Current is null ? "—" : Path.GetFileName(Current))</dd>
             <small>@L[Following ? "Design:FilesFactCurrentFollowing" : "Design:FilesFactCurrentPaused"]</small>
         </div>
@@ -68,10 +68,10 @@
             <div class="lm-fp-head">
                 <div><h2>@L["Design:FilesFootprintTitle"]</h2><p>@L["Design:FilesFootprintDesc"]</p></div>
                 <div class="mo-vl-legend">
-                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:FootprintRootLegend"]</span>
-                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--info" aria-hidden="true"></i>@L["LogChart:FootprintOtherLegend"]</span>
-                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--secondary" aria-hidden="true"></i>@L["LogChart:FootprintArchiveLegend"]</span>
-                    @if (_near is not null) { <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--warning" aria-hidden="true"></i>@L["LogChart:FootprintLimitLegend"]</span> }
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:FootprintRootLegend"]</span>
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--info" aria-hidden="true"></i>@L["LogChart:FootprintOtherLegend"]</span>
+                    <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--secondary" aria-hidden="true"></i>@L["LogChart:FootprintArchiveLegend"]</span>
+                    @if (_near is not null) { <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--warning" aria-hidden="true"></i>@L["LogChart:FootprintLimitLegend"]</span> }
                 </div>
             </div>
             <div class="lm-fp-bar" role="group" aria-label="@L["Design:FilesFootprintTitle"]" @onpointerleave="@(() => _hover = null)">
@@ -92,7 +92,7 @@
             <div class="lm-fp-folders">
                 <button type="button" class="lm-fp-folder mo-vl-role--primary @(Folder is null ? "is-active" : null)"
                         aria-pressed="@(Folder is null ? "true" : "false")" @onclick="@(() => SelectFolder.InvokeAsync(null))">
-                    <i class="mo-vl-swatch mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFootprintAll"] <b class="mo-vl-mono">@Size(_total)</b><small class="mo-vl-mono">(@Files.Count)</small>
+                    <i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label mo-vl-role--primary" aria-hidden="true"></i>@L["Design:FilesFootprintAll"] <b class="mo-vl-mono">@Size(_total)</b><small class="mo-vl-mono">(@Files.Count)</small>
                 </button>
                 @foreach (var group in _folders)
                 {
@@ -100,7 +100,7 @@
                     var bytes = group.Sum(file => file.Size);
                     <button type="button" class="lm-fp-folder @role.ToCssClass() @(Folder == group.Key ? "is-active" : null)"
                             aria-pressed="@(Folder == group.Key ? "true" : "false")" @onclick="@(() => SelectFolder.InvokeAsync(Folder == group.Key ? null : group.Key))">
-                        <i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>
+                        <i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @role.ToCssClass()" aria-hidden="true"></i>
                         @(group.Key == "" ? L["Design:FilesFootprintRoot"].Value : group.Key)<b class="mo-vl-mono">@Size(bytes)</b><small class="mo-vl-mono">@Share(bytes).ToString("0.0")% · @group.Count()</small>
                     </button>
                 }

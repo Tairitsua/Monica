@@ -14,8 +14,7 @@
     {
         <div class="timing-running-search"><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true"
             DebounceInterval="180" aria-label="@L["Running:Search"]" Placeholder="@L["Design:RunningSearchPlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-            Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
-            @if (!string.IsNullOrWhiteSpace(Search)) { <MudButton Variant="Variant.Text" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton> }
+            Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" />
         </div>
     }
     @if (Matches.Count != 0)
@@ -102,6 +101,5 @@
         _page = Math.Clamp(int.TryParse(PageNumber, out var page) ? page : 1, 1, PageCount);
     }
     private void SearchChanged(string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["rq"] = string.IsNullOrEmpty(value) ? null : value, ["rpage"]=null }), replace:true);
-    private Task ClearSearchAsync() { SearchChanged(null); return Task.CompletedTask; }
     private void ChangePage(int value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("rpage",value),replace:true);
 }

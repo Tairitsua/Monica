@@ -28,7 +28,9 @@ Other reusable owners have distinct contracts:
 - `MoJson` owns [JSON viewing and editing](json.md), and `MoIcon` owns [icon rendering](icons.md).
 - Modal evidence inspectors use the [native side-sheet contract](#modal-evidence-side-sheets); navigation drawers retain their own layout owner.
 
-Use a `mo-workbench-container` around `mo-page-shell mo-page-shell--workbench` to measure breakpoints at the workspace’s available inline width before applying gutters. Chart rulers, tracks, and registry layouts can use the same `page` container.
+Use a `mo-workbench-container` around `mo-page-shell mo-page-shell--workbench` to measure breakpoints at the workspace’s available inline width before applying gutters. Chart rulers, tracks, and registry layouts can use the same `page` container. The workbench frame fills its owner on wide displays. Apply a reading width to the part containing prose when it needs a constraint.
+
+Use `mo-vl-soft-action` and a visual role for a compact inline command. It supplies hover, press and focus paint for native buttons and links. Use `mo-vl-search-clear` for a clear action inside a compound search field and `mo-vl-search-clearable` on the field wrapper to suppress the browser's duplicate cancel control. The caller controls visibility and keyword state. Use `mo-vl-swatch--instrument` for a 10 px square and `mo-vl-swatch--label` for optical adjustment next to a text label. Data marks use their plot geometry.
 
 ## Modal evidence side sheets
 

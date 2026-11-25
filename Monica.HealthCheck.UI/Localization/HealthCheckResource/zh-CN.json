@@ -49,7 +49,8 @@
     "TagLabel": "标签",
     "Results": "显示 {0} / {1} 项",
     "AllTags": "全部标签",
-    "Probe": "探针：{0}"
+    "Probe": "探针：{0}",
+    "ClearSearch": "清除搜索"
   },
   "Common": {
     "DurationMilliseconds": "{0} 毫秒",

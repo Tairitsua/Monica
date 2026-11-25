@@ -3,19 +3,20 @@
 .logging-reader ::deep .log-viewer-wrapper { border: 0; border-radius: 0; }
 .logging-search-rail { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 24px 9px; }
 .reader-search {
-    display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 250px; height: 36px; padding: 0 8px 0 10px;
-    border-radius: 6px; background: var(--mud-palette-background);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 300px;
+    min-width: 0;
+    height: 36px;
+    padding: 0 4px 0 11px;
+    border-radius: 6px;
+    background: var(--mud-palette-surface);
     box-shadow: inset 0 0 0 1px var(--mud-palette-lines-inputs);
     color: var(--mud-palette-text-secondary);
 }
 .reader-search:focus-within { box-shadow: inset 0 0 0 1.5px var(--mud-palette-primary); }
 .reader-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--mud-palette-text-primary); font: 13px var(--mo-font-family-body); }
-.reader-search button { display: flex; align-items: center; justify-content: center; padding: 3px; color: var(--mud-palette-text-secondary); }
-.reader-search .reader-apply {
-    align-self: center; min-height: 24px; padding: 0 7px; border-radius: 4px;
-    background: color-mix(in srgb, var(--mud-palette-primary) 10%, var(--mud-palette-surface));
-    color: color-mix(in srgb, var(--mud-palette-primary) 78%, var(--mud-palette-text-primary)); font-size: 12px; font-weight: 500;
-}
 .reader-window { display: inline-flex; align-items: center; gap: 8px; color: var(--mud-palette-text-secondary); font-size: 12.5px; white-space: nowrap; }
 .reader-window ::deep .mud-input-control { min-width: 77px; margin: 0; }
 .reader-window ::deep .mud-input-outlined { min-height: 34px; }

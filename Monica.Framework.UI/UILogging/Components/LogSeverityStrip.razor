@@ -18,7 +18,7 @@
     <div class="lm-decision">
         <div class="lm-decision-main @(Attention > 0 ? "lm-alert" : null)">
             <p class="lm-display-label">
-                <i class="mo-vl-swatch mo-vl-swatch--instrument @(_available ? Attention == 0 ? "mo-vl-role--success" : "mo-vl-role--error" : "mo-vl-role--neutral")" aria-hidden="true"></i>
+                <i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument @(_available ? Attention == 0 ? "mo-vl-role--success" : "mo-vl-role--error" : "mo-vl-role--neutral")" aria-hidden="true"></i>
                 @L["Design:DisplayLabel"]
                 @if (_available && _buckets.Length > 0 && Attention == 0)
                 {
@@ -35,7 +35,7 @@
                         var selected = Snapshot.Filter.Severity == severity;
                         <button class="lm-reason @Role(severity).ToCssClass() @(selected ? "is-active" : null) @(count == 0 ? "is-zero" : null)" type="button"
                                 aria-pressed="@(selected ? "true" : "false")" @onclick="@(() => OnSeverity.InvokeAsync(severity))">
-                            <i class="mo-vl-swatch @(severity == LogSeverity.Critical ? "mo-vl-swatch--diamond" : null) @(count == 0 ? "mo-vl-swatch--empty" : null) @Role(severity).ToCssClass()" aria-hidden="true"></i>
+                            <i class="mo-vl-swatch mo-vl-swatch--label @(severity == LogSeverity.Critical ? "mo-vl-swatch--diamond" : null) @(count == 0 ? "mo-vl-swatch--empty" : null) @Role(severity).ToCssClass()" aria-hidden="true"></i>
                             <span>@L[$"Workbench:Levels:{severity}"]</span><b class="mo-vl-mono">@count.ToString("N0")</b>
                         </button>
                     }
@@ -128,9 +128,9 @@
                         <div class="mo-vl-legend">
                             @foreach (var (key, role, diamond) in Legend)
                             {
-                                <span><i class="mo-vl-swatch @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @role.ToCssClass()" aria-hidden="true"></i>@L[key]</span>
+                                <span><i class="mo-vl-swatch mo-vl-swatch--label @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @role.ToCssClass()" aria-hidden="true"></i>@L[key]</span>
                             }
-                            @if (Snapshot.Filter.HasKeyword) { <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:Matches"]</span> }
+                            @if (Snapshot.Filter.HasKeyword) { <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--primary" aria-hidden="true"></i>@L["LogChart:Matches"]</span> }
                         </div>
                         <code class="lm-per">@L["Design:StripPer", _size]</code>
                     </div>
@@ -315,7 +315,7 @@
     }
 
     private RenderFragment LaneLabel(string key, int count, int? maximum, string lane, MoVisualRole role) => @<div class="lm-lane-label @lane @(IsDimmed(lane) ? "is-dimmed" : null)">
-        <span class="lm-lane-name"><i class="mo-vl-swatch mo-vl-swatch--instrument @role.ToCssClass()" aria-hidden="true"></i>@L[key]<b class="mo-vl-mono">@count.ToString("N0")</b></span>
+        <span class="lm-lane-name"><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument @role.ToCssClass()" aria-hidden="true"></i>@L[key]<b class="mo-vl-mono">@count.ToString("N0")</b></span>
         @if (maximum is { } max) { <small>@L["LogChart:BucketMax", max]</small> }
     </div>;
 

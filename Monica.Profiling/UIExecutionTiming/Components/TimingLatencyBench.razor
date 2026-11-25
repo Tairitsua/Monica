@@ -60,24 +60,24 @@
         </div>
     </div>
     <dl class="et-sig-facts">
-        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--@(_lingering > 0 ? "warning" : "info")"></i>@L["Design:FInFlight"]</dt>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--@(_lingering > 0 ? "warning" : "info")"></i>@L["Design:FInFlight"]</dt>
             <dd>@Running.Count.ToString("N0")</dd>
             <p>@(Running.Count == 0 ? L["Design:FNoFlight"] : _lingering > 0 ? L["Design:FBeyondBaseline", _lingering] : _ranked.Length == 0 ? L["Design:FlightNoBaseline"] : L[_ages.Any(f => f.Baseline is not null) ? "Design:FWithinBaseline" : "Design:FlightNoBaseline"])</p>
         </div>
-        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:FKeys"]</dt>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:FKeys"]</dt>
             <dd>@Statistics.Count.ToString("N0")</dd><p>@L["Bench:Allocation", Statistics.Count(s => s.AverageMemoryBytes.HasValue), Statistics.Count]</p>
         </div>
-        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FSamples"]</dt>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FSamples"]</dt>
             <dd>@Statistics.Sum(s => (long)s.ExecutionCount).ToString("N0")</dd><p>@L["Design:FSamplesSub", TimingAssessment.Cumulative(Statistics.Sum(TimingAssessment.Total))]</p>
         </div>
-        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FKeyMean"]</dt>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FKeyMean"]</dt>
             <dd>@(_ranked.Length == 0 ? "—" : _mean.ToString("N1"))@if (_ranked.Length > 0) { <small>ms</small> }</dd><p>@L["Summary:AverageBasis"]</p>
         </div>
     </dl>
     <div class="et-bench">
         @if (_ages.Length == 0)
         {
-            <div class="et-flight-calm"><i class="mo-vl-swatch mo-vl-role--neutral"></i>@L["Design:FlightEmpty", Time.FormatTime(CapturedAt)]</div>
+            <div class="et-flight-calm"><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-role--neutral" aria-hidden="true"></i>@L["Design:FlightEmpty", Time.FormatTime(CapturedAt)]</div>
         }
         else
         {
@@ -86,8 +86,8 @@
                     <div class="et-band-title"><MoIcon Icon="@MoIcons.Pulse" Size="1rem" /><h3>@L["Design:FlightTitle"]</h3><span class="et-axis-tag et-mono">@L["Design:FlightScale", TimingAssessment.AxisTick(_flightAxis.Ceiling, _flightAxis.Ceiling)]</span></div>
                     <div class="et-band-right">
                         <div class="et-bench-legend">
-                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--info"></i>@L["Design:FlightLegendNormal"]</span>
-                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--warning"></i>@L["Design:FlightLegendLingering"]</span>
+                            <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--info"></i>@L["Design:FlightLegendNormal"]</span>
+                            <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--warning"></i>@L["Design:FlightLegendLingering"]</span>
                             <span><i class="et-tick-swatch"></i>@L["Design:FlightLegendBaseline"]</span>
                         </div>
                         @if (_ages.Length > FlightLimit)
@@ -148,10 +148,10 @@
                         <span class="et-axis-tag et-mono">@L["Design:BenchScope", _lanes.Length, Statistics.Count]</span>
                     </div>
                     <div class="et-band-right et-bench-legend">
-                        <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:BenchLegendMean"]</span>
-                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--warning"></i>@L["Design:BenchLegendSpike"]</span>
-                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--success"></i>@L["Design:BenchLegendFaster"]</span>
-                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--neutral"></i>@L["Design:BenchLegendSteady"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:BenchLegendMean"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--diamond mo-vl-role--warning"></i>@L["Design:BenchLegendSpike"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--diamond mo-vl-role--success"></i>@L["Design:BenchLegendFaster"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--label mo-vl-swatch--diamond mo-vl-role--neutral"></i>@L["Design:BenchLegendSteady"]</span>
                     </div>
                 </header>
                 <div class="et-ruler-row et-drift-ruler-row" aria-hidden="true">

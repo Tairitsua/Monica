@@ -35,10 +35,16 @@
                   Following="@(_reader?.IsRunning == true)" Folder="@FolderKey" SelectFolder="SetFolder" DefaultSink="@DefaultSink" DefaultSinkRelative="@DefaultSinkRelative" ModifiedAge="ModifiedAge" SizeLimit="@SizeLimit" />
     <section class="files-registry mo-vl-surface" aria-label="@L["Workbench:FilesTitle"]">
         <div class="files-controls">
-            <label class="files-search">
+            <div class="files-search mo-vl-search-clearable">
                 <MoIcon Icon="@MoIcons.Search" Size="15px" />
                 <input type="search" spellcheck="false" autocomplete="off" placeholder="@L["Workbench:FilesSearch"]" aria-label="@L["Workbench:FilesSearch"]" value="@_keyword" @oninput="SearchChanged" />
-            </label>
+                @if (!string.IsNullOrEmpty(_keyword))
+                {
+                    <button type="button" class="mo-vl-search-clear" aria-label="@L["Design:ClearFilter"]" @onclick="@(() => SetSearch(null))">
+                        <MoIcon Icon="@MoIcons.Close" Size="14px" />
+                    </button>
+                }
+            </div>
             <div class="files-sort">
                 <span>@L["Workbench:Order"]</span>
                 <div class="mo-vl-segment" role="group" aria-label="@L["Workbench:Order"]">
@@ -81,10 +87,12 @@
                         var near = LogFootprint.NearLimit(file, SizeLimit);
                         <tr @key="file.RelativePath" data-relative-path="@file.RelativePath" class="@(current ? "is-current" : null)">
                             <td class="lm-f-name"><div class="lm-f-ident">
-                                <span class="lm-f-dot @(file.Size == 0 ? "mo-vl-role--neutral" : role.ToCssClass())" aria-hidden="true"></span>
                                 <div class="lm-f-copy">
                                     <div class="lm-f-title-line">
-                                        <a class="lm-f-link" href="@OpenUrl(file.RelativePath)">@file.FileName</a>
+                                        <span class="lm-f-title">
+                                            <i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-swatch--label @(file.Size == 0 ? "mo-vl-role--neutral" : role.ToCssClass())" aria-hidden="true"></i>
+                                            <a class="lm-f-link" href="@OpenUrl(file.RelativePath)">@file.FileName</a>
+                                        </span>
                                         @if (current) { <span class="mo-vl-capsule mo-vl-role--primary">@L["Workbench:LastSource"]</span> }
                                         @if (writer) { <span class="mo-vl-capsule mo-vl-role--info">@L["LogChart:DefaultSinkTag"]</span> }
                                         @if (near) { <span class="mo-vl-capsule @role.ToCssClass()">@L["LogChart:LimitTag", (file.Size / (double)SizeLimit!.Value).ToString("P0")]</span> }
@@ -104,7 +112,7 @@
                             <td class="lm-f-mod" data-label="@L["Workbench:Modified"]"><time datetime="@file.LastModified.ToString("O")">@UiTime.Format(file.LastModified)</time><small>@ModifiedAge(file)</small></td>
                             <td class="lm-f-act">
                                 <div class="lm-f-act-wrap">
-                                    <a class="file-open" href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a>
+                                    <a class="file-open mo-vl-soft-action mo-vl-role--primary" href="@OpenUrl(file.RelativePath)" aria-label="@L["Workbench:OpenFile", file.FileName]">@L["Workbench:Open"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a>
                                     <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Download" Disabled="@_busy" OnClick="@(() => DownloadAsync(file.RelativePath))"
                                                aria-label="@L["Workbench:DownloadFile", file.FileName]">@L["Workbench:Download"]</MudButton>
                                 </div>

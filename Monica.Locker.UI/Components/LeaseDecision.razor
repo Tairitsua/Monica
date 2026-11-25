@@ -130,7 +130,7 @@
         @<button class="ls-finding-link" type="button" @onclick="@(() => Inspect.InvokeAsync(row))">@LeasePresentation.Title(row.Record.Resource.Name, L)</button>;
     private RenderFragment Tally(string key, int count, MoVisualRole role, bool diamond = false) =>
         @<span class="ls-tally-item">
-            <i class="mo-vl-swatch @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @(count == 0 ? "mo-vl-swatch--empty" : null) @role.ToCssClass()" aria-hidden="true"></i>
+            <i class="mo-vl-swatch mo-vl-swatch--label @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @(count == 0 ? "mo-vl-swatch--empty" : null) @role.ToCssClass()" aria-hidden="true"></i>
             @L[key] <b class="mo-vl-mono">@count</b>
         </span>;
 }
