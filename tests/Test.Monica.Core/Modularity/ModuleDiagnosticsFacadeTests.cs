@@ -367,6 +367,24 @@ public sealed class ModuleDiagnosticsFacadeTests
         missing.Message.Should().Be("Failed to load the module option diagnostics.");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void GetModuleOptions_WhenAliasedServiceKeyIsBlank_ShouldPreserveTheRequestedKey(string serviceKey)
+    {
+        using var host = CreateHost(configureProfile: true);
+        var facade = host.Services.GetRequiredService<ModuleDiagnosticsFacade>();
+        var result = facade.GetModuleOptions(
+            ModuleKey.FromModuleType(typeof(DiagnosticsConsumerModule)),
+            ModuleOptionProfileSelector.NamedOrDefault(serviceKey));
+
+        result.Status.Should().Be(ResultStatus.Ok);
+        result.Data!.RequestedProfileName.Should().Be(serviceKey);
+        result.Data.ProfileName.Should().BeNull();
+        result.Data.ProfileResolution.Should().Be(ModuleOptionProfileResolution.DefaultFallback);
+        result.Data.Entries.Should().Contain(entry => entry.Name == "Mode" && entry.Value == "probe");
+    }
+
     [Fact]
     public void GetModuleOptions_WhenProfileSelectorIsNull_ShouldRemainInsideTheResultBoundary()
     {
