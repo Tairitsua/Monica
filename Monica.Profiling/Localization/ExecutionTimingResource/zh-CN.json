@@ -5,7 +5,6 @@
     }
   },
   "Page": {
-    "Eyebrow": "运行时 / 耗时证据",
     "Subtitle": "查找高耗时的操作标识，检查当前主机捕获的执行证据。",
     "Status": {
       "Live": "自动刷新 · {0} 秒",
@@ -24,23 +23,18 @@
     }
   },
   "Summary": {
-    "AverageBasis": "每个操作标识具有相同权重。"
+    "AverageBasis": "每个操作标识权重相同"
   },
   "Statistics": {
-    "Eyebrow": "已完成 / 排序证据",
     "Title": "操作耗时目录",
     "Empty": "尚无已完成样本。",
     "EmptyHelp": "通过 Monica 执行管线测量的业务操作将在完成后显示。",
     "Search": "查找操作",
-    "SearchPlaceholder": "名称或完整操作标识",
-    "DurationPair": "耗时",
-    "FrequencyPair": "完成记录",
     "AllocationPair": "分配记录",
     "RateHelp": "频率为首次完成以来每分钟的累计完成数；分母至少为一分钟。",
     "Pagination": "已完成操作分页"
   },
   "Running": {
-    "Eyebrow": "执行中 / 已捕获实例",
     "Title": "进行中的执行",
     "Empty": "捕获时没有执行中的实例。",
     "Search": "查找已捕获的执行实例",
@@ -50,12 +44,9 @@
     "Name": "操作标识",
     "Description": "说明",
     "StartedAt": "开始时间",
-    "RunningFor": "捕获时长",
-    "Executions": "样本",
     "AverageDuration": "平均",
     "LastDuration": "最近",
     "Rate": "累计 / 分钟",
-    "AverageMemory": "平均",
     "LastMemory": "最近",
     "LastRecordedAt": "最近完成时间"
   },
@@ -72,7 +63,6 @@
     "RecordedBytes": "记录值：{0} 字节"
   },
   "Common": {
-    "Unavailable": "—",
     "VisibleCount": "{0} / {1} 条记录",
     "Order": "排序方式",
     "Clear": "清除搜索",
@@ -86,16 +76,11 @@
     "Category": "执行计时"
   },
   "Bench": {
-    "LongestLingering": "超出基线最久",
-    "LongestFlight": "运行时间最长",
-    "Heaviest": "累计耗时最高",
-    "Slowest": "平均用时最高",
     "Allocation": "{0} / {1} 项记录分配量"
   },
   "Design": {
     "BenchColLatest": "最近",
     "BenchColMean": "均值",
-    "BenchInspect": "查看证据",
     "BenchLegendFaster": "最近回落（≤ 0.5× 且 -50 ms）",
     "BenchLegendMean": "累计均值",
     "BenchLegendSpike": "最近突增（≥ 2× 且 +50 ms）",
@@ -149,11 +134,9 @@
     "SheetClose": "关闭证据面板",
     "SheetCompletedEyebrow": "已完成操作证据",
     "SheetLoadLatest": "载入最新快照",
-    "SheetMeanDuration": "平均耗时",
     "SheetNotFoundBody": "该执行实例可能已完成并合入操作统计，或主机已重启清空了本地计数。可清除选择返回当前快照。",
     "SheetNotFoundTitle": "当前快照中不存在该记录",
     "SheetOpenBaseline": "查看该标识的已完成统计",
-    "SheetPinnedNote": "数值固定于快照 {0}（页面后台刷新不会改写当前证据）",
     "SheetRunningEyebrow": "已捕获执行实例证据",
     "SheetSecAllocation": "可选内存分配",
     "SheetSecIdentity": "标识与来源",
@@ -172,6 +155,43 @@
       "Samples": "样本数量降序",
       "Total": "累计耗时降序"
     },
-    "Title": "执行耗时"
+    "Title": "执行耗时",
+    "CopyHost": "复制主机 {0}",
+    "ScopeHost": "当前主机",
+    "StatusStale": "刷新失败 · 保留上次快照",
+    "StatusFailed": "读取失败",
+    "PillFaster": "{0} 项最近回落",
+    "PillSteady": "最近样本均未超过各自均值 2×",
+    "FNoFlight": "当前无在途调用",
+    "FBeyondBaseline": "{0} 项超过基线 2×",
+    "FWithinBaseline": "均未超过基线阈值",
+    "FindingLingering": "捕获时有 {0} 项执行中实例滞留超过基线 2×，其中 {1} 已运行 {2}（为其均值 {4} 的 {3}）",
+    "FindingSpike": "已完成操作中有 {0} 项最近样本突增，{1} 最近耗时 {2}（均值 {4} 的 {3}）",
+    "FindingPeak": "最高基准均值为 {0} 的 {1}（{2}）。",
+    "FindingRunningOnly": "当前捕获到 {0} 个执行中实例，主机尚无已完成基线。{1} 已运行 {2}。",
+    "FlightLegendNormal": "执行中（正常）",
+    "FlightLegendLingering": "滞留（≥ 2× 均值且 ≥ 1 秒）",
+    "FlightMore": "已显示最长 {0} / {1} 项 · 查看全部",
+    "FlightActive": "执行中",
+    "FlightBaseline": "基线 {0}",
+    "FlightRatio": "{0} 基线",
+    "BenchHint": "↑↓ 切换泳道 · Enter 打开固定证据",
+    "LedgerDescription": "当前主机按标识累计的执行证据。对比条按全快照峰值缩放。",
+    "RunningDescription": "最近成功捕获中的执行实例。同一标识的并发调用按实例 ID 区分。",
+    "LedgerTotal": "累计 {0}",
+    "LatestSpike": "突增 {0}",
+    "LatestFaster": "回落 {0}",
+    "SheetDisplayName": "显示名称",
+    "SheetPinnedAt": "已固定至捕获时间 {0}（后台刷新不会覆盖此视图）",
+    "SheetNewCapture": "已有更新的快照",
+    "SheetInvocationCompare": "捕获时实例时长为 {1} 个已完成样本的均值 {2} 的 {0}。",
+    "SheetCopyInvocation": "复制调用实例 ID",
+    "LedgerSamples": "样本与累计耗时",
+    "LedgerDuration": "均值 ↔ 最近",
+    "LedgerSearchPlaceholder": "搜索显示名称、完整操作标识或执行入口…",
+    "RunningSearchPlaceholder": "搜索显示名称、操作标识、调用实例 ID 或描述…",
+    "RunningCaptureNote": "列表与时长取自本次捕获。暂停时冻结展示的时长，主机继续记录。",
+    "CopyTimestamp": "复制 UTC 时间 {0}",
+    "FindingSeparator": "。"
   }
 }

@@ -5,22 +5,42 @@
 @using Monica.Profiling.UIExecutionTiming.Components
 @inject ExecutionTimingPageStateFactory PageStateFactory
 @using Monica.UI.Shared.Components.Visual
+@using Microsoft.JSInterop
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<ExecutionTimingResource> L
 @inject ILogger<UIExecutionTimingPage> Logger
 @implements IAsyncDisposable
 
 <PageTitle>@L["Pages:ExecutionTiming:Title"]</PageTitle>
-<div class="execution-timing-page mo-page-shell mo-page-shell--full-width">
-    <MoPageMasthead Icon="@MoIcons.Timer" Title="@L["Design:Title"]" Crumb="@L["Page:Eyebrow"]">
-        <Meta><span class="mo-vl-status mo-vl-role--info"><i class="mo-vl-status-dot"></i>@PollingLabel</span><code>@Environment.MachineName</code><span>@UiTime.TimeZone.Id</span></Meta>
-        <Actions>@if (PageState.SnapshotCapturedAt is { } at) { <div class="timing-stamp"><span>@L["Page:Captured"]</span><time datetime="@at.ToString("O")">@UiTime.FormatTime(at)</time></div> }
-            <MudSwitch T="bool" Value="PageState.AutoRefresh" ValueChanged="SetAutoRefresh" Disabled="@(!PageState.CanAutoRefresh)" Color="Color.Primary" Label="@L["Page:Actions:AutoRefresh"]" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshDataAsync" Disabled="@PageState.IsLoading">@L["Design:Refresh"]</MudButton>
+<div class="mo-workbench-container">
+<div class="execution-timing-page mo-page-shell mo-page-shell--workbench">
+    <MoPageMasthead Icon="@MoIcons.Timer" Class="et-masthead" SealAccent Title="@L["Design:Title"]">
+        <Meta>
+            <span class="mo-vl-capsule mo-vl-role--@PollingRole"><i class="mo-vl-swatch"></i>@PollingLabel</span>
+            <button type="button" class="mo-vl-id-chip timing-host" title="@Environment.MachineName" aria-label="@L["Design:CopyHost", Environment.MachineName]" @onclick="CopyHostAsync">
+                <span>@Environment.MachineName</span><MoIcon Icon="@MoIcons.Copy" Size=".8rem" />
+            </button>
+            <span>@L["Design:ScopeHost"]</span><span class="timing-zone">@UiTime.FormatZoneLabel(PageState.SnapshotCapturedAt)</span>
+        </Meta>
+        <Actions>
+            <div class="timing-actions">
+                @if (PageState.SnapshotCapturedAt is { } at)
+                {
+                    <div class="timing-stamp"><span>@L["Page:Captured"]</span><time datetime="@at.ToString("O")" title="@UiTime.Format(at)">@UiTime.FormatTime(at)</time></div>
+                }
+                <div class="timing-switch">
+                    <MudSwitch T="bool" Value="PageState.AutoRefresh" ValueChanged="SetAutoRefresh" Disabled="@(!PageState.CanAutoRefresh)" Color="Color.Info" Label="@L["Page:Actions:AutoRefresh"]" />
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshDataAsync" Disabled="@PageState.IsLoading">@L["Design:Refresh"]</MudButton>
+            </div>
         </Actions>
     </MoPageMasthead>
-    @if (!PageState.AutoRefresh && PageState.HasSnapshot) { <small>@L["Design:PauseNotice",UiTime.FormatTime(PageState.SnapshotCapturedAt)!]</small> }
+    @if (PageState.CanAutoRefresh && !PageState.AutoRefresh && PageState.LoadError is null && PageState.SnapshotCapturedAt is { } pausedAt)
+    {
+        <div class="timing-pause" role="status"><MoIcon Icon="@MoIcons.Pause" Size="1rem" />@L["Design:PauseNotice", UiTime.FormatTime(pausedAt)]</div>
+    }
     @if (PageState.LoadError is not null)
     {
         <div class="timing-error" role="status">
@@ -51,6 +71,7 @@
         <div class="timing-awaiting"><MoContentState Loading="true">@L["Page:Loading"]</MoContentState></div>
     }
 </div>
+</div>
 
 @code {
     public const string PAGE_URL = "/execution-timing";
@@ -68,8 +89,15 @@
     [SupplyParameterFromQuery(Name = "rpage")] public string? RunningPage { get; set; }
     private bool _disposed;
 
-    private string PollingLabel => !PageState.CanAutoRefresh ? L["Page:Status:Manual"]
+    private string PollingRole => PageState.LoadError is not null ? (PageState.HasSnapshot ? "warning" : "error")
+        : PageState.AutoRefresh ? "info" : "neutral";
+
+    private string PollingLabel => PageState.LoadError is not null
+        ? L[PageState.HasSnapshot ? "Design:StatusStale" : "Design:StatusFailed"]
+        : !PageState.CanAutoRefresh ? L["Page:Status:Manual"]
         : PageState.AutoRefresh ? L["Page:Status:Live", PageState.RefreshIntervalMs / 1000d] : L["Page:Status:Paused"];
+
+    private Task CopyHostAsync() => JS.InvokeVoidAsync("navigator.clipboard.writeText", Environment.MachineName).AsTask();
 
     protected override async Task OnInitializedAsync()
     {

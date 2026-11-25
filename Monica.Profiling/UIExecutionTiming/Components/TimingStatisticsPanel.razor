@@ -5,25 +5,28 @@
 @inject NavigationManager Nav
 @inject IStringLocalizer<ExecutionTimingResource> L
 
-<section class="timing-statistics timing-evidence-panel">
-    <header class="timing-panel-heading">
-        <div><span class="timing-panel-eyebrow">@L["Statistics:Eyebrow"]</span><h2>@L["Statistics:Title"]</h2></div>
+<section class="timing-statistics mo-vl-surface">
+    <header class="mo-vl-surface-heading timing-panel-heading">
+        <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.List" Size="1rem" /></span>
+        <div><h2>@L["Statistics:Title"]</h2><p>@L["Design:LedgerDescription"]</p></div>
         <span class="timing-result-count">@L["Common:VisibleCount", Matches.Count, Statistics.Count]</span>
     </header>
     @if (Statistics.Count != 0)
     {
         <div class="timing-ledger-controls">
             <div><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true" DebounceInterval="180"
-                              Label="@L["Statistics:Search"]" Placeholder="@L["Statistics:SearchPlaceholder"]" Variant="Variant.Outlined"
+                              aria-label="@L["Statistics:Search"]" Placeholder="@L["Design:LedgerSearchPlaceholder"]" Variant="Variant.Outlined"
                               Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" /></div>
-            <div><MudSelect T="string" Value="@(Sort ?? "mean")" ValueChanged="OrderChanged" Label="@L["Common:Order"]"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem Value="@("mean")">@L["Design:SortOptions:Mean"]</MudSelectItem>
-                <MudSelectItem Value="@("latest")">@L["Design:SortOptions:Latest"]</MudSelectItem>
-                <MudSelectItem Value="@("total")">@L["Design:SortOptions:Total"]</MudSelectItem>
-                <MudSelectItem Value="@("samples")">@L["Design:SortOptions:Samples"]</MudSelectItem>
-                <MudSelectItem Value="@("identity")">@L["Design:SortOptions:Identity"]</MudSelectItem>
-            </MudSelect></div>
+            <label class="timing-order">
+                <span>@L["Common:Order"]</span>
+                <select aria-label="@L["Common:Order"]" value="@(Sort ?? "mean")" @onchange="@((ChangeEventArgs args) => OrderChanged(args.Value?.ToString()))">
+                    <option value="mean">@L["Design:SortOptions:Mean"]</option>
+                    <option value="latest">@L["Design:SortOptions:Latest"]</option>
+                    <option value="total">@L["Design:SortOptions:Total"]</option>
+                    <option value="samples">@L["Design:SortOptions:Samples"]</option>
+                    <option value="identity">@L["Design:SortOptions:Identity"]</option>
+                </select>
+            </label>
             @if (!string.IsNullOrEmpty(Search) || Point is not null || Signal is not null)
             {
                 <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Close" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton>
@@ -31,52 +34,76 @@
         </div>
     }
     <div class="timing-facets">
-        <div><MoFilterChip Label="@L["Design:Points:All"]" Count="@_pointPool.Length" Selected="@(Point is null)" SelectedChanged="@(() => Change("point",null))" Pill="true" />
+        <div><MoFilterChip Label="@L["Design:Points:All"]" Count="@_pointPool.Length" Selected="@(Point is null)" SelectedChanged="@(() => Change("point",null))" Pill="true" Class="mo-vl-chip--instrument" />
             @foreach (var group in _groups)
-            { <MoFilterChip Label="@GroupLabel(group)" Count="@_pointPool.Count(s => _points[s.OperationKey] == group)" Selected="@(Point == group)" SelectedChanged="@(() => Change("point",group))" ShowDot="true" Pill="true" Role="MoVisualRole.Info" /> }
+            { <MoFilterChip Label="@GroupLabel(group)" Count="@_pointPool.Count(s => _points[s.OperationKey] == group)" Selected="@(Point == group)" SelectedChanged="@(() => Change("point",group))" ShowDot="true" Pill="true" Class="mo-vl-chip--instrument" Role="@PointRole(group)" /> }
         </div>
-        <div><MoFilterChip Label="@L["Design:Signals:All"]" Count="@_signalPool.Length" Selected="@(Signal is null)" SelectedChanged="@(() => Change("signal",null))" Pill="true" />
+        <div><MoFilterChip Label="@L["Design:Signals:All"]" Count="@_signalPool.Length" Selected="@(Signal is null)" SelectedChanged="@(() => Change("signal",null))" Pill="true" Class="mo-vl-chip--instrument" />
             @foreach (var (signal,label,role) in Signals)
-            { <MoFilterChip Label="@L[label]" Count="@_signalPool.Count(s => MatchesSignal(s,signal))" Selected="@(Signal == signal)" SelectedChanged="@(() => Change("signal",signal))" ShowDot="true" Pill="true" Role="@role" /> }
+            { <MoFilterChip Label="@L[label]" Count="@_signalPool.Count(s => MatchesSignal(s,signal))" Selected="@(Signal == signal)" SelectedChanged="@(() => Change("signal",signal))" ShowDot="true" Pill="true" Class="@(signal == "spike" ? "mo-vl-chip--instrument mo-vl-chip--diamond" : "mo-vl-chip--instrument")" Role="@role" /> }
         </div>
     </div>
     @if (Matches.Count != 0)
     {
         <div class="timing-ledger-paint">
             <MudSimpleTable Dense="true" Hover="true" Elevation="0">
-                <thead><tr><th class="timing-identity-column">@L["Columns:Name"]</th><th class="timing-measure-column">@L["Statistics:DurationPair"]</th>
-                    <th class="timing-frequency-column">@L["Statistics:FrequencyPair"]</th><th class="timing-allocation-column">@L["Statistics:AllocationPair"]</th>
-                    <th>@L["Columns:LastRecordedAt"]</th><th class="timing-action-column"><span class="timing-accessible-label">@L["Common:Details"]</span></th></tr></thead>
+                <thead><tr><th class="timing-identity-column">@L["Columns:Name"]</th><th class="timing-measure-column">@L["Design:LedgerDuration"]</th>
+                    <th class="timing-frequency-column">@L["Design:LedgerSamples"]</th><th class="timing-allocation-column">@L["Statistics:AllocationPair"]</th>
+                    <th class="timing-last">@L["Columns:LastRecordedAt"]</th><th class="timing-action-column"><span class="timing-accessible-label">@L["Common:Details"]</span></th></tr></thead>
                 <tbody>
                     @foreach (var item in PageItems)
                     {
-                        <tr @key="item.OperationKey" data-operation-key="@item.OperationKey">
+                        var name = TimingAssessment.NameParts(item.DisplayName);
+                        var drift = TimingAssessment.Drift(item);
+                        var driftRole = TimingAssessment.DriftRole(drift);
+                        var ownRuns = _runsByKey[item.OperationKey];
+                        var point = TimingAssessment.Point(item.OperationKey);
+                        <tr @key="item.OperationKey" data-operation-key="@item.OperationKey" class="@(drift == "spike" ? "timing-spike" : null)">
                             <td class="timing-identity-column">
-                                @if (!string.Equals(item.DisplayName, item.OperationKey, StringComparison.Ordinal))
-                                {
-                                    <button class="timing-operation-name mo-vl-link" @onclick="@(() => OnInspect.InvokeAsync(new TimingCompletedEvidence(item,CapturedAt)))">@item.DisplayName</button>
-                                }
+                                <button type="button" class="timing-operation-name" title="@item.DisplayName" @onclick="@(() => OnInspect.InvokeAsync(new TimingCompletedEvidence(item, CapturedAt)))">
+                                    @if (name.Prefix.Length > 0) { <span>@name.Prefix</span> }
+                                    <strong>@name.Leaf</strong>
+                                </button>
+                                <div class="timing-row-tags">
+                                    <span class="timing-tag mo-vl-role--@TimingAssessment.PointRole(item.OperationKey)"><code>@point</code></span>
+                                    @if (ownRuns.Any()) { <span class="timing-tag mo-vl-role--@(ownRuns.Any(run => TimingAssessment.Lingering(TimingAssessment.Age(run, CapturedAt), item)) ? "warning" : "info")">@L["Design:PillInFlight", ownRuns.Count()]</span> }
+                                    @if (_collisions.Contains(item.DisplayName)) { <span class="timing-tag mo-vl-role--warning">@L["Design:CollisionBadge"]</span> }
+                                </div>
                                 <code class="timing-operation-key" title="@item.OperationKey">@item.OperationKey</code>
-                                @if (_collisions.Contains(item.DisplayName)) { <small>@L["Design:CollisionBadge"]</small> }
-                                <small>@GroupLabel(_points[item.OperationKey])</small>
                             </td>
                             <td class="timing-measure-column">
-                                <span class="timing-stacked-label">@L["Statistics:DurationPair"]</span>
-                                <div class="timing-number-pair"><div><span>@L["Columns:AverageDuration"]</span><strong>@ExecutionTimingDisplayFormatter.FormatDuration(item.AverageDurationMs)</strong></div>
-                                    <div><span>@L["Columns:LastDuration"]</span><strong>@ExecutionTimingDisplayFormatter.FormatDuration(item.LastDurationMs)</strong></div></div>
-                                <div class="timing-relative-track" aria-hidden="true"><span style="width:@TimingAssessment.Percent(item.AverageDurationMs,_peak)"></span></div>
-                                <div class="timing-relative-track trend-latest" aria-hidden="true"><span style="width:@TimingAssessment.Percent(item.LastDurationMs,_peak)"></span></div>
+                                <span class="timing-stacked-label">@L["Design:LedgerDuration"]</span>
+                                <div class="timing-duration-values">
+                                    <span>@L["Columns:AverageDuration"] <strong>@TimingAssessment.Milliseconds(item.AverageDurationMs)</strong></span>
+                                    <span>@L["Columns:LastDuration"] <strong class="timing-latest mo-vl-role--@driftRole">@TimingAssessment.Milliseconds(item.LastDurationMs)</strong></span>
+                                </div>
+                                @if (TimingAssessment.DriftChange(item, drift) is { } change)
+                                { <span class="timing-tag mo-vl-role--@driftRole">@L[drift == "spike" ? "Design:LatestSpike" : "Design:LatestFaster", change]</span> }
+                                <div class="timing-relative-track" aria-hidden="true">
+                                    <i style="width:@TimingAssessment.Percent(item.AverageDurationMs, _peak)"></i>
+                                    <i class="timing-latest-pin mo-vl-role--@driftRole" style="left:@TimingAssessment.Percent(item.LastDurationMs, _peak)"></i>
+                                </div>
                             </td>
-                            <td class="timing-frequency-column"><span class="timing-stacked-label">@L["Statistics:FrequencyPair"]</span><div class="timing-number-pair">
-                                <div><span>@L["Columns:Executions"]</span><strong>@item.ExecutionCount.ToString("N0")</strong></div>
-                                <div><span>@L["Columns:Rate"]</span><strong>@ExecutionTimingDisplayFormatter.FormatRatePerMinute(item, CapturedAt)</strong></div>
-                            </div></td>
-                            <td class="timing-allocation-column"><span class="timing-stacked-label">@L["Statistics:AllocationPair"]</span><div class="timing-number-pair">
-                                <div><span>@L["Columns:AverageMemory"]</span><strong>@ExecutionTimingDisplayFormatter.FormatMemory(item.AverageMemoryBytes)</strong></div>
-                                <div><span>@L["Columns:LastMemory"]</span><strong>@ExecutionTimingDisplayFormatter.FormatMemory(item.LastMemoryBytes)</strong></div>
-                            </div></td>
-                            <td class="timing-last">@UiTime.FormatTime(item.LastRecordedAt)</td><td class="timing-action-column"><MudIconButton Icon="@MoIcons.ArrowRight" Size="Size.Small"
-                                Color="Color.Primary" aria-label="@L["Common:Inspect", item.OperationKey]"
+                            <td class="timing-frequency-column">
+                                <span class="timing-stacked-label">@L["Design:LedgerSamples"]</span>
+                                <div class="timing-number-stack"><strong>@item.ExecutionCount.ToString("N0")</strong>
+                                    <small>@L["Design:BenchReadoutRate", ExecutionTimingDisplayFormatter.FormatRatePerMinute(item, CapturedAt)] · @L["Design:LedgerTotal", TimingAssessment.Cumulative(TimingAssessment.Total(item))]</small>
+                                </div>
+                            </td>
+                            <td class="timing-allocation-column">
+                                <span class="timing-stacked-label">@L["Statistics:AllocationPair"]</span>
+                                <div class="timing-number-stack">
+                                    <strong class="@(item.AverageMemoryBytes > 0 ? "timing-allocation" : null)">@ExecutionTimingDisplayFormatter.FormatMemory(item.AverageMemoryBytes)</strong>
+                                    @if (item.LastMemoryBytes is { } bytes) { <small>@L["Columns:LastMemory"] @ExecutionTimingDisplayFormatter.FormatMemory(bytes)</small> }
+                                </div>
+                            </td>
+                            <td class="timing-last">
+                                <span class="timing-stacked-label">@L["Columns:LastRecordedAt"]</span>
+                                @if (item.LastRecordedAt is { } last) { <time datetime="@last.ToString("O")">@UiTime.Format(last)</time> }
+                                else { <span>—</span> }
+                            </td>
+                            <td class="timing-action-column"><MudIconButton Icon="@MoIcons.ChevronRight" Size="Size.Small"
+                                aria-label="@L["Common:Inspect", item.DisplayName]"
                                 OnClick="@(() => OnInspect.InvokeAsync(new TimingCompletedEvidence(item, CapturedAt)))" /></td>
                         </tr>
                     }
@@ -115,9 +142,11 @@
     [Parameter] public string? Sort { get; set; }
     [Parameter] public string? PageNumber { get; set; }
     private const int PageSize = 12;
+    private static readonly string[] KnownGroups = ["mediator", "jobs", "eventbus", "mvc", "hosted", "direct"];
     private int _page;
     private double _peak;
-    private HashSet<string> _collisions = [], _running = [];
+    private HashSet<string> _collisions = [];
+    private ILookup<string, RunningExecutionTimingInfo> _runsByKey = Enumerable.Empty<RunningExecutionTimingInfo>().ToLookup(run => run.OperationKey);
     private Dictionary<string,string> _points = [];
     private string[] _groups = [];
     private ExecutionTimingStatistics[] _pointPool = [], _signalPool = [];
@@ -125,10 +154,17 @@
     private static readonly (string Id,string Label,MoVisualRole Role)[] Signals = [
         ("spike","Design:Signals:Spike",MoVisualRole.Warning),("inflight","Design:Signals:Inflight",MoVisualRole.Info),("alloc","Design:Signals:Alloc",MoVisualRole.Secondary)];
     private bool MatchesSignal(ExecutionTimingStatistics s,string? signal) => signal switch {
-        "spike" => TimingAssessment.Drift(s) == "spike", "inflight" => _running.Contains(s.OperationKey), "alloc" => s.AverageMemoryBytes.HasValue, _ => true };
+        "spike" => TimingAssessment.Drift(s) == "spike", "inflight" => _runsByKey.Contains(s.OperationKey), "alloc" => s.AverageMemoryBytes.HasValue, _ => true };
     private string GroupLabel(string group) => group switch {
         "mediator" => L["Design:Points:Mediator"], "jobs" => L["Design:Points:Jobs"], "eventbus" => L["Design:Points:Eventbus"], "mvc" => L["Design:Points:Mvc"],
         "hosted" => L["Design:Points:Hosted"], "direct" => L["Design:Points:Direct"], _ => group };
+    private static MoVisualRole PointRole(string group) => group switch
+    {
+        "mediator" or "mvc" => MoVisualRole.Primary,
+        "jobs" or "hosted" => MoVisualRole.Secondary,
+        "eventbus" => MoVisualRole.Info,
+        _ => MoVisualRole.Neutral
+    };
     private int PageCount => Math.Max(1,(Matches.Count+PageSize-1)/PageSize);
     private IEnumerable<ExecutionTimingStatistics> PageItems => Matches.Skip((_page-1)*PageSize).Take(PageSize);
     private int FirstVisible => Matches.Count == 0 ? 0 : (_page-1)*PageSize+1;
@@ -136,9 +172,10 @@
     protected override void OnParametersSet()
     {
         _points = Statistics.ToDictionary(s => s.OperationKey,s => TimingAssessment.Group(s.OperationKey));
-        _groups = _points.Values.Distinct().Order(StringComparer.Ordinal).ToArray();
+        var groups = _points.Values.ToHashSet(StringComparer.Ordinal);
+        _groups = KnownGroups.Where(groups.Contains).Concat(groups.Except(KnownGroups).Order(StringComparer.Ordinal)).ToArray();
         _collisions = Statistics.GroupBy(s => s.DisplayName).Where(g => g.Count()>1).Select(g => g.Key).ToHashSet();
-        _running = Running.Select(r => r.OperationKey).ToHashSet();
+        _runsByKey = Running.ToLookup(run => run.OperationKey);
         _peak = Statistics.Select(s => Math.Max(s.AverageDurationMs,s.LastDurationMs)).DefaultIfEmpty().Max();
         var terms = (Search ?? "").Split((char[]?)null,StringSplitOptions.RemoveEmptyEntries);
         var pool = Statistics.Where(s => terms.All(t => s.DisplayName.Contains(t,StringComparison.OrdinalIgnoreCase) || s.OperationKey.Contains(t,StringComparison.OrdinalIgnoreCase) || _points[s.OperationKey].Contains(t,StringComparison.OrdinalIgnoreCase))).ToArray();
@@ -153,7 +190,7 @@
         _page = Math.Clamp(int.TryParse(PageNumber,out var page) ? page : 1,1,PageCount);
     }
     private void Change(string key,string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { [key]=value, ["page"]=null }),replace:true);
-    private void OrderChanged(string value) => Change("sort",value);
+    private void OrderChanged(string? value) => Change("sort",value);
     private void SearchChanged(string? value) => Change("q",string.IsNullOrWhiteSpace(value) ? null : value);
     private void ChangePage(int value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("page",value),replace:true);
     private Task ClearSearchAsync()

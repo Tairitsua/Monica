@@ -4,15 +4,16 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
 @inject IStringLocalizer<ExecutionTimingResource> L
 
-<section class="timing-running timing-evidence-panel">
-    <header class="timing-panel-heading">
-        <div><span class="timing-panel-eyebrow">@L["Running:Eyebrow"]</span><h2>@L["Running:Title"]</h2></div>
+<section id="et-running-register" class="timing-running mo-vl-surface">
+    <header class="mo-vl-surface-heading timing-panel-heading">
+        <span class="mo-vl-tile mo-vl-role--warning"><MoIcon Icon="@MoIcons.Pulse" Size="1rem" /></span>
+        <div><h2>@L["Running:Title"]</h2><p>@L["Design:RunningDescription"]</p></div>
         <span class="timing-result-count">@L["Common:VisibleCount", Matches.Count, Operations.Count]</span>
     </header>
     @if (Operations.Count != 0)
     {
         <div class="timing-running-search"><MudTextField T="string" Value="@Search" ValueChanged="SearchChanged" Immediate="true"
-            DebounceInterval="180" Label="@L["Running:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+            DebounceInterval="180" aria-label="@L["Running:Search"]" Placeholder="@L["Design:RunningSearchPlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense"
             Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
             @if (!string.IsNullOrWhiteSpace(Search)) { <MudButton Variant="Variant.Text" OnClick="ClearSearchAsync">@L["Common:Clear"]</MudButton> }
         </div>
@@ -22,20 +23,32 @@
         <div class="timing-active-list">
             @foreach (var operation in Matches.Skip((_page - 1) * PageSize).Take(PageSize))
             {
-                <article class="timing-active-operation" @key="operation.InvocationId" data-invocation-id="@operation.InvocationId">
+                var age = TimingAssessment.Age(operation, CapturedAt);
+                var baseline = _baselines.GetValueOrDefault(operation.OperationKey);
+                var lingering = TimingAssessment.Lingering(age, baseline);
+                var role = lingering ? "warning" : "info";
+                var name = TimingAssessment.NameParts(operation.DisplayName);
+                <article class="timing-active-operation @(lingering ? "is-lingering" : null)" @key="operation.InvocationId" data-invocation-id="@operation.InvocationId">
                     <div class="timing-active-identity">
-                        @if (!string.Equals(operation.DisplayName, operation.OperationKey, StringComparison.Ordinal))
-                        {
-                            <strong>@operation.DisplayName</strong>
-                        }
-                        <code title="@operation.OperationKey">@operation.OperationKey</code>
-                        <span class="timing-invocation-id">@L["Details:InvocationId"] <code>@operation.InvocationId</code></span>
-                        <p>@(operation.Description ?? L["Common:Unavailable"])</p>
+                        <div class="timing-active-title">
+                            <span class="mo-vl-capsule mo-vl-role--@role"><i class="mo-vl-swatch"></i>@(lingering ? L["Design:FlightRatio", TimingAssessment.Ratio(age, baseline!.AverageDurationMs)] : L["Design:FlightActive"])</span>
+                            <button type="button" class="timing-active-name" title="@operation.DisplayName" @onclick="@(() => OnInspect.InvokeAsync(new TimingRunningEvidence(operation, CapturedAt)))"><span>@name.Prefix</span><strong>@name.Leaf</strong></button>
+                            <code class="timing-invocation-id" title="@operation.InvocationId">@TimingAssessment.ShortInvocation(operation.InvocationId, Operations)</code>
+                        </div>
+                        <code class="timing-active-key" title="@operation.OperationKey">@operation.OperationKey</code>
+                        <div class="timing-active-meta">
+                            @if (!string.IsNullOrWhiteSpace(operation.Description))
+                            {
+                                <span>@L["Columns:Description"] <span>@operation.Description</span></span>
+                            }
+                            <span>@L["Columns:StartedAt"] <time datetime="@operation.StartedAt.ToString("O")">@Time.Format(operation.StartedAt)</time></span>
+                        </div>
                     </div>
-                    <div class="timing-active-age"><span>@L["Columns:RunningFor"]</span>
-                        <strong>@ExecutionTimingDisplayFormatter.FormatRunningDuration(operation, CapturedAt)</strong>
-                        <small>@Time.FormatTime(operation.StartedAt) · @(Statistics.FirstOrDefault(s => s.OperationKey == operation.OperationKey) is { } baseline ? L["Design:BenchRefLine",TimingAssessment.Duration(baseline.AverageDurationMs)] : L["Design:FlightNoBaseline"])</small></div>
-                    <MudIconButton Icon="@MoIcons.ArrowRight" Color="Color.Primary" Size="Size.Small"
+                    <div class="timing-active-age mo-vl-role--@role">
+                        <strong>@TimingAssessment.RunningAge(age)</strong>
+                        <small>@(baseline is null ? L["Design:FlightNoBaseline"] : L["Design:FlightBaseline", TimingAssessment.Milliseconds(baseline.AverageDurationMs)])</small>
+                    </div>
+                    <MudIconButton Icon="@MoIcons.ChevronRight" Size="Size.Small"
                                    aria-label="@L["Common:Inspect", operation.InvocationId]"
                                    OnClick="@(() => OnInspect.InvokeAsync(new TimingRunningEvidence(operation, CapturedAt)))" />
                 </article>
@@ -47,7 +60,9 @@
         <div class="timing-running-empty" role="status"><MoContentState Compact="true"><MoIcon Icon="@MoIcons.Hourglass" Size="1.25rem" />
             <span>@(Operations.Count == 0 ? L["Running:Empty"] : L["Common:NoMatches"])</span></MoContentState></div>
     }
-    <footer class="timing-running-footer"><span>@L["Design:RunningDualReadNote"]</span>
+    <footer class="timing-running-footer">
+        <div><p>@L["Design:RunningCaptureNote"]</p><p>@L["Design:RunningDualReadNote"]</p></div>
+        <span class="timing-running-range">@L["Common:PageRange", Matches.Count == 0 ? 0 : (_page - 1) * PageSize + 1, Math.Min(_page * PageSize, Matches.Count), Matches.Count]</span>
         @if (PageCount > 1)
         {
             <MudPagination Count="@PageCount" Selected="_page" SelectedChanged="ChangePage" ShowFirstButton="true" ShowLastButton="true"
@@ -68,6 +83,7 @@
     [Parameter] public string? PageNumber { get; set; }
     [Parameter] public string? Search { get; set; }
     private int _page = 1;
+    private Dictionary<string, ExecutionTimingStatistics> _baselines = [];
     private IReadOnlyList<RunningExecutionTimingInfo> Matches
     {
         get
@@ -80,7 +96,11 @@
         }
     }
     private int PageCount => Math.Max(1, (Matches.Count + PageSize - 1) / PageSize);
-    protected override void OnParametersSet() => _page = Math.Clamp(int.TryParse(PageNumber,out var p) ? p : 1,1,PageCount);
+    protected override void OnParametersSet()
+    {
+        _baselines = Statistics.ToDictionary(item => item.OperationKey);
+        _page = Math.Clamp(int.TryParse(PageNumber, out var page) ? page : 1, 1, PageCount);
+    }
     private void SearchChanged(string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["rq"] = string.IsNullOrEmpty(value) ? null : value, ["rpage"]=null }), replace:true);
     private Task ClearSearchAsync() { SearchChanged(null); return Task.CompletedTask; }
     private void ChangePage(int value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter("rpage",value),replace:true);

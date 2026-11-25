@@ -5,7 +5,6 @@
     }
   },
   "Page": {
-    "Eyebrow": "RUNTIME / TIMING EVIDENCE",
     "Subtitle": "Find costly operation identities and inspect captured work in this host.",
     "Status": {
       "Live": "Auto refresh · {0}s",
@@ -24,23 +23,18 @@
     }
   },
   "Summary": {
-    "AverageBasis": "Each operation key has equal weight."
+    "AverageBasis": "Equal weight per operation key"
   },
   "Statistics": {
-    "Eyebrow": "COMPLETED / RANKED EVIDENCE",
     "Title": "Operation ledger",
     "Empty": "No completed samples yet.",
     "EmptyHelp": "Business operations measured by the Monica pipeline appear here after completion.",
     "Search": "Find an operation",
-    "SearchPlaceholder": "Name or full operation key",
-    "DurationPair": "Duration",
-    "FrequencyPair": "Completions",
     "AllocationPair": "Allocation",
     "RateHelp": "Rate is cumulative completions per minute since the first completion, with a one-minute minimum denominator.",
     "Pagination": "Completed operation pages"
   },
   "Running": {
-    "Eyebrow": "IN FLIGHT / CAPTURED INVOCATIONS",
     "Title": "Work in progress",
     "Empty": "No invocations were in flight at capture.",
     "Search": "Find a captured invocation",
@@ -50,12 +44,9 @@
     "Name": "Operation identity",
     "Description": "Description",
     "StartedAt": "Started at",
-    "RunningFor": "Captured age",
-    "Executions": "Samples",
     "AverageDuration": "Mean",
     "LastDuration": "Latest",
     "Rate": "Cumulative / min",
-    "AverageMemory": "Mean",
     "LastMemory": "Latest",
     "LastRecordedAt": "Last completed at"
   },
@@ -72,7 +63,6 @@
     "RecordedBytes": "Recorded: {0} bytes"
   },
   "Common": {
-    "Unavailable": "—",
     "VisibleCount": "{0} / {1} records",
     "Order": "Order by",
     "Clear": "Clear search",
@@ -86,16 +76,11 @@
     "Category": "Execution timing"
   },
   "Bench": {
-    "LongestLingering": "Furthest beyond baseline",
-    "LongestFlight": "Longest in flight",
-    "Heaviest": "Most cumulative work",
-    "Slowest": "Highest mean",
     "Allocation": "{0} / {1} with allocation"
   },
   "Design": {
     "BenchColLatest": "Latest",
     "BenchColMean": "Mean",
-    "BenchInspect": "Inspect",
     "BenchLegendFaster": "Faster latest (≤ 0.5× & -50 ms)",
     "BenchLegendMean": "Cumulative mean",
     "BenchLegendSpike": "Latest spike (≥ 2× & +50 ms)",
@@ -129,7 +114,7 @@
     "KExecutionPoint": "Execution point",
     "KSamples": "Samples",
     "LedgerFootScale": "Duration bars compare against the whole-snapshot peak of {0}.",
-    "PauseNotice": "Polling paused at {0}; host collector continues recording in the background.",
+    "PauseNotice": "Polling paused at {0}. The host collector continues recording in the background.",
     "PillInFlight": "{0} in flight",
     "PillLingering": "{0} lingering",
     "PillSpikes": "{0} latest spikes",
@@ -149,11 +134,9 @@
     "SheetClose": "Close evidence sheet",
     "SheetCompletedEyebrow": "Completed operation evidence",
     "SheetLoadLatest": "Load latest",
-    "SheetMeanDuration": "Mean duration",
     "SheetNotFoundBody": "A running invocation may have already completed and merged into statistics, or the host restarted. Clear selection to return.",
     "SheetNotFoundTitle": "Record is not present in this capture",
     "SheetOpenBaseline": "Inspect completed statistics for this key",
-    "SheetPinnedNote": "Pinned to capture {0} (background page refresh will not overwrite this view)",
     "SheetRunningEyebrow": "Captured invocation evidence",
     "SheetSecAllocation": "Optional allocation",
     "SheetSecIdentity": "Identity & origin",
@@ -172,6 +155,43 @@
       "Samples": "Most samples",
       "Total": "Cumulative time"
     },
-    "Title": "Execution Timing"
+    "Title": "Execution Timing",
+    "CopyHost": "Copy host {0}",
+    "ScopeHost": "This host",
+    "StatusStale": "Refresh failed · retained",
+    "StatusFailed": "Capture failed",
+    "PillFaster": "{0} faster latest",
+    "PillSteady": "Recent samples within 2× of their means",
+    "FNoFlight": "No in-flight invocations",
+    "FBeyondBaseline": "{0} past 2× baseline",
+    "FWithinBaseline": "Within the observed baseline",
+    "FindingLingering": "{0} in-flight invocations are lingering past 2× baseline — {1} has run for {2} ({3} its {4} mean)",
+    "FindingSpike": "{0} completed keys spiked on their latest run, led by {1} at {2} ({3} its {4} mean)",
+    "FindingPeak": "{0} holds the highest baseline mean at {1} ({2}).",
+    "FindingRunningOnly": "Captured {0} running invocations with no completed baseline. {1} has run the longest, at {2}.",
+    "FlightLegendNormal": "In flight (normal)",
+    "FlightLegendLingering": "Lingering (≥ 2× mean & ≥ 1 s)",
+    "FlightMore": "Top {0} of {1} · see all",
+    "FlightActive": "In flight",
+    "FlightBaseline": "Mean {0}",
+    "FlightRatio": "{0} baseline",
+    "BenchHint": "↑↓ select a lane · Enter opens pinned evidence",
+    "LedgerDescription": "Cumulative per-key evidence in this host. Comparison bars always scale against the whole-snapshot peak.",
+    "RunningDescription": "Invocations in the latest successful capture. Concurrent calls for one key stay distinct by invocation ID.",
+    "LedgerTotal": "Total {0}",
+    "LatestSpike": "Spike {0}",
+    "LatestFaster": "Faster {0}",
+    "SheetDisplayName": "Display name",
+    "SheetPinnedAt": "Pinned to capture {0} (background page refresh will not overwrite this view)",
+    "SheetNewCapture": "A newer capture is available",
+    "SheetInvocationCompare": "At capture, this invocation was {0} its {2} completed mean ({1} samples).",
+    "SheetCopyInvocation": "Copy invocation ID",
+    "LedgerSamples": "Samples & total",
+    "LedgerDuration": "Mean ↔ Latest",
+    "LedgerSearchPlaceholder": "Search display name, full operation key, or execution point…",
+    "RunningSearchPlaceholder": "Search display name, operation key, invocation ID, or description…",
+    "RunningCaptureNote": "Membership and elapsed age belong to this capture. Pausing freezes displayed ages while host recording continues.",
+    "CopyTimestamp": "Copy UTC timestamp {0}",
+    "FindingSeparator": ". "
   }
 }

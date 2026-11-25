@@ -4,92 +4,299 @@
 @inject NavigationManager Nav
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
 
-<section class="et-sig"><div class="et-sig-top"><div class="et-sig-primary"><p>@L[_ranked.Length != 0 ? "Design:DisplayPeakMean" : "Design:DisplayPeakFlight", _ranked.Length != 0 ? _ranked.Length : Running.Count]</p>
-    @{ var hero = TimingAssessment.Duration(_ranked.FirstOrDefault()?.AverageDurationMs ?? _ages.FirstOrDefault()?.Age ?? 0).Split(' '); }
-    <MoDisplayValue Value="@hero[0]" Unit="@hero[1]" />
-    <div class="et-sig-reasons">
-        @if (_spikes != 0) { <span class="mo-vl-id-chip">@L["Design:PillSpikes",_spikes]</span> }
-        @if (_lingering != 0) { <span class="mo-vl-id-chip">@L["Design:PillLingering",_lingering]</span> }
-        @if (_spikes == 0 && _lingering == 0) { <span>@L["Design:PillInFlight",Running.Count]</span> }
-    </div></div>
-    <div class="et-sig-finding">@if (_ages.FirstOrDefault() is { } longest) {
-        <p>@L[longest.Lingering ? "Bench:LongestLingering" : "Bench:LongestFlight"] <a href="@Url(null,longest.Item.InvocationId)">@longest.Item.DisplayName</a> · @TimingAssessment.Duration(longest.Age)</p> }
-        @if (_ranked.FirstOrDefault() is { } peak && Statistics.MaxBy(TimingAssessment.Total) is { } heavy) {
-            <p>@L["Bench:Slowest"] <a href="@Url(peak.OperationKey,null)">@peak.DisplayName</a> · @TimingAssessment.Duration(peak.AverageDurationMs).
-            @L["Bench:Heaviest"] <a href="@Url(heavy.OperationKey,null)">@heavy.DisplayName</a> · @TimingAssessment.Duration(TimingAssessment.Total(heavy)).</p> }
-    </div></div>
-    <div class="et-sig-facts">
-        <div><span>@L["Design:FInFlight"]</span><b>@Running.Count</b><small>@L["Design:PillLingering",_lingering]</small></div>
-        <div><span>@L["Design:FKeys"]</span><b>@Statistics.Count</b><small>@L["Bench:Allocation",Statistics.Count(s => s.AverageMemoryBytes.HasValue),Statistics.Count]</small></div>
-        <div><span>@L["Design:FSamples"]</span><b>@Statistics.Sum(s => (long)s.ExecutionCount)</b><small>@L["Design:FSamplesSub",TimingAssessment.Duration(Statistics.Sum(TimingAssessment.Total))]</small></div>
-        <div><span>@L["Design:FKeyMean"]</span><b>@(_ranked.Length == 0 ? "—" : TimingAssessment.Duration(_mean))</b><small>@L["Summary:AverageBasis"]</small></div>
-    </div>
-    <div class="et-bench">
-    @if (_ages.Length == 0) { <div class="et-flight-calm">@L["Design:FlightEmpty",Time.FormatTime(CapturedAt)]</div> }
-    else {
-        <div class="et-flight"><div class="et-band-head"><div class="et-band-title"><MoIcon Icon="@MoIcons.Timer" Size="1rem" /><h3>@L["Design:FlightTitle"]</h3><small>@L["Design:FlightScale",TimingAssessment.Duration(_flightMax)]</small></div><span>@L["Design:FlightLegendBaseline"]</span></div>
-        @foreach (var flight in _ages.Take(4)) {
-            <a class="et-flight-lane mo-vl-role--@(flight.Lingering ? "warning" : "info")" href="@Url(null,flight.Item.InvocationId)">
-                <span class="et-lane-id"><b class="et-lane-name">@flight.Item.DisplayName</b><small class="et-lane-sub">@(flight.Item.InvocationId.ToString("N")[..8]) · @(flight.Baseline is null ? L["Design:FlightNoBaseline"].Value : TimingAssessment.Duration(flight.Baseline.AverageDurationMs))</small></span>
-                <span class="et-track"><i class="et-flight-bar" style="width:@TimingAssessment.Percent(flight.Age,_flightMax)"></i>
-                    @if (flight.Baseline is { } baseline) { <i class="et-base-tick" style="left:@TimingAssessment.Percent(baseline.AverageDurationMs,_flightMax)"></i> }</span>
-                <strong class="et-flight-age">@TimingAssessment.Duration(flight.Age)</strong>
-            </a> }</div>
-    }
-    @if (_lanes.Length != 0) {
-        <div class="et-drift"><div class="et-band-head"><div class="et-band-title"><MoIcon Icon="@MoIcons.ChartTrend" Size="1rem" /><h3>@L["Design:BenchTitle"]</h3><small>@L["Design:BenchScope",_lanes.Length,Statistics.Count]</small></div>
-            <small>@L["Design:BenchLegendMean"] ● · @L["Design:BenchLegendSpike"] ◆ · @L["Design:BenchLegendFaster"] ◆</small></div>
-            <div class="et-ruler-row et-drift-ruler-row"><span></span><div class="et-ruler et-ruler--with-ref"><span class="et-ref-flag" style="left:@TimingAssessment.Percent(_mean,_peak)">@L["Design:BenchRefLine",TimingAssessment.Duration(_mean)]</span>
-                @foreach (var tick in new double[] {0,.25,.5,.75,1}) { <span class="et-tick" style="left:@TimingAssessment.Percent(tick,1)">@TimingAssessment.Duration(tick*_peak)</span> }</div>
-                <div class="et-ruler-cols"><span>@L["Design:BenchColMean"]</span><span>@L["Design:BenchColLatest"]</span></div></div>
-            <div class="et-drift-lanes">
-            @for (var i = 0; i < _lanes.Length; i++) {
-                var index = i; var op = _lanes[i]; var drift = TimingAssessment.Drift(op);
-                var role = drift switch { "spike" => "warning", "faster" => "success", _ => "neutral" };
-                <a class="et-drift-lane @(index == _active ? "is-active" : null) mo-vl-role--@role" href="@Url(op.OperationKey,null)" tabindex="@(index == _active ? 0 : -1)" @ref="_elements[index]" @onfocus="@(() => _active = index)" @onmouseenter="@(() => _active = index)" @onkeydown="@(args => Key(args,index))">
-                    <span class="et-lane-id"><b class="et-lane-name">@op.DisplayName</b><small class="et-lane-sub">@TimingAssessment.Point(op.OperationKey) · @L["Design:BenchReadoutSamples",op.ExecutionCount]</small></span>
-                    <span class="et-track">@foreach (var v in new double[]{0,.25,.5,.75,1}) { <i class="et-grid" style="left:@TimingAssessment.Percent(v,1)"></i> }
-                        <i class="et-ref-line" style="left:@TimingAssessment.Percent(_mean,_peak)"></i>
-                        <i class="et-mean-bar" style="width:@TimingAssessment.Percent(op.AverageDurationMs,_peak)"></i>
-                        <i class="et-drift-stem" style="left:@TimingAssessment.Percent(Math.Min(op.LastDurationMs,op.AverageDurationMs),_peak);width:@TimingAssessment.Percent(Math.Abs(op.LastDurationMs-op.AverageDurationMs),_peak)"></i>
-                        <i class="et-mean-dot" style="left:@TimingAssessment.Percent(op.AverageDurationMs,_peak)"></i><i class="et-latest-mark" style="left:@TimingAssessment.Percent(op.LastDurationMs,_peak)"></i></span>
-                    <span class="et-drift-nums"><b>@TimingAssessment.Duration(op.AverageDurationMs)</b><b>@TimingAssessment.Duration(op.LastDurationMs)</b></span>
-                </a>
-            }</div>
-            @{ var focus = _lanes[_active]; }
-            <div class="et-readout" aria-live="polite"><strong>@focus.DisplayName</strong>
-                <span>@L["Design:BenchReadoutSamples",focus.ExecutionCount] · @L["Design:BenchReadoutTotal",TimingAssessment.Duration(TimingAssessment.Total(focus))] · @L["Design:BenchReadoutRate",ExecutionTimingDisplayFormatter.FormatRatePerMinute(focus,CapturedAt)] · @L["Design:BenchReadoutAlloc",ExecutionTimingDisplayFormatter.FormatMemory(focus.AverageMemoryBytes)]</span>
-                <a href="@Url(focus.OperationKey,null)">@L["Design:BenchInspect"]</a></div>
+<section class="et-sig mo-vl-surface">
+    <div class="et-sig-top">
+        <div class="et-sig-primary">
+            <p class="et-display-label">@L[_ranked.Length == 0 ? "Design:DisplayPeakFlight" : "Design:DisplayPeakMean", _ranked.Length == 0 ? Running.Count : Statistics.Count]</p>
+            <MoDisplayValue Value="@Hero.Value" Unit="@Hero.Unit" Compact />
+            <div class="et-sig-reasons">
+                @if (_lingering > 0)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--warning"><MoIcon Icon="@MoIcons.Warning" Size=".8rem" />@L["Design:PillLingering", _lingering]</span>
+                }
+                @if (_spikes > 0)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--warning"><MoIcon Icon="@MoIcons.ChartTrend" Size=".8rem" />@L["Design:PillSpikes", _spikes]</span>
+                }
+                @if (Running.Count > 0)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--info"><MoIcon Icon="@MoIcons.Pulse" Size=".8rem" />@L["Design:PillInFlight", Running.Count]</span>
+                }
+                @if (_recoveries > 0)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--success"><MoIcon Icon="@MoIcons.ArrowDown" Size=".8rem" />@L["Design:PillFaster", _recoveries]</span>
+                }
+                @if (_lingering == 0 && _spikes == 0 && _ranked.Length > 0)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--success"><i class="mo-vl-swatch"></i>@L["Design:PillSteady"]</span>
+                }
+            </div>
         </div>
-    }</div>
+        <div class="et-sig-finding">
+            <p class="et-lede">
+                @if (_ages.FirstOrDefault(flight => flight.Lingering) is { Baseline: { } lingeringBaseline } lingering)
+                {
+                    <MoRichFinding Template="@L["Design:FindingLingering"].Value"
+                                   Values="@([Mark(_lingering, MoVisualRole.Warning), FindingLink(lingering.Item.DisplayName, null, lingering.Item.InvocationId), Mark(TimingAssessment.RunningAge(lingering.Age), MoVisualRole.Warning), Mark(TimingAssessment.Ratio(lingering.Age, lingeringBaseline.AverageDurationMs), MoVisualRole.Warning), Text(TimingAssessment.Milliseconds(lingeringBaseline.AverageDurationMs))])" />
+                    @L["Design:FindingSeparator"]
+                }
+                @if (_ranked.Where(item => TimingAssessment.Drift(item) == "spike").MaxBy(item => item.LastDurationMs / item.AverageDurationMs) is { } spike)
+                {
+                    <MoRichFinding Template="@L["Design:FindingSpike"].Value"
+                                   Values="@([Mark(_spikes, MoVisualRole.Warning), FindingLink(spike.DisplayName, spike.OperationKey, null), Mark(TimingAssessment.Milliseconds(spike.LastDurationMs), MoVisualRole.Warning), Mark(TimingAssessment.Ratio(spike.LastDurationMs, spike.AverageDurationMs), MoVisualRole.Warning), Text(TimingAssessment.Milliseconds(spike.AverageDurationMs))])" />
+                    @L["Design:FindingSeparator"]
+                }
+                @if (_ranked.FirstOrDefault() is { } peak)
+                {
+                    <MoRichFinding Template="@L["Design:FindingPeak"].Value"
+                                   Values="@([FindingLink(peak.DisplayName, peak.OperationKey, null), Mark(TimingAssessment.Milliseconds(peak.AverageDurationMs), MoVisualRole.Primary), Text(L["Design:BenchReadoutSamples", peak.ExecutionCount.ToString("N0")])])" />
+                }
+                else if (_ages.FirstOrDefault() is { } longest)
+                {
+                    <MoRichFinding Template="@L["Design:FindingRunningOnly"].Value"
+                                   Values="@([Mark(Running.Count, MoVisualRole.Info), FindingLink(longest.Item.DisplayName, null, longest.Item.InvocationId), Mark(TimingAssessment.RunningAge(longest.Age), MoVisualRole.Info)])" />
+                }
+            </p>
+        </div>
+    </div>
+    <dl class="et-sig-facts">
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--@(_lingering > 0 ? "warning" : "info")"></i>@L["Design:FInFlight"]</dt>
+            <dd>@Running.Count.ToString("N0")</dd>
+            <p>@(Running.Count == 0 ? L["Design:FNoFlight"] : _lingering > 0 ? L["Design:FBeyondBaseline", _lingering] : _ranked.Length == 0 ? L["Design:FlightNoBaseline"] : L[_ages.Any(f => f.Baseline is not null) ? "Design:FWithinBaseline" : "Design:FlightNoBaseline"])</p>
+        </div>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:FKeys"]</dt>
+            <dd>@Statistics.Count.ToString("N0")</dd><p>@L["Bench:Allocation", Statistics.Count(s => s.AverageMemoryBytes.HasValue), Statistics.Count]</p>
+        </div>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FSamples"]</dt>
+            <dd>@Statistics.Sum(s => (long)s.ExecutionCount).ToString("N0")</dd><p>@L["Design:FSamplesSub", TimingAssessment.Cumulative(Statistics.Sum(TimingAssessment.Total))]</p>
+        </div>
+        <div class="mo-vl-fact"><dt><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--neutral"></i>@L["Design:FKeyMean"]</dt>
+            <dd>@(_ranked.Length == 0 ? "—" : _mean.ToString("N1"))@if (_ranked.Length > 0) { <small>ms</small> }</dd><p>@L["Summary:AverageBasis"]</p>
+        </div>
+    </dl>
+    <div class="et-bench">
+        @if (_ages.Length == 0)
+        {
+            <div class="et-flight-calm"><i class="mo-vl-swatch mo-vl-role--neutral"></i>@L["Design:FlightEmpty", Time.FormatTime(CapturedAt)]</div>
+        }
+        else
+        {
+            <div class="et-flight" role="region" aria-label="@L["Design:FlightTitle"]">
+                <header class="et-band-head">
+                    <div class="et-band-title"><MoIcon Icon="@MoIcons.Pulse" Size="1rem" /><h3>@L["Design:FlightTitle"]</h3><span class="et-axis-tag et-mono">@L["Design:FlightScale", TimingAssessment.AxisTick(_flightAxis.Ceiling, _flightAxis.Ceiling)]</span></div>
+                    <div class="et-band-right">
+                        <div class="et-bench-legend">
+                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--info"></i>@L["Design:FlightLegendNormal"]</span>
+                            <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--warning"></i>@L["Design:FlightLegendLingering"]</span>
+                            <span><i class="et-tick-swatch"></i>@L["Design:FlightLegendBaseline"]</span>
+                        </div>
+                        @if (_ages.Length > FlightLimit)
+                        {
+                            <a class="et-inline-link" href="#et-running-register">@L["Design:FlightMore", FlightLimit, _ages.Length]<MoIcon Icon="@MoIcons.ArrowDown" Size=".8rem" /></a>
+                        }
+                    </div>
+                </header>
+                <div class="et-ruler-row" aria-hidden="true">
+                    <span></span><div class="et-ruler">
+                        @foreach (var tick in _flightAxis.Ticks)
+                        {
+                            <span class="et-tick" style="left:@TimingAssessment.Percent(tick, _flightAxis.Ceiling)">@TimingAssessment.AxisTick(tick, _flightAxis.Ceiling)</span>
+                        }
+                    </div><span></span>
+                </div>
+                <div class="et-flight-lanes">
+                    @foreach (var flight in _ages.Take(FlightLimit))
+                    {
+                        var role = flight.Lingering ? "warning" : "info";
+                        var baseline = flight.Baseline;
+                        var baselineLabel = baseline is null ? L["Design:FlightNoBaseline"] : L["Design:FlightBaseline", TimingAssessment.Milliseconds(baseline.AverageDurationMs)];
+                        <a class="et-flight-lane mo-vl-role--@role @(flight.Lingering ? "is-lingering" : null)" href="@Url(null, flight.Item.InvocationId)">
+                            <span class="et-lane-id">
+                                <span class="et-lane-name" title="@flight.Item.DisplayName"><i class="et-lane-dot"></i><b>@TimingAssessment.NameParts(flight.Item.DisplayName).Leaf</b></span>
+                                <span class="et-lane-sub et-mono">
+                                    <span>@TimingAssessment.ShortInvocation(flight.Item.InvocationId, Running)</span>
+                                    <span class="et-mini-tag mo-vl-role--@(baseline is null ? "neutral" : role)">
+                                        @(flight.Lingering ? L["Design:FlightRatio", TimingAssessment.Ratio(flight.Age, baseline!.AverageDurationMs)] : baseline is not null ? L["Design:FlightActive"] : L["Design:FlightNoBaseline"])
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="et-track" aria-hidden="true">
+                                @foreach (var tick in _flightAxis.Ticks)
+                                {
+                                    <i class="et-grid" style="left:@TimingAssessment.Percent(tick, _flightAxis.Ceiling)"></i>
+                                }
+                                <span class="et-flight-bar" style="width:max(1.5%, @TimingAssessment.Percent(flight.Age, _flightAxis.Ceiling))"><i class="et-flight-cap"></i></span>
+                                @if (baseline is not null)
+                                {
+                                    <i class="et-base-tick" style="left:@TimingAssessment.Percent(baseline.AverageDurationMs, _flightAxis.Ceiling)" title="@baselineLabel"></i>
+                                }
+                            </span>
+                            <span class="et-lane-nums et-mono"><strong class="et-flight-age">@TimingAssessment.RunningAge(flight.Age)</strong><small>@baselineLabel</small></span>
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+        @if (_lanes.Length != 0)
+        {
+            var active = _hovered ?? _focused;
+            var focus = _lanes[active];
+            var refRatio = _mean / _driftAxis.Ceiling;
+            <div class="et-drift" role="region" aria-label="@L["Design:BenchTitle"]">
+                <header class="et-band-head">
+                    <div class="et-band-title"><MoIcon Icon="@MoIcons.ChartTrend" Size="1rem" /><h3>@L["Design:BenchTitle"]</h3>
+                        <span class="et-axis-tag et-mono">@L["Design:BenchScope", _lanes.Length, Statistics.Count]</span>
+                    </div>
+                    <div class="et-band-right et-bench-legend">
+                        <span><i class="mo-vl-swatch mo-vl-swatch--instrument mo-vl-role--primary"></i>@L["Design:BenchLegendMean"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--warning"></i>@L["Design:BenchLegendSpike"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--success"></i>@L["Design:BenchLegendFaster"]</span>
+                        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--neutral"></i>@L["Design:BenchLegendSteady"]</span>
+                    </div>
+                </header>
+                <div class="et-ruler-row et-drift-ruler-row" aria-hidden="true">
+                    <span></span><div class="et-ruler et-ruler--with-ref">
+                        <span class="et-ref-flag et-mono @(refRatio < .14 ? "is-start" : refRatio > .86 ? "is-end" : null)" style="left:@TimingAssessment.Percent(_mean, _driftAxis.Ceiling)">@L["Design:BenchRefLine", TimingAssessment.Milliseconds(_mean)]</span>
+                        @foreach (var tick in _driftAxis.Ticks)
+                        {
+                            <span class="et-tick" style="left:@TimingAssessment.Percent(tick, _driftAxis.Ceiling)">@TimingAssessment.AxisTick(tick, _driftAxis.Ceiling)</span>
+                        }
+                    </div>
+                    <div class="et-ruler-cols et-mono"><span>@L["Design:BenchColMean"]</span><span>@L["Design:BenchColLatest"]</span></div>
+                </div>
+                <div class="et-drift-lanes" role="listbox" aria-label="@L["Design:BenchTitle"]" @onmouseleave="ClearHover">
+                    @for (var i = 0; i < _lanes.Length; i++)
+                    {
+                        var index = i;
+                        var item = _lanes[index];
+                        var drift = TimingAssessment.Drift(item);
+                        var role = TimingAssessment.DriftRole(drift);
+                        var matching = _runsByKey[item.OperationKey];
+                        var delta = Math.Abs(item.LastDurationMs - item.AverageDurationMs);
+                        <a @key="item.OperationKey" class="et-drift-lane @(index == active ? "is-active" : null) @(drift == "spike" ? "is-spike" : null)"
+                           href="@Url(item.OperationKey, null)" role="option" aria-selected="@(index == active ? "true" : "false")" tabindex="@(index == _focused ? 0 : -1)"
+                           @ref="_elements[index]" @onfocus="@(() => Select(index))" @onmouseenter="@(() => _hovered = index)" @onkeydown="@(args => MoveAsync(args, index))">
+                            <span class="et-lane-id">
+                                <span class="et-lane-name" title="@item.DisplayName"><i class="et-point-dot mo-vl-role--@TimingAssessment.PointRole(item.OperationKey)"></i><b>@TimingAssessment.NameParts(item.DisplayName).Leaf</b></span>
+                                <span class="et-lane-sub">
+                                    <span class="et-mono">@L["Design:BenchReadoutSamples", item.ExecutionCount.ToString("N0")]</span>
+                                    @if (_collisions.Contains(item.DisplayName)) { <span class="et-mini-tag et-mono mo-vl-role--neutral">@TimingAssessment.Point(item.OperationKey)</span> }
+                                    @if (matching.Any()) { <span class="et-mini-tag mo-vl-role--@(matching.Any(run => run.Lingering) ? "warning" : "info")">@L["Design:PillInFlight", matching.Count()]</span> }
+                                </span>
+                            </span>
+                            <span class="et-track" aria-hidden="true">
+                                @foreach (var tick in _driftAxis.Ticks)
+                                {
+                                    <i class="et-grid" style="left:@TimingAssessment.Percent(tick, _driftAxis.Ceiling)"></i>
+                                }
+                                <i class="et-ref-line" style="left:@TimingAssessment.Percent(_mean, _driftAxis.Ceiling)"></i>
+                                <i class="et-mean-bar" style="width:max(1%, @TimingAssessment.Percent(item.AverageDurationMs, _driftAxis.Ceiling))"></i>
+                                @if (delta / _driftAxis.Ceiling > .004)
+                                {
+                                    <i class="et-drift-stem mo-vl-role--@role" style="left:@TimingAssessment.Percent(Math.Min(item.LastDurationMs, item.AverageDurationMs), _driftAxis.Ceiling);width:@TimingAssessment.Percent(delta, _driftAxis.Ceiling)"></i>
+                                }
+                                <i class="et-mean-dot" style="left:@TimingAssessment.Percent(item.AverageDurationMs, _driftAxis.Ceiling)"></i>
+                                <i class="et-latest-mark mo-vl-role--@role" style="left:@TimingAssessment.Percent(item.LastDurationMs, _driftAxis.Ceiling)"></i>
+                            </span>
+                            <span class="et-drift-nums et-mono">
+                                <span class="et-num-mean">@TimingAssessment.Milliseconds(item.AverageDurationMs)</span>
+                                <span class="et-num-latest mo-vl-role--@role">
+                                    @TimingAssessment.Milliseconds(item.LastDurationMs)
+                                    @if (TimingAssessment.DriftChange(item, drift) is { } change) { <em class="et-drift-pill">@change</em> }
+                                </span>
+                            </span>
+                        </a>
+                    }
+                </div>
+                <div class="et-readout" aria-live="polite">
+                    <div class="et-readout-id"><i class="et-point-dot mo-vl-role--@TimingAssessment.PointRole(focus.OperationKey)"></i><strong title="@focus.DisplayName">@TimingAssessment.NameParts(focus.DisplayName).Leaf</strong><span class="et-readout-point et-mono">@TimingAssessment.Point(focus.OperationKey)</span></div>
+                    <div class="et-readout-stats et-mono">
+                        <span>@L["Design:BenchColMean"] <b>@TimingAssessment.Milliseconds(focus.AverageDurationMs)</b></span>
+                        <span>@L["Design:BenchColLatest"] <b class="et-readout-ink mo-vl-role--@TimingAssessment.DriftRole(TimingAssessment.Drift(focus))">@TimingAssessment.Milliseconds(focus.LastDurationMs)</b></span>
+                        <span>@L["Design:BenchReadoutSamples", focus.ExecutionCount.ToString("N0")]</span>
+                        <span>@L["Design:BenchReadoutTotal", TimingAssessment.Cumulative(TimingAssessment.Total(focus))]</span>
+                        <span>@L["Design:BenchReadoutRate", ExecutionTimingDisplayFormatter.FormatRatePerMinute(focus, CapturedAt)]</span>
+                        <span>@L["Design:BenchReadoutAlloc", ExecutionTimingDisplayFormatter.FormatMemory(focus.AverageMemoryBytes)]</span>
+                    </div>
+                    <span class="et-readout-hint">@L["Design:BenchHint"]</span>
+                </div>
+            </div>
+        }
+    </div>
 </section>
+
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ExecutionTimingStatistics> Statistics { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<RunningExecutionTimingInfo> Running { get; set; } = [];
-    [Parameter] public DateTimeOffset CapturedAt { get; set; }
-    private record Flight(RunningExecutionTimingInfo Item, double Age, ExecutionTimingStatistics? Baseline)
-    { internal bool Lingering => TimingAssessment.Lingering(Age,Baseline); }
+    [Parameter, EditorRequired] public DateTimeOffset CapturedAt { get; set; }
+
+    private const int FlightLimit = 4;
+    private sealed record Flight(RunningExecutionTimingInfo Item, double Age, ExecutionTimingStatistics? Baseline)
+    {
+        public bool Lingering => TimingAssessment.Lingering(Age, Baseline);
+    }
     private Flight[] _ages = [];
     private ExecutionTimingStatistics[] _ranked = [], _lanes = [];
-    private int _active, _spikes, _lingering;
-    private double _mean, _peak, _flightMax;
-    private readonly Dictionary<int,ElementReference> _elements = [];
+    private HashSet<string> _collisions = [];
+    private ILookup<string, Flight> _runsByKey = Enumerable.Empty<Flight>().ToLookup(flight => flight.Item.OperationKey);
+    private int _focused, _spikes, _lingering, _recoveries;
+    private int? _hovered;
+    private double _mean;
+    private TimingAssessment.Axis _flightAxis, _driftAxis;
+    private readonly Dictionary<int, ElementReference> _elements = [];
+
+    private (string Value, string Unit) Hero => _ranked.FirstOrDefault() is { } peak
+        ? TimingAssessment.DisplayDuration(peak.AverageDurationMs)
+        : ((_ages[0].Age / 1000).ToString("N2"), "s");
+
     protected override void OnParametersSet()
     {
-        var byKey = Statistics.ToDictionary(s => s.OperationKey);
-        _ranked = Statistics.OrderByDescending(s => s.AverageDurationMs).ToArray();
-        _lanes = _ranked.Where((s,i) => i < 8 || TimingAssessment.Drift(s) == "spike").ToArray();
-        _ages = Running.Select(r => new Flight(r,TimingAssessment.Age(r,CapturedAt),byKey.GetValueOrDefault(r.OperationKey))).OrderByDescending(r => r.Age).ToArray();
-        _mean = Statistics.Count == 0 ? 0 : Statistics.Average(s => s.AverageDurationMs);
-        _peak = Math.Max(10,Statistics.Select(s => Math.Max(s.AverageDurationMs,s.LastDurationMs)).DefaultIfEmpty().Max());
-        _flightMax = Math.Max(10,_ages.Take(4).Select(r => Math.Max(r.Age,r.Baseline?.AverageDurationMs ?? 0)).DefaultIfEmpty().Max());
-        _active = Math.Clamp(_active,0,Math.Max(0,_lanes.Length-1));
-        _spikes = Statistics.Count(s => TimingAssessment.Drift(s) == "spike"); _lingering = _ages.Count(r => r.Lingering);
+        var byKey = Statistics.ToDictionary(item => item.OperationKey);
+        _ranked = Statistics.OrderByDescending(item => item.AverageDurationMs).ToArray();
+        _lanes = _ranked.Where((item, index) => index < 8 || TimingAssessment.Drift(item) == "spike").ToArray();
+        _ages = Running.Select(item => new Flight(item, TimingAssessment.Age(item, CapturedAt), byKey.GetValueOrDefault(item.OperationKey)))
+            .OrderByDescending(flight => flight.Age).ToArray();
+        _runsByKey = _ages.ToLookup(flight => flight.Item.OperationKey);
+        _collisions = Statistics.GroupBy(item => item.DisplayName).Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
+        _mean = Statistics.Count == 0 ? 0 : Statistics.Average(item => item.AverageDurationMs);
+        _driftAxis = TimingAssessment.CreateAxis(Math.Max(_mean, _lanes.Select(item => Math.Max(item.AverageDurationMs, item.LastDurationMs)).DefaultIfEmpty().Max()));
+        _flightAxis = TimingAssessment.CreateAxis(_ages.Take(FlightLimit).Select(flight => Math.Max(flight.Age, flight.Baseline?.AverageDurationMs ?? 0)).DefaultIfEmpty().Max());
+        _focused = Math.Clamp(_focused, 0, Math.Max(0, _lanes.Length - 1));
+        if (_hovered >= _lanes.Length) _hovered = null;
+        _spikes = Statistics.Count(item => TimingAssessment.Drift(item) == "spike");
+        _recoveries = Statistics.Count(item => TimingAssessment.Drift(item) == "faster");
+        _lingering = _ages.Count(flight => flight.Lingering);
     }
-    private string Url(string? op, Guid? inv) => Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["op"]=op, ["inv"]=inv });
-    private async Task Key(KeyboardEventArgs args,int i)
+
+    private string Url(string? operation, Guid? invocation) => Nav.GetUriWithQueryParameters(
+        new Dictionary<string, object?> { ["op"] = operation, ["inv"] = invocation });
+
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="@role">@value</MoValueMark>;
+
+    private static RenderFragment Text(string value) => builder => builder.AddContent(0, value);
+
+    private RenderFragment FindingLink(string name, string? operation, Guid? invocation) =>
+        @<a class="et-find-link" href="@Url(operation, invocation)" title="@name">@TimingAssessment.NameParts(name).Leaf</a>;
+
+    private void ClearHover() => _hovered = null;
+
+    private void Select(int index)
     {
-        var next = args.Key switch { "ArrowUp" => Math.Max(0,i-1), "ArrowDown" => Math.Min(_lanes.Length-1,i+1), "Home" => 0, "End" => _lanes.Length-1, _ => i };
-        if (next != i) await _elements[next].FocusAsync();
+        _focused = index;
+        ClearHover();
+    }
+
+    private async Task MoveAsync(KeyboardEventArgs args, int index)
+    {
+        var next = args.Key switch
+        {
+            "ArrowUp" => Math.Max(0, index - 1),
+            "ArrowDown" => Math.Min(_lanes.Length - 1, index + 1),
+            "Home" => 0,
+            "End" => _lanes.Length - 1,
+            _ => index
+        };
+        if (args.Key == "Escape") ClearHover();
+        if (next != index) await _elements[next].FocusAsync();
     }
 }

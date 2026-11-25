@@ -8,71 +8,217 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
 @inject IStringLocalizer<ExecutionTimingResource> L
 
-<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:SheetClose"]" Width="36rem">
-    <TitleContent><header><small>@L[Invocation is null ? "Design:SheetCompletedEyebrow" : "Design:SheetRunningEyebrow"]</small><h2>@(_run?.DisplayName ?? _op?.DisplayName ?? L["Design:SheetNotFoundTitle"])</h2></header></TitleContent>
-    <ChildContent><div class="timing-sheet">
-        <div class="timing-pin"><MoIcon Icon="@MoIcons.Clock" Size="1rem" /> <span>@L["Design:SheetPinnedNote",Time.Format(_at)]</span>
-            @if (State.SnapshotCapturedAt != _at) { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="Capture">@L["Design:SheetLoadLatest"]</MudButton> }</div>
-        @if (_op is null && _run is null)
-        { <MoContentState><h3>@L["Design:SheetNotFoundTitle"]</h3><code>@(Operation ?? Invocation)</code><p>@L["Design:SheetNotFoundBody"]</p></MoContentState> }
-        else
-        {
-            var key = _run?.OperationKey ?? _op!.OperationKey;
-            var identity = ExecutionOperationKey.ReadIdentity(key);
-            <div class="timing-hero"><small>@L[_run is null ? "Design:SheetMeanDuration" : "Design:SheetCapturedAge"]</small><strong>@TimingAssessment.Duration(_run is null ? _op!.AverageDurationMs : TimingAssessment.Age(_run,_at))</strong>
-                @if (_run is not null) { <span>@(_baseline is null ? L["Design:FlightNoBaseline"].Value : L["Design:BenchRefLine",TimingAssessment.Duration(_baseline.AverageDurationMs)].Value)</span> }</div>
-            <section><h3>@L["Design:SheetSecIdentity"]</h3><dl><div><dt>@L["Details:OperationKey"]</dt><dd><code>@key</code></dd></div>
-                <div><dt>@L["Design:KExecutionPoint"]</dt><dd>@(identity?.Point ?? L["Design:Points:Direct"])</dd></div>
-                @if (identity is { } pipeline) { <div><dt>@L["Design:KComponent"]</dt><dd>@pipeline.Component</dd></div> }
-                @if (_run is not null) { <div><dt>@L["Details:InvocationId"]</dt><dd>@_run.InvocationId</dd></div><div><dt>@L["Columns:Description"]</dt><dd>@_run.Description</dd></div> }
-            </dl></section>
-            @if (_op is { } item)
+<MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Design:SheetClose"]" Width="560px" Compact>
+    <TitleContent>
+        <div class="timing-sheet-heading">
+            <span class="mo-vl-tile mo-vl-role--@(_run is null ? "primary" : RunningRole)"><MoIcon Icon="@(_run is null ? MoIcons.Timer : MoIcons.Pulse)" Size="1rem" /></span>
+            <div>
+                <p>@L[Invocation is null ? "Design:SheetCompletedEyebrow" : "Design:SheetRunningEyebrow"]</p>
+                <h2>@(DisplayName is { } name ? TimingAssessment.NameParts(name).Leaf : L["Design:SheetNotFoundTitle"].Value)</h2>
+                @if (_op is not null)
+                {
+                    <div class="timing-sheet-tags"><code class="mo-vl-capsule mo-vl-role--@TimingAssessment.PointRole(_op.OperationKey)">@TimingAssessment.Point(_op.OperationKey)</code>
+                        @if (_related.Count > 0)
+                        {
+                            <span class="mo-vl-capsule mo-vl-role--@(_related.Any(IsLingering) ? "warning" : "info")"><i class="mo-vl-swatch"></i>@L["Design:PillInFlight", _related.Count]</span>
+                        }
+                    </div>
+                }
+                @if (_run is not null)
+                {
+                    <div class="timing-sheet-tags">
+                        <span class="mo-vl-capsule mo-vl-role--@RunningRole"><i class="mo-vl-swatch"></i>@RunningLabel(_run, _baseline)</span>
+                        <code class="mo-vl-capsule mo-vl-capsule--outline">@TimingAssessment.ShortInvocation(_run.InvocationId, _capturedRuns)</code>
+                    </div>
+                }
+            </div>
+        </div>
+    </TitleContent>
+    <ChildContent>
+        <div class="timing-sheet">
+            <div class="timing-pin">
+                <MoIcon Icon="@MoIcons.Pin" Size=".9rem" />
+                <span>@L["Design:SheetPinnedAt", Time.FormatTime(_at)]</span>
+                @if (State.SnapshotCapturedAt != _at)
+                {
+                    <span class="timing-new-capture">@L["Design:SheetNewCapture"]</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" OnClick="Capture">@L["Design:SheetLoadLatest"]</MudButton>
+                }
+            </div>
+            @if (_op is null && _run is null)
             {
-                <section><h3>@L["Design:SheetSecMeasurements"]</h3><dl>
-                    <div><dt>@L["Design:KSamples"]</dt><dd>@item.ExecutionCount</dd></div><div><dt>@L["Details:MeanDuration"]</dt><dd>@L["Details:RecordedMilliseconds",item.AverageDurationMs.ToString("R")]</dd></div>
-                    <div><dt>@L["Details:LatestDuration"]</dt><dd>@L["Details:RecordedMilliseconds",item.LastDurationMs]</dd></div><div><dt>@L["Design:KDrift"]</dt><dd>@L[TimingAssessment.Drift(item) switch { "spike" => "Design:Signals:Spike", "faster" => "Design:BenchLegendFaster", _ => "Design:BenchLegendSteady" }]</dd></div>
-                    <div><dt>@L["Design:KCumulativeTime"]</dt><dd>@TimingAssessment.Duration(TimingAssessment.Total(item))</dd></div><div><dt>@L["Columns:Rate"]</dt><dd>@ExecutionTimingDisplayFormatter.FormatRatePerMinute(item,_at)</dd></div></dl></section>
-                <section><h3>@L["Design:SheetSecAllocation"]</h3><dl>@foreach (var (label,bytes) in new[]{("Details:MeanAllocation",item.AverageMemoryBytes),("Details:LatestAllocation",item.LastMemoryBytes)})
-                    { <div><dt>@L[label]</dt><dd>@ExecutionTimingDisplayFormatter.FormatMemory(bytes) @if (bytes.HasValue) { <small>@L["Details:RecordedBytes",bytes.Value]</small> }</dd></div> }</dl><p>@L["Details:AllocationHelp"]</p></section>
+                <MoContentState Compact="true"><code>@(Operation ?? Invocation)</code><p>@L["Design:SheetNotFoundBody"]</p></MoContentState>
             }
-            <section><h3>@L["Design:SheetSecTimestamps"]</h3><dl>
-                @foreach (var (label,time) in Times) { <div><dt>@L[label]</dt><dd><time datetime="@time.ToString("O")">@Time.Format(time)</time><small>@time.UtcDateTime.ToString("O")</small></dd></div> }
-            </dl></section>
-            @if (_related.Count > 0) { <section><h3>@L["Design:SheetActiveGroupTitle",_related.Count]</h3>@foreach (var r in _related) { <a class="mo-vl-id-chip" href="@Url(null,r.InvocationId)">@r.InvocationId</a> }</section> }
-        }</div></ChildContent>
-    <FooterContent>
-        @if (_op is not null || _run is not null) { <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Copy" OnClick="Copy">@L["Design:CopyKey"]</MudButton> }
-        @if (_run is not null && _baseline is not null) { <MudButton Href="@Url(_run.OperationKey,null)" Color="Color.Primary" Variant="Variant.Filled">@L["Design:SheetOpenBaseline"]</MudButton> }
-    </FooterContent>
+            else
+            {
+                var key = _run?.OperationKey ?? _op!.OperationKey;
+                var identity = ExecutionOperationKey.ReadIdentity(key);
+                @if (_op is { } item)
+                {
+                    var highest = Math.Max(1, Math.Max(item.AverageDurationMs, item.LastDurationMs));
+                    var driftRole = TimingAssessment.DriftRole(TimingAssessment.Drift(item));
+                    <div class="timing-hero timing-hero--pair">
+                        @foreach (var (label, milliseconds, role) in new[] { ("Details:MeanDuration", item.AverageDurationMs, "primary"), ("Details:LatestDuration", (double)item.LastDurationMs, driftRole) })
+                        {
+                            <div class="timing-hero-metric mo-vl-role--@role"><span>@L[label]</span>
+                                <strong>@TimingAssessment.Milliseconds(milliseconds)</strong>
+                                <small>@L["Details:RecordedMilliseconds", milliseconds.ToString("R")]</small>
+                                <div class="timing-hero-track" aria-hidden="true"><i style="width:@TimingAssessment.Percent(milliseconds, highest)"></i></div>
+                            </div>
+                        }
+                    </div>
+                    @if (_related.Count > 0)
+                    {
+                        <section><h3>@L["Design:SheetActiveGroupTitle", _related.Count]</h3>
+                            <div class="timing-related">
+                                @foreach (var run in _related)
+                                {
+                                    <a href="@Url(null, run.InvocationId)" class="mo-vl-role--@(IsLingering(run) ? "warning" : "info")">
+                                        <span class="timing-related-label"><i class="mo-vl-swatch"></i>@RunningLabel(run, item)</span>
+                                        <code>@TimingAssessment.ShortInvocation(run.InvocationId, _capturedRuns)</code>
+                                        <strong>@TimingAssessment.RunningAge(TimingAssessment.Age(run, _at))</strong><MoIcon Icon="@MoIcons.ChevronRight" Size=".9rem" />
+                                    </a>
+                                }
+                            </div>
+                        </section>
+                    }
+                }
+                @if (_run is { } invocation)
+                {
+                    var age = TimingAssessment.Age(invocation, _at);
+                    var axis = Math.Max(1, Math.Max(age, _baseline?.AverageDurationMs ?? 0));
+                    <div class="timing-hero timing-hero-metric timing-hero--running mo-vl-role--@RunningRole">
+                        <span>@L["Design:SheetCapturedAge"]</span>
+                        <strong>@TimingAssessment.RunningAge(age)</strong>
+                        <small>@L["Details:RecordedMilliseconds", age.ToString("0.###")]</small>
+                        <div class="timing-hero-track" aria-hidden="true"><i style="width:@TimingAssessment.Percent(age, axis)"></i>
+                            @if (_baseline is { } baseline) { <b style="left:@TimingAssessment.Percent(baseline.AverageDurationMs, axis)"></b> }
+                        </div>
+                        @if (_baseline is { } completed)
+                        {
+                            <p>@(TimingAssessment.HasBaseline(completed)
+                                ? L["Design:SheetInvocationCompare", TimingAssessment.Ratio(age, completed.AverageDurationMs), completed.ExecutionCount.ToString("N0"), TimingAssessment.Milliseconds(completed.AverageDurationMs)]
+                                : L["Design:FlightBaseline", TimingAssessment.Milliseconds(completed.AverageDurationMs)])</p>
+                            <MudButton Href="@Url(invocation.OperationKey, null)" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.ChartTrend">@L["Design:SheetOpenBaseline"]</MudButton>
+                        }
+                        else { <p>@L["Design:FlightNoBaseline"]</p> }
+                    </div>
+                }
+                <section>
+                    <h3>@L["Design:SheetSecIdentity"]</h3>
+                    <dl>
+                        <div><dt>@L["Design:SheetDisplayName"]</dt><dd class="timing-display-name">@DisplayName</dd></div>
+                        @if (_run is not null)
+                        {
+                            <div><dt>@L["Details:InvocationId"]</dt><dd><div class="timing-copy-line"><code>@_run.InvocationId</code>
+                                <MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:SheetCopyInvocation"]" OnClick="@(() => CopyAsync(_run.InvocationId.ToString("D")))" />
+                            </div></dd></div>
+                        }
+                        <div><dt>@L["Details:OperationKey"]</dt><dd class="timing-key-field"><code class="timing-exact-key">@key</code>
+                            <MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:CopyKey"]" OnClick="@(() => CopyAsync(key))" />
+                        </dd></div>
+                        <div><dt>@L["Design:KExecutionPoint"]</dt><dd><code class="mo-vl-capsule mo-vl-role--@TimingAssessment.PointRole(key)">@(identity?.Point ?? L["Design:Points:Direct"].Value)</code></dd></div>
+                        @if (identity is { } pipeline)
+                        {
+                            var separator = pipeline.Component.IndexOf(':');
+                            <div><dt>@L["Design:KComponent"]</dt><dd>@(separator < 0 ? pipeline.Component : pipeline.Component[(separator + 1)..])</dd></div>
+                        }
+                        @if (_run?.Description is { } description)
+                        {
+                            <div><dt>@L["Columns:Description"]</dt><dd class="timing-display-name">@description</dd></div>
+                        }
+                    </dl>
+                </section>
+                @if (_op is { } stats)
+                {
+                    var drift = TimingAssessment.Drift(stats);
+                    <section><h3>@L["Design:SheetSecMeasurements"]</h3><dl>
+                        <div><dt>@L["Design:KSamples"]</dt><dd>@stats.ExecutionCount.ToString("N0")</dd></div>
+                        <div><dt>@L["Design:KCumulativeTime"]</dt><dd>@TimingAssessment.Cumulative(TimingAssessment.Total(stats))</dd></div>
+                        <div><dt>@L["Columns:Rate"]</dt><dd>@L["Design:BenchReadoutRate", ExecutionTimingDisplayFormatter.FormatRatePerMinute(stats, _at)]</dd></div>
+                        <div><dt>@L["Design:KDrift"]</dt><dd><span class="mo-vl-capsule mo-vl-role--@TimingAssessment.DriftRole(drift)">
+                            @L[drift switch { "spike" => "Design:Signals:Spike", "faster" => "Design:BenchLegendFaster", _ => "Design:BenchLegendSteady" }]
+                            @if (TimingAssessment.HasBaseline(stats)) { <span>@TimingAssessment.Ratio(stats.LastDurationMs, stats.AverageDurationMs)</span> }
+                        </span></dd></div>
+                    </dl><p>@L["Statistics:RateHelp"]</p></section>
+                    <section><h3>@L["Design:SheetSecAllocation"]</h3><dl>
+                        @foreach (var (label, bytes) in new[] { ("Details:MeanAllocation", stats.AverageMemoryBytes), ("Details:LatestAllocation", stats.LastMemoryBytes) })
+                        {
+                            <div><dt>@L[label]</dt><dd>@ExecutionTimingDisplayFormatter.FormatMemory(bytes)
+                                @if (bytes.HasValue) { <small>@L["Details:RecordedBytes", bytes.Value]</small> }
+                            </dd></div>
+                        }
+                    </dl><p>@L["Details:AllocationHelp"]</p></section>
+                }
+                <section><h3>@L["Design:SheetSecTimestamps"]</h3><dl>
+                    @foreach (var (label, timestamp) in Times)
+                    {
+                        var utc = timestamp.UtcDateTime.ToString("O");
+                        <div><dt>@L[label]</dt><dd><time datetime="@utc">@Time.Format(timestamp)</time>
+                            <div class="timing-copy-line"><small>@utc</small><MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:CopyTimestamp", utc]" OnClick="@(() => CopyAsync(utc))" /></div>
+                        </dd></div>
+                    }
+                </dl></section>
+            }
+        </div>
+    </ChildContent>
 </MoSideSheet>
 
 @code {
     [Parameter, EditorRequired] public ExecutionTimingPageState State { get; set; } = default!;
     [Parameter] public string? Operation { get; set; }
     [Parameter] public string? Invocation { get; set; }
+
     private DateTimeOffset _at;
     private ExecutionTimingStatistics? _op, _baseline;
     private RunningExecutionTimingInfo? _run;
-    private IReadOnlyList<RunningExecutionTimingInfo> _related = [];
+    private IReadOnlyList<RunningExecutionTimingInfo> _related = [], _capturedRuns = [];
+    private string? DisplayName => _run?.DisplayName ?? _op?.DisplayName;
+    private string RunningRole => _run is not null && TimingAssessment.Lingering(TimingAssessment.Age(_run, _at), _baseline) ? "warning" : "info";
+
     protected override void OnInitialized() => Capture();
+
     private void Capture()
     {
         _at = State.SnapshotCapturedAt!.Value;
-        _op = Invocation is null ? State.Statistics.FirstOrDefault(s => s.OperationKey == Operation) : null;
-        _run = Guid.TryParse(Invocation,out var id) ? State.RunningOperations.FirstOrDefault(r => r.InvocationId == id) : null;
-        _baseline = _run is null ? null : State.Statistics.FirstOrDefault(s => s.OperationKey == _run.OperationKey);
-        _related = _op is null ? [] : State.RunningOperations.Where(r => r.OperationKey == _op.OperationKey).ToArray();
+        _capturedRuns = State.RunningOperations;
+        _op = Invocation is null ? State.Statistics.FirstOrDefault(item => item.OperationKey == Operation) : null;
+        _run = Guid.TryParse(Invocation, out var id) ? _capturedRuns.FirstOrDefault(item => item.InvocationId == id) : null;
+        _baseline = _run is null ? null : State.Statistics.FirstOrDefault(item => item.OperationKey == _run.OperationKey);
+        _related = _op is null ? [] : _capturedRuns.Where(item => item.OperationKey == _op.OperationKey).ToArray();
     }
-    private IEnumerable<(string,DateTimeOffset)> Times
+
+    private bool IsLingering(RunningExecutionTimingInfo run) => TimingAssessment.Lingering(TimingAssessment.Age(run, _at), _op);
+
+    private string RunningLabel(RunningExecutionTimingInfo run, ExecutionTimingStatistics? baseline)
+    {
+        var age = TimingAssessment.Age(run, _at);
+        return TimingAssessment.Lingering(age, baseline)
+            ? L["Design:FlightRatio", TimingAssessment.Ratio(age, baseline!.AverageDurationMs)]
+            : L["Design:FlightActive"];
+    }
+
+    private IEnumerable<(string, DateTimeOffset)> Times
     {
         get
         {
-            if (_op is not null) { yield return ("Details:FirstRecordedAt",_op.FirstRecordedAt); if (_op.LastRecordedAt is { } last) yield return ("Columns:LastRecordedAt",last); }
-            if (_run is not null) yield return ("Columns:StartedAt",_run.StartedAt);
-            yield return ("Page:Captured",_at);
+            if (_op is not null)
+            {
+                yield return ("Details:FirstRecordedAt", _op.FirstRecordedAt);
+                if (_op.LastRecordedAt is { } last) yield return ("Columns:LastRecordedAt", last);
+            }
+            if (_run is not null) yield return ("Columns:StartedAt", _run.StartedAt);
+            yield return ("Page:Captured", _at);
         }
     }
-    private Task Copy() => JS.InvokeVoidAsync("navigator.clipboard.writeText", _op?.OperationKey ?? _run?.OperationKey).AsTask();
-    private string Url(string? op,Guid? inv) => Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["op"]=op, ["inv"]=inv });
-    private void Close(bool open) { if (!open) Nav.NavigateTo(Url(null,null)); }
+
+    private Task CopyAsync(string value) => JS.InvokeVoidAsync("navigator.clipboard.writeText", value).AsTask();
+
+    private string Url(string? operation, Guid? invocation) => Nav.GetUriWithQueryParameters(
+        new Dictionary<string, object?> { ["op"] = operation, ["inv"] = invocation });
+
+    private void Close(bool open)
+    {
+        if (!open) Nav.NavigateTo(Url(null, null));
+    }
 }
