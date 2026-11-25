@@ -1,52 +1,136 @@
 @inject IStringLocalizer<LockerResource> L
 @inject MoTimeFormatter Time
 @inject IOptions<ModuleLeaseDiagnosticsOption> Options
+
 <div class="ls-decision-band">
-    <div class="ls-decision-primary"><p>@L["Design:DecisionLabel"]</p>
-        <MoDisplayValue Value="@(Authorities.All(a => a.Snapshot is null) ? "—" : Active.ToString())" Unit="@L["Design:PopulationUnit", Rows.Count]" />
-        <div class="ls-reason-tally"><span>@L["Design:StatusActive"] <b>@Active</b></span><span>@L["Design:StatusExpired"] <b>@(Rows.Count - Active)</b></span>
-            @if (Rows.Any(r => r.Tight)) { <span>@L["Design:StatusTight"] <b>@Rows.Count(r => r.Tight)</b></span> }</div>
+    <div class="ls-decision-primary">
+        <p class="ls-decision-label">@L["Design:DecisionLabel"]</p>
+        <MoDisplayValue Compact="true" Value="@(_allUnavailable ? "—" : _active.Length.ToString())"
+                        Unit="@(_allUnavailable ? L["Design:PopulationUnavailable"] : Rows.Count == 0 ? L["Design:PopulationEmpty"] : L["Design:PopulationUnit", Rows.Count])" />
+        <div class="ls-reason-tally">
+            @Tally("Design:StatusActive", _active.Length, MoVisualRole.Success)
+            @Tally("Design:StatusExpired", _expired.Length, MoVisualRole.Warning)
+            @if (_tight.Length > 0)
+            {
+                @Tally("Design:StatusTight", _tight.Length, MoVisualRole.Warning, diamond: true)
+            }
+            @if (_failed > 0)
+            {
+                @Tally("Design:StatusSourceFailed", _failed, MoVisualRole.Error)
+            }
+        </div>
     </div>
     <div class="ls-decision-finding">
-        @if (Rows.Count == 0) { <p>@L[Authorities.All(a => a.Snapshot is null) ? "Design:FindingUnavailable" : "Design:FindingEmpty"]</p> }
-        else
-        {
-            var active = Rows.Where(r => !r.Expired).ToArray();
-            var top = active.GroupBy(r => r.Record.HolderId).MaxBy(g => g.Count());
-            var expired = Rows.Where(r => r.Expired).MinBy(r => r.RemainingSeconds);
-            var shortest = active.MinBy(r => r.RemainingSeconds);
-            <p>@L["Horizon:Finding", Active, active.Select(r => r.Record.HolderId).Distinct().Count()]
-                @if (expired is not null) { <button class="ls-finding-link" @onclick="@(() => Inspect.InvokeAsync(expired))">@LeasePresentation.Title(expired.Record.Resource.Name,L)</button> <span>@L["Horizon:ExpiredAgo",Duration(expired.RemainingSeconds)]</span> }
-                @if (shortest is not null) { <button class="ls-finding-link" @onclick="@(() => Inspect.InvokeAsync(shortest))">@LeasePresentation.Title(shortest.Record.Resource.Name,L)</button> <span>@L["Horizon:Shortest",Duration(shortest.RemainingSeconds),Duration(shortest.GrantSeconds)]</span> }
-                @if (top is not null && top.Count()>1) { <code>@top.Key</code> <span>@L["Horizon:TopHolder",top.Count()]</span> }
-            </p>
-        }
-        <small class="ls-policy-hint">@L["Design:RefreshPolicy",Duration(Options.Value.InventoryCacheDuration.TotalSeconds)]</small>
+        <p class="ls-finding">
+            @if (Rows.Count == 0)
+            {
+                @L[_allUnavailable ? "Design:FindingUnavailable" : "Design:FindingEmpty"]
+            }
+            else if (_expired.Length == 0 && _tight.Length == 0 && _shortest is { } shortest && _latest is { } latest)
+            {
+                <MoRichFinding Template="@L["Horizon:CalmFinding"].Value"
+                               Values="@([Mark(_active.Length, MoVisualRole.Success), Mark(_holderCount, MoVisualRole.Neutral), RoleLink(latest), Mark(Span((latest.ObservedAtUtc - latest.Record.ConfirmedAtUtc).TotalSeconds), MoVisualRole.Info), RoleLink(shortest), Mark(Span(shortest.RemainingSeconds), MoVisualRole.Success), Text(Span(shortest.GrantSeconds))])" />
+            }
+            else
+            {
+                <MoRichFinding Template="@L["Horizon:MixedFinding"].Value"
+                               Values="@([Mark($"{_active.Length} / {Rows.Count}", MoVisualRole.Success)])" />
+                @if (_expired.FirstOrDefault() is { } expired)
+                {
+                    @(" ")<MoRichFinding Template="@L["Horizon:ExpiredFinding"].Value"
+                                     Values="@([Mark(_expired.Length, MoVisualRole.Warning), RoleLink(expired), Mark(Span(expired.RemainingSeconds), MoVisualRole.Warning)])" />
+                }
+                @if (_tight.FirstOrDefault() is { } tight)
+                {
+                    @(" ")<MoRichFinding Template="@L["Horizon:TightFinding"].Value"
+                                         Values="@([RoleLink(tight), Mark(Span(tight.RemainingSeconds), MoVisualRole.Warning), Text(Span(tight.GrantSeconds))])" />
+                }
+                @if (_topHolder is { } holder)
+                {
+                    @(" ")<MoRichFinding Template="@L["Horizon:HolderFinding"].Value"
+                                         Values="@([HolderCode(holder.Key), Mark(holder.Count(), MoVisualRole.Primary)])" />
+                }
+            }
+        </p>
+        <p class="ls-policy-hint"><MoIcon Icon="@MoIcons.Timer" Size="13px" /><span>@L["Design:RefreshPolicy", Span(Options.Value.InventoryCacheDuration.TotalSeconds)]</span></p>
     </div>
 </div>
-<div class="ls-auth-strip" aria-label="@L["Design:AuthorityStripLabel"]">
+
+<div class="ls-auth-strip" role="group" aria-label="@L["Design:AuthorityStripLabel"]">
     @foreach (var source in Authorities)
     {
-        var rows = Rows.Where(r => r.Authority.Id == source.Authority.Id).ToArray();
-        <button class="ls-auth-card @(Authority == source.Authority.Id ? "is-selected" : null)" type="button" aria-pressed="@(Authority == source.Authority.Id)" @onclick="@(() => SelectAuthority.InvokeAsync(source.Authority.Id))">
-            <span class="ls-auth-top"><span class="ls-auth-kind">@L[$"Providers:{source.Authority.Kind}"]</span><strong class="ls-auth-name">@source.Authority.DisplayName</strong><time class="ls-auth-right">@Time.FormatTime(source.Snapshot?.ObservedAtUtc)</time></span>
-            <span class="ls-auth-bottom"><span>@(source.Snapshot is null ? L["Design:AuthorityFailNoData"] : L[rows.Any(r => r.Expired) ? "Horizon:MixedRecords" : "Design:AuthorityRecords", rows.Count(r => !r.Expired), rows.Count(r => r.Expired)])</span>
-                <small>@source.Authority.NamePrefix* · @L[source.CanRevoke ? "Design:AuthorityRevocable" : "Design:AuthorityReadOnly"]</small></span>
-            @if (source.IsTruncated) { <span>@L["Evidence:Truncated", rows.Length, source.TotalCount]</span> }
-            @if (source.RefreshFailed) { <span>@L["Evidence:RefreshFailed"]</span> }
+        var rows = source.Snapshot?.Leases;
+        var active = rows?.Count(row => row.ExpiresAtUtc > source.Snapshot!.ObservedAtUtc) ?? 0;
+        var expired = (rows?.Count ?? 0) - active;
+        var observed = source.Snapshot?.ObservedAtUtc;
+        var kind = source.Authority.Kind;
+        var role = LeasePresentation.Role(kind);
+        var status = observed is null ? MoVisualRole.Error : source.RefreshFailed ? MoVisualRole.Warning : MoVisualRole.Success;
+        <button class="ls-auth-card @role.ToCssClass() @(Authority == source.Authority.Id ? "is-selected" : null)" type="button"
+                aria-pressed="@(Authority == source.Authority.Id ? "true" : "false")" @onclick="@(() => SelectAuthority.InvokeAsync(source.Authority.Id))">
+            <span class="ls-auth-top">
+                <span class="ls-auth-kind"><MoIcon Icon="@LeasePresentation.Icon(kind)" Size="13px" />@L[$"Providers:{kind}"]</span>
+                <strong class="ls-auth-name">@source.Authority.DisplayName</strong>
+                <span class="ls-auth-right">
+                    <i class="ls-auth-dot @status.ToCssClass()" aria-hidden="true"></i>
+                    <time datetime="@observed?.ToString("O")">@Time.FormatTime(observed)</time>
+                </span>
+            </span>
+            <span class="ls-auth-bottom">
+                <span class="ls-auth-counts">
+                    @(observed is null ? L["Design:AuthorityFailNoData"] : rows?.Count == 0 ? L["Design:AuthorityZero"] :
+                        expired > 0 ? L["Horizon:MixedRecords", active, expired] : L["Design:AuthorityRecords", active])
+                </span>
+                <span class="ls-auth-meta">@(source.Authority.NamePrefix.Length == 0 ? L["Design:AuthorityAllPrefix"].Value : source.Authority.NamePrefix + "*") · @L[source.CanRevoke ? "Design:AuthorityRevocable" : "Design:AuthorityReadOnly"]</span>
+            </span>
+            @if (source.IsTruncated)
+            {
+                <span class="ls-auth-stale mo-vl-role--warning">@L["Evidence:Truncated", rows?.Count ?? 0, source.TotalCount]</span>
+            }
+            @if (source.RefreshFailed && observed is not null)
+            {
+                <span class="ls-auth-stale mo-vl-role--warning">@L["Design:AuthorityStale", Time.FormatTime(observed)]</span>
+            }
         </button>
     }
 </div>
+
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
     [Parameter] public string? Authority { get; set; }
     [Parameter] public EventCallback<string> SelectAuthority { get; set; }
     [Parameter] public EventCallback<LeaseRow> Inspect { get; set; }
-    private int Active => Rows.Count(r => !r.Expired);
-    private string Duration(double seconds)
+
+    private LeaseRow[] _active = [], _expired = [], _tight = [];
+    private LeaseRow? _shortest, _latest;
+    private IGrouping<string, LeaseRow>? _topHolder;
+    private int _holderCount, _failed;
+    private bool _allUnavailable;
+
+    protected override void OnParametersSet()
     {
-        var (value, unit) = LeasePresentation.Duration(Math.Abs(seconds), L);
-        return value + unit;
+        _active = Rows.Where(row => !row.Expired).ToArray();
+        _expired = Rows.Where(row => row.Expired).OrderByDescending(row => row.RemainingSeconds).ToArray();
+        _tight = _active.Where(row => row.Tight).OrderBy(row => row.RemainingSeconds).ToArray();
+        _shortest = _active.MinBy(row => row.RemainingSeconds);
+        _latest = _active.MinBy(row => row.ObservedAtUtc - row.Record.ConfirmedAtUtc);
+        var holders = _active.GroupBy(row => row.Record.HolderId).ToArray();
+        _holderCount = holders.Length;
+        _topHolder = holders.Where(holder => holder.Count() > 1).MaxBy(holder => holder.Count());
+        _failed = Authorities.Count(source => source.RefreshFailed);
+        _allUnavailable = Authorities.All(source => source.Snapshot is null);
     }
+
+    private string Span(double seconds) => LeasePresentation.Span(seconds, L);
+    private static RenderFragment Text(string content) => builder => builder.AddContent(0, content);
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="@role">@value</MoValueMark>;
+    private static RenderFragment HolderCode(string value) => @<code class="ls-inline-code">@value</code>;
+    private RenderFragment RoleLink(LeaseRow row) =>
+        @<button class="ls-finding-link" type="button" @onclick="@(() => Inspect.InvokeAsync(row))">@LeasePresentation.Title(row.Record.Resource.Name, L)</button>;
+    private RenderFragment Tally(string key, int count, MoVisualRole role, bool diamond = false) =>
+        @<span class="ls-tally-item">
+            <i class="mo-vl-swatch @(diamond ? "mo-vl-swatch--diamond" : "mo-vl-swatch--instrument") @(count == 0 ? "mo-vl-swatch--empty" : null) @role.ToCssClass()" aria-hidden="true"></i>
+            @L[key] <b class="mo-vl-mono">@count</b>
+        </span>;
 }

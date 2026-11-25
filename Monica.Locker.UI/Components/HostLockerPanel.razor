@@ -9,78 +9,157 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
-<section class="ls-locker-surface" id="host-locker" @ref="_section" tabindex="-1">
-    <header><MoIcon Icon="@MoIcons.Lock" Size="1.25rem" /><div><h2>@L["Design:LockerTitle"]</h2><p>@L["Design:LockerDesc"]</p></div></header>
-    @if (Highlighted && !_dismissed)
-    {
-        <MudAlert Severity="Severity.Info" Dense="true" ShowCloseIcon="true" CloseIconClicked="Dismiss">@L["Design:LockerConsolidatedBody"]</MudAlert>
-    }
-    @if (_provider is null || _normalizer is null)
-    {
-        <div class="ls-locker-absent"><b>@L["Design:LockerNotRegistered"]</b><p>@L["Design:LockerNotRegisteredDesc"]</p></div>
-    }
-    else
-    {
-        var info = _provider.Info;
-        <div class="ls-locker-grid">
-            <dl>
-                <div><dt>@L["Design:LockerProvider"]</dt><dd>@_provider.GetType().Name</dd></div>
-                @if (info.Backend is not null) { <div><dt>@L["Design:LockerBackend"]</dt><dd>@info.Backend</dd></div> }
-                <div><dt>@L["Design:LockerPrefix"]</dt><dd>@(Options.Value.LockKeyPrefix.Length == 0 ? "∅" : Options.Value.LockKeyPrefix)</dd></div>
-                <div><dt>@L["Design:LockerWaitTimeout"]</dt><dd>@Options.Value.DefaultWaitTimeout</dd></div>
-                @if (info.DefaultLeaseDuration is { } duration) { <div><dt>@L["Design:LockerExpiry"]</dt><dd>@duration</dd></div> }
-            </dl>
-            @if (info.Kind != LockProviderKind.Custom)
-            {
-                <div class="ls-locker-guarantees">
-                    @foreach (var field in Fields)
-                    { <div><strong>@L[$"Locks:{field}"]</strong><p>@L[$"Locks:Mechanisms:{info.Kind}:{field}"]</p></div> }
-                </div>
-            }
-        </div>
-        <div class="ls-normalizer">
-            <h3>@L["Design:NormalizerTitle"]</h3>
-            <div class="ls-normalizer-row">
-                <MudTextField T="string" @bind-Value="_name" Immediate="true" Label="@L["Design:NormalizerInputLabel"]" Placeholder="@L["Design:NormalizerPlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                <MoIcon Icon="@MoIcons.ArrowRight" Size="1rem" />
-                <div class="ls-normalizer-out"><small>@L["Design:NormalizerOutput"]</small><code>@_normalizer.Normalize(_name)</code>
-                    <MudIconButton Icon="@MoIcons.Copy" aria-label="@L["Design:NormalizerOutput"]" OnClick="CopyAsync" Size="Size.Small" /></div>
+<section class="ls-locker-surface mo-vl-surface @(Highlighted ? "is-highlighted" : null)" id="host-locker" @ref="_section" tabindex="-1">
+    <header class="mo-vl-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Lock" Size="16px" /></span>
+        <div><h2>@L["Design:LockerTitle"]</h2><p>@L["Design:LockerDesc"]</p></div>
+        <span class="mo-vl-status mo-vl-status--pill @(_provider is null ? "mo-vl-role--neutral" : "mo-vl-role--success")">
+            <i class="mo-vl-status-dot" aria-hidden="true"></i>
+            @(_provider is null ? L["Design:LockerNotRegistered"] : L["Design:LockerRegistered", _provider.GetType().Name])
+        </span>
+    </header>
+    <div class="ls-locker-body mo-vl-surface-body">
+        @if (Highlighted && !_dismissed)
+        {
+            <div class="ls-consolidated-banner">
+                <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Design:LockerConsolidatedTitle"]">@L["Design:LockerConsolidatedBody"]</MoSemanticCallout>
+                <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" aria-label="@L["Common:Close"]" OnClick="Dismiss" />
             </div>
-        </div>
-    }
-    <p class="ls-locker-boundary">@L["Design:LockerBoundaryNote"]</p>
-    <details class="ls-locker-compare" open="@(!string.IsNullOrWhiteSpace(Provider))">
-        <summary>@L["Design:LockerCompareSummary"]</summary>
-        <table><thead><tr><th>@L["Locks:Provider"]</th>@foreach (var field in Fields) { <th>@L[$"Locks:{field}"]</th> }</tr></thead>
-            <tbody>@foreach (var kind in new[] { LockProviderKind.Medallion, LockProviderKind.InProcess, LockProviderKind.Dapr })
-            { <tr class="@(string.Equals(Provider,kind.ToString(),StringComparison.OrdinalIgnoreCase) ? "is-target" : null)"><th>@L[$"Locks:Mechanisms:{kind}:Short"]</th>@foreach (var field in Fields) { <td>@L[$"Locks:Mechanisms:{kind}:{field}"]</td> }</tr> }</tbody></table>
-    </details>
+        }
+        @if (_provider is null || _normalizer is null)
+        {
+            <p class="ls-locker-absent">@L["Design:LockerNotRegisteredDesc"]</p>
+        }
+        else
+        {
+            var info = _provider.Info;
+            var prefix = Options.Value.LockKeyPrefix;
+            var physicalKey = _normalizer.Normalize(_name);
+            <div class="ls-locker-grid">
+                <dl class="ls-locker-facts">
+                    <div><dt>@L["Design:LockerProvider"]</dt><dd><code>@_provider.GetType().Name</code></dd></div>
+                    @if (info.Backend is not null)
+                    {
+                        <div><dt>@L["Design:LockerBackend"]</dt><dd><code>@info.Backend</code></dd></div>
+                    }
+                    <div>
+                        <dt>@L["Design:LockerPrefix"]</dt>
+                        <dd><code>@(prefix.Length == 0 ? "∅" : prefix)</code><MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:CopyValue", L["Design:LockerPrefix"]]" OnClick="@(() => CopyAsync(prefix))" /></dd>
+                    </div>
+                    <div><dt>@L["Design:LockerWaitTimeout"]</dt><dd><code>@(Options.Value.DefaultWaitTimeout == Timeout.InfiniteTimeSpan ? L["Design:LockerUnlimited"].Value : LeasePresentation.Span(Options.Value.DefaultWaitTimeout.TotalSeconds, L))</code></dd></div>
+                    @if (info.DefaultLeaseDuration is { } duration)
+                    {
+                        <div><dt>@L["Design:LockerExpiry"]</dt><dd><code>@LeasePresentation.Span(duration.TotalSeconds, L)</code></dd></div>
+                    }
+                </dl>
+                @if (info.Kind != LockProviderKind.Custom)
+                {
+                    <div class="ls-locker-guarantees">
+                        @foreach (var field in Fields)
+                        {
+                            var role = GetRole(info.Kind, field);
+                            <div class="ls-guarantee @role.ToCssClass()">
+                                <span class="ls-g-label">@L[$"Locks:{field}"]</span>
+                                <strong class="ls-guarantee-status"><i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>@L[$"Locks:Mechanisms:{info.Kind}:{field}"]</strong>
+                                <p>@L[$"Locks:Mechanisms:{info.Kind}:{NoteKey(field)}"]</p>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="ls-normalizer">
+                <div class="ls-normalizer-head"><MoIcon Icon="@MoIcons.Code" Size="14px" /><h3>@L["Design:NormalizerTitle"]</h3></div>
+                <div class="ls-normalizer-row">
+                    <input class="ls-normalizer-in" type="text" spellcheck="false" @bind="_name" @bind:event="oninput"
+                           aria-label="@L["Design:NormalizerInputLabel"]" placeholder="@L["Design:NormalizerPlaceholder"]" />
+                    <span class="ls-normalizer-arrow" aria-hidden="true"><MoIcon Icon="@MoIcons.ArrowRight" Size="15px" /></span>
+                    <div class="ls-normalizer-out">
+                        <span class="ls-normalizer-out-label">@L["Design:NormalizerOutput"]</span><code>@physicalKey</code>
+                        <MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:CopyValue", L["Design:NormalizerOutput"]]" OnClick="@(() => CopyAsync(physicalKey))" />
+                    </div>
+                </div>
+            </div>
+        }
+        <p class="ls-locker-boundary"><MoIcon Icon="@MoIcons.ShieldCheck" Size="14px" /><span>@L["Design:LockerBoundaryNote"]</span></p>
+        <details class="ls-locker-compare" open="@(HighlightedProvider is not null)">
+            <summary><MoIcon Icon="@MoIcons.ChevronRight" Size="14px" />@L["Design:LockerCompareSummary"]</summary>
+            <div class="ls-compare-wrap">
+                <table class="ls-compare-table">
+                    <thead><tr><th scope="col">@L["Locks:Provider"]</th>@foreach (var field in Fields) { <th scope="col">@L[$"Locks:{field}"]</th> }</tr></thead>
+                    <tbody>
+                    @foreach (var kind in ProviderKinds)
+                    {
+                        var isCurrent = _provider?.Info.Kind == kind;
+                        <tr class="@(isCurrent ? "is-current" : null) @(HighlightedProvider == kind ? "is-highlighted-row" : null)">
+                            <th scope="row">
+                                @L[$"Locks:Mechanisms:{kind}:Short"]
+                                @if (isCurrent) { <span class="mo-vl-capsule mo-vl-role--primary">@L["Design:LockerActiveHere"]</span> }
+                            </th>
+                            @foreach (var field in Fields)
+                            {
+                                <td data-label="@L[$"Locks:{field}"]">@L[$"Locks:Mechanisms:{kind}:{field}"]</td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </div>
 </section>
 
 @code {
     [Parameter] public bool Highlighted { get; set; }
     [Parameter] public string? Provider { get; set; }
     private static readonly string[] Fields = ["Scope", "Expiry", "Signal"];
+    private static readonly LockProviderKind[] ProviderKinds = [LockProviderKind.Medallion, LockProviderKind.InProcess, LockProviderKind.Dapr];
     private ILockProvider? _provider;
     private LockKeyNormalizer? _normalizer;
     private ElementReference _section;
     private string _name = string.Empty;
     private bool _focused, _dismissed;
 
+    private LockProviderKind? HighlightedProvider => Provider?.ToLowerInvariant() switch
+    {
+        "medallion" => LockProviderKind.Medallion,
+        "inprocess" or "in-process" => LockProviderKind.InProcess,
+        "dapr" => LockProviderKind.Dapr,
+        _ => null
+    };
+
     protected override void OnInitialized()
     {
         _provider = Services.GetService<ILockProvider>();
         _normalizer = Services.GetService<LockKeyNormalizer>();
     }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (Highlighted && !_focused) { _focused = true; await _section.FocusAsync(); }
         if (!Highlighted) { _focused = false; _dismissed = false; }
     }
+
     private void Dismiss()
     {
         _dismissed = true;
-        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["section"] = null, ["provider"] = null }), replace:true);
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["section"] = null, ["provider"] = null }), replace: true);
     }
-    private Task CopyAsync() => JS.InvokeVoidAsync("navigator.clipboard.writeText", _normalizer!.Normalize(_name)).AsTask();
+
+    private static MoVisualRole GetRole(LockProviderKind kind, string field) => (kind, field) switch
+    {
+        (LockProviderKind.Medallion, "Signal") => MoVisualRole.Info,
+        (LockProviderKind.Medallion, _) => MoVisualRole.Success,
+        (LockProviderKind.InProcess, "Scope") or (LockProviderKind.Dapr, "Expiry") => MoVisualRole.Warning,
+        (LockProviderKind.Dapr, "Scope") => MoVisualRole.Info,
+        _ => MoVisualRole.Neutral
+    };
+
+    private static string NoteKey(string field) => field switch
+    {
+        "Scope" => "Context",
+        "Expiry" => "LossTitle",
+        _ => "LossNote"
+    };
+
+    private Task CopyAsync(string value) => JS.InvokeVoidAsync("navigator.clipboard.writeText", value).AsTask();
 }

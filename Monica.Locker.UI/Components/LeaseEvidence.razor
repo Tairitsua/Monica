@@ -6,39 +6,131 @@
 @using Monica.UI.Shared.Components.Dialogs
 @implements IAsyncDisposable
 
-<MoSideSheet Open="true" OpenChanged="OnSheetVisibilityChanged" CloseLabel="@L["Common:Close"]">
+<MoSideSheet Open="true" OpenChanged="OnSheetVisibilityChanged" CloseLabel="@L["Common:Close"]" Width="520px" Compact="true">
     <TitleContent>
-        <div class="ls-evidence-title"><p>@L["Evidence:Title"]</p><h2>@LeasePresentation.Title(ResourceName, L)</h2></div>
+        <div class="ls-evidence-title">
+            <p>@L["Evidence:Title"]</p>
+            <h2>@(Evidence?.Snapshot.Leases.Count > 0 ? LeasePresentation.Title(ResourceName, L) :
+                L[Busy ? "Common:Loading" : Failed || Evidence is null ? "Evidence:Unavailable" : "Evidence:Missing"].Value)</h2>
+        </div>
     </TitleContent>
     <ChildContent>
-        <div class="ls-evidence ls-evidence-body">
-            @if (Failed) { <MudAlert Severity="Severity.Warning" Dense="true">@L["Evidence:ExactFailed"]</MudAlert> }
-            @if (_revokeError) { <MudAlert Severity="Severity.Error" Dense="true">@L["Admin:Failed"]</MudAlert> }
-            @if (Evidence?.Snapshot.Leases.FirstOrDefault() is { } record)
+        <div class="ls-evidence-body">
+            @if (Failed && Evidence?.Snapshot.Leases.Count > 0)
             {
-                var expired = record.ExpiresAtUtc <= Evidence.Snapshot.ObservedAtUtc;
-                var duration = LeasePresentation.Duration((record.ExpiresAtUtc - Evidence.Snapshot.ObservedAtUtc).TotalSeconds, L);
-                <div class="ls-grant @(expired ? "warning" : "success")"><span>@L[expired ? "Evidence:Expired" : "Evidence:Unexpired"]</span><b class="ls-grant-value">@(expired ? "−" : null)@duration.Value<small>@duration.Unit</small></b><p>@L[expired ? "Evidence:ExpiredAgo" : "Evidence:Remaining"]</p><div class="ls-grant-holder"><MoIcon Icon="@MoIcons.Server" Size="1rem" />@record.HolderId</div></div>
-                <div class="ls-anatomy"><b>@L["Horizon:Grant"]</b><span>@Span((record.ExpiresAtUtc-record.ConfirmedAtUtc).TotalSeconds)</span><div><i style="@FormattableString.Invariant($"width:{Math.Clamp((Evidence.Snapshot.ObservedAtUtc-record.ConfirmedAtUtc).TotalSeconds/Math.Max(.001,(record.ExpiresAtUtc-record.ConfirmedAtUtc).TotalSeconds),0,1)*100:0.##}%")"></i></div>
-                    <small>@L["Design:HeldFor",Span(((expired ? record.ExpiresAtUtc : Evidence.Snapshot.ObservedAtUtc)-record.AcquiredAtUtc).TotalSeconds)]</small></div>
-                <a class="mo-vl-link" href="@Nav.GetUriWithQueryParameters(new Dictionary<string,object?> { ["holder"]=record.HolderId, ["targetAuthority"]=null, ["source"]=null, ["resource"]=null })">@L["Design:FilterThisHolder"]</a>
-                <div class="ls-exact-action"><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton><p>@L["Evidence:ExactHint"]</p></div>
-                <section><h3>@L["Evidence:Identity"]</h3><dl><div><dt>@L["Inventory:Authority"]</dt><dd>@Evidence.Authority.DisplayName</dd></div><div><dt>@L["Evidence:Scope"]</dt><dd>@record.Resource.Scope</dd></div><div><dt>@L["Evidence:Name"]</dt><dd><button class="mo-vl-id-chip" @onclick="@(() => CopyName(record.Resource.Name))">@record.Resource.Name <MoIcon Icon="@MoIcons.Copy" Size="0.8rem" /></button></dd></div><div><dt>@L["Evidence:ServiceKey"]</dt><dd>@Evidence.Authority.StoreKey</dd></div></dl></section>
-                <section><h3>@L["Evidence:Timeline"]</h3><ol class="ls-time-spine">
-                    @{ DateTimeOffset? previous = null; }
-                    @foreach (var point in new[] { ("Acquired", record.AcquiredAtUtc), ("Confirmed", record.ConfirmedAtUtc), ("Expires", record.ExpiresAtUtc), ("Observed", Evidence.Snapshot.ObservedAtUtc) }.OrderBy(item => item.Item2))
-                    { <li><i></i><div><span>@L[$"Timestamps:{point.Item1}"]</span><time datetime="@point.Item2.ToString("O")">@Time.Format(point.Item2)</time>@if (previous is { } t) { <small>+@Span((point.Item2-t).TotalSeconds)</small> }</div></li> previous = point.Item2; }
-                </ol><p>@L["Evidence:TimelineNote"]</p></section>
-                <section><h3>@L["Evidence:Meaning"]</h3><p>@L[$"Meaning:{Evidence.Authority.Kind}"]</p></section>
-                <section class="ls-admin"><h3>@L["Admin:Title"]</h3><p>@L["Admin:Warning"]</p>
-                    @if (Evidence.CanRevoke) { <MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="@Busy" OnClick="OpenConfirmation">@L["Admin:Revoke"]</MudButton> }
-                    else { <p>@L["Admin:Unavailable"]</p> }
+                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Evidence:RefreshFailed"]">@L["Evidence:ExactFailed"]</MoSemanticCallout>
+            }
+            @if (_revokeError) { <MudAlert Severity="Severity.Error" Dense="true">@L["Admin:Failed"]</MudAlert> }
+            @if (Evidence is { } evidence && evidence.Snapshot.Leases.FirstOrDefault() is { } record)
+            {
+                var observed = evidence.Snapshot.ObservedAtUtc;
+                var row = new LeaseRow(evidence.Authority, record, observed);
+                var (value, unit) = LeasePresentation.Duration(row.RemainingSeconds, L);
+                var elapsed = Math.Max(0, (observed - record.ConfirmedAtUtc).TotalSeconds);
+                var elapsedPct = row.Expired ? 100 : Math.Clamp(elapsed / Math.Max(.001, row.GrantSeconds) * 100, 0, 100);
+                var role = row.Expired ? MoVisualRole.Warning : MoVisualRole.Success;
+                var authorityRole = LeasePresentation.Role(evidence.Authority.Kind);
+                <section class="ls-grant-card @role.ToCssClass()">
+                    <div class="ls-grant-top">
+                        <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass()"><i class="mo-vl-status-dot" aria-hidden="true"></i>@L[row.Expired ? "Design:StatusExpired" : "Design:StatusActive"]</span>
+                        <span class="mo-vl-capsule @authorityRole.ToCssClass()"><MoIcon Icon="@LeasePresentation.Icon(evidence.Authority.Kind)" Size="13px" />@L[$"Providers:{evidence.Authority.Kind}"]</span>
+                    </div>
+                    <div class="ls-grant-metric">
+                        <b>@(row.Expired ? "−" : "+")@value<small>@unit</small></b>
+                        <span>@L[row.Expired ? "Design:ExpiredEvidence" : "Design:ActiveEvidence"]</span>
+                    </div>
+                    <div class="ls-anatomy">
+                        <div class="ls-anatomy-track" aria-hidden="true">
+                            @if (row.Expired) { <span class="ls-anatomy-expired"></span> }
+                            else
+                            {
+                                <span class="ls-anatomy-elapsed" style="width:@Percent(elapsedPct)"></span>
+                                <span class="ls-anatomy-pin" style="left:@Percent(elapsedPct)"></span>
+                                <span class="ls-anatomy-remain" style="width:@Percent(100 - elapsedPct)"></span>
+                            }
+                        </div>
+                        <div class="ls-anatomy-meta">
+                            <span>@L["Timestamps:Confirmed"]: −@Span(elapsed)</span>
+                            <span>@(row.Expired ? $"{L["Design:ExpiredEvidence"]} {Span(row.RemainingSeconds)}" : L["Design:FullGrant", Span(row.GrantSeconds)].Value)</span>
+                        </div>
+                    </div>
+                    <div class="ls-grant-footer">
+                        <div class="ls-grant-holder">
+                            <MoIcon Icon="@MoIcons.Server" Size="14px" /><code>@record.HolderId</code>
+                            @CopyControl(record.HolderId, L["Design:Holder"])
+                        </div>
+                        <div class="ls-grant-badges">
+                            <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@L["Design:HeldFor", Span(row.Tenure.TotalSeconds)]</span>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Href="@HolderUrl(record.HolderId)">@L["Design:FilterThisHolder"]</MudButton>
+                        </div>
+                    </div>
+                </section>
+
+                @ExactRefresh
+
+                <section class="ls-sheet-section">
+                    <h3>@L["Evidence:Timeline"]</h3>
+                    <ol class="ls-spine">
+                        @{ DateTimeOffset? previous = null; }
+                        @foreach (var (label, time, pointRole) in new[] {
+                            ("Acquired", record.AcquiredAtUtc, MoVisualRole.Neutral),
+                            ("Confirmed", record.ConfirmedAtUtc, MoVisualRole.Info),
+                            ("Observed", observed, MoVisualRole.Primary),
+                            ("Expires", record.ExpiresAtUtc, role)
+                        }.OrderBy(point => point.Item2))
+                        {
+                            <li class="@pointRole.ToCssClass()">
+                                <i class="ls-spine-node" aria-hidden="true"></i>
+                                <div class="ls-spine-row">
+                                    <span class="ls-spine-label">@L[$"Timestamps:{label}"]</span>
+                                    <div class="ls-spine-right">
+                                        @if (previous is { } prior && time > prior)
+                                        {
+                                            <span class="ls-spine-delta">+@Delta(time - prior)</span>
+                                        }
+                                        <time datetime="@time.ToString("O")">@Time.Format(time)</time>
+                                    </div>
+                                </div>
+                            </li>
+                            previous = time;
+                        }
+                    </ol>
+                    <p class="ls-sheet-note">@L["Evidence:TimelineNote"]</p>
+                </section>
+
+                <section class="ls-sheet-section">
+                    <h3>@L["Evidence:Identity"]</h3>
+                    <dl class="ls-sheet-identity">
+                        <div><dt>@L["Inventory:Authority"]</dt><dd>@evidence.Authority.DisplayName <code>(@evidence.Authority.Id)</code></dd></div>
+                        @Identity("Evidence:ServiceKey", evidence.Authority.StoreKey)
+                        @Identity("Evidence:Scope", record.Resource.Scope)
+                        @Identity("Evidence:Name", record.Resource.Name)
+                    </dl>
+                </section>
+
+                <MoSemanticCallout Severity="@authorityRole" Title="@L["Evidence:Meaning"]" Icon="@MoIcons.ShieldCheck">@L[$"Meaning:{evidence.Authority.Kind}"]</MoSemanticCallout>
+
+                <section class="ls-sheet-section ls-admin-box">
+                    <h3>@L["Admin:Title"]</h3>
+                    <p>@L[evidence.CanRevoke ? "Admin:Warning" : "Admin:Unavailable"]</p>
+                    @if (evidence.CanRevoke)
+                    {
+                        <MudButton Class="ls-revoke-trigger" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@MoIcons.Key" Disabled="@Busy" OnClick="OpenConfirmation">@L["Admin:Revoke"]</MudButton>
+                    }
                 </section>
             }
             else
             {
-                <MoContentState Loading="@Busy"><MoIcon Icon="@MoIcons.Inbox" Size="2rem" /><h3>@L[Busy ? "Common:Loading" : Failed || Evidence is null ? "Evidence:Unavailable" : "Evidence:Missing"]</h3><p>@L["Evidence:MissingDescription"]</p><MudButton Variant="Variant.Outlined" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton></MoContentState>
-                <dl><div><dt>@L["Inventory:Authority"]</dt><dd>@SourceId</dd></div><div><dt>@L["Evidence:Name"]</dt><dd>@ResourceName</dd></div></dl>
+                <div class="ls-sheet-empty">
+                    <span class="mo-vl-tile @(Failed ? "mo-vl-role--warning" : "mo-vl-role--neutral")"><MoIcon Icon="@(Failed ? MoIcons.Warning : MoIcons.ScanSearch)" Size="20px" /></span>
+                    <h3>@L[Busy ? "Common:Loading" : Failed || Evidence is null ? "Evidence:Unavailable" : "Evidence:Missing"]</h3>
+                    <p>@L[Failed || Evidence is null ? "Evidence:Retry" : "Evidence:MissingDescription"]</p>
+                    @ExactRefresh
+                    <dl class="ls-sheet-identity ls-sheet-empty-meta">
+                        <div><dt>@L["Inventory:Authority"]</dt><dd><code>@SourceId</code></dd></div>
+                        @Identity("Evidence:Name", ResourceName)
+                    </dl>
+                </div>
             }
         </div>
     </ChildContent>
@@ -64,8 +156,24 @@
     private Task? _retirement;
     private LeaseResourceEvidence? _target;
     private readonly DialogOptions _dialogOptions = new() { CloseOnEscapeKey = true, BackdropClick = false, MaxWidth = MaxWidth.Small, FullWidth = true };
-    private Task CopyName(string name) => JS.InvokeVoidAsync("navigator.clipboard.writeText",name).AsTask();
-    private string Span(double seconds) { var (value,unit) = LeasePresentation.Duration(seconds,L); return value + unit; }
+    private string Span(double seconds) => LeasePresentation.Span(seconds, L);
+    private string Delta(TimeSpan difference) => difference.TotalHours >= 1
+        ? $"{(long)difference.TotalHours} {L["Common:Hours"]} {difference.Minutes} {L["Common:Minutes"]}"
+        : difference.TotalMinutes >= 1 && difference.Seconds != 0
+            ? $"{(long)difference.TotalMinutes} {L["Common:Minutes"]} {difference.Seconds} {L["Common:Seconds"]}"
+            : Span(difference.TotalSeconds);
+    private static string Percent(double value) => FormattableString.Invariant($"{value:0.##}%");
+    private string HolderUrl(string holder) => Nav.GetUriWithQueryParameters(new Dictionary<string, object?>
+    {
+        ["group"] = "holder", ["holder"] = holder, ["targetAuthority"] = null, ["source"] = null, ["resource"] = null
+    });
+    private RenderFragment ExactRefresh => @<div class="ls-exact-bar">
+        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@Busy" OnClick="@(() => Refresh.InvokeAsync())">@L["Evidence:RefreshExact"]</MudButton>
+        <p>@L["Evidence:ExactHint"]</p>
+    </div>;
+    private RenderFragment Identity(string label, string value) => @<div><dt>@L[label]</dt><dd><code>@value</code>@CopyControl(value, L[label])</dd></div>;
+    private RenderFragment CopyControl(string value, string label) => @<MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Design:CopyValue", label]"
+        OnClick="@(() => JS.InvokeVoidAsync("navigator.clipboard.writeText", value).AsTask())" />;
     private Task OnSheetVisibilityChanged(bool visible) => !visible && !_retired ? Close.InvokeAsync() : Task.CompletedTask;
     private Task OpenConfirmation()
     {

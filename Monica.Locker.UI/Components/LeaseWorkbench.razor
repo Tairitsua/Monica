@@ -7,28 +7,45 @@
 @inject Microsoft.JSInterop.IJSRuntime JS
 @implements IAsyncDisposable
 
-<div class="ls-root" @ref="_root">
+<div class="ls-root mo-workbench-container" @ref="_root">
 <LeaseWorkspace>
     <Meta>
-        @if (_accessChecked && !State.AccessDenied)
+        @if (_accessChecked)
         {
-            <span class="mo-vl-status mo-vl-role--@(State.Authorities.Any(a => a.RefreshFailed) ? "warning" : State.Authorities.Count > 0 ? "success" : "neutral")"><i class="mo-vl-status-dot"></i>@L["Horizon:Observed",State.Authorities.Count(a => a.Snapshot is not null),State.Authorities.Count]</span>
-            <span class="mo-vl-id-chip">@string.Join(" · ",State.Authorities.Select(a => a.Authority.Scope).Distinct())</span>
-            <span>@Time.TimeZone.Id</span>
+            var failures = State.Authorities.Count(source => source.RefreshFailed);
+            var healthy = State.Authorities.Count - failures;
+            var role = State.AccessDenied ? MoVisualRole.Error : State.Authorities.Count == 0 ? MoVisualRole.Neutral :
+                State.OldestObservation is null ? MoVisualRole.Error : failures > 0 ? MoVisualRole.Warning : MoVisualRole.Success;
+            var status = State.AccessDenied ? L["Access:Denied"] : State.Authorities.Count == 0 ? L["Evidence:Unconfigured"] :
+                State.OldestObservation is null ? L["Design:AuthorityUnavailable"] :
+                failures > 0 ? L["Design:AuthorityPartial", healthy, failures] : L["Design:AuthorityHealthy", healthy];
+            <span class="mo-vl-status mo-vl-status--pill @(State.OldestObservation is not null ? "mo-vl-status--live" : null) @role.ToCssClass()">
+                <i class="mo-vl-status-dot" aria-hidden="true"></i>@status
+            </span>
+            @if (State.Authorities.Count > 0)
+            {
+                <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral ls-scope">@L["Design:ScopeLabel", string.Join(", ", State.Authorities.Select(source => source.Authority.Scope).Distinct())]</span>
+                <span title="@Time.TimeZone.Id">@L["Design:ClockLabel", Time.FormatZoneLabel(State.OldestObservation)]</span>
+            }
         }
     </Meta>
     <Actions>
-        @if (_accessChecked && !State.AccessDenied)
+        @if (_accessChecked && !State.AccessDenied && State.Authorities.Count > 0)
         {
             <div class="ls-refresh">
-                <div class="ls-stamp"><span>@L["Common:Captured"]</span><time datetime="@State.OldestObservation?.ToString("O")">@Time.Format(State.OldestObservation)</time></div>
-                <MudButton Variant="Variant.Outlined" Href="@(Navigation.Uri.Split('#')[0] + "#lease-probe")" StartIcon="@MoIcons.Search" Disabled="@(State.Authorities.Count == 0)">@L["Design:ProbeAction"]</MudButton>
-                <MudMenu Label="@(State.RefreshSeconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", State.RefreshSeconds])" Variant="Variant.Outlined" EndIcon="@MoIcons.ChevronDown" aria-label="@L["Refresh:Title"]">
+                <div class="ls-stamp">
+                    <span>@L["Common:Captured"]</span>
+                    <time datetime="@State.OldestObservation?.ToString("O")" title="@Time.Format(State.OldestObservation)">@Time.FormatTime(State.OldestObservation)</time>
+                </div>
+                <MudMenu Class="ls-interval" Label="@(State.RefreshSeconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", State.RefreshSeconds])"
+                         Variant="Variant.Outlined" StartIcon="@MoIcons.Timer" EndIcon="@MoIcons.ChevronDown" aria-label="@L["Refresh:Title"]">
                     @foreach (var seconds in LeaseWorkbenchState.RefreshIntervals)
                     {
                         <MudMenuItem OnClick="@(() => SetInterval(seconds))" Icon="@(State.RefreshSeconds == seconds ? MoIcons.Check : null)">@(seconds == 0 ? L["Refresh:Off"] : L["Refresh:Every", seconds])</MudMenuItem>
                     }
+                    <p class="ls-refresh-note">@L["Refresh:Note"]</p>
                 </MudMenu>
+                <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.ScanSearch" OnClick="FocusProbeAsync">@L["Design:ProbeAction"]</MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="ManualRefreshAsync" Disabled="@_busy">@L["Common:Refresh"]</MudButton>
             </div>
         }
@@ -58,16 +75,16 @@
             }
             else
             {
-                <section class="ls-signature">
+                <section class="ls-signature mo-vl-surface" aria-label="@L["Design:DecisionLabel"]">
                     <LeaseDecision Authorities="@State.Authorities" Rows="@State.Rows" Authority="@Authority" SelectAuthority="SetAuthority" Inspect="OpenResource" />
-                    <LeaseHorizon Authorities="@State.Authorities" Rows="@State.Rows" Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" Group="@Group" Sort="@Sort" Holder="@Holder" Filter="SetFilter" Inspect="OpenResource" />
+                    <LeaseHorizon Authorities="@State.Authorities" Rows="@State.Rows" Authority="@Authority" EvidenceState="@EvidenceState" Search="@Search" Group="@Group" Sort="@Sort" Holder="@Holder" Filter="SetFilter" Inspect="OpenResource" Selection="_selection" ClearFilters="ClearFilters" Retry="ManualRefreshAsync" />
                 </section>
-                <LeaseProbe Authorities="@State.Authorities" Rows="@State.Rows" />
+                <LeaseProbe @ref="_probe" Authorities="@State.Authorities" Rows="@State.Rows" />
             }
             <HostLockerPanel Highlighted="@(Section == "locker")" Provider="@Provider" />
             @if (Pages.GetRegisteredPages().Any(p => p.Route == "/job-scheduler/runtime"))
             {
-                <footer class="ls-footer"><a class="mo-vl-link" href="@Navigation.ToAbsoluteUri("job-scheduler/runtime")">@L["Horizon:Scheduler"] ↗</a></footer>
+                <footer class="ls-footer"><a class="mo-vl-link" href="@Navigation.ToAbsoluteUri("job-scheduler/runtime")">@L["Horizon:Scheduler"] <MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a></footer>
             }
             @if (!string.IsNullOrEmpty(ResourceName) && !string.IsNullOrEmpty(ResourceAuthority))
             {

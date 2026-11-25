@@ -1,7 +1,7 @@
 @attribute [Route(PAGE_URL)]
 @inject IStringLocalizer<LockerResource> L
 <PageTitle>@L["Navigation:Leases"]</PageTitle>
-<LeaseWorkbench Authority="@(Authority == "all" ? null : Authority)" EvidenceState="@(EvidenceState == "all" ? null : EvidenceState)" Search="@Search" ResourceAuthority="@(TargetAuthority ?? ResourceAuthority)" Group="@Group" Holder="@(Holder == "all" ? null : Holder)" Sort="@Sort" Section="@Section" Provider="@Provider" ResourceName="@ResourceName" />
+<LeaseWorkbench Authority="@(Authority == "all" ? null : Authority)" EvidenceState="@(EvidenceState == "all" ? null : EvidenceState)" Search="@Search" ResourceAuthority="@(TargetAuthority ?? ResourceAuthority)" Group="@Group" Holder="@(Holder == "all" ? null : Holder)" Sort="@Sort" Section="@Section" Provider="@Provider" ResourceName="@ResourceName" RefreshInterval="@RefreshInterval" />
 
 @code {
     public const string PAGE_URL = "/leases";
@@ -16,4 +16,5 @@
     [SupplyParameterFromQuery(Name = "section")] public string? Section { get; set; }
     [SupplyParameterFromQuery(Name = "targetAuthority")] public string? TargetAuthority { get; set; }
     [SupplyParameterFromQuery(Name = "provider")] public string? Provider { get; set; }
+    [SupplyParameterFromQuery(Name = "leaseRefresh")] public string? RefreshInterval { get; set; }
 }

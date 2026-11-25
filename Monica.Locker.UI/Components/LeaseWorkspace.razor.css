@@ -1,1 +1,7 @@
-.lease-workspace { display:flex; flex-direction:column; gap:22px; min-width:0; container:page / inline-size; }
+.lease-workspace { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+@container page (max-width: 1182px) {
+    .lease-workspace ::deep .mo-vl-actions { flex-basis: 100%; }
+}
+@container page (max-width: 720px) {
+    .lease-workspace { gap: 18px; }
+}

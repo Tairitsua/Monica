@@ -19,6 +19,8 @@ public partial class LeaseWorkbench
     [Parameter] public string? Sort { get; set; }
     [Parameter] public string? Section { get; set; }
     [Parameter] public string? Provider { get; set; }
+    [Parameter] public string? RefreshInterval { get; set; }
+    private LeaseProbe? _probe;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly CancellationToken _token;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -40,6 +42,12 @@ public partial class LeaseWorkbench
 
     protected override Task OnParametersSetAsync()
     {
+        if (int.TryParse(RefreshInterval, out var seconds) && LeaseWorkbenchState.RefreshIntervals.Contains(seconds)
+            && State.RefreshSeconds != seconds)
+        {
+            State.RefreshSeconds = seconds;
+            Wake();
+        }
         if (_selection == (ResourceAuthority, ResourceName)) return Task.CompletedTask;
         _selection = (ResourceAuthority, ResourceName);
         var selection = _selection;
@@ -84,7 +92,9 @@ public partial class LeaseWorkbench
     private void SetInterval(int seconds)
     {
         if (!LeaseWorkbenchState.RefreshIntervals.Contains(seconds)) return;
-        State.RefreshSeconds = seconds; Wake();
+        State.RefreshSeconds = seconds;
+        Wake();
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("leaseRefresh", seconds), replace: true);
     }
 
     private void Wake() { if (!_retired && _wake.CurrentCount == 0) _wake.Release(); }
@@ -156,6 +166,13 @@ public partial class LeaseWorkbench
         }
         catch (OperationCanceledException) when (_token.IsCancellationRequested) { }
     }
+
+    private Task FocusProbeAsync() => _probe?.FocusResourceAsync() ?? Task.CompletedTask;
+
+    private void ClearFilters() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+    {
+        ["authority"] = null, ["holder"] = null, ["state"] = null, ["q"] = null
+    }), replace: true);
 
     private void SetAuthority(string id) => SetFilter(("authority", Authority == id ? null : id));
     private void SetFilter((string Key, string? Value) filter) => Navigation.NavigateTo(

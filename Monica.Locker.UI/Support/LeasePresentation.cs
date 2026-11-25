@@ -1,22 +1,35 @@
 using Microsoft.Extensions.Localization;
 using Monica.Locker.Leases.Diagnostics;
 using Monica.Locker.UI.Localization;
+using Monica.UI.Icons;
+using Monica.UI.Shared.Components.Visual;
 
 namespace Monica.Locker.UI.Support;
 
 internal static class LeasePresentation
 {
-    public static string Role(LeaseAuthorityKind kind) => kind switch
+    public static MoVisualRole Role(LeaseAuthorityKind kind) => kind switch
     {
-        LeaseAuthorityKind.Sql => "info", LeaseAuthorityKind.Redis => "third", _ => "neutral"
+        LeaseAuthorityKind.Sql => MoVisualRole.Info,
+        LeaseAuthorityKind.Redis => MoVisualRole.Secondary,
+        _ => MoVisualRole.Neutral
     };
+
+    public static string Icon(LeaseAuthorityKind kind) =>
+        kind == LeaseAuthorityKind.Sql ? MoIcons.Database : MoIcons.Layers;
+
+    public static string Span(double seconds, IStringLocalizer<LockerResource> localizer)
+    {
+        var (value, unit) = Duration(seconds, localizer);
+        return value + " " + unit;
+    }
 
     public static (string Value, string Unit) Duration(double seconds, IStringLocalizer<LockerResource> localizer)
     {
         var value = Math.Abs(seconds);
         return value < 60 ? (value.ToString("0"), localizer["Common:Seconds"])
-            : value < 3600 ? ((value / 60).ToString("0.0"), localizer["Common:Minutes"])
-            : ((value / 3600).ToString("0.0"), localizer["Common:Hours"]);
+            : value < 3600 ? ((value / 60).ToString("0.#"), localizer["Common:Minutes"])
+            : ((value / 3600).ToString("0.#"), localizer["Common:Hours"]);
     }
 
     public static string Title(string name, IStringLocalizer<LockerResource> localizer) => name switch

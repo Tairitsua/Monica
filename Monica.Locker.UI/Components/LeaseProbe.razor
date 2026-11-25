@@ -1,31 +1,94 @@
 @inject IStringLocalizer<LockerResource> L
 @inject NavigationManager Navigation
 
-<section class="ls-probe-surface" id="lease-probe">
-    <header><MoIcon Icon="@MoIcons.Search" Size="1.25rem" /><div><h2>@L["Design:ProbeTitle"]</h2><p>@L["Design:ProbeDesc"]</p></div></header>
-    <form class="ls-probe-form" @onsubmit="Submit" @onsubmit:preventDefault>
-        <MudSelect T="string" Label="@L["Design:ProbeAuthority"]" Value="@Source.Id" ValueChanged="@ChangeSource" Variant="Variant.Outlined" Margin="Margin.Dense">
-            @foreach (var item in Authorities) { <MudSelectItem Value="@item.Authority.Id">@item.Authority.DisplayName</MudSelectItem> }
-        </MudSelect>
-        <MudTextField T="string" @bind-Value="_name" Immediate="true" MaxLength="512" Label="@L["Design:ProbeResource"]" Placeholder="@L["Design:ProbePlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense" Error="@(_error is not null)" ErrorText="@_error" />
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Search">@L["Design:ProbeSubmit"]</MudButton>
-    </form>
-    <div class="ls-probe-examples">@foreach (var row in Rows.Where(row => row.Authority.Id == Source.Id).Take(3))
-        { <button type="button" @onclick="@(() => { _name = row.Record.Resource.Name; _error = null; })">@row.Record.Resource.Name</button> }</div>
+<section class="ls-probe-surface mo-vl-surface" id="lease-probe">
+    <header class="mo-vl-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.ScanSearch" Size="16px" /></span>
+        <div><h2>@L["Design:ProbeTitle"]</h2><p>@L["Design:ProbeDesc"]</p></div>
+    </header>
+    <div class="ls-probe-body mo-vl-surface-body">
+        <form class="ls-probe-form" @onsubmit="Submit" @onsubmit:preventDefault>
+            <div class="ls-probe-field">
+                <span>@L["Design:ProbeAuthority"]</span>
+                <MudSelect T="string" aria-label="@L["Design:ProbeAuthority"]" Value="@Source.Id" ValueChanged="ChangeSource"
+                           ToStringFunc="DescribeSource" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var item in Authorities)
+                    {
+                        <MudSelectItem Value="@item.Authority.Id">@DescribeSource(item.Authority.Id)</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            <label class="ls-probe-field">
+                <span>@L["Design:ProbeResource"]</span>
+                <span class="ls-probe-input-wrap">
+                    <span class="ls-probe-scope-tag" title="@Source.Scope">@Source.Scope</span>
+                    <input @ref="_input" type="text" spellcheck="false" @bind="_name" @bind:event="oninput" maxlength="512"
+                           placeholder="@L["Design:ProbePlaceholder"]" aria-invalid="@(_error is null ? "false" : "true")" />
+                </span>
+            </label>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" StartIcon="@MoIcons.Crosshair">@L["Design:ProbeSubmit"]</MudButton>
+        </form>
+        @if (_error is not null)
+        {
+            <div class="ls-probe-error" role="alert"><MoIcon Icon="@MoIcons.Warning" Size="14px" />@_error</div>
+        }
+        @if (Rows.Count > 0)
+        {
+            <div class="ls-probe-suggestions">
+                <span>@L["Design:ProbeQuick"]</span>
+                @foreach (var row in QuickProbes)
+                {
+                    <button class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral" type="button"
+                            @key="(row.Authority.Id, row.Record.Resource.Name)" @onclick="@(async () => await UseSampleAsync(row))">@row.Record.Resource.Name</button>
+                }
+            </div>
+        }
+    </div>
 </section>
+
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<LeaseAuthorityEvidence> Authorities { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<LeaseRow> Rows { get; set; } = [];
+    private ElementReference _input;
     private string? _source, _error;
     private string _name = string.Empty;
-    private LeaseAuthority Source => (Authorities.FirstOrDefault(a => a.Authority.Id == _source) ?? Authorities[0]).Authority;
-    private void ChangeSource(string id) { _source = id; _error = null; }
+    private LeaseAuthority Source => (Authorities.FirstOrDefault(item => item.Authority.Id == _source) ?? Authorities[0]).Authority;
+    private IEnumerable<LeaseRow> QuickProbes => Rows.GroupBy(row => row.Authority.Id)
+        .Select(group => group.MinBy(row => row.RemainingSeconds)!)
+        .Concat(Rows.Where(row => row.Tight))
+        .Concat(Rows)
+        .DistinctBy(row => (row.Authority.Id, row.Record.Resource.Name)).Take(3);
+
+    /// <summary>Focuses the exact probe's resource input.</summary>
+    public Task FocusResourceAsync() => _input.FocusAsync().AsTask();
+
+    private string DescribeSource(string? id)
+    {
+        var authority = Authorities.FirstOrDefault(item => item.Authority.Id == id)?.Authority;
+        return authority is null ? string.Empty : $"{L[$"Providers:{authority.Kind}"]} · {authority.DisplayName} ({authority.Scope})";
+    }
+
+    private void ChangeSource(string id)
+    {
+        _source = id;
+        _error = null;
+    }
+
+    private async Task UseSampleAsync(LeaseRow row)
+    {
+        ChangeSource(row.Authority.Id);
+        _name = row.Record.Resource.Name;
+        await FocusResourceAsync();
+    }
+
     private void Submit()
     {
         _error = string.IsNullOrWhiteSpace(_name) ? L["Design:ProbeEmptyError"].Value :
             !_name.StartsWith(Source.NamePrefix, StringComparison.Ordinal) ? L["Design:ProbePrefixError", Source.NamePrefix].Value : null;
         if (_error is null)
-            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> {
-                ["targetAuthority"] = Source.Id, ["source"] = null, ["resource"] = _name }));
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+            {
+                ["targetAuthority"] = Source.Id, ["source"] = null, ["resource"] = _name
+            }));
     }
 }
