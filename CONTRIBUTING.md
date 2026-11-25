@@ -65,6 +65,24 @@ The checker assigns changed source files to their most specific catalog owner an
 4. Keep public XML documentation accurate for developer-facing APIs.
 5. Run the relevant build and test commands before opening the pull request.
 
+## Public Repository Publishing
+
+Keep internal reports, exports, and environment information in private storage. Monica's public repository excludes Office documents and PDFs. Transfer approved file changes between repositories on the public branch's history.
+
+Use a full Git clone and Python 3.10 or later. Enable the publication hook in each publishing clone with this command.
+
+```bash
+git config --local core.hooksPath .githooks
+```
+
+If the clone already has a pre-push hook, call the publication checker from that hook. For an automated publisher, run the same check on the published and outgoing revisions before uploading.
+
+```bash
+python3 scripts/check_publication.py --base <published-revision> --tip <outgoing-revision>
+```
+
+The check covers the outgoing commit range and the tip tree. A new ref uses the publishing remote's fetched `dev` as its baseline. GitHub Actions checks updates after upload.
+
 ## Commit Messages
 
 Release notes are generated from commit messages between release tags. Commits that affect package behavior, public APIs, documentation, or migration guidance should use Conventional Commit prefixes:

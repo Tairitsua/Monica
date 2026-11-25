@@ -1,0 +1,5 @@
+#!/bin/sh
+if command -v python >/dev/null 2>&1; then
+    exec python scripts/check_publication.py --pre-push "$1"
+fi
+exec python3 scripts/check_publication.py --pre-push "$1"

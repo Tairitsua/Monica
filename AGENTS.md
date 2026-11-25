@@ -9,6 +9,7 @@ Monica is modular .NET infrastructure for agent-driven development. `Monica.slnx
 - Apply the [Monica coding standards](skills/monica-coding-standards/SKILL.md) when designing, implementing, reviewing, or simplifying framework code. Breaking changes are allowed unless the task requires compatibility; keep refactoring within the requested scope.
 - Document public and developer-facing contracts, including meaningful option defaults, registration prerequisites, and lifecycle/ownership constraints. Use the [C# contracts](skills/monica-coding-standards/references/csharp-contracts.md) when changing C# APIs.
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before committing or preparing a release; follow its Conventional Commit policy.
+- Follow the [public repository publishing checks](CONTRIBUTING.md#public-repository-publishing) before uploading branches or tags.
 
 ## Task routing
 

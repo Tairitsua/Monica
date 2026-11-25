@@ -382,5 +382,17 @@ temp/
 .zcode/
 .zcodeignore
 
+# Office documents and PDF exports belong in private storage
+*.[dD][oO][cC]
+*.[dD][oO][cC][mM]
+*.[dD][oO][cC][xX]
+*.[xX][lL][sS]
+*.[xX][lL][sS][mM]
+*.[xX][lL][sS][xX]
+*.[pP][pP][tT]
+*.[pP][pP][tT][mM]
+*.[pP][pP][tT][xX]
+*.[pP][dD][fF]
+
 # Local UI design prototypes and verification evidence
 .ui-design/
