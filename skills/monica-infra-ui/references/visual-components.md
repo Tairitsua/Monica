@@ -10,11 +10,11 @@ The visual instruments below live in `Monica.UI.Shared.Components.Visual`. Inspe
 | --- | --- | --- |
 | Emphasize a number or subject inside a finding | `MoValueMark` | Choose a `MoVisualRole`; use `Href` only for navigation. This is not a status label, filter toggle, or command button. |
 | Localized finding containing emphasized values or links | `MoRichFinding` | Supply one localized `Template` and ordered `Values` fragments. Keep language-specific word order in resources. |
-| One feature value and its unit | `MoDisplayValue` | Supply formatted `Value`, optional `Unit`, and a complete `AccessibleLabel` when the visual fragments need one reading. |
-| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Icon` for the workspace seal, `Crumb`, `Meta`, and `Actions`; the page owns action hierarchy and links. |
+| One feature value and its unit | `MoDisplayValue` | Supply formatted `Value`, optional `Unit`, and a complete `AccessibleLabel` when the visual fragments need one reading. Set `Compact` for a proportional muted unit. The surrounding surface can supply `--mo-vl-display-size`. |
+| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Icon` for the workspace seal, `SealAccent` for a soft primary seal, `Crumb`, `Meta`, and `Actions`; the page owns action hierarchy and links. |
 | Contiguous facts sharing a frame | `MoFactGrid` with `MoFact` | Supply localized labels and preformatted values; this is not a grid of independent cards. |
 | State explanation with an icon tile | `MoSemanticCallout` | Supply `Severity`, `Title`, and evidence in `ChildContent`; use it for a contextual note, not a toast or modal alert. |
-| State/category filter | `MoFilterChip` | Supply `Label`, `Selected`, `SelectedChanged`, optional `Count` and `ShowDot`; a real zero remains an operable filter. `Pill=true` selects the compact capsule silhouette; the default remains rectangular. |
+| State/category filter | `MoFilterChip` | Supply `Label`, `Selected`, `SelectedChanged`, optional `Count` and `ShowDot`; a real zero remains an operable filter. `Pill=true` selects the compact capsule silhouette; the default remains rectangular. Use `mo-vl-chip--instrument` for a workbench filter rail or add `mo-vl-chip--diamond` when a diamond matches the plotted signal. |
 | Two measured contributions on one scale | `MoTwoRoleMeter` | Supply both values, `ScaleMaximum`, roles and `AccessibleDescription`; do not combine measurements with unrelated scales. |
 | Ranked records with optional inspection and expansion | `MoRankedLedger` with `MoLedgerRow` | Supply stable keys, provenance and totals; set `OnRowSelected` only when inspection exists. It is not an execution-log table. |
 | Compact ordered evidence | `MoSpine` with `MoSpineItem` | Supply ordered items and `AriaLabel`; nodes are static unless `OnItemSelected` is supplied. |
@@ -22,11 +22,13 @@ The visual instruments below live in `Monica.UI.Shared.Components.Visual`. Inspe
 
 Other reusable owners have distinct contracts:
 
-- `Monica.UI.Shared.Components.Navigation.MoWorkbenchNavigation` groups peer route links. The caller supplies localized `Label`, links and exact `aria-current` state; use local tabs for subordinate views instead.
+- `Monica.UI.Shared.Components.Navigation.MoWorkbenchNavigation` groups peer route links. The caller supplies localized `Label`, links and exact `aria-current` state; Set `Compact` for a short rail of peer pages within a workbench.
 - `MoContentState` owns [loading and empty content regions](content-states.md).
 - `MoTimeFormatter` owns [timestamp display](time-display.md); precision and calendar semantics remain explicit.
 - `MoJson` owns [JSON viewing and editing](json.md), and `MoIcon` owns [icon rendering](icons.md).
 - Modal evidence inspectors use the [native side-sheet contract](#modal-evidence-side-sheets); navigation drawers retain their own layout owner.
+
+Use a `mo-workbench-container` around `mo-page-shell mo-page-shell--workbench` to measure breakpoints at the workspace’s available inline width before applying gutters. Chart rulers, tracks, and registry layouts can use the same `page` container.
 
 ## Modal evidence side sheets
 
@@ -42,7 +44,7 @@ Use `Monica.UI.Shared.Components.Dialogs.MoSideSheet` for modal evidence inspect
 
 The example's localizer, `_open` state and `EvidenceContent` belong to the caller. `Open` defaults to false; inline callers bind `Open`/`OpenChanged` or unmount on dismissal. Accept the false notification before reopening. The component drains opening and closes its inline portal on disposal, including a reference produced after retirement. Callers retain query selection, reads, refresh, mutations and any nested confirmation lifetime.
 
-`TitleContent` replaces the text heading inside the shared padded identity region; compose the subject, icon and status there. `HeaderContent` is an edge-to-edge stationary toolbar region below that heading: a caller putting ordinary content there must supply its own inner padding. `ChildContent` scrolls; `FooterContent` holds stationary actions. Put related navigation in the evidence body when the workflow's primary decision belongs in the fixed footer. For tabbed evidence, supply native `MudTabPanel` children through `TabPanels` instead of `ChildContent`, and bind `ActiveTabIndex`/`ActiveTabIndexChanged` (index defaults to zero). The shared `MudTabs` keeps the tab bar stationary and scrolls the panels without breaking native tab associations or keyboard behavior. Do not split native tabs from their content.
+`TitleContent` replaces the text heading inside the shared padded identity region; compose the subject, icon and status there. `HeaderContent` is an edge-to-edge stationary toolbar region below that heading: a caller putting ordinary content there must supply its own inner padding. Set `Compact` for workbench padding. `ChildContent` scrolls; `FooterContent` holds stationary actions. Put related navigation in the evidence body when the workflow's primary decision belongs in the fixed footer. For tabbed evidence, supply native `MudTabPanel` children through `TabPanels` instead of `ChildContent`, and bind `ActiveTabIndex`/`ActiveTabIndexChanged` (index defaults to zero). The shared `MudTabs` keeps the tab bar stationary and scrolls the panels without breaking native tab associations or keyboard behavior. Do not split native tabs from their content.
 
 The title supplies the live accessible name. `Width` defaults to `480px` and is capped at the viewport. `CloseLabel` optionally supplies a contextual localized label. `Dismissible` defaults to true; false disables Close, Escape and backdrop dismissal while the caller completes admitted work. It does not block route retirement or cancel business work. Keep feature composition inside these slots; the shared component owns outer padding, body scrolling and reduced-motion styling. Do not add another overlay, focus trap, Escape handler or scrolling body.
 

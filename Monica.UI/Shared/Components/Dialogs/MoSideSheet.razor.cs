@@ -45,6 +45,9 @@ public partial class MoSideSheet : IAsyncDisposable
     /// <summary>Gets or sets the desired CSS width, capped at the viewport. Defaults to 480px.</summary>
     [Parameter] public string Width { get; set; } = "480px";
 
+    /// <summary>Uses the compact evidence padding in the identity and scrolling body. Defaults to false.</summary>
+    [Parameter] public bool Compact { get; set; }
+
     /// <summary>Gets or sets whether Close, Escape, and backdrop dismissal are enabled. Defaults to true.</summary>
     /// <remarks>Disabling dismissal does not prevent route retirement or disposal of owned business work.</remarks>
     [Parameter] public bool Dismissible { get; set; } = true;

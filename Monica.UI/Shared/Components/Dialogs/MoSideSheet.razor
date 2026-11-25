@@ -3,7 +3,7 @@
 
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
-           Class="mo-side-sheet" Style="@($"--mo-side-sheet-width: {Width};")"
+           Class="@(Compact ? "mo-side-sheet mo-side-sheet--compact" : "mo-side-sheet")" Style="@($"--mo-side-sheet-width: {Width};")"
            AriaLabelledBy="@_headingId">
     <TitleContent>
         <div class="mo-side-sheet-heading">

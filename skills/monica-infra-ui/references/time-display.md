@@ -30,7 +30,9 @@ Inject `MoTimeFormatter` into pages or their display owners. Use `Format` for a 
 timestamp, `FormatTime` or `FormatDate` for intentionally compact contexts, and
 `FormatRange` for a range that omits a repeated same-day end date. A nullable value
 renders an em dash. All conversions use the target instant's timezone rules,
-including daylight saving; the current culture is read on every format call.
+including daylight saving. The formatter reads the current culture on each call.
+Use `FormatZoneLabel(capturedAt)` for a workbench zone label. It uses the capture’s
+numeric UTC offset and falls back to the configured zone ID when the capture is absent.
 
 `DateTimeOffset` always represents an instant. UTC or Local `DateTime` values are
 also converted as instants. Unspecified `DateTime` is already deployment wall time

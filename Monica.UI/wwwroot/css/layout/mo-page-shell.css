@@ -19,6 +19,12 @@
     --mo-page-content-max-width: none;
 }
 
+.mo-workbench-container { min-width: 0; container: page / inline-size; }
+.mo-page-shell--workbench { --mo-page-content-max-width: 1480px; padding: 26px 31px 40px; }
+@container page (max-width: 720px) {
+    .mo-page-shell--workbench { padding: 20px 16px 36px; }
+}
+
 .mo-page-shell--compact {
     --mo-page-gutter-inline: clamp(12px, 1.5vw, 24px);
     --mo-page-gutter-block: clamp(14px, 1.5vw, 24px);

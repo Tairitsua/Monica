@@ -1,5 +1,5 @@
 @* The single display-scale value of a view; the page can supply a contrasting foreground for an inverse feature field. *@
-<p class="mo-vl-display @Class" aria-label="@AccessibleLabel">
+<p class="mo-vl-display @(Compact ? "mo-vl-display--compact" : null) @Class" aria-label="@AccessibleLabel">
     <span class="mo-vl-display__value" aria-hidden="@(AccessibleLabel is null ? null : "true")">@Value</span>
     @if (!string.IsNullOrWhiteSpace(Unit))
     {
@@ -16,6 +16,9 @@
 
     /// <summary>Gets or sets the accessible reading of the value; when supplied the visual parts are hidden from assistive technology.</summary>
     [Parameter] public string? AccessibleLabel { get; set; }
+
+    /// <summary>Uses the compact workbench scale with a muted, proportional unit. Defaults to false.</summary>
+    [Parameter] public bool Compact { get; set; }
 
     /// <summary>Gets or sets an optional identification class.</summary>
     [Parameter] public string? Class { get; set; }

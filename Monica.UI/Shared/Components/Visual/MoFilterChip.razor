@@ -6,7 +6,7 @@
         @onclick="ToggleAsync">
     @if (ShowDot)
     {
-        <span class="mo-vl-chip-dot" aria-hidden="true"></span>
+        <span class="mo-vl-chip-dot @(Count == 0 ? "mo-vl-chip-dot--empty" : null)" aria-hidden="true"></span>
     }
     <span>@Label</span>
     @if (Count is { } count)

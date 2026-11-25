@@ -51,3 +51,8 @@
     .mo-workbench-navigation { gap: 3px; }
     .mo-workbench-navigation ::deep a { padding: 9px 10px; }
 }
+
+.mo-workbench-navigation--compact { gap: 4px; padding-bottom: 10px; }
+.mo-workbench-navigation--compact ::deep a { min-height: 32px; padding: 0 12px; gap: 7px; }
+.mo-workbench-navigation--compact ::deep a[aria-current="page"] { color: color-mix(in srgb, var(--mud-palette-primary) 78%, var(--mud-palette-text-primary)); }
+.mo-workbench-navigation--compact ::deep :is(.mud-icon-root, .mo-icon) { width: 15px; height: 15px; }

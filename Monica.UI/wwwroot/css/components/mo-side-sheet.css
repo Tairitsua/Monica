@@ -32,6 +32,14 @@
     .mo-side-sheet-heading, .mo-side-sheet-body, .mo-side-sheet-tabs > .mud-tabs-panels { padding: 20px; }
     .mo-side-sheet .mud-dialog-actions.mo-side-sheet-footer { padding: 12px 20px; }
 }
+.mo-side-sheet--compact .mo-side-sheet-heading { padding: 18px 22px 14px; }
+.mo-side-sheet--compact .mud-dialog-actions.mo-side-sheet-footer { padding: 12px 22px; }
+.mo-side-sheet--compact :is(.mo-side-sheet-body, .mo-side-sheet-tabs > .mud-tabs-panels) { padding: 18px 22px 28px; }
+@media (max-width: 560px) {
+    .mo-side-sheet--compact .mo-side-sheet-heading,
+    .mo-side-sheet--compact .mud-dialog-actions.mo-side-sheet-footer,
+    .mo-side-sheet--compact :is(.mo-side-sheet-body, .mo-side-sheet-tabs > .mud-tabs-panels) { padding-inline: 16px; }
+}
 .mo-side-sheet-backdrop { backdrop-filter: blur(2px); }
 .mud-overlay.mo-side-sheet-backdrop .mud-overlay-scrim.mud-overlay-dark { background: color-mix(in srgb, var(--mud-palette-overlay-dark) 55%, transparent); }
 [data-theme$="-dark"] .mud-dialog.mo-side-sheet { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mud-palette-text-primary) 6%, transparent), 0 18px 40px -12px color-mix(in srgb, var(--mud-palette-black) 65%, transparent) !important; }

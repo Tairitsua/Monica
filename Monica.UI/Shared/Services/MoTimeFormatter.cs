@@ -25,6 +25,11 @@ public sealed class MoTimeFormatter(
     /// <summary>Gets the deployment timezone, defaulting to UTC when Clock has no override.</summary>
     public TimeZoneInfo TimeZone => clockOptions.Value.LocalTimeZone?.GetTimeZoneInfo() ?? TimeZoneInfo.Utc;
 
+    /// <summary>Gets the deployment clock label for a capture, using its UTC offset at the supplied instant.</summary>
+    /// <remarks>Missing observations use the configured timezone identifier.</remarks>
+    public string FormatZoneLabel(DateTimeOffset? instant) => instant is null || TimeZone.Equals(TimeZoneInfo.Utc)
+        ? TimeZone.Id : $"UTC{ToDisplayTime(instant.Value).ToString("zzz", CultureInfo.InvariantCulture)}";
+
     /// <summary>Converts an instant into the configured deployment timezone.</summary>
     public DateTimeOffset ToDisplayTime(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, TimeZone);
 

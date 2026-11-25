@@ -1,4 +1,4 @@
-<nav class="mo-workbench-navigation @Class" aria-label="@Label">
+<nav class="mo-workbench-navigation @(Compact ? "mo-workbench-navigation--compact" : null) @Class" aria-label="@Label">
     @ChildContent
 </nav>
 
@@ -8,6 +8,9 @@
 
     /// <summary>Gets or sets native route links; callers own URLs, localized labels, and exact aria-current state.</summary>
     [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Uses the compact related-route rail. Defaults to false.</summary>
+    [Parameter] public bool Compact { get; set; }
 
     /// <summary>Gets or sets an optional identification class without changing the shared navigation treatment.</summary>
     [Parameter] public string? Class { get; set; }
