@@ -51,6 +51,7 @@ internal static class HostedServiceExecutionAdapter
         CancellationToken cancellationToken)
         where TWorkItem : class, IHostedServiceWorkItem
     {
+        using var admission = ((IMoHostedService)service).RuntimeInfo.Role?.AdmitWork();
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var workItem = scope.ServiceProvider.GetRequiredService<TWorkItem>();
         var descriptor = ExecutionDescriptor.ForInterface<ExecutionUnit, ExecutionUnit>(
@@ -83,6 +84,7 @@ internal static class HostedServiceExecutionAdapter
         CancellationToken cancellationToken)
         where TWorkItem : class, IHostedServiceWorkItem<TInput, TResult>
     {
+        using var admission = ((IMoHostedService)service).RuntimeInfo.Role?.AdmitWork();
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var workItem = scope.ServiceProvider.GetRequiredService<TWorkItem>();
         var descriptor = ExecutionDescriptor.ForInterface<TInput, TResult>(

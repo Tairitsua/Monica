@@ -110,7 +110,7 @@ public class KafkaEndpoint(
                 if (Metadata.Direction is ConnectionDirection.Input or ConnectionDirection.InputAndOutput)
                 {
                     _consumer = new KafkaConsumerRuntime(Metadata, clients, _producer, DeliverAsync,
-                        ReportFailure, unavailable => Pipe.IsNotAvailable = unavailable);
+                        () => Pipe.IsRoleQuarantined, ReportFailure, unavailable => Pipe.IsNotAvailable = unavailable);
                     await _consumer.StartAsync(cancellationToken);
                 }
                 cancellationToken.ThrowIfCancellationRequested();
@@ -163,7 +163,7 @@ public class KafkaEndpoint(
         _consumer = null;
         if (consumer is not null)
         {
-            try { await consumer.StopAsync(); }
+            try { await consumer.StopAsync(Pipe.IsRoleQuarantined ? Pipe.HostStopping : null); }
             catch (Exception exception) { (failures ??= []).Add(exception); }
         }
         // Already-faulted publication tasks belong to their callers. Await all operations before releasing the producer.

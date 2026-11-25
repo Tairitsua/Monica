@@ -34,7 +34,7 @@ public enum TypeActivationKind
     DataChannel
 }
 
-/// <summary>Supplies one host's immutable business activation policy to infrastructure consumers.</summary>
+/// <summary>Supplies frozen host placement and current role quarantine decisions to infrastructure consumers.</summary>
 /// <remarks>
 /// The application composition installs the same instance before discovery commits and registers it for runtime
 /// guards. Core installs a default policy for standalone hosts using Application:AutonomousWork.

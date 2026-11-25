@@ -1,5 +1,6 @@
 
 using Monica.Core.ObservableInstance.Models;
+using Monica.Core.HostedService.Services.Support;
 
 namespace Monica.Core.HostedService.Models;
 
@@ -23,6 +24,8 @@ public class HostedServiceRuntimeInfo
     /// Gets the underlying observable tracker for internal runtime operations.
     /// </summary>
     internal ObservableInstanceTracker Tracker => _tracker;
+
+    internal HostedServiceRoleBinding? Role { get; set; }
 
     // Service Identity (delegates to tracker)
 

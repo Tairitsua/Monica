@@ -38,9 +38,55 @@ public sealed class OutboxDeliveryTests
         Assert.Equal(0, probe.Sends);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RuntimeQuarantine_DrainsClaimedDeliveryAndLeavesNextRowsUntouched(bool transportOutlivesDeadline)
+    {
+        var time = new OutboxTestTimeProvider();
+        var probe = new SendProbe();
+        var health = new FaultedStoreOwner { Faulted = false };
+        await using var app = await CreateAsync(time, probe, health);
+        await SeedAsync(app, time, 3);
+        var dispatcher = app.Services.GetRequiredService<OutboxDispatcher<TestRepositoryDbContext>>();
+        var pass = dispatcher.DrainAsync(3, Token);
+        var first = await probe.Started.Reader.ReadAsync(Token);
+        try
+        {
+            if (transportOutlivesDeadline)
+            {
+                var timeout = await time.TakeDelayAsync(TimeSpan.FromSeconds(29), Token);
+                time.Advance(TimeSpan.FromSeconds(29));
+                timeout.Fire();
+                Assert.Equal(0, await pass.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            }
+            health.Faulted = true;
+            var drain = Task.WhenAll(app.Services.GetServices<IRoleLifecycleParticipant>()
+                .Select(participant => participant.OnRoleQuarantinedAsync("delivery", Token)));
+            Assert.False(drain.IsCompleted);
+            await Assert.ThrowsAsync<RoleUnavailableException>(() => dispatcher.DrainAsync(1, Token));
+            first.Completion.TrySetResult();
+            Assert.Equal(transportOutlivesDeadline ? 0 : 1, await pass.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            await drain.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            Assert.Equal(1, probe.Sends);
+            await app.VerifyAsync<TestRepositoryDbContext>(async (db, ct) =>
+            {
+                var rows = await db.Set<OutboxMessage>().OrderBy(row => row.Sequence).ToListAsync(ct);
+                Assert.Equal(!transportOutlivesDeadline, rows[0].DeliveredAtUtc.HasValue);
+                Assert.All(rows.Skip(1), row =>
+                {
+                    Assert.Equal(0, row.Attempts);
+                    Assert.Null(row.LeaseId);
+                });
+            }, Token);
+        }
+        finally { first.Completion.TrySetResult(); }
+    }
+
     private sealed class FaultedStoreOwner : IRoleHealthStateProvider
     {
-        public bool IsRoleFaulted(string roleId) => roleId == "delivery";
+        internal bool Faulted { get; set; } = true;
+        public bool IsRoleFaulted(string roleId) => Faulted && roleId == "delivery";
         public string? GetRoleId(Type implementationType, Type? registrationOwner = null)
             => implementationType == typeof(TestRepositoryDbContext) ? "delivery" : null;
         public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();

@@ -6,21 +6,23 @@
         <div class="rh-legend">
             @foreach (var state in new[] { RoleHealthStatus.Healthy, RoleHealthStatus.Degraded, RoleHealthStatus.Faulted })
             {
-                <span><i class="@(state == RoleHealthStatus.Faulted ? "rh-legend-quarantine" : "rh-cell-mark") @RoleHealthDisplay.Color(state).ToCssClass()"></i>@L[$"Roles:States:{state}"]</span>
+                <span><i class="@(state == RoleHealthStatus.Faulted ? "rh-legend-quarantine" : state == RoleHealthStatus.Degraded ? "rh-cell-mark is-diamond" : "rh-cell-mark") @RoleHealthDisplay.Color(state).ToCssClass()"></i>@L[$"Roles:States:{state}"]</span>
             }
+            @if (Roles.Any(role => role.OverrideCriticality.HasValue)) { <span><i class="rh-cell-ov mo-vl-role--secondary"></i>@L["Roles:Override"]</span> }
         </div>
     </header>
     @if (_ordered.Length > 0)
     {
-        <div class="rh-chambers @(_ordered.Length == 1 ? "is-single" : null)" role="listbox" aria-label="@L["Roles:Board"]">
+        <HealthListKeyPolicy ElementId="@_boardId" TargetClass="rh-cell" />
+        <div id="@_boardId" class="rh-chambers @(_ordered.Length == 1 ? "is-single" : null)" role="listbox" aria-label="@L["Roles:Board"]">
             @foreach (var criticality in Enum.GetValues<RoleCriticality>())
             {
                 var chamber = _ordered.Where(role => role.EffectiveCriticality == criticality).ToArray();
                 if (_ordered.Length == 1 && chamber.Length == 0) continue;
                 var domains = chamber.GroupBy(role => role.DomainId).ToArray();
                 <div class="rh-chamber @(criticality == RoleCriticality.Required ? "mo-vl-role--primary" : "mo-vl-role--info") @(chamber.Any(r => r.Status == RoleHealthStatus.Faulted) ? "has-fault" : null)" role="group" aria-label="@L[$"Roles:Chamber:{criticality}"]">
-                    <header class="rh-chamber-head"><div class="rh-chamber-title-row"><span class="rh-chamber-icon"><MoIcon Icon="@(criticality == RoleCriticality.Required ? MoIcons.ShieldCheck : MoIcons.Shield)" Size="15px" /></span>
-                        <div class="rh-chamber-copy"><h4>@L[$"Roles:Chamber:{criticality}"]</h4><p>@L[$"Roles:ChamberDesc:{criticality}"]</p></div><span class="rh-chamber-count">@chamber.Count(r => r.Status == RoleHealthStatus.Healthy) / @chamber.Length</span></div>
+                    <header class="rh-chamber-head"><div class="rh-chamber-title-row"><span class="rh-chamber-icon"><MoIcon Icon="@(criticality == RoleCriticality.Required ? MoIcons.ShieldCheck : MoIcons.Split)" Size="15px" /></span>
+                        <div class="rh-chamber-copy"><h4>@L[$"Roles:Chamber:{criticality}"]</h4><p>@L[$"Roles:ChamberDesc:{criticality}"]</p></div><span class="rh-chamber-count @RoleHealthDisplay.Color(chamber.MinBy(RoleHealthDisplay.Severity)?.Status ?? RoleHealthStatus.Inactive).ToCssClass()">@L["Roles:ChamberCount", chamber.Count(r => r.Status == RoleHealthStatus.Healthy), chamber.Length]@if (chamber.Any(r => r.Status == RoleHealthStatus.Faulted)) { <text> · @L["Roles:FaultCount", chamber.Count(r => r.Status == RoleHealthStatus.Faulted)]</text> }</span></div>
                     </header>
                     @if (domains.Length == 0) { <div class="rh-chamber-empty">@L["Roles:ChamberEmpty"]</div> }
                     <div class="rh-chamber-domains @(domains.Length >= 6 ? "is-grid" : null)">
@@ -30,13 +32,14 @@
                                 @foreach (var role in domain)
                                 {
                                     var index = Array.IndexOf(_ordered, role);
-                                    <button @key="role.RoleId" @ref="_buttons[index]" type="button" role="option" aria-label="@($"{role.RoleId} · {L[$"Roles:States:{role.Status}"]}")" aria-selected="@((index == _selected).ToString().ToLowerInvariant())"
-                                        tabindex="@(index == _selected ? 0 : -1)" class="rh-cell @RoleHealthDisplay.Color(role.Status).ToCssClass() is-@role.Status.ToString().ToLowerInvariant()"
-                                        @onfocus="@(() => _selected = index)" @onmouseenter="@(() => _hover = index)" @onmouseleave="@(() => _hover = null)"
+                                    var inspected = string.Equals(Role, role.RoleId, StringComparison.OrdinalIgnoreCase);
+                                    <button @key="role.RoleId" @ref="_buttons[index]" type="button" role="option" aria-label="@($"{role.RoleId} · {L[$"Roles:States:{role.Status}"]}")" title="@(role.Faults.FirstOrDefault()?.Summary ?? role.RoleId)" aria-selected="@inspected.ToString().ToLowerInvariant()"
+                                        tabindex="@(index == _selected ? 0 : -1)" class="rh-cell @(inspected ? "is-selected" : null) @RoleHealthDisplay.Color(role.Status).ToCssClass() is-@role.Status.ToString().ToLowerInvariant()"
+                                        @onfocus="@(() => { _selected = index; _hover = null; })" @onmouseenter="@(() => _hover = index)" @onmouseleave="@(() => _hover = null)"
                                         @onkeydown="@(key => MoveAsync(key, index))" @onclick="@(() => Nav.NavigateTo(Nav.GetUriWithQueryParameter("role", role.RoleId)))">
                                         <span class="rh-cell-top"><i class="rh-cell-mark @(role.Status == RoleHealthStatus.Degraded ? "is-diamond" : null)"></i><b class="rh-cell-id">@role.RoleId</b>
                                         @if (role.OverrideCriticality.HasValue) { <i class="rh-cell-ov mo-vl-role--secondary" title="@L["Roles:Override"]"></i> }</span>
-                                        @if (role.Status == RoleHealthStatus.Faulted) { <span class="rh-cell-sub"><span class="rh-micro-badge">503</span><small class="rh-micro-stage">@L[$"Roles:Stages:{role.Faults.FirstOrDefault()?.Stage}"]</small>
+                                        @if (role.Faults.FirstOrDefault() is { } fault) { <span class="rh-cell-sub">@if (role.Status == RoleHealthStatus.Faulted) { <span class="rh-micro-badge">503</span> }<small class="rh-micro-stage">@L[$"Roles:Stages:{fault.Stage}"]</small>
                                             @if (RoleHealthDisplay.CandidateReady(role)) { <span class="rh-micro-badge mo-vl-role--success">@L["Roles:Verified"]</span> }</span> }
                                     </button>
                                 }
@@ -47,18 +50,22 @@
             }
         </div>
         var readout = _ordered[_hover ?? _selected];
-        <div class="rh-readout" aria-live="polite"><span class="rh-readout-text"><i class="rh-cell-mark @RoleHealthDisplay.Color(readout.Status).ToCssClass()"></i><b>@readout.RoleId</b> · @L[$"Roles:States:{readout.Status}"] @readout.Faults.FirstOrDefault()?.Summary</span><span class="rh-readout-hint">@L["Roles:KeyHint"]</span></div>
+        <div class="rh-readout" aria-live="polite"><span class="rh-readout-text"><i class="rh-cell-mark @RoleHealthDisplay.Color(readout.Status).ToCssClass()"></i><span><b>@readout.RoleId</b> · @L[$"Roles:Criticalities:{readout.EffectiveCriticality}"] · @L[$"Roles:States:{readout.Status}"] · @(readout.Faults.FirstOrDefault()?.Summary ?? L["Roles:InventoryCount", Resources.GetValueOrDefault(readout.RoleId)?.Count ?? 0].Value)</span></span><span class="rh-readout-hint">@L["Roles:KeyHint"]</span></div>
     }
     @if (Roles.Where(r => !r.IsActiveOnCurrentHost).ToArray() is { Length: > 0 } remote)
     {
-        <div class="rh-remote-strip"><span>@L["Roles:RemotePlacement", remote.Length, string.Join(", ", remote.Select(r => r.AssignedAppId).Distinct())]</span><a href="@Nav.GetUriWithQueryParameter("inactive", "1")">@L["Roles:ShowRemote"]</a></div>
+        <div class="rh-remote-strip"><span class="rh-remote-text"><MoIcon Icon="@MoIcons.Network" Size="14px" />@L["Roles:RemotePlacement", remote.Length, string.Join(", ", remote.Select(r => r.AssignedAppId).Distinct())]</span><a href="@Nav.GetUriWithQueryParameter("inactive", Inactive == "1" ? null : "1")">@L[Inactive == "1" ? "Roles:HideRemote" : "Roles:ShowRemote"]</a></div>
     }
 </div>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<RoleHealthEntrySnapshot> Roles { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, IReadOnlyList<RoleResourceSnapshot>> Resources { get; set; } = default!;
+    [SupplyParameterFromQuery] public string? Role { get; set; }
+    [SupplyParameterFromQuery] public string? Inactive { get; set; }
     private RoleHealthEntrySnapshot[] _ordered = [];
     private ElementReference[] _buttons = [];
+    private readonly string _boardId = $"role-board-{Guid.NewGuid():N}";
     private int _selected;
     private int? _hover;
 
@@ -78,6 +85,6 @@
         var next = key.Key switch { "Home" => 0, "End" => _buttons.Length - 1,
             "ArrowRight" or "ArrowDown" => Math.Min(index + 1, _buttons.Length - 1),
             "ArrowLeft" or "ArrowUp" => Math.Max(0, index - 1), _ => index };
-        if (next != index) { _selected = next; await _buttons[next].FocusAsync(preventScroll: true); }
+        if (next != index) { _selected = next; await _buttons[next].FocusAsync(preventScroll: false); }
     }
 }

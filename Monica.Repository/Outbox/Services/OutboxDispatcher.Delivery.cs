@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 using Monica.EventBus.Services.Support;
@@ -27,7 +28,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
     public async Task<int> DrainAsync(int maximumMessages = 100, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumMessages, 1);
-        EnsureStoreAvailable();
+        using var admission = _admission.AdmitDelivery();
         if (System.Transactions.Transaction.Current is not null)
             throw new InvalidOperationException("Outbox delivery cannot run inside an ambient transaction; claims must commit before sending.");
         await using var scope = scopes.CreateAsyncScope();
@@ -45,6 +46,8 @@ public sealed partial class OutboxDispatcher<TDbContext>
             while (remaining > 0 || active.Count > 0)
             {
                 stopping.Token.ThrowIfCancellationRequested();
+                // Completed claims retain their send/acknowledgment budget after role quarantine.
+                if (_admission.IsQuarantined) remaining = 0;
                 var available = ReserveDeliverySlots(remaining);
                 if (available > 0)
                 {
@@ -62,7 +65,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
                             foreach (var batch in CreateDeliveryBatches(claimed, scope.ServiceProvider))
                             {
                                 reserved -= batch.Rows.Count;
-                                active.Add(DeliverAsync(batch, started, stopping.Token));
+                                active.Add(DeliverAsync(batch, started, admission.Retain(), stopping.Token));
                             }
                         }
                     }
@@ -128,7 +131,8 @@ public sealed partial class OutboxDispatcher<TDbContext>
         }
     }
 
-    private async Task<int> DeliverAsync(DeliveryBatch batch, long claimStarted, CancellationToken cancellationToken)
+    private async Task<int> DeliverAsync(DeliveryBatch batch, long claimStarted, RoleWorkAdmission.Lease admission,
+        CancellationToken cancellationToken)
     {
         CancellationTokenSource? timeout = null;
         CancellationTokenSource? deadline = null;
@@ -155,12 +159,12 @@ public sealed partial class OutboxDispatcher<TDbContext>
         finally
         {
             // Waiting can end before sending. The real operation retains its scope, cancellation sources and slot.
-            _ = ReleaseDeliverySlotAsync(delivery ?? Task.FromResult(0), timeout, deadline, batch.Rows);
+            _ = ReleaseDeliverySlotAsync(delivery ?? Task.FromResult(0), timeout, deadline, batch.Rows, admission);
         }
     }
 
     private async Task ReleaseDeliverySlotAsync(Task<int> delivery, CancellationTokenSource? timeout,
-        CancellationTokenSource? deadline, IReadOnlyList<OutboxMessage> candidates)
+        CancellationTokenSource? deadline, IReadOnlyList<OutboxMessage> candidates, RoleWorkAdmission.Lease admission)
     {
         try { await delivery; }
         catch (OperationCanceledException) { }
@@ -170,6 +174,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
             deadline?.Dispose();
             timeout?.Dispose();
             _deliverySlots.Release(candidates.Count);
+            admission.Dispose();
         }
     }
 

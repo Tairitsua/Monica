@@ -162,6 +162,13 @@ public abstract class MoHostedService : IHostedService, IMoHostedService, IHoste
     /// <param name="cancellationToken">Signals that application startup is being aborted.</param>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var role = RuntimeInfo.Role;
+        if (role?.TryBeginStart() == false)
+        {
+            RecordState("Startup skipped because the owning role is quarantined", HostedServiceState.Faulted);
+            return;
+        }
         try
         {
             await ExecuteLifecycleAsync(
@@ -183,14 +190,24 @@ public abstract class MoHostedService : IHostedService, IMoHostedService, IHoste
                 },
                 cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             RecordState("Service start failed", HostedServiceState.Faulted, ex);
-
-            if (_options.FailFastOnStartupError)
+            if (role is null)
             {
-                throw;
+                if (_options.FailFastOnStartupError) throw;
+                return;
             }
+
+            if (!role.TryIsolateStartupFault()) throw;
+        }
+        finally
+        {
+            role?.CompleteStart();
         }
     }
 
@@ -199,7 +216,14 @@ public abstract class MoHostedService : IHostedService, IMoHostedService, IHoste
     /// with the shared execution pipeline.
     /// </summary>
     /// <param name="cancellationToken">Signals the graceful-shutdown deadline.</param>
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        var role = RuntimeInfo.Role;
+        if (role?.Skipped == true) return Task.CompletedTask;
+        return role is null ? StopCoreAsync(cancellationToken) : role.StopOnceAsync(() => StopCoreAsync(cancellationToken));
+    }
+
+    private async Task StopCoreAsync(CancellationToken cancellationToken)
     {
         try
         {

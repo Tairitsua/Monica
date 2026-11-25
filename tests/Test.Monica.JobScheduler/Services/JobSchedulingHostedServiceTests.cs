@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Services;
 using Monica.Core.TypeDiscovery.Abstractions;
+using Monica.Core.ApplicationRoles;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Operations;
@@ -45,6 +46,52 @@ public sealed class JobSchedulingHostedServiceTests
         await service.ScheduleAsync(TestContext.Current.CancellationToken);
         Assert.False((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "removed", TestContext.Current.CancellationToken))!.IsPresent);
         Assert.True((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_B, "foreign", TestContext.Current.CancellationToken))!.IsPresent);
+    }
+
+    [Fact]
+    public async Task RuntimeQuarantine_ReleasesOwnerCoordinatorWithoutAnotherPollAndPreservesDurableManifest()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new StoreFixture.ManualTimeProvider(NOW);
+        var store = new InMemoryJobSchedulerStore(time);
+        var activation = Substitute.For<ITypeActivationPolicy>();
+        var definition = new LocalJobDefinition
+        {
+            OwnerKey = StoreFixture.OWNER_A,
+            Declaration = StoreFixture.RecurringDeclaration("jobs.alpha", cron: "0 0 * * * *"),
+            JobClrType = typeof(object)
+        };
+        var roles = Substitute.For<IRoleHealthStateProvider>();
+        roles.GetSnapshot().Returns(new RoleHealthSnapshot("host", "host", null, RoleFaultPolicyMode.Auto, true,
+            [new RoleHealthEntrySnapshot("role", "domain", StoreFixture.OWNER_A, "host", RoleCriticality.Optional, null,
+                RoleHealthStatus.Faulted, NOW, [])]));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var boundary = Substitute.For<IJobSchedulerStore>();
+        boundary.CoordinatorLeases.Returns(store.CoordinatorLeases);
+        boundary.SyncOwnerSnapshotAsync(Arg.Any<JobOwnerSnapshot>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                entered.TrySetResult();
+                await finish.Task.WaitAsync(token);
+                return await store.SyncOwnerSnapshotAsync(call.Arg<JobOwnerSnapshot>(), call.Arg<CancellationToken>());
+            });
+        using var service = CreateService(boundary, [definition], time, activation: activation, roleHealth: roles);
+        var scheduling = service.ScheduleAsync(token);
+        await entered.Task.WaitAsync(token);
+        activation.SuspendedWorkloadOwners.Returns([StoreFixture.OWNER_A]);
+        var retiring = service.OnRoleQuarantinedAsync("role", token);
+        var resource = new LeaseResource(StoreFixture.SCOPE, JobCoordinatorLeaseAdapter.PREFIX + "owner:" + StoreFixture.OWNER_A);
+        try
+        {
+            Assert.False(retiring.IsCompleted);
+            Assert.Null(await store.CoordinatorLeases.TryAcquireAsync(resource, "healthy-replica", TimeSpan.FromMinutes(1), token));
+        }
+        finally { finish.TrySetResult(); }
+        await Task.WhenAll(scheduling, retiring);
+        var lease = await store.CoordinatorLeases.TryAcquireAsync(resource, "healthy-replica", TimeSpan.FromMinutes(1), token);
+        Assert.NotNull(lease);
+        Assert.True((await store.GetDefinitionAsync(StoreFixture.SCOPE, StoreFixture.OWNER_A, "jobs.alpha", token))!.IsPresent);
     }
 
     private sealed class EmptySelectedRole : ITypeActivationPolicy
@@ -685,7 +732,8 @@ public sealed class JobSchedulingHostedServiceTests
         bool manualMode = false,
         ModuleJobSchedulerOption? configuredOptions = null,
         ITypeActivationPolicy? activation = null,
-        HistoryCleanupLeaseStore? historyCleanupLeases = null)
+        HistoryCleanupLeaseStore? historyCleanupLeases = null,
+        IRoleHealthStateProvider? roleHealth = null)
     {
         var options = configuredOptions ?? new ModuleJobSchedulerOption
         {
@@ -705,6 +753,6 @@ public sealed class JobSchedulingHostedServiceTests
             Options.Create(new ModuleHostedServiceOption()),
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<JobSchedulingHostedService>.Instance,
-            activation, historyCleanupLeases);
+            activation, historyCleanupLeases, roleHealth: roleHealth);
     }
 }

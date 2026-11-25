@@ -45,6 +45,11 @@
       "Impact": "Restart impact on this instance",
       "Observed": "Candidate validated on this instance",
       "Missing": "No valid candidate observed",
+      "None": "None",
+      "OtherFaults": "Isolated for another fault",
+      "MissingNote": "Verify deployment inputs on the replacement instance.",
+      "ObservedNote": "Validation used the inputs visible to this process.",
+      "InterruptedNote": "All serving roles stop during instance replacement.",
       "Interrupted": "Serving roles interrupted",
       "Serving": "{0} of {1} assigned roles"
     },

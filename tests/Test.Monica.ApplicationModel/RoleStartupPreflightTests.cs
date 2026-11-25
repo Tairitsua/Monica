@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Monica.Core.HostedService.Abstractions;
+using Monica.Core.ObservableInstance.Abstractions;
 using Monica.ApplicationModel.Models;
 using Monica.Configuration.Abstractions;
 using Monica.Configuration.Annotations;
@@ -189,9 +193,130 @@ public sealed class RoleStartupPreflightTests
         Assert.Empty(app.Services.GetRequiredService<ITypeActivationPolicy>().ActiveWorkloadOwners!);
     }
 
+    [Fact]
+    public async Task RuntimeQuarantine_ClosesHandlerAdmissionBeforeParticipantsDrain()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var drain = new DrainParticipant();
+        await using var app = await new Factory(validWorker: true, configure: services =>
+            services.AddSingleton<IRoleLifecycleParticipant>(drain)).CreateAsync(cancellationToken: token);
+        var coordinator = app.Services.GetRequiredService<IRoleFaultCoordinator>();
+        var health = app.Services.GetRequiredService<IRoleHealthStateProvider>();
+        var fault = RoleFaultRecord.ForResource(RoleFaultStage.RuntimeResource, typeof(Worker));
+        await coordinator.ReportRuntimeResourceFaultAsync(WORKER_ROLE, false, fault, token);
+        Assert.Equal(RoleHealthStatus.Degraded, health.GetSnapshot().Roles.Single(role => role.RoleId == WORKER_ROLE).Status);
+        await using var scope = app.CreateScope(token);
+        var mediator = scope.Resolve<IMediator>();
+        Assert.Equal("required", await mediator.Send(new RoleQuery(), token));
+
+        coordinator.ReportRuntimeResourceFault(WORKER_ROLE, true, fault);
+        Assert.True(health.IsRoleFaulted(WORKER_ROLE));
+        var quarantine = coordinator.ReportRuntimeResourceFaultAsync(WORKER_ROLE, true, fault, token);
+        try
+        {
+            await drain.Entered.Task.WaitAsync(token);
+            Assert.False(quarantine.IsCompleted);
+            var policy = app.Services.GetRequiredService<ITypeActivationPolicy>();
+            Assert.Contains(WORKER_ROLE, policy.SuspendedWorkloadOwners);
+            Assert.DoesNotContain(WORKER_ROLE, policy.ActiveWorkloadOwners!);
+            await Assert.ThrowsAsync<RoleUnavailableException>(() => mediator.Send(new PrivateWorkerQuery(), token));
+            Assert.False(health.IsRoleFaulted(API_ROLE));
+        }
+        finally { drain.Release.TrySetResult(); }
+        await quarantine;
+        await coordinator.ReportRuntimeResourceFaultAsync(WORKER_ROLE, false, fault, token);
+        Assert.Equal(RoleHealthStatus.Faulted, health.GetSnapshot().Roles.Single(role => role.RoleId == WORKER_ROLE).Status);
+        Assert.Equal(1, drain.Calls);
+    }
+
+    [Theory]
+    [InlineData("Auto", false)]
+    [InlineData("IsolateAll", true)]
+    public async Task OwnedStartupFailure_UsesRolePolicyEvenWhenHostedFailFastIsDisabled(string mode, bool isolate)
+    {
+        var drain = new DrainParticipant();
+        var factory = new Factory(mode, validWorker: true, configure: services =>
+        {
+            services.AddSingleton<IRoleLifecycleParticipant>(drain);
+            services.AddHostedService<FailingStartupService>();
+        });
+        var token = TestContext.Current.CancellationToken;
+        if (!isolate)
+        {
+            var error = await Assert.ThrowsAnyAsync<Exception>(() => factory.CreateAsync(cancellationToken: token));
+            Assert.Contains("startup diagnostic fixture", error.ToString());
+            return;
+        }
+
+        await using var app = await factory.CreateAsync(cancellationToken: token);
+        // The Generic Host has returned even though role cleanup is still waiting for an admitted operation.
+        await drain.Entered.Task.WaitAsync(token);
+        drain.Release.SetResult();
+        var role = app.Services.GetRequiredService<IRoleHealthStateProvider>().GetSnapshot().Roles.Single(r => r.RoleId == API_ROLE);
+        Assert.Equal(RoleHealthStatus.Faulted, role.Status);
+        var evidence = Assert.Single(role.Faults);
+        Assert.Equal(RoleFaultStage.HostedServiceStartup, evidence.Stage);
+        Assert.DoesNotContain("startup diagnostic fixture", evidence.Summary);
+        Assert.Contains(nameof(FailingStartupService), evidence.Summary);
+        await using var scope = app.CreateScope(token);
+        Assert.Equal("required", await scope.Resolve<IMediator>().Send(new RoleQuery(), token));
+    }
+
+    [Fact]
+    public async Task CriticalBackgroundExit_QuarantinesRoleWithSafeRuntimeEvidence()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var exit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var app = await new Factory(validWorker: true, configure: services =>
+        {
+            services.AddSingleton(exit);
+            services.AddHostedService<CriticalBackgroundService>();
+        }).CreateAsync(cancellationToken: token);
+        var service = app.Services.GetServices<IHostedService>().OfType<CriticalBackgroundService>().Single();
+        exit.SetResult();
+        await service.ExecuteTask!.WaitAsync(token);
+        var role = app.Services.GetRequiredService<IRoleHealthStateProvider>().GetSnapshot().Roles.Single(r => r.RoleId == API_ROLE);
+        Assert.Equal(RoleHealthStatus.Faulted, role.Status);
+        Assert.Equal(RoleFaultStage.RuntimeResource, Assert.Single(role.Faults).Stage);
+        Assert.DoesNotContain("background diagnostic fixture", role.Faults[0].Summary);
+    }
+
+    private sealed class DrainParticipant : IRoleLifecycleParticipant
+    {
+        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int Calls;
+
+        public Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Calls);
+            Entered.TrySetResult();
+            return Release.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class FailingStartupService(IObservableInstanceRegistry registry, IOptions<ModuleHostedServiceOption> options,
+        IServiceScopeFactory scopes, ILogger<FailingStartupService> logger) : MoHostedService(registry, options, scopes, logger)
+    {
+        protected override Task OnStartingAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("startup diagnostic fixture");
+    }
+
+    [RoleCriticalResource]
+    private sealed class CriticalBackgroundService(TaskCompletionSource exit,
+        IObservableInstanceRegistry registry, IOptions<ModuleHostedServiceOption> options,
+        IServiceScopeFactory scopes, ILogger<CriticalBackgroundService> logger) : MoBackgroundService(registry, options, scopes, logger)
+    {
+        protected override async Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
+        {
+            await exit.Task.WaitAsync(stoppingToken);
+            throw new InvalidOperationException("background diagnostic fixture");
+        }
+    }
+
     private sealed class Factory(string mode = "Auto", string criticality = "Optional", bool combined = true,
         string appId = "worker", bool invalidShared = false, bool unsafeValidator = false, bool earlySharedRead = false,
-        bool earlyScopedRead = false)
+        bool earlyScopedRead = false, bool validWorker = false, Action<IServiceCollection>? configure = null)
         : MonicaTestApplicationFactory<ApiQuery>
     {
         internal SharedStartupOptions? FirstRead { get; private set; }
@@ -204,13 +329,14 @@ public sealed class RoleStartupPreflightTests
         {
             var input = new Dictionary<string, string?>
             {
-                ["WorkerStartup:Attempts"] = "0",
+                ["WorkerStartup:Attempts"] = validWorker ? "1" : "0",
                 ["SharedStartup:Count"] = invalidShared ? "0" : "1",
                 ["Application:RoleFaultPolicy:Mode"] = mode,
                 ["Application:RoleFaultPolicy:RoleCriticalityOverrides:ordering.worker"] = criticality
             };
             if (unsafeValidator) input["NestedStartup:Values:private-key:Value"] = "private-input";
             builder.Configuration.AddInMemoryCollection(input);
+            configure?.Invoke(builder.Services);
         }
 
         protected override void ConfigureMonica(IMonicaBuilder builder)
@@ -236,6 +362,7 @@ public sealed class RoleStartupPreflightTests
                 SecondRead = builder.GetStartupOptions<SharedStartupOptions>();
             }
             if (earlyScopedRead) builder.GetStartupOptions<WorkerStartupOptions>();
+            if (configure is not null) builder.AddHostedService();
             builder.AddMediator();
             builder.AddDependencyInjection();
         }

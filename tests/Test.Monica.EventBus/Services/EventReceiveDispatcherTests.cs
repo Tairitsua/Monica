@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Core.TypeDiscovery.Abstractions;
@@ -179,7 +180,53 @@ public sealed class EventReceiveDispatcherTests
                 null, "original-parent", null),
             EventSubscriptionScope.Distributed, Encoding.UTF8.GetBytes("{\"value\":\"payload\"}"));
 
-    private sealed class OwnershipFactory : MonicaTestApplicationFactory<OwnershipNotice>
+    [Fact]
+    public async Task Quarantine_ClosesNewReceivesAndDrainsBeforeRemovingTheExternalSubscription()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var health = new ReceiverHealth();
+        await using var app = await new OwnershipFactory(health).CreateAsync(cancellationToken: token);
+        var registry = app.Services.GetRequiredService<IEventSubscriptionRegistry>();
+        var probe = app.Services.GetRequiredService<OwnerSubscriptionProbe>();
+        var recorder = app.Services.GetRequiredService<DeliveryRecorder>();
+        var dispatcher = app.Services.GetRequiredService<IEventReceiveDispatcher>();
+        using var observation = registry.Subscribe(probe);
+        foreach (var subscription in registry.GetAll())
+            probe.OnNext(new EventSubscriptionChange(EventSubscriptionChangeType.Added, subscription, DateTime.UtcNow));
+        var subscriptionId = registry.GetAll().Single(s => s.HandlerType == typeof(PolicyOwnedHandler)).Id;
+        recorder.ReleasePolicyHandler = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var admitted = dispatcher.DispatchAsync(CreateMessage(), "policy-owner", token);
+        await recorder.PolicyHandlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+        try
+        {
+            health.Faulted = true;
+            var drain = ((IRoleLifecycleParticipant)registry).OnRoleQuarantinedAsync("receiver.integration", token);
+            Assert.False(drain.IsCompleted);
+            Assert.Empty(probe.RemovedOwners);
+            await Assert.ThrowsAsync<RoleUnavailableException>(() => dispatcher.DispatchAsync(CreateMessage(), "policy-owner", token));
+            await Assert.ThrowsAsync<RoleUnavailableException>(() => dispatcher.DispatchAsync(CreateMessage(), token));
+            Assert.Equal(["policy-owner"], recorder.Owners);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => registry.ActivateAsync(subscriptionId, token));
+            await dispatcher.DispatchAsync(CreateMessage(), "explicit-owner", token);
+            recorder.ReleasePolicyHandler.TrySetResult();
+            await admitted.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await drain.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Equal(["policy-owner"], probe.RemovedOwners);
+            Assert.Equal(EventSubscriptionState.Disabled, registry.GetById(subscriptionId)!.State);
+        }
+        finally { recorder.ReleasePolicyHandler.TrySetResult(); }
+    }
+
+    private sealed class ReceiverHealth : IRoleHealthStateProvider
+    {
+        internal bool Faulted { get; set; }
+        public bool IsRoleFaulted(string roleId) => Faulted && roleId == "receiver.integration";
+        public string? GetRoleId(Type implementationType, Type? registrationOwner = null)
+            => implementationType == typeof(PolicyOwnedHandler) ? "receiver.integration" : null;
+        public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();
+    }
+
+    private sealed class OwnershipFactory(ReceiverHealth? health = null) : MonicaTestApplicationFactory<OwnershipNotice>
     {
         protected override void ConfigureMonica(IMonicaBuilder builder)
         {
@@ -194,6 +241,7 @@ public sealed class EventReceiveDispatcherTests
             services.RemoveAll<IDistributedEventBus>();
             services.Add(productionGateway);
             services.AddSingleton<ITypeActivationPolicy, OwnershipPolicy>();
+            if (health is not null) services.AddSingleton<IRoleHealthStateProvider>(health);
             services.AddSingleton<DeliveryRecorder>();
             services.AddSingleton<OwnerSubscriptionProbe>();
             services.AddScoped<PolicyOwnedHandler>();
@@ -216,6 +264,8 @@ public sealed class EventReceiveDispatcherTests
         public List<string> Owners { get; } = [];
         public List<EventDeliveryMetadata> Metadata { get; } = [];
         public Action? AfterDelivery { get; set; }
+        public TaskCompletionSource? ReleasePolicyHandler { get; set; }
+        public TaskCompletionSource PolicyHandlerStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Record(string owner, IEventDeliveryContext delivery)
         {
@@ -234,7 +284,8 @@ public sealed class EventReceiveDispatcherTests
         public Task HandleEventAsync(OwnershipNotice eventData, CancellationToken cancellationToken)
         {
             recorder.Record("policy-owner", delivery);
-            return Task.CompletedTask;
+            recorder.PolicyHandlerStarted.TrySetResult();
+            return recorder.ReleasePolicyHandler?.Task ?? Task.CompletedTask;
         }
     }
 
@@ -285,6 +336,7 @@ public sealed class EventReceiveDispatcherTests
             observableRegistry, hostedOptions, scopeFactory, logger, serviceKey: null)
     {
         public List<string?> CreatedOwners { get; } = [];
+        public List<string?> RemovedOwners { get; } = [];
         protected override bool GroupSubscriptionsByWorkloadOwner => true;
 
         public void ChangeState(string? owner, TopicSubscriptionRuntimeState state)
@@ -301,6 +353,9 @@ public sealed class EventReceiveDispatcherTests
         }
 
         protected override Task RemoveExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken)
-            => Task.CompletedTask;
+        {
+            RemovedOwners.Add(group.WorkloadOwner);
+            return Task.CompletedTask;
+        }
     }
 }

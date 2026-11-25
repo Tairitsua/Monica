@@ -33,7 +33,8 @@
             </div>
             <span class="hc-env-axis-right">@L["Design:EnvelopeAxisRight"]</span>
         </div>
-        <div class="hc-env-body" role="listbox" aria-label="@title" @onpointerleave="@(() => _hoveredIndex = null)">
+        <HealthListKeyPolicy ElementId="@_envelopeId" TargetClass="hc-env-row" />
+        <div id="@_envelopeId" class="hc-env-body" role="listbox" aria-label="@title" @onpointerleave="@(() => _hoveredIndex = null)">
             <div class="hc-env-grid" aria-hidden="true">
                 <span></span>
                 <div class="hc-env-grid-track">
@@ -92,6 +93,7 @@
 }
 
 @code {
+    private readonly string _envelopeId = $"health-envelope-{Guid.NewGuid():N}";
     [Parameter, EditorRequired] public HealthCheckSnapshot Snapshot { get; set; } = default!;
     [Parameter] public string? EntryName { get; set; }
     [Parameter] public bool Stale { get; set; }

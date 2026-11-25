@@ -1,0 +1,5 @@
+.system-info-dialog-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+.system-info-dialog-heading .mo-vl-tile { flex:none; width:32px; height:32px; border-radius:8px; }
+.system-info-dialog-heading ::deep .mud-icon-button { flex:none; margin-inline-start:auto; width:30px; height:30px; border-radius:6px; color:var(--mud-palette-text-secondary); }
+.system-info-dialog-heading ::deep .mud-icon-button:hover { background:var(--mud-palette-action-default-hover); color:var(--mud-palette-text-primary); }
+.system-info-dialog-heading ::deep .mud-icon-button:focus-visible { outline:2px solid var(--mud-palette-primary); outline-offset:-2px; }

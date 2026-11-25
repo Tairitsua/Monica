@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Extensions;
 using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Framework.Seeder.Abstractions;
@@ -8,7 +9,7 @@ using Monica.Tool.Extensions;
 
 namespace Monica.Framework.Seeder.Services.Support;
 
-internal sealed class SeederState(SeederGraph graph, TimeProvider timeProvider) : ISeederState
+internal sealed class SeederState(SeederGraph graph, TimeProvider timeProvider, IRoleHealthStateProvider? roles = null) : ISeederState
 {
     private const int MAX_ERROR_TYPE_LENGTH = 512;
     private const int MAX_ERROR_MESSAGE_LENGTH = 2048;
@@ -297,6 +298,7 @@ internal sealed class SeederState(SeederGraph graph, TimeProvider timeProvider) 
             Status = state.Status,
             Activation = descriptor.Activation,
             ActivationReason = state.ActivationReason,
+            IsRoleQuarantined = roles?.GetRoleId(descriptor.SeederType) is { } role && roles.IsRoleFaulted(role),
             ParticipatesInReadiness = state.ParticipatesInReadiness,
             Attempts = state.Attempts,
             MaxAttempts = descriptor.MaxAttempts,

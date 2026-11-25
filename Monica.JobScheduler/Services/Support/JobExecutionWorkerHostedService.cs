@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.JobScheduler.Abstractions;
 using Monica.JobScheduler.Models;
 using Monica.JobScheduler.Models.Definitions;
@@ -34,8 +36,10 @@ internal sealed class JobExecutionWorkerHostedService(
     IOptions<ModuleHostedServiceOption> hostedServiceOptions,
     IServiceScopeFactory serviceScopeFactory,
     ILogger<JobExecutionWorkerHostedService> logger,
-    IMeterFactory? meterFactory = null)
-    : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
+    IMeterFactory? meterFactory = null,
+    ITypeActivationPolicy? activation = null,
+    IRoleHealthStateProvider? roleHealth = null)
+    : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger), IRoleLifecycleParticipant
 {
     private readonly ConcurrentDictionary<string, Task> _executions = new(StringComparer.Ordinal);
     private readonly Channel<bool> _completionWake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
@@ -253,6 +257,9 @@ internal sealed class JobExecutionWorkerHostedService(
 
             var owner = _localOwners[_nextClaimOwnerIndex];
             _nextClaimOwnerIndex = (_nextClaimOwnerIndex + 1) % _localOwners.Length;
+            if (activation?.SuspendedWorkloadOwners.Contains(owner.Key) == true) continue;
+            using var claimAdmission = owner.Admission.TryEnter();
+            if (claimAdmission is null) continue;
             var requestStarted = timeProvider.GetTimestamp();
             long? recoveryStarted;
             lock (_workerStateGate)
@@ -286,7 +293,7 @@ internal sealed class JobExecutionWorkerHostedService(
                 var task = !CanAdmitWork() || workerToken.IsCancellationRequested
                     ? FinalizeAsync(lease, null)
                     : ExecuteLeaseAsync(lease, workerToken, requestStarted);
-                if (!_executions.TryAdd(lease.Execution.InstanceId, NotifyExecutionCompletedAsync(task)))
+                if (!_executions.TryAdd(lease.Execution.InstanceId, NotifyExecutionCompletedAsync(task, claimAdmission.Retain())))
                 {
                     throw new InvalidOperationException(
                         $"Execution '{lease.Execution.InstanceId}' was claimed twice by one worker.");
@@ -799,7 +806,7 @@ internal sealed class JobExecutionWorkerHostedService(
         }
     }
 
-    private async Task NotifyExecutionCompletedAsync(Task execution)
+    private async Task NotifyExecutionCompletedAsync(Task execution, RoleWorkAdmission.Lease admission)
     {
         try
         {
@@ -807,11 +814,22 @@ internal sealed class JobExecutionWorkerHostedService(
         }
         finally
         {
+            admission.Dispose();
             _ = _completionWake.Writer.TryWrite(true);
         }
     }
 
-    private sealed record LocalOwner(string Key, IReadOnlyCollection<string> JobKeys, string ManifestHash);
+    public Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken)
+    {
+        var ownerKey = roleHealth?.GetSnapshot().Roles.Single(role => role.RoleId == roleId).WorkloadOwner;
+        var local = _localOwners.FirstOrDefault(owner => owner.Key == ownerKey);
+        return local?.Admission.CloseAndDrainAsync().WaitAsync(cancellationToken) ?? Task.CompletedTask;
+    }
+
+    private sealed record LocalOwner(string Key, IReadOnlyCollection<string> JobKeys, string ManifestHash)
+    {
+        internal RoleWorkAdmission Admission { get; } = new();
+    }
 
     /// <summary>
     /// Owns one store call and an independent deadline; cancellation callbacks never run on its timer thread.

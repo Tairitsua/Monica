@@ -23,7 +23,8 @@ internal sealed class ApplicationApiInvoker(
     IOptions<ModuleApiClientOption> apiClientOptions,
     IEnumerable<IApplicationInvocationAuthorityPolicy> authorities,
     IServiceProvider services,
-    IRoleHealthStateProvider? roleHealth = null) : IApplicationApiInvoker
+    IRoleHealthStateProvider? roleHealth = null,
+    IRoleQuarantineRequestMetrics? metrics = null) : IApplicationApiInvoker
 {
     private readonly IApplicationInvocationAuthorityPolicy? _authority = authorities.SingleOrDefault();
 
@@ -51,7 +52,10 @@ internal sealed class ApplicationApiInvoker(
             {
                 var roleId = operation.RequiredRole ?? operation.RoleId;
                 if (roleHealth?.IsRoleFaulted(roleId) == true)
+                {
+                    metrics?.RecordLocalRejection(roleId);
                     return TResponse.CreateRemoteFailure(ResultStatus.ServiceUnavailable, RoleUnavailableException.MessageForRole(roleId));
+                }
                 return await local.InvokeAsync(request, cancellationToken, transaction);
             }
             destination = new ApplicationInvocationDestination(model.ResolveRoleAppId(operation.RequiredRole ?? operation.RoleId));

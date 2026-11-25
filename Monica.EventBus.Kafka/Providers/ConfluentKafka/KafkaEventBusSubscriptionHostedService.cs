@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.EventBus.Abstractions;
@@ -76,6 +77,14 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         }
 
         await consumer.StopAsync();
+    }
+
+    protected override async Task DrainExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken)
+    {
+        // Keep the consumer visible to host shutdown while a native commit or handler is still outstanding.
+        if (_consumers.Find(group.TopicName, group.WorkloadOwner) is not { } consumer) return;
+        try { await consumer.DrainAsync(); }
+        finally { _consumers.Remove(group.TopicName, group.WorkloadOwner); }
     }
 
     protected override Task DisposeExternalSubscriptionsAsync(CancellationToken cancellationToken)
@@ -206,6 +215,8 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 {
                     continue;
                 }
+                using var settlement = topicConsumer.TryEnterDelivery();
+                if (settlement is null) return;
                 if (batchSubscription is not null)
                 {
                     try
@@ -228,7 +239,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     }
                     catch (KafkaProcessingBlockedException) { throw; }
                     catch (KafkaConsumerRestartRequiredException) { throw; }
-                    catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+                    catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
                     {
                         // Collection may have read ahead. Recreate instead of advancing past any retained record.
                         throw new KafkaConsumerRestartRequiredException("Kafka batch collection failed before acknowledgment.", failure);
@@ -258,6 +269,11 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                break;
+            }
+            catch (RoleUnavailableException refusal)
+            {
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Stopped, refusal.Message);
                 break;
             }
             catch (KafkaConsumerRestartRequiredException)
@@ -314,7 +330,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             {
                 await retryPolicy.ExecuteAsync(handle, cancellationToken);
             }
-            catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 // End exhausted processing only after the last attempt's transaction and scope unwind.
                 cancellationToken.ThrowIfCancellationRequested();
@@ -329,7 +345,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             // The caller disposes this consumer without advancing its broker position.
             throw;
         }
-        catch (Exception failure) when (failure is KafkaProcessingBlockedException or KafkaConsumerRestartRequiredException)
+        catch (Exception failure) when (failure is RoleUnavailableException or KafkaProcessingBlockedException or KafkaConsumerRestartRequiredException)
         {
             throw;
         }
@@ -462,6 +478,11 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             }
         }
 
+        internal TopicConsumer? Find(string topicName, string? workloadOwner)
+        {
+            lock (_lifecycleLock) return _consumers.GetValueOrDefault((topicName, workloadOwner));
+        }
+
         internal IReadOnlyList<TopicConsumer> Drain()
         {
             lock (_lifecycleLock)
@@ -489,6 +510,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         private readonly object _lifecycleLock = new();
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly Func<TopicConsumer, Task> _consumeAsync;
+        private readonly RoleWorkAdmission _settlements = new();
         private Task? _consumerTask;
         private Task? _stopTask;
 
@@ -510,6 +532,14 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         public string? WorkloadOwner { get; }
 
         public CancellationToken CancellationToken { get; }
+
+        internal RoleWorkAdmission.Lease? TryEnterDelivery() => _settlements.TryEnter();
+
+        internal async Task DrainAsync()
+        {
+            await _settlements.CloseAndDrainAsync().ConfigureAwait(false);
+            await StopAsync().ConfigureAwait(false);
+        }
 
         internal bool TryStart()
         {

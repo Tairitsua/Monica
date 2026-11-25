@@ -42,7 +42,7 @@ See [API documentation](api-documentation-and-visibility.md#crud-collection-resp
 
 ## Role-owned endpoint admission
 
-Application-model HTTP admission keeps generated receiver actions and role-owned MVC routes discoverable on an assigned, quarantined role. Their requests receive the host's configured 503 result envelope after authorization and before model binding or controller activation. Actions in the same generated controller can belong to different roles. Inactive MVC role routes continue to be omitted.
+Application-model HTTP admission keeps generated receiver actions and role-owned MVC routes discoverable on an assigned, quarantined role. Their requests receive the host's configured 503 result envelope after authorization and before model binding or controller activation. Actions in the same generated controller can belong to different roles. Inactive MVC role routes continue to be omitted. A runtime quarantine takes effect on the next admission and lets requests already executing finish. The refusing MVC or Monica Minimal API gate increments `monica.application.role.quarantined_requests` with `transport=http` once. See [role metrics](../../monica-infra-observability/references/opentelemetry-metrics.md#application-role-isolation).
 
 Minimal APIs mapped with the module's `UseEndpoints` helper or marked with `WithMonicaEndpoint()` also gate the role-owned handler before parameter binding. The role comes from the handler type or the owning Monica module contribution. A host with the result-envelope module receives its configured error envelope. See [startup fault policy](../../monica-infra-hosting/references/application-model.md#startup-fault-policy).
 

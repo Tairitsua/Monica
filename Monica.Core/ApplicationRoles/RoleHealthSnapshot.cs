@@ -21,7 +21,12 @@ public sealed record RoleConfigValidationIssueRef(string DefinitionKey, string S
 
 /// <summary>Describes a fault without exposing raw configuration values or exception payloads.</summary>
 public sealed record RoleFaultRecord(RoleFaultStage Stage, string Summary, DateTimeOffset OccurredAt,
-    IReadOnlyList<RoleConfigValidationIssueRef> ConfigurationIssues);
+    IReadOnlyList<RoleConfigValidationIssueRef> ConfigurationIssues)
+{
+    /// <summary>Creates safe resource evidence using only the lifecycle stage and concrete resource type.</summary>
+    public static RoleFaultRecord ForResource(RoleFaultStage stage, Type resourceType) =>
+        new(stage, $"Resource '{resourceType.FullName}' failed during {stage}.", DateTimeOffset.UtcNow, []);
+}
 
 /// <summary>Placement, effective criticality and process-local health of one role.</summary>
 public sealed record RoleHealthEntrySnapshot(string RoleId, string DomainId, string WorkloadOwner, string AssignedAppId,
@@ -64,6 +69,8 @@ public interface IRoleHealthStateProvider
 {
     /// <summary>Captures all catalog roles. Candidate validation is opt-in and may rebind deployment inputs.</summary>
     RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false);
+    /// <summary>Returns whether this host is assigned the role, including quarantined roles.</summary>
+    bool IsRoleActive(string roleId) => GetSnapshot().Roles.Any(role => role.RoleId == roleId && role.IsActiveOnCurrentHost);
     /// <summary>Returns true only when this process quarantined the role.</summary>
     bool IsRoleFaulted(string roleId);
     /// <summary>Resolves resource ownership, including a domain background role, or null for host infrastructure.</summary>

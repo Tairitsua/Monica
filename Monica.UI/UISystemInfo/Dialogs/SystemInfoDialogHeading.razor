@@ -1,0 +1,15 @@
+@using Monica.UI.Shared.Components.Dialogs
+@inject IStringLocalizer<SharedResource> L
+
+<div class="system-info-dialog-heading">
+    <span class="mo-vl-tile @Tone.ToCssClass()"><MoIcon Icon="@Icon" Size="18px" /></span>
+    <MoDialogHeading Text="@Text" />
+    <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" aria-label="@L["Common:Close"]" OnClick="Close" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+    [Parameter] public MoVisualRole Tone { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+}

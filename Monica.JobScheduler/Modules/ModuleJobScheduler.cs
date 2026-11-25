@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.ApplicationRoles;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Monica.Core;
@@ -255,9 +256,11 @@ public sealed class ModuleJobScheduler : MonicaModule<ModuleJobSchedulerOption>
             services.AddSingleton(provider => new HistoryCleanupLeaseStore(
                 provider.GetRequiredKeyedService<IExclusiveLeaseStore>(cleanupSelection.ServiceKey)));
         services.AddSingleton<JobSchedulingHostedService>();
+        services.AddSingleton<IRoleLifecycleParticipant>(sp => sp.GetRequiredService<JobSchedulingHostedService>());
         services.AddSingleton<JobExecutionWorkerHostedService>();
         services.AddHostedService(static provider => provider.GetRequiredService<JobSchedulingHostedService>());
         context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobSchedulingHostedService));
+        services.AddSingleton<IRoleLifecycleParticipant>(sp => sp.GetRequiredService<JobExecutionWorkerHostedService>());
         services.AddHostedService(static provider => provider.GetRequiredService<JobExecutionWorkerHostedService>());
         context.Composition.AdmitHostedLifecycle(services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService)), typeof(JobExecutionWorkerHostedService));
 

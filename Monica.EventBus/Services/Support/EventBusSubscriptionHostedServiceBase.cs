@@ -7,6 +7,7 @@ using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
+using Monica.EventBus.Models.Internal;
 using Monica.Modules;
 
 namespace Monica.EventBus.Services.Support;
@@ -176,7 +177,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
 
                 case EventSubscriptionChangeType.Removed:
                 case EventSubscriptionChangeType.Deactivated:
-                    HandleSubscriptionRemovedAsync(change.Subscription.Id, CancellationToken.None)
+                    HandleSubscriptionRemovedAsync(change.Subscription.Id, change.Subscription is EventSubscription { IsQuarantined: true }, CancellationToken.None)
                         .GetAwaiter().GetResult();
                     break;
             }
@@ -189,6 +190,8 @@ public abstract class EventBusSubscriptionHostedServiceBase(
             Logger.LogError(ex,
                 "Error handling subscription change {ChangeType} for {EventSubscriptionId}",
                 change.ChangeType, change.Subscription.Id);
+            if (change.ChangeType == EventSubscriptionChangeType.Deactivated
+                && change.Subscription is EventSubscription { IsQuarantined: true }) throw;
         }
     }
 
@@ -290,7 +293,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
         }
     }
 
-    private async Task HandleSubscriptionRemovedAsync(EventSubscriptionId subscriptionId, CancellationToken cancellationToken)
+    private async Task HandleSubscriptionRemovedAsync(EventSubscriptionId subscriptionId, bool quarantined, CancellationToken cancellationToken)
     {
         // Find which topic this subscription belongs to
         SubscriptionGroup? groupToRemove = null;
@@ -326,7 +329,8 @@ public abstract class EventBusSubscriptionHostedServiceBase(
             if (groupToRemove is { } groupToStop)
             {
                 RecordState($"Removing external subscription for topic {groupToStop.TopicName}", HostedServiceState.Running);
-                await RemoveExternalSubscriptionForTopicAsync(groupToStop, cancellationToken);
+                if (quarantined) await DrainExternalSubscriptionForTopicAsync(groupToStop, cancellationToken);
+                else await RemoveExternalSubscriptionForTopicAsync(groupToStop, cancellationToken);
                 ReportRemainingTopicState(groupToStop.TopicName);
                 RecordState($"Successfully removed external subscription for topic {groupToStop.TopicName}", HostedServiceState.Running);
             }
@@ -484,6 +488,11 @@ public abstract class EventBusSubscriptionHostedServiceBase(
         SubscriptionGroup group,
         CancellationToken cancellationToken);
 
+    /// <summary>Closes a quarantined group's transport after any accepted broker acknowledgments settle.</summary>
+    /// <remarks>Override when acknowledgment is owned by the transport beyond the handler's lifetime.</remarks>
+    protected virtual Task DrainExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken) =>
+        RemoveExternalSubscriptionForTopicAsync(group, cancellationToken);
+
     /// <summary>
     /// Handles an external message received from the messaging system.
     /// Triggers all registered handlers for the prepared received message.
@@ -502,6 +511,10 @@ public abstract class EventBusSubscriptionHostedServiceBase(
         // Get topic information
         if (!_topicSubscriptions.ContainsKey(group))
         {
+            foreach (var subscription in SubscriptionManager.GetByTopicName(topicName).Where(s =>
+                         s.Scope == EventSubscriptionScope.Distributed && s.ServiceKey == ServiceKey
+                         && GetSubscriptionGroup(s) == group))
+                EventSubscription.EnsureRoleAvailable(subscription);
             throw new InvalidOperationException(
                 $"Received message for inactive topic '{topicName}' and owner '{workloadOwner ?? "<unowned>"}'.");
         }

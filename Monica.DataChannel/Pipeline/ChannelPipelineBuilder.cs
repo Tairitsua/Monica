@@ -153,36 +153,49 @@ public class ChannelPipelineBuilder
     /// </summary>
     /// <param name="provider">The service provider used to resolve dependencies.</param>
     /// <returns>The fully built data pipeline instance.</returns>
-    internal ChannelPipeline Build(IServiceProvider provider)
+    internal async ValueTask<ChannelPipeline> BuildAsync(IServiceProvider provider)
     {
-        // Create the inner endpoint.
-        var innerEndpoint = TransientProxy.CreateEndpointProxy(provider, InnerCoreType!, ChannelSide.Inner, _innerEndpointMetadata);
-
-        // Create the outer endpoint.
-        var outerEndpoint = TransientProxy.CreateEndpointProxy(provider, OuterCoreType!, ChannelSide.Outer, _outerEndpointMetadata);
-        outerEndpoint.EntranceType = ChannelSide.Outer;
-
-        // Resolve the observable instance registry.
         var observableManager = provider.GetRequiredService<IObservableInstanceRegistry>();
         var logger = provider.GetRequiredService<ILogger<ChannelPipeline>>();
         var options = provider.GetRequiredService<IOptions<ModuleDataChannelOption>>().Value;
+        IPipelineEndpoint? inner = null;
+        IPipelineEndpoint? outer = null;
+        ChannelPipeline? pipeline = null;
+        try
+        {
+            inner = TransientProxy.CreateEndpointProxy(provider, InnerCoreType!, ChannelSide.Inner, _innerEndpointMetadata);
+            outer = TransientProxy.CreateEndpointProxy(provider, OuterCoreType!, ChannelSide.Outer, _outerEndpointMetadata);
+            outer.EntranceType = ChannelSide.Outer;
+            var middlewares = new List<IPipelineMiddleware>(_middlewares);
+            foreach (var type in _diMiddlewares)
+                middlewares.Add(TransientProxy.CreateMiddlewareProxy(provider, type));
 
-        // Resolve every component before allocating the pipeline's observable lifetime.
-        var middlewaresList = new List<IPipelineMiddleware>(_middlewares);
-        foreach (var type in _diMiddlewares)
-            middlewaresList.Add(TransientProxy.CreateMiddlewareProxy(provider, type));
-
-        // Create the pipeline.
-        var pipe = new ChannelPipeline(
-            innerEndpoint,
-            outerEndpoint,
-            Id,
-            observableManager,
-            logger,
-            options.RecentExceptionToKeep,
-            GroupId);
-
-        pipe.SetMiddlewares(middlewaresList);
-        return pipe;
+            pipeline = new ChannelPipeline(inner, outer, Id, observableManager, logger, options.RecentExceptionToKeep, GroupId);
+            pipeline.SetMiddlewares(middlewares);
+            return pipeline;
+        }
+        catch (Exception original)
+        {
+            // Constructors can acquire endpoint resources before a complete pipeline exists.
+            var failures = new List<Exception> { original };
+            if (pipeline is not null)
+            {
+                try { await pipeline.DisposeAsync(); }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            else
+            {
+                foreach (var endpoint in new[] { outer, inner }.OfType<ICommunicationEndpoint>())
+                {
+                    try { await endpoint.DisposeAsync(); }
+                    catch (Exception failure) { failures.Add(failure); }
+                }
+            }
+            if (failures.Count > 1) throw new PipelineRollbackException(failures);
+            throw;
+        }
     }
 }
+
+/// <summary>The host cannot isolate a setup whose provisional endpoint cleanup failed.</summary>
+internal sealed class PipelineRollbackException(IEnumerable<Exception> failures) : AggregateException(failures);

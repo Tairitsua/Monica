@@ -1,6 +1,6 @@
 # Transactional events and delivery
 
-Application-model hosts admit Outbox workers by the concrete context's execution owner. A quarantined context contributes no automatic store. Explicit `DrainAsync` and `CleanupAsync` on its dispatcher raise `RoleUnavailableException` before taking a lease or claiming rows. Committed pending rows stay available for a future healthy owner. A healthy sibling context can continue dispatching in the same process.
+Application-model hosts admit Outbox workers by the concrete context's execution owner. A registration callback cannot take ownership of a context from another role. A quarantined context contributes no automatic store. Explicit `DrainAsync` and `CleanupAsync` on its dispatcher raise `RoleUnavailableException` before taking a lease or claiming rows. Committed pending rows stay available for a future healthy owner. A runtime quarantine stops new claims, wakes idle polling and lets sends already admitted finish their acknowledgment. A healthy sibling context can continue dispatching. For a verified shared physical store, the next eligible contribution takes over after the previous dispatcher drains.
 
 Outbox, Inbox and their lease table use the [common infrastructure table layout](infrastructure-table-layout.md). Configure the same policy for all contexts mapping a shared physical store, with one migration owner and explicit exclusions elsewhere. Layout selection alone does not consolidate existing stores. Use `SharedStoreKey` below to consolidate automatic dispatchers and qualify delivery destinations.
 

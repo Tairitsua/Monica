@@ -4,6 +4,7 @@ using Monica.Core.JsonSerialization.Abstractions;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Annotations;
 using Monica.EventBus.Models;
+using Monica.EventBus.Models.Internal;
 using Monica.EventBus.Services.Support;
 
 namespace Monica.EventBus.Services;
@@ -33,9 +34,9 @@ public sealed class EventReceiveDispatcher(
         if (messages.Count == 0) throw new ArgumentException("A receive batch cannot be empty.", nameof(messages));
         var subscription = registry.GetById(id)
             ?? throw new InvalidOperationException($"Event subscription '{id}' no longer exists.");
+        EventSubscription.EnsureRoleAvailable(subscription);
         if (!subscription.IsBatch || subscription.Scope != EventSubscriptionScope.Distributed
-            || (subscription.State != EventSubscriptionState.Active
-                && !(allowHeld && subscription.State == EventSubscriptionState.Held)))
+            || !EventSubscription.HasDeliveryState(subscription, allowHeld))
             throw new InvalidOperationException($"Event subscription '{id}' is not eligible for batch delivery.");
         var inputs = messages.ToArray();
         foreach (var message in inputs)
@@ -79,8 +80,8 @@ public sealed class EventReceiveDispatcher(
             ?? throw new InvalidOperationException($"Event subscription '{id}' no longer exists.")).ToArray();
         foreach (var subscription in subscriptions)
         {
-            if ((subscription.State != EventSubscriptionState.Active
-                    && !(allowHeld && subscription.State == EventSubscriptionState.Held))
+            EventSubscription.EnsureRoleAvailable(subscription);
+            if (!EventSubscription.HasDeliveryState(subscription, allowHeld)
                 || subscription.Scope != message.Scope
                 || subscription.TopicName != message.Metadata.TopicName
                 || subscription.ServiceKey != message.Metadata.ServiceKey)
@@ -99,10 +100,17 @@ public sealed class EventReceiveDispatcher(
             .Where(subscription => subscription.TopicName == metadata.TopicName &&
                                    subscription.ServiceKey == metadata.ServiceKey &&
                                    subscription.Scope == message.Scope &&
-                                   subscription.State == EventSubscriptionState.Active &&
                                    (!filterWorkloadOwner || subscription.WorkloadOwner == workloadOwner))
             .ToArray();
-        await DispatchSelectedAsync(message, subscriptions, cancellationToken, allowHeld: false).ConfigureAwait(false);
+        // A shared broker acknowledgment covers every matching handler. Refuse the whole delivery before
+        // invoking a healthy sibling if another handler on the same physical subscription is quarantined.
+        var active = subscriptions.Where(subscription =>
+        {
+            var state = subscription.State;
+            EventSubscription.EnsureRoleAvailable(subscription);
+            return state == EventSubscriptionState.Active;
+        }).ToArray();
+        await DispatchSelectedAsync(message, active, cancellationToken, allowHeld: false).ConfigureAwait(false);
     }
 
     private async Task DispatchSelectedAsync(EventMessage message, IEventSubscription[] subscriptions,

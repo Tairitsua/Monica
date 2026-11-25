@@ -61,6 +61,16 @@ public sealed class RoleReadinessTests
     }
 
     [Fact]
+    public async Task FailFastRuntimeQuarantine_Returns503ForAnOptionalRoleWithASurvivingSibling()
+    {
+        var state = new ProbeFixture { Faulted = true, Mode = RoleFaultPolicyMode.FailFast };
+        await using var app = await StartAsync(state);
+        using var client = app.GetTestClient();
+        using var response = await client.GetAsync("/health", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
     public async Task OptionalTimeout_ReportsRawUnhealthy_AndCallerCancellationPropagates()
     {
         var state = new ProbeFixture { Wait = true };
@@ -138,6 +148,7 @@ public sealed class RoleReadinessTests
         public int Created, Disposed;
         public bool Active = true, Sibling = true, InfrastructureHealthy = true, Faulted, Healthy, Wait, Degraded;
         public RoleCriticality Criticality = RoleCriticality.Optional;
+        public RoleFaultPolicyMode Mode = RoleFaultPolicyMode.Auto;
 
         public string? GetRoleId(Type implementationType, Type? registrationOwner = null) => implementationType == typeof(OwnedCheck) ? "optional" : null;
         public bool IsRoleFaulted(string roleId) => roleId == "optional" && Faulted;
@@ -151,7 +162,7 @@ public sealed class RoleReadinessTests
                 new("optional", "domain", "optional", "app", Criticality, null, status, DateTimeOffset.UnixEpoch, [])
             };
             if (Sibling) roles.Add(new("core", "domain", "core", "app", RoleCriticality.Required, null, RoleHealthStatus.Healthy, DateTimeOffset.UnixEpoch, []));
-            return new("app", "Application", "test", RoleFaultPolicyMode.Auto, true, roles);
+            return new("app", "Application", "test", Mode, true, roles);
         }
     }
 }

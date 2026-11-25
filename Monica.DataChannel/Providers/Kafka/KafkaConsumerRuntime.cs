@@ -9,12 +9,14 @@ internal sealed class KafkaConsumerRuntime(
     IKafkaDataChannelClientFactory clients,
     IProducer<byte[], byte[]>? deadLetterProducer,
     Func<ConsumeResult<byte[], byte[]>, CancellationToken, Task> deliver,
+    Func<bool> isRoleQuarantined,
     Action<Exception, string> reportFailure,
     Action<bool> reportAvailability)
 {
     private static readonly TimeSpan POLL_TIMEOUT = TimeSpan.FromMilliseconds(100);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile bool _drainRequested;
     private readonly Dictionary<TopicPartition, PartitionState> _partitions = [];
     private readonly List<Worker> _workers = [];
     private readonly List<PartitionState> _retiredStates = [];
@@ -40,8 +42,14 @@ internal sealed class KafkaConsumerRuntime(
         await _started.Task.WaitAsync(cancellationToken);
     }
 
-    internal async Task StopAsync()
+    internal async Task StopAsync(CancellationToken? drainUntilHostStops = null)
     {
+        if (drainUntilHostStops is { } token && _owner is not null)
+        {
+            _drainRequested = true;
+            try { await _owner.WaitAsync(token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        }
         // No consumer is disposed while its owner is polling or while protected work still runs.
         try { await _lifetime.CancelAsync(); }
         finally
@@ -60,7 +68,7 @@ internal sealed class KafkaConsumerRuntime(
     {
         try
         {
-            while (!_lifetime.IsCancellationRequested)
+            while (!_lifetime.IsCancellationRequested && !_drainRequested)
             {
                 IConsumer<byte[], byte[]>? consumer = null;
                 try
@@ -115,7 +123,7 @@ internal sealed class KafkaConsumerRuntime(
                     _paused.Clear();
                     PublishSnapshot();
                 }
-                if (!_lifetime.IsCancellationRequested)
+                if (!_lifetime.IsCancellationRequested && !_drainRequested)
                     _lifetime.Token.WaitHandle.WaitOne(options.RetryDelay);
             }
         }
@@ -135,6 +143,7 @@ internal sealed class KafkaConsumerRuntime(
             CompleteWorkers();
             ReleaseRetiredStates();
             CommitReadyHeads(consumer);
+            if (_drainRequested && _workers.Count == 0 && !_partitions.Values.Any(state => state.ReadyToCommit)) return;
             StartWorkers();
             ApplyBackpressure(consumer);
             PublishSnapshot();
@@ -231,6 +240,7 @@ internal sealed class KafkaConsumerRuntime(
 
     private void StartWorkers()
     {
+        if (_drainRequested || isRoleQuarantined()) return;
         foreach (var state in _partitions.Values)
         {
             if (_lifetime.IsCancellationRequested) break;
@@ -278,6 +288,13 @@ internal sealed class KafkaConsumerRuntime(
             {
                 state.ReadyToCommit = true;
                 if (state.ProcessingFailure is null) _processed++;
+                continue;
+            }
+            if (isRoleQuarantined())
+            {
+                // Quarantine can outlast a retry budget while another delivery drains. Keep the unadmitted offset for restart.
+                state.Blocked = new(record.Topic, record.Partition.Value, record.Offset.Value, failure.GetType().Name);
+                state.Record = null;
                 continue;
             }
             if (state.ProcessingFailure is not null)

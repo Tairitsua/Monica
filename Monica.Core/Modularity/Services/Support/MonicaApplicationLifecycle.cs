@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Monica.Core.ApplicationRoles;
 using Microsoft.Extensions.Logging;
 using Monica.Core.TypeDiscovery.Abstractions;
 
@@ -36,7 +37,18 @@ internal sealed class MonicaApplicationLifecycle(
                 {
                     var app = (MonicaApplication)state!;
                     app.Profiling.MarkApplicationReady();
-                    (app.TypeActivation as ApplicationRoles.IRoleStartupFaultPolicy)?.MarkHostStarted();
+                    (app.TypeActivation as IRoleStartupFaultPolicy)?.MarkHostStarted();
+                    if (app.TypeActivation is IRoleHealthStateProvider health)
+                    {
+                        var roles = health.GetSnapshot().Roles;
+                        var isolated = roles.Where(role => role.Status == RoleHealthStatus.Faulted).ToArray();
+                        var evidence = isolated.SelectMany(role => role.Faults.Select(fault =>
+                            $"{role.RoleId} [{fault.Stage}] {fault.Summary}"));
+                        app.CreateLogger<MonicaApplicationLifecycle>().LogInformation(
+                            "Local roles at startup: {HealthyCount} healthy, {DegradedCount} degraded, {FaultedCount} quarantined. {RoleFaults}",
+                            roles.Count(role => role.Status == RoleHealthStatus.Healthy),
+                            roles.Count(role => role.Status == RoleHealthStatus.Degraded), isolated.Length, string.Join(" | ", evidence));
+                    }
                     var held = app.ActivationResources.Where(resource => resource.Mode != ActivationMode.Automatic)
                         .Select(resource => $"{resource.Key} [{resource.Kind}, {resource.Mode}]").ToArray();
                     if (held.Length != 0)

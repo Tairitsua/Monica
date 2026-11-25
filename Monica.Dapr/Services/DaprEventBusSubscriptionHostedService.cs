@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
@@ -230,6 +231,11 @@ internal class DaprEventBusSubscriptionHostedService(
             catch (Exception) when (ct.IsCancellationRequested)
             {
                 // The SDK token now represents stream shutdown, not an attempt deadline.
+                return TopicResponseAction.Retry;
+            }
+            catch (RoleUnavailableException)
+            {
+                // Leave this delivery with the broker while the owning role is quarantined.
                 return TopicResponseAction.Retry;
             }
             catch (Exception ex)

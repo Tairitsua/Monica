@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Models;
@@ -165,6 +166,49 @@ public sealed class EventSubscriptionRegistryTests
 
         registry.GetAll().Should().BeEmpty();
         subscription.State.Should().Be(EventSubscriptionState.Disposed);
+    }
+
+    [Fact]
+    public async Task Quarantine_WaitsForItsDeactivationWhenAnotherThreadOwnsNotificationDispatch()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var health = new SubscriptionRole();
+        var registry = new EventSubscriptionRegistry(NullLogger<EventSubscriptionRegistry>.Instance, health: health);
+        var owned = await registry.SubscribeAsync(CreateDescriptor(new TrackingHandlerFactory(), "owned") with
+        {
+            Scope = EventSubscriptionScope.Distributed
+        }, token);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var removed = false;
+        using var observation = registry.Subscribe(new CallbackObserver(change =>
+        {
+            if (change.Subscription.TopicName == "other" && change.ChangeType == EventSubscriptionChangeType.Added)
+            {
+                entered.TrySetResult();
+                release.Wait(token);
+            }
+            if (change.Subscription.Id == owned.Id && change.ChangeType == EventSubscriptionChangeType.Deactivated)
+                removed = true;
+        }));
+
+        var adding = Task.Run(() => registry.SubscribeAsync(CreateDescriptor(new TrackingHandlerFactory(), "other"), token), token);
+        await entered.Task.WaitAsync(token);
+        health.Faulted = true;
+        var quarantine = registry.OnRoleQuarantinedAsync("worker", token);
+        try { Assert.False(quarantine.IsCompleted); }
+        finally { release.Set(); }
+        await quarantine;
+        Assert.True(removed);
+        await adding;
+    }
+
+    private sealed class SubscriptionRole : IRoleHealthStateProvider
+    {
+        internal bool Faulted;
+        public bool IsRoleFaulted(string roleId) => roleId == "worker" && Faulted;
+        public string? GetRoleId(Type implementationType, Type? registrationOwner = null) => "worker";
+        public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();
     }
 
     private static EventSubscriptionRegistry CreateRegistry()

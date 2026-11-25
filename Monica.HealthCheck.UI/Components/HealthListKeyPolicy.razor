@@ -1,0 +1,23 @@
+@using MudBlazor.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IKeyInterceptorService Keys
+
+@code {
+    [Parameter, EditorRequired] public string ElementId { get; set; } = default!;
+    [Parameter, EditorRequired] public string TargetClass { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        string[] navigation = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"];
+        var options = navigation.Select(key => new KeyOptions { Key = key, PreventDown = "key+none" }).ToArray();
+        await Keys.SubscribeAsync(ElementId, new KeyInterceptorOptions(TargetClass, options), (Action<KeyboardEventArgs>?)null, null);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await Keys.UnsubscribeAsync(ElementId); }
+        catch (JSDisconnectedException) { }
+    }
+}

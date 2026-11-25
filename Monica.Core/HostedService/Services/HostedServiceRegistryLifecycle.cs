@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Abstractions.Internal;
+using Monica.Core.HostedService.Services.Support;
 
 namespace Monica.Core.HostedService.Services;
 
@@ -27,9 +28,8 @@ internal sealed class HostedServiceRegistryLifecycle(
                 "The hosted-service registry lifecycle cannot be started more than once.");
         }
 
-        var hostedServices = serviceProvider.GetServices<IHostedService>()
-            .OfType<IMoHostedService>()
-            .ToArray();
+        var allServices = serviceProvider.GetServices<IHostedService>().ToArray();
+        var hostedServices = allServices.OfType<IMoHostedService>().ToArray();
         ValidateDistinctInstances(hostedServices);
 
         var subscriptions = new List<IDisposable>(hostedServices.Length * 2);
@@ -55,6 +55,7 @@ internal sealed class HostedServiceRegistryLifecycle(
                 }
             }
 
+            serviceProvider.GetService<HostedServiceRoleParticipant>()?.Bind(allServices);
             registryWriter.Publish(hostedServices);
         }
         catch (Exception exception)

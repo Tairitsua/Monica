@@ -54,6 +54,7 @@ public static class MonicaEndpointConventionExtensions
         endpoint.RequestDelegate = context =>
         {
             if (!health.IsRoleFaulted(roleId)) return next(context);
+            context.RequestServices.GetService<IRoleQuarantineRequestMetrics>()?.RecordHttpRejection(roleId);
             if (context.RequestServices.GetService<IResultErrorMessageProvider>() is not null)
                 return ResultHttpProjection.ToMinimalApiResult(Result.Failure(RoleUnavailableException.MessageForRole(roleId),
                     ResultStatus.ServiceUnavailable)).ExecuteAsync(context);

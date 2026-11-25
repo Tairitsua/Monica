@@ -43,7 +43,13 @@ public class ModuleHostedService : MonicaModule<ModuleHostedServiceOption>
     public override void ConfigureServices(ModuleContext<ModuleHostedServiceOption> context)
     {
         var services = context.Services;
-        services.AddSingleton(new HostedServiceDescriptorCatalog(services));
+        services.AddSingleton(new HostedServiceDescriptorCatalog(services, context.Composition));
+        if (Application.TypeActivation is Monica.Core.ApplicationRoles.IRoleHealthStateProvider)
+        {
+            services.AddSingleton<HostedServiceRoleParticipant>();
+            services.AddSingleton<Monica.Core.ApplicationRoles.IRoleLifecycleParticipant>(provider =>
+                provider.GetRequiredService<HostedServiceRoleParticipant>());
+        }
         services.AddSingleton<IValidateOptions<HostedServiceRegistrationValidationOptions>, HostedServiceRegistrationValidator>();
         services.AddOptions<HostedServiceRegistrationValidationOptions>().ValidateOnStart();
 

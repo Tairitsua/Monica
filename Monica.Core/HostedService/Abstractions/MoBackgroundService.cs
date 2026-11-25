@@ -159,9 +159,16 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
         RuntimeInfo.Tracker.RecordState(message, newState, exception, logLevel);
     }
 
-    /// <summary>
-    /// Starts the heartbeat monitoring task
-    /// </summary>
+    private async Task StopHeartbeatAsync()
+    {
+        var source = Interlocked.Exchange(ref _heartbeatCts, null);
+        if (source is null) return;
+        await source.CancelAsync().ConfigureAwait(false);
+        if (_heartbeatTask is not null) await _heartbeatTask.ConfigureAwait(false);
+        source.Dispose();
+    }
+
+    /// <summary>Starts the periodic heartbeat observer for the background loop.</summary>
     private void StartHeartbeat()
     {
         if (HeartbeatInterval == null || HeartbeatInterval.Value <= TimeSpan.Zero)
@@ -208,6 +215,13 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
     /// <param name="cancellationToken">Signals that application startup is being aborted.</param>
     public sealed override async Task StartAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var role = RuntimeInfo.Role;
+        if (role?.TryBeginStart() == false)
+        {
+            RecordState("Startup skipped because the owning role is quarantined", HostedServiceState.Faulted);
+            return;
+        }
         try
         {
             await HostedServiceExecutionAdapter.ExecuteLifecycleAsync(
@@ -222,22 +236,31 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
                     RuntimeInfo.StartedAt = DateTime.UtcNow;
 
                     await OnStartingAsync(cancellationToken).ConfigureAwait(false);
-                    await base.StartAsync(cancellationToken).ConfigureAwait(false);
                     StartHeartbeat();
-
                     RecordState("Service started, executing background work", HostedServiceState.Running);
+                    await base.StartAsync(cancellationToken).ConfigureAwait(false);
                     await OnStartedAsync(cancellationToken).ConfigureAwait(false);
                 },
                 cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             RecordState("Service start failed", HostedServiceState.Faulted, ex);
-
-            if (_options.FailFastOnStartupError)
+            if (role is null)
             {
-                throw;
+                if (_options.FailFastOnStartupError) throw;
+                return;
             }
+
+            if (!role.TryIsolateStartupFault()) throw;
+        }
+        finally
+        {
+            role?.CompleteStart();
         }
     }
 
@@ -247,7 +270,14 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
     /// <see cref="OnStoppedAsync"/> so all cleanup remains inside the lifecycle boundary.
     /// </summary>
     /// <param name="cancellationToken">Signals the graceful-shutdown deadline.</param>
-    public sealed override async Task StopAsync(CancellationToken cancellationToken)
+    public sealed override Task StopAsync(CancellationToken cancellationToken)
+    {
+        var role = RuntimeInfo.Role;
+        if (role?.Skipped == true) return Task.CompletedTask;
+        return role is null ? StopCoreAsync(cancellationToken) : role.StopOnceAsync(() => StopCoreAsync(cancellationToken));
+    }
+
+    private async Task StopCoreAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -260,21 +290,15 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
                 async () =>
                 {
                     RecordState("Service stopping", HostedServiceState.Stopping);
-                    await OnStoppingAsync(cancellationToken).ConfigureAwait(false);
-
-                    if (_heartbeatCts != null)
+                    try
                     {
-                        try { await _heartbeatCts.CancelAsync().ConfigureAwait(false); }
-                        catch (ObjectDisposedException) { }
+                        await OnStoppingAsync(cancellationToken).ConfigureAwait(false);
                     }
-                    if (_heartbeatTask != null)
+                    finally
                     {
-                        await _heartbeatTask.ConfigureAwait(false);
+                        try { await StopHeartbeatAsync().ConfigureAwait(false); }
+                        finally { await base.StopAsync(cancellationToken).ConfigureAwait(false); }
                     }
-                    _heartbeatCts.SafeCancelAndDispose();
-                    _heartbeatCts = null;
-
-                    await base.StopAsync(cancellationToken).ConfigureAwait(false);
 
                     RuntimeInfo.StoppedAt = DateTime.UtcNow;
                     RecordState("Service stopped", HostedServiceState.Stopped);
@@ -330,13 +354,23 @@ public abstract class MoBackgroundService : BackgroundService, IMoHostedService,
             RecordState("Executing background work", HostedServiceState.Executing);
             await ExecuteBackgroundAsync(stoppingToken);
         }
-        catch (OperationCanceledException)
+        catch (Monica.Core.ApplicationRoles.RoleUnavailableException) when (RuntimeInfo.Role?.Quarantined == true)
+        {
+            Logger.LogDebug("{ServiceName} stopped accepting work for its quarantined role", ServiceName);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested || RuntimeInfo.Role is null)
         {
             Logger.LogDebug("{ServiceName} background work cancelled", ServiceName);
         }
         catch (Exception ex)
         {
             RecordState("Background work failed", HostedServiceState.Faulted, ex);
+            if (RuntimeInfo.Role is { } role)
+            {
+                await StopHeartbeatAsync().ConfigureAwait(false);
+                // StopAsync waits for this loop. Let it return while the host-owned coordinator drains the role.
+                _ = role.ObserveBackgroundFaultAsync(ex, Logger);
+            }
         }
     }
 

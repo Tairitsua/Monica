@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Execution;
 using Monica.Core.TypeDiscovery.Abstractions;
 
@@ -62,9 +63,17 @@ public sealed class Mediator(IServiceProvider serviceProvider) : IMediator
         where TRequest : IRequest<TResponse>
     {
         var activation = serviceProvider.GetService<ITypeActivationPolicy>();
-        activation?.EnsureCanExecuteRequest(typeof(TRequest));
-        if (activation is { SuspendedWorkloadOwners.Count: > 0 })
-            serviceProvider.GetRequiredService<MediatorHandlerAdmission>().EnsureAvailable(typeof(IRequestHandler<TRequest, TResponse>));
+        try
+        {
+            activation?.EnsureCanExecuteRequest(typeof(TRequest));
+            if (activation is { SuspendedWorkloadOwners.Count: > 0 })
+                serviceProvider.GetRequiredService<MediatorHandlerAdmission>().EnsureAvailable(typeof(IRequestHandler<TRequest, TResponse>), activation);
+        }
+        catch (RoleUnavailableException exception)
+        {
+            serviceProvider.GetService<IRoleQuarantineRequestMetrics>()?.RecordLocalRejection(exception.RoleId);
+            throw;
+        }
         var handler = serviceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
         var handlerType = handler.GetType();
         var readOnly = request is IQueryRequest;

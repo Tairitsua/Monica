@@ -14,9 +14,12 @@
     var role = Snapshot.Host.Roles.FirstOrDefault(r => string.Equals(RoleId, r.RoleId, StringComparison.OrdinalIgnoreCase));
     <MoSideSheet Open="true" OpenChanged="Close" CloseLabel="@L["Actions:Close"]" Compact="true" Width="520px">
         <TitleContent>
-            <div class="rh-sheet-head"><span class="mo-vl-tile @(role is null ? "mo-vl-role--neutral" : RoleHealthDisplay.Color(role.Status).ToCssClass())"><MoIcon Icon="@MoIcons.ShieldCheck" Size="18px" /></span>
-                <div><small>@L["Roles:Inspector"]</small><h2>@(role?.RoleId ?? RoleId)</h2>
-                @if (role is not null) { <span class="mo-vl-status mo-vl-status--pill @RoleHealthDisplay.Color(role.Status).ToCssClass()"><i class="mo-vl-status-dot"></i>@L[$"Roles:States:{role.Status}"]</span> }
+            <div class="rh-sheet-head"><span class="mo-vl-tile @(role is null ? "mo-vl-role--neutral" : RoleHealthDisplay.Color(role.Status).ToCssClass())"><MoIcon Icon="@(role?.Status switch { RoleHealthStatus.Faulted => MoIcons.Error, RoleHealthStatus.Degraded => MoIcons.Warning, RoleHealthStatus.Healthy => MoIcons.Success, _ => MoIcons.Shield })" Size="18px" /></span>
+                <div><small>@L["Roles:Inspector"] · @Time.FormatTime(Snapshot.CheckedAt)</small>
+                    <div class="rh-sheet-name"><h2>@(role?.RoleId ?? RoleId)</h2>@if (role is not null) { <MudIconButton Icon="@MoIcons.Copy" Size="Size.Small" aria-label="@L["Details:CopyValue"]" OnClick="@(() => CopyValueAsync(role.RoleId))" /> }</div>
+                @if (role is not null) { <span class="mo-vl-status mo-vl-status--pill @RoleHealthDisplay.Color(role.Status).ToCssClass()"><i class="mo-vl-status-dot"></i>@L[$"Roles:States:{role.Status}"]</span>
+                    @if (role.Status == RoleHealthStatus.Faulted) { <span class="mo-vl-capsule mo-vl-role--error">HTTP 503</span> }
+                    <span class="mo-vl-capsule @(role.EffectiveCriticality == RoleCriticality.Required ? "mo-vl-role--primary" : "mo-vl-role--info")">@L[$"Roles:Criticalities:{role.EffectiveCriticality}"]</span> }
                 </div>
             </div>
         </TitleContent>
@@ -30,36 +33,50 @@
             {
                 @foreach (var fault in role.Faults)
                 {
-                    <section class="rh-fault"><h3>@L[$"Roles:Stages:{fault.Stage}"]</h3><time datetime="@fault.OccurredAt.ToString("O")">@Time.Format(fault.OccurredAt)</time><p>@fault.Summary</p>
-                        @foreach (var issue in fault.ConfigurationIssues)
-                        {
-                            <div class="rh-issue"><code>@issue.SectionPath · @issue.LogicalPath</code><p>@issue.Problem</p>
-                                @if (CanInspectConfig)
-                                {
-                                    <a href="@($"/configuration/state?definitionKey={Uri.EscapeDataString(issue.DefinitionKey)}")">@L["Roles:InspectConfig"] · @issue.DefinitionKey</a>
-                                }
-                                else { <code>@issue.DefinitionKey</code> }
-                            </div>
-                        }
+                    <section class="rh-fault @RoleHealthDisplay.Color(role.Status).ToCssClass()">
+                        <div class="rh-fault-head"><MoIcon Icon="@(role.Status == RoleHealthStatus.Faulted ? MoIcons.Error : MoIcons.Warning)" Size="16px" />
+                            <h3>@L["Roles:FaultEvidence"]</h3><span class="mo-vl-capsule">@L[$"Roles:Stages:{fault.Stage}"]</span></div>
+                        <p>@fault.Summary</p>
+                        <dl><div><dt>@L["Roles:Occurred"]</dt><dd><time datetime="@fault.OccurredAt.ToString("O")">@Time.Format(fault.OccurredAt)</time></dd></div></dl>
                     </section>
                 }
-                @if (role.Status == RoleHealthStatus.Faulted)
+                @if (role.Faults.SelectMany(fault => fault.ConfigurationIssues).ToArray() is { Length: > 0 } issues)
                 {
-                    var configFault = role.Faults.Any(fault => fault.Stage == RoleFaultStage.StartupConfiguration);
                     var ready = RoleHealthDisplay.CandidateReady(role);
-                    <MoSemanticCallout Severity="@(ready ? MoVisualRole.Success : MoVisualRole.Warning)" Title="@L[configFault ? "Roles:Candidate" : "Roles:Recovery"]">
-                        @L[configFault ? ready ? "Roles:CandidateReady" : "Roles:CandidateUnknown" : "Roles:NonConfigRecovery"]
-                    </MoSemanticCallout>
-                    @if (CanInspectSystem)
-                    {
-                        <MudButton Href="@($"/system-info?restore={Uri.EscapeDataString(role.RoleId)}")" Variant="Variant.Outlined" StartIcon="@MoIcons.Server">@L["Roles:InspectRecovery"]</MudButton>
-                    }
+                    <section class="rh-config">
+                        <h3>@L["Roles:ValidationIssues"]</h3>
+                        <div class="rh-issues">@foreach (var issue in issues)
+                        {
+                            <div class="rh-issue"><code>@($"{issue.SectionPath}:{issue.LogicalPath}")</code><p>@issue.Problem</p></div>
+                        }</div>
+                        <MoSemanticCallout Severity="@(ready ? MoVisualRole.Success : MoVisualRole.Warning)" Title="@L[ready ? "Roles:Verified" : "Roles:Candidate"]">
+                            @L[ready ? "Roles:CandidateReady" : "Roles:CandidateUnknown"]
+                        </MoSemanticCallout>
+                        <div class="rh-config-actions">
+                            @if (CanInspectConfig)
+                            {
+                                @foreach (var key in issues.Select(issue => issue.DefinitionKey).Distinct(StringComparer.OrdinalIgnoreCase))
+                                {
+                                    <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Sliders" Size="Size.Small" title="@key" Href="@($"/configuration/state?definitionKey={Uri.EscapeDataString(key)}")">@L["Roles:InspectConfig"]</MudButton>
+                                }
+                            }
+                            @if (CanInspectSystem && role.Status == RoleHealthStatus.Faulted)
+                            {
+                                <MudButton Href="@($"/system-info?restore={Uri.EscapeDataString(role.RoleId)}")" Variant="@(ready ? Variant.Filled : Variant.Outlined)" Color="@(ready ? Color.Primary : Color.Default)" Size="Size.Small" StartIcon="@MoIcons.Power">@L["Roles:InspectRecovery"]</MudButton>
+                            }
+                        </div>
+                    </section>
                 }
-                else if (role.Status == RoleHealthStatus.Degraded)
+                else if (role.Status == RoleHealthStatus.Faulted)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Roles:AdmissionClosed"]">@L["Roles:TerminalFault"]</MoSemanticCallout>
+                }
+                else if (role.Status == RoleHealthStatus.Degraded && role.Faults.Count == 0)
                 {
                     <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Roles:ProbeEvidence"]"><a href="/health-checks">@L["Roles:HostHealth"]</a></MoSemanticCallout>
                 }
                 <section><h3>@L["Roles:Placement"]</h3><dl>
+                    <div><dt>@L["Roles:Role"]</dt><dd>@role.RoleId</dd></div>
                     <div><dt>@L["Roles:Select:domain"]</dt><dd>@role.DomainId</dd></div>
                     <div><dt>@L["Roles:AssignedApp"]</dt><dd>@role.AssignedAppId</dd></div>
                     <div><dt>@L["Roles:Workload"]</dt><dd>@role.WorkloadOwner</dd></div>
@@ -67,11 +84,16 @@
                     <div><dt>@L["Roles:Declared"]</dt><dd>@L[$"Roles:Criticalities:{role.DeclaredCriticality}"]</dd></div>
                     <div><dt>@L["Roles:Override"]</dt><dd>@(role.OverrideCriticality is { } value ? L[$"Roles:Criticalities:{value}"].Value : "—")</dd></div>
                     <div><dt>@L["Roles:Effective"]</dt><dd>@L[$"Roles:Criticalities:{role.EffectiveCriticality}"] · @L[ActionKey(role)]</dd></div>
+                    <div><dt>@L["Roles:Transition"]</dt><dd><time datetime="@role.LastTransitionAt.ToString("O")">@Time.Format(role.LastTransitionAt)</time></dd></div>
                 </dl></section>
-                <section><h3>@L["Roles:Resources"]</h3>
+                <section><div class="rh-section-head"><h3>@L["Roles:Resources"]</h3><small>@(Snapshot.Resources.GetValueOrDefault(role.RoleId)?.Count ?? 0)</small></div>
                     @if (Snapshot.Resources.TryGetValue(role.RoleId, out var resources))
                     {
-                        <ul>@foreach (var resource in resources) { <li><b>@L[$"Roles:Kinds:{resource.Kind}"]</b><code>@resource.Key</code><small>@L[$"Roles:Modes:{resource.Mode}"]</small></li> }</ul>
+                        <ul>@foreach (var resource in resources)
+                        {
+                            <li class="@(role.Status == RoleHealthStatus.Faulted ? "is-quarantined" : null)"><div class="rh-resource-head"><small>@L[$"Roles:Kinds:{resource.Kind}"]</small><span class="mo-vl-capsule @(resource.Mode == ActivationMode.Disabled ? "mo-vl-role--neutral" : "mo-vl-role--info")">@L["Roles:RegisteredMode", L[$"Roles:Modes:{resource.Mode}"]]</span></div>
+                                <code>@resource.Key</code></li>
+                        }</ul>
                         @if (role.Status == RoleHealthStatus.Faulted && resources.Any(resource => resource.Kind == TypeActivationKind.Job))
                         {
                             <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Roles:JobProtection"]">@L["Roles:JobProtectionDesc"]</MoSemanticCallout>
@@ -109,7 +131,12 @@
     private async Task CopyAsync(RoleHealthEntrySnapshot role)
     {
         var json = JsonSerializer.Serialize(new { Snapshot.CheckedAt, Snapshot.Host.AppId, Role = role, Resources = Snapshot.Resources.GetValueOrDefault(role.RoleId) }, JsonOptions);
-        await JS.InvokeVoidAsync("navigator.clipboard.writeText", json);
+        await CopyValueAsync(json);
+    }
+
+    private async Task CopyValueAsync(string value)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
         Notifications.Add(L["Design:Copied"], Severity.Success);
     }
 }

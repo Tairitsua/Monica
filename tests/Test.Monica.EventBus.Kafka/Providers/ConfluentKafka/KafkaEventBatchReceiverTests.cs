@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Kafka.Models;
 using Monica.EventBus.Kafka.Providers.ConfluentKafka;
 using Monica.EventBus.Services.Support;
@@ -13,6 +14,20 @@ namespace Test.Monica.EventBus.Kafka.Providers.ConfluentKafka;
 public sealed class KafkaEventBatchReceiverTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task DeliverAsync_WhenRoleRefusesBatch_ShouldRetainOffsetsWithoutSplittingOrRejecting(int count)
+    {
+        var attempts = new List<int>();
+        var records = Enumerable.Range(0, count).Select(offset => Record(offset)).ToArray();
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => KafkaEventBatchReceiver.DeliverAsync(records,
+            batch => { attempts.Add(batch.Count); throw new RoleUnavailableException("sync"); },
+            (_, _) => Assert.Fail("A refused batch cannot commit."), Policy(3), Token,
+            (_, _) => throw new InvalidOperationException("A refused batch cannot be skipped or forwarded.")));
+        Assert.Equal([count], attempts);
+    }
 
     [Fact]
     public void Collect_WhenCountReached_ShouldStopWithoutReadingAnotherRecord()

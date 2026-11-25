@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
+using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.Modularity.Extensions;
 using Monica.Core.ObservableInstance.Services;
@@ -1086,6 +1088,42 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
         }
     }
 
+    [Fact]
+    public async Task RuntimeQuarantine_WaitsForAcceptedLeaseAndSuppressesFurtherOwnerClaims()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new ControllableTimeProvider(NOW);
+        var probe = new CancellationProbe();
+        using var host = CreateJobHost<CancellationIgnoringRecurringJob, CancellationProbe>(probe);
+        var definition = CreateDefinition<CancellationIgnoringRecurringJob>();
+        var store = Substitute.For<IJobSchedulerStore>();
+        store.ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>()).Returns(
+            Task.FromResult<IReadOnlyList<JobExecutionLease>>([CreateLease(definition.Declaration.JobKey, TimeSpan.FromMinutes(1))]));
+        var activation = Substitute.For<ITypeActivationPolicy>();
+        var health = Substitute.For<IRoleHealthStateProvider>();
+        health.GetSnapshot().Returns(new RoleHealthSnapshot("test", "test", null, RoleFaultPolicyMode.Auto, true,
+            [new("ordering.worker", "ordering", OWNER, "test", RoleCriticality.Optional, null, RoleHealthStatus.Faulted, NOW, [])]));
+        var (worker, _) = CreateWorker(store, [definition], host.Services.GetRequiredService<IServiceScopeFactory>(),
+            settings => settings.MaxWorkerExecutionThreads = 2, timeProvider: time, activation: activation, roleHealth: health);
+        using (worker)
+        {
+            await worker.ClaimAvailableWorkAsync(token);
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            try
+            {
+                activation.SuspendedWorkloadOwners.Returns([OWNER]);
+                var drain = worker.OnRoleQuarantinedAsync("ordering.worker", token);
+                Assert.False(drain.IsCompleted);
+                await worker.ClaimAvailableWorkAsync(token);
+                await store.Received(1).ClaimAsync(Arg.Any<JobClaimRequest>(), Arg.Any<CancellationToken>());
+                probe.Release.TrySetResult();
+                await drain.WaitAsync(TimeSpan.FromSeconds(5), token);
+                await store.Received(1).CompleteAttemptAsync(Arg.Any<JobAttemptCompletion>(), Arg.Any<CancellationToken>());
+            }
+            finally { probe.Release.TrySetResult(); }
+        }
+    }
+
     private static IHostApplicationLifetime CreateApplicationLifetime(out Task restartRequested)
     {
         var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1119,7 +1157,8 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
             IServiceScopeFactory scopeFactory,
             Action<ModuleJobSchedulerOption>? configure,
             IHostApplicationLifetime? applicationLifetime = null,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            ITypeActivationPolicy? activation = null, IRoleHealthStateProvider? roleHealth = null)
     {
         var options = new OptionsWrapper<ModuleJobSchedulerOption>(new ModuleJobSchedulerOption
         {
@@ -1150,7 +1189,7 @@ public sealed partial class JobExecutionWorkerHostedServiceTests
             new ObservableInstanceRegistry(Options.Create(new ModuleObservableInstanceOption())),
             Options.Create(new ModuleHostedServiceOption()),
             scopeFactory,
-            NullLogger<JobExecutionWorkerHostedService>.Instance);
+            NullLogger<JobExecutionWorkerHostedService>.Instance, activation: activation, roleHealth: roleHealth);
         return (worker, options);
     }
 

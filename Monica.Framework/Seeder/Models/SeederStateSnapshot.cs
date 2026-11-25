@@ -60,7 +60,7 @@ public sealed record SeederStateSnapshot
 
     /// <summary>Gets the number of required seeders that have not succeeded.</summary>
     public int RequiredUnsuccessfulCount => Seeders.Count(static seeder =>
-        seeder.ParticipatesInReadiness &&
+        seeder.ParticipatesInReadiness && !seeder.IsRoleQuarantined &&
         seeder.Criticality == SeederCriticality.Required && seeder.Status != SeederStatus.Succeeded);
 
     /// <summary>Gets the number of optional seeders that ended unsuccessfully.</summary>
@@ -74,7 +74,7 @@ public sealed record SeederStateSnapshot
         get
         {
             if (Status is SeederRunStatus.Aborting or SeederRunStatus.Aborted || RequiredUnsuccessfulCount > 0 ||
-                Seeders.Any(static seeder => seeder.FailureBehavior == SeederFailureBehavior.FailFast &&
+                Seeders.Any(static seeder => !seeder.IsRoleQuarantined && seeder.FailureBehavior == SeederFailureBehavior.FailFast &&
                     seeder.Status == SeederStatus.Failed))
             {
                 return SeederReadinessStatus.Unhealthy;

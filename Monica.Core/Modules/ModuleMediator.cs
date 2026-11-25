@@ -33,7 +33,8 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
     public override void ConfigureServices(ModuleContext<ModuleMediatorOption> context)
     {
         context.Services.TryAddTransient<IMediator, Mediator>();
-        if (Application.TypeActivation is not { SuspendedWorkloadOwners.Count: > 0 } activation) return;
+        if (Application.TypeActivation is not Monica.Core.ApplicationRoles.IRoleHealthStateProvider
+            && Application.TypeActivation is not { SuspendedWorkloadOwners.Count: > 0 }) return;
         var admission = new MediatorHandlerAdmission();
         context.Services.AddSingleton(admission);
         context.Composition.OnServicesFinalized(_ => { }, descriptors =>
@@ -45,8 +46,7 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
                     || service.GetGenericTypeDefinition() != typeof(IRequestHandler<,>)) continue;
                 var implementation = descriptor.ImplementationType ?? descriptor.ImplementationInstance?.GetType()
                     ?? _handlerAliases.GetValueOrDefault(descriptor) ?? typeof(object);
-                admission.Record(service, activation.GetFaultedRequestHandlerRole(implementation,
-                    context.Composition.GetServiceRegistrationOwner(descriptor)));
+                admission.Record(service, implementation, context.Composition.GetServiceRegistrationOwner(descriptor));
             }
             _handlerAliases.Clear();
         });
@@ -95,7 +95,8 @@ public class ModuleMediator : MonicaModule<ModuleMediatorOption>
         foreach (var serviceType in match.OpenGenericInterfaces)
         {
             var alias = ServiceDescriptor.Transient(serviceType.ClosedInterface, provider => provider.GetRequiredService(implementationType));
-            if (registrations.TryAdd(alias) && Application.TypeActivation is { SuspendedWorkloadOwners.Count: > 0 })
+            if (registrations.TryAdd(alias) && (Application.TypeActivation is Monica.Core.ApplicationRoles.IRoleHealthStateProvider
+                || Application.TypeActivation is { SuspendedWorkloadOwners.Count: > 0 }))
                 _handlerAliases.Add(alias, implementationType);
         }
     }

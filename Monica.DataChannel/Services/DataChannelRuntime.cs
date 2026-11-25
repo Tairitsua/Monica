@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.DataChannel.Abstractions;
@@ -14,12 +15,13 @@ using Monica.Modules;
 namespace Monica.DataChannel.Services;
 
 /// <summary>Owns setup admission, channel identity and endpoint lifetimes for one host.</summary>
-internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelManager, IDataChannelLifecycle
+internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelManager, IDataChannelLifecycle, IRoleLifecycleParticipant
 {
     private readonly object _syncRoot = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly IServiceProvider _services;
     private readonly MonicaApplication _application;
+    private readonly IRoleHealthStateProvider? _roleHealth;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<DataChannelRuntime> _logger;
     private readonly int _initThreadCount;
@@ -29,7 +31,8 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
     private bool _configured;
     private bool _stopping;
     private Task? _shutdown;
-    private readonly CancellationTokenSource _shutdownCancellation = new();
+    private readonly Dictionary<string, Lazy<Task>> _roleRetirements = new(StringComparer.Ordinal);
+    private readonly CancellationTokenSource _shutdownCancellation;
     private readonly CancellationToken _shutdownToken;
 
     public DataChannelRuntime(IServiceProvider services, MonicaApplication application,
@@ -41,8 +44,11 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
         _lifetime = lifetime;
         _logger = logger;
         _initThreadCount = options.Value.InitThreadCount;
+        _shutdownCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         _shutdownToken = _shutdownCancellation.Token;
-        _setups = registrations.Select(registration => new SetupEntry(registration)).ToDictionary(entry => entry.Id, StringComparer.Ordinal);
+        _roleHealth = services.GetService<IRoleHealthStateProvider>();
+        _setups = registrations.Select(registration => new SetupEntry(registration,
+            _roleHealth?.GetRoleId(registration.ImplementationType, registration.RegistrationOwner))).ToDictionary(entry => entry.Id, StringComparer.Ordinal);
     }
 
     /// <inheritdoc />
@@ -53,16 +59,97 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
     {
         if (_configured) throw new InvalidOperationException("Data-channel pipelines have already been configured for this host.");
         var automatic = _setups.Values.Where(entry => entry.Registration.Mode == ActivationMode.Automatic).ToArray();
-        // Detect duplicate identities across every automatic declaration before building any endpoint.
-        foreach (var entry in automatic) Declare(entry);
-        foreach (var entry in automatic) MaterializeAsync(entry, app).GetAwaiter().GetResult();
-        _configured = true;
+        try
+        {
+            // Detect duplicate identities across every automatic declaration before building any endpoint.
+            foreach (var entry in automatic) ConfigureEntry(entry, () => Declare(entry));
+            foreach (var entry in automatic) ConfigureEntry(entry, () => MaterializeAsync(entry, atStartup: true).GetAwaiter().GetResult());
+            // These callbacks can mutate the host and cannot be rolled back. Only committed setups reach them.
+            foreach (var component in ApplicationComponents()) component.ConfigApplicationBuilder(app);
+            _configured = true;
+        }
+        catch (Exception original)
+        {
+            try { ShutdownAsync().GetAwaiter().GetResult(); }
+            catch (Exception cleanup) { throw new AggregateException(original, cleanup); }
+            throw;
+        }
     }
 
     internal void ConfigureEndpoints(IApplicationBuilder app)
     {
-        foreach (var component in FetchAll().SelectMany(channel => channel.Pipe.GetComponents()).OfType<IApplicationBuilderConfigurable>())
-            component.ConfigEndpoints(app);
+        foreach (var component in ApplicationComponents()) component.ConfigEndpoints(app);
+    }
+
+    private IEnumerable<IApplicationBuilderConfigurable> ApplicationComponents() =>
+        FetchAll().SelectMany(channel => channel.Pipe.GetComponents()).OfType<IApplicationBuilderConfigurable>();
+
+    private bool IsQuarantined(SetupEntry entry) => entry.RoleId is { } roleId && _roleHealth!.IsRoleFaulted(roleId);
+
+    private void ConfigureEntry(SetupEntry entry, Action configure)
+    {
+        if (IsQuarantined(entry)) return;
+        try { configure(); }
+        catch (Exception exception) when (entry.RoleId is not null && exception is not
+            (ChannelIdentityConflictException or PipelineRollbackException or OperationCanceledException))
+        {
+            var fault = RoleFaultRecord.ForResource(RoleFaultStage.PipelineSetup, entry.Registration.ImplementationType);
+            var coordinator = _services.GetService<IRoleFaultCoordinator>();
+            if (coordinator is null) throw;
+            // No channel has started yet. Roll back this owner before host callbacks or deferred participant cleanup.
+            OnRoleQuarantinedAsync(entry.RoleId, CancellationToken.None).GetAwaiter().GetResult();
+            if (!coordinator.TryIsolateStartupFault(entry.RoleId, fault)) throw;
+            _logger.LogError(exception, "Quarantined role {RoleId} after data-channel setup {SetupId} failed.", entry.RoleId, entry.Id);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken)
+    {
+        Lazy<Task> retirement;
+        await _lifecycle.WaitAsync();
+        try
+        {
+            if (!_roleRetirements.TryGetValue(roleId, out retirement!))
+            {
+                var retired = new List<DataChannel>();
+                lock (_syncRoot)
+                {
+                    foreach (var entry in _setups.Values.Where(entry => entry.RoleId == roleId))
+                    {
+                        foreach (var channel in entry.Channels)
+                        {
+                            _channels.Remove(channel.Id);
+                            retired.Add(channel);
+                            RecordActivation(entry, $"DataChannel:channel:{channel.Id}", "Retired because its role was quarantined.", ActivationMode.Disabled);
+                        }
+                        entry.Materialized = false;
+                        entry.Channels = [];
+                        SetState(entry, DataChannelSetupState.Disabled, RoleUnavailableException.MessageForRole(roleId));
+                    }
+                }
+                retirement = new Lazy<Task>(() => DrainAndDisposeAsync(retired));
+                _roleRetirements.Add(roleId, retirement);
+            }
+        }
+        finally { _lifecycle.Release(); }
+        // Deliveries may depend on another setup's lifecycle or on host shutdown to signal cancellation.
+        await retirement.Value;
+    }
+
+    private static async Task DrainAndDisposeAsync(List<DataChannel> retired)
+    {
+        var failures = new List<Exception>();
+        foreach (var channel in retired.AsEnumerable().Reverse())
+        {
+            try
+            {
+                await channel.Pipe.DrainRoleDeliveriesAsync();
+                await channel.Pipe.DisposeAsync();
+            }
+            catch (Exception failure) { failures.Add(failure); }
+        }
+        if (failures.Count > 0) throw new AggregateException(failures);
     }
 
     internal async Task<int> InitializeAutomaticAsync(CancellationToken cancellationToken)
@@ -75,6 +162,7 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
             var failures = 0;
             foreach (var entry in _setups.Values.Where(entry => entry.Registration.Mode == ActivationMode.Automatic))
             {
+                if (IsQuarantined(entry)) continue;
                 try { await StartCoreAsync(entry, cancellationToken); }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch (Exception exception)
@@ -139,10 +227,15 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
                 if (_stopping) throw new InvalidOperationException("The data-channel host is stopping.");
                 if (!_configured) throw new InvalidOperationException("The data-channel host has not completed composition.");
                 entry = _setups.GetValueOrDefault(setupId) ?? throw new KeyNotFoundException($"Data-channel setup '{setupId}' was not found.");
+                if (IsQuarantined(entry)) throw new RoleUnavailableException(entry.RoleId!);
                 if (entry.Registration.Mode == ActivationMode.Disabled)
                     throw new InvalidOperationException($"Data-channel setup '{setupId}' belongs to an owner that is disabled in this host.");
             }
             await action(entry, token);
+        }
+        catch (ChannelIdentityConflictException duplicate)
+        {
+            throw new InvalidOperationException(duplicate.Message, duplicate);
         }
         finally { _lifecycle.Release(); }
     }
@@ -161,13 +254,13 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
         {
             foreach (var builder in registrar.Builders)
                 if (_channelOwners.ContainsKey(builder.Id))
-                    throw new InvalidOperationException($"Data channel '{builder.Id}' is already registered in the current host.");
+                    throw new ChannelIdentityConflictException(builder.Id);
             entry.Definitions = registrar.Builders.ToArray();
             foreach (var builder in entry.Definitions) _channelOwners.Add(builder.Id, entry);
         }
     }
 
-    private async Task MaterializeAsync(SetupEntry entry, IApplicationBuilder? startupApp = null)
+    private async Task MaterializeAsync(SetupEntry entry, bool atStartup = false)
     {
         if (entry.Materialized) return;
         var channels = new List<DataChannel>();
@@ -175,13 +268,12 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
         {
             foreach (var builder in entry.Definitions!)
             {
-                var pipeline = builder.Build(_services);
+                var pipeline = await builder.BuildAsync(_services);
+                if (entry.RoleId is { } roleId) pipeline.BindRole(roleId, _roleHealth!, _shutdownToken);
                 var channel = new DataChannel(pipeline) { Reinitializer = token => ReinitializeAsync(entry, pipeline, token) };
                 channels.Add(channel);
-                var components = pipeline.GetComponents().OfType<IApplicationBuilderConfigurable>().ToArray();
-                if (startupApp is null && components.Length != 0)
+                if (!atStartup && pipeline.GetComponents().OfType<IApplicationBuilderConfigurable>().Any())
                     throw new InvalidOperationException($"Data-channel setup '{entry.Id}' requires startup-time HTTP configuration and cannot be first materialized at runtime. Use Automatic startup for this setup.");
-                foreach (var component in components) component.ConfigApplicationBuilder(startupApp!);
             }
             lock (_syncRoot)
             {
@@ -202,7 +294,7 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
                 try { await channel.Pipe.DisposeAsync(); }
                 catch (Exception exception) { failures.Add(exception); }
             }
-            if (failures.Count > 1) throw new AggregateException(failures);
+            if (failures.Count > 1) throw new PipelineRollbackException(failures);
             throw;
         }
     }
@@ -284,17 +376,19 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
         {
             entry.State = state;
             entry.Error = error;
-            RecordActivation(entry, $"DataChannel:setup:{entry.Registration.ImplementationType.FullName}", $"Setup lifecycle: {state}. Inspect DataChannel for channel readiness and operation errors.");
+            RecordActivation(entry, $"DataChannel:setup:{entry.Registration.ImplementationType.FullName}",
+                $"Setup lifecycle: {state}. Inspect DataChannel for channel readiness and operation errors.",
+                state == DataChannelSetupState.Disabled ? ActivationMode.Disabled : entry.Registration.Mode);
         }
     }
 
-    private void RecordActivation(SetupEntry entry, string key, string reason) => _application.RecordActivation(new ResourceActivation
+    private void RecordActivation(SetupEntry entry, string key, string reason, ActivationMode? mode = null) => _application.RecordActivation(new ResourceActivation
     {
         Key = key,
         ImplementationType = entry.Registration.ImplementationType,
         RegistrationOwner = entry.Registration.RegistrationOwner,
         Kind = TypeActivationKind.DataChannel,
-        Mode = entry.Registration.Mode,
+        Mode = mode ?? entry.Registration.Mode,
         Reason = reason
     });
 
@@ -337,15 +431,23 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
                 SetState(entry, entryFailures.Count == 0 ? DataChannelSetupState.Stopped : DataChannelSetupState.Failed,
                     entryFailures.Count == 0 ? null : new AggregateException(entryFailures).Message);
             }
+            foreach (var retirement in _roleRetirements.Values)
+            {
+                try { await retirement.Value; }
+                catch (Exception failure) { failures.Add(failure); }
+            }
         }
         finally { _lifecycle.Release(); _shutdownCancellation.Dispose(); }
         if (failures.Count > 0) throw new AggregateException(failures).Flatten();
     }
 
-    private sealed class SetupEntry(DataChannelSetupRegistration registration)
+    private sealed class ChannelIdentityConflictException(string id) : InvalidOperationException($"Data channel '{id}' is already registered in the current host.");
+
+    private sealed class SetupEntry(DataChannelSetupRegistration registration, string? roleId)
     {
         public string Id { get; } = $"{registration.ImplementationType.Assembly.GetName().Name}:{registration.ImplementationType.FullName}";
         public DataChannelSetupRegistration Registration { get; } = registration;
+        public string? RoleId { get; } = roleId;
         public DataChannelSetupState State { get; set; } = registration.Mode == ActivationMode.Disabled
             ? DataChannelSetupState.Disabled : registration.Mode == ActivationMode.Manual ? DataChannelSetupState.Held : DataChannelSetupState.Stopped;
         public string? Error { get; set; }
@@ -369,7 +471,7 @@ internal sealed class DataChannelRuntime : IDataChannelRegistrar, IDataChannelMa
             configure(builder);
             builder.Prepare(id, groupId);
             if (!_builders.TryAdd(id, builder))
-                throw new InvalidOperationException($"Data channel '{id}' is already registered in the current host.");
+                throw new ChannelIdentityConflictException(id);
         }
     }
 }

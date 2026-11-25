@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.ApplicationRoles;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Pipeline;
 using Monica.DataChannel.Providers.Kafka;
@@ -11,6 +12,74 @@ namespace Test.Monica.DataChannel.Providers.Kafka;
 
 public sealed class KafkaConsumerTests
 {
+    [Theory]
+    [InlineData(KafkaFailureAction.LogAndSkip)]
+    [InlineData(KafkaFailureAction.DeadLetter)]
+    public async Task Input_WhenRoleQuarantinesDuringProcessing_ShouldPreserveUnsettledOffset(KafkaFailureAction action)
+    {
+        using var deadline = Deadline();
+        var roles = new ChannelRole();
+        var scenario = new KafkaScenario { RoleHealth = roles };
+        scenario.Options.ProcessingMaxAttempts = 1;
+        scenario.Options.ProcessingFailureAction = action;
+        if (action == KafkaFailureAction.DeadLetter) scenario.Options.DeadLetterTopic = "failures";
+        var finish = Signal();
+        scenario.Receive = context => finish.Task.WaitAsync(context.CancellationToken);
+        await using var application = await StartAsync(scenario, deadline.Token);
+        var channel = Channel(application);
+        var consumer = Assert.Single(scenario.Clients.Consumers);
+        consumer.Assign(0, 1);
+        consumer.Enqueue(KafkaScenario.Record(0, 7));
+        await scenario.Signal.UntilAsync(() => !scenario.Deliveries.IsEmpty, deadline.Token);
+        roles.Faulted = true;
+        finish.SetException(new InvalidOperationException("Delivery did not settle."));
+        consumer.Enqueue(KafkaScenario.Record(1, 8));
+        await scenario.Signal.UntilAsync(() => KafkaScenario.Snapshot(channel).BlockedPartitions.Count == 1, deadline.Token);
+        var polling = consumer.Polls;
+        await scenario.Signal.UntilAsync(() => consumer.Polls >= polling + 3, deadline.Token);
+        Assert.Single(scenario.Deliveries);
+        Assert.Empty(consumer.Commits);
+        Assert.All(scenario.Clients.Producers, producer => Assert.Empty(producer.Records));
+        Assert.Equal(0, KafkaScenario.Snapshot(channel).DeadLetteredMessages);
+        Assert.Equal(0, KafkaScenario.Snapshot(channel).SkippedMessages);
+    }
+
+    private sealed class ChannelRole : IRoleHealthStateProvider
+    {
+        internal volatile bool Faulted;
+        public bool IsRoleFaulted(string roleId) => Faulted;
+        public string? GetRoleId(Type implementationType, Type? registrationOwner = null) => "connector";
+        public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task Quarantine_WhenBusinessDeliverySucceeded_ShouldDrainItsOutstandingCommit()
+    {
+        using var deadline = Deadline();
+        var roles = new ChannelRole();
+        var scenario = new KafkaScenario { RoleHealth = roles };
+        await using var application = await StartAsync(scenario, deadline.Token);
+        var consumer = Assert.Single(scenario.Clients.Consumers);
+        consumer.CommitFailuresRemaining = int.MaxValue;
+        consumer.Assign(0);
+        consumer.Enqueue(KafkaScenario.Record(0, 7));
+        await scenario.Signal.UntilAsync(() => !consumer.CommitAttempts.IsEmpty, deadline.Token);
+        roles.Faulted = true;
+        var drain = Task.WhenAll(application.Services.GetServices<IRoleLifecycleParticipant>()
+            .Select(participant => participant.OnRoleQuarantinedAsync("connector", deadline.Token)));
+        try
+        {
+            var attempts = consumer.CommitAttempts.Count;
+            await scenario.Signal.UntilAsync(() => consumer.CommitAttempts.Count > attempts, deadline.Token);
+            Assert.False(drain.IsCompleted);
+            Assert.Empty(consumer.Commits);
+        }
+        finally { Interlocked.Exchange(ref consumer.CommitFailuresRemaining, 0); }
+        await drain.WaitAsync(deadline.Token);
+        Assert.Equal([8L], Positions(consumer, 0));
+        Assert.Single(scenario.Deliveries);
+    }
+
     [Fact]
     public async Task Input_WhenPartitionWorkWaits_ShouldKeepPollingAndCompleteOtherPartitionsWithoutOvertaking()
     {

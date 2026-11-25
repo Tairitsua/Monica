@@ -4,6 +4,7 @@ using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity.Abstractions;
 using Monica.DataChannel.Abstractions;
 using Monica.DataChannel.Abstractions.Communication;
@@ -33,6 +34,7 @@ internal sealed class KafkaTestApplicationFactory(KafkaScenario scenario)
     {
         base.ConfigureServices(services);
         services.AddSingleton(scenario);
+        if (scenario.RoleHealth is { } roles) services.AddSingleton(roles);
         services.RemoveAll<IKafkaDataChannelClientFactory>();
         services.AddSingleton<IKafkaDataChannelClientFactory>(scenario.Clients);
         services.AddSingleton<IDataChannelPartitionKeyResolver>(new KafkaScenarioPartitionKeyResolver(scenario));
@@ -41,6 +43,7 @@ internal sealed class KafkaTestApplicationFactory(KafkaScenario scenario)
 
 internal sealed class KafkaScenario
 {
+    internal IRoleHealthStateProvider? RoleHealth { get; init; }
     internal const string CHANNEL_ID = "kafka-contract";
     internal const string TOPIC = "scenario-topic";
     internal KafkaOptions Options { get; } = new(ConnectionDirection.Input)

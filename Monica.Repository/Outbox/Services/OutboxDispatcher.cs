@@ -14,6 +14,9 @@ namespace Monica.Repository.Outbox.Services;
 
 internal interface IOutboxStore
 {
+    bool IsQuarantined { get; }
+    Task QuarantineStarted { get; }
+    Task DrainQuarantinedDeliveriesAsync(CancellationToken cancellationToken);
     string StoreName { get; }
     string? SharedStoreKey { get; }
     OutboxStorePolicy Policy { get; }
@@ -45,13 +48,10 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
         IExclusiveLeaseStore? maintenanceLeaseStore, IMeterFactory? meterFactory)
         : this(scopes, time, registration, logger, contextFactory, maintenanceLeaseStore, meterFactory, null) { }
 
-    private readonly string? _roleId = roleHealth?.GetRoleId(typeof(TDbContext));
-
-    private void EnsureStoreAvailable()
-    {
-        if (_roleId is not null && roleHealth!.IsRoleFaulted(_roleId))
-            throw new RoleUnavailableException(_roleId);
-    }
+    private readonly OutboxRoleAdmission<TDbContext> _admission = registration.RoleAdmission ?? new(roleHealth);
+    bool IOutboxStore.IsQuarantined => _admission.IsQuarantined;
+    Task IOutboxStore.QuarantineStarted => _admission.QuarantineStarted;
+    Task IOutboxStore.DrainQuarantinedDeliveriesAsync(CancellationToken cancellationToken) => _admission.DrainAsync(cancellationToken);
 
     private readonly RelationalLeaseStore<TDbContext> _leases = new(contextFactory, time,
         registration.Options.MaintenanceLease.OperationTimeout);
@@ -174,7 +174,7 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
     /// This manual invocation releases its role after completion.</remarks>
     public async Task<int> CleanupAsync(CancellationToken cancellationToken = default)
     {
-        EnsureStoreAvailable();
+        _admission.EnsureAvailable();
         await using var coordinator = CreateCoordinator();
         var context = await coordinator.GetAsync(await GetMaintenanceResourceAsync(cancellationToken), cancellationToken);
         if (context is null) return 0;
@@ -187,6 +187,7 @@ public sealed partial class OutboxDispatcher<TDbContext>(IServiceScopeFactory sc
 
     private async Task<int> CleanupAsync(LeaseIdentity identity, CancellationToken cancellationToken)
     {
+        _admission.EnsureAvailable();
         if (identity.Resource != await GetMaintenanceResourceAsync(cancellationToken))
             throw new ArgumentException("The lease must identify this physical outbox table's maintenance role.", nameof(identity));
         await using var scope = scopes.CreateAsyncScope();

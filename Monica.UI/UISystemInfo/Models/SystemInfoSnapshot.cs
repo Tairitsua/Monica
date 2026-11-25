@@ -46,7 +46,11 @@ public sealed record SystemInfoMonicaHost(string FrameworkVersion, int ModuleCou
 
 /// <summary>Role identity, placement and recovery evidence without configuration values or exception details.</summary>
 public sealed record SystemInfoRole(string Id, string DomainId, string AppId, RoleHealthStatus Status,
-    RoleCriticality Criticality, bool HasOverride, bool? StartupCandidateValid);
+    RoleCriticality Criticality, bool HasOverride, bool? StartupCandidateValid)
+{
+    /// <summary>Whether the role reported a startup configuration fault on this instance.</summary>
+    public bool HasStartupConfigurationFault { get; init; }
+}
 
 /// <summary>Catalog placement and process-local restart impact captured at the same instant as the host dossier.</summary>
 public sealed record SystemInfoRoleDeployment(string AppId, int ApplicationCount, RoleFaultPolicyMode Policy, ImmutableArray<SystemInfoRole> Roles)
@@ -59,7 +63,8 @@ public sealed record SystemInfoRoleDeployment(string AppId, int ApplicationCount
     internal static SystemInfoRoleDeployment Capture(RoleHealthSnapshot snapshot) => new(
         snapshot.AppId, snapshot.ApplicationCount, snapshot.ConfiguredPolicyMode, snapshot.Roles.Select(role =>
             new SystemInfoRole(role.RoleId, role.DomainId, role.AssignedAppId, role.Status, role.EffectiveCriticality,
-                role.OverrideCriticality.HasValue, role.StartupCandidateObservedValid)).ToImmutableArray());
+                role.OverrideCriticality.HasValue, role.StartupCandidateObservedValid)
+            { HasStartupConfigurationFault = role.Faults.Any(fault => fault.Stage == RoleFaultStage.StartupConfiguration) }).ToImmutableArray());
 }
 
 /// <summary>

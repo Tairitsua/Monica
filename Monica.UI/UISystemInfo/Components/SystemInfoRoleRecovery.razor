@@ -6,7 +6,7 @@
 <section class="role-recovery @(HasCandidate ? "observed" : null)" aria-labelledby="role-recovery-title">
     <header>
         <div class="recovery-copy">
-            <small><MoIcon Icon="@MoIcons.ShieldCheck" Size="16px" /> @Deployment.AppId @if (!string.IsNullOrEmpty(Scope)) { <span>· @Scope</span> }</small>
+            <small><span class="recovery-icon"><MoIcon Icon="@MoIcons.ShieldCheck" Size="16px" /></span><b>@L[HasCandidate ? "Page:Recovery:Observed" : "Page:Recovery:Missing"]</b> @Deployment.AppId @if (!string.IsNullOrEmpty(Scope)) { <span>· @Scope</span> }</small>
             <h2 id="role-recovery-title">@L[HasCandidate ? "Page:Recovery:ReadyTitle" : "Page:Recovery:PendingTitle"]</h2>
             <p>@L["Page:Recovery:Evidence"]</p>
         </div>

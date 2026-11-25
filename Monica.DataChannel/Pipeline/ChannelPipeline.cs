@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.ObservableInstance.Abstractions;
 using Monica.Core.ObservableInstance.Models;
 using Monica.DataChannel.Abstractions;
@@ -25,6 +26,18 @@ public class ChannelPipeline : IObservableInstance
     private bool _isNotAvailable;
     private bool _isDisposed;
     private Task? _disposalTask;
+    private IRoleHealthStateProvider? _roleHealth;
+    private string? _roleId;
+    private RoleWorkAdmission? _admission;
+    private CancellationToken _hostStopping;
+
+    internal void BindRole(string roleId, IRoleHealthStateProvider health, CancellationToken hostStopping) =>
+        (_roleId, _roleHealth, _hostStopping, _admission) = (roleId, health, hostStopping, new RoleWorkAdmission());
+
+    internal bool IsRoleQuarantined => _roleId is not null && _roleHealth!.IsRoleFaulted(_roleId);
+    internal CancellationToken HostStopping => _hostStopping;
+
+    internal Task DrainRoleDeliveriesAsync() => _admission?.CloseAndDrainAsync() ?? Task.CompletedTask;
     /// <summary>
     /// Gets or sets the inner endpoint.
     /// Handles data flowing from the outer side into the inner side.
@@ -300,7 +313,7 @@ public class ChannelPipeline : IObservableInstance
     /// <summary>
     /// Sends data through the pipeline.
     /// The data is processed by transform middleware and then dispatched to the opposite endpoint based on its source side.
-    /// The original cancellation token owns the entire delivery, even when middleware replaces the context.
+    /// Caller cancellation follows the entire delivery, including replacement contexts. Host shutdown also cancels role-owned deliveries.
     /// </summary>
     /// <param name="data">The data context to send.</param>
     /// <returns>A task that represents the asynchronous send operation.</returns>
@@ -308,12 +321,30 @@ public class ChannelPipeline : IObservableInstance
     {
         var cancellationToken = data.CancellationToken;
         cancellationToken.ThrowIfCancellationRequested();
+        using var delivery = _admission?.TryEnter();
+        if (_roleId is not null && (delivery is null || IsRoleQuarantined)) throw new RoleUnavailableException(_roleId);
         lock (_initializationGate)
         {
             ObjectDisposedException.ThrowIf(_isDisposed, this);
             if (!_isInitialized && !_isInitializing)
                 throw new InvalidOperationException($"Data channel '{Id}' is not running. Start its setup explicitly before sending.");
         }
+        if (!_hostStopping.CanBeCanceled)
+        {
+            await DeliverAsync(data, cancellationToken);
+            return;
+        }
+
+        using var linked = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _hostStopping) : null;
+        data.CancellationToken = linked?.Token ?? _hostStopping;
+        try { await DeliverAsync(data, data.CancellationToken); }
+        finally { data.CancellationToken = cancellationToken; }
+    }
+
+    private async Task DeliverAsync(ChannelDataContext data, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         // Run transform middleware.
         await TransformMiddlewares.DoAsync(async p =>
         {

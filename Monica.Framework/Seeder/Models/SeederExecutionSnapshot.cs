@@ -47,6 +47,9 @@ public sealed record SeederExecutionSnapshot
     /// </summary>
     public bool ParticipatesInReadiness { get; init; } = true;
 
+    /// <summary>Gets whether the owning role is quarantined. Role readiness then owns the failure's effect on the host.</summary>
+    public bool IsRoleQuarantined { get; init; }
+
     /// <summary>Gets the cumulative number of attempts started in this process, including explicit reruns.</summary>
     public required int Attempts { get; init; }
 

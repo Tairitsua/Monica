@@ -116,6 +116,7 @@ public sealed partial class JobSchedulerFacade(
         var owners = (localDefinitions ?? [])
             .Select(definition => definition.OwnerKey ?? options.Value.GetProjectName())
             .Concat(activation?.ActiveWorkloadOwners ?? [])
+            .Except(activation?.SuspendedWorkloadOwners ?? [], StringComparer.Ordinal)
             .ToHashSet(StringComparer.Ordinal);
         if (activation?.ActiveWorkloadOwners is null && owners.Count == 0)
             owners.Add(options.Value.GetProjectName());

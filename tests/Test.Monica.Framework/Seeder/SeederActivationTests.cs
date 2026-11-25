@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.TypeDiscovery.Abstractions;
@@ -170,6 +171,50 @@ public sealed class SeederActivationTests
         Assert.Equal(5, state.GetSnapshot().SucceededCount);
     }
 
+    [Fact]
+    public async Task ExhaustedRoleSeeder_ReportsCriticalFailureAndRefusesANewAttempt()
+    {
+        var roles = new SeederRole();
+        await using var application = await CreateAsync(new Factory(roles: roles));
+        var executor = application.Services.GetRequiredService<ISeederExecutor>();
+        var probe = application.Services.GetRequiredService<Probe>();
+        probe.FailTarget = true;
+
+        var result = await executor.RunAsync(Identity("Target"), Token);
+        Assert.True(roles.Faulted);
+        Assert.Equal(RoleFaultStage.SeederExecution, roles.Fault?.Stage);
+        Assert.DoesNotContain("Synthetic", roles.Fault!.Summary);
+        var target = result.Seeders.Single(seeder => seeder.SeederTypeName == Identity("Target"));
+        Assert.True(target.IsRoleQuarantined);
+        Assert.Equal(SeederStatus.Failed, target.Status);
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => executor.RunAsync(Identity("Target"), Token));
+        await executor.RunAsync(Identity("Independent"), Token);
+        Assert.Single(probe.Calls, name => name == "Target");
+    }
+
+    private sealed class SeederRole : IRoleHealthStateProvider, IRoleFaultCoordinator
+    {
+        internal bool Faulted;
+        internal RoleFaultRecord? Fault;
+        public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false) => throw new NotSupportedException();
+        public bool IsRoleActive(string roleId) => roleId == "worker";
+        public bool IsRoleFaulted(string roleId) => IsRoleActive(roleId) && Faulted;
+        public string? GetRoleId(Type implementationType, Type? registrationOwner = null) =>
+            implementationType.Name == "Target" ? "worker" : null;
+        public bool TryIsolateStartupFault(string roleId, RoleFaultRecord fault) => throw new NotSupportedException();
+        public void ReportRuntimeResourceFault(string roleId, bool isRoleCriticalResource, RoleFaultRecord fault)
+        {
+            Faulted = isRoleCriticalResource;
+            Fault = fault;
+        }
+        public Task ReportRuntimeResourceFaultAsync(string roleId, bool isRoleCriticalResource, RoleFaultRecord fault,
+            CancellationToken cancellationToken = default)
+        {
+            ReportRuntimeResourceFault(roleId, isRoleCriticalResource, fault);
+            return Task.CompletedTask;
+        }
+    }
+
     private static async Task<MonicaTestApplication> CreateAsync(Factory factory)
     {
         var application = await factory.CreateAsync(cancellationToken: Token);
@@ -179,7 +224,7 @@ public sealed class SeederActivationTests
     }
 
     private sealed class Factory(bool disabledFoundation = false, bool standalone = false, bool automatic = false,
-        bool localAutomatic = false)
+        bool localAutomatic = false, SeederRole? roles = null)
         : MonicaTestApplicationFactory<SeederActivationTests>
     {
         public new async Task<MonicaTestApplication> CreateAsync(
@@ -210,6 +255,11 @@ public sealed class SeederActivationTests
         {
             base.ConfigureServices(services);
             services.AddSingleton<Probe>();
+            if (roles is not null)
+            {
+                services.AddSingleton<IRoleHealthStateProvider>(roles);
+                services.AddSingleton<IRoleFaultCoordinator>(roles);
+            }
         }
     }
 

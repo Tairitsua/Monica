@@ -19,24 +19,46 @@
             <p class="rh-pop">@L["Roles:Population", active.Count(r => r.Status == RoleHealthStatus.Healthy), active.Count(r => r.Status == RoleHealthStatus.Degraded), faults.Length, host.Roles.Count - active.Length]</p>
         </div>
         <p class="rh-finding">
-            @L[active.Length == 0 ? "Roles:Zero" : attention.Length == 0 ? "Roles:Calm" : "Roles:AttentionFinding"]
-            @foreach (var r in attention)
+            @if (attention.Length == 0) { @L[active.Length == 0 ? "Roles:Zero" : "Roles:Calm"] }
+            else
             {
-                <a class="mo-vl-mark @RoleHealthDisplay.Color(r.Status).ToCssClass()" href="@Nav.GetUriWithQueryParameter("role", r.RoleId)">@r.RoleId</a>
+                @if (faults.Length > 0)
+                {
+                    <span>@L["Roles:IsolatedFinding", faults.Length]</span>
+                    @foreach (var role in faults) { @RoleLink(role) }
+                }
+                @if (attention.Length > faults.Length)
+                {
+                    <span>@L["Roles:DegradedFinding", attention.Length - faults.Length]</span>
+                    @foreach (var role in attention.Where(r => r.Status == RoleHealthStatus.Degraded)) { @RoleLink(role) }
+                }
+                <span>@L["Roles:ServingFinding", active.Count(role => role.Status is RoleHealthStatus.Healthy or RoleHealthStatus.Degraded), active.Length, http]</span>
+                @if (candidates.Length > 0) { <span>@L["Roles:CandidateFinding", candidates.Count(RoleHealthDisplay.CandidateReady), candidates.Length]</span> }
             }
         </p>
     </div>
     <div class="rh-strip">
-        <div><h3><i class="mo-vl-swatch mo-vl-role--primary"></i>@L["Roles:Policy"]</h3><strong>@Policy</strong><small>@host.DeploymentScope · @L["Roles:PolicyCounts", active.Count(r => r.EffectiveCriticality == RoleCriticality.Required), active.Count(r => r.EffectiveCriticality == RoleCriticality.Optional), active.Count(r => r.OverrideCriticality is not null)]</small></div>
-        <a href="/health-checks?entry=monica.application.roles"><h3><i class="mo-vl-swatch @gate.ToCssClass()"></i>@L["Roles:Gate"]</h3><strong>HTTP @http · @L[$"Status:{Snapshot.RoleReadiness}"]</strong><small>monica.application.roles</small></a>
-        <a href="@Nav.GetUriWithQueryParameter("status", "Faulted")"><h3><i class="mo-vl-swatch mo-vl-role--error"></i>@L["Roles:Quarantine"]</h3><strong>@L["Roles:QuarantinedCount", faults.Length]</strong><small>@L["Roles:ResourcesCount", faults.Sum(r => Snapshot.Resources.GetValueOrDefault(r.RoleId)?.Count ?? 0)]</small></a>
-        <a href="@Nav.GetUriWithQueryParameter("stage", nameof(RoleFaultStage.StartupConfiguration))"><h3><i class="mo-vl-swatch mo-vl-role--info"></i>@L["Roles:Recovery"]</h3><strong>@L["Roles:VerifiedCount", candidates.Count(RoleHealthDisplay.CandidateReady), candidates.Length]</strong><small>@L["Roles:InstanceOnly"]</small></a>
+        @{
+            var quarantine = faults.Length == 0 ? MoVisualRole.Success : MoVisualRole.Error;
+            var recovery = faults.Length == 0 || candidates.Any(RoleHealthDisplay.CandidateReady) ? MoVisualRole.Success : MoVisualRole.Warning;
+            var filterKey = candidates.Length > 0 ? "stage" : "status";
+            var filterValue = candidates.Length > 0 ? nameof(RoleFaultStage.StartupConfiguration) : nameof(RoleHealthStatus.Faulted);
+            var selected = candidates.Length > 0 ? Stage == filterValue : Status == filterValue;
+        }
+        <div class="mo-vl-role--primary"><h3><i class="mo-vl-swatch mo-vl-swatch--instrument"></i>@L["Roles:Policy"]<span>@host.ConfiguredPolicyMode</span></h3><strong>@Policy</strong><small>@host.DeploymentScope · @L["Roles:PolicyCounts", active.Count(r => r.EffectiveCriticality == RoleCriticality.Required), active.Count(r => r.EffectiveCriticality == RoleCriticality.Optional), active.Count(r => r.OverrideCriticality is not null)]</small></div>
+        <a class="@gate.ToCssClass()" href="/health-checks?entry=monica.application.roles"><h3><i class="mo-vl-swatch mo-vl-swatch--instrument"></i>@L["Roles:Gate"]<span>HTTP @http</span></h3><strong>@L[$"Status:{Snapshot.RoleReadiness}"]</strong><small>monica.application.roles</small></a>
+        <button type="button" class="@quarantine.ToCssClass()" aria-pressed="@((Status == "Faulted").ToString().ToLowerInvariant())" @onclick="@(() => Filter("status", Status == "Faulted" ? null : "Faulted"))"><h3><i class="mo-vl-swatch mo-vl-swatch--instrument"></i>@L["Roles:Quarantine"]<span>@(faults.Length > 0 ? "503" : "OK")</span></h3><strong>@L["Roles:QuarantinedCount", faults.Length]</strong><small>@L["Roles:ResourcesCount", faults.Sum(r => Snapshot.Resources.GetValueOrDefault(r.RoleId)?.Count ?? 0)]</small></button>
+        <button type="button" class="@recovery.ToCssClass()" disabled="@(faults.Length == 0)" aria-pressed="@(selected.ToString().ToLowerInvariant())" @onclick="@(() => Filter(filterKey, selected ? null : filterValue))"><h3><i class="mo-vl-swatch mo-vl-swatch--instrument"></i>@L["Roles:Recovery"]<span>@(candidates.Length > 0 ? $"{candidates.Count(RoleHealthDisplay.CandidateReady)}/{candidates.Length}" : faults.Length.ToString())</span></h3><strong>@(candidates.Length > 0 ? L["Roles:VerifiedCount", candidates.Count(RoleHealthDisplay.CandidateReady), candidates.Length] : L[faults.Length > 0 ? "Roles:TerminalCount" : "Roles:NoFault", faults.Length])</strong><small>@L[candidates.Length > 0 ? "Roles:InstanceOnly" : faults.Length > 0 ? "Roles:TerminalFault" : "Roles:Calm"]</small></button>
     </div>
-    <RoleBulkheadBoard Roles="@host.Roles" />
+    <RoleBulkheadBoard Roles="@host.Roles" Resources="@Snapshot.Resources" />
 </section>
 
 @code {
     [Parameter, EditorRequired] public RoleHealthDashboardSnapshot Snapshot { get; set; } = default!;
+    [SupplyParameterFromQuery] public string? Stage { get; set; }
+    [SupplyParameterFromQuery] public string? Status { get; set; }
+    private RenderFragment RoleLink(RoleHealthEntrySnapshot role) => @<a class="mo-vl-mark @RoleHealthDisplay.Color(role.Status).ToCssClass()" href="@Nav.GetUriWithQueryParameter("role", role.RoleId)">@role.RoleId</a>;
+    private void Filter(string key, string? value) => Nav.NavigateTo(Nav.GetUriWithQueryParameter(key, value), replace: true);
     private string Policy => Snapshot.Host.ConfiguredPolicyMode == RoleFaultPolicyMode.Auto && Snapshot.Host.Roles.Count(r => r.IsActiveOnCurrentHost) == 1
-        ? L["Roles:AutoSingle"].Value : Snapshot.Host.ConfiguredPolicyMode.ToString();
+        ? L["Roles:AutoSingle"].Value : Snapshot.Host.ConfiguredPolicyMode == RoleFaultPolicyMode.Auto ? L["Roles:AutoMulti"].Value : Snapshot.Host.ConfiguredPolicyMode.ToString();
 }

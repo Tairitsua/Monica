@@ -2,12 +2,13 @@
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Components
-@using Monica.UI.Shared.Components.Dialogs
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<SystemInfoResource> L
 
-<MudDialog>
-    <TitleContent><MoDialogHeading Text="@L["Page:Dialogs:Endpoint:Title"]" /></TitleContent>
+<MudDialog DefaultFocus="DefaultFocus.FirstChild" Style="width:min(480px,calc(100vw - 32px)); max-width:calc(100vw - 32px); margin:16px;">
+    <TitleContent>
+        <SystemInfoDialogHeading Text="@L["Page:Dialogs:Endpoint:Title"]" Tone="MoVisualRole.Info" Icon="@MoIcons.Network" Close="Close" />
+    </TitleContent>
     <DialogContent>
         <div class="system-info-endpoint-dialog">
             <dl>

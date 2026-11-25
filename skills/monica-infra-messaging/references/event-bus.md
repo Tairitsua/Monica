@@ -1,5 +1,7 @@
 # Publish and receive events
 
+An application-model host closes admission to a quarantined role's distributed handlers immediately. The active handler invocation keeps its scope until it finishes, then the registry signals transport removal for the affected subscription. Independent consumer groups on the same topic and passive in-process subscriptions remain available. When a transport shares one acknowledgment across several handlers, Monica admits all matching handlers together. A quarantined handler holds that whole physical delivery for redelivery before sibling handlers run. Explicit test delivery and reactivation respect the same quarantine. Repair the underlying fault and restart the host.
+
 Preparing a new event envelope allocates its message identity once with `Guid.CreateVersion7().ToString("D")`. Outbox delivery and receive retries preserve the accepted envelope identity. Incoming transport message IDs remain opaque provenance; do not regenerate them or infer delivery order from UUID order. Payload entity identities are owned by the producer and are distinct from envelope identity.
 
 For application EventBus contracts and consumers, including outbox or inbox refactors, first follow the Building Block event contract in `$monica-application-building-block-development` (`references/12-entity-request-event-template.md`) and handler in `$monica-application-building-block-development` (`references/14-event-handler-template.md`) templates. This reference owns transport capabilities and setup; the interface example below demonstrates the general EventBus API.
@@ -217,8 +219,11 @@ Retries run immediately within one transport delivery, invoking the receive disp
 | Receive outcome | Dapr streaming provider | Native Kafka provider |
 | --- | --- | --- |
 | Any attempt completes | `Success` | Commit offset |
+| Assigned role refuses admission during quarantine | Return `Retry` to retain the broker delivery | Stop the topic/owner consumer and retain its offset, including for a refused batch |
 | Processing retry budget exhausted | Log and return `Drop`; Dapr forwards to the configured dead-letter topic, or discards when none is configured | Apply the subscription's `Block`, `LogAndSkip` or `DeadLetter` policy |
 | Transport/host stops or subscription is removed | Stop attempts and return `Retry` when the stream can still acknowledge | Stop without committing or seeking |
+
+When a Kafka topic/owner group retires during role quarantine, an accepted record or batch keeps the consumer alive through its offset commit. The group closes admission before waiting. Host shutdown and broker partition loss retain their normal cancellation and replay behavior.
 
 Cancellation of the transport lifetime is shutdown, not a processing failure. An exception or canceled task produced by a handler while the transport remains active is an ordinary failed attempt. This preserves messages during normal host restarts without depending on the handler's exception type.
 

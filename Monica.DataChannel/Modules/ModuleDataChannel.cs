@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
@@ -46,6 +47,7 @@ public class ModuleDataChannel : MonicaModule<ModuleDataChannelOption>, IWebHost
     {
         var services = context.Services;
         services.TryAddSingleton<DataChannelRuntime>();
+        services.AddSingleton<IRoleLifecycleParticipant>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<IDataChannelRegistrar>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<IDataChannelManager>(provider => provider.GetRequiredService<DataChannelRuntime>());
         services.TryAddSingleton<IDataChannelLifecycle>(provider => provider.GetRequiredService<DataChannelRuntime>());

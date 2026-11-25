@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
+using Monica.EventBus.Models.Internal;
 
 namespace Monica.EventBus.Services.Support;
 
@@ -46,11 +47,31 @@ internal static class EventHandlerDispatcher
         CancellationToken cancellationToken,
         bool allowHeld = false)
     {
+        List<IDisposable>? admissions = null;
+        try
+        {
+            // Reserve all selected handlers before side effects. A shared physical delivery has one acknowledgment.
+            foreach (var subscription in subscriptions)
+                if (subscription is EventSubscription owned && owned.AdmitDelivery() is { } admission)
+                    (admissions ??= []).Add(admission);
+
+            await InvokeSelectedAsync(subscriptions, invoker, logger, eventType, eventData, metadata, cancellationToken, allowHeld);
+        }
+        finally
+        {
+            if (admissions is not null)
+                foreach (var admission in admissions) admission.Dispose();
+        }
+    }
+
+    private static async Task InvokeSelectedAsync(IReadOnlyList<IEventSubscription> subscriptions,
+        IEventHandlerInvoker invoker, ILogger logger, Type eventType, object eventData,
+        EventDeliveryMetadata? metadata, CancellationToken cancellationToken, bool allowHeld)
+    {
         foreach (var subscription in subscriptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (subscription.State != EventSubscriptionState.Active
-                && !(allowHeld && subscription.State == EventSubscriptionState.Held))
+            if (!EventSubscription.HasDeliveryState(subscription, allowHeld))
             {
                 throw new InvalidOperationException(
                     $"Event subscription '{subscription.Id}' stopped before delivery completed.");
@@ -88,8 +109,8 @@ internal static class EventHandlerDispatcher
         IReadOnlyList<object> payloads, IReadOnlyList<EventDeliveryMetadata> metadata, CancellationToken cancellationToken,
         bool allowHeld)
     {
-        if (subscription.State != EventSubscriptionState.Active
-            && !(allowHeld && subscription.State == EventSubscriptionState.Held))
+        using var admission = (subscription as EventSubscription)?.AdmitDelivery();
+        if (!EventSubscription.HasDeliveryState(subscription, allowHeld))
             throw new InvalidOperationException($"Batch subscription '{subscription.Id}' stopped before delivery.");
         await using var scope = await subscription.HandlerFactory.CreateExecutionScopeAsync().ConfigureAwait(false);
         scope.ServiceProvider.GetRequiredService<EventDeliveryContext>().Set(null);
@@ -97,8 +118,7 @@ internal static class EventHandlerDispatcher
         await invoker.InvokeAsync(scope.EventHandler, payloads, subscription.EventType, subscription,
             scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        if (subscription.State != EventSubscriptionState.Active
-            && !(allowHeld && subscription.State == EventSubscriptionState.Held))
+        if (!EventSubscription.HasDeliveryState(subscription, allowHeld))
             throw new InvalidOperationException($"Batch subscription '{subscription.Id}' stopped before acknowledgment.");
     }
 }

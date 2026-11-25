@@ -1,7 +1,16 @@
-.role-recovery { --recovery: var(--mud-palette-warning-darken); display: grid; gap: 1rem; min-width: 0; padding: 1.25rem; background: color-mix(in srgb, var(--recovery) 4%, var(--mud-palette-surface)); border: 1px solid color-mix(in srgb, var(--recovery) 40%, var(--mud-palette-divider)); border-inline-start: 4px solid var(--recovery); border-radius: .75rem; }
+.role-recovery { --recovery: var(--mud-palette-warning-darken); display: grid; gap: 0; min-width: 0; overflow: hidden; background: color-mix(in srgb, var(--recovery) 4%, var(--mud-palette-surface)); border: 1px solid color-mix(in srgb, var(--recovery) 40%, var(--mud-palette-divider));  border-radius: .75rem; }
 .role-recovery.observed { --recovery: var(--mud-palette-success-darken); }
 .role-recovery header, .recovery-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .65rem; }
 .recovery-copy { flex: 1 1 24rem; min-width: 0; }
 .recovery-copy small { display: inline-flex; align-items: center; gap: .4rem; color: var(--recovery); font-family: monospace; }
 .recovery-copy h2 { margin-block: .35rem; font-size: 1.18rem; line-height: 1.35; font-weight: 650; }
 .recovery-copy p { color: var(--mud-palette-text-secondary); font-size: .86rem; }
+.role-recovery header { padding:16px 24px; }
+.recovery-copy small { flex-wrap:wrap; font:500 11.5px var(--mo-font-family-mono); color:var(--mud-palette-text-secondary); }
+.recovery-icon,.recovery-copy small b { display:inline-flex; align-items:center; color:color-mix(in srgb,var(--recovery) 70%,var(--mud-palette-text-primary)); border-radius:5px; background:color-mix(in srgb,var(--recovery) 12%,var(--mud-palette-surface)); }
+.recovery-icon { padding:5px; }
+.recovery-copy small b { padding:3px 7px; font-family:var(--mud-typography-default-family); }
+.recovery-copy h2 { font-size:16px; font-weight:600; }
+.recovery-copy p { max-width:72ch; font-size:13px; line-height:1.65; }
+.recovery-actions ::deep .mud-button-root { min-height:32px; border-radius:6px; font-size:12.5px; }
+@container page (max-width:720px) { .role-recovery header { padding:14px 16px; } }

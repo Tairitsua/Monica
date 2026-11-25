@@ -2,23 +2,20 @@
 @using Monica.UI.Localization
 @using Monica.UI.UISystemInfo.Models
 @using Monica.UI.UISystemInfo.Components
-@using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<SystemInfoResource> L
 
-<MudDialog>
+<MudDialog DefaultFocus="DefaultFocus.FirstChild" Style="width:min(480px,calc(100vw - 32px)); max-width:calc(100vw - 32px); margin:16px;">
     <TitleContent>
-        <div class="system-info-restart-heading">
-            <span><MoIcon Icon="@MoIcons.Power" Size="18px" /></span>
-            <MoDialogHeading Text="@L["Page:Dialogs:Restart:Title"]" />
-        </div>
+        <SystemInfoDialogHeading Text="@L["Page:Dialogs:Restart:Title"]" Tone="MoVisualRole.Error" Icon="@MoIcons.Power" Close="Cancel" />
     </TitleContent>
     <DialogContent>
         <div class="system-info-restart-dialog">
             <p>@L["Page:Dialogs:Restart:Summary"]</p>
             @if (Deployment is { } deployment)
             {
-                <h3>@L["Page:Recovery:Impact"]</h3>
-                <SystemInfoRestartImpact Deployment="@deployment" />
+                <section class="system-info-dialog-impact"><h3>@L["Page:Recovery:Impact"]</h3>
+                    <SystemInfoRestartImpact Deployment="@deployment" Compact="true" />
+                </section>
             }
             <div class="system-info-restart-dialog__delay">
                 <MoIcon Icon="@MoIcons.Clock" Size="1.25rem" />

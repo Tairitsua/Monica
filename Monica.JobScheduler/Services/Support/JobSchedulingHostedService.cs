@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
@@ -5,6 +6,7 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.HostedService.Abstractions;
 using Monica.Core.HostedService.Models;
 using Monica.Core.ObservableInstance.Abstractions;
@@ -35,14 +37,17 @@ internal sealed class JobSchedulingHostedService(
     ILogger<JobSchedulingHostedService> logger,
     ITypeActivationPolicy? activation = null,
     HistoryCleanupLeaseStore? historyCleanupLeases = null,
-    IMeterFactory? meterFactory = null)
-    : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger)
+    IMeterFactory? meterFactory = null,
+    IRoleHealthStateProvider? roleHealth = null)
+    : MoBackgroundService(observableRegistry, hostedServiceOptions, serviceScopeFactory, logger), IRoleLifecycleParticipant
 {
     private readonly ModuleJobSchedulerOption _options = schedulerOptions.Value;
     private readonly IGrouping<string, LocalJobDefinition>[] _localOwners = localDefinitions
         .GroupBy(definition => definition.OwnerKey ?? schedulerOptions.Value.GetProjectName(), StringComparer.Ordinal)
         .OrderBy(static owner => owner.Key, StringComparer.Ordinal)
         .ToArray();
+    private readonly ConcurrentDictionary<string, LeaseCoordinator> _ownerCoordinators = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, RoleWorkAdmission> _ownerAdmissions = new(StringComparer.Ordinal);
     private readonly LeaseCoordinator _coordinators = new(store.CoordinatorLeases,
         schedulerOptions.Value.WorkerInstanceId, timeProvider, logger, CoordinatorOptions(schedulerOptions.Value), meterFactory);
     private readonly Dictionary<string, DateTimeOffset> _nextSnapshotSyncUtc = new(StringComparer.Ordinal);
@@ -85,13 +90,15 @@ internal sealed class JobSchedulingHostedService(
             // the scheduler's database roles alive after its protected work has drained.
             _coordinators.Dispose();
             _historyCoordinator?.Dispose();
-            await Task.WhenAll(_coordinators.DisposeAsync().AsTask(),
-                _historyCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask);
+            await Task.WhenAll(_ownerCoordinators.Values.Select(owner => owner.DisposeAsync().AsTask())
+                .Append(_coordinators.DisposeAsync().AsTask())
+                .Append(_historyCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask));
         }
     }
 
     public override void Dispose()
     {
+        foreach (var owner in _ownerCoordinators.Values) owner.Dispose();
         _coordinators.Dispose();
         _historyCoordinator?.Dispose();
         base.Dispose();
@@ -140,9 +147,13 @@ internal sealed class JobSchedulingHostedService(
             if (_manualCatalogInitialized) return;
             foreach (var owner in _localOwners)
             {
+                using var admission = AdmitOwner(owner.Key);
+                if (admission is null) continue;
                 await store.SyncOwnerSnapshotAsync(new JobOwnerSnapshot(scopeKey, owner.Key,
                     owner.Select(definition => definition.Declaration).ToArray()), cancellationToken);
                 foreach (var definition in owner.Where(definition => definition.Declaration.JobType == JobType.Recurring))
+                {
+                    if (IsSuspended(owner.Key)) break;
                     await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
                     {
                         CursorKey = new RecurringScheduleCursorKey
@@ -151,18 +162,28 @@ internal sealed class JobSchedulingHostedService(
                         },
                         HostSuspensionReasons = JobRecurringScheduleSuspensionReason.Manual
                     }, cancellationToken);
+                }
             }
             _manualCatalogInitialized = true;
             runtimeState.SetScheduling(true, "The isolated local catalog is ready; automatic scheduling and maintenance are held.");
             return;
         }
+        // Custom activation policies can expose suspension without an application-model lifecycle publisher.
+        if (roleHealth is null)
+            foreach (var suspended in activation?.SuspendedWorkloadOwners ?? [])
+                await RetireOwnerAsync(suspended, cancellationToken).ConfigureAwait(false);
         var snapshots = GetLocalSnapshots(scopeKey);
         var budget = _options.MaxRecurringMaterializationsPerCycle;
         for (var visited = 0; visited < snapshots.Length; visited++)
         {
             var snapshot = snapshots[(_nextMaterializationOwnerIndex + visited) % snapshots.Length];
-            var context = await GetCoordinatorAsync("owner:" + snapshot.OwnerKey, cancellationToken);
-            if (context is null) continue;
+            using var admission = AdmitOwner(snapshot.OwnerKey);
+            if (admission is null) continue;
+            var ownerCoordinator = _ownerCoordinators.GetOrAdd(snapshot.OwnerKey, _ => new LeaseCoordinator(
+                store.CoordinatorLeases, _options.WorkerInstanceId, timeProvider, Logger, CoordinatorOptions(_options), meterFactory));
+            var context = await ownerCoordinator.GetAsync(new LeaseResource(scopeKey,
+                JobCoordinatorLeaseAdapter.PREFIX + "owner:" + snapshot.OwnerKey), cancellationToken);
+            if (context is null || IsSuspended(snapshot.OwnerKey)) continue;
             using var term = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.StoppingToken);
             var lease = JobCoordinatorLeaseAdapter.ToKey(context.Identity);
             await SyncOwnerStateAsync(snapshot, lease, term.Token);
@@ -191,6 +212,29 @@ internal sealed class JobSchedulingHostedService(
             MaxLeaseLossesBeforeFailure = _options.MaxLeaseLossesBeforeFailure
         }, cancellationToken);
         runtimeState.RecordLeaseRecoveryWork(timeProvider.GetUtcNow());
+    }
+
+    private bool IsSuspended(string ownerKey) => activation?.SuspendedWorkloadOwners.Contains(ownerKey) == true;
+
+    private RoleWorkAdmission.Lease? AdmitOwner(string ownerKey)
+    {
+        var lease = _ownerAdmissions.GetOrAdd(ownerKey, static _ => new()).TryEnter();
+        if (!IsSuspended(ownerKey)) return lease;
+        lease?.Dispose();
+        return null;
+    }
+
+    public Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken)
+    {
+        var owner = roleHealth?.GetSnapshot().Roles.Single(role => role.RoleId == roleId).WorkloadOwner;
+        return owner is null ? Task.CompletedTask : RetireOwnerAsync(owner, cancellationToken);
+    }
+
+    private async Task RetireOwnerAsync(string owner, CancellationToken cancellationToken)
+    {
+        await _ownerAdmissions.GetOrAdd(owner, static _ => new()).CloseAndDrainAsync().WaitAsync(cancellationToken);
+        if (_ownerCoordinators.TryGetValue(owner, out var coordinator))
+            await coordinator.DisposeAsync();
     }
 
     private JobOwnerSnapshot[] GetLocalSnapshots(string scopeKey)
@@ -224,6 +268,7 @@ internal sealed class JobSchedulingHostedService(
             foreach (var declaration in snapshot.Declarations.Where(declaration => declaration.JobType == JobType.Recurring))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (IsSuspended(snapshot.OwnerKey)) return;
                 await store.SynchronizeRecurringScheduleAsync(new RecurringScheduleSynchronization
                 {
                     CoordinatorLease = lease,
@@ -246,7 +291,7 @@ internal sealed class JobSchedulingHostedService(
     private async Task<int> MaterializeOwnerDueOccurrencesAsync(
         string scopeKey, string ownerKey, int remainingBudget, JobCoordinatorLeaseKey lease, CancellationToken cancellationToken)
     {
-        while (remainingBudget > 0)
+        while (remainingBudget > 0 && !IsSuspended(ownerKey))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var cursors = await store.GetDueRecurringSchedulesAsync(
@@ -262,6 +307,7 @@ internal sealed class JobSchedulingHostedService(
             var materializedThisRound = 0;
             foreach (var cursor in cursors)
             {
+                if (IsSuspended(ownerKey)) return remainingBudget;
                 if (cursor.NextOccurrenceUtc is not { } occurrence)
                 {
                     continue;

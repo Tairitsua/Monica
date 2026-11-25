@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Modules;
 
 namespace Monica.EventBus.Services.Support;
 
 /// <summary>
-/// Bounds processing attempts for one distributed transport delivery, independently of exception type.
+/// Bounds processing attempts for one distributed transport delivery.
 /// </summary>
 /// <remarks>
 /// The callback must enter a fresh receive scope on each attempt. Transport acknowledgment and dead-letter
@@ -24,7 +25,8 @@ public sealed class EventMessageRetryPolicy(IOptions<ModuleEventBusOption> optio
     /// <summary>
     /// Executes the callback once, then retries any failure up to the configured count. Throws the final
     /// failure when exhausted. Cancellation of <paramref name="cancellationToken"/> stops processing
-    /// without retrying; a callback's independent cancellation consumes the ordinary retry budget.
+    /// without retrying. A quarantined role refuses admission immediately. A callback's independent
+    /// cancellation consumes the ordinary retry budget.
     /// </summary>
     public async Task ExecuteAsync(Func<Task> handle, CancellationToken cancellationToken)
     {
@@ -37,7 +39,7 @@ public sealed class EventMessageRetryPolicy(IOptions<ModuleEventBusOption> optio
                 cancellationToken.ThrowIfCancellationRequested();
                 return;
             }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested && retry < _retryCount)
+            catch (Exception error) when (error is not RoleUnavailableException && !cancellationToken.IsCancellationRequested && retry < _retryCount)
             {
                 // Each invocation re-enters the receive pipeline after the attempt callback exits.
             }

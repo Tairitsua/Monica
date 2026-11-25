@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Monica.Core.ApplicationRoles;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Core;
 using Monica.Core.Modularity;
@@ -43,7 +44,9 @@ public class ModuleEventBus : MonicaModule<ModuleEventBusOption>
     {
         var services = context.Services;
         // Register core EventBus services (shared across all EventBus instances)
-        services.AddSingleton<IEventSubscriptionRegistry, EventSubscriptionRegistry>();
+        services.AddSingleton<EventSubscriptionRegistry>();
+        services.AddSingleton<IEventSubscriptionRegistry>(sp => sp.GetRequiredService<EventSubscriptionRegistry>());
+        services.AddSingleton<IRoleLifecycleParticipant>(sp => sp.GetRequiredService<EventSubscriptionRegistry>());
         services.AddSingleton<ITopicSubscriptionStatusStore, TopicSubscriptionStatusStore>();
         services.AddSingleton<IEventHandlerInvoker, EventHandlerInvoker>();
         services.AddSingleton<LocalEventBus>();

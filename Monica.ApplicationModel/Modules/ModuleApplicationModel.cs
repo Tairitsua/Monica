@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
+using Monica.ApplicationModel.Metrics;
 using Monica.ApplicationModel.Models;
 using Monica.ApplicationModel.Services;
 using Monica.Core;
@@ -96,8 +97,18 @@ public sealed class ModuleApplicationModel : MonicaModule<ModuleApplicationModel
     {
         var model = _model ?? throw new InvalidOperationException("The application model must be prepared before service registration.");
         context.Services.AddSingleton<IApplicationModel>(model);
+        context.Services.AddSingleton(model);
+        context.Services.AddSingleton<RoleFaultCoordinator>();
+        context.Services.AddSingleton<IRoleFaultCoordinator>(provider => provider.GetRequiredService<RoleFaultCoordinator>());
+        context.Services.AddSingleton<IRoleHostedServiceFaultObserver>(provider => provider.GetRequiredService<RoleFaultCoordinator>());
         context.Services.AddSingleton<IRoleHealthStateProvider>(model);
         context.Services.AddSingleton<IRoleProbeStateSink>(model);
+        context.Services.AddMetrics();
+        context.Services.AddSingleton<ApplicationRoleMetrics>();
+        context.Services.AddSingleton<IRoleQuarantineRequestMetrics>(sp => sp.GetRequiredService<ApplicationRoleMetrics>());
+        context.Services.AddHostedService(sp => sp.GetRequiredService<ApplicationRoleMetrics>());
+        context.Composition.AdmitHostedLifecycle(context.Services.Last(service => service.ServiceType == typeof(IHostedService)),
+            typeof(ApplicationRoleMetrics));
         context.Services.AddSingleton<Monica.Core.Domains.Abstractions.IDomainCatalogSource, ApplicationDomainCatalogSource>();
         context.Services.AddSingleton(model.Deployment);
         foreach (var client in _clients)

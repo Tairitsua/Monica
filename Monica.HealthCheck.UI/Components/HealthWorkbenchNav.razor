@@ -1,12 +1,12 @@
 @using Monica.UI.Shared.Components.Navigation
 @inject IStringLocalizer<HealthCheckResource> L
 
-<MoWorkbenchNavigation Label="@L["Navigation:Category"]" Compact="true">
+<div class="health-view-rail"><MoWorkbenchNavigation Label="@L["Navigation:Category"]" Compact="true">
     <a href="/health-checks" aria-current="@(RolesActive ? null : "page")"><MoIcon Icon="@MoIcons.HeartPulse" />@L["Roles:HostHealth"]</a>
     <a href="/health-checks/roles" aria-current="@(RolesActive ? "page" : null)"><MoIcon Icon="@MoIcons.ShieldCheck" />@L["Roles:Title"]
         @if (Attention > 0) { <span class="mo-vl-capsule mo-vl-role--warning">@Attention</span> }
     </a>
-</MoWorkbenchNavigation>
+</MoWorkbenchNavigation></div>
 
 @code {
     [Parameter] public bool RolesActive { get; set; }

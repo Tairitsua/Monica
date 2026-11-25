@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Monica.Core.ApplicationRoles;
 using Microsoft.Extensions.Logging;
 using Monica.Core.TypeDiscovery.Abstractions;
 using Monica.Core;
@@ -17,9 +18,10 @@ namespace Monica.EventBus.Services;
 public class EventSubscriptionRegistry(
     ILogger<EventSubscriptionRegistry> logger,
     ITypeActivationPolicy? activation = null,
-    MonicaApplication? application = null) : IEventSubscriptionRegistry
+    MonicaApplication? application = null,
+    IRoleHealthStateProvider? health = null) : IEventSubscriptionRegistry, IRoleLifecycleParticipant
 {
-    private readonly ConcurrentQueue<EventSubscriptionChange> _notificationQueue = new();
+    private readonly ConcurrentQueue<PendingNotification> _notificationQueue = new();
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<Guid, IObserver<EventSubscriptionChange>> _observers = new();
     private int _isDispatchingNotifications;
@@ -54,7 +56,9 @@ public class EventSubscriptionRegistry(
             ? ActivationMode.Automatic
             : activation?.GetActivation(handler ?? typeof(EventSubscription),
                 TypeActivationKind.ExternalSubscription, descriptor.RegistrationOwner) ?? ActivationMode.Automatic;
-        var subscription = new EventSubscription(descriptor, mode);
+        var roleId = descriptor.Scope == EventSubscriptionScope.Distributed
+            ? health?.GetRoleId(handler ?? typeof(EventSubscription), descriptor.RegistrationOwner) : null;
+        var subscription = new EventSubscription(descriptor, mode, roleId, health);
         application?.RecordActivation(new ResourceActivation
         {
             Key = $"EventBus:{descriptor.ServiceKey ?? "default"}:{descriptor.TopicName}:{descriptor.WorkloadOwner ?? "unowned"}:{handler?.FullName ?? subscription.Id.ToString()}",
@@ -106,9 +110,10 @@ public class EventSubscriptionRegistry(
                 committed =>
                 {
                     EnqueueNotification(EventSubscriptionChangeType.Added, committed);
-                    EnqueueNotification(EventSubscriptionChangeType.Activated, committed);
+                    if (committed.State == EventSubscriptionState.Active)
+                        EnqueueNotification(EventSubscriptionChangeType.Activated, committed);
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken, creating: true).ConfigureAwait(false);
             DrainNotifications();
             return subscription;
         }
@@ -337,6 +342,21 @@ public class EventSubscriptionRegistry(
 
     #endregion
 
+    /// <inheritdoc />
+    public async Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken)
+    {
+        var affected = _subscriptions.Values.Where(subscription => subscription.RoleId == roleId).ToArray();
+        await Task.WhenAll(affected.Select(async subscription =>
+        {
+            await subscription.DrainDeliveriesAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            EnqueueNotification(EventSubscriptionChangeType.Deactivated, subscription, delivered);
+            DrainNotifications();
+            // Another thread can own the dispatcher. Its ordered callback retires the physical subscription.
+            await delivered.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        })).ConfigureAwait(false);
+    }
+
     #region Batch Operations
 
     public async Task UnsubscribeByEventTypeAsync(Type eventType, CancellationToken cancellationToken = default)
@@ -438,12 +458,11 @@ public class EventSubscriptionRegistry(
 
     private void EnqueueNotification(
         EventSubscriptionChangeType changeType,
-        IEventSubscription subscription)
+        IEventSubscription subscription,
+        TaskCompletionSource? delivered = null)
     {
-        _notificationQueue.Enqueue(new EventSubscriptionChange(
-            changeType,
-            subscription,
-            DateTime.UtcNow));
+        _notificationQueue.Enqueue(new PendingNotification(
+            new EventSubscriptionChange(changeType, subscription, DateTime.UtcNow), delivered));
     }
 
     private void DrainNotifications()
@@ -469,19 +488,26 @@ public class EventSubscriptionRegistry(
         }
     }
 
-    private void NotifyObservers(EventSubscriptionChange change)
+    private sealed record PendingNotification(EventSubscriptionChange Change, TaskCompletionSource? Delivered);
+
+    private void NotifyObservers(PendingNotification notification)
     {
+        List<Exception>? failures = null;
         foreach (var observer in _observers.Values)
         {
             try
             {
-                observer.OnNext(change);
+                observer.OnNext(notification.Change);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error notifying observer of subscription change");
+                if (notification.Delivered is not null) (failures ??= []).Add(ex);
             }
         }
+
+        if (failures is null) notification.Delivered?.TrySetResult();
+        else notification.Delivered?.TrySetException(failures);
     }
 
     private sealed class Unsubscriber(

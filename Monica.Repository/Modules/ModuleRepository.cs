@@ -192,7 +192,12 @@ public static class ModuleRepositoryRegistrationExtensions
         {
             if (context.Services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistration<TDbContext>)))
                 throw new InvalidOperationException($"Outbox context '{typeof(TDbContext).FullName}' must be registered once with one declaring owner.");
-            context.Services.AddSingleton(new OutboxRegistration<TDbContext>(options));
+            context.Services.AddSingleton<OutboxRoleAdmission<TDbContext>>();
+            context.Services.AddSingleton<IRoleLifecycleParticipant>(sp => sp.GetRequiredService<OutboxRoleAdmission<TDbContext>>());
+            context.Services.AddSingleton(sp => new OutboxRegistration<TDbContext>(options)
+            {
+                RoleAdmission = sp.GetRequiredService<OutboxRoleAdmission<TDbContext>>()
+            });
             // Inspect the completed host collection at first resolution, including host overrides applied
             // after AddMonica. Never construct scoped transports while building this singleton catalog.
             context.Services.TryAddSingleton(sp => new OutboxDeliveryCapabilities(

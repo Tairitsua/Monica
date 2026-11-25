@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.ApplicationModel.Abstractions;
 using Monica.ApplicationModel.Annotations;
 using Monica.Core.ApplicationRoles;
@@ -49,8 +50,11 @@ internal sealed class ApplicationApiReceiverConvention(IApplicationModel? model,
         public void OnResourceExecuting(ResourceExecutingContext context)
         {
             if (health.IsRoleFaulted(roleId))
+            {
+                context.HttpContext.RequestServices.GetService<IRoleQuarantineRequestMetrics>()?.RecordHttpRejection(roleId);
                 context.Result = ResultHttpProjection.ToMvcResult(Result.Failure(
                     RoleUnavailableException.MessageForRole(roleId), ResultStatus.ServiceUnavailable));
+            }
         }
 
         public void OnResourceExecuted(ResourceExecutedContext context) { }

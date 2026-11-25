@@ -150,8 +150,8 @@ internal sealed partial class CompiledApplicationModel : IApplicationModel, ITyp
 
     public string AppId => _deployment.AppId;
     public ApplicationDeployment Deployment => _deployment;
-    public IReadOnlyCollection<string> ActiveWorkloadOwners => _activeWorkloadOwners;
-    public IReadOnlyCollection<string> SuspendedWorkloadOwners => _suspendedWorkloadOwners;
+    public IReadOnlyCollection<string> ActiveWorkloadOwners => _workloadPlacement.ActiveOwners;
+    public IReadOnlyCollection<string> SuspendedWorkloadOwners => _workloadPlacement.SuspendedOwners;
     public IReadOnlyDictionary<string, ApplicationDomainDefinition> Domains { get; }
     public IReadOnlyDictionary<string, ApplicationRoleDefinition> Roles { get; }
     public IReadOnlyDictionary<Type, ApplicationOperationDefinition> Operations { get; }

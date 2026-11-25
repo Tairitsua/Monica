@@ -1,3 +1,4 @@
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.Core.TypeDiscovery.Abstractions;
@@ -7,7 +8,8 @@ namespace Monica.EventBus.Models.Internal;
 /// <summary>
 /// Concrete subscription implementation with lifecycle management.
 /// </summary>
-internal class EventSubscription(EventSubscriptionDescriptor descriptor, ActivationMode activation = ActivationMode.Automatic) : IEventSubscription
+internal class EventSubscription(EventSubscriptionDescriptor descriptor, ActivationMode activation = ActivationMode.Automatic,
+    string? roleId = null, IRoleHealthStateProvider? health = null) : IEventSubscription
 {
     private readonly SemaphoreSlim _mutationGate = new(1, 1);
     private volatile EventSubscriptionState _state = activation switch
@@ -17,7 +19,32 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor, Activat
         _ => EventSubscriptionState.Pending
     };
 
-    public ActivationMode Activation { get; } = activation;
+    internal string? RoleId { get; } = roleId;
+    private readonly RoleWorkAdmission? _deliveryAdmission = roleId is null ? null : new();
+    internal bool IsQuarantined => RoleId is not null && health?.IsRoleFaulted(RoleId) == true;
+    public ActivationMode Activation => IsQuarantined ? ActivationMode.Disabled : activation;
+
+    // The registered lifecycle state also governs admitted handlers while new work is being refused.
+    internal static bool HasDeliveryState(IEventSubscription subscription, bool allowHeld)
+    {
+        var state = subscription is EventSubscription owned ? owned._state : subscription.State;
+        return state == EventSubscriptionState.Active || allowHeld && state == EventSubscriptionState.Held;
+    }
+
+    internal static void EnsureRoleAvailable(IEventSubscription subscription)
+    {
+        if (subscription is EventSubscription { IsQuarantined: true } owned)
+            throw new RoleUnavailableException(owned.RoleId!);
+    }
+
+    internal IDisposable? AdmitDelivery()
+    {
+        if (_deliveryAdmission is null) return null;
+        if (!IsQuarantined && _deliveryAdmission.TryEnter() is { } lease) return lease;
+        throw new RoleUnavailableException(RoleId!);
+    }
+
+    internal Task DrainDeliveriesAsync() => _deliveryAdmission?.CloseAndDrainAsync() ?? Task.CompletedTask;
 
     #region Identity
 
@@ -44,7 +71,8 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor, Activat
 
     #region Lifecycle
 
-    public EventSubscriptionState State => _state;
+    public EventSubscriptionState State => _state != EventSubscriptionState.Disposed && IsQuarantined
+        ? EventSubscriptionState.Disabled : _state;
     public DateTime CreatedAt { get; } = DateTime.UtcNow;
     public DateTime? ActivatedAt { get; private set; }
     public DateTime? DeactivatedAt { get; private set; }
@@ -72,11 +100,16 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor, Activat
 
     internal async Task ActivateAsync(
         Action<EventSubscription> onCommitted,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool creating = false)
     {
         await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (creating && IsQuarantined)
+            {
+                onCommitted(this);
+                return;
+            }
             if (Activation != ActivationMode.Automatic)
                 throw new InvalidOperationException("Held or disabled subscriptions cannot attach to a transport. Use explicit test delivery for eligible held subscriptions.");
             if (_state != EventSubscriptionState.Pending && _state != EventSubscriptionState.Inactive)

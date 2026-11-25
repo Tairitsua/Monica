@@ -40,7 +40,7 @@
         var snapshot = _session.Snapshot;
 
         @if (snapshot.ApplicationModel is { } deployment &&
-            (deployment.Faulted.Any(role => role.StartupCandidateValid == true || role.Id == Restore)))
+            deployment.Faulted.Any(role => role.StartupCandidateValid == true || role.HasStartupConfigurationFault && string.Equals(role.Id, Restore, StringComparison.OrdinalIgnoreCase)))
         {
             <SystemInfoRoleRecovery Deployment="@deployment" Scope="@snapshot.MonicaHost?.DeploymentScope"
                                     FocusRole="@Restore" RoleHealthUrl="@_roleHealthUrl"

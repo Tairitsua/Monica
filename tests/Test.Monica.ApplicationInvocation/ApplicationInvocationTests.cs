@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -351,6 +352,36 @@ public sealed class ApplicationInvocationTests
         var token = TestContext.Current.CancellationToken;
         await using var host = await new InvocationApplicationFactory(colocated: true, receivers: true, authority: true, remoteOnly: true,
             faultInvocation: true).CreateAsync(cancellationToken: token);
+        var meterFactory = host.Services.GetRequiredService<IMeterFactory>();
+        var rejected = new ConcurrentQueue<(string Role, string Transport, long Value)>();
+        var states = new List<(string Role, string Criticality, string Stage, int Value)>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, observer) =>
+            {
+                if (ReferenceEquals(instrument.Meter.Scope, meterFactory) && instrument.Meter.Name == "Monica.ApplicationModel")
+                    observer.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+        {
+            Assert.Equal("monica.application.role.quarantined_requests", instrument.Name);
+            var labels = tags.ToArray().ToDictionary(pair => pair.Key, pair => (string)pair.Value!);
+            Assert.Equal(2, labels.Count);
+            rejected.Enqueue((labels["role_id"], labels["transport"], value));
+        });
+        listener.SetMeasurementEventCallback<int>((instrument, value, tags, _) =>
+        {
+            Assert.Equal("monica.application.role.state", instrument.Name);
+            var labels = tags.ToArray().ToDictionary(pair => pair.Key, pair => (string)pair.Value!);
+            Assert.Equal(3, labels.Count);
+            states.Add((labels["role_id"], labels["criticality"], labels["fault_stage"], value));
+        });
+        listener.Start();
+        listener.RecordObservableInstruments();
+        Assert.Equal(2, states.Count);
+        Assert.Contains(("ordering.invocation", "Optional", "StartupConfiguration", 2), states);
+        Assert.Contains(("ordering.worker", "Required", "none", 0), states);
         using var client = ((TestServer)host.Services.GetRequiredService<IServer>()).CreateClient();
         foreach (var path in new[] { "/invocation-selection/ordinary", "/invocation-selection/constrained", "/role-owned/manual", "/api/v1/Ordering/ledger", "/role-owned/minimal" })
         {
@@ -376,6 +407,21 @@ public sealed class ApplicationInvocationTests
         var remote = await invoker.InvokeAsync(new QueryOrdinary("authority"), OrdinaryEndpoint, token, ApiTransaction.Independent);
         Assert.Equal(501, remote.Data);
         Assert.StartsWith("https://primary.test/external/", Assert.Single(host.Services.GetRequiredService<RecordingTransport>().Calls).Uri);
+
+        var coordinator = host.Services.GetRequiredService<IRoleFaultCoordinator>();
+        var fault = RoleFaultRecord.ForResource(RoleFaultStage.RuntimeResource, typeof(OrdinaryHandler));
+        await coordinator.ReportRuntimeResourceFaultAsync("ordering.worker", false, fault, token);
+        states.Clear();
+        listener.RecordObservableInstruments();
+        Assert.Contains(("ordering.worker", "Required", "RuntimeResource", 1), states);
+        await coordinator.ReportRuntimeResourceFaultAsync("ordering.worker", true, fault, token);
+        states.Clear();
+        listener.RecordObservableInstruments();
+        Assert.Contains(("ordering.worker", "Required", "RuntimeResource", 2), states);
+        Assert.Equal(8, rejected.Count);
+        Assert.All(rejected, point => Assert.Equal(("ordering.invocation", 1L), (point.Role, point.Value)));
+        Assert.Equal(5, rejected.Count(point => point.Transport == "http"));
+        Assert.Equal(3, rejected.Count(point => point.Transport == "local"));
     }
 
     private static void PrepareCaller(MonicaTestApplication host)

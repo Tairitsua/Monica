@@ -9,7 +9,7 @@
 @inject Monica.UI.Shared.Services.MoTimeFormatter Time
 @inject IJSRuntime JS
 
-<PageTitle>@L["Roles:Title"]</PageTitle>
+<PageTitle>@L["Roles:PageTitle"]</PageTitle>
 <div class="mo-workbench-container"><div class="mo-page-shell mo-page-shell--workbench role-page">
 @if (!_checked)
 {
@@ -21,13 +21,14 @@ else if (!_authorized)
 }
 else
 {
-    <MoPageMasthead Icon="@MoIcons.ShieldCheck" Crumb="@L["Design:Eyebrow"]" Title="@L["Roles:Title"]" Meta="@Metadata">
+    <MoPageMasthead Icon="@MoIcons.ShieldCheck" Crumb="@L["Design:Eyebrow"]" Title="@L["Roles:PageTitle"]" Meta="@Metadata">
 
         <Actions>
             @if (_snapshot is { } captured)
             {
                 <div class="rh-time"><small>@L[_failed ? "Page:StaleChecked" : "Page:LastChecked"]</small><time datetime="@captured.CheckedAt.ToString("O")">@Time.FormatTime(captured.CheckedAt)</time></div>
-                <MudButton Variant="Variant.Outlined" StartIcon="@(_paused ? MoIcons.Play : MoIcons.Pause)" aria-pressed="@_paused.ToString().ToLowerInvariant()" OnClick="@(() => _paused = !_paused)">@L[_paused ? "Design:ResumeAuto" : "Design:PauseAuto"]</MudButton>
+                var pauseLabel = L[_paused ? "Design:ResumeAuto" : "Design:PauseAuto"];
+                <MudButton Class="rh-pause" Variant="Variant.Outlined" aria-label="@pauseLabel" title="@pauseLabel" StartIcon="@(_paused ? MoIcons.Play : MoIcons.Pause)" aria-pressed="@_paused.ToString().ToLowerInvariant()" OnClick="@(() => _paused = !_paused)"><span>@pauseLabel</span></MudButton>
             }
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="Refresh">@L["Actions:Refresh"]</MudButton>
         </Actions>

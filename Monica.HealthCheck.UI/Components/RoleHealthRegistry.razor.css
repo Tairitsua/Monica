@@ -1,13 +1,25 @@
 .rh-registry { min-width:0; overflow:hidden; }
 .rh-registry header > small { margin-inline-start:auto; color:var(--mud-palette-text-secondary); }
-.rh-toolbar { display:grid; gap:10px; padding:12px 20px; border-block:1px solid var(--mud-palette-divider); }
+.rh-toolbar { display:grid; gap:10px; padding:0 20px 14px; border-bottom:1px solid var(--mud-palette-divider); }
 .rh-inputs,.rh-filters { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
-.rh-search { display:flex; align-items:center; flex:1 1 220px; gap:8px; height:38px; padding:0 10px; border:1px solid var(--mud-palette-lines-inputs); border-radius:6px; }
-.rh-search input { min-width:0; flex:1; font:inherit; font-size:13px; color:inherit; outline:0; }
-.rh-search:focus-within { outline:2px solid var(--mud-palette-primary); }
-.rh-select { display:flex; gap:7px; align-items:center; min-width:0; font-size:12px; color:var(--mud-palette-text-secondary); }
-.rh-select ::deep .mud-input-control { margin:0; max-width:190px; min-width:100px; }
-.rh-select ::deep .mud-input-slot { font-size:13px; }
+.rh-search { display:flex; flex:1 1 260px; align-items:center; gap:8px; min-width:0; height:34px; padding:0 8px 0 11px; border-radius:6px; background:var(--mud-palette-surface); box-shadow:inset 0 0 0 1px var(--mud-palette-lines-inputs); color:var(--mud-palette-text-secondary); }
+.rh-search input { flex:1; min-width:0; border:0; background:transparent; color:var(--mud-palette-text-primary); font-size:13px; outline:0; }
+.rh-search:focus-within,.rh-select:focus-within { box-shadow:inset 0 0 0 1px var(--mud-palette-primary); }
+.rh-select { display:inline-flex; align-items:center; gap:7px; min-width:0; height:34px; padding-inline-start:10px; box-shadow:inset 0 0 0 1px var(--mud-palette-lines-inputs); border-radius:6px; color:var(--mud-palette-text-secondary); font-size:12.5px; }
+.rh-select ::deep .mud-input-control { min-width:96px; max-width:210px; margin:0; }
+.rh-select ::deep .mud-input-outlined { height:34px; }
+.rh-select ::deep .mud-input-slot { padding:0 5px; font-size:12.5px; }
+.rh-select ::deep .mud-input-outlined-border { border-color:transparent; }
+.rh-select ::deep .mud-input-adornment-end { margin:0 5px; }
+.rh-select ::deep .mud-input-adornment-end svg { width:16px; height:16px; }
+.rh-inspect { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:6px; color:var(--mud-palette-text-secondary); }
+.rh-inspect:hover,.rh-inspect:focus-visible { background:var(--mud-palette-action-default-hover); color:var(--mud-palette-primary); }
+.rh-inspect:active { background:var(--mud-palette-action-default-disabled); }
+.rh-registry ::deep .is-faulted { background:color-mix(in srgb,var(--mud-palette-error) 3%,var(--mud-palette-surface)); }
+.rh-registry ::deep .is-selected { background:color-mix(in srgb,var(--mud-palette-primary) 7%,var(--mud-palette-surface)); }
+.rh-row-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.rh-row-title .mo-vl-capsule,.rh-code { font:500 11px var(--mo-font-family-mono); }
+.rh-code { padding-inline-start:5px; border-inline-start:1px solid currentColor; }
 .rh-separator { border-inline-start:1px solid var(--mud-palette-divider); height:18px; }
 .rh-toggle { display:flex; align-items:center; gap:7px; margin-inline-start:auto; font-size:12px; }
 .rh-id { font-family:var(--mo-font-family-mono); font-weight:600; color:var(--mud-palette-text-primary); overflow-wrap:anywhere; }
@@ -16,4 +28,4 @@
 .rh-registry ::deep thead { background:var(--mud-palette-background-gray); }
 .rh-registry ::deep .mud-table-cell small { display:block; margin-top:4px; color:var(--mud-palette-text-secondary); }
 .rh-registry footer { border-top:1px solid var(--mud-palette-divider); padding:9px 18px; font-size:12px; color:var(--mud-palette-text-secondary); }
-@container page (max-width:640px) { .rh-toolbar {padding:10px;} .rh-select {flex-wrap:wrap;} .rh-toggle {margin-inline-start:0;} }
+@container page (max-width:640px) { .rh-toolbar {padding:10px;} .rh-inputs {align-items:stretch;} .rh-select {flex:1 1 140px; justify-content:space-between;} .rh-select ::deep .mud-input-control {min-width:0;} .rh-toggle {margin-inline-start:0;} }

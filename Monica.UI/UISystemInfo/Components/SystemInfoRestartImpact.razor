@@ -3,25 +3,32 @@
 @using Monica.UI.UISystemInfo.Models
 @inject IStringLocalizer<SystemInfoResource> L
 
-<dl class="restart-impact">
+<dl class="restart-impact @(Compact ? "is-compact" : null)">
     @foreach (var valid in new[] { true, false })
     {
-        var affected = Deployment.Faulted.Where(role => (role.StartupCandidateValid == true) == valid).ToArray();
+        var affected = Deployment.Faulted.Where(role => role.HasStartupConfigurationFault && (role.StartupCandidateValid == true) == valid).ToArray();
         <div>
             <dt>@L[valid ? "Page:Recovery:Observed" : "Page:Recovery:Missing"]</dt>
             <dd>
-                @if (affected.Length == 0) { <span>—</span> }
+                @if (affected.Length == 0) { <span class="impact-none">@L["Page:Recovery:None"]</span> }
                 @foreach (var role in affected)
                 {
                     <a class="impact-role @(valid ? "valid" : null)" href="@(RoleHealthUrl is null ? null : $"{RoleHealthUrl}?role={Uri.EscapeDataString(role.Id)}")">@role.Id</a>
                 }
             </dd>
+            @if (!Compact) { <dd class="impact-note">@L[valid ? "Page:Recovery:ObservedNote" : "Page:Recovery:MissingNote"]</dd> }
         </div>
     }
-    <div><dt>@L["Page:Recovery:Interrupted"]</dt><dd>@L["Page:Recovery:Serving", Deployment.ServingCount, Deployment.Local.Count()]</dd></div>
+    @if (Deployment.Faulted.Any(role => !role.HasStartupConfigurationFault))
+    {
+        <div><dt>@L["Page:Recovery:OtherFaults"]</dt><dd>@foreach (var role in Deployment.Faulted.Where(role => !role.HasStartupConfigurationFault)) { <a class="impact-role" href="@(RoleHealthUrl is null ? null : $"{RoleHealthUrl}?role={Uri.EscapeDataString(role.Id)}")">@role.Id</a> }</dd></div>
+    }
+    <div><dt>@L["Page:Recovery:Interrupted"]</dt><dd>@L["Page:Recovery:Serving", Deployment.ServingCount, Deployment.Local.Count()]</dd>@if (!Compact) { <dd class="impact-note">@L["Page:Recovery:InterruptedNote"]</dd> }</div>
 </dl>
 
 @code {
     [Parameter, EditorRequired] public SystemInfoRoleDeployment Deployment { get; set; } = null!;
+    /// <summary>Uses labeled rows in the restart confirmation dialog.</summary>
+    [Parameter] public bool Compact { get; set; }
     [Parameter] public string? RoleHealthUrl { get; set; }
 }

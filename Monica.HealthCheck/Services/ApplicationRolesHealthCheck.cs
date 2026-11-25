@@ -22,7 +22,8 @@ internal sealed class ApplicationRolesHealthCheck(IRoleHealthStateProvider roles
         var active = snapshot.Roles.Where(role => role.IsActiveOnCurrentHost).ToArray();
         if (active.Length == 0) return HealthStatus.Healthy;
         if (active.All(role => role.Status is not (RoleHealthStatus.Healthy or RoleHealthStatus.Degraded))
-            || active.Any(role => role.Status == RoleHealthStatus.Faulted && role.EffectiveCriticality == RoleCriticality.Required))
+            || active.Any(role => role.Status == RoleHealthStatus.Faulted && (role.EffectiveCriticality == RoleCriticality.Required
+                || snapshot.ConfiguredPolicyMode == RoleFaultPolicyMode.FailFast)))
             return HealthStatus.Unhealthy;
 
         return active.Any(role => role.Status != RoleHealthStatus.Healthy) ? HealthStatus.Degraded : HealthStatus.Healthy;

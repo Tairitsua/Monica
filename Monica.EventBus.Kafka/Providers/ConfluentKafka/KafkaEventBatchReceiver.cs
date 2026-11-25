@@ -1,5 +1,6 @@
 using System.Text;
 using Confluent.Kafka;
+using Monica.Core.ApplicationRoles;
 using Monica.EventBus.Kafka.Models;
 using Monica.EventBus.Services.Support;
 using static Monica.EventBus.Kafka.Providers.ConfluentKafka.KafkaEventBusSubscriptionHostedService;
@@ -68,7 +69,7 @@ internal static class KafkaEventBatchReceiver
             {
                 await retryPolicy.ExecuteAsync(() => handle(records), cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 if (handleExhausted is null)
                     throw new KafkaProcessingBlockedException(
@@ -83,7 +84,7 @@ internal static class KafkaEventBatchReceiver
             {
                 await handle(records).ConfigureAwait(false);
             }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 // Each tree node is attempted once. Singleton retry budgets never restart in this tree.
                 var middle = records.Count / 2;

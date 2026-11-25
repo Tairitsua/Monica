@@ -18,15 +18,15 @@ internal sealed class OutboxWorker(
     : MoBackgroundService(registry, hostedOptions, scopes, logger)
 {
     private readonly IOutboxStore[] _contributions = stores.ToArray();
-    private IOutboxStore[] _stores = [];
+    private IOutboxStore[][] _storeGroups = [];
 
     public override string ServiceName => "MonicaOutbox";
 
     protected override async Task OnStartingAsync(CancellationToken cancellationToken)
     {
-        var selected = new List<IOutboxStore>();
+        var selected = new List<IOutboxStore[]>();
         var identities = new HashSet<OutboxStoreIdentity>();
-        foreach (var group in _contributions.Where(store => store.SharedStoreKey is not null)
+        foreach (var group in _contributions.Where(store => !store.IsQuarantined && store.SharedStoreKey is not null)
                      .GroupBy(store => store.SharedStoreKey, StringComparer.Ordinal))
         {
             var owner = group.First();
@@ -40,14 +40,25 @@ internal sealed class OutboxWorker(
             }
             if (!identities.Add(identity))
                 throw new InvalidOperationException("The same physical Outbox is registered under different shared store keys.");
-            selected.Add(owner);
+            selected.Add(group.ToArray());
         }
-        selected.AddRange(_contributions.Where(store => store.SharedStoreKey is null));
-        _stores = selected.ToArray();
+        selected.AddRange(_contributions.Where(store => store.SharedStoreKey is null)
+            .Select(store => new[] { store }));
+        _storeGroups = selected.ToArray();
     }
 
     protected override Task ExecuteBackgroundAsync(CancellationToken stoppingToken)
-        => Task.WhenAll(_stores.Select(store => RunStoreAsync(store, stoppingToken)));
+        => Task.WhenAll(_storeGroups.Select(group => RunStoreGroupAsync(group, stoppingToken)));
+
+    private async Task RunStoreGroupAsync(IOutboxStore[] group, CancellationToken stoppingToken)
+    {
+        foreach (var store in group)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+            if (!store.IsQuarantined) await RunStoreAsync(store, stoppingToken);
+            if (store.IsQuarantined) await store.DrainQuarantinedDeliveriesAsync(stoppingToken);
+        }
+    }
 
     private async Task RunStoreAsync(IOutboxStore store, CancellationToken stoppingToken)
     {
@@ -73,7 +84,7 @@ internal sealed class OutboxWorker(
 
     private async Task DeliverAsync(IOutboxStore store, CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested && !store.IsQuarantined)
         {
             var delivered = 0;
             try
@@ -86,6 +97,10 @@ internal sealed class OutboxWorker(
             {
                 return;
             }
+            catch (Monica.Core.ApplicationRoles.RoleUnavailableException) when (store.IsQuarantined)
+            {
+                return;
+            }
             catch (Exception exception)
             {
                 RecordState($"{store.StoreName}: outbox scan failed; retrying after its polling interval",
@@ -93,7 +108,7 @@ internal sealed class OutboxWorker(
             }
 
             if (delivered < store.BatchSize)
-                await Task.Delay(store.PollInterval, time, stoppingToken);
+                await Task.WhenAny(Task.Delay(store.PollInterval, time, stoppingToken), store.QuarantineStarted);
             else
                 await Task.Yield();
         }
@@ -103,10 +118,11 @@ internal sealed class OutboxWorker(
         Func<LeaseIdentity, CancellationToken, Task> action, CancellationToken stoppingToken)
     {
         var delay = interval;
-        while (!stoppingToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested && !store.IsQuarantined)
         {
             // Maintenance has its own cadence and does not scan the database at host startup.
-            await Task.Delay(delay, time, stoppingToken);
+            await Task.WhenAny(Task.Delay(delay, time, stoppingToken), store.QuarantineStarted);
+            if (store.IsQuarantined || stoppingToken.IsCancellationRequested) return;
             LeaseContext? context = null;
             try
             {
@@ -127,6 +143,10 @@ internal sealed class OutboxWorker(
             catch (OperationCanceledException) when (context?.StoppingToken.IsCancellationRequested == true)
             {
                 delay = store.MaintenanceRetryInterval;
+            }
+            catch (Monica.Core.ApplicationRoles.RoleUnavailableException) when (store.IsQuarantined)
+            {
+                return;
             }
             catch (Exception exception)
             {

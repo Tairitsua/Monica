@@ -67,10 +67,6 @@
                     }
                     <section class="hc-sheet-sec">
                         <h3>@L["Details:Description"]</h3><p class="hc-sheet-desc @(entry.Description is null ? "is-empty" : null)">@(entry.Description ?? L["Details:NoDescription"].Value)</p>
-                        @if (entry.Name == "monica.application.roles")
-                        {
-                            <MudButton Href="/health-checks/roles" StartIcon="@MoIcons.ShieldCheck" Color="Color.Primary">@L["Roles:Title"]</MudButton>
-                        }
                     </section>
                     <section class="hc-sheet-sec">
                         <div class="hc-sheet-sec-head"><h3>@L["Design:Inspector:TimingTitle"]</h3><span class="hc-sheet-pct">@shareText</span></div>
@@ -140,9 +136,16 @@
                 var gate = HealthCheckEntryTable.Probes.First(probe => HealthCheckPageSession.MatchesProbe(entry, probe.Id));
                 <div class="hc-sheet-actions">
                     <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.Copy" OnClick="@(() => CopySnapshotAsync(snapshot, entry))">@L["Design:CopyJson"]</MudButton>
-                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Filter" OnClick="@(() => NavigateFilter("probe", gate.Id))">
+                    @if (entry.Name == "monica.application.roles")
+                    {
+                        <MudButton Href="/health-checks/roles" Variant="Variant.Filled" StartIcon="@MoIcons.ShieldCheck" Size="Size.Small" Color="Color.Primary">@L["Roles:Title"]</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.Filter" OnClick="@(() => NavigateFilter("probe", gate.Id))">
                         @L["Design:Inspector:FilterByGate", L[gate.Label]]
-                    </MudButton>
+                        </MudButton>
+                    }
                 </div>
             }
         </FooterContent>

@@ -145,6 +145,19 @@ Role criticality defaults to `RoleCriticality.Required`. Declare an isolatable r
 | FailFast | Any assigned role fault fails startup. |
 | IsolateAll | The host can start for diagnostics with any assigned role isolated. Required isolation or the loss of every assigned role makes readiness unhealthy. |
 
+The same startup rules apply to role-owned hosted-service startup and channel setup. A thrown composition or registration callback still fails the host. Once a role is quarantined, it stays unavailable for the lifetime of this instance. An ordinary background resource failure degrades the owning role and leaves its entries open. An exhausted critical resource or an explicit critical report closes admission immediately.
+
+| Runtime quarantine | Host readiness and shutdown |
+| --- | --- |
+| Auto or IsolateAll, optional role with a healthy sibling | Degraded (HTTP 200). Sibling roles keep serving. |
+| Any mode, required role or loss of every assigned role | Unhealthy (HTTP 503). Multi-role hosts remain available for diagnostics. |
+| FailFast, any role | Unhealthy (HTTP 503). A single-role host requests graceful shutdown after participants drain. |
+| Auto, single role | Set `Application:RoleFaultPolicy:StopHostOnSingleRoleRuntimeFault` to `true` to request graceful shutdown after draining. The default is `false`. IsolateAll keeps the host available for diagnostics. |
+
+Infrastructure handling new work should check `IRoleHealthStateProvider.IsRoleFaulted` at admission. Already admitted operations keep their transaction and cancellation scope. A singleton `IRoleLifecycleParticipant` can stop its role's listeners and drain work it owns. The coordinator closes admission before notifying participants, once per role. Startup-triggered notification runs asynchronously so work waiting for host startup can complete. Use safe stage and type evidence in `RoleFaultRecord`. Retain the original exception in the resource's diagnostics.
+
+Use `IRoleFaultCoordinator.ReportRuntimeResourceFault(roleId, isRoleCriticalResource, fault)` inside an admitted handler, seeder or background resource. It publishes state before returning and queues cleanup on the host, allowing the caller to release its own work. An external supervisor can await `ReportRuntimeResourceFaultAsync` for drain completion. Cancelling that wait leaves the host-owned drain running.
+
 An explicitly empty placement is valid. The optional `IRoleHealthStateProvider` reports local readiness and remote placement. `IsRoleActive` continues to mean assigned to this host, including quarantined roles. Preflight runs after placement freezes and before registration callbacks. Each included owner still registers passive services. A faulted role skips its active callback. Code in passive registration must be safe to run on every placement. Read [Startup validation](../../monica-infra-configuration/references/options-and-validation.md) for configuration ownership and early reads.
 
 `IApplicationModel` exposes domains, roles, operations, placement, and exact role lookup. `LocalHandlers` is an `IReadOnlyDictionary<Type, Type>` from request type to verified local handler type; remote-only operations have no entry. `IsRoleAvailable(roleId)` reports whether the artifact includes that exact role's implementation, while `IsRoleActive(roleId)` reports whether the current AppId selects it. A local binding alone does not bypass a request's required active role. Core receives the same immutable instance as `ITypeActivationPolicy` before registration commits. Module callbacks and finalizers cannot remove, replace, or duplicate its runtime singleton registration; composition rejects these changes before any replacement factory executes.

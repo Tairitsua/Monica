@@ -45,6 +45,11 @@
       "Impact": "重启对本实例的影响",
       "Observed": "本实例候选已通过校验",
       "Missing": "本实例尚未观测到有效候选",
+      "None": "无",
+      "OtherFaults": "其他故障导致隔离",
+      "MissingNote": "请在接替实例上验证部署输入。",
+      "ObservedNote": "验证使用当前进程可见的输入。",
+      "InterruptedNote": "替换实例期间，所有正在服务的角色都会停止。",
       "Interrupted": "重启期间将中断服务的角色",
       "Serving": "承载的 {1} 个角色中有 {0} 个正在服务"
     },

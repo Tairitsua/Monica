@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Microsoft.Extensions.Configuration;
 using Monica.Core.ApplicationRoles;
 
@@ -6,24 +7,27 @@ namespace Monica.ApplicationModel.Services;
 internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvider, IRoleStartupFaultPolicy, IRoleProbeStateSink
 {
     private readonly Dictionary<string, RoleCriticality> _criticalityOverrides = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, List<StartupFault>> _roleFaults = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RoleState> _roleStates = new(StringComparer.Ordinal);
     private readonly DateTimeOffset _preparedAt = DateTimeOffset.UtcNow;
-    private readonly Lock _probeGate = new();
-    private readonly Dictionary<string, RoleProbeState> _probeStates = new(StringComparer.Ordinal);
+    private readonly Lock _healthGate = new();
     private long _startedAtTicks;
     private RoleFaultPolicyMode _mode;
     private readonly string? _deploymentScope;
     private bool _capOptionalChecks;
     private bool _preflightClosed;
     private string[] _assignedRoles = [];
-    private IReadOnlyCollection<string> _activeWorkloadOwners = [];
-    private IReadOnlyCollection<string> _suspendedWorkloadOwners = [];
+    private volatile WorkloadPlacement _workloadPlacement = new(FrozenSet<string>.Empty, [], []);
+    private bool _stopOnSingleRoleFault;
+
+    internal bool StopAfterRuntimeQuarantine => _assignedRoles.Length == 1
+        && (_mode == RoleFaultPolicyMode.FailFast || _mode == RoleFaultPolicyMode.Auto && _stopOnSingleRoleFault);
 
     private void InitializeHealth(IConfiguration startup)
     {
         var policy = startup.GetSection("Application:RoleFaultPolicy");
         _mode = ParsePolicyValue(policy["Mode"], RoleFaultPolicyMode.Auto, "Mode");
         _capOptionalChecks = policy.GetValue("CapOptionalRoleHealthChecksAtDegraded", _mode == RoleFaultPolicyMode.Auto);
+        _stopOnSingleRoleFault = policy.GetValue<bool>("StopHostOnSingleRoleRuntimeFault");
         foreach (var item in policy.GetSection("RoleCriticalityOverrides").GetChildren())
         {
             if (!Roles.ContainsKey(item.Key) || string.IsNullOrWhiteSpace(item.Value))
@@ -32,7 +36,7 @@ internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvide
         }
 
         _assignedRoles = Roles.Keys.Where(IsRoleActive).Order(StringComparer.Ordinal).ToArray();
-        UpdateWorkloadOwners();
+        PublishPlacement(FrozenSet<string>.Empty);
     }
 
     private static TEnum ParsePolicyValue<TEnum>(string? value, TEnum fallback, string key) where TEnum : struct, Enum
@@ -43,11 +47,12 @@ internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvide
         return Enum.Parse<TEnum>(value, ignoreCase: true);
     }
 
-    private void UpdateWorkloadOwners()
+    private void PublishPlacement(FrozenSet<string> quarantined)
     {
         string Owner(string id) => Roles[id].WorkloadOwner ?? id;
-        _activeWorkloadOwners = Array.AsReadOnly(_assignedRoles.Where(id => !IsRoleFaulted(id)).Select(Owner).Order(StringComparer.Ordinal).ToArray());
-        _suspendedWorkloadOwners = Array.AsReadOnly(_assignedRoles.Where(IsRoleFaulted).Select(Owner).Order(StringComparer.Ordinal).ToArray());
+        _workloadPlacement = new(quarantined,
+            Array.AsReadOnly(_assignedRoles.Where(id => !quarantined.Contains(id)).Select(Owner).Order(StringComparer.Ordinal).ToArray()),
+            Array.AsReadOnly(quarantined.Select(Owner).Order(StringComparer.Ordinal).ToArray()));
     }
 
     internal void ClosePreflight() => _preflightClosed = true;
@@ -57,23 +62,23 @@ internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvide
     public void Report(string roleId, string registrationName, bool degraded)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(registrationName);
-        if (!IsRoleActive(roleId) || IsRoleFaulted(roleId)) return;
-        lock (_probeGate)
+        lock (_healthGate)
         {
-            if (!_probeStates.TryGetValue(roleId, out var state))
+            if (!IsRoleActive(roleId) || IsRoleFaulted(roleId)) return;
+            if (!_roleStates.TryGetValue(roleId, out var state))
             {
                 if (!degraded) return;
-                _probeStates.Add(roleId, state = new RoleProbeState());
+                _roleStates.Add(roleId, state = new RoleState());
             }
-            var wasDegraded = state.DegradedChecks.Count != 0;
+            var wasDegraded = state.IsDegraded;
             if (degraded) state.DegradedChecks.Add(registrationName);
             else state.DegradedChecks.Remove(registrationName);
-            if (wasDegraded != (state.DegradedChecks.Count != 0))
+            if (wasDegraded != state.IsDegraded)
                 state.LastTransitionAt = DateTimeOffset.UtcNow;
         }
     }
 
-    public bool IsRoleFaulted(string roleId) => _roleFaults.ContainsKey(roleId);
+    public bool IsRoleFaulted(string roleId) => _workloadPlacement.Quarantined.Contains(roleId);
 
     public string? GetRoleId(Type implementationType, Type? registrationOwner = null)
     {
@@ -98,51 +103,85 @@ internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvide
     {
         if (_preflightClosed || !IsRoleActive(roleId))
             throw new InvalidOperationException("Configuration faults must belong to an assigned role during startup preflight.");
-        if (!_roleFaults.TryGetValue(roleId, out var faults))
+        lock (_healthGate)
         {
-            _roleFaults.Add(roleId, faults = []);
-            UpdateWorkloadOwners();
+            var mayIsolate = CanIsolateStartupFault(roleId);
+            AddFault(roleId, fault, quarantine: true, validateVisibleCandidate);
+            return mayIsolate;
         }
-        faults.Add(new StartupFault(fault, validateVisibleCandidate));
-        return _mode == RoleFaultPolicyMode.IsolateAll || _mode == RoleFaultPolicyMode.Auto
-            && _assignedRoles.Length > _roleFaults.Count
-            && _criticalityOverrides.GetValueOrDefault(roleId, Roles[roleId].Criticality) == RoleCriticality.Optional;
+    }
+
+    internal (bool Isolated, bool Transitioned) RecordStartupResourceFault(string roleId, RoleFaultRecord fault)
+    {
+        lock (_healthGate)
+        {
+            if (!IsRoleActive(roleId) || !CanIsolateStartupFault(roleId)) return (false, false);
+            return (true, AddFault(roleId, fault, quarantine: true));
+        }
+    }
+
+    private bool CanIsolateStartupFault(string roleId) =>
+        _mode == RoleFaultPolicyMode.IsolateAll || _mode == RoleFaultPolicyMode.Auto
+        && _assignedRoles.Length > _workloadPlacement.Quarantined.Count + (IsRoleFaulted(roleId) ? 0 : 1)
+        && _criticalityOverrides.GetValueOrDefault(roleId, Roles[roleId].Criticality) == RoleCriticality.Optional;
+
+    internal bool RecordRuntimeFault(string roleId, RoleFaultRecord fault, bool critical)
+    {
+        lock (_healthGate)
+        {
+            if (!IsRoleActive(roleId))
+                throw new InvalidOperationException($"Runtime faults require an assigned role, received '{roleId}'.");
+            if (IsRoleFaulted(roleId)) return false;
+            return AddFault(roleId, fault, critical);
+        }
+    }
+
+    private bool AddFault(string roleId, RoleFaultRecord fault, bool quarantine, Func<bool>? candidate = null)
+    {
+        if (!_roleStates.TryGetValue(roleId, out var state))
+            _roleStates.Add(roleId, state = new RoleState());
+        var wasDegraded = state.IsDegraded;
+        var transitioned = quarantine && !IsRoleFaulted(roleId);
+        if (candidate is not null || transitioned || !state.Faults.Any(entry =>
+                entry.Record.Stage == fault.Stage && entry.Record.Summary == fault.Summary))
+            state.Faults.Add(new FaultEvidence(fault with { ConfigurationIssues = Array.AsReadOnly(fault.ConfigurationIssues.ToArray()) }, candidate));
+        if (transitioned)
+            PublishPlacement(_workloadPlacement.Quarantined.Append(roleId).ToFrozenSet(StringComparer.Ordinal));
+        if (transitioned || !wasDegraded) state.LastTransitionAt = fault.OccurredAt;
+        return transitioned;
     }
 
     public RoleHealthSnapshot GetSnapshot(bool includeCandidateValidation = false)
     {
         var started = Interlocked.Read(ref _startedAtTicks);
-        var observed = new Dictionary<Func<bool>, bool>();
-        var entries = Roles.Values.OrderBy(role => role.Id, StringComparer.Ordinal).Select(role =>
+        (RoleHealthEntrySnapshot Role, FaultEvidence[] Faults)[] captured;
+        lock (_healthGate)
+            captured = Roles.Values.OrderBy(role => role.Id, StringComparer.Ordinal).Select(role =>
         {
-            var faults = _roleFaults.GetValueOrDefault(role.Id);
-            var status = !IsRoleActive(role.Id) ? RoleHealthStatus.Inactive : faults is not null ? RoleHealthStatus.Faulted
-                : started == 0 ? RoleHealthStatus.Initializing : RoleHealthStatus.Healthy;
-            var changedAt = faults?.First().Record.OccurredAt ?? (status == RoleHealthStatus.Healthy
-                ? new DateTimeOffset(started, TimeSpan.Zero) : _preparedAt);
-            if (status == RoleHealthStatus.Healthy)
-            {
-                lock (_probeGate)
-                {
-                    if (_probeStates.TryGetValue(role.Id, out var probe))
-                    {
-                        if (probe.DegradedChecks.Count != 0) status = RoleHealthStatus.Degraded;
-                        if (probe.LastTransitionAt > changedAt) changedAt = probe.LastTransitionAt;
-                    }
-                }
-            }
-            return new RoleHealthEntrySnapshot(role.Id, role.DomainId, role.WorkloadOwner ?? role.Id,
+            var state = _roleStates.GetValueOrDefault(role.Id);
+            var status = !IsRoleActive(role.Id) ? RoleHealthStatus.Inactive : IsRoleFaulted(role.Id) ? RoleHealthStatus.Faulted
+                : state?.IsDegraded == true ? RoleHealthStatus.Degraded : started == 0 ? RoleHealthStatus.Initializing : RoleHealthStatus.Healthy;
+            var changedAt = status == RoleHealthStatus.Healthy ? new DateTimeOffset(started, TimeSpan.Zero) : _preparedAt;
+            if (state is not null && state.LastTransitionAt > changedAt) changedAt = state.LastTransitionAt;
+            return (new RoleHealthEntrySnapshot(role.Id, role.DomainId, role.WorkloadOwner ?? role.Id,
                 ResolveRoleAppId(role.Id), role.Criticality, _criticalityOverrides.TryGetValue(role.Id, out var value) ? value : null,
-                status, changedAt, Array.AsReadOnly(faults?.Select(ProjectFault).ToArray() ?? []));
+                status, changedAt, []), state?.Faults.ToArray() ?? []);
+        }).ToArray();
+
+        // Candidate validation can rebind external configuration. Never run it while holding the state lock.
+        var observed = new Dictionary<Func<bool>, bool>();
+        var entries = captured.Select(entry => entry.Role with
+        {
+            Faults = Array.AsReadOnly(entry.Faults.Select(ProjectFault).ToArray())
         }).ToArray();
         return new RoleHealthSnapshot(AppId, Deployment.AppName, _deploymentScope, _mode, _capOptionalChecks, Array.AsReadOnly(entries))
         {
             ApplicationCount = Deployment.Applications.Count
         };
 
-        RoleFaultRecord ProjectFault(StartupFault failure)
+        RoleFaultRecord ProjectFault(FaultEvidence failure)
         {
-            if (!includeCandidateValidation) return failure.Record;
+            if (!includeCandidateValidation || failure.ValidateCandidate is null) return failure.Record;
             if (!observed.TryGetValue(failure.ValidateCandidate, out var valid))
                 observed.Add(failure.ValidateCandidate, valid = failure.ValidateCandidate());
             return failure.Record with { ConfigurationIssues = Array.AsReadOnly(failure.Record.ConfigurationIssues
@@ -150,11 +189,16 @@ internal sealed partial class CompiledApplicationModel : IRoleHealthStateProvide
         }
     }
 
-    private sealed class RoleProbeState
+    private sealed record WorkloadPlacement(FrozenSet<string> Quarantined, IReadOnlyCollection<string> ActiveOwners,
+        IReadOnlyCollection<string> SuspendedOwners);
+
+    private sealed class RoleState
     {
+        internal List<FaultEvidence> Faults { get; } = [];
         internal HashSet<string> DegradedChecks { get; } = new(StringComparer.Ordinal);
+        internal bool IsDegraded => DegradedChecks.Count != 0 || Faults.Count != 0;
         internal DateTimeOffset LastTransitionAt { get; set; }
     }
 
-    private sealed record StartupFault(RoleFaultRecord Record, Func<bool> ValidateCandidate);
+    private sealed record FaultEvidence(RoleFaultRecord Record, Func<bool>? ValidateCandidate);
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
@@ -106,6 +107,8 @@ public sealed class ModuleSeeder : MonicaModule<ModuleSeederOption>
         services.AddSingleton<SeederFacade>();
         services.TryAddSingleton<ISeederRetryDelay, SeederRetryDelay>();
         services.AddSingleton<SeederScheduler>();
+        if (Application.TypeActivation is IRoleHealthStateProvider)
+            services.AddSingleton<IRoleLifecycleParticipant>(provider => provider.GetRequiredService<SeederScheduler>());
         services.AddSingleton<ISeederExecutor>(static provider => provider.GetRequiredService<SeederScheduler>());
         var scheduler = ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, SeederBackgroundService>();
         services.Add(scheduler);

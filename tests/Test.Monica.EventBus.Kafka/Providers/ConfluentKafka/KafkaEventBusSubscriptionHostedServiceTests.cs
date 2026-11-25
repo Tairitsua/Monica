@@ -2,6 +2,7 @@ using System.Text;
 using AwesomeAssertions;
 using Confluent.Kafka;
 using Microsoft.Extensions.Options;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.ExceptionHandling.Exceptions;
 using Monica.EventBus.Services.Support;
 using Monica.Modules;
@@ -71,6 +72,19 @@ public class KafkaEventBusSubscriptionHostedServiceTests
         new TimeoutException("Timed out."),
         new OperationCanceledException("Handler canceled independently.")
     };
+
+    [Fact]
+    public async Task CommitAfterHandlingAsync_WhenRoleRefusesAdmission_ShouldRetainTheBrokerPosition()
+    {
+        var attempts = 0;
+        await Assert.ThrowsAsync<RoleUnavailableException>(() => KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(
+            () => { attempts++; throw new RoleUnavailableException("sync"); },
+            () => Assert.Fail("A refused delivery cannot commit."),
+            () => Assert.Fail("The quarantined consumer exits without seeking."),
+            _ => throw new InvalidOperationException("A refused delivery cannot be skipped or forwarded."),
+            CreatePolicy(3), TestContext.Current.CancellationToken));
+        Assert.Equal(1, attempts);
+    }
 
     [Theory]
     [MemberData(nameof(ProcessingFailures))]
@@ -428,6 +442,48 @@ public class KafkaEventBusSubscriptionHostedServiceTests
 
         started.Should().BeFalse();
         Volatile.Read(ref executionCount).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TopicConsumerDrain_WhenCommitIsInFlight_ShouldPreserveItsTokenAndRefuseAnotherDelivery(bool batch)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var committing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var commits = 0;
+        var consumer = CreateConsumer(async current =>
+        {
+            using var settlement = current.TryEnterDelivery();
+            Assert.NotNull(settlement);
+            void Commit()
+            {
+                committing.SetResult();
+                if (!release.Wait(TimeSpan.FromSeconds(5), current.CancellationToken)) throw new TimeoutException();
+                current.CancellationToken.ThrowIfCancellationRequested();
+                Interlocked.Increment(ref commits);
+            }
+            if (batch)
+                await KafkaEventBatchReceiver.DeliverAsync([CreateRecord(), CreateRecord()], _ => Task.CompletedTask,
+                    (_, _) => Commit(), CreatePolicy(), current.CancellationToken);
+            else
+                await KafkaEventBusSubscriptionHostedService.CommitAfterHandlingAsync(() => Task.CompletedTask,
+                    Commit, () => Assert.Fail("No rewind expected."), _ => throw new InvalidOperationException(),
+                    CreatePolicy(), current.CancellationToken);
+        });
+        Assert.True(consumer.TryStart());
+        await committing.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+        var drain = consumer.DrainAsync();
+        try
+        {
+            Assert.Null(consumer.TryEnterDelivery());
+            Assert.False(consumer.CancellationToken.IsCancellationRequested);
+            Assert.False(drain.IsCompleted);
+        }
+        finally { release.Set(); }
+        await drain.WaitAsync(TimeSpan.FromSeconds(5), token);
+        Assert.Equal(1, commits);
     }
 
     [Fact]

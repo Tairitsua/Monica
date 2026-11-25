@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Extensions;
 using Monica.Core.Execution;
 using Monica.Core.TypeDiscovery.Abstractions;
@@ -18,11 +20,17 @@ internal sealed class SeederScheduler(
     ISeederRetryDelay retryDelay,
     IOptions<Monica.Modules.ModuleSeederOption> options,
     ILogger<SeederScheduler> logger,
-    IHostApplicationLifetime? applicationLifetime = null) : ISeederExecutor
+    IHostApplicationLifetime? applicationLifetime = null,
+    IRoleHealthStateProvider? roles = null,
+    IRoleFaultCoordinator? roleFaults = null) : ISeederExecutor, IRoleLifecycleParticipant
 {
     private readonly Monica.Modules.ModuleSeederOption _options = options.Value;
+    private readonly ConcurrentDictionary<string, RoleWorkAdmission> _roleAdmissions = new(StringComparer.Ordinal);
     private int _batchRunning;
     private volatile bool _startupFinished;
+
+    public Task OnRoleQuarantinedAsync(string roleId, CancellationToken cancellationToken) =>
+        _roleAdmissions.GetOrAdd(roleId, static _ => new()).CloseAndDrainAsync().WaitAsync(cancellationToken);
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -54,6 +62,7 @@ internal sealed class SeederScheduler(
             var selected = new Dictionary<Type, SeederDescriptor>();
             void Include(SeederDescriptor node)
             {
+                if (GetQuarantinedRole(node) is { } role) throw new RoleUnavailableException(role);
                 if (node.Activation == ActivationMode.Disabled)
                     throw new InvalidOperationException($"Seeder '{node.SeederTypeName}' is disabled in this application's placement.");
                 if (!selected.TryAdd(node.SeederType, node)) return;
@@ -117,7 +126,7 @@ internal sealed class SeederScheduler(
             var finished = await WaitForFinishedSeedersAsync(running).ConfigureAwait(false);
             var failFastTrigger = finished
                 .Where(static execution =>
-                    execution.Result.Status == SeederStatus.Failed &&
+                    execution.Result.Status == SeederStatus.Failed && !execution.Result.ConfinedToRole &&
                     execution.Descriptor.FailureBehavior == SeederFailureBehavior.FailFast)
                 .OrderBy(static execution => execution.Descriptor.SeederTypeName, StringComparer.Ordinal)
                 .FirstOrDefault();
@@ -234,8 +243,11 @@ internal sealed class SeederScheduler(
         return running.Values.Any(static execution =>
             execution.Descriptor.FailureBehavior == SeederFailureBehavior.FailFast &&
             execution.Task.IsCompletedSuccessfully &&
-            execution.Task.Result.Status == SeederStatus.Failed);
+            execution.Task.Result.Status == SeederStatus.Failed && !execution.Task.Result.ConfinedToRole);
     }
+
+    private string? GetQuarantinedRole(SeederDescriptor descriptor) =>
+        roles?.GetRoleId(descriptor.SeederType) is { } roleId && roles.IsRoleFaulted(roleId) ? roleId : null;
 
     private bool IsReady(SeederDescriptor descriptor)
     {
@@ -318,12 +330,24 @@ internal sealed class SeederScheduler(
         SeederDescriptor descriptor,
         CancellationToken cancellationToken)
     {
+        var role = roles?.GetRoleId(descriptor.SeederType);
+        if (role is not null && !roles!.IsRoleActive(role)) role = null;
         for (var attempt = 1; attempt <= descriptor.MaxAttempts; attempt++)
         {
-            state.MarkRunning(descriptor.SeederType, attempt);
+            var admission = role is null ? null : _roleAdmissions.GetOrAdd(role, static _ => new()).TryEnter();
+            if (role is not null && (admission is null || roles!.IsRoleFaulted(role)))
+            {
+                admission?.Dispose();
+                return new SeederExecutionResult(SeederStatus.Cancelled, new RoleUnavailableException(role));
+            }
             try
             {
-                await ExecuteAttemptAsync(descriptor.SeederType, cancellationToken).ConfigureAwait(false);
+                // Release the attempt before reporting its fault. The notification drains other admitted attempts.
+                using (admission)
+                {
+                    state.MarkRunning(descriptor.SeederType, attempt);
+                    await ExecuteAttemptAsync(descriptor.SeederType, cancellationToken).ConfigureAwait(false);
+                }
                 state.MarkAttemptSucceeded(descriptor.SeederType);
                 return SeederExecutionResult.Succeeded;
             }
@@ -344,6 +368,15 @@ internal sealed class SeederScheduler(
                         attempt,
                         descriptor.MaxAttempts,
                         descriptor.FailureBehavior);
+                    if (role is not null && roleFaults is not null)
+                    {
+                        var critical = descriptor.Criticality == SeederCriticality.Required
+                            || descriptor.FailureBehavior == SeederFailureBehavior.FailFast
+                            || descriptor.SeederType.IsDefined(typeof(RoleCriticalResourceAttribute), inherit: true);
+                        roleFaults.ReportRuntimeResourceFault(role, critical,
+                            RoleFaultRecord.ForResource(RoleFaultStage.SeederExecution, descriptor.SeederType));
+                        return new SeederExecutionResult(SeederStatus.Failed, exception, ConfinedToRole: true);
+                    }
                     return new SeederExecutionResult(SeederStatus.Failed, exception);
                 }
 
@@ -432,7 +465,7 @@ internal sealed class SeederScheduler(
 
     private sealed record CompletedSeeder(SeederDescriptor Descriptor, SeederExecutionResult Result);
 
-    private sealed record SeederExecutionResult(SeederStatus Status, Exception? Exception)
+    private sealed record SeederExecutionResult(SeederStatus Status, Exception? Exception, bool ConfinedToRole = false)
     {
         public static SeederExecutionResult Succeeded { get; } = new(SeederStatus.Succeeded, null);
     }

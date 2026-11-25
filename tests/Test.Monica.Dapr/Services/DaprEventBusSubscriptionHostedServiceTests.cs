@@ -1,3 +1,4 @@
+using Monica.Core.ApplicationRoles;
 using System.Collections.Concurrent;
 using System.Runtime.Versioning;
 using System.Text;
@@ -404,6 +405,21 @@ public sealed class DaprEventBusSubscriptionHostedServiceTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(TopicResponseAction.Drop, action);
+    }
+
+    [Fact]
+    public async Task MessageHandler_WhenRoleRefusesAdmission_ShouldReturnRetryWithoutDropping()
+    {
+        var attempts = 0;
+        using var fixture = await CreateFixtureAsync((_, _) =>
+        {
+            attempts++;
+            throw new RoleUnavailableException("sync");
+        }, retryCount: 3);
+
+        var action = await fixture.HandleAsync("{}", TestContext.Current.CancellationToken);
+        Assert.Equal(TopicResponseAction.Retry, action);
+        Assert.Equal(1, attempts);
     }
 
     [Theory]

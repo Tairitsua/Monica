@@ -4,6 +4,17 @@ Use SDK exporters for measurements leaving the process. Use Monica's in-process 
 
 For process-counter history, use [Runtime Metrics](metrics.md); for adding module instruments, use OpenTelemetry development in `$monica-opentelemetry`.
 
+## Application role isolation
+
+Hosts composed with `AddApplicationModel()` publish the meter `Monica.ApplicationModel` even before a client makes a request. Monica's default `Monica.*` meter selection includes it. A custom SDK allowlist can select `ApplicationRoleMetricNames.MeterName` from `Monica.ApplicationModel.Metrics`.
+
+| Instrument | Meaning | Tags |
+| --- | --- | --- |
+| `monica.application.role.state` | Current state of each assigned role. Healthy is 0, Degraded is 1 and Faulted is 2. Inactive and Initializing roles have no point. | `role_id`, effective `criticality` (Required or Optional), `fault_stage` (latest recorded phase name or `none` when no fault record exists) |
+| `monica.application.role.quarantined_requests` | Count of actual requests refused on this instance. Each rejected request adds one. | `role_id`, `transport` (`http` for inbound MVC or Minimal API, `local` for generated local invocation or direct mediator) |
+
+A newly quarantined role can have state 2 and zero rejected requests until traffic reaches it. The gauge reads the in-memory snapshot without validating configuration candidates. Probes, polling and background admissions do not increment the counter. Use the role detail drawer for fault summaries and affected registrations. See [application ownership](../../monica-infra-hosting/references/application-model.md) for the readiness policy and admission boundaries.
+
 ## Register the required consumer
 
 Inside `builder.AddMonica(monica => { ... })`, choose an exporter explicitly:
