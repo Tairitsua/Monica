@@ -56,7 +56,7 @@ internal static class KafkaEventBatchReceiver
         return new CollectedBatch(records, null);
     }
 
-    internal static async Task DeliverAsync(IReadOnlyList<ConsumeResult<byte[], byte[]>> records,
+    internal static void Deliver(IReadOnlyList<ConsumeResult<byte[], byte[]>> records,
         Func<IReadOnlyList<ConsumeResult<byte[], byte[]>>, Task> handle,
         Action<ConsumeResult<byte[], byte[]>, int> commit, EventMessageRetryPolicy retryPolicy,
         CancellationToken cancellationToken, Func<ConsumeResult<byte[], byte[]>, Exception, Task>? handleExhausted = null)
@@ -67,14 +67,14 @@ internal static class KafkaEventBatchReceiver
         {
             try
             {
-                await retryPolicy.ExecuteAsync(() => handle(records), cancellationToken).ConfigureAwait(false);
+                retryPolicy.ExecuteAsync(() => handle(records), cancellationToken).GetAwaiter().GetResult();
             }
             catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 if (handleExhausted is null)
                     throw new KafkaProcessingBlockedException(
                         $"Batch consumer stopped at {records[0].TopicPartitionOffset} after exhausting singleton retries; the record remains unacknowledged.", failure);
-                await handleExhausted(records[0], failure).ConfigureAwait(false);
+                handleExhausted(records[0], failure).GetAwaiter().GetResult();
                 processed = 0;
             }
         }
@@ -82,14 +82,14 @@ internal static class KafkaEventBatchReceiver
         {
             try
             {
-                await handle(records).ConfigureAwait(false);
+                handle(records).GetAwaiter().GetResult();
             }
             catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 // Each tree node is attempted once. Singleton retry budgets never restart in this tree.
                 var middle = records.Count / 2;
-                await DeliverAsync(records.Take(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted).ConfigureAwait(false);
-                await DeliverAsync(records.Skip(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted).ConfigureAwait(false);
+                Deliver(records.Take(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted);
+                Deliver(records.Skip(middle).ToArray(), handle, commit, retryPolicy, cancellationToken, handleExhausted);
                 return;
             }
         }

@@ -149,6 +149,8 @@ public sealed class OrderApprovedReceiver(ILogger<OrderApprovedReceiver> logger)
 
 The native worker creates one consumer per `(topic, workload owner)` within each bus instance. A delivery invokes only that owner's matching active handlers, including when several owners share a topic in a combined host. Replicas of the same owner and bus compete within the same Kafka group; different owners each receive their own copy. Several handlers within one owner share its delivery and acknowledgment. Keep the same stable owner and group prefix when moving roles between combined and split hosts. Preserve existing `[Inbox("...")]` values: they remain handler deduplication identities.
 
+Every active consumer owns a dedicated worker thread for blocking Kafka calls, including polling and offset operations. The worker waits for asynchronous delivery and failure handling to finish before it polls again. Account for one dedicated worker per active topic and owner within each bus when sizing combined hosts.
+
 `ConsumerGroupId` is a prefix, `monica-eventbus` by default. The exact group construction is:
 
 | Receiver | Effective group |

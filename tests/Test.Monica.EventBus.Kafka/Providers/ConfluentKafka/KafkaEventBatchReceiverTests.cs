@@ -18,11 +18,11 @@ public sealed class KafkaEventBatchReceiverTests
     [Theory]
     [InlineData(1)]
     [InlineData(3)]
-    public async Task DeliverAsync_WhenRoleRefusesBatch_ShouldRetainOffsetsWithoutSplittingOrRejecting(int count)
+    public void Deliver_WhenRoleRefusesBatch_ShouldRetainOffsetsWithoutSplittingOrRejecting(int count)
     {
         var attempts = new List<int>();
         var records = Enumerable.Range(0, count).Select(offset => Record(offset)).ToArray();
-        await Assert.ThrowsAsync<RoleUnavailableException>(() => KafkaEventBatchReceiver.DeliverAsync(records,
+        Assert.Throws<RoleUnavailableException>(() => KafkaEventBatchReceiver.Deliver(records,
             batch => { attempts.Add(batch.Count); throw new RoleUnavailableException("sync"); },
             (_, _) => Assert.Fail("A refused batch cannot commit."), Policy(3), Token,
             (_, _) => throw new InvalidOperationException("A refused batch cannot be skipped or forwarded.")));
@@ -98,26 +98,35 @@ public sealed class KafkaEventBatchReceiverTests
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenTransactionStillRunning_ShouldNotCommit()
+    public async Task Deliver_WhenTransactionStillRunning_ShouldNotCommit()
     {
+        var handling = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var commits = new List<long>();
-        var delivery = KafkaEventBatchReceiver.DeliverAsync([Record(0), Record(1)], _ => completed.Task,
-            (record, _) => commits.Add(record.Offset.Value), Policy(), Token);
-        Assert.Empty(commits);
-        completed.SetResult();
+        var token = Token;
+        var delivery = Task.Run(() => KafkaEventBatchReceiver.Deliver([Record(0), Record(1)], _ =>
+        {
+            handling.SetResult();
+            return completed.Task;
+        }, (record, _) => commits.Add(record.Offset.Value), Policy(), token), token);
+        try
+        {
+            await handling.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Empty(commits);
+        }
+        finally { completed.TrySetResult(); }
         await delivery;
         Assert.Equal([1L], commits);
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenPoisonRecordExhausts_ShouldCommitOnlySuccessfulPrefixAndStop()
+    public void Deliver_WhenPoisonRecordExhausts_ShouldCommitOnlySuccessfulPrefixAndStop()
     {
         var attempts = new List<long[]>();
         var commits = new List<long>();
         var failure = new InvalidOperationException("poison");
-        var exception = await Assert.ThrowsAsync<KafkaProcessingBlockedException>(() =>
-            KafkaEventBatchReceiver.DeliverAsync([Record(0), Record(1), Record(2), Record(3)], records =>
+        var exception = Assert.Throws<KafkaProcessingBlockedException>(() =>
+            KafkaEventBatchReceiver.Deliver([Record(0), Record(1), Record(2), Record(3)], records =>
             {
                 var offsets = records.Select(record => record.Offset.Value).ToArray();
                 attempts.Add(offsets);
@@ -131,11 +140,11 @@ public sealed class KafkaEventBatchReceiverTests
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenGroupFailsButSmallerGroupsSucceed_ShouldSplitInOrder()
+    public void Deliver_WhenGroupFailsButSmallerGroupsSucceed_ShouldSplitInOrder()
     {
         var commits = new List<long>();
         var attempts = 0;
-        await KafkaEventBatchReceiver.DeliverAsync([Record(0), Record(1), Record(2), Record(3)], records =>
+        KafkaEventBatchReceiver.Deliver([Record(0), Record(1), Record(2), Record(3)], records =>
         {
             attempts++;
             return records.Count > 2 ? Task.FromException(new InvalidOperationException("too large")) : Task.CompletedTask;
@@ -145,11 +154,11 @@ public sealed class KafkaEventBatchReceiverTests
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenCommitFails_ShouldRestartWithoutSplittingOrAcknowledgingLaterRecords()
+    public void Deliver_WhenCommitFails_ShouldRestartWithoutSplittingOrAcknowledgingLaterRecords()
     {
         var attempts = 0;
         var commits = 0;
-        await Assert.ThrowsAsync<KafkaConsumerRestartRequiredException>(() => KafkaEventBatchReceiver.DeliverAsync(
+        Assert.Throws<KafkaConsumerRestartRequiredException>(() => KafkaEventBatchReceiver.Deliver(
             [Record(0), Record(1)], _ => { attempts++; return Task.CompletedTask; }, (_, _) =>
             {
                 commits++;
@@ -160,26 +169,35 @@ public sealed class KafkaEventBatchReceiverTests
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenCancellationIgnoredByHandler_ShouldAwaitItAndLeaveOffsetsUncommitted()
+    public async Task Deliver_WhenCancellationIgnoredByHandler_ShouldAwaitItAndLeaveOffsetsUncommitted()
     {
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var token = Token;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var handling = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var commits = 0;
-        var delivery = KafkaEventBatchReceiver.DeliverAsync([Record(0), Record(1)], _ => completed.Task,
-            (_, _) => commits++, Policy(), cancellation.Token);
-        cancellation.Cancel();
-        Assert.False(delivery.IsCompleted);
-        completed.SetResult();
+        var delivery = Task.Run(() => KafkaEventBatchReceiver.Deliver([Record(0), Record(1)], _ =>
+        {
+            handling.SetResult();
+            return completed.Task;
+        }, (_, _) => commits++, Policy(), cancellation.Token), token);
+        try
+        {
+            await handling.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            cancellation.Cancel();
+            Assert.False(delivery.IsCompleted);
+        }
+        finally { completed.TrySetResult(); }
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery);
         Assert.Equal(0, commits);
     }
 
     [Fact]
-    public async Task DeliverAsync_WhenExhaustedSingletonIsSkipped_ShouldAcknowledgeItAndContinueInOrder()
+    public void Deliver_WhenExhaustedSingletonIsSkipped_ShouldAcknowledgeItAndContinueInOrder()
     {
         var positions = new List<(long Offset, int Processed)>();
         var rejected = new List<long>();
-        await KafkaEventBatchReceiver.DeliverAsync([Record(3), Record(4), Record(5)],
+        KafkaEventBatchReceiver.Deliver([Record(3), Record(4), Record(5)],
             records => records.Any(record => record.Offset.Value == 4)
                 ? Task.FromException(new InvalidDataException("Rejected")) : Task.CompletedTask,
             (record, count) => positions.Add((record.Offset.Value, count)), Policy(), Token,

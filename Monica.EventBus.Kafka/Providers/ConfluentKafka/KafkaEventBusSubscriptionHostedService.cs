@@ -58,7 +58,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     protected override Task CreateExternalSubscriptionForTopicAsync(SubscriptionGroup group, Type eventType, CancellationToken cancellationToken)
     {
-        var consumer = new TopicConsumer(group.TopicName, cancellationToken, ConsumeAsync, group.WorkloadOwner);
+        var consumer = new TopicConsumer(group.TopicName, cancellationToken, Consume, group.WorkloadOwner);
         if (!_consumers.TryAddAndStart(consumer))
         {
             return consumer.StopAsync();
@@ -99,7 +99,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         return base.OnStoppingAsync(cancellationToken);
     }
 
-    private async Task ConsumeAsync(TopicConsumer topicConsumer)
+    private void Consume(TopicConsumer topicConsumer)
     {
         var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
         try
@@ -108,7 +108,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             {
                 try
                 {
-                    await ConsumeTopicAsync(topicConsumer);
+                    ConsumeTopic(topicConsumer);
                     return;
                 }
                 catch (KafkaConsumerRestartRequiredException ex)
@@ -117,7 +117,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     // resumes from the broker's last committed position, including after rebalances.
                     ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Recovering,
                         "Kafka consumer ownership or position changed; recreating the consumer", ex);
-                    await Task.Delay(options.Value.ConsumerErrorBackoff, topicConsumer.CancellationToken);
+                    Task.Delay(options.Value.ConsumerErrorBackoff, topicConsumer.CancellationToken).GetAwaiter().GetResult();
                 }
             }
         }
@@ -137,7 +137,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         }
     }
 
-    private async Task ConsumeTopicAsync(TopicConsumer topicConsumer)
+    private void ConsumeTopic(TopicConsumer topicConsumer)
     {
         var cancellationToken = topicConsumer.CancellationToken;
         var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
@@ -226,7 +226,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                         pending = batch.Pending;
                         foreach (var partition in batch.PartitionGroups)
                         {
-                            await KafkaEventBatchReceiver.DeliverAsync(partition,
+                            KafkaEventBatchReceiver.Deliver(partition,
                                 records => Dispatcher.DispatchBatchAsync(
                                     records.Select(record => CreateReceivedMessage(record, ServiceKey)).ToArray(), batchSubscription.Id, cancellationToken),
                                 (record, count) =>
@@ -246,7 +246,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     }
                     continue;
                 }
-                var processed = await CommitAfterHandlingAsync(
+                var processed = CommitAfterHandling(
                     () => HandleExternalMessageAsync(
                         CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner),
                     () => consumer.Commit(result),
@@ -305,7 +305,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 RecordState($"Kafka consumer failed for topic {topicConsumer.TopicName}", HostedServiceState.Degraded, ex);
                 try
                 {
-                    await Task.Delay(options.Value.ConsumerErrorBackoff, cancellationToken);
+                    Task.Delay(options.Value.ConsumerErrorBackoff, cancellationToken).GetAwaiter().GetResult();
                 }
                 catch (OperationCanceledException)
                 {
@@ -318,7 +318,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         // coordinator. Consumer.Dispose uses NO_CONSUMER_CLOSE instead.
     }
 
-    internal static async Task<bool> CommitAfterHandlingAsync(
+    internal static bool CommitAfterHandling(
         Func<Task> handle, Action commit, Action rewind, Func<Exception, Task> reject,
         EventMessageRetryPolicy retryPolicy,
         CancellationToken cancellationToken = default)
@@ -328,13 +328,13 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         {
             try
             {
-                await retryPolicy.ExecuteAsync(handle, cancellationToken);
+                retryPolicy.ExecuteAsync(handle, cancellationToken).GetAwaiter().GetResult();
             }
             catch (Exception failure) when (failure is not RoleUnavailableException && !cancellationToken.IsCancellationRequested)
             {
                 // End exhausted processing only after the last attempt's transaction and scope unwind.
                 cancellationToken.ThrowIfCancellationRequested();
-                await reject(failure).ConfigureAwait(false);
+                reject(failure).GetAwaiter().GetResult();
                 processed = false;
             }
 
@@ -509,7 +509,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     {
         private readonly object _lifecycleLock = new();
         private readonly CancellationTokenSource _cancellationTokenSource;
-        private readonly Func<TopicConsumer, Task> _consumeAsync;
+        private readonly Action<TopicConsumer> _consume;
         private readonly RoleWorkAdmission _settlements = new();
         private Task? _consumerTask;
         private Task? _stopTask;
@@ -517,12 +517,12 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         internal TopicConsumer(
             string topicName,
             CancellationToken cancellationToken,
-            Func<TopicConsumer, Task> consumeAsync,
+            Action<TopicConsumer> consume,
             string? workloadOwner = null)
         {
             TopicName = topicName;
             WorkloadOwner = workloadOwner;
-            _consumeAsync = consumeAsync;
+            _consume = consume;
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             CancellationToken = _cancellationTokenSource.Token;
         }
@@ -550,11 +550,13 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                     return false;
                 }
 
+                // Native polling and offset operations block. Keep them on this dedicated worker
+                // across handler completion, backoff and client recreation.
                 _consumerTask = Task.Factory.StartNew(
-                    () => _consumeAsync(this),
+                    () => _consume(this),
                     CancellationToken.None,
                     TaskCreationOptions.LongRunning,
-                    TaskScheduler.Default).Unwrap();
+                    TaskScheduler.Default);
                 return true;
             }
         }
