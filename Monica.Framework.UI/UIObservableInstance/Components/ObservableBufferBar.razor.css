@@ -1,0 +1,4 @@
+.oi-buf-track { position: relative; display: block; height: 6px; min-width: 0; width: 100%; overflow: hidden; border-radius: 6px; background: var(--mud-palette-background-gray); }
+.oi-buf-track.is-tall { height: 8px; }
+.oi-buf-fill { position: absolute; inset: 0 auto 0 0; display: block; border-radius: inherit; background: var(--mo-vl-role); }
+.oi-buf-evicted { position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--mud-palette-text-secondary) 60%, transparent) 3px 4px); }

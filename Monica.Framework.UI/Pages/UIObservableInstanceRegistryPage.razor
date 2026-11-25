@@ -1,3 +1,9 @@
+@using Monica.Framework.UI.UIObservableInstance.Support
 @attribute [Route(PAGE_URL)]
-<ObservableWorkspace View="Instances" />
-@code { public const string PAGE_URL = UIObservableInstanceMonitorPage.PAGE_URL + "/instances"; }
+@inject NavigationManager Navigation
+
+@code {
+    public const string PAGE_URL = "/observable-instance-monitor/instances";
+
+    protected override void OnInitialized() => ObservableViewQuery.Redirect(Navigation, grouped: false);
+}

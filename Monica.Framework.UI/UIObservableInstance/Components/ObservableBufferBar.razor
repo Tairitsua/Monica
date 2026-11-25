@@ -1,0 +1,17 @@
+<span class="oi-buf-track @Role.ToCssClass() @(Tall ? "is-tall" : null)" aria-hidden="true">
+    @if (Evicted > 0) { <span class="oi-buf-evicted"></span> }
+    <span class="oi-buf-fill" style="@FormattableString.Invariant($"width:{Fill}%")"></span>
+</span>
+
+@code {
+    /// <summary>Gets the tracker with retained occupancy, configured capacity and lifetime records.</summary>
+    [Parameter, EditorRequired] public ObservableInstanceSnapshot Snapshot { get; set; } = default!;
+    /// <summary>Uses the detail sheet's larger meter when true.</summary>
+    [Parameter] public bool Tall { get; set; }
+
+    private int Evicted => Snapshot.TotalRecords - Snapshot.History.Count;
+    private double Fill => Snapshot.History.Count == 0 ? 0 : Math.Clamp(100d * Snapshot.History.Count / Snapshot.MaxHistorySize, Tall ? 0 : 4, 100);
+    private MoVisualRole Role => Evicted > 0 && (Tall || Snapshot.History.Count >= Snapshot.MaxHistorySize)
+        || Snapshot.TotalExceptions > Snapshot.History.Count(entry => entry.Exception is not null)
+            ? MoVisualRole.Warning : Snapshot.History.Count == 0 ? MoVisualRole.Neutral : MoVisualRole.Info;
+}

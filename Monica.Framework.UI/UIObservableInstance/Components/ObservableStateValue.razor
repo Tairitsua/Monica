@@ -1,0 +1,40 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+
+@if (Value.CaptureError is { } error)
+{
+    <div class="mo-vl-callout mo-vl-role--error oi-value-error">
+        <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Error" Size="16px" /></span>
+        <div class="mo-vl-callout-content">
+            <div class="mo-vl-callout-title">@L["Design:ValueUnavailable"]</div>
+            <code class="mo-vl-mono">@error</code>
+        </div>
+    </div>
+}
+else if (Value.Text is not { } text)
+{
+    <div class="oi-val-scalar"><span>@L["Design:NoState"]</span></div>
+}
+else if (!ForcePayload && !ObservablePayload.IsComplex(Value))
+{
+    <div class="oi-val-scalar">
+        <code class="oi-val-scalar-text mo-vl-mono">@text</code>
+        @if (Value.TypeName is { } type)
+        { <code class="oi-val-scalar-type mo-vl-mono" title="@type">@ObservableText.ShortType(type)</code> }
+    </div>
+}
+else
+{
+    <div class="oi-val-box">
+        <MoJson Value="@text" Label="@(Value.TypeName is { } type ? ObservableText.ShortType(type) : Label)" AllowPlainText="true" ShowStatus="false"
+                ShowLineNumbers="false" WrapLines="true" MaxHeight="none" />
+    </div>
+}
+
+@code {
+    /// <summary>Gets detached scalar or structured state text and its capture status.</summary>
+    [Parameter, EditorRequired] public ObservableValueSnapshot Value { get; set; } = default!;
+    /// <summary>Gets the localized accessible caption used when the captured type is absent.</summary>
+    [Parameter] public string? Label { get; set; }
+    /// <summary>Displays the full payload inside an expanded before/after comparison.</summary>
+    [Parameter] public bool ForcePayload { get; set; }
+}

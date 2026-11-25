@@ -1,0 +1,202 @@
+@using Monica.UI.UIStackTrace.Components
+@implements IAsyncDisposable
+@inject MoTimeFormatter Time
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject IJSRuntime JS
+
+<div class="oi-timeline" @ref="_root">
+    <div class="oi-sheet-hfilt">
+        <div class="mo-vl-chips" role="group" aria-label="@L["Design:TimelineFacetLabel"]">
+            @foreach (var facet in Facets)
+            {
+                var count = facet.Id == "timeline" ? Snapshot.History.Count : Snapshot.History.Count(entry => Matches(entry, facet.Id));
+                <button type="button" class="mo-vl-chip mo-vl-chip--pill @facet.Role.ToCssClass()" aria-pressed="@(Query.Timeline == facet.Id ? "true" : "false")"
+                        @onclick="() => ChangeView(facet.Id, Query.Sequence)">
+                    @L[$"Design:TimelineFilters:{facet.Key}"] <span class="mo-vl-chip-count">@count</span>
+                </button>
+            }
+        </div>
+        <p class="oi-sheet-scope">@L["Design:TimelineScope", _matches.Length, Snapshot.History.Count, Snapshot.TotalRecords]</p>
+    </div>
+    @if (Query.Timeline == "exceptions" && _evicted > 0)
+    {
+        <div class="mo-vl-callout mo-vl-role--warning">
+            <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+            <p class="mo-vl-callout-body">@L["Design:EvictedInSheetNote", _evicted]</p>
+        </div>
+    }
+    @if (Query.Sequence is { } selected && !Snapshot.History.Any(entry => entry.Sequence == selected))
+    {
+        <p class="oi-sheet-scope" role="status">@L["Design:SequenceUnavailable", selected]</p>
+    }
+    @if (_matches.Length == 0)
+    {
+        <p class="oi-empty-inline">@L["Design:NoHistoryInSheet"]</p>
+    }
+    else
+    {
+        <ol class="oi-entry-list">
+            @foreach (var entry in _matches.Skip(Page * PageSize).Take(PageSize))
+            {
+                var pinned = entry.Sequence == Query.Sequence;
+                var exception = entry.Exception;
+                var changed = entry.PreviousState != entry.CurrentState;
+                var level = entry.LogLevel?.ToString() ?? "Unknown";
+                var role = exception is not null ? MoVisualRole.Error : TrackerEvidence.LevelRole(entry.LogLevel);
+                var kind = exception is not null ? changed ? "TransitionEx" : "Exception" : changed ? "Transition" : "Message";
+                <li class="oi-entry-card @(exception is not null ? "is-exception" : null) @(pinned ? "is-pinned" : null)" @key="entry.Sequence"
+                    tabindex="@(pinned ? "-1" : null)" data-pinned="@(pinned ? "true" : null)">
+                    <header class="oi-entry-head">
+                        <span class="oi-entry-seq mo-vl-mono">#@entry.Sequence</span>
+                        <time class="mo-vl-mono" datetime="@entry.Timestamp.ToString("O")">@Time.Format(entry.Timestamp)</time>
+                        <span class="mo-vl-capsule @role.ToCssClass()">@L[$"Design:Levels:{level}"]</span>
+                        <span class="oi-entry-kind">@L[$"Design:EntryKinds:{kind}"]</span>
+                        @if (Query.Timeline != "timeline")
+                        {
+                            <button class="oi-ctx-btn" type="button" @onclick='() => RevealContext(entry.Sequence)'>@L["Design:ShowContext"]</button>
+                        }
+                    </header>
+                    <p class="oi-entry-msg">@entry.Message</p>
+
+                    @if (changed)
+                    {
+                        if (!ObservablePayload.IsComplex(entry.PreviousState) && !ObservablePayload.IsComplex(entry.CurrentState))
+                        {
+                            var type = entry.CurrentState.TypeName ?? entry.PreviousState.TypeName;
+                            <div class="oi-tr-row">
+                                <span class="oi-tr-pill mo-vl-mono">
+                                    <span class="oi-tr-prev">@(entry.PreviousState.Text ?? "∅")</span>
+                                    <span class="oi-tr-arrow" aria-hidden="true">→</span>
+                                    <span class="oi-tr-next">@(entry.CurrentState.Text ?? "∅")</span>
+                                </span>
+                                @if (type is not null) { <span class="oi-tr-type mo-vl-mono" title="@type">@ObservableText.ShortType(type)</span> }
+                            </div>
+                        }
+                        else
+                        {
+                            var fields = ObservablePayload.Compare(entry.PreviousState, entry.CurrentState).ToArray();
+                            <div class="oi-complex-diff">
+                                @if (fields.Length > 0)
+                                {
+                                    <ul class="oi-jdiff mo-vl-mono">
+                                        @foreach (var field in fields)
+                                        { <li><span class="oi-jdiff-k">@field.Key:</span> <span class="oi-tr-prev">@field.Before</span> → <b class="oi-tr-next">@field.After</b></li> }
+                                    </ul>
+                                }
+                                <details class="oi-disclosure">
+                                    <summary>@L["Design:ComparePayload"]</summary>
+                                    <div class="oi-payload-stack">
+                                        <section><h4>@L["Design:BeforeLabel"]</h4><ObservableStateValue Value="entry.PreviousState" Label="@L["Design:BeforeLabel"]" ForcePayload="true" /></section>
+                                        <section><h4>@L["Design:AfterLabel"]</h4><ObservableStateValue Value="entry.CurrentState" Label="@L["Design:AfterLabel"]" ForcePayload="true" /></section>
+                                    </div>
+                                </details>
+                            </div>
+                        }
+                    }
+                    else if (entry.CurrentState.CaptureError is not null)
+                    {
+                        <ObservableStateValue Value="entry.CurrentState" />
+                    }
+
+                    @if (exception is not null)
+                    {
+                        <div class="oi-ex-inline">
+                            <div class="oi-ex-head">
+                                <strong class="mo-vl-mono">@ObservableMarkup.Breakable(exception.TypeName)</strong>
+                                <p>@exception.Message</p>
+                                @if (exception.CaptureError is { } error)
+                                {
+                                    <p class="mo-vl-callout mo-vl-role--error mo-vl-mono">@error</p>
+                                }
+                            </div>
+                            <details class="oi-disclosure" open="@(pinned || Query.Timeline == "exceptions" && Query.Sequence is null && entry.Sequence == _matches[Page * PageSize].Sequence)">
+                                <summary>@L["Design:StackTraceDetails"]</summary>
+                                <StackTraceViewer Message="@exception.Details" AllowRawView="true" />
+                            </details>
+                        </div>
+                    }
+                </li>
+            }
+        </ol>
+        <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+    }
+</div>
+
+@code {
+    private const int PageSize = 12;
+    private static readonly (string Id, string Key, MoVisualRole Role)[] Facets =
+        [("timeline", "All", MoVisualRole.Primary), ("transitions", "Transitions", MoVisualRole.Info), ("exceptions", "Exceptions", MoVisualRole.Error)];
+    private ObservableStateEntrySnapshot[] _matches = [];
+    private ElementReference _root;
+    private Task<IJSObjectReference>? _browser;
+    private Task? _retirement;
+    private string? _facet;
+    private long? _sequence;
+    private bool _reveal;
+    private bool _focus;
+    private bool _retired;
+    private int _page;
+    private int _evicted;
+
+    /// <summary>Gets the complete frozen history for one registration.</summary>
+    [Parameter, EditorRequired] public ObservableInstanceSnapshot Snapshot { get; set; } = default!;
+    /// <summary>Gets the timeline filter and pinned sequence from the URL.</summary>
+    [Parameter, EditorRequired] public ObservableViewQuery Query { get; set; } = default!;
+    /// <summary>Publishes an evidence context or facet change to the workbench URL.</summary>
+    [Parameter] public EventCallback<ObservableInspection> ChangeInspection { get; set; }
+
+    private int Page => Math.Min(_page, Math.Max(0, (_matches.Length - 1) / PageSize));
+
+    protected override void OnParametersSet()
+    {
+        if (_facet == Query.Timeline && _sequence == Query.Sequence) return;
+        _facet = Query.Timeline;
+        _sequence = Query.Sequence;
+        _evicted = Math.Max(0, Snapshot.TotalExceptions - Snapshot.History.Count(entry => entry.Exception is not null));
+        _matches = Snapshot.History.Reverse().Where(entry => Matches(entry, _facet)).ToArray();
+        var index = Array.FindIndex(_matches, entry => entry.Sequence == _sequence);
+        _page = index < 0 ? 0 : index / PageSize;
+        _reveal = index >= 0;
+    }
+
+    private static bool Matches(ObservableStateEntrySnapshot entry, string? filter) => filter switch
+    {
+        "transitions" => entry.CurrentState != entry.PreviousState,
+        "exceptions" => entry.Exception is not null,
+        _ => true
+    };
+
+    private Task ChangeView(string view, long? sequence) =>
+        ChangeInspection.InvokeAsync(new ObservableInspection(Snapshot.Identity.InstanceId, view, sequence));
+
+    private Task RevealContext(long sequence)
+    {
+        _focus = true;
+        return ChangeView("timeline", sequence);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_reveal || _retired) return;
+        _reveal = false;
+        var focus = _focus;
+        _focus = false;
+        try
+        {
+            var module = await (_browser ??= JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.Framework.UI/js/observable-instance.js").AsTask());
+            if (!_retired) await module.InvokeVoidAsync("reveal", _root, "[data-pinned]", "nearest", focus);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    /// <summary>Releases the owned module reference even when import completes during retirement.</summary>
+    public ValueTask DisposeAsync() => new(_retirement ??= RetireAsync());
+
+    private async Task RetireAsync()
+    {
+        _retired = true;
+        if (_browser is null) return;
+        try { await (await _browser).DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

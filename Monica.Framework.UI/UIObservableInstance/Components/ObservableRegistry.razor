@@ -1,0 +1,314 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject MoTimeFormatter Time
+@inject NavigationManager Navigation
+
+<section class="mo-vl-surface oi-sig" aria-labelledby="oi-review-count">
+    <div class="oi-decision">
+        <div>
+            <p id="oi-review-count" class="oi-display-label">@L["Design:ReviewLabel"]</p>
+            <div class="mo-vl-display mo-vl-display--compact">
+                <strong class="mo-vl-display__value">@Evidence.ReviewCount</strong>
+                <span class="mo-vl-display__unit">@L["Design:OfTracked", Evidence.Trackers.Length]</span>
+            </div>
+            <div class="oi-reasons">
+                @foreach (var reason in Reasons())
+                {
+                    <span class="@(reason.Count == 0 ? "is-zero" : null)">
+                        <i class="mo-vl-swatch @reason.Role.ToCssClass() @(reason.Count == 0 ? "mo-vl-swatch--empty" : null)" aria-hidden="true"></i>
+                        @L[$"Design:Reasons:{reason.Key}"]<b class="mo-vl-mono">@reason.Count</b>
+                    </span>
+                }
+            </div>
+        </div>
+        <p class="mo-vl-lede">@Finding()</p>
+    </div>
+
+    <dl class="mo-vl-facts oi-facts" aria-label="@L["Design:FactsLabel"]">
+        @foreach (var fact in Facts())
+        {
+            <div class="mo-vl-fact">
+                <dt><i class="mo-vl-swatch @fact.Role.ToCssClass()" aria-hidden="true"></i>@L[$"Design:Facts:{fact.Key}"]</dt>
+                <dd>
+                    @if (fact.Key == "RetainedEx" && fact.Count > 0)
+                    {
+                        <a class="oi-fact-link" href="@ObservableViewQuery.Link(Navigation, ObservableViewQuery.ExceptionsPath)">@fact.Count.ToString("N0")</a>
+                    }
+                    else { @fact.Count.ToString("N0") }
+                </dd>
+                <dd class="oi-fact-sub">@fact.Detail</dd>
+            </div>
+        }
+    </dl>
+
+    <ObservableRetentionHorizon Evidence="Evidence" SelectedId="@Query.Inspector" Inspect="Inspect" />
+</section>
+
+<div class="oi-inventory-area @(Query["section"] == "registry" ? "is-registry-anchor" : null)">
+    <section class="mo-vl-surface oi-inv" id="oi-registry" aria-labelledby="oi-inv-title">
+        <header class="oi-inv-head">
+            <div class="oi-inv-title-wrap">
+                <div class="oi-inv-title">
+                    <h2 id="oi-inv-title">@L["Design:RegistryTitle"]</h2>
+                    <span class="oi-count">@L["Design:MatchesCount", _matches.Length, Evidence.Trackers.Length]</span>
+                </div>
+                <p class="oi-inv-desc">@L["Design:RegistryDesc"]</p>
+            </div>
+            <div class="oi-inv-head-actions">
+                @if (HasFilters)
+                {
+                    <MudButton Size="Size.Small" OnClick="ClearAllAsync">@L["Design:ClearFilters"]</MudButton>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@MoIcons.Grid" Class="oi-mx-btn"
+                           aria-expanded="@Pressed(_matrix)" aria-controls="oi-group-type-matrix" OnClick="() => _matrix = !_matrix">
+                    @L[_matrix ? "Design:MatrixHide" : "Design:MatrixShow"]
+                </MudButton>
+                <div class="mo-vl-segment" role="group" aria-label="@L["Design:ViewModeLabel"]">
+                    <button type="button" aria-pressed="@Pressed(!Grouped)" @onclick='() => Change("grouping", null)'>@L["Design:ViewModes:Flat"]</button>
+                    <button type="button" aria-pressed="@Pressed(Grouped)" @onclick='() => Change("grouping", "group")'>@L["Design:ViewModes:Group"]</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="oi-group-bar" role="group" aria-label="@L["Design:AllGroups"]">
+            <button type="button" class="oi-gpill" aria-pressed="@Pressed(Query["group"] is null)" @onclick='() => Change("group", null)'>
+                <span class="oi-gpill-name">@L["Design:AllGroups"]</span>
+                <span class="oi-gpill-n mo-vl-mono">@Evidence.Trackers.Length</span>
+            </button>
+            @foreach (var group in Evidence.Groups)
+            {
+                <button type="button" class="oi-gpill" aria-pressed="@Pressed(Query["group"] == group.Key)" @onclick='() => Toggle("group", group.Key)'>
+                    <span class="oi-gpill-name">@GroupLabel(group.First())</span>
+                    <span class="oi-gpill-marks" aria-hidden="true">
+                        @foreach (var item in group) { <i class="oi-mark is-mini is-@item.Standing"></i> }
+                    </span>
+                    <span class="oi-gpill-n mo-vl-mono">@group.Count()</span>
+                </button>
+            }
+        </div>
+
+        @if (_matrix)
+        {
+            <div class="oi-mx" id="oi-group-type-matrix">
+                <div class="oi-mx-scroll" tabindex="0" role="region" aria-label="@L["Design:MatrixTitle"]">
+                    <table class="oi-mx-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="oi-mx-corner-th">
+                                    <div class="oi-mx-corner"><span>@L["Design:MatrixGroupCol"]</span><small>@L["Design:MatrixTypeAxis"]</small></div>
+                                </th>
+                                @foreach (var type in Evidence.Types)
+                                {
+                                    <th scope="col">
+                                        <button type="button" class="oi-mx-col" title="@type.First().Snapshot.InstanceTypeName"
+                                                aria-pressed="@Pressed(Query["type"] == type.Key)" @onclick='() => Toggle("type", type.Key)'>
+                                            @(type.First().Snapshot.InstanceTypeShortName ?? L["Design:NoType"].Value)
+                                        </button>
+                                    </th>
+                                }
+                                <th scope="col" class="oi-mx-total">Σ</th>
+                            </tr>
+                        </thead>
+                        <tbody data-oi-matrix>
+                            @{ var firstMark = true; }
+                            @foreach (var group in Evidence.Groups)
+                            {
+                                <tr>
+                                    <th scope="row">
+                                        <button type="button" class="oi-mx-row" aria-pressed="@Pressed(Query["group"] == group.Key)" @onclick='() => Toggle("group", group.Key)'>
+                                            <span>@GroupLabel(group.First())</span>
+                                            @if (group.Count(item => item.NeedsReview) is var review && review > 0)
+                                            { <span class="oi-mx-flag">@review</span> }
+                                        </button>
+                                    </th>
+                                    @foreach (var type in Evidence.Types)
+                                    {
+                                        <td class="@(Query["group"] == group.Key || Query["type"] == type.Key ? "is-band" : null)">
+                                            @foreach (var item in group.Where(item => item.TypeKey == type.Key))
+                                            {
+                                                <button type="button" class="oi-mark is-@item.Standing" data-oi-mark tabindex="@(firstMark ? "0" : "-1")"
+                                                        aria-label="@MatrixLabel(item)" title="@MatrixLabel(item)" @onclick="() => Open(item)"></button>
+                                                firstMark = false;
+                                            }
+                                        </td>
+                                    }
+                                    <td class="oi-mx-total mo-vl-mono">@group.Count()</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <div class="oi-filters">
+            <div class="mo-vl-chips" role="group" aria-label="@L["Design:HealthFilter"]">
+                <button type="button" class="mo-vl-chip mo-vl-chip--pill mo-vl-role--primary" aria-pressed="@Pressed(Query["health"] is null)" @onclick='() => Change("health", null)'>
+                    @L["Design:AllRegistrations"] <span class="mo-vl-chip-count">@_healthBase.Length</span>
+                </button>
+                @foreach (var facet in HealthFacets)
+                {
+                    var count = _healthBase.Count(item => item.Health.ToString() == facet.Name);
+                    <button type="button" class="mo-vl-chip mo-vl-chip--pill @facet.Role.ToCssClass()" aria-pressed="@Pressed(Query["health"] == facet.Name)" @onclick='() => Toggle("health", facet.Name)'>
+                        <i class="mo-vl-swatch @facet.Role.ToCssClass()" aria-hidden="true"></i>
+                        @L[$"Design:Health:{facet.Name}"] <span class="mo-vl-chip-count">@count</span>
+                    </button>
+                }
+            </div>
+
+            <div class="oi-tools">
+                <label class="oi-search">
+                    <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                    <input type="search" aria-label="@L["Design:SearchInstances"]" value="@Query["q"]" placeholder="@L["Design:SearchInstances"]"
+                           autocomplete="off" spellcheck="false" @oninput='args => Change("q", args.Value?.ToString())' />
+                </label>
+                <div class="oi-select oi-evidence-select">
+                    <MudSelect T="string" Value="@(Query["evidence"] ?? "")" ValueChanged='value => Change("evidence", value)'
+                               aria-label="@L["Design:EvidenceFilter"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                        <MudSelectItem T="string" Value="@string.Empty">@L["Design:EvidenceFilter"]: @L["Design:EvidenceOpts:All"]</MudSelectItem>
+                        @foreach (var option in EvidenceOptions)
+                        { <MudSelectItem T="string" Value="@option">@L[$"Design:EvidenceOpts:{Capitalize(option)}"]</MudSelectItem> }
+                    </MudSelect>
+                </div>
+                <div class="oi-select oi-sort">
+                    <span>@L["Design:SortBy"]</span>
+                    <MudSelect T="string" Value="@(Query["sort"] ?? "attention")" ValueChanged='value => Change("sort", value == "attention" ? null : value)'
+                               aria-label="@L["Design:SortBy"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                        @foreach (var option in SortOptions)
+                        { <MudSelectItem T="string" Value="@option">@L[$"Design:Sorts:{Capitalize(option)}"]</MudSelectItem> }
+                    </MudSelect>
+                </div>
+            </div>
+            <details class="oi-more-filters" open="@(_from is not null || _to is not null || Query["type"] is not null || Query["level"] is not null)">
+                <summary>@L["Design:MoreFilters"]</summary>
+                <div class="oi-more-grid">
+                    <div class="oi-field">
+                        <span>@L["Design:TypeFilter"]</span>
+                        <MudSelect T="string" Value="@(Query["type"] ?? "")" ValueChanged='value => Change("type", value)'
+                                   aria-label="@L["Design:TypeFilter"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                            <MudSelectItem T="string" Value="@string.Empty">@L["Design:AllTypes"]</MudSelectItem>
+                            @foreach (var type in Evidence.Types)
+                            { <MudSelectItem T="string" Value="@type.Key">@(type.First().Snapshot.InstanceTypeName ?? L["Design:NoType"].Value)</MudSelectItem> }
+                        </MudSelect>
+                    </div>
+                    <div class="oi-field">
+                        <span>@L["Design:LevelFilter"]</span>
+                        <MudSelect T="string" Value="@(Query["level"] ?? "")" ValueChanged='value => Change("level", value)'
+                                   aria-label="@L["Design:LevelFilter"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                            <MudSelectItem T="string" Value="@string.Empty">@L["Design:AllLevels"]</MudSelectItem>
+                            @foreach (var level in LevelOptions)
+                            { <MudSelectItem T="string" Value="@level">@L[$"Design:Levels:{level}"]</MudSelectItem> }
+                        </MudSelect>
+                    </div>
+                    <ObservableDateFilter Label="@L["Design:RegisteredFrom"]" Value="_from" ValueChanged='value => ChangeDate("from", value)' />
+                    <ObservableDateFilter Label="@L["Design:RegisteredTo"]" Value="_to" ValueChanged='value => ChangeDate("to", value)' />
+                </div>
+            </details>
+        </div>
+
+        @if (_matches.Length == 0)
+        {
+            <MoContentState Compact="true" Class="oi-nomatch">
+                <div class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Search" Size="18px" /></div>
+                <h3>@L["Design:NoMatchesTitle"]</h3>
+                <p>@L["Design:NoMatchesBody"]</p>
+                @if (HasFilters) { <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ClearAllAsync">@L["Design:ClearFilters"]</MudButton> }
+            </MoContentState>
+        }
+        else if (Grouped)
+        {
+            <div class="oi-grouped-wrap">
+                @foreach (var group in _matches.GroupBy(item => item.GroupKey))
+                {
+                    <div class="oi-group-block" @key="group.Key">
+                        <header class="oi-group-block-head"><h3>@GroupLabel(group.First())</h3><span class="oi-count">@group.Count()</span></header>
+                        @Table(group)
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            @Table(_matches.Skip(Page * PageSize).Take(PageSize))
+            <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+        }
+    </section>
+    @ChildContent
+</div>
+
+@code {
+    private RenderFragment Table(IEnumerable<TrackerEvidence> items) => @<div class="oi-table-wrap">
+        <table class="oi-table">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Design:Cols:Identity"]</th>
+                    <th scope="col">@L["Design:Cols:State"]</th>
+                    <th scope="col">@L["Design:Cols:Buffer"]</th>
+                    <th scope="col" class="is-num">@L["Design:Cols:Exceptions"]</th>
+                    <th scope="col" class="is-num">@L["Design:Cols:LastAt"]</th>
+                    <th scope="col">@L["Design:Cols:Actions"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    var state = item.Snapshot.CurrentState;
+                    <tr class="@(item.Health == HealthState.Unhealthy ? "is-alert-row" : null)" @key="item.Id">
+                        <td class="oi-col-id" data-label="@L["Design:Cols:Identity"]">
+                            <button type="button" class="oi-row-name" @onclick="() => Open(item)">
+                                <strong>@item.Name</strong><MoIcon Icon="@MoIcons.ArrowUpRight" Size="13px" />
+                            </button>
+                            <code class="oi-row-id mo-vl-mono">@ObservableMarkup.Breakable(item.Id)</code>
+                            <div class="oi-row-tags">
+                                <span class="oi-row-type mo-vl-mono" title="@item.Snapshot.InstanceTypeName">@(item.Snapshot.InstanceTypeShortName ?? L["Design:NoType"].Value)</span>
+                                <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@GroupLabel(item)</span>
+                                @if (item.Snapshot.InstanceKey is { Length: > 0 } key)
+                                { <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral mo-vl-mono">@key</span> }
+                            </div>
+                        </td>
+                        <td class="oi-col-state" data-label="@L["Design:Cols:State"]">
+                            <ObservableStatus Snapshot="item.Snapshot" />
+                            <div class="oi-row-state-val mo-vl-mono @(state.CaptureError is not null ? "oi-err-text" : null)" title="@(state.CaptureError ?? state.Text)">
+                                @(state.CaptureError is not null ? L["Design:ValueUnavailable"].Value : state.Text is { Length: > 0 } text ? ObservableText.Preview(text, 44) : L["Design:NoState"].Value)
+                            </div>
+                            <small class="oi-row-lvl">@L[$"Design:Levels:{item.Level}"]</small>
+                        </td>
+                        <td class="oi-col-buf" data-label="@L["Design:Cols:Buffer"]">
+                            <div class="oi-buf-line">
+                                <b class="mo-vl-mono">@L["Design:BufferText", item.Retained, item.Snapshot.MaxHistorySize]</b>
+                                @if (item.EvictedRecords > 0) { <span class="oi-evict-tag mo-vl-mono">@L["Design:EvictedNote", item.EvictedRecords]</span> }
+                            </div>
+                            <ObservableBufferBar Snapshot="item.Snapshot" />
+                            <small class="oi-row-span mo-vl-mono">
+                                @(item.Oldest is not null ? L["Design:SpanNote", Time.FormatTime(item.Oldest), Time.FormatTime(item.Latest)] : L["Design:NoHistoryLabel"]) · @item.Snapshot.TotalRecords.ToString("N0")
+                            </small>
+                        </td>
+                        <td class="oi-col-ex is-num" data-label="@L["Design:Cols:Exceptions"]">
+                            @if (item.LatestException is { } seq)
+                            {
+                                <button type="button" class="oi-ex-pair is-err is-clickable mo-vl-mono" @onclick='() => Open(item, "exceptions", seq)'>
+                                    <b>@item.RetainedExceptions.Length</b> / @item.Snapshot.TotalExceptions
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="oi-ex-pair mo-vl-mono @(item.EvictedExceptions > 0 ? "is-warn" : "is-dim")">0 / @item.Snapshot.TotalExceptions</span>
+                            }
+                            @if (item.EvictedExceptions > 0) { <small class="oi-warn-sub">@L["Design:EvictedBadge", item.EvictedExceptions]</small> }
+                        </td>
+                        <td class="oi-col-at is-num mo-vl-mono" data-label="@L["Design:Cols:LastAt"]">
+                            @if (item.Snapshot.TotalRecords > 0)
+                            { <time datetime="@item.Snapshot.LastRecordedAt.ToString("O")">@Time.Format(item.Snapshot.LastRecordedAt)</time> }
+                            else { <span class="oi-dim">—</span> }
+                        </td>
+                        <td class="oi-col-act" data-label="@L["Design:Cols:Actions"]">
+                            <div class="oi-row-actions">
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => Open(item)">@L["Design:Inspect"]</MudButton>
+                                <MudButton Size="Size.Small" Disabled="@(Busy || item.Retained == 0)" OnClick="() => Clear.InvokeAsync(item.Snapshot)">@L["Design:ClearHistory"]</MudButton>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>;
+}

@@ -7,9 +7,19 @@
 @inject ILogger<StackTraceViewer> Logger
 @inject IStringLocalizer<SharedResource> L
 
-<div class="stack-trace-viewer @(_wrapLines ? "" : "is-unwrapped")">
+<div class="stack-trace-viewer @(AllowRawView ? "has-display-modes" : null) @(_wrapLines ? "" : "is-unwrapped")">
     <div class="trace-toolbar">
-        <span class="trace-caption">@L["StackTrace:Caption"]</span>
+        @if (AllowRawView)
+        {
+            <div class="mo-vl-segment trace-modes" role="group" aria-label="@L["StackTrace:Caption"]">
+                <button type="button" aria-pressed="@(!_raw ? "true" : "false")" @onclick="() => _raw = false">@L["StackTrace:Highlighted"]</button>
+                <button type="button" aria-pressed="@(_raw ? "true" : "false")" @onclick="() => _raw = true">@L["StackTrace:Raw"]</button>
+            </div>
+        }
+        else
+        {
+            <span class="trace-caption">@L["StackTrace:Caption"]</span>
+        }
         <div class="trace-actions">
             <button type="button" class="trace-button trace-wrap" aria-pressed="@(_wrapLines ? "true" : "false")"
                     aria-disabled="@(HasSource ? "false" : "true")" @onclick="ToggleWrap">@L["StackTrace:WrapLines"]</button>
@@ -47,6 +57,10 @@
     [Parameter]
     public string? Message { get; set; }
 
+    /// <summary>Offers highlighted and raw views of the same source. Defaults to false.</summary>
+    [Parameter] public bool AllowRawView { get; set; }
+
+    private bool _raw;
     private TextCopySession? _copy;
     private string? _source;
     private IReadOnlyList<StackTraceSourceSpan> _spans = [];
@@ -68,12 +82,19 @@
         if (_retired || _copy?.SetSource(Message) != true) return;
         _source = Message;
         _wrapLines = true;
+        _raw = false;
         _spans = StackTraceSourcePresentation.Create(_source, ParserService);
     }
 
     private RenderFragment SourceContent => builder =>
     {
         if (_source is not { } source) return;
+        if (AllowRawView && _raw)
+        {
+            builder.AddContent(0, source);
+            return;
+        }
+
         foreach (var span in _spans)
         {
             var text = source.Substring(span.Start, span.Length);

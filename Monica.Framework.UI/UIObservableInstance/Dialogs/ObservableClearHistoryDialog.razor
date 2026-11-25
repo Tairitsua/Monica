@@ -1,13 +1,26 @@
-@using Monica.Core.ObservableInstance.Models
-@using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<ObservableInstanceResource> L
-<MudDialog>
-    <TitleContent><MoDialogHeading Text="@L["Shared:Actions:ClearHistory"]" /></TitleContent>
-    <DialogContent><div class="observable-clear-scope"><p>@L["Page:Dialog:ClearHistoryMessage", Instance.InstanceName]</p><p>@L["Workbench:ClearScope"]</p></div></DialogContent>
-    <DialogActions><div class="observable-clear-actions"><MudButton OnClick="() => MudDialog.Cancel()">@L["Page:Dialog:Cancel"]</MudButton><MudButton Color="Color.Default" Variant="Variant.Outlined" Class="observable-clear-confirm" OnClick="() => MudDialog.Close(DialogResult.Ok(true))">@L["Shared:Actions:ClearHistory"]</MudButton></div></DialogActions>
+
+<MudDialog DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent><MoDialogHeading Text="@L["Design:ClearTitle"]" /></TitleContent>
+    <DialogContent>
+        <div class="observable-clear-scope">
+            <p><strong>@L["Design:ClearMessage", Instance.InstanceName]</strong></p>
+            <p>@L["Design:ClearScope"]</p>
+            <p class="mo-vl-mono">@L["Design:ClearDetails", Instance.History.Count, Instance.History.Count(entry => entry.Exception is not null), Instance.Identity.RegistrationId[..Math.Min(12, Instance.Identity.RegistrationId.Length)]]</p>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div class="observable-clear-actions">
+            <MudButton OnClick="() => MudDialog.Cancel()">@L["Design:Cancel"]</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@MoIcons.Delete"
+                       OnClick="() => MudDialog.Close(DialogResult.Ok(true))">@L["Design:ConfirmClear"]</MudButton>
+        </div>
+    </DialogActions>
 </MudDialog>
+
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
-    /// <summary>Gets or sets the captured registration whose retained history may be cleared.</summary>
+
+    /// <summary>Gets or sets the frozen registration whose retained history may be cleared.</summary>
     [Parameter, EditorRequired] public ObservableInstanceSnapshot Instance { get; set; } = default!;
 }

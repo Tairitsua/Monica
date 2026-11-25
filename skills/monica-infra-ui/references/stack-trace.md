@@ -32,6 +32,8 @@ The existing parser remains a best-effort recognizer. Its flat inner-marker indi
 
 Wrapping starts enabled. The local **Wrap lines** control changes reading layout without changing source or copy payload. A changed ordinal `Message` resets wrapping to enabled; an unrelated rerender with the same source preserves the reader's choice. The viewer has one rounded, inset surface and no vertical height cap; its page or dialog owns vertical scrolling. Turning wrapping off intentionally gives the code pane horizontal scrolling, with the toolbar outside that scroller. Give an embedded owner `min-width: 0` and keep its available width; do not add another capped, padded, bordered trace wrapper or reach into the viewer's private token selectors.
 
+`AllowRawView` defaults to `false`. Set it to `true` to offer Highlighted and Raw controls in the same toolbar. Raw displays the same encoded source without token emphasis. Toggle state is local to the reader and resets to Highlighted when `Message` changes. Both modes copy the same exact admitted source.
+
 ## Copy and lifetime
 
 **Copy** captures the exact string admitted by that click and passes it to the shared clipboard helper. Success is reported only after the helper returns `true`; refusal or interop failure produces a local manual-copy instruction. Browser and operating-system clipboard APIs can normalize line endings, so payload identity and native clipboard representation are separate boundaries.
@@ -42,7 +44,7 @@ The shared HTTP fallback borrows focus synchronously for its temporary textarea,
 
 ## Existing callers and verification
 
-The Observable registration inspector keeps its complete raw capture disclosure and optional formatted disclosure. Its captured identity, sequences, paging and capture-error evidence remain caller-owned; the shared viewer does not refresh a frozen inspector. Retained legacy exception/history components use the same viewer inside their existing expansion panels.
+The Observable registration sheet exposes one stack trace disclosure per timeline exception with both reader modes available. The sheet owns the frozen identity, sequences, paging, and capture-error evidence. Other callers can use the default highlighted presentation with the existing Wrap and Copy controls.
 
 The DataChannel exception inspector keeps record selection and its native Evidence / Stack trace tabs. Its selected record's stack text is the supplied authority; it is not necessarily a complete `Exception.ToString()` capture. Missing component provenance stays missing, and retained counts do not prove runtime health or recovery.
 

@@ -192,3 +192,8 @@
         padding-bottom: 12px;
     }
 }
+
+.has-display-modes .trace-toolbar { justify-content: space-between; padding: 6px 10px; background: var(--mud-palette-background-gray); }
+.has-display-modes .trace-button { min-height: 28px; min-width: 0; padding: 3px 8px; }
+.has-display-modes .trace-copy { min-width: 0; border-color: var(--mud-palette-lines-inputs); }
+.has-display-modes .trace-modes button { min-height: 23px; padding-inline: 7px; font-size: 11.5px; }

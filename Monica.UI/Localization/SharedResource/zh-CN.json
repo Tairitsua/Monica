@@ -237,6 +237,8 @@
     }
   },
   "StackTrace": {
+    "Highlighted": "高亮",
+    "Raw": "原文",
     "Caption": "诊断文本",
     "WrapLines": "自动换行",
     "Copy": "复制",

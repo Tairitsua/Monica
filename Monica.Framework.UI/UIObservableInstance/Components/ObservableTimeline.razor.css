@@ -1,0 +1,88 @@
+.oi-sheet-hfilt { display: flex; flex-direction: column; gap: 8px; }
+.oi-sheet-scope { font-size: 12px; color: var(--mud-palette-text-secondary); }
+.oi-entry-list { display: flex; flex-direction: column; gap: 12px; }
+.oi-entry-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 13px 15px;
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default);
+    min-width: 0;
+}
+.oi-entry-card.is-exception { border-left: 3px solid var(--mud-palette-error); }
+.oi-entry-card.is-pinned { background: color-mix(in srgb, var(--mud-palette-primary) 4%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-primary) 42%, transparent); }
+.oi-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; font-size: 12px; color: var(--mud-palette-text-secondary); }
+.oi-entry-seq { font-weight: 600; color: var(--mud-palette-text-primary); }
+.oi-entry-kind { margin-left: auto; font-size: 11.5px; color: var(--mud-palette-text-secondary); }
+.oi-ctx-btn {
+    padding: 2px 8px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--mud-palette-primary) 10%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mud-palette-primary) 72%, var(--mud-palette-text-primary));
+    font-size: 11.5px;
+    font-weight: 500;
+}
+.oi-ctx-btn:hover { background: color-mix(in srgb, var(--mud-palette-primary) 18%, var(--mud-palette-surface)); }
+.oi-entry-msg { font-size: 13px; line-height: 1.55; color: var(--mud-palette-text-primary); overflow-wrap: anywhere; }
+
+/* Adaptive scalar transition row & structured JSON field diff */
+.oi-tr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.oi-tr-pill {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: var(--mud-palette-background-gray);
+    font-size: 12px;
+}
+.oi-tr-prev { color: var(--mud-palette-text-secondary); }
+.oi-tr-arrow { color: var(--mud-palette-text-secondary); }
+.oi-tr-next { color: var(--mud-palette-text-primary); font-weight: 600; }
+.oi-tr-type { font-size: 11.5px; color: var(--mud-palette-text-secondary); }
+
+.oi-complex-diff { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.oi-jdiff {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: var(--mud-palette-background);
+    box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default);
+    font-size: 12px;
+}
+.oi-jdiff li { display: inline-flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
+.oi-jdiff-k { color: var(--mud-palette-text-secondary); font-weight: 500; }
+.oi-payload-stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.oi-ex-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--mud-palette-divider);
+    min-width: 0;
+}
+.oi-ex-head { display: flex; flex-direction: column; gap: 3px; }
+.oi-ex-head strong { font-size: 12.5px; color: color-mix(in srgb, var(--mud-palette-error) 70%, var(--mud-palette-text-primary)); overflow-wrap: anywhere; }
+.oi-ex-head p { font-size: 13px; color: var(--mud-palette-text-primary); line-height: 1.5; overflow-wrap: anywhere; }
+
+.oi-disclosure { font-size: 12.5px; min-width: 0; }
+.oi-disclosure summary { cursor: pointer; font-weight: 500; color: var(--mud-palette-text-secondary); padding: 3px 0; width: fit-content; }
+.oi-disclosure summary:hover { color: var(--mud-palette-text-primary); }
+.oi-disclosure[open] > summary { margin-bottom: 8px; }
+
+
+.oi-timeline { display: grid; gap: 16px; min-width: 0; }
+.oi-entry-list, .oi-jdiff { margin: 0; list-style: none; }
+.oi-entry-list { padding: 0; }
+.oi-entry-head .mo-vl-role--secondary { --mo-vl-role: var(--mo-color-role-third); }
+.oi-jdiff li { display: inline; min-width: 0; overflow-wrap: anywhere; }
+.oi-tr-pill > span, .oi-tr-type { min-width: 0; overflow-wrap: anywhere; }
+.oi-payload-stack h4 { margin-bottom: 5px; color: var(--mud-palette-text-secondary); font-size: 12px; font-weight: 500; }
+.oi-empty-inline { color: var(--mud-palette-text-secondary); font-size: 13px; }
+.oi-entry-card:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }

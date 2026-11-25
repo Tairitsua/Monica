@@ -1,0 +1,18 @@
+.oi-val-scalar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--mud-palette-background);
+    box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default);
+}
+.oi-val-scalar-text { font-size: 14px; font-weight: 600; color: var(--mud-palette-text-primary); overflow-wrap: anywhere; }
+.oi-val-scalar-type { margin-left: auto; font-size: 12px; color: var(--mud-palette-text-secondary); }
+
+
+.oi-value-error code { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.oi-val-box { min-width: 0; }
+.oi-val-box ::deep .mo-json { border-radius: 8px; }
+.oi-val-box ::deep .json-toolbar { padding: 6px 10px; }
