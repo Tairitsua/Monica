@@ -1,49 +1,72 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<EventBusResource> L
 
 @if (Status is { } status)
 {
-    <div class="topic-evidence">
-        <div class="topic-evidence-status"><EventBusStatusBadge Tone="@EventBusPresentation.RuntimeColor(status.State)">@L.GetTopicRuntimeStateText(status.State)</EventBusStatusBadge><span>@L["SubscriptionDetail:Runtime:StateSince"] <time>@UiTime.Format(status.StateChangedAt)</time></span></div>
-        <dl class="topic-evidence-counts">
-            <div><dt>@L["SubscriptionDetail:Runtime:ProcessedMessages"]</dt><dd>@status.ProcessedMessages</dd></div>
-            <div><dt>@L["SubscriptionDetail:Runtime:MessageErrorCount"]</dt><dd>@status.MessageErrorCount</dd></div>
-            <div><dt>@L["SubscriptionDetail:Runtime:ConsecutiveFailures"]</dt><dd>@status.ConsecutiveFailures</dd></div>
-            <div><dt>@L["SubscriptionDetail:Runtime:RecoveryCount"]</dt><dd>@status.RecoveryCount</dd></div>
+    <div class="eb-te">
+        <div class="eb-te-head">
+            <EventBusRuntimeBadge Status="@status" />
+            <span class="eb-te-since">@L["SubscriptionDetail:Runtime:StateSince"]
+                <time class="mono" datetime="@EventBusVisuals.TimeTag(status.StateChangedAt)">@UiTime.Format(status.StateChangedAt)</time>
+            </span>
+        </div>
+        <dl class="eb-te-counts">
+            <div><dt>@L["SubscriptionDetail:Runtime:ProcessedMessages"]</dt><dd class="mono">@status.ProcessedMessages.ToString("N0")</dd></div>
+            <div><dt>@L["SubscriptionDetail:Runtime:MessageErrorCount"]</dt><dd class="mono @(status.MessageErrorCount > 0 ? "eb-ink-warn" : null)">@status.MessageErrorCount</dd></div>
+            <div><dt>@L["SubscriptionDetail:Runtime:ConsecutiveFailures"]</dt><dd class="mono @(status.ConsecutiveFailures > 0 ? "eb-ink-err" : null)">@status.ConsecutiveFailures</dd></div>
+            <div><dt>@L["SubscriptionDetail:Runtime:RecoveryCount"]</dt><dd class="mono">@status.RecoveryCount</dd></div>
         </dl>
-        <p class="topic-evidence-note">@L["Inspector:CounterScope"]</p>
-        <dl class="topic-evidence-facts">
-            <div><dt>@L["SubscriptionDetail:Runtime:Provider"]</dt><dd>@L.GetProviderKindText(status.Provider)</dd></div>
-            <div><dt>@L["SubscriptionDetail:Runtime:LastMessageAt"]</dt><dd>@(status.LastMessageReceivedAt is { } received ? UiTime.Format(received) : L["Inspector:NoTimestamp"].Value)</dd></div>
-            <div><dt>@L["SubscriptionDetail:Runtime:LastErrorAt"]</dt><dd>@(status.LastErrorAt is { } lastErrorAt ? UiTime.Format(lastErrorAt) : L["Inspector:NoTimestamp"].Value)</dd></div>
+        <p class="eb-note">@L["Inspector:CounterScope"]</p>
+        <dl class="eb-kv">
+            <EventBusEvidenceField Label="@L["SubscriptionDetail:Runtime:Provider"]" Value="@L.GetProviderKindText(status.Provider)" Code="false" />
+            <EventBusEvidenceField Label="@L["SubscriptionDetail:Runtime:LastMessageAt"]" Value="@FormatOptional(status.LastMessageReceivedAt)" />
+            <EventBusEvidenceField Label="@L["SubscriptionDetail:Runtime:LastErrorAt"]" Value="@FormatOptional(status.LastErrorAt)" />
         </dl>
         @if (!string.IsNullOrWhiteSpace(status.LastErrorMessage))
         {
-            <section class="topic-evidence-error"><h3>@L["SubscriptionDetail:Runtime:LastError"]</h3><p>@status.LastErrorMessage</p><p class="topic-evidence-note">@L["Inspector:RetainedError"]</p></section>
+            var failed = status.State == TopicSubscriptionRuntimeState.Failed;
+            <div class="callout mo-vl-role--@(failed ? "error" : "warning")">
+                <span class="tile"><MoIcon Icon="@(failed ? MoIcons.Error : MoIcons.Warning)" Size="16px" /></span>
+                <div><b>@L["SubscriptionDetail:Runtime:LastError"]</b><span class="eb-te-errmsg">@status.LastErrorMessage</span><p>@L["Inspector:RetainedError"]</p></div>
+            </div>
         }
         @if (!string.IsNullOrWhiteSpace(status.LastErrorException))
         {
-            <MudExpansionPanels Elevation="0" Outlined="true"><MudExpansionPanel Icon="@MoIcons.ChevronDown" Text="@L["SubscriptionDetail:Runtime:ExceptionDetails"]"><pre>@status.LastErrorException</pre></MudExpansionPanel></MudExpansionPanels>
+            <details class="eb-te-details"><summary>@L["SubscriptionDetail:Runtime:ExceptionDetails"]</summary><pre class="mono eb-break">@status.LastErrorException</pre></details>
         }
         @if (status.RecentErrors.Count > 0)
         {
-            <section class="topic-evidence-history">
-                <h3>@L["SubscriptionDetail:Runtime:RecentErrors"]</h3>
-                <p class="topic-evidence-note">@L["Inspector:RetainedErrors", status.RecentErrors.Count]</p>
-                @foreach (var error in status.RecentErrors)
-                {
-                    <article><time>@UiTime.Format(error.OccurredAt)</time><p>@error.Message</p>
-                        @if (!string.IsNullOrWhiteSpace(error.ExceptionText))
-                        {
-                            <MudExpansionPanels Elevation="0" Outlined="true"><MudExpansionPanel Icon="@MoIcons.ChevronDown" Text="@L["SubscriptionDetail:Runtime:ExceptionDetails"]"><pre>@error.ExceptionText</pre></MudExpansionPanel></MudExpansionPanels>
-                        }
-                    </article>
-                }
+            <section class="eb-insp-sec">
+                <h3>@L["Inspector:RetainedErrors", status.RecentErrors.Count]</h3>
+                <div class="eb-te-errbox">
+                    @foreach (var error in status.RecentErrors.Reverse())
+                    {
+                        <article class="eb-receipt-item">
+                            <time class="mono" datetime="@EventBusVisuals.TimeTag(error.OccurredAt)">@UiTime.Format(error.OccurredAt)</time>
+                            <p class="eb-te-errmsg">@error.Message</p>
+                            @if (!string.IsNullOrWhiteSpace(error.ExceptionText))
+                            {
+                                <details class="eb-te-details"><summary>@L["SubscriptionDetail:Runtime:ExceptionDetails"]</summary><pre class="mono eb-break">@error.ExceptionText</pre></details>
+                            }
+                        </article>
+                    }
+                </div>
             </section>
         }
     </div>
 }
+else
+{
+    <div class="callout mo-vl-role--neutral"><span class="tile"><MoIcon Icon="@MoIcons.RadioOff" Size="16px" /></span>
+        <div><b>@L.CoverageText(EventBusCoverage.Unreported)</b><p>@L["Precision:InspUnreportedHelp"]</p></div>
+    </div>
+}
 
-@code { [Parameter] public TopicSubscriptionStatus? Status { get; set; } }
+@code {
+    /// <summary>Gets or sets the sampled transport evidence, with null indicating an unreported distributed topic.</summary>
+    [Parameter] public TopicSubscriptionStatus? Status { get; set; }
+
+    private string? FormatOptional(DateTime? instant) => instant is null ? null : UiTime.Format(instant);
+}

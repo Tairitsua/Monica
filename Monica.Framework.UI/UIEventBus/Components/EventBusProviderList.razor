@@ -1,163 +1,153 @@
 @using Monica.EventBus.Models
+@using Monica.Framework.UI.Pages
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
-@implements IAsyncDisposable
-@inject IDialogService DialogService
+@using Monica.UI.Shared.Components.States
 @inject IStringLocalizer<EventBusResource> L
 
-<section class="provider-directory">
-    <header class="provider-directory-heading">
-        <div><span class="provider-directory-kicker">@L["ProviderDirectory:Eyebrow"]</span><h2>@L["Providers:Title"]</h2><p>@L["ProviderDirectory:Scope"]</p></div>
-        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" OnClick="OnRefresh" Disabled="@IsLoading">@L["Providers:Refresh"]</MudButton>
-    </header>
-    <div class="provider-directory-search">
-        <MudTextField ClearIcon="@MoIcons.Close" T="string" @ref="_searchField" @bind-Value="_search" Label="@L["ProviderDirectory:Search"]" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" />
-        <span>@L["ProviderDirectory:Shown", FilteredProviders.Count, Providers.Count]</span>
+@{
+    var model = Workbench.Model!;
+    var providers = model.Snapshot.Providers;
+    var subscriptions = model.Snapshot.Subscriptions;
+    var distributed = providers.Count(item => item.IsDistributed);
+    var scope = Workbench.Query["scope"];
+    var query = Workbench.Query["q"] ?? "";
+    var search = query.Trim();
+    var filtered = providers.Where(provider => (scope != "Distributed" || provider.IsDistributed)
+        && (scope != "Local" || !provider.IsDistributed) && MatchesSearch(provider, search)).ToArray();
+    var atRisk = providers.FirstOrDefault(provider => provider.UnhealthyTopicCount > 0);
+    var keyed = providers.Count(provider => provider.ServiceKey is not null);
+    var emptyKey = providers.FirstOrDefault(provider => provider.ServiceKey == "");
+}
+<section class="eb-sig">
+    <EventBusDecision Role="third" Label="@L["Precision:PvLabel"]" Value="@providers.Count" Population="@L["Precision:PvUnit", distributed, providers.Count - distributed]">
+        <Reasons>
+            <EventBusReason Role="third" Count="@model.Distributed">@L.GetProviderModeText(true)</EventBusReason>
+            <EventBusReason Role="info" Count="@(subscriptions.Count - model.Distributed)">@L.GetProviderModeText(false)</EventBusReason>
+            <EventBusReason Role="error" Count="@(model.Failed + model.Recovering)">@L["Precision:OvReasonFailed"] / @L["Precision:OvReasonRecovering"]</EventBusReason>
+        </Reasons>
+        <Finding>
+            @if (atRisk is null && keyed == 0)
+            {
+                @L["Precision:PvCalm", providers.Count, subscriptions.Count]
+            }
+            else
+            {
+                @if (atRisk is not null)
+                {
+                    <a class="vmark is-link mo-vl-role--error" href="@Workbench.InspectionLink("provider", atRisk.UniqueId)">@L.GetProviderKindText(atRisk.ProviderType) · @EventBusPresentation.KeyText(atRisk.ServiceKey, L)</a>
+                    @L["Precision:PvReports"]
+                    <span class="vmark mo-vl-role--error">@L["Precision:PvUnhealthy", atRisk.UnhealthyTopicCount]</span>
+                }
+                else { @L["Precision:PvNoFaults", distributed] }
+                @if (keyed > 0)
+                {
+                    @L["Precision:PvKeyed", keyed]
+                    @if (emptyKey is not null)
+                    {
+                        @L["Precision:PvEmptyFinding"]
+                        <a class="vmark is-link mo-vl-role--info mono" href="@Workbench.InspectionLink("provider", emptyKey.UniqueId, "options")">""</a>
+                    }
+                }
+            }
+        </Finding>
+    </EventBusDecision>
+</section>
+
+<section class="surface eb-pv-surface" aria-label="@L["Precision:PvLabel"]">
+    <div class="eb-toolbar eb-pv-toolbar">
+        <div class="fchips" role="group" aria-label="@L["Precision:SubFilterScope"]">
+            <EventBusFilterChip Count="@providers.Count" Selected="@(scope is null)" Select='() => Workbench.EditQuery(("scope", null))'>@L["Precision:PvFilterAll"]</EventBusFilterChip>
+            <EventBusFilterChip Role="third" Count="@distributed" Selected='@(scope == "Distributed")' Select='() => Workbench.EditQuery(("scope", "Distributed"))'>@L["Precision:PvFilterDist"]</EventBusFilterChip>
+            <EventBusFilterChip Role="info" Count="@(providers.Count - distributed)" Selected='@(scope == "Local")' Select='() => Workbench.EditQuery(("scope", "Local"))'>@L["Precision:PvFilterLocal"]</EventBusFilterChip>
+        </div>
+        <div class="eb-toolbar-end">
+            <label class="eb-search"><MoIcon Class="i" Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" value="@query" placeholder="@L["Precision:PvSearchPh"]" aria-label="@L["Precision:PvSearchPh"]"
+                       @oninput='args => Workbench.EditQuery(("q", args.Value is string { Length: > 0 } value ? value : null))' />
+            </label>
+            <span class="eb-shown">@L["Precision:PvShown", filtered.Length, providers.Count]</span>
+        </div>
     </div>
-    @if (IsLoading && Providers.Count == 0)
+    @if (filtered.Length == 0)
     {
-        <div class="provider-directory-empty" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /><p>@L["ProviderDirectory:Loading"]</p></div>
-    }
-    else if (Providers.Count == 0)
-    {
-        <div class="provider-directory-empty"><MoIcon Icon="@MoIcons.Network" Size="1.5rem" /><h3>@L["Providers:States:Empty"]</h3><p>@L["ProviderDirectory:EmptyHelp"]</p></div>
-    }
-    else if (FilteredProviders.Count == 0)
-    {
-        <div class="provider-directory-empty"><MoIcon Icon="@MoIcons.SearchOff" Size="1.5rem" /><h3>@L["ProviderDirectory:NoMatches"]</h3><MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ClearSearchAsync">@L["ProviderDirectory:ClearSearch"]</MudButton></div>
+        <MoContentState>
+            <MoIcon Icon="@MoIcons.SearchOff" Size="18px" /><h2>@L["Precision:PvEmptySearch"]</h2>
+            <button class="btn btn-outline btn-sm" type="button" @onclick='() => Workbench.EditQuery(("q", null), ("scope", null))'>@L["Precision:PvClearSearch"]</button>
+        </MoContentState>
     }
     else
     {
-        <div class="provider-directory-surface" aria-busy="@(IsLoading ? "true" : "false")">
-            @foreach (var group in FilteredProviders.GroupBy(provider => provider.ServiceKey is not null).OrderBy(group => group.Key))
+        <div class="eb-pv-groups">
+            @foreach (var group in filtered.GroupBy(provider => provider.ServiceKey is not null).OrderBy(group => group.Key))
             {
-                <header class="provider-directory-group"><h3>@L[group.Key ? "ProviderDirectory:Keyed" : "ProviderDirectory:Default"]</h3><span>@L["Providers:Count", group.Count()]</span></header>
-                @foreach (var provider in group.OrderBy(provider => provider.ServiceKey, StringComparer.Ordinal).ThenBy(provider => provider.IsDistributed))
-                {
-                    var kind = L.GetProviderKindText(provider.ProviderType);
-                    var mode = L.GetProviderModeText(provider.IsDistributed);
-                    <article class="provider-directory-record" @key="provider.UniqueId">
-                        <div class="provider-directory-identity">
-                            <span class="provider-directory-icon" data-mode="@(provider.IsDistributed ? "distributed" : "local")"><MoIcon Icon="@(provider.IsDistributed ? MoIcons.Cloud : MoIcons.Cpu)" Size="1.5rem" /></span>
-                            <div><h4 title="@provider.ImplementationType">@kind@if (kind != mode) { <span class="provider-mode">@mode</span> }</h4><code>@ProviderKey(provider)</code></div>
-                        </div>
-                        <dl class="provider-directory-counts">
-                            <div><dt>@L["ProviderDirectory:Registrations"]</dt><dd>@provider.SubscriptionCount</dd></div>
-                            <div><dt>@L["ProviderDirectory:Active"]</dt><dd>@provider.ActiveSubscriptionCount</dd></div>
-                            <div><dt>@L["ProviderDirectory:ReportedProblems"]</dt><dd data-attention="@(provider.UnhealthyTopicCount > 0 ? "true" : "false")">@provider.UnhealthyTopicCount</dd></div>
-                        </dl>
-                        <div class="provider-directory-actions"><MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@MoIcons.ArrowUpRight" OnClick="() => ViewDetailsAsync(provider)" aria-label="@L["ProviderDirectory:Inspect", ProviderKey(provider), L.GetProviderModeText(provider.IsDistributed)]">@L["Providers:Card:ViewDetails"]</MudButton></div>
-                        <div class="provider-directory-capabilities">
-                            @if (provider.SupportsBulkPublish) { <span>@L["Providers:Capabilities:BulkPublish"]</span> }
-                            @if (provider.SupportsStreaming) { <span>@L["Providers:Capabilities:Streaming"]</span> }
-                            @if (provider.SupportsDeadLetterQueue) { <span>@L["Providers:Capabilities:DeadLetterQueue"]</span> }
-                            @if (provider.HasOptionDiagnostics) { <span>@L["Providers:Capabilities:HasOptions"]</span> }
-                            @if (!provider.SupportsBulkPublish && !provider.SupportsStreaming && !provider.SupportsDeadLetterQueue) { <span>@L["Providers:Capabilities:Basic"]</span> }
-                        </div>
-                    </article>
-                }
+                <div class="eb-pv-group">
+                    <header class="eb-pv-group-head"><h3>@L[group.Key ? "Precision:PvGroupKeyed" : "Precision:PvGroupDefault"]</h3><span class="count">@group.Count()</span></header>
+                    <div class="eb-pv-rows">
+                        @foreach (var provider in group)
+                        {
+                            var href = Workbench.InspectionLink("provider", provider.UniqueId);
+                            var rows = subscriptions.Where(row => row.Scope == (provider.IsDistributed ? EventSubscriptionScope.Distributed : EventSubscriptionScope.Local)
+                                && string.Equals(row.ServiceKey, provider.ServiceKey, StringComparison.Ordinal)).ToArray();
+                            var denominator = Math.Max(1, subscriptions.Count);
+                            <article class="eb-pv-row" @key="provider.UniqueId">
+                                <div class="eb-pv-id">
+                                    <a href="@href" class="eb-tbadge-btn"><EventBusTransportBadge Distributed="@provider.IsDistributed" Kind="@provider.ProviderType" ServiceKey="@provider.ServiceKey" Large="true" /></a>
+                                    <span class="eb-pv-impl mono">@provider.ImplementationType</span>
+                                </div>
+                                <div class="eb-pv-share">
+                                    <div class="eb-pv-share-head"><span class="mono"><b>@provider.ActiveSubscriptionCount</b> / @provider.SubscriptionCount</span><span class="eb-row-sub">@L.GetSubscriptionStateText(EventSubscriptionState.Active)</span></div>
+                                    <div class="meter" role="img" aria-label="@($"{provider.SubscriptionCount} / {subscriptions.Count}")">
+                                        @foreach (var segment in rows.GroupBy(row => EventBusVisuals.Role(row.State)).OrderBy(group => SegmentOrder(group.Key)))
+                                        {
+                                            <span class="mo-vl-role--@segment.Key @(segment.Key == "neutral" ? "is-light" : null)" style="@FormattableString.Invariant($"width:{100d * segment.Count() / denominator:0.##}%")"></span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="eb-pv-topics">
+                                    @if (!provider.IsDistributed) { <span class="eb-row-sub">@L.CoverageText(EventBusCoverage.Local)</span> }
+                                    else
+                                    {
+                                        <div class="eb-pv-topic-pills">
+                                            @foreach (var status in model.Topics.Where(topic => topic.ServiceKey == provider.ServiceKey)
+                                                .GroupBy(topic => topic.Coverage == EventBusCoverage.HealthyErr ? EventBusCoverage.Healthy : topic.Coverage)
+                                                .OrderBy(status => status.Key))
+                                            {
+                                                @if (status.Key == EventBusCoverage.Unreported)
+                                                {
+                                                    <span class="eb-rt-unreported"><span class="sw is-hatch"></span>@L.CoverageText(status.Key) @status.Count()</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="status is-pill mo-vl-role--@EventBusVisuals.Role(status.Key)"><span class="status-dot"></span>@L.CoverageText(status.Key) @status.Count()</span>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="eb-pv-caps"><EventBusCapabilityChips Provider="@provider" /></div>
+                                <div class="eb-pv-act">
+                                    <a class="btn btn-ghost btn-sm" href="@EventBusRouteQuery.To(UIEventBusSubscriptionsPage.PAGE_URL, ("provider", provider.UniqueId))">@L["Precision:PvFilterSubs"]</a>
+                                    <a class="btn btn-outline btn-sm" href="@href">@L["Precision:PvViewDetails"]</a>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </div>
             }
         </div>
     }
-    <p class="provider-directory-note">@L["ProviderDirectory:CountsHelp"]</p>
+    <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:PvFoot"]</footer>
 </section>
 
 @code {
-    /// <summary>Gets or sets the provider registrations to display.</summary>
-    [Parameter] public List<EventBusProviderInfo> Providers { get; set; } = [];
-    /// <summary>Gets or sets the subscriptions available to the compatibility inspector path.</summary>
-    [Parameter] public List<SubscriptionViewModel> AllSubscriptions { get; set; } = [];
-    /// <summary>Gets or sets the host-owned provider refresh action.</summary>
-    [Parameter] public EventCallback OnRefresh { get; set; }
-    /// <summary>Gets or sets the host-owned provider inspection action.</summary>
-    [Parameter] public EventCallback<EventBusProviderInfo> OnProviderClick { get; set; }
-    /// <summary>Gets or sets whether the provider capture is refreshing.</summary>
-    [Parameter] public bool IsLoading { get; set; }
+    /// <summary>Gets the workbench that owns the captured provider group and route selection.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
 
-    private string _search = string.Empty;
-    private MudTextField<string>? _searchField;
-    private Task? _clearTask;
-    private bool _clearing;
-    private bool _retired;
-    private bool _opening;
-    private Task? _openTask;
-    private Task? _disposeTask;
-    private IDialogReference? _dialog;
+    private bool MatchesSearch(EventBusProviderInfo item, string search) => search.Length == 0 ||
+        new[] { item.ServiceKey, item.ImplementationType, L.GetProviderKindText(item.ProviderType),
+            L.GetProviderModeText(item.IsDistributed), EventBusPresentation.KeyText(item.ServiceKey, L) }
+        .Any(value => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true);
 
-    private List<EventBusProviderInfo> FilteredProviders => Providers.Where(provider =>
-        string.IsNullOrWhiteSpace(_search) ||
-        ProviderKey(provider).Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-        provider.ImplementationType.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-        L.GetProviderKindText(provider.ProviderType).Contains(_search, StringComparison.CurrentCultureIgnoreCase) ||
-        L.GetProviderModeText(provider.IsDistributed).Contains(_search, StringComparison.CurrentCultureIgnoreCase)).ToList();
-
-    private string ProviderKey(EventBusProviderInfo provider) => EventBusPresentation.KeyText(provider.ServiceKey, L);
-
-    private Task ClearSearchAsync()
-    {
-        if (_retired || _clearing) return Task.CompletedTask;
-        _clearing = true;
-        return _clearTask = ClearInputAsync();
-    }
-
-    private async Task ClearInputAsync()
-    {
-        try
-        {
-            if (_searchField is { } field) await field.ClearAsync();
-            if (!_retired) _search = string.Empty;
-        }
-        finally { _clearing = false; }
-    }
-
-    private Task ViewDetailsAsync(EventBusProviderInfo provider)
-    {
-        if (_retired) return Task.CompletedTask;
-        if (OnProviderClick.HasDelegate) return OnProviderClick.InvokeAsync(provider);
-        if (_opening) return Task.CompletedTask;
-        return _openTask = OpenCompatibilityInspectorAsync(provider);
-    }
-
-    private async Task OpenCompatibilityInspectorAsync(EventBusProviderInfo provider)
-    {
-        _opening = true;
-        try
-        {
-            var subscriptions = AllSubscriptions.Where(subscription =>
-                string.Equals(subscription.ServiceKey, provider.ServiceKey, StringComparison.Ordinal) &&
-                subscription.Scope == (provider.IsDistributed ? EventSubscriptionScope.Distributed : EventSubscriptionScope.Local)).ToList();
-            var reference = await DialogService.ShowAsync<EventBusProviderDetailDialog>(
-                ProviderKey(provider),
-                new DialogParameters { [nameof(EventBusProviderDetailDialog.Provider)] = provider, [nameof(EventBusProviderDetailDialog.Subscriptions)] = subscriptions },
-                new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true });
-            if (_retired)
-            {
-                var cancellation = DialogResult.Cancel();
-                reference.Close(cancellation);
-                reference.Dismiss(cancellation);
-                await reference.Result;
-                return;
-            }
-            _dialog = reference;
-            await reference.Result;
-            if (ReferenceEquals(_dialog, reference)) _dialog = null;
-        }
-        finally { _opening = false; }
-    }
-
-    public ValueTask DisposeAsync() => new(_disposeTask ??= RetireAsync());
-
-    private async Task RetireAsync()
-    {
-        _retired = true;
-        if (_dialog is { } reference)
-        {
-            var cancellation = DialogResult.Cancel();
-            reference.Close(cancellation);
-            reference.Dismiss(cancellation);
-        }
-        _dialog = null;
-        var tasks = new[] { _openTask, _clearTask }.OfType<Task>().ToArray();
-        await Task.WhenAll(tasks);
-    }
+    private static int SegmentOrder(string role) => role switch { "success" => 0, "info" => 1, "warning" => 2, _ => 3 };
 }

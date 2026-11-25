@@ -1,7 +1,37 @@
-.subscription-remove { padding: 0 4px; min-width: 0; }
-.subscription-remove p { font-size: .84rem; line-height: 1.7; margin: 0 0 20px; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
-.subscription-remove dl { margin-bottom: 20px; padding: 20px; border: 1px solid var(--mud-palette-divider); border-radius: var(--mud-default-borderradius); background: color-mix(in srgb, var(--mud-palette-error) 3%, var(--mud-palette-surface)); }
-.subscription-remove dl > div + div { margin-top: 16px; }
-.subscription-remove dt { font-size: .74rem; color: color-mix(in srgb, var(--mud-palette-text-secondary) 80%, var(--mud-palette-text-primary)); }
-.subscription-remove dd { margin: 5px 0 0; font-size: .82rem; line-height: 1.7; overflow-wrap: anywhere; }
-.subscription-remove code { font-family: var(--mo-font-family-mono); font-size: .77rem; white-space: pre-wrap; }
+.subscription-remove-heading { display: flex; gap: 14px; align-items: flex-start; }
+.subscription-remove-heading p { margin-top: 3px; color: var(--mud-palette-text-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.subscription-remove-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--mud-palette-error) 13%, var(--mud-palette-surface));
+    color: var(--mud-palette-error);
+}
+.subscription-remove { min-width: 0; font-size: 13px; line-height: 1.55; }
+.subscription-remove > p { color: var(--mud-palette-text-secondary); }
+.subscription-remove dl { margin: 14px 0 0; border-top: 1px solid var(--mud-palette-divider); }
+.subscription-remove dl > div {
+    display: grid;
+    grid-template-columns: minmax(90px, 35%) minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--mud-palette-divider);
+    font-size: 12.5px;
+}
+.subscription-remove dt { color: var(--mud-palette-text-secondary); }
+.subscription-remove dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.subscription-remove code { font: 12px var(--mo-font-family-mono); }
+.subscription-remove .subscription-remove-warning {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-top: 14px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--mud-palette-warning) 12%, var(--mud-palette-surface));
+    color: color-mix(in srgb, var(--mud-palette-warning) 70%, var(--mud-palette-text-primary));
+}

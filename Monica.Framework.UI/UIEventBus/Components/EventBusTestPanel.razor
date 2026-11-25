@@ -9,56 +9,186 @@
 @inject IStringLocalizer<EventBusResource> L
 @inject ILogger<EventBusTestPanel> Logger
 
-<section class="event-test-bench">
-    <header class="test-bench-scope">
-        <div class="test-bench-scope-icon"><MoIcon Icon="@MoIcons.Cloud" Size="1.5rem" /></div>
-        <div><span class="test-bench-kicker">@L["TestBench:Eyebrow"]</span><h2>@L["TestBench:Title"]</h2><p>@L["TestBench:Scope"]</p></div>
-        <div class="test-bench-contract"><span>@L["TestBench:EventContract"]</span><code>@nameof(TestEventMessage)</code></div>
-    </header>
-    <div class="test-bench-workspace">
-        <section class="test-bench-publish">
-            <header class="test-bench-section-heading"><span class="test-bench-step">01</span><div><h3>@L["TestPanel:Publish:Title"]</h3><p>@L["TestBench:PublishHelp"]</p></div></header>
-            <div class="test-bench-form">
-                <MudTextField T="string" @bind-Value="_publishTopicName" Label="@L["TestPanel:Publish:TopicName"]" Variant="Variant.Outlined" Immediate="true" Disabled="@(_retired || _commandBusy)" />
-                <MudTextField T="string" @bind-Value="_publishMessage" Label="@L["TestPanel:Publish:MessageContent"]" Placeholder="@L["TestPanel:Publish:MessagePlaceholder"]" Variant="Variant.Outlined" Immediate="true" Lines="6" Disabled="@(_retired || _commandBusy)" />
-                <p class="test-bench-help">@L["TestBench:AcceptanceHelp"]</p>
-                <div class="test-bench-publish-actions"><MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@MoIcons.Send" OnClick="PublishMessageAsync" Disabled="@_retired" aria-disabled="@BusyAttribute" aria-busy="@(_publishing ? "true" : "false")">@(_publishing ? L["TestPanel:Publish:Sending"] : L["TestPanel:Publish:Send"])</MudButton></div>
-                @if (_accepted) { <p class="test-bench-accepted" role="status"><MoIcon Icon="@MoIcons.Success" Size="1.25rem" />@L["TestBench:Accepted"]</p> }
-            </div>
-        </section>
-        <section class="test-bench-receive">
-            <header class="test-bench-section-heading"><span class="test-bench-step">02</span><div><h3>@L["TestBench:ReceiveTitle"]</h3><p>@L["TestBench:ReceiveHelp"]</p></div><span class="test-bench-listener-state" data-listening="@(_ownsSubscription ? "true" : "false")" role="status">@ListenerStateText</span></header>
-            <div class="test-bench-listener">
-                <MudTextField T="string" @bind-Value="_subscribeTopicName" Label="@L["TestPanel:Subscribe:TopicName"]" Variant="Variant.Outlined" Immediate="true" Disabled="@(_retired || _commandBusy || _ownsSubscription || !_listenerReady)" />
-                <div class="test-bench-listener-actions">
-                    <MudButton Color="@(_ownsSubscription ? Color.Warning : Color.Primary)" Variant="Variant.Outlined" StartIcon="@(_ownsSubscription ? MoIcons.StopCircle : MoIcons.Play)" OnClick="ToggleListeningAsync" Disabled="@_retired" aria-disabled="@ListenerBusyAttribute" aria-busy="@(_listenerBusy ? "true" : "false")">@(_ownsSubscription ? L["TestPanel:Subscribe:Stop"] : L["TestPanel:Subscribe:Start"])</MudButton>
-                    <MudButton Color="Color.Default" OnClick="ClearMessages" Disabled="@_retired" aria-disabled="@(_commandBusy || !_listenerReady || _messages.Count == 0 ? "true" : "false")">@L["TestPanel:Subscribe:Clear"]</MudButton>
-                </div>
-            </div>
-            <div class="test-bench-receipt-heading"><span>@L["TestBench:Retained", _messages.Count]</span><span>@L["TestBench:Retention"]</span></div>
-            @if (_messages.Count == 0)
+
+@using Monica.EventBus.Abstractions
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.Pages
+@using Monica.Framework.UI.UIEventBus.Support
+@using Monica.UI.Shared.Components.States
+@{
+    var rows = Workbench.RowListenerIds.Order(StringComparer.Ordinal).ToArray();
+    var defaultProvider = Workbench.Model?.Provider(EventSubscriptionScope.Distributed, null);
+    var accepted = _acceptedId is not null;
+    var verified = accepted && _messages.Any(message => message.EventData.MessageId == _acceptedId);
+    var sameTopic = string.Equals(_publishTopicName, _subscribeTopicName, StringComparison.Ordinal);
+    var retention = EventBusTestService.StandaloneReceiptLimit;
+}
+
+<section class="eb-sig">
+    <EventBusDecision Label="@L["Precision:TtLabel"]" Value="@(rows.Length + (_ownsSubscription ? 1 : 0))"
+                      Population="@L["Precision:TtPopulation", ListenerStateText, rows.Length]" Role="@(_ownsSubscription || rows.Length > 0 ? "info" : "neutral")">
+        <Finding>
+            @if (_ownsSubscription)
             {
-                <div class="test-bench-empty"><MoIcon Icon="@MoIcons.Inbox" Size="1.5rem" /><h4>@L["TestPanel:Subscribe:NoMessages"]</h4><p>@L["TestBench:EmptyHelp"]</p></div>
+                @L["Precision:TtActiveFinding"] <code class="mono eb-break">@_subscribeTopicName</code>
+                @L["Precision:TtActiveDetail", _messages.Count, rows.Length]
             }
             else
             {
-                <ol class="test-bench-receipts">
-                    @foreach (var message in _messages.AsEnumerable().Reverse())
+                @L["Precision:TtStoppedFinding"]
+                @if (rows.Length > 0) { @L["Precision:SubListenerFinding", rows.Length] @L["Precision:SubListenerDetail"] }
+            }
+        </Finding>
+    </EventBusDecision>
+    <div class="eb-loop-bar">
+        <div class="eb-loop-head">
+            <div class="eb-loop-id"><span class="tile mo-vl-role--third"><MoIcon Icon="@MoIcons.Cloud" Size="16px" /></span>
+                <div><h2>@L["Precision:TtLoopTitle"]</h2><p>@L["Precision:TtLoopSub"]</p></div>
+            </div>
+            <div class="eb-loop-tags">
+                @if (defaultProvider is not null) { <EventBusTransportBadge Distributed="true" Kind="@defaultProvider.ProviderType" /> }
+                <code class="chip is-outline is-mono">@nameof(TestEventMessage)</code>
+            </div>
+        </div>
+        <ol class="eb-loop-steps" aria-label="@L["Precision:TtLoopTitle"]">
+            <li class="eb-loop-step @(_ownsSubscription ? "is-done" : null)">
+                <span class="status mo-vl-role--@(_ownsSubscription ? "success" : "neutral")"><span class="status-dot"></span>@L["Precision:TtStepListen"]</span>
+                <span class="eb-row-sub">@ListenerStateText</span>
+            </li>
+            <li class="eb-loop-arrow" aria-hidden="true"><MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></li>
+            <li class="eb-loop-step @(accepted ? "is-done" : null)">
+                <span class="status mo-vl-role--@(accepted ? "primary" : "neutral")"><span class="status-dot"></span>@L["Precision:TtStepPublish"]</span>
+                <span class="eb-row-sub mono eb-break">@(_acceptedId ?? "—")</span>
+            </li>
+            <li class="eb-loop-arrow" aria-hidden="true"><MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></li>
+            <li class="eb-loop-step @(verified ? "is-done" : null)">
+                <span class="status mo-vl-role--@(verified ? "success" : "neutral")"><span class="status-dot"></span>@L["Precision:TtStepVerify"]</span>
+                <span class="mono eb-row-sub">@_messages.Count / @retention</span>
+            </li>
+        </ol>
+    </div>
+</section>
+<div class="eb-tt-grid">
+    <section class="surface eb-tt-receive">
+        <header class="surface-head">
+            <span class="tile mo-vl-role--@(_ownsSubscription ? "success" : "info")"><MoIcon Icon="@MoIcons.Radio" Size="18px" /></span>
+            <div><h2>@L["Precision:TtStepListen"]</h2><p>@L["Precision:TtRetainedReceipts", _messages.Count, retention]</p></div>
+            <span class="status is-pill aside mo-vl-role--@(_ownsSubscription ? "success" : _listenerFailed ? "error" : "neutral")"><span class="status-dot"></span>@ListenerStateText</span>
+        </header>
+        <div class="surface-body eb-tt-body">
+            <div class="eb-field">
+                <label for="eb-listen-topic" class="eb-field-label">@L["Precision:TtListenTopic"]</label>
+                <input id="eb-listen-topic" type="text" class="eb-input mono" spellcheck="false" disabled="@(_ownsSubscription || _commandBusy)" @bind="_subscribeTopicName" @bind:event="oninput" />
+            </div>
+            <div class="eb-tt-actions">
+                <button type="button" class="btn btn-sm btn-soft mo-vl-role--@(_ownsSubscription ? "warning" : "info")"
+                        disabled="@(_commandBusy || !_listenerReady)" @onclick="ToggleListeningAsync">
+                    <MoIcon Icon="@(_ownsSubscription ? MoIcons.StopCircle : MoIcons.Play)" Size="14px" />@L[_ownsSubscription ? "Precision:TtStopListen" : "Precision:TtStartListen"]
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled="@(_commandBusy || _messages.Count == 0)" @onclick="ClearMessages">@L["Precision:TtClearReceipts"]</button>
+            </div>
+            @if (_messages.Count == 0)
+            {
+                <div class="eb-tt-empty">
+                    <MoIcon Icon="@MoIcons.Inbox" Size="20px" /><h3>@L["Precision:TtNoReceiptsTitle"]</h3><p>@L["Precision:TtNoReceiptsBody"]</p>
+                </div>
+            }
+            else
+            {
+                <ol class="eb-receipt-list">
+                    @foreach (var message in _messages)
                     {
-                        <li @key="message">
-                            <header><span class="test-bench-received-mark"><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="1.25rem" />@L["TestBench:Received"]</span><time>@UiTime.FormatTime(message.ReceivedAt)</time></header>
-                            <p class="test-bench-message">@message.EventData.Message</p>
-                            <dl><div><dt>@L["TestPanel:Publish:TopicName"]</dt><dd><code>@message.TopicName</code></dd></div><div><dt>@L["TestBench:MessageId"]</dt><dd><code>@message.EventData.MessageId</code></dd></div><div><dt>@L["TestBench:CreatedUtc"]</dt><dd><time>@UiTime.Format(message.EventData.CreatedAt)</time></dd></div></dl>
+                        var data = message.EventData;
+                        var createdAt = data.CreatedAt.Kind == DateTimeKind.Unspecified
+                            ? DateTime.SpecifyKind(data.CreatedAt, DateTimeKind.Utc)
+                            : data.CreatedAt;
+                        <li class="eb-receipt-item" @key="message">
+                            <header><span class="eb-receipt-tag"><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="13px" />@L["Precision:TtReceivedAt"]</span>
+                                <time class="mono" datetime="@message.ReceivedAt.ToUniversalTime().ToString("O")">@UiTime.FormatTime(message.ReceivedAt)</time>
+                            </header>
+                            <p class="eb-receipt-msg">@data.Message</p>
+                            <dl class="eb-receipt-meta">
+                                <div><dt>@L["Precision:TtMessageId"]</dt><dd class="mono eb-break">@data.MessageId <button class="icon-btn" type="button" aria-label="@L["Precision:CopyField", L["Precision:TtMessageId"]]" @onclick="() => Workbench.CopyAsync(data.MessageId)"><MoIcon Icon="@MoIcons.Copy" Size="14px" /></button></dd></div>
+                                <div><dt>@L["Precision:TtCreatedAt"]</dt><dd><time class="mono" datetime="@createdAt.ToUniversalTime().ToString("O")">@UiTime.Format(createdAt)</time></dd></div>
+                                <div class="is-wide"><dt>@L["Precision:TtPublishTopic"]</dt><dd class="mono eb-break">@message.TopicName</dd></div>
+                            </dl>
                         </li>
                     }
                 </ol>
             }
-            <footer class="test-bench-listener-help"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" /><p>@L["TestBench:ListenerLifetime"]</p></footer>
-        </section>
-    </div>
+        </div>
+        <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:TtListenerLifetime"]</footer>
+    </section>
+    <section class="surface eb-tt-publish">
+        <EventBusSurfaceHeading Icon="@MoIcons.Send" Title="@L["Precision:TtStepPublish"]" Description="@L["Precision:TtAcceptanceCaveat"]" />
+        <form class="surface-body eb-tt-body" @onsubmit="PublishMessageAsync" @onsubmit:preventDefault>
+            <div class="eb-field">
+                <div class="eb-field-head">
+                    <label for="eb-pub-topic" class="eb-field-label">@L["Precision:TtPublishTopic"]</label>
+                    @if (!sameTopic)
+                    {
+                        <button type="button" class="eb-inline-link" @onclick="() => _publishTopicName = _subscribeTopicName">@L["Precision:TtMatchListener"]</button>
+                    }
+                </div>
+                <input id="eb-pub-topic" type="text" class="eb-input mono" spellcheck="false" disabled="@_commandBusy" @bind="_publishTopicName" @bind:event="oninput" />
+            </div>
+            <div class="eb-field">
+                <label class="eb-field-label" for="eb-pub-msg">@L["Precision:TtMessageContent"]</label>
+                <textarea id="eb-pub-msg" class="eb-textarea" rows="6" placeholder="@L["Precision:TtMessagePh"]" disabled="@_commandBusy"
+                          @bind="_publishMessage" @bind:event="oninput"></textarea>
+            </div>
+            <div class="eb-tt-actions">
+                <button type="submit" class="btn btn-primary" disabled="@_commandBusy"><MoIcon Icon="@MoIcons.Send" Size="15px" />@L[_publishing ? "TestPanel:Publish:Sending" : "Precision:TtSend"]</button>
+            </div>
+            @if (accepted)
+            {
+                <div class="callout mo-vl-role--success" role="status"><span class="tile"><MoIcon Icon="@MoIcons.Check" Size="16px" /></span>
+                    <p>@L["Precision:TtAcceptedBanner", _acceptedId!]</p>
+                </div>
+            }
+        </form>
+    </section>
+</div>
+<section class="surface eb-retained-surface">
+    <EventBusSurfaceHeading Icon="@MoIcons.Flask" Role="info" Title="@L["Precision:TtRetainedTitle"]" Description="@L["Precision:TtRetainedSub"]" Count="@rows.Length.ToString()" />
+    @if (rows.Length == 0)
+    {
+        <div class="eb-retained-empty">
+            <p>@L["Precision:TtNoRetained"]</p><a class="btn btn-outline btn-sm" href="@UIEventBusSubscriptionsPage.PAGE_URL"><MoIcon Icon="@MoIcons.Route" Size="14px" />@L["Precision:ChGoToSubs"]</a>
+        </div>
+    }
+    else
+    {
+        <ul class="eb-retained-list">
+            @foreach (var id in rows)
+            {
+                var source = Workbench.Model!.Snapshot.Subscriptions.FirstOrDefault(item => item.SubscriptionId == id);
+                var listener = TestService.GetRuntimeListenerSnapshot(new EventSubscriptionId(Guid.Parse(id)));
+                <li class="eb-retained-row" @key="id">
+                    <div class="eb-retained-id">
+                        <span class="status is-pill mo-vl-role--success"><span class="status-dot is-live"></span>@L["Precision:TtListening"]</span>
+                        <div class="eb-cell-stack"><b>@(source?.EventTypeShortName ?? L["Precision:TtRemovedSource"].Value)</b>
+                            <span class="mono eb-row-sub eb-break">@listener.TopicName · @id[..Math.Min(id.Length, 12)]</span>
+                        </div>
+                    </div>
+                    <span class="mono eb-row-sub">@L["Precision:TtRetainedReceipts", listener.MessageCount, TestService.RuntimeReceiptLimit]</span>
+                    <div class="eb-retained-acts">
+                        @if (source is not null)
+                        {
+                            <button class="btn btn-outline btn-sm" type="button" @onclick="() => Workbench.OpenTest(id)"><MoIcon Icon="@MoIcons.Flask" Size="14px" />@L["Precision:TtReopenTest"]</button>
+                        }
+                        <button class="btn btn-soft btn-sm mo-vl-role--warning" type="button" disabled="@Workbench.Busy" @onclick="() => Workbench.StopListenerAsync(id)"><MoIcon Icon="@MoIcons.StopCircle" Size="14px" />@L["Precision:TtStopListener"]</button>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
 </section>
 
 @code {
+    /// <summary>Gets the workbench whose rail and diagnostics share the circuit's listener state.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly object _disposeSync = new();
     private CancellationToken _lifetimeToken;
@@ -75,15 +205,17 @@
     private string _subscribeTopicName = string.Empty;
     private bool _commandBusy;
     private bool _publishing;
-    private bool _listenerBusy;
     private bool _ownsSubscription;
     private bool _listenerReady;
     private bool _listenerFailed;
-    private bool _accepted;
+    private string? _acceptedId;
     private bool _retired;
-    private string BusyAttribute => _commandBusy ? "true" : "false";
-    private string ListenerBusyAttribute => _commandBusy || !_listenerReady ? "true" : "false";
-    private string ListenerStateText => _listenerReady ? L[_ownsSubscription ? "TestBench:Listening" : "TestBench:Stopped"].Value
+    private TopicSubscriptionRuntimeState? ListenerTransport =>
+        _ownsSubscription ? Workbench.Model?.Topic(EventBusCaptureView.TopicId(null, _subscribeTopicName))?.Status?.State : null;
+
+    private string ListenerStateText => ListenerTransport is { } reported && reported != TopicSubscriptionRuntimeState.Healthy
+        ? L.GetTopicRuntimeStateText(reported)
+        : _listenerReady ? L[_ownsSubscription ? "TestBench:Listening" : "TestBench:Stopped"].Value
         : L[_listenerFailed ? "TestBench:ListenerUnavailable" : "TestBench:PreparingListener"].Value;
 
     protected override async Task OnInitializedAsync()
@@ -134,10 +266,10 @@
         var message = _publishMessage;
         var topic = _publishTopicName;
         _publishing = true;
-        _accepted = false;
+        _acceptedId = null;
         return AdmitCommandAsync(async () =>
         {
-            var result = await TestService.PublishTestMessageAsync(message, topic, _lifetimeToken);
+            var result = await TestService.PublishStandaloneMessageAsync(message, topic, _lifetimeToken);
             if (_retired) return;
             var error = result;
             if (result.IsFailure())
@@ -145,7 +277,7 @@
                 Snackbar.Add(L["TestPanel:Snackbars:PublishFailed", error.Message ?? string.Empty], Severity.Error);
                 return;
             }
-            _accepted = true;
+            _acceptedId = result.Data?.MessageId;
             _publishMessage = string.Empty;
             Snackbar.Add(L["TestBench:Accepted"], Severity.Success);
         });
@@ -162,7 +294,6 @@
             return Task.CompletedTask;
         }
         var topic = _subscribeTopicName;
-        _listenerBusy = true;
         return AdmitCommandAsync(async () =>
         {
             var result = await lease.SubscribeAsync(topic);
@@ -183,7 +314,6 @@
     private Task StopListeningAsync()
     {
         if (_retired || _commandBusy || !_listenerReady || !_ownsSubscription || _listenerLease is not { } lease) return Task.CompletedTask;
-        _listenerBusy = true;
         return AdmitCommandAsync(async () =>
         {
             var result = await lease.UnsubscribeAsync();
@@ -216,8 +346,7 @@
         {
             _commandBusy = false;
             _publishing = false;
-            _listenerBusy = false;
-            if (!_retired) StateHasChanged();
+            if (!_retired) { StateHasChanged(); Workbench.ListenerChanged(); }
         }
     }
 

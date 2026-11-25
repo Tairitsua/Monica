@@ -1,0 +1,32 @@
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.UIEventBus.Support
+@inject IStringLocalizer<EventBusResource> L
+
+@{ var coverage = EventBusCaptureView.Coverage(Status, Scope); }
+@if (coverage == EventBusCoverage.Local)
+{
+    <span class="eb-rt-local"><span class="sw mo-vl-role--info" aria-hidden="true"></span>@(Compact ? L.GetSubscriptionScopeText(Scope) : L.CoverageText(coverage))</span>
+}
+else if (coverage == EventBusCoverage.Unreported)
+{
+    <span class="eb-rt-unreported" title="@L["Precision:MxUnreportedNote"]"><span class="sw is-hatch" aria-hidden="true"></span>@L.CoverageText(coverage)</span>
+}
+else
+{
+    <span class="eb-rt-group">
+        <span class="status is-pill mo-vl-role--@EventBusVisuals.Role(coverage == EventBusCoverage.HealthyErr ? EventBusCoverage.Healthy : coverage)"><span class="status-dot" aria-hidden="true"></span>@L.GetTopicRuntimeStateText(Status!.State)</span>
+        @if (coverage == EventBusCoverage.HealthyErr)
+        {
+            <span class="eb-err-pip mo-vl-role--warning" title="@L["Precision:InspRetainedErrorNote"]">+@Status.MessageErrorCount</span>
+        }
+    </span>
+}
+
+@code {
+    /// <summary>Gets or sets the registration scope.</summary>
+    [Parameter] public EventSubscriptionScope Scope { get; set; } = EventSubscriptionScope.Distributed;
+    /// <summary>Gets or sets the sampled runtime report, when the provider reported one.</summary>
+    [Parameter] public TopicSubscriptionStatus? Status { get; set; }
+    /// <summary>Gets or sets whether local scope uses its short name.</summary>
+    [Parameter] public bool Compact { get; set; }
+}

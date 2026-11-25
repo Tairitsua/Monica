@@ -1,0 +1,14 @@
+@using Monica.EventBus.Abstractions
+@using Monica.Framework.UI.UIEventBus.Models
+@inject IStringLocalizer<EventBusResource> L
+
+@if (Provider.SupportsBulkPublish) { <span class="chip is-outline">@L["Providers:Capabilities:BulkPublish"]</span> }
+@if (Provider.SupportsStreaming) { <span class="chip is-outline">@L["Providers:Capabilities:Streaming"]</span> }
+@if (Provider.SupportsDeadLetterQueue) { <span class="chip is-outline">@L["Providers:Capabilities:DeadLetterQueue"]</span> }
+@if (Provider.HasOptionDiagnostics) { <span class="chip is-outline">@L["Precision:PvConfiguration"]</span> }
+@if (Provider.Capabilities == EventBusProviderCapabilities.None) { <span class="chip is-outline">@L["Precision:PvBasic"]</span> }
+
+@code {
+    /// <summary>Gets or sets the captured provider whose declared capabilities are shown.</summary>
+    [Parameter, EditorRequired] public EventBusProviderInfo Provider { get; set; } = null!;
+}

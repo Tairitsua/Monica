@@ -1,0 +1,36 @@
+@inject IStringLocalizer<EventBusResource> L
+
+<div class="eb-kv-row">
+    <dt>@Label</dt>
+    <dd>
+        @if (ChildContent is not null) { @ChildContent }
+        else if (Value is not null)
+        {
+            @if (Code) { <code class="mono eb-break">@Value</code> }
+            else { <span class="eb-break">@Value</span> }
+        }
+        else { <span class="eb-dim">@L["Precision:InspNoTimestamp"]</span> }
+        @if (Copy && (ClipboardValue ?? Value) is { } payload)
+        {
+            <button class="icon-btn" type="button" aria-label="@L["Precision:CopyField", Label]" title="@L["Precision:CopyField", Label]"
+                    @onclick="() => Workbench.CopyAsync(payload)"><MoIcon Icon="@MoIcons.Copy" Size="14px" /></button>
+        }
+    </dd>
+</div>
+
+@code {
+    /// <summary>Gets the workbench owning the clipboard command.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+    /// <summary>Gets or sets the field label.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    /// <summary>Gets or sets the display value, also used verbatim for copying.</summary>
+    [Parameter] public string? Value { get; set; }
+    /// <summary>Gets or sets whether this field presents an exact value in monospace.</summary>
+    [Parameter] public bool Code { get; set; } = true;
+    /// <summary>Gets or sets whether the field exposes its exact value to the clipboard.</summary>
+    [Parameter] public bool Copy { get; set; }
+    /// <summary>Gets or sets an exact clipboard value when the visible label describes a special key.</summary>
+    [Parameter] public string? ClipboardValue { get; set; }
+    /// <summary>Gets or sets rich value content instead of a plain value.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

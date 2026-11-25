@@ -3,11 +3,13 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Monica.Core.Results;
 using Monica.EventBus.Models;
+using Monica.EventBus.Abstractions;
 using Monica.Framework.UI.Localization;
 using Monica.Framework.UI.Pages;
 using Monica.Framework.UI.UIEventBus.Dialogs;
 using Monica.Framework.UI.UIEventBus.Models;
 using Monica.Framework.UI.UIEventBus.State;
+using Monica.Framework.UI.UIEventBus.Support;
 using Monica.UI.Icons;
 using MudBlazor;
 
@@ -39,7 +41,6 @@ public partial class EventBusWorkbench : IAsyncDisposable
     private readonly object _ownershipGate = new();
     private readonly HashSet<TaskCompletionSource> _admitted = [];
     private readonly HashSet<IDialogReference> _dialogs = [];
-    private readonly SubscriptionFilter _filter = new();
     private EventBusMonitorChangeFeed? _feed;
     private Task? _reader;
     private Task? _poll;
@@ -47,11 +48,6 @@ public partial class EventBusWorkbench : IAsyncDisposable
     private long _observation;
     private bool _retired;
     private bool _busy;
-    private bool _autoRefresh = true;
-    private bool _queryMissingProvider;
-    private string? _activeProviderId;
-    private bool _parametersSeen;
-    private (EventBusWorkbenchView View, string? Event, string? Topic, string? Provider) _lastParameters;
 
     /// <summary>Creates a component-local observation lifetime; DI services are borrowed and never disposed here.</summary>
     public EventBusWorkbench() => _token = _lifetime.Token;
@@ -63,15 +59,6 @@ public partial class EventBusWorkbench : IAsyncDisposable
         EventBusWorkbenchView.Changes => L["Pages:EventBusChanges:Title"].Value,
         EventBusWorkbenchView.TestTools => L["Pages:EventBusTestTools:Title"].Value,
         _ => L["Pages:EventBusMonitor:Title"].Value
-    };
-
-    private string Description => View switch
-    {
-        EventBusWorkbenchView.Providers => L["Workbench:ProvidersDescription"].Value,
-        EventBusWorkbenchView.Subscriptions => L["Workbench:SubscriptionsDescription"].Value,
-        EventBusWorkbenchView.Changes => L["Workbench:ChangesDescription"].Value,
-        EventBusWorkbenchView.TestTools => L["Workbench:TestToolsDescription"].Value,
-        _ => L["Workbench:OverviewDescription"].Value
     };
 
     private string SectionTitle(EventBusWorkbenchView section) => section switch
@@ -101,64 +88,235 @@ public partial class EventBusWorkbench : IAsyncDisposable
         _ => MoIcons.Network
     };
 
-    private List<SubscriptionViewModel> FilteredSubscriptions => _queryMissingProvider ? [] :
-        State.ApplyFilter(_filter).Where(row => (EventType == null || string.Equals(row.EventType, EventType, StringComparison.Ordinal))
-            && (Topic == null || string.Equals(row.TopicName, Topic, StringComparison.Ordinal))).ToList();
 
-    protected override Task OnInitializedAsync()
+    private EventBusWorkbenchSnapshot? _modelSnapshot;
+    private EventBusCaptureView? _model;
+    private EventBusCaptureView? _inspectionModel;
+    private SubscriptionChangeViewModel? _inspectionChange;
+    private (string Key, string Id)? _resolvedInspection;
+    private readonly Stack<string> _ancestorInspections = new();
+    private IDialogReference? _testReference;
+    private string? _seenTestId;
+
+    internal EventBusRouteQuery Query { get; private set; } = new("");
+    internal string CurrentRoute => Route(View);
+    internal bool Busy => _busy || _retired;
+    internal EventBusWorkbenchState CaptureState => State;
+    internal IReadOnlySet<string> RowListenerIds => TestService.GetActiveRuntimeListenerIds();
+    internal int ListenerCount => RowListenerIds.Count + (TestService.IsSubscribed ? 1 : 0);
+    internal bool IsEmpty => Model is { Snapshot: { Subscriptions.Count: 0, Providers.Count: 0, TopicStatuses.Count: 0 } };
+
+    internal EventBusCaptureView? Model
     {
-        return RunOwned(async () =>
+        get
         {
-            lock (_ownershipGate)
+            var snapshot = State.Snapshot;
+            if (!ReferenceEquals(snapshot, _modelSnapshot))
             {
-                if (_retired) return;
-                _observation = State.BeginObservation();
-                _feed = Monitor.OpenChangeFeed(_token);
-                _reader = ReadFeedAsync(_feed);
-                _poll = PollAsync();
+                _modelSnapshot = snapshot;
+                _model = snapshot is null ? null : new EventBusCaptureView(snapshot);
             }
-            await CaptureAsync();
-        });
+            return _model;
+        }
     }
+
+    internal (string Key, string Id)? Inspection
+    {
+        get
+        {
+            foreach (var key in new[] { "subId", "topicKey", "changeId" })
+                if (Query[key] is { Length: > 0 } id) return (key, id);
+            return View == EventBusWorkbenchView.Providers && Query["provider"] is { Length: > 0 } provider
+                ? ("provider", provider) : null;
+        }
+    }
+
+    internal EventBusCaptureView? InspectionModel => _inspectionModel;
+    internal EventBusTopicRow? SelectedTopic => Inspection is { Key: "topicKey" } route ? _inspectionModel?.Topic(route.Id) : null;
+    internal SubscriptionViewModel? SelectedSubscription => _inspectionChange?.Subscription ??
+        (Inspection is { Key: "subId" } route ? _inspectionModel?.Snapshot.Subscriptions.FirstOrDefault(row => row.SubscriptionId == route.Id) : null);
+    internal EventBusProviderInfo? SelectedProvider => Inspection is { Key: "provider" } route
+        ? _inspectionModel?.Snapshot.Providers.FirstOrDefault(provider => provider.UniqueId == route.Id) : null;
+    internal SubscriptionChangeViewModel? InspectionChange => _inspectionChange;
+    internal DateTimeOffset? InspectionTime => _inspectionChange is { } change
+        ? new DateTimeOffset(DateTime.SpecifyKind(change.Timestamp, DateTimeKind.Utc))
+        : _inspectionModel?.Snapshot.CapturedAt;
+    internal bool HasInspectionAncestor => _ancestorInspections.Count > 0 ||
+        Query["subId"] is not null && (Query["topicKey"] is not null || View == EventBusWorkbenchView.Providers && Query["provider"] is not null);
+
+    private (long? Count, string Role) NavigationCount(EventBusWorkbenchView view) => view switch
+    {
+        EventBusWorkbenchView.Overview when Model is { Attention: > 0 } model => (model.Attention, model.Failed > 0 ? "error" : "warning"),
+        EventBusWorkbenchView.Subscriptions when State.Snapshot is { } capture => (capture.Subscriptions.Count, "neutral"),
+        EventBusWorkbenchView.Changes when State.ObservedChanges.Count > 0 => (State.ObservedChanges.Count, State.DroppedChangeCount > 0 ? "warning" : "neutral"),
+        EventBusWorkbenchView.TestTools when ListenerCount > 0 => (ListenerCount, "info"),
+        _ => (null, "neutral")
+    };
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += LocationChanged;
+        ReadLocation(Navigation.Uri);
+    }
+
+    private Task StartObservationAsync() => RunOwned(async () =>
+    {
+        lock (_ownershipGate)
+        {
+            if (_retired) return;
+            _observation = State.BeginObservation();
+            _feed = Monitor.OpenChangeFeed(_token);
+            _reader = ReadFeedAsync(_feed);
+            _poll = PollAsync();
+        }
+        await CaptureAsync();
+        if (!_retired) StateHasChanged();
+    });
 
     protected override void OnParametersSet()
     {
-        var parameters = (View, EventType, Topic, ProviderId);
-        if (_parametersSeen && _lastParameters == parameters) return;
-        _parametersSeen = true;
-        _lastParameters = parameters;
-        _filter.Clear();
-        _queryMissingProvider = false;
-        _activeProviderId = ProviderId;
-        ReconcileProviderQuery();
+        if (ReadLocation(Navigation.Uri)) return;
+        var legacy = EventBusRouteQuery.To(CurrentRoute, ("event", EventType), ("topic", Topic), ("provider", ProviderId));
+        Query = new EventBusRouteQuery(Navigation.ToAbsoluteUri(legacy).Query);
     }
 
-    private void ReconcileProviderQuery()
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs arguments)
     {
-        if (_retired || State.Snapshot == null) return;
-        if (_activeProviderId == null) { _filter.SelectedProvider = null; _queryMissingProvider = false; return; }
-        _filter.SelectedProvider = State.Providers.FirstOrDefault(provider => string.Equals(provider.UniqueId, _activeProviderId, StringComparison.Ordinal));
-        _queryMissingProvider = _filter.SelectedProvider == null;
+        if (_retired) return;
+        _ = InvokeAsync(() =>
+        {
+            if (_retired || !ReadLocation(arguments.Location)) return;
+            StateHasChanged();
+        });
+    }
 
+    private bool ReadLocation(string location)
+    {
+        var uri = Navigation.ToAbsoluteUri(location);
+        if (!string.Equals(uri.AbsolutePath.TrimEnd('/'), CurrentRoute, StringComparison.OrdinalIgnoreCase)) return false;
+        Query = new EventBusRouteQuery(uri.Query);
+        if (Inspection is null) _ancestorInspections.Clear();
+        UpdateInspection();
+        if (Query["testId"] != _seenTestId && _testReference is { } dialog) CancelDialog(dialog);
+        return true;
+    }
+
+    private void UpdateInspection()
+    {
+        var selected = Inspection;
+        if (_resolvedInspection != selected)
+        {
+            _inspectionModel = null;
+            _inspectionChange = null;
+            _resolvedInspection = selected;
+        }
+        if (selected is not { } value || _inspectionModel is not null || _inspectionChange is not null) return;
+        if (value.Key == "changeId")
+            _inspectionChange = State.ObservedChanges.FirstOrDefault(change => change.ObservationId == value.Id);
+        else
+            _inspectionModel = Model;
     }
 
     private async Task CaptureAsync()
     {
         await State.RefreshAsync(_token);
-        if (!_retired) ReconcileProviderQuery();
+        if (!_retired) UpdateInspection();
     }
 
     private Task RefreshAsync() => State.IsRefreshing ? Task.CompletedTask : RunOwned(CaptureAsync);
-    private Task AutoRefreshChanged(bool value) { _autoRefresh = value; return value ? RefreshAsync() : Task.CompletedTask; }
-    private void FilterChanged() { }
-    private void ProviderSelectionChanged(string? id) { _activeProviderId = id; ReconcileProviderQuery(); }
-    private void ClearAllFilters()
+
+    private Task AutoRefreshChanged(bool value)
     {
-        _filter.Clear();
-        _activeProviderId = null;
-        _queryMissingProvider = false;
-        if (EventType != null || Topic != null || ProviderId != null) Navigation.NavigateTo(UIEventBusSubscriptionsPage.PAGE_URL);
+        State.AutoRefresh = value;
+        return value ? RefreshAsync() : Task.CompletedTask;
     }
+
+    internal void EditQuery(params (string Key, string? Value)[] edits) =>
+        Navigation.NavigateTo(Query.Link(CurrentRoute, edits), replace: true);
+
+    internal void OpenInspection(string key, string id, string? tab = null)
+    {
+        var selected = Inspection;
+        var edits = InspectionEdits();
+        if (selected is { } parent && parent != (key, id))
+        {
+            _ancestorInspections.Push(Navigation.Uri);
+            if (key == "subId" && parent.Key is "topicKey" or "provider") edits.Add(parent);
+        }
+        edits.Add((key, id));
+        if (tab is not null) edits.Add(("tab", tab));
+        Navigation.NavigateTo(Query.Link(CurrentRoute, edits.ToArray()));
+    }
+
+    internal void BackInspection()
+    {
+        if (_ancestorInspections.TryPop(out var url)) Navigation.NavigateTo(url, replace: true);
+        else if (Query["subId"] is not null) EditQuery(("subId", null), ("tab", null));
+    }
+
+    private void OnInspectionVisibilityChanged(bool visible)
+    {
+        if (visible) return;
+        _ancestorInspections.Clear();
+        EditQuery(InspectionEdits().ToArray());
+    }
+
+    private List<(string Key, string? Value)> InspectionEdits()
+    {
+        List<(string Key, string? Value)> edits = [("topicKey", null), ("subId", null), ("changeId", null), ("tab", null)];
+        if (View == EventBusWorkbenchView.Providers) edits.Add(("provider", null));
+        return edits;
+    }
+
+    internal string InspectionLink(string key, string id, string? tab = null)
+    {
+        var edits = InspectionEdits();
+        edits.Add((key, id));
+        if (tab is not null) edits.Add(("tab", tab));
+        return Query.Link(CurrentRoute, edits.ToArray());
+    }
+
+    internal void OpenTest(string id) => Navigation.NavigateTo(Query.Link(CurrentRoute, ("testId", id)));
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) return StartObservationAsync();
+
+        var id = Query["testId"];
+        if (_retired || id == _seenTestId || State.Snapshot is null) return Task.CompletedTask;
+        var row = State.Subscriptions.FirstOrDefault(item => item.SubscriptionId == id);
+        _seenTestId = id;
+        if (id is null) return Task.CompletedTask;
+        if (row is null)
+        {
+            Snackbar.Add(L["Precision:InspNotFoundBody"].Value, Severity.Warning);
+            return Task.CompletedTask;
+        }
+        return RunOwned(async () =>
+        {
+            await ShowOwnedAsync<SubscriptionTestDialog>(L["SubscriptionTestDialog:Title", row.EventTypeShortName].Value,
+                new DialogParameters
+                {
+                    [nameof(SubscriptionTestDialog.Subscription)] = EventBusWorkbenchState.CloneSubscription(row),
+                    [nameof(SubscriptionTestDialog.ProviderKind)] = row.TopicStatus?.Provider ??
+                        Model?.Provider(row.Scope, row.ServiceKey)?.ProviderType ?? EventBusProviderKind.Unknown
+                },
+                onOpened: reference => _testReference = reference);
+            _testReference = null;
+            if (!_retired && Query["testId"] == id)
+            {
+                EditQuery(("testId", null));
+                await CaptureAsync();
+            }
+        });
+    }
+
+    internal Task CopyAsync(string text) => RunOwned(async () =>
+    {
+        await JS.InvokeAsync<bool>("MoClipboard.copyText", _token, [text]);
+    });
+
+    internal void ListenerChanged() => StateHasChanged();
 
     private async Task ReadFeedAsync(EventBusMonitorChangeFeed feed)
     {
@@ -191,7 +349,7 @@ public partial class EventBusWorkbench : IAsyncDisposable
             {
                 await InvokeAsync(async () =>
                 {
-                    if (_retired || !_autoRefresh || State.IsRefreshing) return;
+                    if (_retired || !State.AutoRefresh || State.IsRefreshing) return;
                     await CaptureAsync();
                     if (!_retired) StateHasChanged();
                 });
@@ -201,70 +359,34 @@ public partial class EventBusWorkbench : IAsyncDisposable
         catch (Exception exception) { Logger.LogError(exception, "EventBus workbench refresh stopped unexpectedly"); }
     }
 
-    private Task InspectSubscriptionAsync(SubscriptionViewModel row, DateTimeOffset capturedAt) => RunOwned(() => InspectSubscriptionCoreAsync(row, capturedAt));
-    private async Task InspectSubscriptionCoreAsync(SubscriptionViewModel row, DateTimeOffset capturedAt)
-    {
-        await ShowOwnedAsync<SubscriptionDetailDialog>(L["SubscriptionDetail:Title"].Value, new DialogParameters
-        {
-            [nameof(SubscriptionDetailDialog.Subscription)] = EventBusWorkbenchState.CloneSubscription(row),
-            [nameof(SubscriptionDetailDialog.CapturedAt)] = capturedAt
-        });
-    }
-
-    private Task InspectChangeAsync(SubscriptionChangeViewModel change) => RunOwned(() =>
-        InspectSubscriptionCoreAsync(change.Subscription, new DateTimeOffset(DateTime.SpecifyKind(change.Timestamp, DateTimeKind.Utc))));
-
-    private Task InspectTopicAsync(TopicSubscriptionStatus topic, DateTimeOffset capturedAt) => RunOwned(async () =>
-    {
-        await ShowOwnedAsync<EventBusTopicDetailDialog>(L["Overview:TopicInspector"].Value, new DialogParameters
-        {
-            [nameof(EventBusTopicDetailDialog.Status)] = topic with { RecentErrors = topic.RecentErrors.ToArray() },
-            [nameof(EventBusTopicDetailDialog.CapturedAt)] = capturedAt
-        });
-    });
-
-    private Task InspectProviderAsync(EventBusProviderInfo provider, EventBusWorkbenchSnapshot capture) => RunOwned(async () =>
-    {
-        var scope = provider.IsDistributed ? EventSubscriptionScope.Distributed : EventSubscriptionScope.Local;
-        var rows = capture.Subscriptions.Where(row => row.Scope == scope && string.Equals(row.ServiceKey, provider.ServiceKey, StringComparison.Ordinal))
-            .Select(EventBusWorkbenchState.CloneSubscription).ToList();
-        await ShowOwnedAsync<EventBusProviderDetailDialog>(L.GetProviderDisplayName(provider), new DialogParameters
-        {
-            [nameof(EventBusProviderDetailDialog.Provider)] = provider,
-            [nameof(EventBusProviderDetailDialog.Subscriptions)] = rows,
-            [nameof(EventBusProviderDetailDialog.CapturedAt)] = capture.CapturedAt
-        });
-    });
-
-    private Task TestSubscriptionAsync(SubscriptionViewModel row) => RunOwned(async () =>
-    {
-        await ShowOwnedAsync<SubscriptionTestDialog>(L["SubscriptionTestDialog:Title", row.EventTypeShortName].Value,
-            new DialogParameters { [nameof(SubscriptionTestDialog.Subscription)] = EventBusWorkbenchState.CloneSubscription(row) });
-        if (!_retired) await CaptureAsync();
-    });
-
-    private Task ActivateAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
+    internal Task ActivateAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
     {
         var result = await Monitor.ActivateSubscriptionAsync(ParseId(row.SubscriptionId));
         Report(result, "Page:Messages:ActivateSucceeded");
     });
 
-    private Task DeactivateAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
+    internal Task DeactivateAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
     {
         var result = await Monitor.DeactivateSubscriptionAsync(ParseId(row.SubscriptionId));
         Report(result, "Page:Messages:DeactivateSucceeded");
     });
 
-    private Task StopListenerAsync(string id) => ExecuteCommandAsync(async () =>
+    internal Task StopListenerAsync(string id) => ExecuteCommandAsync(async () =>
     {
         var result = await TestService.StopRuntimeListenerAsync(ParseId(id));
         Report(result, "SubscriptionTestDialog:Messages:StopListeningSucceeded");
     });
 
-    private Task RemoveAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
+    internal Task RemoveAsync(SubscriptionViewModel row) => ExecuteCommandAsync(async () =>
     {
         var result = await ShowOwnedAsync<SubscriptionRemoveDialog>(L["Registry:RemoveTitle"].Value,
-            new DialogParameters { [nameof(SubscriptionRemoveDialog.Subscription)] = EventBusWorkbenchState.CloneSubscription(row) }, MaxWidth.Small);
+            new DialogParameters
+            {
+                [nameof(SubscriptionRemoveDialog.Subscription)] = EventBusWorkbenchState.CloneSubscription(row),
+                [nameof(SubscriptionRemoveDialog.ProviderKind)] = row.TopicStatus?.Provider ??
+                    Model?.Provider(row.Scope, row.ServiceKey)?.ProviderType ?? EventBusProviderKind.Unknown,
+                [nameof(SubscriptionRemoveDialog.HasListener)] = RowListenerIds.Contains(row.SubscriptionId)
+            });
         _token.ThrowIfCancellationRequested();
         if (result is not { Canceled: false, Data: true }) return;
         var id = ParseId(row.SubscriptionId);
@@ -300,15 +422,16 @@ public partial class EventBusWorkbench : IAsyncDisposable
 
     private static EventSubscriptionId ParseId(string id) => new(Guid.Parse(id));
 
-    private async Task<DialogResult?> ShowOwnedAsync<T>(string title, DialogParameters parameters, MaxWidth maxWidth = MaxWidth.Large) where T : IComponent
+    private async Task<DialogResult?> ShowOwnedAsync<T>(string title, DialogParameters parameters, Action<IDialogReference>? onOpened = null) where T : IComponent
     {
         _token.ThrowIfCancellationRequested();
-        var reference = await DialogService.ShowAsync<T>(title, parameters, new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, FullWidth = true, MaxWidth = maxWidth });
+        var reference = await DialogService.ShowAsync<T>(title, parameters, new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.False });
         lock (_ownershipGate)
         {
             if (_retired) { CancelDialog(reference); return null; }
             _dialogs.Add(reference);
         }
+        onOpened?.Invoke(reference);
         try { return await reference.Result; }
         finally { lock (_ownershipGate) { _dialogs.Remove(reference); } }
     }
@@ -353,6 +476,7 @@ public partial class EventBusWorkbench : IAsyncDisposable
 
     private async Task RetireAsync()
     {
+        Navigation.LocationChanged -= LocationChanged;
         State.EndObservation(_observation);
         _feed?.Dispose();
         _lifetime.Cancel();

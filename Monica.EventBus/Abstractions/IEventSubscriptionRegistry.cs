@@ -6,6 +6,10 @@ namespace Monica.EventBus.Abstractions;
 /// Manages all event subscriptions with queryable, observable capabilities.
 /// Serves as the single source of truth for subscription state.
 /// </summary>
+/// <remarks>
+/// The default registry dispatches change observers outside the caller's synchronization context.
+/// Observers that update a UI marshal that update to their own dispatcher.
+/// </remarks>
 public interface IEventSubscriptionRegistry : IObservable<EventSubscriptionChange>
 {
     #region EventSubscription CRUD

@@ -1,0 +1,25 @@
+@using Monica.UI.Shared.Components.Visual
+
+<div class="eb-decision">
+    <div class="eb-decision-val">
+        <p class="display-label"><span class="sw mo-vl-role--@Role" aria-hidden="true"></span>@Label</p>
+        <div class="display">@Value <small>@Population</small></div>
+        @if (Reasons is not null) { <div class="eb-reasons">@Reasons</div> }
+    </div>
+    @if (Finding is not null) { <p class="lede">@Finding</p> }
+</div>
+
+@code {
+    /// <summary>Gets or sets the localized decision label.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    /// <summary>Gets or sets the display value derived from the current evidence.</summary>
+    [Parameter] public long Value { get; set; }
+    /// <summary>Gets or sets the denominator or population descriptive text.</summary>
+    [Parameter, EditorRequired] public string Population { get; set; } = "";
+    /// <summary>Gets or sets the semantic color role of the signature mark.</summary>
+    [Parameter] public string Role { get; set; } = "primary";
+    /// <summary>Gets or sets the supporting reason counts.</summary>
+    [Parameter] public RenderFragment? Reasons { get; set; }
+    /// <summary>Gets or sets the finding and its links to evidence.</summary>
+    [Parameter] public RenderFragment? Finding { get; set; }
+}

@@ -1,3 +1,4 @@
+using Monica.EventBus.Abstractions;
 using Monica.EventBus.Models;
 using Monica.UI.Icons;
 using MudBlazor;
@@ -9,6 +10,9 @@ namespace Monica.Framework.UI.UIEventBus.Models;
 /// </summary>
 public class SubscriptionChangeViewModel
 {
+    internal string ObservationId { get; init; } = string.Empty;
+    internal EventBusProviderKind? ReportedProvider { get; init; }
+
     /// <summary>
     /// Change type
     /// </summary>

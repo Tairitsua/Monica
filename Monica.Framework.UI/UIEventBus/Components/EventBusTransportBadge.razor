@@ -1,0 +1,30 @@
+@using Monica.EventBus.Abstractions
+@using Monica.Framework.UI.UIEventBus.Support
+@inject IStringLocalizer<EventBusResource> L
+
+@{ var scope = Distributed ? "third" : "info"; }
+<span class="eb-tbadge mo-vl-role--@scope @(Large ? "is-md" : null)" title="@EventBusPresentation.KeyText(ServiceKey, L)">
+    <span class="eb-tbadge-kind"><MoIcon Class="i" Icon="@EventBusVisuals.ProviderIcon(Distributed)" Size="14px" />@L.GetProviderKindText(Kind)</span>
+    <span class="eb-tbadge-key @(ServiceKey is null ? "is-default" : string.IsNullOrWhiteSpace(ServiceKey) ? "is-special-key" : "is-named")">
+        @KeyLabel
+    </span>
+</span>
+
+@code {
+    private string KeyLabel => ServiceKey switch
+    {
+        null => L["Precision:Default"],
+        "" => L["Precision:CompactEmptyKey"],
+        _ when string.IsNullOrWhiteSpace(ServiceKey) => L["Precision:CompactWhitespaceKey", ServiceKey.Length],
+        _ => ServiceKey
+    };
+
+    /// <summary>Gets or sets the transport scope.</summary>
+    [Parameter] public bool Distributed { get; set; }
+    /// <summary>Gets or sets the exact service key, with null selecting the default provider.</summary>
+    [Parameter] public string? ServiceKey { get; set; }
+    /// <summary>Gets or sets the declared or reporting provider kind.</summary>
+    [Parameter] public EventBusProviderKind Kind { get; set; } = EventBusProviderKind.Unknown;
+    /// <summary>Gets or sets whether to use the directory row size.</summary>
+    [Parameter] public bool Large { get; set; }
+}

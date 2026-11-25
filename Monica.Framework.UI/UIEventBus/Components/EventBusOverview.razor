@@ -1,102 +1,241 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+@using Monica.EventBus.Abstractions
 @using Monica.EventBus.Models
-@using Monica.Framework.UI.UIEventBus.Models
-@using Monica.Framework.UI.UIEventBus.Support
 @using Monica.Framework.UI.Pages
+@using Monica.Framework.UI.UIEventBus.Support
+@using Monica.UI.Shared.Components.States
 @inject IStringLocalizer<EventBusResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 
-@if (Snapshot is { } capture)
-{
-    var stats = capture.Statistics;
-    <div class="eventbus-overview">
-        <div class="eventbus-overview-lead">
-            <section class="eventbus-registration">
-                <div class="eventbus-registration-top"><span class="eventbus-eyebrow">@L["Overview:RegistrationKicker"]</span><MoIcon Icon="@MoIcons.Network" Size="1.5rem" /></div>
-                <div class="eventbus-registration-headline"><strong>@stats.TotalSubscriptions</strong><div><h2>@L["Overview:RegisteredHandlers"]</h2><p>@L["Overview:RegistrationHelp"]</p></div></div>
-                <div class="eventbus-registration-distribution" aria-hidden="true">
-                    @foreach (var state in Enum.GetValues<EventSubscriptionState>())
-                    {
-                        var count = capture.Subscriptions.Count(row => row.State == state);
-                        if (count > 0) { <span data-state="@state" style="@($"flex-grow:{count}")"></span> }
-                    }
-                </div>
-                <div class="eventbus-registration-states">
-                    <div data-state="Active"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Active)</span><strong>@stats.ActiveSubscriptions</strong></div>
-                    <div data-state="Inactive"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Inactive)</span><strong>@stats.InactiveSubscriptions</strong></div>
-                    <div data-state="Pending"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Pending)</span><strong>@stats.PendingSubscriptions</strong></div>
-                    <div data-state="Disposed"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Disposed)</span><strong>@stats.DisposedSubscriptions</strong></div>
-                    <div data-state="Held"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Held)</span><strong>@stats.HeldSubscriptions</strong></div>
-                    <div data-state="Disabled"><span>@L.GetSubscriptionStateText(EventSubscriptionState.Disabled)</span><strong>@stats.DisabledSubscriptions</strong></div>
-                </div>
-                <div class="eventbus-registration-footer"><span>@L["Overview:DiscoveryCounts", stats.AutoDiscoveredCount, stats.ManualSubscriptionCount]</span><MudButton Href="@UIEventBusSubscriptionsPage.PAGE_URL" EndIcon="@MoIcons.ArrowRight">@L["Overview:ExploreRegistry"]</MudButton></div>
-            </section>
-            <section class="eventbus-runtime-summary">
-                <span class="eventbus-eyebrow">@L["Overview:RuntimeKicker"]</span>
-                <h2>@L["Overview:ReportedTopics", capture.TopicStatuses.Count]</h2>
-                <p>@L["Overview:RuntimeHelp"]</p>
-                <div class="eventbus-runtime-counts">
-                    <div><EventBusStatusBadge Tone="@(capture.TopicStatuses.Any(status => status.State == TopicSubscriptionRuntimeState.Failed) ? Color.Error : capture.TopicStatuses.Any(status => status.State == TopicSubscriptionRuntimeState.Recovering) ? Color.Warning : Color.Default)">@L["Overview:ReportedProblems"]</EventBusStatusBadge><strong>@stats.UnhealthyTopics</strong></div>
-                    <div><span>@L["Overview:ReportedCoverage"]</span><strong>@capture.Subscriptions.Count(row => row.Scope == EventSubscriptionScope.Distributed && row.TopicStatus != null)<small> / @stats.DistributedSubscriptions</small></strong></div>
-                    <div><span>@L["Overview:LocalHandlers"]</span><strong>@stats.LocalSubscriptions</strong></div>
-                </div>
-                <p class="eventbus-runtime-note">@L["Overview:CoverageHelp"]</p>
-                <MudButton Href="@UIEventBusProvidersPage.PAGE_URL" Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" EndIcon="@MoIcons.ArrowRight">@L["Overview:ExploreProviders", capture.Providers.Count]</MudButton>
-            </section>
+@{
+    var model = Workbench.Model!;
+    var subscriptions = model.Snapshot.Subscriptions;
+    var providers = model.Snapshot.Providers;
+    var failed = model.Topics.FirstOrDefault(topic => topic.Coverage == EventBusCoverage.Failed);
+    var recovering = model.Topics.FirstOrDefault(topic => topic.Coverage == EventBusCoverage.Recovering && !topic.IsOrphan);
+    var gap = model.Topics.FirstOrDefault(topic => topic.IsActiveGap);
+    var orphan = model.Topics.FirstOrDefault(topic => topic.IsOrphan);
+    var errorTopic = model.Topics.FirstOrDefault(topic => topic.Coverage == EventBusCoverage.HealthyErr);
+    var held = subscriptions.Count(row => row.State == EventSubscriptionState.Held);
+    var disabled = subscriptions.Count(row => row.State == EventSubscriptionState.Disabled);
+    var automatic = subscriptions.Count(row => row.IsAutoDiscovered);
+    var distProviders = providers.Count(provider => provider.IsDistributed);
+    var dist = Workbench.Query["dist"] == "topics" ? model.TopicKinds : model.EventKinds;
+    var peak = Math.Max(1, dist.FirstOrDefault()?.Count ?? 1);
+    var filter = Workbench.Query["coverage"] ?? "all";
+    var search = Workbench.Query["q"] ?? "";
+    var rows = model.Topics.Where(topic => MatchesCoverage(topic, filter) && MatchesSearch(topic, search)).ToArray();
+}
+<section class="eb-sig">
+    <EventBusDecision Label="@L["Precision:OvLabel"]" Value="@model.Attention"
+                      Population="@L[model.Attention == 0 ? "Precision:OvCalmUnit" : "Precision:OvUnit", model.Topics.Count]"
+                      Role="@(model.Failed > 0 ? "error" : model.Attention > 0 ? "warning" : "success")">
+        <Reasons>
+            <EventBusReason Role="error" Count="@model.Failed">@L["Precision:OvReasonFailed"]</EventBusReason>
+            <EventBusReason Role="warning" Count="@model.Topics.Count(topic => topic.Coverage == EventBusCoverage.Recovering && !topic.IsOrphan)">@L["Precision:OvReasonRecovering"]</EventBusReason>
+            <EventBusReason Hatched="true" Count="@model.ActiveGaps">@L["Precision:OvReasonUnreported"]</EventBusReason>
+            <EventBusReason Role="warning" Diamond="true" Count="@model.Orphans">@L["Precision:OvReasonOrphan"]</EventBusReason>
+        </Reasons>
+        <Finding>
+            @if (model.Attention == 0)
+            {
+                @L["Precision:OvNoAttention", model.Reported, model.Topics.Count]
+            }
+            @if (failed is not null)
+            {
+                <span class="vmark mo-vl-role--error">@L[model.Failed == 1 ? "Precision:OvFailedOne" : "Precision:OvFailedFinding", model.Failed]</span>@(" ")
+                <a href="@Workbench.InspectionLink("topicKey", failed.Id)" class="vmark is-link mo-vl-role--error">@failed.Topic</a>@(" ")
+                <span>@L["Precision:OvFailedDetail", failed.Active, failed.Status?.ConsecutiveFailures ?? 0]</span>@(" ")
+            }
+            @if (recovering is not null)
+            {
+                <span class="vmark mo-vl-role--warning">@L["Precision:OvRecoveringFinding"]</span>@(" ")
+                <a href="@Workbench.InspectionLink("topicKey", recovering.Id)" class="vmark is-link mo-vl-role--warning">@recovering.Topic</a>@(" ")
+                <span>@L["Precision:OvRecoveringDetail", recovering.Status?.ConsecutiveFailures ?? 0]</span>@(" ")
+            }
+            @if (gap is not null)
+            {
+                <span class="vmark mo-vl-role--warning">@L[model.ActiveGaps == 1 ? "Precision:OvGapOne" : "Precision:OvGapFinding", model.ActiveGaps]</span>@(" ")
+                <a href="@Workbench.InspectionLink("topicKey", gap.Id)" class="vmark is-link mo-vl-role--neutral">@gap.Topic</a>@(". ")
+            }
+            @if (orphan is not null)
+            {
+                <span class="vmark mo-vl-role--warning">@L[model.Orphans == 1 ? "Precision:OvOrphanOne" : "Precision:OvOrphanFinding", model.Orphans]</span>@(" ")
+                <a href="@Workbench.InspectionLink("topicKey", orphan.Id)" class="vmark is-link mo-vl-role--warning">@orphan.Topic</a>@(". ")
+            }
+            @if (errorTopic is not null)
+            {
+                <span>@L["Precision:OvErrorFinding", model.RetainedErrors]</span>@(" ")
+                <a href="@Workbench.InspectionLink("topicKey", errorTopic.Id)" class="vmark is-link mo-vl-role--warning">@errorTopic.Topic</a>@(" ")
+                <span>@L["Precision:OvErrorDetail", errorTopic.Status?.MessageErrorCount ?? 0]</span>
+            }
+        </Finding>
+    </EventBusDecision>
+    <div class="eb-facts-band">
+        <dl class="facts" aria-label="@L["Precision:OvLabel"]">
+            <div class="fact"><dt><span class="sw mo-vl-role--primary"></span>@L["Precision:OvFactHandlers"]</dt><dd>@subscriptions.Count</dd><span class="fact-sub">@L["Precision:OvFactHandlersSub", automatic, subscriptions.Count - automatic]</span></div>
+            <div class="fact"><dt><span class="sw mo-vl-role--success"></span>@L["Precision:OvFactActive"]</dt><dd>@model.Active <small>/ @subscriptions.Count</small></dd><span class="fact-sub">@L["Precision:OvFactActiveSub", held, disabled]</span></div>
+            <div class="fact"><dt><span class="sw @(model.ActiveGaps > 0 ? "mo-vl-role--warning" : "mo-vl-role--third") @(model.Reported == 0 ? "is-hatch" : null)"></span>@L["Precision:OvFactCoverage"]</dt><dd>@model.Reported <small>/ @model.Topics.Count</small></dd><span class="fact-sub">@L["Precision:OvFactCoverageSub", model.Reported, model.Topics.Count]</span></div>
+            <div class="fact"><dt><span class="sw mo-vl-role--info"></span>@L["Precision:OvFactProviders"]</dt><dd>@providers.Count</dd><span class="fact-sub">@L["Precision:OvFactProvidersSub", distProviders, providers.Count - distProviders]</span></div>
+        </dl>
+    </div>
+    <EventBusCirculationMatrix />
+</section>
+
+<section class="surface eb-topic-surface">
+    <EventBusSurfaceHeading Icon="@MoIcons.Radio" Role="@(failed is not null ? "error" : recovering is not null ? "warning" : "third")"
+                            Title="@L["Precision:TopicLedgerTitle"]" Description="@L["Precision:TopicLedgerSub"]" Count="@($"{rows.Length} / {model.Topics.Count}")" />
+    <div class="eb-toolbar">
+        <div class="fchips" role="group" aria-label="@L["Precision:TopicLedgerTitle"]">
+            @foreach (var (id, label, tone) in TopicFilters)
+            {
+                <button type="button" class="fchip mo-vl-role--@tone" aria-pressed="@(filter == id ? "true" : "false")"
+                        @onclick='() => Workbench.EditQuery(("coverage", id == "all" ? null : id))'>
+                    @label <span class="n">@model.Topics.Count(topic => MatchesCoverage(topic, id))</span>
+                </button>
+            }
         </div>
-        <section class="eventbus-topic-ledger">
-            <header class="eventbus-section-heading"><div><span class="eventbus-eyebrow">@L["Overview:TransportEvidence"]</span><h2>@L["Overview:TopicLedger"]</h2><p>@L["Overview:TopicLedgerHelp"]</p></div><span class="eventbus-section-count">@L["Overview:TopicCount", capture.TopicStatuses.Count]</span></header>
-            <div class="eventbus-clipped-table">
-                <MudTable T="TopicSubscriptionStatus" Items="capture.TopicStatuses.OrderByDescending(status => status.State is TopicSubscriptionRuntimeState.Failed or TopicSubscriptionRuntimeState.Recovering).ThenBy(status => status.TopicName, StringComparer.Ordinal)" Square="true" Elevation="0" Breakpoint="Breakpoint.Xs" Hover="true" RowsPerPage="10">
-                    <HeaderContent><MudTh>@L["SubscriptionTable:Columns:TopicName"]</MudTh><MudTh>@L["SubscriptionFilter:Provider"]</MudTh><MudTh>@L["Registry:ReportedRuntime"]</MudTh><MudTh>@L["Overview:MatchedHandlers"]</MudTh><MudTh>@L["Overview:StateChanged"]</MudTh><MudTh>@L["SubscriptionTable:Columns:Actions"]</MudTh></HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="@L["SubscriptionTable:Columns:TopicName"]"><div class="eventbus-cell"><code class="eventbus-topic-name">@context.TopicName</code>@if (context.State is TopicSubscriptionRuntimeState.Failed or TopicSubscriptionRuntimeState.Recovering) { <p class="eventbus-topic-error">@context.LastErrorMessage</p> }</div></MudTd>
-                        <MudTd DataLabel="@L["SubscriptionFilter:Provider"]"><div class="eventbus-cell"><code>@EventBusPresentation.KeyText(context.ServiceKey, L)</code><span class="eventbus-muted">@L.GetProviderKindText(context.Provider)</span></div></MudTd>
-                        <MudTd DataLabel="@L["Registry:ReportedRuntime"]"><div class="eventbus-cell"><EventBusStatusBadge Tone="@EventBusPresentation.RuntimeColor(context.State)">@L.GetTopicRuntimeStateText(context.State)</EventBusStatusBadge></div></MudTd>
-                        <MudTd DataLabel="@L["Overview:MatchedHandlers"]"><div class="eventbus-cell">@capture.Subscriptions.Count(row => row.Scope == EventSubscriptionScope.Distributed && row.ServiceKey == context.ServiceKey && row.TopicName == context.TopicName)</div></MudTd>
-                        <MudTd DataLabel="@L["Overview:StateChanged"]"><div class="eventbus-cell"><time>@UiTime.Format(context.StateChangedAt)</time></div></MudTd>
-                        <MudTd DataLabel="@L["SubscriptionTable:Columns:Actions"]"><div class="eventbus-cell"><MudIconButton Icon="@MoIcons.ExternalLink" Size="Size.Small" Color="Color.Primary" aria-label="@L["Overview:InspectTopic", context.TopicName]" title="@L["Overview:TopicInspector"]" OnClick="() => OnTopicClick.InvokeAsync(context)" /></div></MudTd>
-                    </RowTemplate>
-                    <NoRecordsContent><div class="eventbus-empty">@L["Overview:NoReportedTopics"]</div></NoRecordsContent>
-                    <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@(new[] { 10, 20, 50 })" /></PagerContent>
-                </MudTable>
-            </div>
-        </section>
-        <div class="eventbus-route-groups">
-            <section>
-                <header class="eventbus-section-heading"><div><span class="eventbus-eyebrow">@L["Overview:RegistrationMap"]</span><h2>@L["Overview:EventTypes"]</h2><p>@L["Overview:EventTypesHelp"]</p></div><strong class="eventbus-section-count">@_eventTypes.Count</strong></header>
-                <div class="eventbus-clipped-table">
-                    <MudTable T="EventTypeCount" Items="_eventTypes" Square="true" Elevation="0" RowsPerPage="5" Breakpoint="Breakpoint.None" Hover="true">
-                        <HeaderContent><MudTh>@L["SubscriptionTable:Columns:EventType"]</MudTh><MudTh>@L["Overview:Handlers"]</MudTh></HeaderContent>
-                        <RowTemplate><MudTd><div class="eventbus-cell"><MudButton Href="@RegistryLink("event", context.EventType)" Class="eventbus-group-link" title="@context.EventType">@context.EventTypeShortName</MudButton><code class="eventbus-muted">@context.EventType</code></div></MudTd><MudTd><div class="eventbus-cell"><strong>@context.Count</strong></div></MudTd></RowTemplate>
-                        <NoRecordsContent><div class="eventbus-empty">@L["Overview:NoRegistrations"]</div></NoRecordsContent>
-                        <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@(new[] { 5, 10, 20 })" /></PagerContent>
-                    </MudTable>
+        <div class="eb-toolbar-end"><label class="eb-search"><MoIcon Class="i" Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" value="@search" placeholder="@L["Precision:TopicSearchPh"]" aria-label="@L["Precision:TopicSearchPh"]"
+                   @oninput='args => Workbench.EditQuery(("q", EmptyToNull(args.Value?.ToString())))' />
+        </label></div>
+    </div>
+    <div class="eb-tl" role="table" aria-label="@L["Precision:TopicLedgerTitle"]">
+        <div class="eb-tl-head" role="row">
+            <span role="columnheader">@L["Precision:ColTopic"]</span>
+            <span role="columnheader">@L["Precision:ColProvider"]</span>
+            <span role="columnheader">@L["Precision:ColRuntime"]</span>
+            <span class="is-num" role="columnheader">@L["Precision:ColHandlers"]</span>
+            <span class="is-num" role="columnheader">@L["Precision:ColProcessed"]</span>
+            <span role="columnheader">@L["Precision:ColStateSince"]</span>
+            <span class="eb-col-act" role="columnheader">@L["Precision:ColActions"]</span>
+        </div>
+        @if (rows.Length == 0)
+        {
+            <MoContentState Compact="true"><p>@L[model.Topics.Count == 0 ? "Precision:NoReportedTopics" : "Precision:NoTopicsMatch"]</p></MoContentState>
+        }
+        @foreach (var row in rows)
+        {
+            var status = row.Status;
+            var href = Workbench.InspectionLink("topicKey", row.Id);
+            var inspectLabel = L["Registry:Inspect", row.Topic];
+            var rowTone = row.Coverage switch
+            {
+                EventBusCoverage.Failed => "is-fault",
+                EventBusCoverage.Recovering => "is-warn",
+                _ => ""
+            };
+            <article class="eb-tl-item @rowTone" role="row" @key="row.Id">
+                <div class="eb-tl-main">
+                    <div role="cell" class="eb-tl-cell eb-tl-topic" data-label="@L["Precision:ColTopic"]">
+                        <a class="eb-link-btn mono eb-break" href="@href">@row.Topic</a>
+                        @if (row.IsOrphan) { <span class="mo-vl-chip mo-vl-role--warning">@L["Precision:OrphanBadge"]</span> }
+                        @if (status is { State: TopicSubscriptionRuntimeState.Healthy, ProcessedMessages: 0 })
+                        {
+                            <span class="eb-idle-tag">@L["Precision:IdleBadge"]</span>
+                        }
+                    </div>
+                    <div role="cell" class="eb-tl-cell" data-label="@L["Precision:ColProvider"]">
+                        <EventBusTransportBadge Distributed="true" ServiceKey="@row.ServiceKey" Kind="@(status?.Provider ?? row.Provider?.ProviderType ?? EventBusProviderKind.Unknown)" />
+                    </div>
+                    <div role="cell" class="eb-tl-cell" data-label="@L["Precision:ColRuntime"]"><EventBusRuntimeBadge Status="@status" /></div>
+                    <div role="cell" class="eb-tl-cell is-num" data-label="@L["Precision:ColHandlers"]"><span class="mono"><b>@row.Active</b> <span class="eb-dim">/ @row.Handlers.Count</span></span></div>
+                    <div role="cell" class="eb-tl-cell is-num" data-label="@L["Precision:ColProcessed"]">
+                        @if (status is not null)
+                        {
+                            <div class="eb-cell-stack is-end">
+                                <span class="mono">@status.ProcessedMessages.ToString("N0") @if (status.MessageErrorCount > 0) { <b class="eb-ink-warn">· @status.MessageErrorCount</b> }</span>
+                                <span class="eb-row-sub">@(status.LastMessageReceivedAt is { } received ? L.FormatEventBusRelativeTime(received, UiTime) : L["Precision:InspNoTimestamp"].Value)</span>
+                            </div>
+                        }
+                        else { <span class="eb-dim">—</span> }
+                    </div>
+                    <div role="cell" class="eb-tl-cell" data-label="@L["Precision:ColStateSince"]">
+                        @if (status is not null) { <time class="mono eb-ts" datetime="@EventBusVisuals.TimeTag(status.StateChangedAt)">@UiTime.Format(status.StateChangedAt)</time> }
+                        else { <span class="eb-dim">—</span> }
+                    </div>
+                    <div role="cell" class="eb-tl-cell eb-col-act" data-label="@L["Precision:ColActions"]">
+                        <a class="icon-btn" href="@href" aria-label="@inspectLabel" title="@inspectLabel"><MoIcon Icon="@MoIcons.ChevronRight" Size="16px" /></a>
+                    </div>
                 </div>
-            </section>
-            <section>
-                <header class="eventbus-section-heading"><div><span class="eventbus-eyebrow">@L["Overview:RegistrationMap"]</span><h2>@L["Overview:Topics"]</h2><p>@L["Overview:TopicsHelp"]</p></div><strong class="eventbus-section-count">@_topics.Count</strong></header>
-                <div class="eventbus-clipped-table">
-                    <MudTable T="TopicCount" Items="_topics" Square="true" Elevation="0" RowsPerPage="5" Breakpoint="Breakpoint.None" Hover="true">
-                        <HeaderContent><MudTh>@L["SubscriptionTable:Columns:TopicName"]</MudTh><MudTh>@L["Overview:Handlers"]</MudTh></HeaderContent>
-                        <RowTemplate><MudTd><div class="eventbus-cell"><MudButton Href="@RegistryLink("topic", context.TopicName)" Class="eventbus-group-link">@context.TopicName</MudButton></div></MudTd><MudTd><div class="eventbus-cell"><strong>@context.Count</strong></div></MudTd></RowTemplate>
-                        <NoRecordsContent><div class="eventbus-empty">@L["Overview:NoRegistrations"]</div></NoRecordsContent>
-                        <PagerContent><MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" PageSizeOptions="@(new[] { 5, 10, 20 })" /></PagerContent>
-                    </MudTable>
-                </div>
-            </section>
+                @if (status?.LastErrorMessage is { Length: > 0 } error)
+                {
+                    <div class="eb-tl-diag mo-vl-role--@(row.Coverage == EventBusCoverage.Failed ? "error" : "warning")" role="cell" aria-colspan="7"><MoIcon Class="i" Icon="@(row.Coverage == EventBusCoverage.Failed ? MoIcons.Error : MoIcons.Warning)" Size="14px" /><span>@error</span></div>
+                }
+                else if (status is null)
+                {
+                    <div class="eb-tl-diag mo-vl-role--neutral" role="cell" aria-colspan="7"><MoIcon Class="i" Icon="@MoIcons.RadioOff" Size="14px" /><span>@L["Precision:MxUnreportedNote"]</span></div>
+                }
+            </article>
+        }
+    </div>
+    <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:TopicLedgerFoot"]</footer>
+</section>
+
+<section class="surface eb-dist-surface">
+    <EventBusSurfaceHeading Icon="@MoIcons.ChartColumn" Title="@L["Precision:DistTitle"]" Description="@L["Precision:DistSub"]" />
+    <div class="eb-dist-controls">
+        <div class="eb-seg" role="group" aria-label="@L["Precision:DistTitle"]">
+            <button type="button" aria-pressed="@(ReferenceEquals(dist, model.EventKinds) ? "true" : "false")" @onclick='() => Workbench.EditQuery(("dist", null))'>
+                <span>@L["Precision:DistTabEvents"]</span><span class="eb-seg-n mono">@model.EventKinds.Count</span>
+            </button>
+            <button type="button" aria-pressed="@(ReferenceEquals(dist, model.TopicKinds) ? "true" : "false")" @onclick='() => Workbench.EditQuery(("dist", "topics"))'>
+                <span>@L["Precision:DistTabTopics"]</span><span class="eb-seg-n mono">@model.TopicKinds.Count</span>
+            </button>
         </div>
     </div>
-}
+    <div class="eb-dist-grid">
+        @for (var index = 0; index < Math.Min(10, dist.Count); index++)
+        {
+            var row = dist[index];
+            <a class="eb-dist-row" href="@SubscriptionDistributionLink(ReferenceEquals(dist, model.EventKinds), row.Key)">
+                <span class="eb-dist-rank mono">@((index + 1).ToString("D2"))</span>
+                <div class="eb-dist-name"><b class="eb-break">@row.Title</b>@if (row.Title != row.Key) { <code class="eb-break">@row.Key</code> }</div>
+                <div class="eb-dist-meter"><div class="meter" aria-hidden="true">
+                    <span class="mo-vl-role--success" style="@Width(row.Active - row.Risk, peak)"></span>
+                    @if (row.Risk > 0) { <span class="mo-vl-role--error" style="@Width(row.Risk, peak)"></span> }
+                    @if (row.Count > row.Active) { <span class="mo-vl-role--neutral is-light" style="@Width(row.Count - row.Active, peak)"></span> }
+                </div></div>
+                <span class="eb-dist-total mono">@row.Count</span><MoIcon Class="i" Icon="@MoIcons.ChevronRight" Size="14px" />
+            </a>
+        }
+    </div>
+    <div class="eb-dist-foot">
+        <div class="eb-mx-legend"><span><span class="sw mo-vl-role--success"></span>@L["Precision:DistActive"]</span><span><span class="sw mo-vl-role--error"></span>@L["Precision:DistRisk"]</span><span><span class="sw mo-vl-role--neutral"></span>@L["Precision:DistOther"]</span></div>
+        <a class="btn btn-sm btn-outline" href="@UIEventBusSubscriptionsPage.PAGE_URL">@L["Precision:DistExplore", subscriptions.Count]<MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></a>
+    </div>
+</section>
 
 @code {
-    [Parameter] public EventBusWorkbenchSnapshot? Snapshot { get; set; }
-    [Parameter] public EventCallback<TopicSubscriptionStatus> OnTopicClick { get; set; }
-    private List<EventTypeCount> _eventTypes = [];
-    private List<TopicCount> _topics = [];
-    protected override void OnParametersSet()
+    /// <summary>Gets the owning workbench and its current capture.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+
+    private (string Id, string Label, string Role)[] TopicFilters =>
+    [
+        ("all", L["Precision:TopicFilterAll"], "primary"),
+        ("problems", L["Precision:TopicFilterProblems"], "error"),
+        ("errors", L["Precision:TopicFilterErrors"], "warning"),
+        ("unreported", L["Precision:TopicFilterUnreported"], "neutral"),
+        ("orphans", L["Precision:TopicFilterOrphans"], "warning")
+    ];
+
+    private static bool MatchesCoverage(EventBusTopicRow row, string category) => category switch
     {
-        _eventTypes = (Snapshot?.Subscriptions ?? []).GroupBy(row => row.EventType, StringComparer.Ordinal).OrderByDescending(group => group.Count()).ThenBy(group => group.Key, StringComparer.Ordinal).Select(group => new EventTypeCount { EventType = group.Key, EventTypeShortName = group.First().EventTypeShortName, Count = group.Count() }).ToList();
-        _topics = (Snapshot?.Subscriptions ?? []).GroupBy(row => row.TopicName, StringComparer.Ordinal).OrderByDescending(group => group.Count()).ThenBy(group => group.Key, StringComparer.Ordinal).Select(group => new TopicCount { TopicName = group.Key, Count = group.Count() }).ToList();
+        "problems" => row.Coverage is EventBusCoverage.Failed or EventBusCoverage.Recovering,
+        "errors" => row.Status is { MessageErrorCount: > 0 } or { RecentErrors.Count: > 0 },
+        "unreported" => row.Status is null,
+        "orphans" => row.IsOrphan,
+        _ => true
+    };
+
+    private static bool MatchesSearch(EventBusTopicRow row, string input)
+    {
+        var search = input.Trim();
+        return search.Length == 0 || new[] { row.Topic, row.ServiceKey, row.Status?.LastErrorMessage,
+            (row.Status?.Provider ?? row.Provider?.ProviderType)?.ToString() }.Any(value => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true);
     }
-    private static string RegistryLink(string key, string value) => $"{UIEventBusSubscriptionsPage.PAGE_URL}?{key}={Uri.EscapeDataString(value)}";
+
+    private static string? EmptyToNull(string? value) => value is { Length: > 0 } ? value : null;
+    private static string Width(int numerator, int total) => FormattableString.Invariant($"width:{100d * numerator / total:0.##}%");
+    private static string SubscriptionDistributionLink(bool events, string key) =>
+        EventBusRouteQuery.To(UIEventBusSubscriptionsPage.PAGE_URL, (events ? "event" : "topic", key));
 }

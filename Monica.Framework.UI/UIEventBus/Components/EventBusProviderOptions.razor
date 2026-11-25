@@ -1,0 +1,99 @@
+@using Monica.Core.Modularity.Diagnostics.Facades
+@using Monica.Core.Modularity.Diagnostics.Models
+@using Monica.Core.Results
+@using Monica.Framework.UI.UIEventBus.Models
+@using Monica.Framework.UI.UIEventBus.Support
+@using Monica.UI.Shell.Support
+@using Monica.UI.Shared.Components.States
+@using Monica.UI.UIModuleSystem.Components
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.Extensions.Logging
+@implements IAsyncDisposable
+@inject IServiceProvider Services
+@inject OperationalPageAccessEvaluator Access
+@inject IStringLocalizer<EventBusResource> L
+@inject ILogger<EventBusProviderOptions> Logger
+
+@if (!Provider.HasOptionDiagnostics)
+{
+    <div class="callout mo-vl-role--neutral"><span class="tile"><MoIcon Icon="@MoIcons.Settings" Size="16px" /></span><p>@L["Providers:Detail:Options:NoDedicatedConfiguration"]</p></div>
+}
+else if (_denied)
+{
+    <div class="callout mo-vl-role--warning" role="alert"><span class="tile"><MoIcon Icon="@MoIcons.Lock" Size="16px" /></span><p>@L["Providers:Detail:Options:AccessDenied"]</p></div>
+}
+else if (_failed)
+{
+    <div class="callout mo-vl-role--error" role="alert"><span class="tile"><MoIcon Icon="@MoIcons.Error" Size="16px" /></span><p>@L["Providers:Detail:Options:LoadFailed"]</p></div>
+}
+else if (_options is { } options)
+{
+    @if (options.ProfileResolution == ModuleOptionProfileResolution.DefaultFallback)
+    {
+        <div class="callout mo-vl-role--info"><span class="tile"><MoIcon Icon="@MoIcons.Info" Size="16px" /></span>
+            <p>@L["Precision:PvDefaultFallback", EventBusPresentation.KeyText(Provider.ServiceKey, L)]</p>
+        </div>
+    }
+    <ModuleOptionDiagnosticsPanel Diagnostics="@options" />
+}
+else
+{
+    <MoContentState Compact="true" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Small" /><p>@L["ProviderInspector:LoadingOptions"]</p></MoContentState>
+}
+@if (Provider.HasOptionDiagnostics && !_denied)
+{
+    <button class="btn btn-outline btn-sm" type="button" disabled="@(_load is { IsCompleted: false })" @onclick="ReadAsync">
+        <MoIcon Icon="@MoIcons.Refresh" Size="14px" />@L["Precision:PvReloadOptions"]
+    </button>
+}
+
+@code {
+    /// <summary>Gets or sets the frozen provider registration whose options are read after authorization.</summary>
+    [Parameter, EditorRequired] public EventBusProviderInfo Provider { get; set; } = null!;
+
+    private bool _denied;
+    private bool _failed;
+    private bool _retired;
+    private Task? _load;
+    private ModuleOptionDiagnostics? _options;
+
+    protected override Task OnInitializedAsync() => ReadAsync();
+
+    private Task ReadAsync()
+    {
+        if (_retired || _load is { IsCompleted: false } || Provider.OptionDiagnosticsTarget is not { } target)
+            return Task.CompletedTask;
+        _options = null;
+        _failed = false;
+        _denied = false;
+        return _load = LoadAsync(target);
+    }
+
+    private async Task LoadAsync(ModuleOptionDiagnosticsTarget target)
+    {
+        try
+        {
+            var allowed = await Access.IsAuthorizedAsync();
+            if (_retired) return;
+            if (!allowed) { _denied = true; return; }
+            if (Services.GetService<ModuleDiagnosticsFacade>() is not { } facade) { _failed = true; return; }
+            var result = facade.GetModuleOptions(target.ModuleKey, target.ProfileSelector);
+            var diagnostics = result.Data;
+            _failed = result.IsFailure() || diagnostics is null;
+            if (!_failed) _options = diagnostics;
+        }
+        catch (Exception error)
+        {
+            Logger.LogError(error, "Loading provider option diagnostics failed for {ProviderIdentity}", Provider.UniqueId);
+            if (!_retired) _failed = true;
+        }
+    }
+
+    /// <summary>Prevents late authorization results from publishing option values after the tab closes.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        _options = null;
+        if (_load is not null) await _load;
+    }
+}

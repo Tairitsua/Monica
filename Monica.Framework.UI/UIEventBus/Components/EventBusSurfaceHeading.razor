@@ -1,0 +1,18 @@
+<header class="surface-head">
+    <span class="tile mo-vl-role--@Role"><MoIcon Class="i" Icon="@Icon" Size="18px" /></span>
+    <div><h2>@Title</h2>@if (Description is not null) { <p>@Description</p> }</div>
+    @if (Count is not null) { <span class="count aside">@Count</span> }
+</header>
+
+@code {
+    /// <summary>Gets or sets the heading icon.</summary>
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    /// <summary>Gets or sets the localized section title.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    /// <summary>Gets or sets the supporting localized evidence description.</summary>
+    [Parameter] public string? Description { get; set; }
+    /// <summary>Gets or sets the section's localized or formatted count.</summary>
+    [Parameter] public string? Count { get; set; }
+    /// <summary>Gets or sets the section's semantic role.</summary>
+    [Parameter] public string Role { get; set; } = "primary";
+}
