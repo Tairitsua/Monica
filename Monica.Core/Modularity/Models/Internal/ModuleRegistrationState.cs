@@ -196,7 +196,7 @@ internal sealed class ModuleRegistrationState
 
     internal void AddKeyedServiceKey(string serviceKey)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
+        ArgumentNullException.ThrowIfNull(serviceKey);
         EnsureNotFinalized();
         _keyedServiceKeys.Add(serviceKey);
     }

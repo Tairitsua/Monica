@@ -43,10 +43,12 @@ public sealed record ModuleOptionProfileSelector
     /// Creates a selector that uses the requested named profile when present and otherwise projects default options.
     /// This is intended for keyed services that may alias a module's shared default provider.
     /// </summary>
-    /// <param name="profileName">The exact case-sensitive profile name.</param>
+    /// <param name="profileName">
+    /// An exact non-null profile name or service key. Empty and whitespace keys preserve their identity and resolve to the default options.
+    /// </param>
     public static ModuleOptionProfileSelector NamedOrDefault(string profileName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        ArgumentNullException.ThrowIfNull(profileName);
         return new ModuleOptionProfileSelector(ModuleOptionProfileSelectionMode.NamedOrDefault, profileName);
     }
 }

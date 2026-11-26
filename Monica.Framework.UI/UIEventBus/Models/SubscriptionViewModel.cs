@@ -160,7 +160,7 @@ public class SubscriptionViewModel
         TopicSubscriptionRuntimeState.Healthy => Color.Success,
         TopicSubscriptionRuntimeState.Subscribing => Color.Info,
         TopicSubscriptionRuntimeState.Recovering => Color.Warning,
-        TopicSubscriptionRuntimeState.Failed or TopicSubscriptionRuntimeState.Stopped => Color.Error,
+        TopicSubscriptionRuntimeState.Failed => Color.Error,
         _ => Color.Default
     };
 

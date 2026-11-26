@@ -107,7 +107,7 @@ public class EventSubscriptionRegistry(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 EnqueueNotification(EventSubscriptionChangeType.Added, subscription);
-                DrainNotifications();
+                await DispatchNotificationsAsync().ConfigureAwait(false);
                 return subscription;
             }
             // Creation and activation form one committed mutation. Notifications are queued while
@@ -120,7 +120,7 @@ public class EventSubscriptionRegistry(
                         EnqueueNotification(EventSubscriptionChangeType.Activated, committed);
                 },
                 cancellationToken, creating: true).ConfigureAwait(false);
-            DrainNotifications();
+            await DispatchNotificationsAsync().ConfigureAwait(false);
             return subscription;
         }
         catch (Exception activationError)
@@ -318,7 +318,7 @@ public class EventSubscriptionRegistry(
         await subscription.ActivateAsync(
             committed => EnqueueNotification(EventSubscriptionChangeType.Activated, committed),
             cancellationToken).ConfigureAwait(false);
-        DrainNotifications();
+        await DispatchNotificationsAsync().ConfigureAwait(false);
     }
 
     public async Task DeactivateAsync(
@@ -336,7 +336,7 @@ public class EventSubscriptionRegistry(
         await subscription.DeactivateAsync(
             committed => EnqueueNotification(EventSubscriptionChangeType.Deactivated, committed),
             cancellationToken).ConfigureAwait(false);
-        DrainNotifications();
+        await DispatchNotificationsAsync().ConfigureAwait(false);
     }
 
     public async Task ReactivateAsync(
@@ -357,7 +357,7 @@ public class EventSubscriptionRegistry(
             await subscription.DrainDeliveriesAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             EnqueueNotification(EventSubscriptionChangeType.Deactivated, subscription, delivered);
-            DrainNotifications();
+            await DispatchNotificationsAsync().ConfigureAwait(false);
             // Another thread can own the dispatcher. Its ordered callback retires the physical subscription.
             await delivered.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
         })).ConfigureAwait(false);
@@ -447,7 +447,7 @@ public class EventSubscriptionRegistry(
                 }
             },
             cancellationToken).ConfigureAwait(false);
-        DrainNotifications();
+        await DispatchNotificationsAsync().ConfigureAwait(false);
     }
 
     #endregion
@@ -469,6 +469,19 @@ public class EventSubscriptionRegistry(
     {
         _notificationQueue.Enqueue(new PendingNotification(
             new EventSubscriptionChange(changeType, subscription, DateTime.UtcNow), delivered));
+    }
+
+    private async Task DispatchNotificationsAsync()
+    {
+        if (SynchronizationContext.Current is not null || TaskScheduler.Current != TaskScheduler.Default)
+        {
+            // A synchronous observer can wait for asynchronous transport work. Continuing outside
+            // the caller context leaves that context available and lets the transport finish.
+            await Task.Run(DrainNotifications).ConfigureAwait(false);
+            return;
+        }
+
+        DrainNotifications();
     }
 
     private void DrainNotifications()

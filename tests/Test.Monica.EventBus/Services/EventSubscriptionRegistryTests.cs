@@ -141,6 +141,35 @@ public sealed class EventSubscriptionRegistryTests
     }
 
     [Fact]
+    public async Task UnsubscribeAsync_WhenCallerHasSynchronizationContext_ShouldNotifyOutsideIt()
+    {
+        var registry = CreateRegistry();
+        var token = TestContext.Current.CancellationToken;
+        var subscription = await registry.SubscribeAsync(
+            CreateDescriptor(new TrackingHandlerFactory(), "context-affinity"), token);
+        var observed = new List<(EventSubscriptionChangeType Change, SynchronizationContext? Context)>();
+        using var observation = registry.Subscribe(new CallbackObserver(change =>
+            observed.Add((change.ChangeType, SynchronizationContext.Current))));
+
+        var callerContext = SynchronizationContext.Current;
+        Task removal;
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try
+        {
+            removal = registry.UnsubscribeAsync(subscription.Id, token);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(callerContext);
+        }
+
+        await removal.WaitAsync(TimeSpan.FromSeconds(5), token);
+        observed.Should().ContainSingle()
+            .Which.Should().Be((EventSubscriptionChangeType.Removed, null));
+        registry.GetById(subscription.Id).Should().BeNull();
+    }
+
+    [Fact]
     public async Task ActivateAsync_WhenUnsubscribeOwnsMutation_ShouldNotReactivateDisposedSubscription()
     {
         var registry = CreateRegistry();

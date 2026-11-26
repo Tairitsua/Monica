@@ -1,0 +1,267 @@
+@using Monica.EventBus.Abstractions
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.UIEventBus.Models
+@using Monica.Framework.UI.UIEventBus.State
+@using Monica.Framework.UI.UIEventBus.Support
+@using Monica.UI.Shared.Components.States
+@inject IStringLocalizer<EventBusResource> L
+
+@{
+    var view = Workbench.Model!;
+    var query = Workbench.Query;
+    var all = view.Snapshot.Subscriptions;
+    var listeners = Workbench.RowListenerIds;
+    var provider = view.Snapshot.Providers.FirstOrDefault(item => item.UniqueId == query["provider"]);
+    var missingProvider = provider is null && !string.IsNullOrEmpty(query["provider"]);
+    var common = CommonPool(all, provider, missingProvider, listeners);
+    var runtime = query.Choice<EventBusCoverage>("runtime");
+    var registration = query["state"];
+    var states = common.Where(row => MatchesRuntime(row, runtime)).ToArray();
+    var coverage = common.Where(row => MatchesRegistration(row, registration)).ToArray();
+    var matches = Sort(states.Where(row => MatchesRegistration(row, registration)), query["sort"]).ToArray();
+    var page = Math.Min(query.Page, Math.Max(1, (matches.Length + PageSize - 1) / PageSize));
+    var active = matches.Count(row => row.State == EventSubscriptionState.Active);
+    var distributed = matches.Count(row => row.Scope == EventSubscriptionScope.Distributed);
+    var duplicates = all.Where(row => !row.IsActionHandler).GroupBy(row => row.HandlerTypeShortName)
+        .Where(group => group.Select(row => row.HandlerType).Distinct(StringComparer.Ordinal).Skip(1).Any())
+        .Select(group => group.Key).ToHashSet();
+    var atRisk = all.FirstOrDefault(row => row.IsUnhealthy);
+    var filtered = FilterKeys.Any(key => query[key] is not null);
+}
+<section class="eb-sig">
+    <EventBusDecision Label="@L["Precision:SubLabel"]" Value="@matches.Length"
+                      Population="@(filtered ? L["Precision:SubScopedUnit", matches.Length, all.Count] : L["Precision:SubUnit", active, distributed])">
+        <Finding>
+            @if (atRisk is not null)
+            {
+                <a class="vmark is-link mo-vl-role--error" href="@Workbench.InspectionLink("subId", atRisk.SubscriptionId)">@L["Precision:SubRisk", view.AtRisk]</a>
+                @L["Precision:SubRiskDetail"]
+            }
+            @if (view.ActiveGaps > 0)
+            {
+                <button class="vmark is-link mo-vl-role--warning" type="button" @onclick='() => Filter("runtime", "Unreported")'>@L["Precision:SubGaps", view.ActiveGaps]</button>
+                @L["Precision:SubGapsDetail"]
+            }
+            @if (view.Shared > 0)
+            {
+                <span class="vmark mo-vl-role--neutral">@L["Precision:SubSharedFinding", view.Shared]</span> @L["Precision:SubSharedDetail"]
+            }
+            @if (atRisk is null && view.ActiveGaps == 0 && view.Shared == 0) { @L["Precision:SubCalm", all.Count] }
+            @if (listeners.Count > 0)
+            {
+                <button class="vmark is-link mo-vl-role--info" type="button" @onclick='() => Filter("listening", "1")'>@L["Precision:SubListenerFinding", listeners.Count]</button>
+                @L["Precision:SubListenerDetail"]
+            }
+        </Finding>
+    </EventBusDecision>
+    <div class="eb-rt-strip" role="group" aria-label="@L["Precision:SubFilterRuntime"]">
+        <span class="eb-strip-label">@L["Precision:SubFilterRuntime"]</span>
+        <div class="fchips">
+            <EventBusFilterChip Count="@coverage.Length" Selected="@(runtime is null)" Select='() => Filter("runtime", null)'>@L["Precision:SubAllRuntime"]</EventBusFilterChip>
+            @foreach (var item in Enum.GetValues<EventBusCoverage>())
+            {
+                <EventBusFilterChip Role="@EventBusVisuals.Role(item)" Count="@coverage.Count(row => MatchesRuntime(row, item))"
+                                    Selected="@(runtime == item)" Marked="true" Hatched="@(item == EventBusCoverage.Unreported)"
+                                    Select='() => Filter("runtime", runtime == item ? null : item.ToString())'>@L.CoverageText(item)</EventBusFilterChip>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="surface eb-reg-surface" aria-label="@L["Precision:SubLabel"]">
+    <div class="eb-reg-controls">
+        <div class="eb-reg-row1">
+            <label class="eb-search eb-search-grow"><MoIcon Class="i" Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" value="@query["q"]" placeholder="@L["Precision:SubSearchPh"]" aria-label="@L["Precision:SubSearchPh"]"
+                       @oninput='args => Filter("q", args.Value?.ToString())' />
+            </label>
+            <MudSelect T="string" Class="eb-native-select" aria-label="@L["Precision:SubFilterProvider"]" Value="@(query["provider"] ?? "")" ValueChanged='value => Filter("provider", value)'
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" AdornmentIcon="@MoIcons.ChevronDown">
+                <MudSelectItem T="string" Value="@string.Empty">@L["Precision:SubFilterProvider"] · @L["Precision:FilterAllOpt"]</MudSelectItem>
+                @foreach (var item in view.Snapshot.Providers)
+                {
+                    <MudSelectItem T="string" Value="@item.UniqueId">@L.GetProviderKindText(item.ProviderType) · @EventBusPresentation.KeyText(item.ServiceKey, L)</MudSelectItem>
+                }
+                @if (missingProvider) { <MudSelectItem T="string" Value="@query["provider"]">@L["Precision:SubProviderMissing"]</MudSelectItem> }
+            </MudSelect>
+            <MudSelect T="string" Class="eb-native-select" aria-label="@L["Precision:SubFilterScope"]" Value="@(query["scope"] ?? "")" ValueChanged='value => Filter("scope", value)'
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" AdornmentIcon="@MoIcons.ChevronDown">
+                <MudSelectItem T="string" Value="@string.Empty">@L["Precision:SubFilterScope"] · @L["Precision:FilterAllOpt"]</MudSelectItem>
+                @foreach (var item in Enum.GetValues<EventSubscriptionScope>())
+                {
+                    <MudSelectItem T="string" Value="@item.ToString()">@L.GetSubscriptionScopeText(item)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" Class="eb-native-select" aria-label="@L["Precision:SubFilterDiscovery"]" Value="@(query["discovery"] ?? "")" ValueChanged='value => Filter("discovery", value)'
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" AdornmentIcon="@MoIcons.ChevronDown">
+                <MudSelectItem T="string" Value="@string.Empty">@L["Precision:SubFilterDiscovery"] · @L["Precision:FilterAllOpt"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("true")">@L.GetDiscoveryModeText(true)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("false")">@L.GetDiscoveryModeText(false)</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" Class="eb-native-select" aria-label="@L["Precision:SubSortLabel"]" Value="@(query["sort"] ?? "")" ValueChanged='value => Filter("sort", value)'
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" AdornmentIcon="@MoIcons.ChevronDown">
+                <MudSelectItem T="string" Value="@string.Empty">@L["Precision:SubSortLabel"] · @L["Precision:SortUrgency"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("createdDesc")">@L["Precision:SortCreated"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("eventAsc")">@L["Precision:SortEvent"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("topicAsc")">@L["Precision:SortTopic"]</MudSelectItem>
+            </MudSelect>
+        </div>
+        <div class="eb-reg-row2">
+            <div class="fchips" role="group" aria-label="@L["Precision:SubColReg"]">
+                <EventBusFilterChip Count="@states.Length" Selected="@(registration is null)" Select='() => Filter("state", null)'>@L["Precision:SubFilterAll"]</EventBusFilterChip>
+                @if (registration == "PendingInactive")
+                {
+                    <EventBusFilterChip Role="warning" Count="@states.Count(row => MatchesRegistration(row, registration))" Selected="true" Marked="true"
+                                        Select='() => Filter("state", null)'>@L["Precision:MxPendingInactive"]</EventBusFilterChip>
+                }
+                @foreach (var item in EventBusCaptureView.Registrations)
+                {
+                    var id = item.ToString();
+                    <EventBusFilterChip Role="@EventBusVisuals.Role(item)" Count="@states.Count(row => row.State == item)" Selected="@(registration == id)"
+                                        Marked="true" Select='() => Filter("state", registration == id ? null : id)'>@L.GetSubscriptionStateText(item)</EventBusFilterChip>
+                }
+            </div>
+            <div class="eb-reg-toggles">
+                <label class="eb-check"><input type="checkbox" checked="@query.IsSet("exactKey")" @onchange="ToggleExact" /><span>@L["Precision:SubExactKey"]</span></label>
+                @if (query.IsSet("exactKey"))
+                {
+                    <input type="text" class="eb-exact-input mono" value="@query["key"]" aria-label="@L["Precision:SubExactKey"]"
+                           placeholder="@L["Precision:SubExactKeyPh"]" spellcheck="false"
+                           @oninput='args => Workbench.EditQuery(("key", args.Value?.ToString()), ("page", null))' />
+                }
+                @if (listeners.Count > 0 || query.IsSet("listening"))
+                {
+                    <EventBusFilterChip Role="info" Count="@listeners.Count" Selected="@query.IsSet("listening")"
+                                        Select='() => Filter("listening", query.IsSet("listening") ? null : "1")'>
+                        <MoIcon Icon="@MoIcons.Radio" Size="13px" />@L["Precision:SubListeningOnly"]
+                    </EventBusFilterChip>
+                }
+                @if (filtered)
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="ClearFilters"><MoIcon Icon="@MoIcons.FilterOff" Size="14px" />@L["Precision:SubClearFilters"]</button>
+                }
+            </div>
+        </div>
+        @if (missingProvider)
+        {
+            <div class="callout mo-vl-role--warning" role="status"><span class="tile"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span><p>@L["Precision:SubProviderMissing"]</p></div>
+        }
+        @if (query["event"] is not null || query["topic"] is not null)
+        {
+            <div class="eb-route-pin">
+                <span class="eb-strip-label">@L["Precision:SubExactRouteBar"]</span>
+                @if (query["event"] is { } eventType) { <code class="chip is-mono mo-vl-role--primary">@eventType</code> }
+                @if (query["topic"] is { } topic) { <code class="chip is-mono mo-vl-role--third">@topic</code> }
+                <button class="btn btn-ghost btn-sm" type="button" @onclick='() => Workbench.EditQuery(("event", null), ("topic", null), ("page", null))'>@L["Precision:SubClearFilters"]</button>
+            </div>
+        }
+    </div>
+
+    <div class="eb-table-wrap">
+        <table class="eb-table eb-sub-table eb-reg-table" aria-label="@L["Precision:SubLabel"]">
+            <thead><tr>
+                <th scope="col">@L["Precision:SubColEvent"]</th><th scope="col">@L["Precision:SubColHandler"]</th>
+                <th scope="col">@L["Precision:SubColBus"]</th><th scope="col">@L["Precision:SubColReg"]</th>
+                <th scope="col">@L["Precision:SubColRuntime"]</th><th scope="col" class="eb-col-act">@L["Precision:ColActions"]</th>
+            </tr></thead>
+            <tbody>
+                @foreach (var row in matches.Skip((page - 1) * PageSize).Take(PageSize))
+                {
+                    var isListening = listeners.Contains(row.SubscriptionId);
+                    var kind = row.TopicStatus?.Provider ?? view.Provider(row.Scope, row.ServiceKey)?.ProviderType ?? EventBusProviderKind.Unknown;
+                    <tr class="@(row.IsUnhealthy ? "is-row-fault" : null)" @key="row.SubscriptionId">
+                        <td data-label="@L["Precision:SubColEvent"]"><div class="eb-cell-stack">
+                            <a class="eb-link-btn eb-ev-name" href="@Workbench.InspectionLink("subId", row.SubscriptionId)" title="@row.EventType">@row.EventTypeShortName</a>
+                            <code class="eb-topic-code mono eb-break">@row.TopicName</code><span class="eb-row-sub">@L.GetDiscoveryModeText(row.IsAutoDiscovered)</span>
+                        </div></td>
+                        <td data-label="@L["Precision:SubColHandler"]"><div class="eb-cell-stack">
+                            <span class="eb-handler-name" title="@(row.HandlerType ?? row.ActionMethodSignature)">@L.GetHandlerDisplayText(row)</span>
+                            <span class="eb-handler-ns mono eb-break @(duplicates.Contains(row.HandlerTypeShortName) ? "is-disambig" : null)">@(row.IsActionHandler ? row.ActionDeclaringType : EventBusVisuals.NameSpace(row.HandlerType, row.HandlerTypeShortName))</span>
+                            <span class="eb-id-sub mono" title="@row.SubscriptionId">@row.SubscriptionId[..Math.Min(12, row.SubscriptionId.Length)]</span>
+                        </div></td>
+                        <td data-label="@L["Precision:SubColBus"]"><EventBusTransportBadge Distributed="@(row.Scope == EventSubscriptionScope.Distributed)" Kind="@kind" ServiceKey="@row.ServiceKey" /></td>
+                        <td data-label="@L["Precision:SubColReg"]"><span class="status is-pill mo-vl-role--@EventBusVisuals.Role(row.State)"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
+                        <td data-label="@L["Precision:SubColRuntime"]"><div class="eb-cell-stack">
+                            <EventBusRuntimeBadge Scope="@row.Scope" Status="@row.TopicStatus" />
+                            @if (view.IsShared(row)) { <span class="eb-shared-pill" title="@L["Precision:MxSharedNote"]">@L["Precision:SubSharedTag"]</span> }
+                            @if (isListening) { <span class="eb-listen-pill"><MoIcon Icon="@MoIcons.Radio" Size="11px" />@L["Precision:SubListeningTag"]</span> }
+                        </div></td>
+                        <td class="eb-col-act" data-label="@L["Precision:ColActions"]">
+                            @if (row.State != EventSubscriptionState.Disposed)
+                            {
+                                <div class="eb-row-actions">
+                                    <button type="button" class="icon-btn @(isListening ? "eb-btn-listening" : null)" title="@L["SubscriptionLifecycle:Actions:Test"]" aria-label="@L["SubscriptionLifecycle:Actions:Test"]"
+                                            @onclick="() => Workbench.OpenTest(row.SubscriptionId)"><MoIcon Icon="@MoIcons.Flask" Size="16px" /></button>
+                                    @if (row.CanActivate)
+                                    {
+                                        <button type="button" class="icon-btn" title="@L["SubscriptionLifecycle:Actions:Activate"]" aria-label="@L["SubscriptionLifecycle:Actions:Activate"]"
+                                                disabled="@Workbench.Busy" @onclick="() => Workbench.ActivateAsync(row)"><MoIcon Icon="@MoIcons.PlayCircle" Size="16px" /></button>
+                                    }
+                                    else if (row.State == EventSubscriptionState.Active)
+                                    {
+                                        <button type="button" class="icon-btn" title="@L["SubscriptionLifecycle:Actions:Deactivate"]" aria-label="@L["SubscriptionLifecycle:Actions:Deactivate"]"
+                                                disabled="@Workbench.Busy" @onclick="() => Workbench.DeactivateAsync(row)"><MoIcon Icon="@MoIcons.PauseCircle" Size="16px" /></button>
+                                    }
+                                    <button type="button" class="icon-btn eb-btn-danger" title="@L["Precision:Remove"]" aria-label="@L["Precision:Remove"]"
+                                            disabled="@Workbench.Busy" @onclick="() => Workbench.RemoveAsync(row)"><MoIcon Icon="@MoIcons.Delete" Size="16px" /></button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (matches.Length == 0) { <MoContentState Compact="true"><p>@L["Precision:SubNoMatch"]</p></MoContentState> }
+    </div>
+    <EventBusPager Page="@(page)" PageSize="@PageSize" Total="@matches.Length" Changed='value => Workbench.EditQuery(("page", value == 1 ? null : value.ToString(System.Globalization.CultureInfo.InvariantCulture)))' />
+    <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:SubFoot"]</footer>
+</section>
+
+@code {
+    /// <summary>Gets the owning workbench whose capture and query drive this view.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+
+    private const int PageSize = 12;
+    private static readonly string[] FilterKeys = ["state", "runtime", "scope", "provider", "discovery", "event", "topic", "exactKey", "key", "listening", "q"];
+
+    private IEnumerable<SubscriptionViewModel> CommonPool(IReadOnlyList<SubscriptionViewModel> rows,
+        EventBusProviderInfo? provider, bool missingProvider, IReadOnlySet<string> listeners)
+    {
+        if (missingProvider) return [];
+        var query = Workbench.Query;
+        var filter = new SubscriptionFilter
+        {
+            Scope = query.Choice<EventSubscriptionScope>("scope"),
+            SelectedProvider = provider,
+            IsAutoDiscovered = bool.TryParse(query["discovery"], out var discovered) ? discovered : null,
+            ServiceKey = query.IsSet("exactKey") ? query["key"] ?? "" : null,
+            SearchText = query["q"]
+        };
+        return EventBusMonitorService.ApplyFilter(rows, filter).Where(row =>
+            (query["event"] is not { Length: > 0 } evt || row.EventType == evt)
+            && (query["topic"] is not { Length: > 0 } topic || row.TopicName == topic)
+            && (!query.IsSet("listening") || listeners.Contains(row.SubscriptionId)));
+    }
+
+    private static bool MatchesRuntime(SubscriptionViewModel row, EventBusCoverage? runtime) =>
+        runtime is null || EventBusCaptureView.Coverage(row) == runtime;
+
+    private static bool MatchesRegistration(SubscriptionViewModel row, string? registration) => registration switch
+    {
+        null or "" => true,
+        "PendingInactive" => row.State is EventSubscriptionState.Pending or EventSubscriptionState.Inactive,
+        _ => row.State.ToString() == registration
+    };
+
+    private static IEnumerable<SubscriptionViewModel> Sort(IEnumerable<SubscriptionViewModel> rows, string? sort) => sort switch
+    {
+        "createdDesc" => rows.OrderByDescending(row => row.CreatedAt).ThenBy(row => row.EventTypeShortName, StringComparer.Ordinal),
+        "eventAsc" => rows.OrderBy(row => row.EventTypeShortName, StringComparer.Ordinal).ThenBy(row => row.TopicName, StringComparer.Ordinal),
+        "topicAsc" => rows.OrderBy(row => row.TopicName, StringComparer.Ordinal).ThenBy(row => row.EventTypeShortName, StringComparer.Ordinal),
+        _ => rows.OrderBy(EventBusCaptureView.Urgency).ThenByDescending(row => row.CreatedAt)
+    };
+
+    private void Filter(string key, string? value) => Workbench.EditQuery((key, string.IsNullOrEmpty(value) ? null : value), ("page", null));
+    private void ToggleExact(ChangeEventArgs args) => Workbench.EditQuery(("exactKey", args.Value is true ? "1" : null), ("key", null), ("page", null));
+    private void ClearFilters() => Workbench.EditQuery(FilterKeys.Append("page").Select(key => (key, (string?)null)).ToArray());
+}

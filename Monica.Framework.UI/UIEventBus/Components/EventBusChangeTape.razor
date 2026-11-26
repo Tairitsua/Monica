@@ -1,0 +1,73 @@
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.UIEventBus.Models
+@using Monica.Framework.UI.UIEventBus.Support
+@implements IAsyncDisposable
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+@inject IStringLocalizer<EventBusResource> L
+@inject IJSRuntime JS
+
+@{
+    var tape = Entries.Take(TapeLimit).Reverse().ToArray();
+    var focus = Array.FindIndex(tape, entry => entry.ObservationId == _focus);
+    if (focus < 0) focus = tape.Length - 1;
+    var point = tape.FirstOrDefault(entry => entry.ObservationId == _hover) ?? tape[focus];
+}
+<div class="eb-tape-wrap">
+    <div class="eb-tape-head">
+        <div><h2>@L["Precision:ChTapeTitle"]</h2><p>@L["Precision:ChTapeSub"]</p></div>
+        <div class="eb-mx-legend">
+            @foreach (var kind in Enum.GetValues<EventSubscriptionChangeType>())
+            {
+                <span><span class="sw mo-vl-role--@EventBusVisuals.Role(kind)"></span>@L.GetSubscriptionChangeTypeText(kind)</span>
+            }
+        </div>
+    </div>
+    <div class="eb-tape-bed">
+        <div class="eb-tape" role="group" aria-label="@L["Precision:ChTapeTitle"]" @ref="_grid">
+            @for (var i = 0; i < tape.Length; i++)
+            {
+                var entry = tape[i];
+                var current = _hover is null ? i == focus : entry.ObservationId == _hover;
+                <button type="button" class="eb-tape-tick mo-vl-role--@EventBusVisuals.Role(entry.ChangeType) @(current ? "is-current" : null)"
+                        data-row="0" data-column="@i" tabindex="@(i == focus ? 0 : -1)" @key="entry.ObservationId"
+                        aria-label="@($"{L.GetSubscriptionChangeTypeText(entry.ChangeType)} · {entry.Subscription.EventTypeShortName} · {UiTime.Format(entry.Timestamp)}")"
+                        @onfocus="() => Focus(entry.ObservationId)" @onmouseenter="() => _hover = entry.ObservationId" @onmouseleave="() => _hover = null"
+                        @onclick='() => Workbench.OpenInspection("changeId", entry.ObservationId)'><i aria-hidden="true"></i></button>
+            }
+        </div>
+        <div class="eb-tape-axis mono" aria-hidden="true">
+            <span>@UiTime.FormatTime(tape[0].Timestamp)</span><span class="eb-tape-rule"></span><span>@UiTime.FormatTime(tape[^1].Timestamp) · @tape.Length / @TapeLimit</span>
+        </div>
+    </div>
+    <div class="eb-mx-readout is-active" aria-live="polite"><span class="eb-mx-dot mo-vl-role--@EventBusVisuals.Role(point.ChangeType)"></span>
+        <span><b class="mono">@UiTime.Format(point.Timestamp)</b> · @L.GetSubscriptionChangeTypeText(point.ChangeType) · @point.Subscription.EventTypeShortName (<code class="mono">@point.Subscription.TopicName</code>)</span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets the owning workbench used to open frozen evidence.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+    /// <summary>Gets or sets the nonempty retained history in newest-first order.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SubscriptionChangeViewModel> Entries { get; set; } = [];
+
+    private const int TapeLimit = 40;
+    private ElementReference _grid;
+    private EventBusGridKeyboard? _keyboard;
+    private string? _focus, _hover;
+
+    private void Focus(string id)
+    {
+        _focus = id;
+        _hover = null;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return Task.CompletedTask;
+        _keyboard = new EventBusGridKeyboard(JS, _grid, wrap: false);
+        return _keyboard.Ready;
+    }
+
+    /// <summary>Retires the tape's DOM keyboard handler.</summary>
+    public ValueTask DisposeAsync() => _keyboard?.DisposeAsync() ?? ValueTask.CompletedTask;
+}

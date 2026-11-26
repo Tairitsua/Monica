@@ -1,0 +1,158 @@
+@using Monica.Framework.UI.Pages
+@using Monica.Framework.UI.UIEventBus.Support
+@implements IAsyncDisposable
+@inject IStringLocalizer<EventBusResource> L
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@{
+    var model = Workbench.Model!;
+    var rows = EventBusCaptureView.MatrixRows;
+    var columns = EventBusCaptureView.MatrixColumns;
+    var peak = Math.Max(1, rows.Max(row => columns.Max(column => model.MatrixCount(row, column))));
+    var (activeRow, activeColumn) = _hover ?? _focus;
+    var activeCount = model.MatrixCount(rows[activeRow], columns[activeColumn]);
+    var tabStop = model.MatrixCount(rows[_focus.Row], columns[_focus.Column]) > 0 ? _focus :
+        (from rowIndex in Enumerable.Range(0, rows.Length)
+         from columnIndex in Enumerable.Range(0, columns.Length)
+         where model.MatrixCount(rows[rowIndex], columns[columnIndex]) > 0
+         select (rowIndex, columnIndex)).FirstOrDefault();
+}
+<div class="eb-mx">
+    <div class="eb-mx-head">
+        <div><h2>@L["Precision:MxTitle"]</h2><p>@L["Precision:MxSub"]</p></div>
+        <div class="eb-mx-legend">
+            <span><span class="sw mo-vl-role--error"></span>@L.CoverageText(EventBusCoverage.Failed)</span>
+            <span><span class="sw mo-vl-role--warning"></span>@L.CoverageText(EventBusCoverage.Recovering) / @L.CoverageText(EventBusCoverage.HealthyErr)</span>
+            <span><span class="sw mo-vl-role--success"></span>@L.CoverageText(EventBusCoverage.Healthy)</span>
+            <span><span class="sw is-hatch"></span>@L["Precision:MxLegendHatch"]</span>
+        </div>
+    </div>
+    <div class="eb-mx-scroll">
+        <div class="eb-mx-grid" role="grid" aria-label="@L["Precision:MxTitle"]" @ref="_grid">
+            <div class="eb-mx-row is-head" role="row">
+                <div class="eb-mx-corner" role="columnheader">@L["Precision:MxRowLabel"]</div>
+                @foreach (var column in columns)
+                {
+                    var total = rows.Sum(row => model.MatrixCount(row, column));
+                    <div class="eb-mx-ch" role="columnheader">
+                        <span class="eb-mx-ch-title"><span class="sw mo-vl-role--@EventBusVisuals.Role(column) @(column == EventBusCoverage.Unreported ? "is-hatch" : null)"></span><span>@ColumnText(column)</span></span>
+                        <span class="eb-mx-ch-n mono @(total == 0 ? "is-zero" : null)">@total</span>
+                    </div>
+                }
+            </div>
+            @for (var i = 0; i < rows.Length; i++)
+            {
+                var row = rows[i];
+                var rowIndex = i;
+                var total = model.MatrixTotal(row);
+                <div class="eb-mx-row @(row == "Orphan" ? "is-orphan-row" : null)" role="row">
+                    <div class="eb-mx-rh" role="rowheader"><span class="eb-mx-rh-name">@RowText(row)</span><span class="eb-mx-rh-n mono @(total == 0 ? "is-zero" : null)">@total</span></div>
+                    @for (var j = 0; j < columns.Length; j++)
+                    {
+                        var column = columns[j];
+                        var columnIndex = j;
+                        var count = model.MatrixCount(row, column);
+                        var shared = row is "Held" or "Disabled" && column is EventBusCoverage.Healthy or EventBusCoverage.HealthyErr;
+                        var tone = CellRole(row, column);
+                        var hot = row == "Orphan" || row == "Active" && column is EventBusCoverage.Failed or EventBusCoverage.Recovering or EventBusCoverage.Unreported;
+                        <div class="eb-mx-cell-wrap @(count == 0 ? "is-empty-wrap" : null)" role="gridcell">
+                            <button type="button" class="eb-mx-cell @(count == 0 ? "is-empty" : $"is-filled {tone} {(hot ? "is-hot" : "")}")"
+                                    data-row="@rowIndex" data-column="@columnIndex" tabindex="@(tabStop == (rowIndex, columnIndex) ? 0 : -1)"
+                                    aria-disabled="@(count == 0 ? "true" : null)" aria-label="@Readout(row, column, count)"
+                                    @onfocus="() => Focus(rowIndex, columnIndex)" @onmouseenter="() => _hover = (rowIndex, columnIndex)"
+                                    @onmouseleave="() => _hover = null" @onclick="() => Activate(model, row, column, count)">
+                                @if (count == 0) { <span class="eb-mx-zero" aria-hidden="true">·</span> }
+                                else
+                                {
+                                    <span class="eb-mx-col-mob">@ColumnText(column)</span><span class="eb-mx-val mono">@count</span>
+                                    <span class="eb-mx-bar" aria-hidden="true"><i style="@FormattableString.Invariant($"width:{Math.Max(18, Math.Round(Math.Sqrt((double)count / peak) * 100))}%")"></i></span>
+                                    @if (shared) { <span class="eb-mx-tag">@L["Precision:SubSharedTag"]</span> }
+                                }
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+    <div class="eb-mx-readout @(activeCount > 0 ? "is-active" : null)" aria-live="polite">
+        <span class="eb-mx-dot @(columns[activeColumn] == EventBusCoverage.Unreported ? "is-hatch" : CellRole(rows[activeRow], columns[activeColumn]))"></span>
+        <span>@(activeCount > 0 ? Readout(rows[activeRow], columns[activeColumn], activeCount) : L["Precision:MxHint"].Value)</span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets the owning workbench and active evidence capture.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+
+    private ElementReference _grid;
+    private EventBusGridKeyboard? _keyboard;
+    private (int Row, int Column) _focus;
+    private (int Row, int Column)? _hover;
+
+    private string RowText(string row) => row switch
+    {
+        "Active" => L["Precision:MxActive"], "Held" => L["Precision:MxHeld"], "Disabled" => L["Precision:MxDisabled"],
+        "Orphan" => L["Precision:MxOrphan"], _ => L["Precision:MxPendingInactive"]
+    };
+
+    private string ColumnText(EventBusCoverage coverage) =>
+        coverage == EventBusCoverage.Local ? L["Precision:MxLocal"] : L.CoverageText(coverage);
+
+    private static string CellRole(string row, EventBusCoverage column) => (row, column) switch
+    {
+        (_, EventBusCoverage.Failed) => "mo-vl-role--error",
+        ("Orphan", _) or ("Active", EventBusCoverage.Unreported) => "mo-vl-role--warning",
+        (_, EventBusCoverage.Unreported) => "is-hatch",
+        (not "Active", EventBusCoverage.Healthy) => "mo-vl-role--neutral",
+        _ => $"mo-vl-role--{EventBusVisuals.Role(column)}"
+    };
+
+    private string Readout(string row, EventBusCoverage column, int count)
+    {
+        var note = (row, column) switch
+        {
+            ("Orphan", _) => L["Precision:MxOrphanNote"].Value,
+            ("Active", EventBusCoverage.Failed) => L["Precision:MxFailedActiveNote"].Value,
+            ("Active", EventBusCoverage.Recovering) => L["Precision:MxRecoveringActiveNote"].Value,
+            (_, EventBusCoverage.Unreported) => L["Precision:MxUnreportedNote"].Value,
+            ("Held" or "Disabled", EventBusCoverage.Healthy or EventBusCoverage.HealthyErr) => L["Precision:MxSharedNote"].Value,
+            _ => ""
+        };
+        return L["Precision:MxReadout", RowText(row), ColumnText(column), count, note];
+    }
+
+    private void Focus(int row, int column)
+    {
+        _focus = (row, column);
+        _hover = null;
+    }
+
+    private void Activate(EventBusCaptureView model, string row, EventBusCoverage column, int count)
+    {
+        if (count == 0) return;
+        if (row == "Orphan")
+        {
+            if (count == 1)
+            {
+                var topic = model.Topics.Single(topic => topic.IsOrphan && topic.Coverage == column);
+                Workbench.OpenInspection("topicKey", topic.Id);
+            }
+            else Workbench.EditQuery(("coverage", "orphans"));
+            return;
+        }
+        Navigation.NavigateTo(EventBusRouteQuery.To(UIEventBusSubscriptionsPage.PAGE_URL, ("state", row),
+            column == EventBusCoverage.Local ? ("scope", "Local") : ("runtime", column.ToString())));
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return Task.CompletedTask;
+        _keyboard = new EventBusGridKeyboard(JS, _grid, wrap: true);
+        return _keyboard.Ready;
+    }
+
+    /// <summary>Retires the circulation matrix's DOM keyboard attachment.</summary>
+    public ValueTask DisposeAsync() => _keyboard?.DisposeAsync() ?? ValueTask.CompletedTask;
+}

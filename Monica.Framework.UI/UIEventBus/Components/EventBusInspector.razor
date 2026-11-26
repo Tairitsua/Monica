@@ -1,0 +1,241 @@
+@using Monica.EventBus.Abstractions
+@using Monica.Core.TypeDiscovery.Abstractions
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.Pages
+@using Monica.Framework.UI.UIEventBus.Models
+@using Monica.Framework.UI.UIEventBus.Support
+@inject IStringLocalizer<EventBusResource> L
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+
+<div class="eb-sheet-body">
+    @if (Workbench.SelectedTopic is { } topic)
+    {
+        var kind = topic.Status?.Provider ?? topic.Provider?.ProviderType ?? EventBusProviderKind.Unknown;
+        <dl class="eb-kv">
+            <EventBusEvidenceField Label="@L["Precision:ColTopic"]" Value="@topic.Topic" Copy="true" />
+            <EventBusEvidenceField Label="@L["Precision:ColProvider"]"><EventBusTransportBadge Distributed="true" Kind="@kind" ServiceKey="@topic.ServiceKey" /></EventBusEvidenceField>
+            <EventBusEvidenceField Label="@L["Precision:InspMatchedHandlers"]" Value="@topic.Handlers.Count.ToString()" />
+        </dl>
+        @if (topic.IsOrphan)
+        {
+            <div class="callout mo-vl-role--warning"><span class="tile"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span><div><b>@L["Precision:OrphanBadge"]</b><p>@L["Precision:MxOrphanNote"]</p></div></div>
+        }
+        <EventBusTopicEvidence Status="@topic.Status" />
+        @if (topic.Handlers.Count > 0)
+        {
+            <section class="eb-insp-sec">
+                <h3>@L["Precision:InspMatchedHandlers"] <small>@topic.Handlers.Count</small></h3>
+                @Handlers(topic.Handlers)
+            </section>
+        }
+    }
+    else if (Workbench.SelectedProvider is { } provider)
+    {
+        var tab = TabIndex(ProviderTabs);
+        var rows = Workbench.InspectionModel!.Snapshot.Subscriptions.Where(row => row.ServiceKey == provider.ServiceKey
+            && (row.Scope == EventSubscriptionScope.Distributed) == provider.IsDistributed).ToArray();
+        <div class="eb-insp-actions">
+            <a class="btn btn-outline btn-sm" href="@EventBusRouteQuery.To(UIEventBusSubscriptionsPage.PAGE_URL, ("provider", provider.UniqueId))">
+                <MoIcon Icon="@MoIcons.Route" Size="14px" />@L["Precision:PvFilterSubs"] (@provider.SubscriptionCount)
+            </a>
+        </div>
+        <MudTabs Class="eb-evidence-tabs" Elevation="0" ActivePanelIndex="@tab" ActivePanelIndexChanged="index => SetTab(ProviderTabs, index)"
+                 MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+            <MudTabPanel Text="@L["Precision:InspTabInfo"]">
+                @if (tab == 0)
+                {
+                    <div class="eb-tab-panel">
+                        <dl class="eb-te-counts eb-pv-sheet-counts">
+                            <div><dt>@L["Precision:OvFactHandlers"]</dt><dd class="mono">@provider.SubscriptionCount</dd></div>
+                            <div><dt>@L.GetSubscriptionStateText(EventSubscriptionState.Active)</dt><dd class="mono">@provider.ActiveSubscriptionCount</dd></div>
+                            <div><dt>@L["Precision:OvReasonFailed"] / @L["Precision:OvReasonRecovering"]</dt><dd class="mono @(provider.UnhealthyTopicCount > 0 ? "eb-ink-err" : null)">@provider.UnhealthyTopicCount</dd></div>
+                        </dl>
+                        <dl class="eb-kv">
+                            <EventBusEvidenceField Label="@L["Precision:ColProvider"]"><EventBusTransportBadge Distributed="@provider.IsDistributed" Kind="@provider.ProviderType" ServiceKey="@provider.ServiceKey" /></EventBusEvidenceField>
+                            <EventBusEvidenceField Label="@L["Providers:Detail:Fields:ServiceKey"]" Value="@EventBusPresentation.KeyText(provider.ServiceKey, L)" Copy="@(provider.ServiceKey is not null)" ClipboardValue="@provider.ServiceKey" />
+                            <EventBusEvidenceField Label="@L["Providers:Detail:Fields:ImplementationType"]" Value="@provider.ImplementationType" Copy="true" />
+                        </dl>
+                        <section class="eb-insp-sec">
+                            <h3>@L["Providers:Detail:Fields:Capabilities"]</h3>
+                            <div class="eb-cap-row"><EventBusCapabilityChips Provider="@provider" /></div>
+                            <p class="eb-note">@L["ProviderInspector:CapabilitiesHelp"]</p>
+                        </section>
+                    </div>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="@L["Precision:InspTabOptions"]">
+                @if (tab == 1) { <div class="eb-tab-panel"><EventBusProviderOptions @key="provider.UniqueId" Provider="@provider" /></div> }
+            </MudTabPanel>
+            <MudTabPanel Text="@($"{L["Precision:InspTabSubs"]} ({rows.Length})")">
+                @if (tab == 2)
+                {
+                    <div class="eb-tab-panel">
+                        @if (rows.Length == 0) { <p class="eb-note">@L["Precision:SubNoMatch"]</p> }
+                        else { @Handlers(rows) }
+                    </div>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    }
+    else if (Workbench.SelectedSubscription is { } row)
+    {
+        var frozen = Workbench.InspectionChange;
+        var tab = TabIndex(SubscriptionTabs);
+        var model = Workbench.InspectionModel;
+        var distributed = row.Scope == EventSubscriptionScope.Distributed;
+        var kind = row.TopicStatus?.Provider ?? frozen?.ReportedProvider ?? model?.Provider(row.Scope, row.ServiceKey)?.ProviderType ?? EventBusProviderKind.Unknown;
+        var current = Workbench.Model?.Snapshot.Subscriptions.FirstOrDefault(item => item.SubscriptionId == row.SubscriptionId);
+        @if (frozen is not null)
+        {
+            <div class="callout mo-vl-role--info"><span class="tile"><MoIcon Icon="@MoIcons.Lock" Size="16px" /></span>
+                <div><b>@L["Precision:ChFrozenTitle"]</b><p>@L["Precision:ChFrozenBody"]</p></div>
+            </div>
+        }
+        else if (current is not null)
+        {
+            <div class="eb-insp-actions">
+                <button class="btn btn-sm btn-primary" type="button" @onclick="() => Workbench.OpenTest(row.SubscriptionId)"><MoIcon Icon="@MoIcons.Flask" Size="14px" />@L["SubscriptionLifecycle:Actions:Test"]</button>
+                @if (Workbench.RowListenerIds.Contains(row.SubscriptionId)) { <span class="eb-listen-pill"><MoIcon Icon="@MoIcons.Radio" Size="12px" />@L["Precision:SubListeningTag"]</span> }
+                @if (current.CanActivate)
+                {
+                    <button class="btn btn-sm btn-outline" type="button" disabled="@Workbench.Busy" @onclick="() => Workbench.ActivateAsync(current)"><MoIcon Icon="@MoIcons.Play" Size="14px" />@L["SubscriptionLifecycle:Actions:Activate"]</button>
+                }
+                else if (current.State == EventSubscriptionState.Active)
+                {
+                    <button class="btn btn-sm btn-outline" type="button" disabled="@Workbench.Busy" @onclick="() => Workbench.DeactivateAsync(current)"><MoIcon Icon="@MoIcons.Pause" Size="14px" />@L["SubscriptionLifecycle:Actions:Deactivate"]</button>
+                }
+                <button class="btn btn-sm btn-ghost eb-btn-danger" type="button" disabled="@Workbench.Busy" @onclick="() => Workbench.RemoveAsync(current)"><MoIcon Icon="@MoIcons.Delete" Size="14px" />@L["Precision:Remove"]</button>
+            </div>
+        }
+        @if (model?.IsShared(row) == true)
+        {
+            <div class="callout mo-vl-role--warning"><span class="tile"><MoIcon Icon="@MoIcons.Info" Size="16px" /></span><p>@L["Precision:InspSharedTopicNote"]</p></div>
+        }
+        <MudTabs Class="eb-evidence-tabs" Elevation="0" ActivePanelIndex="@tab" ActivePanelIndexChanged="index => SetTab(SubscriptionTabs, index)"
+                 MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+            <MudTabPanel Text="@L["Precision:InspTabRouting"]">
+                @if (tab == 0)
+                {
+                    <div class="eb-tab-panel">
+                        <section class="eb-insp-sec">
+                            <dl class="eb-kv">
+                                <EventBusEvidenceField Label="@L["Precision:InspSubscriptionId"]" Value="@row.SubscriptionId" Copy="true" />
+                                <EventBusEvidenceField Label="@L["Precision:SubColEvent"]" Value="@row.EventType" Copy="true" />
+                                <EventBusEvidenceField Label="@L["Precision:ColTopic"]" Value="@row.TopicName" Copy="true" />
+                                <EventBusEvidenceField Label="@L["Precision:ColProvider"]"><EventBusTransportBadge Distributed="@distributed" Kind="@kind" ServiceKey="@row.ServiceKey" /></EventBusEvidenceField>
+                                <EventBusEvidenceField Label="@L["Precision:SubFilterDiscovery"]" Value="@L.GetDiscoveryModeText(row.IsAutoDiscovered)" Code="false" />
+                                <EventBusEvidenceField Label="@L["Precision:InspActivation"]" Value="@ActivationText(row.Activation)" Code="false" />
+                            </dl>
+                        </section>
+                        <section class="eb-insp-sec">
+                            <h3>@L["Precision:SubColHandler"]</h3>
+                            <dl class="eb-kv">
+                                @if (row.IsActionHandler)
+                                {
+                                    <EventBusEvidenceField Label="@L["Precision:InspDeclaringType"]" Value="@row.ActionDeclaringType" Copy="true" />
+                                    <EventBusEvidenceField Label="@L["Precision:InspMethodName"]" Value="@row.ActionMethodName" />
+                                    <EventBusEvidenceField Label="@L["Precision:InspMethodSignature"]" Value="@row.ActionMethodSignature" />
+                                    <EventBusEvidenceField Label="@L["Precision:InspIsStatic"]" Value="@(row.ActionIsStatic == true ? L["Precision:Yes"].Value : L["Precision:No"].Value)" Code="false" />
+                                }
+                                else { <EventBusEvidenceField Label="@L["Precision:SubColHandler"]" Value="@row.HandlerType" Copy="true" /> }
+                                <EventBusEvidenceField Label="@L["Precision:InspFactory"]" Value="@row.HandlerFactoryType" />
+                            </dl>
+                        </section>
+                        <section class="eb-insp-sec">
+                            <h3>@L["Precision:InspTabRouting"]</h3>
+                            <dl class="eb-kv">
+                                @foreach (var (label, timestamp) in Lifecycle(row))
+                                {
+                                    <EventBusEvidenceField Label="@label">
+                                        @if (timestamp is { } instant) { <time class="mono" datetime="@EventBusVisuals.TimeTag(instant)">@UiTime.Format(instant)</time> }
+                                        else { <span class="eb-dim">@L["Precision:InspNoTimestamp"]</span> }
+                                    </EventBusEvidenceField>
+                                }
+                            </dl>
+                        </section>
+                    </div>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="@L["Precision:InspTabRuntime"]">
+                @if (tab == 1)
+                {
+                    <div class="eb-tab-panel">
+                        @if (distributed)
+                        {
+                            <EventBusTopicEvidence Status="@row.TopicStatus" />
+                        }
+                        else
+                        {
+                            <div class="callout mo-vl-role--info"><span class="tile"><MoIcon Icon="@MoIcons.Cpu" Size="16px" /></span><div><b>@L.CoverageText(EventBusCoverage.Local)</b><p>@L["Precision:InspLocalRuntimeHelp"]</p></div></div>
+                        }
+                    </div>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="@($"{L["Precision:InspTabMetadata"]} ({row.Metadata.Count})")">
+                @if (tab == 2)
+                {
+                    <div class="eb-tab-panel">
+                        @if (row.Metadata.Count == 0) { <p class="eb-note">@L["Precision:InspNoMetadata"]</p> }
+                        else
+                        {
+                            <dl class="eb-kv">
+                                @foreach (var entry in row.Metadata.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                                {
+                                    <EventBusEvidenceField Label="@entry.Key" Value="@entry.Value" Copy="true" />
+                                }
+                            </dl>
+                        }
+                    </div>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    }
+    else
+    {
+        <div class="callout mo-vl-role--neutral"><span class="tile"><MoIcon Icon="@MoIcons.SearchOff" Size="16px" /></span>
+            <div><b>@L["Precision:InspNotFoundTitle"]</b><p>@L["Precision:InspNotFoundBody"]</p></div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Gets the workbench's selected identity and frozen evidence.</summary>
+    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
+
+    private static readonly string[] ProviderTabs = ["info", "options", "subs"];
+    private static readonly string[] SubscriptionTabs = ["routing", "runtime", "meta"];
+
+    private int TabIndex(string[] tabs) => Math.Max(0, Array.IndexOf(tabs, Workbench.Query["tab"]));
+    private void SetTab(string[] tabs, int index)
+    {
+        if (index >= 0 && index < tabs.Length && index != TabIndex(tabs))
+            Workbench.EditQuery(("tab", index == 0 ? null : tabs[index]));
+    }
+
+    private (string Label, DateTime? Time)[] Lifecycle(SubscriptionViewModel row) =>
+    [
+        (L["Precision:InspCreated"], row.CreatedAt),
+        (L["Precision:InspActivated"], row.ActivatedAt),
+        (L["Precision:InspDeactivated"], row.DeactivatedAt)
+    ];
+
+    private string ActivationText(ActivationMode mode) => mode switch
+    {
+        ActivationMode.Manual => L["Precision:ActivationHeld"],
+        ActivationMode.Disabled => L["Precision:ActivationDisabled"],
+        _ => L["Precision:ActivationAutomatic"]
+    };
+
+    private RenderFragment Handlers(IReadOnlyList<SubscriptionViewModel> rows) => @<ul class="eb-mini-list">
+        @foreach (var row in rows)
+        {
+            <li @key="row.SubscriptionId">
+                <button type="button" class="eb-mini-row" @onclick='() => Workbench.OpenInspection("subId", row.SubscriptionId)'>
+                    <span class="eb-mini-copy"><b>@row.EventTypeShortName</b><small class="mono eb-break">@row.TopicName</small></span>
+                    <span class="status is-pill mo-vl-role--@EventBusVisuals.Role(row.State)"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span>
+                    <MoIcon Icon="@MoIcons.ChevronRight" Size="14px" />
+                </button>
+            </li>
+        }
+    </ul>;
+}

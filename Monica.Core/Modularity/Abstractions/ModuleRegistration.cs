@@ -188,9 +188,10 @@ public sealed class ModuleRegistration<TModule, TOptions>
     /// <summary>
     /// Records an externally discoverable keyed service identifier owned by this module.
     /// </summary>
+    /// <param name="serviceKey">An exact, non-null DI key. Empty and whitespace keys remain distinct.</param>
     public ModuleRegistration<TModule, TOptions> RecordKeyedServiceKey(string serviceKey)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
+        ArgumentNullException.ThrowIfNull(serviceKey);
         _application.Modules.GetOrAddRegistration<TModule>().AddKeyedServiceKey(serviceKey);
         return this;
     }

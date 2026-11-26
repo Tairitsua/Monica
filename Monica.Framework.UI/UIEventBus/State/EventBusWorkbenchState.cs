@@ -21,7 +21,8 @@ public sealed class EventBusWorkbenchState(
     EventBusProviderDiscoveryService providerDiscoveryService,
     ILogger<EventBusWorkbenchState> logger)
 {
-    private const int OBSERVED_CHANGE_LIMIT = 100;
+    internal const int ObservedChangeLimit = 100;
+    internal bool AutoRefresh { get; set; } = true;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly object _stateLock = new();
     private EventBusWorkbenchSnapshot? _snapshot;
@@ -270,17 +271,19 @@ public sealed class EventBusWorkbenchState(
             {
                 var detached = new SubscriptionChangeViewModel
                 {
+                    ObservationId = $"chg-{++_observedChangeCount}",
+                    ReportedProvider = _snapshot?.Providers.FirstOrDefault(provider =>
+                        provider.IsDistributed == (registryChange.Change.Subscription.Scope == EventSubscriptionScope.Distributed)
+                        && string.Equals(provider.ServiceKey, registryChange.Change.Subscription.ServiceKey, StringComparison.Ordinal))?.ProviderType,
                     ChangeType = registryChange.Change.ChangeType,
                     Timestamp = registryChange.Change.Timestamp,
                     Subscription = CloneSubscription(registryChange.Change.Subscription)
                 };
                 _observedChanges = _observedChanges.Insert(0, detached);
-                if (_observedChanges.Length > OBSERVED_CHANGE_LIMIT)
+                if (_observedChanges.Length > ObservedChangeLimit)
                 {
-                    _observedChanges = _observedChanges.RemoveAt(OBSERVED_CHANGE_LIMIT);
+                    _observedChanges = _observedChanges.RemoveAt(ObservedChangeLimit);
                 }
-
-                _observedChangeCount++;
             }
 
             return true;

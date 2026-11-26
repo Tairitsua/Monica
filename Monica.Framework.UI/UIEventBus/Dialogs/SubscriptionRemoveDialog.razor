@@ -1,19 +1,53 @@
+@using Monica.EventBus.Abstractions
+@using Monica.EventBus.Models
+@using Monica.Framework.UI.UIEventBus.Components
 @using Monica.Framework.UI.UIEventBus.Models
-@using Monica.Framework.UI.UIEventBus.Support
 @using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<EventBusResource> L
 
-<MudDialog>
-    <TitleContent><MoDialogHeading Text="@L["Registry:RemoveTitle"]" /></TitleContent>
-    <DialogContent><div class="subscription-remove"><p>@L["Registry:RemoveHelp"]</p><dl>
-        <div><dt>@L["SubscriptionDetail:Fields:SubscriptionId"]</dt><dd><code>@Subscription.SubscriptionId</code></dd></div>
-        <div><dt>@L["SubscriptionDetail:Fields:EventType"]</dt><dd><code>@Subscription.EventType</code></dd></div>
-        <div><dt>@L["SubscriptionDetail:Fields:TopicName"]</dt><dd><code>@Subscription.TopicName</code></dd></div>
-        <div><dt>@L["Registry:ProviderScope"]</dt><dd><code>@EventBusPresentation.KeyText(Subscription.ServiceKey, L)</code> · @L.GetSubscriptionScopeText(Subscription.Scope)</dd></div>
-    </dl><p>@L["Registry:RemoveListenerHelp"]</p></div></DialogContent>
-    <DialogActions><MudButton OnClick="() => MudDialog.Cancel()">@L["Registry:Cancel"]</MudButton><MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="() => MudDialog.Close(DialogResult.Ok(true))">@L["Registry:ConfirmRemove"]</MudButton></DialogActions>
+<MudDialog DefaultFocus="DefaultFocus.FirstChild" Style="width: min(480px, calc(100% - 32px)); max-width: none; margin: 16px; max-height: calc(100dvh - 32px);">
+    <TitleContent>
+        <div class="subscription-remove-heading">
+            <span class="subscription-remove-icon"><MoIcon Icon="@MoIcons.Delete" Size="18px" /></span>
+            <div>
+                <MoDialogHeading Text="@L["Registry:RemoveTitle"]" />
+                <p>@Subscription.EventTypeShortName</p>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="subscription-remove">
+            <p>@L["Registry:RemoveHelp"]</p>
+            <dl>
+                <div><dt>@L["SubscriptionDetail:Fields:SubscriptionId"]</dt><dd><code>@Subscription.SubscriptionId</code></dd></div>
+                <div><dt>@L["SubscriptionDetail:Fields:EventType"]</dt><dd><code>@Subscription.EventType</code></dd></div>
+                <div><dt>@L["SubscriptionDetail:Fields:TopicName"]</dt><dd><code>@Subscription.TopicName</code></dd></div>
+                <div>
+                    <dt>@L["Registry:ProviderScope"]</dt>
+                    <dd><EventBusTransportBadge Distributed="@(Subscription.Scope == EventSubscriptionScope.Distributed)" Kind="@ProviderKind" ServiceKey="@Subscription.ServiceKey" /></dd>
+                </div>
+            </dl>
+            @if (HasListener)
+            {
+                <p class="subscription-remove-warning"><MoIcon Icon="@MoIcons.Warning" Size="16px" />@L["Registry:RemoveListenerHelp"]</p>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => MudDialog.Cancel()">@L["Registry:Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@MoIcons.Delete" OnClick="() => MudDialog.Close(DialogResult.Ok(true))">@L["Registry:ConfirmRemove"]</MudButton>
+    </DialogActions>
 </MudDialog>
+
 @code {
     [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>Gets or sets the exact captured registration presented for removal.</summary>
     [Parameter, EditorRequired] public SubscriptionViewModel Subscription { get; set; } = null!;
+
+    /// <summary>Gets or sets the provider kind shown with the registration's scope and key.</summary>
+    [Parameter] public EventBusProviderKind ProviderKind { get; set; } = EventBusProviderKind.Unknown;
+
+    /// <summary>Gets or sets whether this circuit owned a row listener when confirmation opened.</summary>
+    [Parameter] public bool HasListener { get; set; }
 }

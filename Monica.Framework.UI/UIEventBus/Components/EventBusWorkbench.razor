@@ -1,84 +1,125 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.EventBus.Models
 @using Monica.Framework.UI.UIEventBus.Models
 @using Monica.Framework.UI.UIEventBus.Support
-@using Monica.Framework.UI.Pages
+@using Monica.UI.Shared.Components.Dialogs
 @using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.States
+@using Monica.UI.Shared.Components.Visual
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
+@inject Microsoft.Extensions.Hosting.IHostEnvironment Host
+@inject IJSRuntime JS
 
-@{ var capture = State.Snapshot; }
+@{
+    var capture = State.Snapshot;
+    var showInspection = capture is not null && Inspection is not null;
+    var tone = State.RefreshError is not null ? capture is null ? "error" : "warning"
+        : IsEmpty ? "neutral" : capture is null || State.AutoRefresh ? "info" : "neutral";
+}
 <PageTitle>@Title</PageTitle>
-<div class="eventbus-workbench" aria-busy="@(State.IsRefreshing ? "true" : "false")">
-    <header class="eventbus-workbench-heading">
-        <div><span class="eventbus-workbench-kicker">@L["Workbench:Eyebrow"]</span><h1>@Title</h1><p>@Description</p></div>
-        <div class="eventbus-workbench-controls">
-            <div class="eventbus-capture"><span>@L["Workbench:Captured"]</span><time>@(capture?.CapturedAt is { } captured ? UiTime.Format(captured) : L["Workbench:NoCapture"].Value)</time></div>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" aria-disabled="@(State.IsRefreshing || _retired ? "true" : "false")">@L["Page:Header:Refresh"]</MudButton>
-        </div>
-    </header>
-    <MoWorkbenchNavigation Class="eventbus-workbench-nav" Label="@L["Workbench:Navigation"]">
-        @foreach (var section in Enum.GetValues<EventBusWorkbenchView>())
-        {
-            <a href="@Route(section)" aria-current="@(View == section ? "page" : null)" data-view="@(section)"><MoIcon Icon="@SectionIcon(section)" Size="1.25rem" /><span>@SectionTitle(section)</span>
-                @if (capture is { } navigationCapture && section == EventBusWorkbenchView.Subscriptions) { <span class="eventbus-nav-count">@navigationCapture.Subscriptions.Count</span> }
-            </a>
-        }
-    </MoWorkbenchNavigation>
-    <div class="eventbus-workbench-sampling"><span>@L["Workbench:Scope"]</span><MudSwitch T="bool" Value="_autoRefresh" ValueChanged="AutoRefreshChanged" Color="Color.Primary" Size="Size.Small" Label="@L["Workbench:AutoRefresh"]" /></div>
-    @if (State.RefreshError != null)
-    {
-        <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error" Variant="Variant.Outlined"><strong>@L["Workbench:ReadFailed"]</strong><p>@State.RefreshError</p><p>@L[capture == null ? "Workbench:UnavailableHelp" : "Workbench:PreviousCaptureHelp"]</p></MudAlert>
-    }
-    @if (capture is null)
-    {
-        @if (State.IsInitialLoading || !State.HasAttemptedCapture) { <div class="eventbus-initial" role="status"><MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" /><p>@L["Workbench:Loading"]</p></div> }
-    }
-    else if (View == EventBusWorkbenchView.Overview)
-    {
-        <EventBusOverview Snapshot="capture" OnTopicClick="topic => InspectTopicAsync(topic, capture.CapturedAt)" />
-    }
-    else if (View == EventBusWorkbenchView.Providers)
-    {
-        <EventBusProviderList Providers="capture.Providers.ToList()" AllSubscriptions="capture.Subscriptions.ToList()" IsLoading="State.IsRefreshing" OnRefresh="RefreshAsync" OnProviderClick="provider => InspectProviderAsync(provider, capture)" />
-    }
-    else if (View == EventBusWorkbenchView.Subscriptions)
-    {
-        <section class="eventbus-registry">
-            <SubscriptionFilterPanel Filter="_filter" Providers="capture.Providers.ToList()" Subscriptions="capture.Subscriptions" OnFilterChanged="FilterChanged" SelectedProviderId="@_activeProviderId" OnProviderSelectionChanged="ProviderSelectionChanged" />
-            @if (_queryMissingProvider) { <MudAlert Icon="@MoIcons.Warning" Severity="Severity.Warning" Variant="Variant.Outlined">@L["Registry:ProviderMissing"]</MudAlert> }
-            @if (EventType != null || Topic != null)
-            {
-                <div class="eventbus-route-selection"><span>@L["Registry:ExactRoute"]</span><div class="eventbus-route-constraints">
-                    @if (EventType != null) { <code>@EventType</code> }
-                    @if (Topic != null) { <code>@Topic</code> }
-                </div><MudButton OnClick="ClearAllFilters" Size="Size.Small">@L["SubscriptionFilter:Clear"]</MudButton></div>
-            }
-            <div class="eventbus-registry-heading"><h2>@L["Registry:Title"]</h2><span>@L["Registry:Shown", FilteredSubscriptions.Count, capture.Subscriptions.Count]</span></div>
-            <SubscriptionTable Subscriptions="FilteredSubscriptions" Loading="State.IsRefreshing" IsBusy="_busy" HasRegistrations="capture.Subscriptions.Count > 0"
-                OnRowClick="row => InspectSubscriptionAsync(row, capture.CapturedAt)" OnTest="TestSubscriptionAsync" OnActivate="ActivateAsync" OnDeactivate="DeactivateAsync" OnUnsubscribe="RemoveAsync" ActiveTestListenerIds="TestService.GetActiveRuntimeListenerIds()" />
-            <p class="eventbus-workbench-note">@L["Registry:RuntimeHelp"]</p>
-        </section>
-    }
-    else if (View == EventBusWorkbenchView.Changes)
-    {
-        <EventBusChangesLedger Changes="State.ObservedChanges" ObservedChangeCount="State.ObservedChangeCount" DroppedChangeCount="State.DroppedChangeCount" OnInspect="InspectChangeAsync" />
-    }
-    else
-    {
-        <EventBusTestPanel />
-        @if (TestService.GetActiveRuntimeListenerIds().Count > 0)
-        {
-            <section class="eventbus-retained-listeners"><h2>@L["Workbench:RetainedListeners"]</h2><p>@L["Workbench:RetainedListenersHelp"]</p>
-                <div class="eventbus-listener-list">
-                    @foreach (var id in TestService.GetActiveRuntimeListenerIds().Order(StringComparer.Ordinal))
+<CascadingValue Value="this">
+    <div class="eb-page mo-page-shell mo-page-shell--workbench" aria-busy="@(State.IsRefreshing ? "true" : "false")">
+        <MoPageMasthead Icon="@SectionIcon(View)" Title="@Title" Crumb="@L["Precision:Eyebrow"]">
+            <Meta>
+                <span class="status is-pill mo-vl-role--@tone"><span class="status-dot @(State.AutoRefresh && State.RefreshError is null && capture is not null && !IsEmpty ? "is-live" : null)" aria-hidden="true"></span>
+                    @L[State.RefreshError is not null ? capture is null ? "Precision:FailedStatus" : "Precision:StaleStatus"
+                        : capture is null ? "Precision:LoadingStatus" : IsEmpty ? "Precision:EmptyStatus" : State.AutoRefresh ? "Precision:Live" : "Precision:Paused"]
+                </span>
+                <button class="chip is-outline is-mono" type="button" title="@Host.ApplicationName" @onclick="() => CopyAsync(Host.ApplicationName)">
+                    <MoIcon Icon="@MoIcons.Server" Size="13px" /><span>@L["Precision:ScopeChip", Host.ApplicationName]</span>
+                </button>
+                <span class="chip is-outline" title="@UiTime.TimeZone.Id"><span>@L["Precision:TzChip", UiTime.FormatZoneLabel(capture?.CapturedAt ?? DateTimeOffset.UtcNow)]</span></span>
+            </Meta>
+            <Actions>
+                <div class="eb-capture-time">
+                    <span>@L["Precision:Captured"]</span>
+                    @if (capture is not null)
                     {
-                        var source = capture.Subscriptions.FirstOrDefault(row => row.SubscriptionId == id);
-                        <article><div><strong>@(source?.EventTypeShortName ?? L["Workbench:RemovedListenerSource"].Value)</strong><code>@id</code></div><div>
-                            @if (source != null) { <MudButton OnClick="() => TestSubscriptionAsync(source)" Size="Size.Small" Color="Color.Primary">@L["SubscriptionLifecycle:Actions:Test"]</MudButton> }
-                            <MudButton OnClick="() => StopListenerAsync(id)" aria-disabled="@(_busy ? "true" : "false")" Size="Size.Small" Color="Color.Warning">@L["SubscriptionTestDialog:Actions:StopListening"]</MudButton>
-                        </div></article>
+                        <time datetime="@capture.CapturedAt.ToString("O")" title="@UiTime.Format(capture.CapturedAt)">@UiTime.FormatTime(capture.CapturedAt)</time>
                     }
+                    else { <b>@L["Precision:NotCaptured"]</b> }
                 </div>
+                <button type="button" class="btn btn-outline eb-auto" role="switch" aria-checked="@(State.AutoRefresh ? "true" : "false")"
+                        @onclick="() => AutoRefreshChanged(!State.AutoRefresh)">
+                    <span class="status-dot mo-vl-role--@tone" aria-hidden="true"></span>@L[State.RefreshError is not null ? "Precision:AutoFailing" : State.AutoRefresh ? "Precision:AutoOn" : "Precision:AutoOff"]
+                </button>
+                <button type="button" class="btn btn-primary" @onclick="RefreshAsync" disabled="@(State.IsRefreshing || _retired)">
+                    <MoIcon Class="i" Icon="@MoIcons.Refresh" Size="15px" />@L["Precision:Refresh"]
+                </button>
+            </Actions>
+        </MoPageMasthead>
+
+        <MoWorkbenchNavigation Compact="true" Class="eb-wbn" Label="@L["Precision:NavLabel"]">
+            @foreach (var section in Enum.GetValues<EventBusWorkbenchView>())
+            {
+                var (count, role) = NavigationCount(section);
+                <a href="@Route(section)" class="eb-wbn-link" aria-current="@(View == section ? "page" : null)">
+                    <MoIcon Icon="@SectionIcon(section)" Size="15px" /><span>@SectionTitle(section)</span>
+                    @if (count is not null) { <span class="eb-wbn-count mo-vl-role--@role">@count</span> }
+                </a>
+            }
+        </MoWorkbenchNavigation>
+
+        @if (capture is null || IsEmpty && View is not (EventBusWorkbenchView.Changes or EventBusWorkbenchView.TestTools))
+        {
+            <section class="surface eb-state-panel">
+                <MoContentState Loading="@(capture is null && State.RefreshError is null)" role="@(State.RefreshError is not null ? "alert" : "status")">
+                    <span class="tile mo-vl-role--@(State.RefreshError is not null ? "error" : IsEmpty ? "neutral" : "info")">
+                        <MoIcon Icon="@(State.RefreshError is not null ? MoIcons.Error : IsEmpty ? MoIcons.Network : MoIcons.Refresh)" Size="18px" />
+                    </span>
+                    <h2>@L[State.RefreshError is not null ? "Precision:LoadFailedTitle" : IsEmpty ? "Precision:EmptyHostTitle" : "Precision:LoadingTitle"]</h2>
+                    <p>@L[State.RefreshError is not null ? "Precision:LoadFailedBody" : IsEmpty ? "Precision:EmptyHostBody" : "Precision:LoadingBody"]</p>
+                    @if (State.RefreshError is { } failure) { <p class="mono eb-state-err">@failure</p> }
+                    @if (IsEmpty || State.RefreshError is not null)
+                    {
+                        <button type="button" class="btn btn-outline" @onclick="RefreshAsync"><MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Precision:Retry"]</button>
+                    }
+                </MoContentState>
             </section>
         }
-    }
-</div>
+        else
+        {
+            @if (State.RefreshError is { } latestFailure)
+            {
+                <div class="callout mo-vl-role--warning" role="status"><span class="tile"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+                    <div><b>@L["Precision:StaleTitle"]</b><p>@L["Precision:StaleBody", UiTime.Format(capture.CapturedAt)] <span class="eb-err-inline mono">@latestFailure</span></p></div>
+                </div>
+            }
+            @switch (View)
+            {
+                case EventBusWorkbenchView.Overview: <EventBusOverview /> break;
+                case EventBusWorkbenchView.Providers: <EventBusProviderList /> break;
+                case EventBusWorkbenchView.Subscriptions: <EventBusRegistry /> break;
+                case EventBusWorkbenchView.Changes: <EventBusChangesLedger /> break;
+                case EventBusWorkbenchView.TestTools: <EventBusTestPanel /> break;
+            }
+        }
+    </div>
+    <MoSideSheet Open="@showInspection" OpenChanged="OnInspectionVisibilityChanged" Width="520px" Compact="true" CloseLabel="@L["Precision:InspClose"]">
+        <TitleContent>
+            @if (showInspection)
+            {
+                <div class="eb-overlay">
+                    <CascadingValue Value="this"><EventBusInspectionHeading /></CascadingValue>
+                </div>
+            }
+        </TitleContent>
+        <HeaderContent>
+            @if (showInspection && Inspection is { } selection && InspectionTime is { } frozen)
+            {
+                <div class="eb-overlay">
+                    <div class="eb-sheet-stamp"><MoIcon Icon="@MoIcons.Lock" Size="14px" />
+                        @L[selection.Key == "changeId" ? "Precision:InspFrozenChange" : "Precision:InspFrozen", UiTime.Format(frozen)]
+                    </div>
+                </div>
+            }
+        </HeaderContent>
+        <ChildContent>
+            @if (showInspection)
+            {
+                <div class="eb-overlay">
+                    <CascadingValue Value="this"><EventBusInspector @key="Inspection" /></CascadingValue>
+                </div>
+            }
+        </ChildContent>
+    </MoSideSheet>
+</CascadingValue>

@@ -40,7 +40,8 @@ public sealed class EventBusTestService(
     IStringLocalizer<EventBusResource> localizer,
     ILogger<EventBusTestService> logger) : IAsyncDisposable
 {
-    private const int DEFAULT_LEGACY_MESSAGE_COUNT = 100;
+    internal const int StandaloneReceiptLimit = 100;
+    internal int RuntimeReceiptLimit => Math.Max(1, options.Value.TestListenerMessageLimit);
 
     private readonly ConcurrentDictionary<EventSubscriptionId, RuntimeListenerState> _runtimeListeners = new();
     private readonly SemaphoreSlim _runtimeListenerGate = new(1, 1);
@@ -516,18 +517,21 @@ public sealed class EventBusTestService(
     /// <summary>
     /// Publish standalone test-panel message.
     /// </summary>
-    public async Task<Result> PublishTestMessageAsync(string message, string? topicName, CancellationToken cancellationToken = default)
+    public async Task<Result> PublishTestMessageAsync(string message, string? topicName, CancellationToken cancellationToken = default) =>
+        (await PublishStandaloneMessageAsync(message, topicName, cancellationToken)).WithoutData();
+
+    internal async Task<Result<TestEventMessage>> PublishStandaloneMessageAsync(string message, string? topicName, CancellationToken cancellationToken)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(message))
             {
-                return Result.Failure(localizer["Services:Common:MessageContentRequired"]);
+                return Result.Failure<TestEventMessage>(localizer["Services:Common:MessageContentRequired"]);
             }
 
             if (string.IsNullOrWhiteSpace(topicName))
             {
-                return Result.Failure(localizer["Services:Common:TopicNameRequired"]);
+                return Result.Failure<TestEventMessage>(localizer["Services:Common:TopicNameRequired"]);
             }
 
             var testMessage = new TestEventMessage
@@ -539,14 +543,14 @@ public sealed class EventBusTestService(
 
             await serviceProvider.GetRequiredService<IDistributedEventBus>().PublishAsync(testMessage, topicName, cancellationToken);
 
-            logger.LogInformation("已发布测试消息到主题 {TopicName}: {MessageId}", topicName, testMessage.MessageId);
+            logger.LogInformation("Published test message {MessageId} to EventBus topic {TopicName}", testMessage.MessageId, topicName);
 
-            return Result.Success();
+            return Result.Success(testMessage);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "发布测试消息失败");
-            return Result.Failure(localizer["Services:Test:PublishMessageFailed", ex.GetMessageRecursively()]);
+            logger.LogError(ex, "Publishing an EventBus test message failed");
+            return Result.Failure<TestEventMessage>(localizer["Services:Test:PublishMessageFailed", ex.GetMessageRecursively()]);
         }
     }
 
@@ -595,7 +599,7 @@ public sealed class EventBusTestService(
 
                 _receivedMessages.Enqueue(receivedMessage);
 
-                while (_receivedMessages.Count > DEFAULT_LEGACY_MESSAGE_COUNT)
+                while (_receivedMessages.Count > StandaloneReceiptLimit)
                 {
                     _receivedMessages.TryDequeue(out _);
                 }
