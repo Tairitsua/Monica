@@ -30,7 +30,7 @@ app.MapMonica();
 app.Run();
 ```
 
-`AddBuildingBlocks()` is separate from the bundle and requires EventBus; the no-op distributed transport above is appropriate only for a local example. Choose a real provider when events must cross processes. Include domain and protocol assemblies in type discovery so controllers, application services, and Building Blocks are present in the host catalog. The application owns the request contracts; [endpoints and execution](endpoints-and-execution.md) explains how request metadata, generated controllers, and the typed execution pipeline fit together.
+`AddBuildingBlocks()` adds architecture discovery independently of the transport. The no-op distributed transport above is for the local Web API example. Choose a real provider when events must cross processes. Include domain and protocol assemblies in type discovery so controllers, application services, and Building Blocks are present in the host catalog. The application owns the request contracts; [endpoints and execution](endpoints-and-execution.md) explains how request metadata, generated controllers, and the typed execution pipeline fit together.
 
 The Web host calls `UseMonica()` then `MapMonica()` on the built app as shown; [host composition](../../monica-infra-hosting/references/host-composition.md) owns the graph lifecycle and generic-host rules.
 

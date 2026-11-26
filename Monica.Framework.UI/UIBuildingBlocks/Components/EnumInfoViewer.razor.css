@@ -1,8 +1,9 @@
 .enum-info-viewer {
+    padding: 24px clamp(16px, 3vw, 32px) 40px;
     container: enum-reference / inline-size;
     min-width: 0;
-    --enum-muted: var(--building-blocks-muted-ink, color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary) 15%));
-    --enum-accent: var(--building-blocks-accent-ink, color-mix(in srgb, var(--mud-palette-primary) 80%, var(--mud-palette-text-primary) 20%));
+    --enum-muted: color-mix(in srgb, var(--mud-palette-text-secondary) 85%, var(--mud-palette-text-primary) 15%);
+    --enum-accent: color-mix(in srgb, var(--mud-palette-primary) 80%, var(--mud-palette-text-primary) 20%);
 }
 .enum-info-viewer__heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 28px; min-width: 0; margin-bottom: 24px; }
 .enum-info-viewer__heading > div:first-child { flex: 1 1 30rem; min-width: 0; }

@@ -9,12 +9,10 @@ using Monica.Configuration.Abstractions;
 using Monica.Configuration.Annotations;
 using Monica.Configuration.Models;
 using Monica.Core;
-using Monica.Core.JsonSerialization.Abstractions;
 using Monica.Core.Results;
 using Monica.Core.Mediator;
 using Monica.Core.TypeDiscovery.Models;
 using Monica.Core.XmlDocumentation.Abstractions;
-using Monica.EventBus.Abstractions;
 using Monica.EventBus.Abstractions.Handlers;
 using Monica.EventBus.Events;
 using Monica.Framework.Seeder.Abstractions;
@@ -558,8 +556,6 @@ public sealed class BuildingBlockCatalogTests
         IBuildingBlockCatalog catalog,
         IBuildingBlockRequirementLinkResolver? resolver = null)
     {
-        var serializerOptions = Substitute.For<IJsonSerializerOptionsProvider>();
-        var eventBus = Substitute.For<IDistributedEventBus>();
         var application = new MonicaApplicationOptions
         {
             ProjectName = "Ordering.Api",
@@ -575,11 +571,7 @@ public sealed class BuildingBlockCatalogTests
             resolver ?? new TestRequirementLinkResolver(_ => null),
             NullLogger<BuildingBlockProjectionService>.Instance);
 
-        return new BuildingBlockCatalogService(
-            eventBus,
-            serializerOptions,
-            catalog,
-            projections);
+        return new BuildingBlockCatalogService(catalog, projections);
     }
 
     private static ConfigurationDefinition CreateDefinition(string definitionKey)

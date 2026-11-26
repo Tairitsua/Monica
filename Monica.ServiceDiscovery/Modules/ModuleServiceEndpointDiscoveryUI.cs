@@ -11,16 +11,23 @@ namespace Monica.Modules;
 /// <summary>Endpoint diagnostics page, usable without registry membership or a state store.</summary>
 public sealed class ModuleServiceEndpointDiscoveryUI : MonicaModule<ModuleServiceEndpointDiscoveryUIOption>, IUIModule
 {
+    internal static NavigationCategoryId NavigationCategory { get; } = NavigationCategoryId.Create("Monica.ServiceDiscovery");
+
     /// <inheritdoc />
     public override void Describe(ModuleDescriptor module)
     {
         module.Require<ModuleServiceEndpointDiscovery>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(o => o.AddResource<ServiceDiscoveryResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(o => o.ConfigureNavigation(n =>
+        {
+            var category = n.RegisterLocalizedCategory<ServiceDiscoveryResource>(
+                NavigationCategory.Value, "Navigation:Category", 100,
+                parentId: BuiltInNavigationCategoryIds.Monitor, icon: MoIcons.Cloud);
             n.RegisterLocalizedPage<UIServiceDiscoveryEndpointsPage, ServiceDiscoveryResource>(
                 UIServiceDiscoveryEndpointsPage.PAGE_URL, "Workbench:Views:Endpoints:Title", MoIcons.Network,
-                BuiltInNavigationCategoryIds.Monitor, addToNav: true, navOrder: 45,
-                descriptionKey: "Workbench:Views:Endpoints:Description")));
+                category, addToNav: true, navOrder: 45,
+                descriptionKey: "Workbench:Views:Endpoints:Description");
+        }));
     }
 }
 

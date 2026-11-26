@@ -2,17 +2,17 @@
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @using Monica.Core.Results
-@using Monica.ServiceDiscovery.Abstractions
+@using Monica.UI.Shell.Support
 @using Monica.ServiceDiscovery.Facades
 @using Monica.ServiceDiscovery.Localization
 @using Monica.ServiceDiscovery.Models
 @using Monica.ServiceDiscovery.UIServiceDiscovery.Components
 @inject ServiceEndpointDiscoveryFacade Facade
-@inject IEnumerable<IServiceRegistrationCoordinator> Registrations
+@inject IPageCatalog PageCatalog
 @inject IStringLocalizer<ServiceDiscoveryResource> L
 
 <PageTitle>@L["Workbench:Views:Endpoints:Title"]</PageTitle>
-<DiscoveryWorkbench View="Endpoints" ShowRegistry="@Registrations.Any()">
+<DiscoveryWorkbench View="Endpoints" ShowRegistry="@PageCatalog.GetRegisteredPages().Any(page => page.ComponentType == typeof(UIServiceDiscoveryPage))">
     @if (_snapshot is { } snapshot)
     {
         <section class="endpoint-signature">

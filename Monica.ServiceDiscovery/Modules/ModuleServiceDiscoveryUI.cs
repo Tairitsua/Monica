@@ -6,7 +6,6 @@ using Monica.ServiceDiscovery.Localization;
 using Monica.ServiceDiscovery.Pages;
 using Monica.ServiceDiscovery.UIServiceDiscovery.State;
 using Monica.ServiceDiscovery.UIServiceDiscovery.Support;
-using Monica.UI.Shell.Models;
 using Monica.UI.Icons;
 using MudBlazor;
 
@@ -39,11 +38,7 @@ public class ModuleServiceDiscoveryUI : MonicaModule<ModuleServiceDiscoveryUIOpt
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
             option.ConfigureNavigation(static navigation =>
             {
-                var category = navigation.RegisterLocalizedCategory<ServiceDiscoveryResource>(
-                    "Monica.ServiceDiscovery", "Navigation:Category", 100,
-                    parentId: BuiltInNavigationCategoryIds.Monitor,
-                    icon: MoIcons.Cloud);
-
+                var category = ModuleServiceEndpointDiscoveryUI.NavigationCategory;
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryPage.SERVICE_DISCOVERY_DEBUG_URL,
                     "Pages:ServiceDiscovery:Title",

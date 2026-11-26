@@ -73,22 +73,14 @@ public class ModuleBuildingBlocksUI : MonicaModule<ModuleBuildingBlocksUIOption>
                     addToNav: true,
                     navOrder: 20,
                     descriptionKey: "Pages:BuildingBlocks:Graph:Description");
-                registry.RegisterLocalizedPage<UIBuildingBlocksEventsPage, BuildingBlocksResource>(
-                    UIBuildingBlocksEventsPage.PAGE_URL,
-                    "Pages:BuildingBlocks:Events:Title",
-                    MoIcons.Calendar,
-                    category,
-                    addToNav: true,
-                    navOrder: 30,
-                    descriptionKey: "Pages:BuildingBlocks:Events:Description");
                 registry.RegisterLocalizedPage<UIBuildingBlocksEnumsPage, BuildingBlocksResource>(
                     UIBuildingBlocksEnumsPage.PAGE_URL,
-                    "Pages:BuildingBlocks:Enums:Title",
+                    "Pages:EnumReference:Title",
                     MoIcons.Braces,
-                    category,
+                    BuiltInNavigationCategoryIds.Documentation,
                     addToNav: true,
                     navOrder: 50,
-                    descriptionKey: "Pages:BuildingBlocks:Enums:Description");
+                    descriptionKey: "Pages:EnumReference:Description");
             }));
     }
 

@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -51,7 +50,6 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
     public override void Describe(ModuleDescriptor module)
     {
         module.Require<ModuleJsonSerialization>();
-        module.Require<ModuleEventBus>();
         module.AfterIfPresent<ModuleAutoControllers>();
     }
 
@@ -120,18 +118,6 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
         UseEndpoints(context, endpoints =>
         {
             var tagName = Option.GetApiGroupName();
-
-            endpoints.MapPost("/framework/building-blocks/domain-event/{eventKey}/publish",
-                async ([FromRoute] string eventKey,
-                      [FromServices] BuildingBlocksFacade buildingBlocksFacade,
-                      [FromBody] JsonNode eventContent) =>
-                {
-                    return await buildingBlocksFacade.PublishDomainEventAsync(eventKey, eventContent);
-                })
-                .WithName("BuildingBlocks.PublishDomainEvent")
-                .WithTags(tagName)
-                .WithSummary("Publish a discovered domain event")
-                .WithDescription("Deserializes and publishes a domain event by its discovered building-block key.");
 
             endpoints.MapGet("/framework/building-blocks",
                 async ([FromServices] BuildingBlocksFacade buildingBlocksFacade) =>

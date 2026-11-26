@@ -2,7 +2,7 @@
   "Pages": {
     "BuildingBlocks": {
       "Title": "Building Blocks",
-      "Description": "Explore the host's discovered building blocks, architecture relationships, context completeness, and operational tools.",
+      "Description": "Explore the host's discovered building blocks, their relationships, and context coverage.",
       "Overview": {
         "Title": "Building block overview",
         "Description": "Review catalog composition, context completeness, and building blocks that need attention."
@@ -14,29 +14,23 @@
       "Graph": {
         "Title": "Building block relationships",
         "Description": "Trace directed dependencies, explore connected building blocks, and inspect the architecture graph."
-      },
-      "Events": {
-        "Title": "Domain event tools",
-        "Description": "Inspect event descriptors and prepare editable payloads for this host's distributed event bus."
-      },
-      "Enums": {
-        "Title": "Enum reference",
-        "Description": "Browse assembly and enum identities, value descriptions, and search matches."
       }
+    },
+    "EnumReference": {
+      "Title": "Enum reference",
+      "Description": "Browse assembly and enum identities, value descriptions, and search matches."
     }
   },
   "Page": {
     "Header": {
       "Title": "Building Blocks",
       "Eyebrow": "Monica / Architecture Registry",
-      "Description": "Explore the host's discovered capabilities, architecture relationships, context completeness, and operational test tools."
+      "Description": "Review the host's architecture, context coverage, and building blocks that need attention."
     },
     "Tabs": {
       "StatusOverview": "Overview",
       "BuildingBlock": "Building block catalog",
-      "ArchitectureVisualization": "Relationships",
-      "DomainEventTester": "Domain events",
-      "EnumInfo": "Enums"
+      "ArchitectureVisualization": "Relationships"
     }
   },
   "Workspace": {
@@ -153,42 +147,6 @@
       "Virtual": "Virtual",
       "Abstract": "Abstract",
       "Async": "Async"
-    }
-  },
-  "DomainEventTester": {
-    "Header": {
-      "Title": "Domain Event Tester",
-      "Description": "Inspect a discovered event contract, edit its JSON draft, and publish through this host."
-    },
-    "Actions": {
-      "Refresh": "Refresh event list",
-      "Publish": "Publish event",
-      "Publishing": "Publishing..."
-    },
-    "Sections": {
-      "EventList": "Discovered events",
-      "EventTester": "Payload draft"
-    },
-    "Fields": {
-      "EventName": "Dispatch identity",
-      "EventContent": "Event content (JSON)",
-      "EventContentPlaceholder": "Enter the event JSON payload..."
-    },
-    "States": {
-      "Empty": "No domain events were discovered in this host.",
-      "NoSelection": "Select a discovered event to inspect its identity and prepare a payload."
-    },
-    "Messages": {
-      "SelectEventAndContent": "Select an event and provide its content.",
-      "PublishFailed": "Publish failed: {0}",
-      "PublishSucceeded": "Published successfully.",
-      "PublishException": "Publish exception: {0}"
-    },
-    "Desk": {
-      "Eyebrow": "EVENT CONTRACTS",
-      "DraftLabel": "EDITABLE PAYLOAD",
-      "DispatchHint": "Publishes through this host's distributed event bus.",
-      "DraftHint": "Selection generates a representative draft. Publishing sends the edited JSON."
     }
   },
   "EnumInfoViewer": {

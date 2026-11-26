@@ -2,7 +2,7 @@
   "Pages": {
     "BuildingBlocks": {
       "Title": "构件",
-      "Description": "查看当前宿主发现的构件、架构关系、上下文完整度与运行工具。",
+      "Description": "查看当前宿主发现的构件、构件间的依赖关系与上下文覆盖情况。",
       "Overview": {
         "Title": "构件概览",
         "Description": "查看构件目录的构成、上下文完整度，以及需要关注的构件。"
@@ -14,29 +14,23 @@
       "Graph": {
         "Title": "构件依赖关系",
         "Description": "追踪有向依赖、浏览连通构件，并查看架构关系图。"
-      },
-      "Events": {
-        "Title": "领域事件工具",
-        "Description": "查看事件描述，并为当前宿主的分布式事件总线准备可编辑的载荷。"
-      },
-      "Enums": {
-        "Title": "枚举参考",
-        "Description": "浏览程序集与枚举标识、值的说明，以及搜索匹配项。"
       }
+    },
+    "EnumReference": {
+      "Title": "枚举参考",
+      "Description": "浏览程序集与枚举标识、值的说明，以及搜索匹配项。"
     }
   },
   "Page": {
     "Header": {
       "Title": "构件",
       "Eyebrow": "Monica / 架构目录",
-      "Description": "集中查看当前宿主发现的能力、架构关系、上下文完整度与运行测试工具。"
+      "Description": "查看当前宿主的架构、上下文覆盖情况，以及需要关注的构件。"
     },
     "Tabs": {
       "StatusOverview": "概览",
       "BuildingBlock": "构件目录",
-      "ArchitectureVisualization": "依赖关系",
-      "DomainEventTester": "领域事件",
-      "EnumInfo": "枚举参考"
+      "ArchitectureVisualization": "依赖关系"
     }
   },
   "Workspace": {
@@ -153,42 +147,6 @@
       "Virtual": "虚方法",
       "Abstract": "抽象",
       "Async": "异步"
-    }
-  },
-  "DomainEventTester": {
-    "Header": {
-      "Title": "领域事件测试",
-      "Description": "查看已发现事件的契约，编辑 JSON 草稿，并通过当前主机发布。"
-    },
-    "Actions": {
-      "Refresh": "刷新事件列表",
-      "Publish": "发布事件",
-      "Publishing": "发布中..."
-    },
-    "Sections": {
-      "EventList": "已发现的事件",
-      "EventTester": "载荷草稿"
-    },
-    "Fields": {
-      "EventName": "发布标识",
-      "EventContent": "事件内容（JSON）",
-      "EventContentPlaceholder": "请输入事件的 JSON 数据..."
-    },
-    "States": {
-      "Empty": "当前主机未发现领域事件。",
-      "NoSelection": "选择已发现的事件，查看发布标识并准备载荷。"
-    },
-    "Messages": {
-      "SelectEventAndContent": "请选择事件并填写事件内容。",
-      "PublishFailed": "发布失败: {0}",
-      "PublishSucceeded": "发布成功。",
-      "PublishException": "发布异常: {0}"
-    },
-    "Desk": {
-      "Eyebrow": "事件契约",
-      "DraftLabel": "可编辑载荷",
-      "DispatchHint": "通过当前主机的分布式事件总线发布。",
-      "DraftHint": "选择事件后生成示例草稿；发布操作发送编辑后的 JSON。"
     }
   },
   "EnumInfoViewer": {

@@ -6,7 +6,7 @@ namespace Monica.BuildingBlocks.Models;
 public sealed class BuildingBlockDomainEventInfo
 {
     /// <summary>
-    /// Gets the discovered event's full CLR type identity for exact publication.
+    /// Gets the discovered event's full CLR type identity.
     /// Display titles and short type names are not used to derive this key.
     /// </summary>
     public string EventKey { get; init; } = string.Empty;

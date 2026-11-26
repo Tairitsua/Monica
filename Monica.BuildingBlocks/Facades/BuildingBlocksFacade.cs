@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Monica.Core.Extensions;
@@ -90,29 +89,6 @@ public sealed class BuildingBlocksFacade(
             logger.LogError(ex, "Failed to load domain events.");
             return Task.FromResult<Result<List<BuildingBlockDomainEventInfo>>>(
                 Result.Failure<List<BuildingBlockDomainEventInfo>>($"Failed to load domain events: {ex.GetMessageRecursively()}"));
-        }
-    }
-
-    /// <summary>
-    /// Publishes a domain event payload.
-    /// </summary>
-    /// <param name="eventKey">
-    /// The exact full CLR identity supplied by <see cref="BuildingBlockDomainEventInfo.EventKey"/>.
-    /// Legacy short type names remain supported only when they identify exactly one catalog building block.
-    /// </param>
-    /// <param name="eventContent">The JSON payload to deserialize as the selected event type.</param>
-    /// <returns>A result envelope describing whether the event was published.</returns>
-    public async Task<Result> PublishDomainEventAsync(string eventKey, JsonNode eventContent)
-    {
-        try
-        {
-            await CatalogService.PublishDomainEventAsync(eventKey, eventContent);
-            return Result.Success().WithMessage($"Published domain event '{eventKey}'.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to publish domain event {EventKey}.", eventKey);
-            return Result.Failure($"Failed to publish domain event: {ex.GetMessageRecursively()}");
         }
     }
 
