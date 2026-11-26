@@ -117,49 +117,6 @@ public sealed class BuildingBlocksFacade(
     }
 
     /// <summary>
-    /// Gets a read-only snapshot of the current host's request-filter service and disabled paths.
-    /// </summary>
-    /// <returns>
-    /// A result envelope that distinguishes an unavailable service from an available service with no disabled paths.
-    /// Reading this snapshot does not attach middleware, change paths, or grant mutation access.
-    /// </returns>
-    public Task<Result<BuildingBlockRequestFilterState>> GetRequestFilterStateAsync()
-    {
-        try
-        {
-            return Task.FromResult(Result.Success(CatalogService.GetRequestFilterState()));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read request-filter state.");
-            return Task.FromResult<Result<BuildingBlockRequestFilterState>>(
-                Result.Failure<BuildingBlockRequestFilterState>($"Failed to read request-filter state: {ex.GetMessageRecursively()}"));
-        }
-    }
-
-    /// <summary>
-    /// Reads and updates the request-filter state.
-    /// </summary>
-    /// <param name="urls">Request paths to update, or <see langword="null"/> to query the current state.</param>
-    /// <param name="disable"><see langword="true"/> to disable the paths; <see langword="false"/> to enable them.</param>
-    /// <returns>
-    /// A result envelope containing the currently disabled request paths, or an empty list if no service is registered.
-    /// Use <see cref="GetRequestFilterStateAsync"/> when availability must be distinguished from an empty set.
-    /// </returns>
-    public Task<Result<List<string>>> ManageRequestFilterAsync(List<string>? urls, bool? disable)
-    {
-        try
-        {
-            return Task.FromResult(Result.Success<List<string>>(CatalogService.ManageRequestFilter(urls, disable)));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to manage request filters.");
-            return Task.FromResult(Result.Failure<List<string>>($"Failed to manage request filters: {ex.GetMessageRecursively()}"));
-        }
-    }
-
-    /// <summary>
     /// Gets enum metadata.
     /// </summary>
     /// <param name="name">An optional short enum type name used to filter the result.</param>

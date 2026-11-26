@@ -81,14 +81,6 @@ public class ModuleBuildingBlocksUI : MonicaModule<ModuleBuildingBlocksUIOption>
                     addToNav: true,
                     navOrder: 30,
                     descriptionKey: "Pages:BuildingBlocks:Events:Description");
-                registry.RegisterLocalizedPage<UIBuildingBlocksRequestFiltersPage, BuildingBlocksResource>(
-                    UIBuildingBlocksRequestFiltersPage.PAGE_URL,
-                    "Pages:BuildingBlocks:RequestFilters:Title",
-                    MoIcons.Filter,
-                    category,
-                    addToNav: true,
-                    navOrder: 40,
-                    descriptionKey: "Pages:BuildingBlocks:RequestFilters:Description");
                 registry.RegisterLocalizedPage<UIBuildingBlocksEnumsPage, BuildingBlocksResource>(
                     UIBuildingBlocksEnumsPage.PAGE_URL,
                     "Pages:BuildingBlocks:Enums:Title",

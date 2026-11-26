@@ -19,56 +19,10 @@ namespace Test.Monica.BuildingBlocks.Facades;
 
 public sealed class BuildingBlocksFacadeTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task GetRequestFilterState_WhenPathsAreEmpty_ShouldDistinguishServiceAvailability(bool enabled)
-    {
-        await using var application = await new FacadeScenarioFactory(enabled)
-            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
-
-        var result = await scope.Resolve<BuildingBlocksFacade>().GetRequestFilterStateAsync();
-
-        result.Status.Should().Be(ResultStatus.Ok);
-        result.Message.Should().BeNullOrEmpty();
-        result.Data.Should().NotBeNull();
-        result.Data!.IsAvailable.Should().Be(enabled);
-        result.Data.DisabledPaths.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetRequestFilterState_WhenPathsChange_ShouldRetainDetachedExactSnapshotAndHostIsolation()
-    {
-        await using var first = await new FacadeScenarioFactory(true)
-            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await using var second = await new FacadeScenarioFactory(true)
-            .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await using var firstScope = first.CreateScope(TestContext.Current.CancellationToken);
-        await using var secondScope = second.CreateScope(TestContext.Current.CancellationToken);
-        var facade = firstScope.Resolve<BuildingBlocksFacade>();
-
-        var disabled = await facade.ManageRequestFilterAsync(["/probe", "/Probe", "/probe"], true);
-        disabled.Status.Should().Be(ResultStatus.Ok);
-        disabled.Data.Should().BeEquivalentTo("/probe", "/Probe");
-        var captured = await facade.GetRequestFilterStateAsync();
-        captured.Status.Should().Be(ResultStatus.Ok);
-        captured.Data!.DisabledPaths.Should().BeEquivalentTo("/probe", "/Probe");
-
-        var enabled = await facade.ManageRequestFilterAsync(["/probe"], false);
-        enabled.Status.Should().Be(ResultStatus.Ok);
-        enabled.Data.Should().Equal("/Probe");
-        captured.Data.DisabledPaths.Should().BeEquivalentTo("/probe", "/Probe");
-        var other = await secondScope.Resolve<BuildingBlocksFacade>().GetRequestFilterStateAsync();
-        other.Status.Should().Be(ResultStatus.Ok);
-        other.Data!.IsAvailable.Should().BeTrue();
-        other.Data.DisabledPaths.Should().BeEmpty();
-    }
-
     [Fact]
     public async Task PublishDomainEvent_WhenDisplayTitleDiffers_ShouldUseDiscoveredExactOperationKey()
     {
-        await using var application = await new FacadeScenarioFactory(false)
+        await using var application = await new FacadeScenarioFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var facade = scope.Resolve<BuildingBlocksFacade>();
@@ -90,7 +44,7 @@ public sealed class BuildingBlocksFacadeTests
     [Fact]
     public async Task PublishDomainEvent_WhenShortNamesCollide_ShouldDispatchEachFullIdentityExactly()
     {
-        await using var application = await new FacadeScenarioFactory(false)
+        await using var application = await new FacadeScenarioFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
         var facade = scope.Resolve<BuildingBlocksFacade>();
@@ -108,7 +62,7 @@ public sealed class BuildingBlocksFacadeTests
     [Fact]
     public async Task PublishDomainEvent_WhenUsingLegacyShortKey_ShouldRetainPublication()
     {
-        await using var application = await new FacadeScenarioFactory(false)
+        await using var application = await new FacadeScenarioFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
 
@@ -123,7 +77,7 @@ public sealed class BuildingBlocksFacadeTests
     [Fact]
     public async Task PublishDomainEvent_WhenShortKeyIsAmbiguous_ShouldRejectWithoutDispatch()
     {
-        await using var application = await new FacadeScenarioFactory(false)
+        await using var application = await new FacadeScenarioFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
 
@@ -138,7 +92,7 @@ public sealed class BuildingBlocksFacadeTests
     [Fact]
     public async Task GetDomainEvents_WhenRecordRequiresConstructorArguments_ShouldRetainDescriptorWithoutSample()
     {
-        await using var application = await new FacadeScenarioFactory(false)
+        await using var application = await new FacadeScenarioFactory()
             .CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         await using var scope = application.CreateScope(TestContext.Current.CancellationToken);
 
@@ -167,7 +121,7 @@ public sealed class BuildingBlocksFacadeTests
         public sealed class EventCollision : IDomainEvent;
     }
 
-    private sealed class FacadeScenarioFactory(bool enableFilter)
+    private sealed class FacadeScenarioFactory
         : MonicaTestApplicationFactory<EventFriendlyDispatch>
     {
         protected override void ConfigureMonica(IMonicaBuilder builder)
@@ -175,7 +129,7 @@ public sealed class BuildingBlocksFacadeTests
             builder.ConfigureModuleSystem(options => options.AutoAddMonicaHttpListener = false);
             builder.AddEventBus(options => options.DisableAutoDiscovery = true)
                 .UseDistributedEventBus<RecordingDistributedProvider>();
-            builder.AddBuildingBlocks(options => options.EnableRequestFilter = enableFilter);
+            builder.AddBuildingBlocks();
         }
 
         protected override void ConfigureServices(IServiceCollection services)

@@ -15,7 +15,6 @@ using Monica.Core.XmlDocumentation.Abstractions;
 using Monica.BuildingBlocks.Abstractions;
 using Monica.BuildingBlocks.Facades;
 using Monica.BuildingBlocks.Models;
-using Monica.BuildingBlocks.Providers.AspNetCore;
 using Monica.BuildingBlocks.Services;
 using Monica.BuildingBlocks.Services.Support;
 using Monica.Tool.Extensions;
@@ -29,7 +28,7 @@ public static class ModuleBuildingBlocksBuilderExtensions
     extension(IMonicaBuilder builder)
     {
         /// <summary>
-        /// Registers host-scoped project architecture discovery, diagnostics, and optional request filtering.
+        /// Registers host-scoped project architecture discovery and diagnostics.
         /// </summary>
         /// <param name="action">An optional callback that configures discovery and endpoint behavior.</param>
         /// <returns>The host-bound module registration.</returns>
@@ -68,11 +67,6 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
         services.AddScoped<BuildingBlockProjectionService>();
         services.AddScoped<BuildingBlockCatalogService>();
         services.AddScoped<BuildingBlocksFacade>();
-
-        if (Option.EnableRequestFilter)
-        {
-            services.AddRequestFilter();
-        }
     }
 
     /// <inheritdoc />
@@ -120,26 +114,9 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
             ?.ImplementationInstance as IConfigurationDefinitionRegistry;
     }
 
-    private sealed class RequestFilterDto
-    {
-        public List<string>? Urls { get; set; }
-        public bool? Disable { get; set; }
-    }
-
-    /// <inheritdoc />
-    public override void ConfigureApplicationBuilder(WebModuleContext<ModuleBuildingBlocksOption> context)
-    {
-        var app = context.ApplicationBuilder;
-        if (Option.EnableRequestFilter)
-        {
-            app.UseRequestFilter();
-        }
-    }
-
     /// <inheritdoc />
     public override void ConfigureEndpoints(WebModuleContext<ModuleBuildingBlocksOption> context)
     {
-        var app = context.ApplicationBuilder;
         UseEndpoints(context, endpoints =>
         {
             var tagName = Option.GetApiGroupName();
@@ -155,20 +132,6 @@ public class ModuleBuildingBlocks : MonicaModule<ModuleBuildingBlocksOption>, IW
                 .WithTags(tagName)
                 .WithSummary("Publish a discovered domain event")
                 .WithDescription("Deserializes and publishes a domain event by its discovered building-block key.");
-
-            if (Option.EnableRequestFilter)
-            {
-                endpoints.MapPost("/framework/request-filter",
-                    async ([FromBody] RequestFilterDto dto,
-                          [FromServices] BuildingBlocksFacade buildingBlocksFacade) =>
-                    {
-                        return await buildingBlocksFacade.ManageRequestFilterAsync(dto.Urls, dto.Disable);
-                    })
-                    .WithName("BuildingBlocks.ConfigureRequestFilter")
-                    .WithTags(tagName)
-                    .WithSummary("Configure the building-block request filter")
-                    .WithDescription("Enables or disables host-local request paths when request filtering is configured.");
-            }
 
             endpoints.MapGet("/framework/building-blocks",
                 async ([FromServices] BuildingBlocksFacade buildingBlocksFacade) =>
@@ -303,12 +266,6 @@ public class ModuleBuildingBlocksOption : MinimalApiModuleOptions<ModuleBuilding
     /// Gets or sets the naming rules used to validate discovered architectural building blocks.
     /// </summary>
     public BuildingBlockNamingOptions Naming { get; set; } = new();
-
-    /// <summary>
-    /// Gets or sets whether the request-filter middleware and its management endpoint are enabled.
-    /// The filter is disabled by default and its path state is isolated to the current host.
-    /// </summary>
-    public bool EnableRequestFilter { get; set; }
 
     /// <summary>
     /// Gets or sets whether Building Blocks loads XML summaries for discovered types and methods.

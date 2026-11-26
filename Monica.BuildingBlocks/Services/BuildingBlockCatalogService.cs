@@ -12,8 +12,7 @@ internal sealed class BuildingBlockCatalogService(
     IDistributedEventBus eventBus,
     IJsonSerializerOptionsProvider jsonSerializerOptionsProvider,
     IBuildingBlockCatalog catalog,
-    BuildingBlockProjectionService projections,
-    IRequestFilter? requestFilter = null)
+    BuildingBlockProjectionService projections)
 {
     internal List<BuildingBlockSummary> GetAll()
     {
@@ -53,40 +52,6 @@ internal sealed class BuildingBlockCatalogService(
 
         await eventBus.PublishAsync(unitEvent.ClrType, eventToPublish);
         return eventToPublish;
-    }
-
-    internal BuildingBlockRequestFilterState GetRequestFilterState()
-    {
-        return new BuildingBlockRequestFilterState
-        {
-            IsAvailable = requestFilter is not null,
-            DisabledPaths = requestFilter is null ? [] : requestFilter.GetDisabledUrls().AsReadOnly()
-        };
-    }
-
-    internal List<string> ManageRequestFilter(List<string>? urls, bool? disable)
-    {
-        if (requestFilter == null)
-        {
-            return [];
-        }
-
-        if (urls is { } urlList && disable is { } disableFlag)
-        {
-            foreach (var url in urlList)
-            {
-                if (disableFlag)
-                {
-                    requestFilter.Disable(url);
-                }
-                else
-                {
-                    requestFilter.Enable(url);
-                }
-            }
-        }
-
-        return requestFilter.GetDisabledUrls();
     }
 
     internal List<DtoAssemblyEnumInfo> GetEnumInfo(string? name = null)

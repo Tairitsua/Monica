@@ -19,10 +19,6 @@
         "Title": "Domain event tools",
         "Description": "Inspect event descriptors and prepare editable payloads for this host's distributed event bus."
       },
-      "RequestFilters": {
-        "Title": "Request path controls",
-        "Description": "Review disabled request paths and manage the host's configured request filter."
-      },
       "Enums": {
         "Title": "Enum reference",
         "Description": "Browse assembly and enum identities, value descriptions, and search matches."
@@ -40,7 +36,6 @@
       "BuildingBlock": "Building block catalog",
       "ArchitectureVisualization": "Relationships",
       "DomainEventTester": "Domain events",
-      "RequestFilterManager": "Request paths",
       "EnumInfo": "Enums"
     }
   },
@@ -512,68 +507,6 @@
       "PageRange": "{0}–{1} of {2} records",
       "PreviousPage": "Previous evidence page",
       "NextPage": "Next evidence page"
-    }
-  },
-  "RequestFilterManager": {
-    "Header": {
-      "Title": "Request Filter Manager",
-      "Description": "Review this host's request-filter state and apply explicit changes to individual or batch paths."
-    },
-    "Actions": {
-      "RefreshState": "Refresh state",
-      "Disable": "Disable",
-      "Enable": "Enable",
-      "BatchDisable": "Batch disable",
-      "BatchEnable": "Batch enable",
-      "EnableAllUrls": "Enable all URLs"
-    },
-    "Fields": {
-      "UrlPath": "URL path",
-      "UrlPlaceholder": "Example: /api/test",
-      "BatchUrls": "Batch URLs (one per line)",
-      "BatchUrlsPlaceholder": "Example:\n/api/test1\n/api/test2\n/api/test3"
-    },
-    "Sections": {
-      "UrlManagement": "URL management",
-      "BatchManagement": "Batch management",
-      "DisabledUrls": "Currently disabled URLs"
-    },
-    "States": {
-      "EmptyDisabledUrls": "No paths are listed as disabled in this snapshot."
-    },
-    "Messages": {
-      "RequireUrl": "Enter a URL path.",
-      "RequireBatchUrls": "Enter the URL list to manage.",
-      "NoValidUrls": "No valid URLs were found.",
-      "OperationFailed": "Operation failed: {0}",
-      "OperationException": "Operation exception: {0}",
-      "DisableSucceeded": "URL disabled successfully.",
-      "EnableSucceeded": "URL enabled successfully.",
-      "BatchOperationFailed": "Batch operation failed: {0}",
-      "BatchOperationException": "Batch operation exception: {0}",
-      "BatchDisableSucceeded": "Disabled {0} URLs successfully.",
-      "BatchEnableSucceeded": "Enabled {0} URLs successfully.",
-      "EnableSingleFailed": "Failed to enable the URL: {0}",
-      "EnableSingleSucceeded": "URL {0} enabled successfully.",
-      "EnableSingleException": "Enable exception: {0}",
-      "EnableAllFailed": "Failed to enable all URLs: {0}",
-      "EnableAllSucceeded": "All URLs have been enabled successfully.",
-      "EnableAllException": "Enable all exception: {0}"
-    },
-    "Desk": {
-      "Eyebrow": "REQUEST PATH OPERATIONS",
-      "StateLabel": "HOST FILTER SNAPSHOT",
-      "Available": "Request-filter service registered",
-      "Unavailable": "Request-filter service unavailable",
-      "AvailabilityHint": "This snapshot lists paths disabled by the registered filter. Middleware attachment and access policies are separate.",
-      "UnavailableHint": "This host has no registered request-filter service. Path changes are unavailable.",
-      "EnablePath": "Enable path {0}",
-      "ControlsHint": "Trimmed paths are applied exactly; path casing is preserved.",
-      "ModeLabel": "Path input mode",
-      "SingleMode": "Single path",
-      "BatchMode": "Batch paths",
-      "BatchCount": "{0} input paths · one per line",
-      "Applying": "Applying path changes…"
     }
   }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monica.Configuration.Abstractions;
@@ -12,14 +11,13 @@ using Monica.Tool.Extensions;
 namespace Monica.BuildingBlocks.Services.Support;
 
 /// <summary>
-/// Owns building-block discovery, dependency analysis, and request-filter state for one Monica host.
+/// Owns building-block discovery and dependency analysis for one Monica host.
 /// </summary>
-internal sealed class BuildingBlockCatalog : IBuildingBlockCatalog, IRequestFilter
+internal sealed class BuildingBlockCatalog : IBuildingBlockCatalog
 {
     private readonly Dictionary<string, BuildingBlock> _unitsByFullName = [];
     private readonly Dictionary<string, BuildingBlock?> _unitsByName = [];
     private readonly Dictionary<string, Type> _enumTypes = [];
-    private readonly ConcurrentDictionary<string, byte> _disabledRequestUrls = new(StringComparer.Ordinal);
     private readonly BuildingBlockFactory _unitFactory;
     private int _documentationAttached;
 
@@ -188,28 +186,6 @@ internal sealed class BuildingBlockCatalog : IBuildingBlockCatalog, IRequestFilt
     public TBuildingBlock? FindByName<TBuildingBlock>(string? typeName) where TBuildingBlock : BuildingBlock
     {
         return FindByName(typeName) as TBuildingBlock;
-    }
-
-    public void Disable(string url)
-    {
-        ArgumentNullException.ThrowIfNull(url);
-        _disabledRequestUrls.TryAdd(url, 0);
-    }
-
-    public void Enable(string url)
-    {
-        ArgumentNullException.ThrowIfNull(url);
-        _disabledRequestUrls.TryRemove(url, out _);
-    }
-
-    public List<string> GetDisabledUrls()
-    {
-        return [.. _disabledRequestUrls.Keys];
-    }
-
-    internal bool IsRequestDisabled(string path)
-    {
-        return _disabledRequestUrls.ContainsKey(path);
     }
 
     private void DiscoverBuildingBlock(BusinessTypeShape shape)

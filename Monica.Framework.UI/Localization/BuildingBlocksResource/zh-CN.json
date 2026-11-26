@@ -19,10 +19,6 @@
         "Title": "领域事件工具",
         "Description": "查看事件描述，并为当前宿主的分布式事件总线准备可编辑的载荷。"
       },
-      "RequestFilters": {
-        "Title": "请求路径控制",
-        "Description": "查看已禁用的请求路径，并管理宿主已配置的请求过滤器。"
-      },
       "Enums": {
         "Title": "枚举参考",
         "Description": "浏览程序集与枚举标识、值的说明，以及搜索匹配项。"
@@ -40,7 +36,6 @@
       "BuildingBlock": "构件目录",
       "ArchitectureVisualization": "依赖关系",
       "DomainEventTester": "领域事件",
-      "RequestFilterManager": "请求路径",
       "EnumInfo": "枚举参考"
     }
   },
@@ -512,68 +507,6 @@
       "PageRange": "第 {0}–{1} 项，共 {2} 项",
       "PreviousPage": "上一页",
       "NextPage": "下一页"
-    }
-  },
-  "RequestFilterManager": {
-    "Header": {
-      "Title": "请求过滤管理",
-      "Description": "查看当前主机的请求过滤状态，并明确更新单条或批量路径。"
-    },
-    "Actions": {
-      "RefreshState": "刷新状态",
-      "Disable": "禁用",
-      "Enable": "启用",
-      "BatchDisable": "批量禁用",
-      "BatchEnable": "批量启用",
-      "EnableAllUrls": "启用所有 URL"
-    },
-    "Fields": {
-      "UrlPath": "URL 路径",
-      "UrlPlaceholder": "例如: /api/test",
-      "BatchUrls": "批量 URL（每行一个）",
-      "BatchUrlsPlaceholder": "例如:\n/api/test1\n/api/test2\n/api/test3"
-    },
-    "Sections": {
-      "UrlManagement": "URL 管理",
-      "BatchManagement": "批量管理",
-      "DisabledUrls": "当前被禁用的 URL"
-    },
-    "States": {
-      "EmptyDisabledUrls": "当前快照中没有已禁用的路径。"
-    },
-    "Messages": {
-      "RequireUrl": "请输入 URL 路径。",
-      "RequireBatchUrls": "请输入要管理的 URL 列表。",
-      "NoValidUrls": "没有有效的 URL。",
-      "OperationFailed": "操作失败: {0}",
-      "OperationException": "操作异常: {0}",
-      "DisableSucceeded": "URL 禁用成功。",
-      "EnableSucceeded": "URL 启用成功。",
-      "BatchOperationFailed": "批量操作失败: {0}",
-      "BatchOperationException": "批量操作异常: {0}",
-      "BatchDisableSucceeded": "批量禁用成功，共处理 {0} 个 URL。",
-      "BatchEnableSucceeded": "批量启用成功，共处理 {0} 个 URL。",
-      "EnableSingleFailed": "启用失败: {0}",
-      "EnableSingleSucceeded": "URL {0} 启用成功。",
-      "EnableSingleException": "启用异常: {0}",
-      "EnableAllFailed": "启用所有 URL 失败: {0}",
-      "EnableAllSucceeded": "所有 URL 启用成功。",
-      "EnableAllException": "启用所有 URL 异常: {0}"
-    },
-    "Desk": {
-      "Eyebrow": "请求路径操作",
-      "StateLabel": "主机过滤快照",
-      "Available": "已注册请求过滤服务",
-      "Unavailable": "请求过滤服务不可用",
-      "AvailabilityHint": "此快照列出已注册过滤服务禁用的路径；是否挂接中间件以及访问策略需分别判断。",
-      "UnavailableHint": "当前主机未注册请求过滤服务，无法更改路径状态。",
-      "EnablePath": "启用路径 {0}",
-      "ControlsHint": "去除首尾空白后按原路径更新，保留大小写。",
-      "ModeLabel": "路径输入模式",
-      "SingleMode": "单条路径",
-      "BatchMode": "批量路径",
-      "BatchCount": "{0} 条输入路径 · 每行一条",
-      "Applying": "正在更新路径…"
     }
   }
 }
