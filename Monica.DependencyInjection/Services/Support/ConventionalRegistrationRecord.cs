@@ -9,6 +9,7 @@ namespace Monica.DependencyInjection.Services.Support;
 /// </summary>
 internal sealed class ConventionalRegistrationRecord(
     ServiceDescriptor descriptor,
+    DependencyInjectionActivation activation,
     Type sourceImplementationType,
     ServiceLifetime lifetime,
     DependencyInjectionLifetimeSource lifetimeSource,
@@ -21,6 +22,9 @@ internal sealed class ConventionalRegistrationRecord(
     /// Gets the descriptor associated with the record.
     /// </summary>
     public ServiceDescriptor Descriptor { get; } = descriptor;
+
+    /// <summary>Gets how the registrar constructed this descriptor.</summary>
+    public DependencyInjectionActivation Activation { get; } = activation;
 
     /// <summary>
     /// Gets the implementation type Monica discovered during conventional registration.

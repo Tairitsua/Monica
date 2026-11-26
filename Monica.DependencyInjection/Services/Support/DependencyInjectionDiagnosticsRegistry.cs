@@ -39,6 +39,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
     /// </summary>
     public void RecordConventionalRegistration(
         ServiceDescriptor descriptor,
+        DependencyInjectionActivation activation,
         Type sourceImplementationType,
         ServiceLifetime lifetime,
         DependencyInjectionLifetimeSource lifetimeSource,
@@ -56,6 +57,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
         {
             var record = new ConventionalRegistrationRecord(
                 descriptor,
+                activation,
                 sourceImplementationType,
                 lifetime,
                 lifetimeSource,
@@ -118,7 +120,18 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
         IReadOnlyList<DependencyInjectionAutoRegistrationIssueInfo> standaloneIssues)
     {
         var descriptors = new List<DependencyInjectionDescriptorInfo>(services.Count);
+        var identityIndices = new Dictionary<ServiceIdentifier, int>();
+        // Reserve direct matches before considering logical matches in collection order.
         var matchedRecords = new HashSet<ConventionalRegistrationRecord>(ReferenceEqualityComparer.Instance);
+        for (var index = 0; index < services.Count; index++)
+        {
+            var descriptor = services[index];
+            identityIndices.TryAdd(new ServiceIdentifier(descriptor.ServiceKey, descriptor.ServiceType), index);
+            if (directRecords.TryGetValue(descriptor, out var directRecord))
+            {
+                matchedRecords.Add(directRecord);
+            }
+        }
         var autoRegistrationIssues = allRecords
             .SelectMany(record => record.Issues)
             .Concat(standaloneIssues)
@@ -130,7 +143,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
         for (var index = 0; index < services.Count; index++)
         {
             var descriptor = services[index];
-            directRecords.TryGetValue(descriptor, out var record);
+            var isDirectMatch = directRecords.TryGetValue(descriptor, out var record);
 
             if (record == null)
             {
@@ -142,7 +155,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
                 matchedRecords.Add(record);
             }
 
-            descriptors.Add(CreateDescriptorInfo(index, descriptor, record));
+            descriptors.Add(CreateDescriptorInfo(index, descriptor, record, isDirectMatch, identityIndices));
         }
 
         return new DependencyInjectionDiagnosticsSnapshot
@@ -177,9 +190,11 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
     private static DependencyInjectionDescriptorInfo CreateDescriptorInfo(
         int index,
         ServiceDescriptor descriptor,
-        ConventionalRegistrationRecord? record)
+        ConventionalRegistrationRecord? record,
+        bool isDirectMatch,
+        IReadOnlyDictionary<ServiceIdentifier, int> identityIndices)
     {
-        var implementationType = descriptor.GetResolvedImplementationType();
+        var implementationType = isDirectMatch ? record!.SourceImplementationType : descriptor.GetResolvedImplementationType();
         var implementationKind = descriptor.GetImplementationKind();
         var hasWarningIssues = record?.Issues.Any(item => item.Severity == DependencyInjectionDiagnosticSeverity.Warning) ?? false;
         var hasErrorIssues = record?.Issues.Any(item => item.Severity == DependencyInjectionDiagnosticSeverity.Error) ?? false;
@@ -187,6 +202,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
         return new DependencyInjectionDescriptorInfo
         {
             Index = index,
+            ServiceIdentityIndex = identityIndices[new ServiceIdentifier(descriptor.ServiceKey, descriptor.ServiceType)],
             ServiceType = descriptor.ServiceType.GetCleanFullName(),
             ServiceTypeDisplayName = descriptor.ServiceType.GetCleanName(),
             ServiceAssemblyName = descriptor.ServiceType.Assembly.GetName().Name,
@@ -194,19 +210,27 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
             IsKeyedService = descriptor.IsKeyedService,
             ServiceKey = descriptor.GetServiceKeyDisplay(),
             ImplementationKind = implementationKind,
+            Activation = isDirectMatch
+                ? record!.Activation
+                : implementationKind == DependencyInjectionDescriptorImplementationKind.Factory
+                    ? DependencyInjectionActivation.Factory
+                    : DependencyInjectionActivation.Direct,
             ImplementationType = implementationType?.GetCleanFullName(),
             ImplementationTypeDisplayName = implementationType?.GetCleanName(),
             ImplementationAssemblyName = implementationType?.Assembly.GetName().Name,
             FactoryDisplay = descriptor.GetFactoryDisplay(),
             IsOpenGeneric = descriptor.ServiceType.IsGenericTypeDefinition || (implementationType?.IsGenericTypeDefinition ?? false),
             IsAutoRegistered = record != null,
-            AutoRegistration = record == null ? null : CreateAutoRegistrationInfo(record),
+            IsDirectConventionMatch = isDirectMatch,
+            AutoRegistration = record == null ? null : CreateAutoRegistrationInfo(record, identityIndices),
             HasWarningIssues = hasWarningIssues,
             HasErrorIssues = hasErrorIssues
         };
     }
 
-    private static DependencyInjectionAutoRegistrationInfo CreateAutoRegistrationInfo(ConventionalRegistrationRecord record)
+    private static DependencyInjectionAutoRegistrationInfo CreateAutoRegistrationInfo(
+        ConventionalRegistrationRecord record,
+        IReadOnlyDictionary<ServiceIdentifier, int> identityIndices)
     {
         return new DependencyInjectionAutoRegistrationInfo
         {
@@ -220,6 +244,7 @@ internal sealed class DependencyInjectionDiagnosticsRegistry
             ExposedServices = record.ExposedServices
                 .Select(item => new DependencyInjectionExposedServiceInfo
                 {
+                    ServiceIdentityIndex = identityIndices.TryGetValue(item, out var index) ? index : null,
                     ServiceType = item.ServiceType.GetCleanFullName(),
                     ServiceTypeDisplayName = item.ServiceType.GetCleanName(),
                     IsKeyedService = item.ServiceKey != null,

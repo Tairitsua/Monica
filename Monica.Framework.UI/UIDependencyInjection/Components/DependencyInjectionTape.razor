@@ -1,0 +1,348 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="di-tape">
+    <div class="di-tape-head">
+        <div><h3>@L["Workbench:TapeTitle"]</h3><p>@L["Workbench:TapeNote", Model.Descriptors.Length]</p></div>
+        <div class="legend">
+            <span><i class="swatch role-info" aria-hidden="true"></i>@L["Workbench:Legend:Auto"]</span>
+            <span><i class="di-sw-other" aria-hidden="true"></i>@L["Workbench:Legend:Other"]</span>
+            @if (_tape.Arcs.Any(a => a.Reason != ConventionFinding.RegisteredTwice))
+            {
+                <span><i class="di-sw-arc role-warning" aria-hidden="true"></i>@L["Workbench:Legend:Elsewhere"]</span>
+            }
+            @if (_tape.Arcs.Any(a => a.Reason == ConventionFinding.RegisteredTwice))
+            {
+                <span><i class="di-sw-arc is-dashed role-warning" aria-hidden="true"></i>@L["Workbench:Legend:Twice"]</span>
+            }
+            @if (_tape.Replaced.Length > 0) { <span><i class="swatch role-third is-diamond" aria-hidden="true"></i>@L["Workbench:Legend:Replaced"]</span> }
+            @if (_tape.Advisory.Length > 0) { <span><i class="di-sw-adv" aria-hidden="true"></i>@L["Workbench:Legend:Advisory"]</span> }
+            @if (_tape.Missing.Length > 0) { <span><i class="swatch is-hatch" aria-hidden="true"></i>@L["Workbench:Legend:NotIn"]</span> }
+        </div>
+    </div>
+    @if (Model.Descriptors.Length == 0 && _tape.Missing.Length == 0)
+    {
+        <MoContentState Class="di-none" Compact="true"><p>@L["Workbench:EmptyRegistry"]</p></MoContentState>
+    }
+    else
+    {
+        <div class="di-tape-body" @ref="_wrap" style="height:208px" data-count="@Model.Descriptors.Length">
+            @if (_width > 0)
+            {
+                var arcTargets = ArcTargets();
+                <svg class="di-tape-svg" width="@_width" height="208" aria-hidden="true">
+                    <defs>
+                        <pattern id="di-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <rect width="6" height="6" class="di-t-binbg" /><line x1="0" y1="0" x2="0" y2="6" class="di-t-hatch" />
+                        </pattern>
+                    </defs>
+                    @SvgLabel(0, 19, L["Workbench:Lanes:Segments"], "di-t-label")
+                    @SvgLabel(0, 74, L["Workbench:Lanes:Arcs"], "di-t-label")
+                    @SvgLabel(0, 99, L["Workbench:Lanes:Auto"], "di-t-label")
+                    @if (!Narrow) { @SvgLabel(0, 119, L["Workbench:Lanes:Advisory"], "di-t-label") }
+                    @for (var i = 0; i < Lifetimes.Length; i++)
+                    {
+                        var y = 130 + i * 18;
+                        @SvgLabel(0, y + 10, Lifetime(L, Lifetimes[i]), "di-t-label")
+                        <rect x="@G(LabelWidth)" y="@y" width="@G(LanesWidth)" height="12" rx="2" class="di-t-lane" />
+                        @foreach (var run in _tape.Lifetimes[i])
+                        {
+                            <rect x="@G(X(run.From))" y="@y" width="@G(RunWidth(run.From, run.To))" height="12" class="di-t-lt role-third" />
+                        }
+                    }
+                    @for (var i = 0; i < _tape.Segments.Length; i++)
+                    {
+                        var s = _tape.Segments[i];
+                        var width = RunWidth(s.From, s.To);
+                        <rect x="@G(X(s.From))" y="0" width="@G(Math.Max(1, width - 1))" height="30" rx="4"
+                              class="di-t-seg @(i % 2 != 0 ? "is-alt" : null) @(_activeSegment == s ? "is-focus" : null)" />
+                        @if (width > 64)
+                        {
+                            <g><text x="@G(X(s.From) + 8)" y="19" class="di-t-segtext">@Family(s)<tspan dx="5" class="di-t-segn">@s.Count</tspan></text></g>
+                        }
+                        else if (width > 26) { @SvgLabel(X(s.From) + width / 2, 19, s.Count.ToString(CultureInfo.CurrentCulture), "di-t-segn is-mid") }
+                        @if (i > 0)
+                        {
+                            <line x1="@G(X(s.From) - .5)" x2="@G(X(s.From) - .5)" y1="36" y2="186" class="di-t-grid" />
+                        }
+                    }
+                    <rect x="@G(LabelWidth)" y="84" width="@G(LanesWidth)" height="22" rx="3" class="di-t-other" />
+                    @foreach (var run in _tape.Conventional)
+                    {
+                        <rect x="@G(X(run.From))" y="84" width="@G(RunWidth(run.From, run.To))" height="22" class="di-t-auto role-info" />
+                    }
+                    @foreach (var index in _tape.Advisory)
+                    {
+                        <rect x="@G(X(index))" y="113" width="@G(Math.Max(1, MarkWidth))" height="6" class="di-t-adv role-warning" />
+                    }
+                    @if (_range is { } range)
+                    {
+                        <rect x="@G(X(range.From))" y="36" width="@G(Math.Max(2, RunWidth(range.From, range.To)))" height="150" class="di-t-range role-primary" />
+                    }
+                    @foreach (var arc in _tape.Arcs)
+                    {
+                        var x1 = Center(arc.From);
+                        var x2 = Center(arc.To);
+                        var h = ArcHeight(x1, x2);
+                        <g class="di-t-arc @CssRole(FindingRole(arc.Reason))">
+                            <path d="@($"M{G(x1)},80 Q{G((x1 + x2) / 2)},{G(80 - 2 * h)} {G(x2)},80")"
+                                  class="@(arc.Reason == ConventionFinding.RegisteredTwice ? "is-dashed" : null)" />
+                            <circle cx="@G(x1)" cy="80" r="3" class="is-from" /><circle cx="@G(x2)" cy="80" r="3.5" />
+                        </g>
+                    }
+                    @foreach (var target in arcTargets.Where(target => target.X != target.Apex))
+                    {
+                        <line x1="@G(target.Apex)" x2="@G(target.X)" y1="@G(target.Y)" y2="@G(target.Y)"
+                              class="di-t-arc-leader @CssRole(FindingRole(target.Arc.Reason))" />
+                    }
+                    @foreach (var index in _tape.Replaced)
+                    {
+                        <rect x="@G(Center(index) - 4)" y="76" width="8" height="8" transform="@($"rotate(45 {G(Center(index))} 80)")" class="di-t-diamond role-third" />
+                    }
+                    @if (_hover >= 0 && _range is null)
+                    {
+                        <line x1="@G(Center(_hover))" x2="@G(Center(_hover))" y1="36" y2="186" class="di-t-cross" />
+                    }
+                    <line x1="@G(LabelWidth)" x2="@G(LabelWidth + LanesWidth)" y1="188" y2="188" class="di-t-axis" />
+                    @for (var index = 0; index < Model.Descriptors.Length; index += TickStep)
+                    {
+                        <line x1="@G(X(index))" x2="@G(X(index))" y1="188" y2="192" class="di-t-axis" />
+                        @if (!Narrow || index % (2 * TickStep) == 0) { @SvgLabel(X(index), 204, $"#{index}", "di-t-tick") }
+                    }
+                    @if (BinWidth > 0)
+                    {
+                        <rect x="@G(BinLeft)" y="84" width="@BinWidth" height="94" rx="4" fill="url(#di-hatch)" class="di-t-bin" />
+                        @SvgLabel(BinLeft + BinWidth / 2d, 76, _tape.Missing.Length.ToString(CultureInfo.CurrentCulture), "di-t-tick is-mid")
+                    }
+                </svg>
+                @if (Model.Descriptors.Length > 0)
+                {
+                    <div class="di-tape-hit" tabindex="-1" style="@($"left:{G(LabelWidth)}px;width:{G(LanesWidth)}px;top:84px;height:102px")"></div>
+                }
+                <div class="di-seg-strip" role="toolbar" aria-label="@L["Workbench:SegmentLabel"]">
+                    @foreach (var segment in _tape.Segments)
+                    {
+                        <button type="button" class="di-seg-btn" tabindex="@(segment == _tape.Segments[0] ? "0" : "-1")"
+                                style="@($"left:{G(X(segment.From))}px;width:{G(Math.Max(4, RunWidth(segment.From, segment.To) - 1))}px;height:30px")"
+                                aria-label="@($"{SegmentCaption(segment)}. {L["Workbench:SegmentAction"]}")"
+                                @onfocus="() => ReadSegment(segment, true)" @onblur="ClearReadout"
+                                @onmouseenter="() => ReadSegment(segment, false)" @onmouseleave="ClearReadout"
+                                @onclick="() => OpenRange.InvokeAsync((segment.From, segment.To))"></button>
+                    }
+                </div>
+                @foreach (var target in arcTargets)
+                {
+                    var arc = target.Arc;
+                    var label = L["Workbench:Caption:Arc", arc.Display, arc.From, arc.To].Value;
+                    <button type="button" class="di-arc-btn @CssRole(FindingRole(arc.Reason)) @(target.X != target.Apex ? "is-separated" : null)"
+                            style="@($"left:{G(target.X - 9)}px;top:{G(target.Y - 9)}px")" aria-label="@label" title="@label"
+                            @onfocus="() => _readout = label" @onblur="ClearReadout" @onmouseenter="() => _readout = label"
+                            @onmouseleave="ClearReadout" @onclick="() => OpenImplementation.InvokeAsync(arc.Type)"></button>
+                }
+                @if (BinWidth > 0)
+                {
+                    <div class="di-bin-buttons" style="@($"left:{G(BinLeft + 8)}px;width:{BinWidth - 16}px")">
+                        @foreach (var implementation in _tape.Missing)
+                        {
+                            var label = $"{implementation.Display} · {Reason(L, ConventionFinding.NotRegistered)}";
+                            <button type="button" class="di-bin-btn role-error" aria-label="@label" title="@label"
+                                    @onfocus="() => _readout = label" @onblur="ClearReadout"
+                                    @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                                <MoIcon Icon="@MoIcons.Error" Size="12px" />
+                                @if (!Narrow) { <span>@implementation.Display</span> }
+                            </button>
+                        }
+                    </div>
+                }
+            }
+        </div>
+        <div class="di-tape-caption">
+            <p class="mono" aria-live="polite">@Caption</p>
+            @if (_range is { } selected)
+            {
+                <span class="di-tape-actions">
+                    <button type="button" class="di-btn is-soft is-small" @onclick="() => OpenRange.InvokeAsync(selected)"><MoIcon Icon="@MoIcons.ListTree" Size="14px" />@L["Workbench:OpenRange"]</button>
+                    <button type="button" class="di-btn is-ghost is-small" @onclick="ClearRange">@L["Workbench:ClearRange"]</button>
+                </span>
+            }
+            else if (_activeSegment is not null)
+            {
+                <span class="di-tape-hint">@L["Workbench:SegmentAction"]</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    internal const string ModulePath = "./_content/Monica.Framework.UI/UIDependencyInjection/Components/DependencyInjectionTape.razor.js";
+
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(int From, int To)> OpenRange { get; set; }
+
+    private DependencyInjectionWorkbenchSnapshot? _observedModel;
+    private RegistrationTape _tape = default!;
+    private ElementReference _wrap;
+    private DotNetObjectReference<DependencyInjectionTape>? _reference;
+    private Task? _binding;
+    private IJSObjectReference? _module;
+    private int _width;
+    private int _hover = -1;
+    private (int From, int To)? _range;
+    private RegistrationTape.Segment? _activeSegment;
+    private string? _readout;
+    private bool _disposed;
+
+    private bool Narrow => _width < 560;
+    private int LabelWidth => Narrow ? 58 : 92;
+    private int BinWidth => _tape.Missing.Length == 0 ? 0 : Narrow ? 54 : 86;
+    private double LanesWidth => Math.Max(0, _width - LabelWidth - (BinWidth > 0 ? BinWidth + 10 : 0));
+    private double BinLeft => LabelWidth + LanesWidth + 10;
+    private double MarkWidth => Math.Max(.6, LanesWidth / Math.Max(1, Model.Descriptors.Length));
+    private int TickStep => Model.Descriptors.Length > 1200 ? 250 : Model.Descriptors.Length > 500 ? 100 : 50;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_observedModel, Model))
+        {
+            _observedModel = Model;
+            _tape = new(Model);
+            ClearRange();
+            ClearReadout();
+        }
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_binding is null && !_disposed && (Model.Descriptors.Length > 0 || _tape.Missing.Length > 0))
+        {
+            _binding = BindAsync();
+            return _binding;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task BindAsync()
+    {
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            if (!_disposed)
+            {
+                _reference = DotNetObjectReference.Create(this);
+                await _module.InvokeVoidAsync("bindTape", _wrap, _reference);
+            }
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    [JSInvokable]
+    public Task SetWidth(int width) => InvokeAsync(() =>
+    {
+        if (_disposed || _width == width) { return; }
+        _width = width;
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task ReadPointer(int hover, int from, int to, bool open) => InvokeAsync(async () =>
+    {
+        if (_disposed) { return; }
+        _hover = hover;
+        if (from >= 0)
+        {
+            _range = (from, to);
+        }
+        else if (open)
+        {
+            ClearRange();
+            if (hover >= 0 && hover < Model.Descriptors.Length)
+            {
+                await OpenIdentity.InvokeAsync(Model.Identities[Model.Descriptors[hover].ServiceIdentityIndex]);
+            }
+        }
+
+        if (!_disposed) { StateHasChanged(); }
+    });
+
+    private string Caption => _range is { } range ? L["Workbench:Caption:Range", range.From, range.To, range.To - range.From + 1]
+        : _hover >= 0 && _hover < Model.Descriptors.Length ? DescriptorCaption(Model.Descriptors[_hover])
+        : _readout ?? L["Workbench:Caption:Idle"];
+
+    private string DescriptorCaption(DependencyInjectionDescriptorInfo descriptor)
+    {
+        var implementation = Implementation(L, descriptor);
+        var name = descriptor.ServiceTypeDisplayName;
+        return L["Workbench:Caption:Descriptor", descriptor.Index, name, implementation == name ? "" : $" → {implementation}",
+            Lifetime(L, descriptor.Lifetime), Activation(L, descriptor.Activation),
+            descriptor.IsAutoRegistered ? L["Workbench:Caption:ConventionalSuffix"].Value : ""];
+    }
+
+    private string SegmentCaption(RegistrationTape.Segment segment) => L["Workbench:Caption:Segment", segment.From, segment.To,
+        Family(segment), segment.Count, segment.Conventional > 0 ? L["Workbench:Caption:SegmentAuto", segment.Conventional].Value : "",
+        string.Join(" · ", Lifetimes.Select((l, i) => $"{Lifetime(L, l)} {segment.Lifetimes[i]}"))];
+
+    private static string Family(RegistrationTape.Segment s) => s.Mixed ? s.Family + "+" : s.Family;
+    private void ReadSegment(RegistrationTape.Segment segment, bool focus)
+    {
+        _hover = -1;
+        if (focus) { _range = null; }
+        _activeSegment = segment;
+        _readout = SegmentCaption(segment);
+    }
+
+    private void ClearReadout() { _activeSegment = null; _readout = null; }
+    private void ClearRange() { _range = null; _hover = -1; }
+
+    private (RegistrationTape.Arc Arc, double Apex, double X, double Y)[] ArcTargets()
+    {
+        var targets = _tape.Arcs.Select(arc =>
+        {
+            var x1 = Center(arc.From);
+            var x2 = Center(arc.To);
+            return (Arc: arc, Apex: (x1 + x2) / 2, Y: 80 - ArcHeight(x1, x2));
+        }).OrderBy(target => target.Apex).ToArray();
+
+        var right = (double)_width - 9;
+        var left = LabelWidth + 9d;
+        var spacing = Math.Min(18, Math.Max(1, (right - left) / Math.Max(1, targets.Length - 1)));
+        var result = new (RegistrationTape.Arc, double, double, double)[targets.Length];
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var (arc, apex, y) = targets[i];
+            var x = Math.Clamp(apex, left, Math.Max(left, right - spacing * (targets.Length - 1 - i)));
+            result[i] = (arc, apex, x, y);
+            left = x + spacing;
+        }
+
+        return result;
+    }
+
+    private static double ArcHeight(double x1, double x2) => Math.Min(38, 12 + Math.Abs(x2 - x1) * .22);
+
+    private double X(int index) => LabelWidth + index * LanesWidth / Math.Max(1, Model.Descriptors.Length);
+    private double Center(int index) => X(index) + MarkWidth / 2;
+    private double RunWidth(int from, int to) => Math.Max(MarkWidth, X(to + 1) - X(from));
+    private static string G(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    private static RenderFragment SvgLabel(double x, int y, string label, string css)
+        => @<g><text x="@G(x)" y="@y" class="@css">@label</text></g>;
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        try
+        {
+            if (_binding is not null) { await _binding; }
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("unbindTape", _wrap);
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        finally { _reference?.Dispose(); }
+    }
+}

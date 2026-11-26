@@ -1,0 +1,150 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+
+@{
+    var implementations = Model.Implementations;
+    var attention = implementations.Where(i => i.NeedsAttention).ToArray();
+    var advisory = implementations.Count(i => i.Matches(ConventionFinding.ConcreteOnly));
+    var conventional = Model.Descriptors.Where(d => d.IsAutoRegistered).ToArray();
+    var clauses = FindingClauses(attention);
+}
+<section class="mo-vl-panel di-sig" aria-labelledby="di-display">
+    <div class="di-decision">
+        <div class="di-decision-value">
+            <p class="display-label" id="di-display">@L["Workbench:DisplayLabel"]</p>
+            <div class="display">@attention.Length<small>@L["Workbench:OfImpls", implementations.Length]</small></div>
+            <ul class="di-reasons">
+                @foreach (var reason in Reasons)
+                {
+                    var count = implementations.Count(i => i.Matches(reason));
+                    <li class="@(count == 0 ? "is-zero" : null)">
+                        <span class="di-tip" tabindex="0" title="@ReasonTip(L, reason)"><i class="swatch @CssRole(FindingRole(reason))" aria-hidden="true"></i>@Reason(L, reason)</span>
+                        <b class="mono">@count</b>
+                    </li>
+                }
+            </ul>
+            @if (advisory > 0 && attention.Length > 0)
+            {
+                <p class="di-advisory">@L["Workbench:Advisory", advisory]</p>
+            }
+        </div>
+        <p class="lede di-lede">
+            @if (implementations.Length == 0)
+            {
+                <MoRichFinding Template="@L["Workbench:NoConvention"]" Values="@([Mark(Model.Descriptors.Length, MoVisualRole.Neutral)])" />
+            }
+            else if (attention.Length == 0)
+            {
+                <MoRichFinding Template="@L["Workbench:Calm"]" Values="@([Mark(implementations.Length, MoVisualRole.Success)])" />
+                @if (advisory > 0)
+                {
+                    <MoRichFinding Template="@L["Workbench:CalmAdvisory"]" Values="@([Mark(advisory, MoVisualRole.Neutral)])" />
+                }
+            }
+            else
+            {
+                @for (var index = 0; index < clauses.Count; index++)
+                {
+                    var clause = clauses[index];
+                    @if (index > 0) { @L["Workbench:ClauseSep"] }
+                    <MoRichFinding Template="@clause.Template" Values="@clause.Values" />
+                }
+                @L["Workbench:SentenceEnd"]
+            }
+        </p>
+    </div>
+    @if (implementations.Length > 0)
+    {
+        <dl class="facts">
+            @Fact(L["Workbench:Facts:Impls"], implementations.Length, conventional.Length > 0 ?
+                L["Workbench:Facts:ImplsSub", conventional.Length, conventional[0].Index, conventional[^1].Index] : L["Workbench:Facts:NoDescriptors"], "role-info")
+            @Fact(L["Workbench:Facts:Forward"], conventional.Count(d => d.Activation == DependencyInjectionActivation.Forward), L["Workbench:Facts:ForwardSub"], "role-third")
+            @Fact(L["Workbench:Facts:Monica"], conventional.Count(d => d.Activation == DependencyInjectionActivation.MonicaActivated), L["Workbench:Facts:MonicaSub"], "role-third")
+            @Fact(L["Workbench:Facts:Attribute"], implementations.Count(i => i.LifetimeSource == DependencyInjectionLifetimeSource.DependencyAttribute),
+                L["Workbench:Facts:AttributeSub", implementations.Count(i => i.Replaced), implementations.Count(i => i.Mode == DependencyInjectionAutoRegistrationMode.TryAdd)], "role-primary")
+        </dl>
+    }
+    <DependencyInjectionTape Model="Model" OpenImplementation="OpenImplementation" OpenIdentity="OpenIdentity" OpenRange="OpenRange" />
+</section>
+@if (implementations.Length > 0)
+{
+    <DependencyInjectionFindings Model="Model" Filter="Filter" Query="@Query" Change="Change" OpenImplementation="OpenImplementation" />
+}
+
+@code {
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter] public ConventionFinding Filter { get; set; }
+    [Parameter] public string? Query { get; set; }
+    [Parameter, EditorRequired] public EventCallback<IReadOnlyDictionary<string, object?>> Change { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(int From, int To)> OpenRange { get; set; }
+
+    private List<(string Template, RenderFragment[] Values)> FindingClauses(ConventionImplementation[] attention)
+    {
+        var clauses = new List<(string, RenderFragment[])>();
+        var missing = attention.Where(i => i.Matches(ConventionFinding.NotRegistered)).ToArray();
+        if (missing.Length > 0)
+        {
+            clauses.Add((missing.Length == 1 ? L["Workbench:FindingParts:NotRegisteredOne"] : L["Workbench:FindingParts:NotRegistered"],
+                [Join(missing.Select(i => ImplementationLink(i, "role-error")))]));
+        }
+
+        foreach (var implementation in attention.Where(i => i.Matches(ConventionFinding.BypassesActivation)))
+        {
+            var exposure = implementation.Exposures.First(e => e.State == ExposureState.Bypass);
+            clauses.Add((L["Workbench:FindingParts:Bypass"], [ImplementationLink(implementation, "role-error"),
+                Mark($"#{exposure.Winner!.Index}", MoVisualRole.Error)]));
+        }
+
+        var elsewhere = attention.SelectMany(i => i.Exposures).Where(e => e.State == ExposureState.Elsewhere)
+            .DistinctBy(e => e.Identity!.Index).ToArray();
+        if (elsewhere.Length > 0)
+        {
+            var template = (clauses.Count == 0, elsewhere.Length) switch
+            {
+                (true, 1) => L["Workbench:FindingParts:ElsewhereFirstOne"],
+                (true, _) => L["Workbench:FindingParts:ElsewhereFirst"],
+                (false, 1) => L["Workbench:FindingParts:ElsewhereOne"],
+                _ => L["Workbench:FindingParts:Elsewhere"]
+            };
+            clauses.Add((template, [Join(elsewhere.Select(e => IdentityLink(e.Identity!))),
+                Join(elsewhere.Select(e => Mark($"#{e.Winner!.Index}", MoVisualRole.Warning)))]));
+        }
+
+        var duplicates = attention.Where(i => i.Matches(ConventionFinding.RegisteredTwice)).ToArray();
+        if (duplicates.Length > 0)
+        {
+            clauses.Add((duplicates.Length == 1 ? L["Workbench:FindingParts:Twice"] : L["Workbench:FindingParts:TwiceMany"],
+                [Join(duplicates.Select(i => ImplementationLink(i, "role-warning")))]));
+        }
+
+        return clauses;
+    }
+
+    private RenderFragment ImplementationLink(ConventionImplementation implementation, string role)
+        => @<button type="button" class="di-rec @role" @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">@implementation.Display</button>;
+
+    private RenderFragment IdentityLink(ServiceIdentity identity)
+        => @<button type="button" class="di-rec role-warning" @onclick="() => OpenIdentity.InvokeAsync(identity)">@identity.Display</button>;
+
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="role">@value</MoValueMark>;
+
+    private RenderFragment Join(IEnumerable<RenderFragment> fragments) => builder =>
+    {
+        var items = fragments.ToArray();
+        for (var i = 0; i < items.Length; i++)
+        {
+            if (i > 0)
+            {
+                builder.AddContent(0, i == items.Length - 1 ? L["Workbench:ListLast"].Value : L["Workbench:ListSeparator"].Value);
+            }
+            builder.AddContent(1, items[i]);
+        }
+    };
+
+    private static RenderFragment Fact(string label, int value, string detail, string role) =>
+        @<div class="fact">
+            <dt><i class="swatch @role" aria-hidden="true"></i>@label</dt>
+            <dd><b>@value</b><small title="@detail">@detail</small></dd>
+        </div>;
+}

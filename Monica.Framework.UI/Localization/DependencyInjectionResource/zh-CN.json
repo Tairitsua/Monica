@@ -1,191 +1,296 @@
 {
+  "Navigation": {
+    "Category": "依赖注入"
+  },
   "Pages": {
     "DependencyInjection": {
       "Title": "依赖注入",
-      "Description": "检查服务注册、生命周期与自动注册问题。"
+      "Description": "检查宿主的约定注册及其发现。"
+    },
+    "DependencyInjectionServices": {
+      "Title": "服务解析",
+      "Description": "每行一个服务标识（服务类型加服务键）；展开可看到它的全部描述符。"
     }
   },
-  "Page": {
-    "PageTitle": "依赖注入",
-    "Header": {
-      "Title": "依赖注入",
-      "Description": "查看最终的 ServiceCollection，并标记由 Monica 约定注册生成的描述符。",
-      "Eyebrow": "Monica / 运行时组合",
-      "Refresh": "刷新",
-      "GeneratedAt": "注册表生成于 · {0}"
+  "Workbench": {
+    "DisplayLabel": "需要处理的约定实现",
+    "OfImpls": "/ {0} 个约定实现",
+    "Advisory": "另有 {0} 个实现仅暴露具体类型，作为建议项单独列出。",
+    "NoConvention": "此主机上 Monica 没有发现约定注册的实现：全部 {0} 个描述符都来自手动或框架注册，没有可以与声明比对的内容。要查看某个服务会解析成什么，请打开服务解析。",
+    "Calm": "Monica 发现的 {0} 个实现全部按声明解析：每个暴露服务都返回约定实现，也没有被手动再次注册。",
+    "CalmAdvisory": "其中 {0} 个只暴露具体类型，对控制器和事件处理器来说是预期的。",
+    "ClauseSep": "；",
+    "SentenceEnd": "。",
+    "Facts": {
+      "Impls": "约定实现",
+      "ImplsSub": "生成 {0} 个描述符 · #{1}–#{2}",
+      "NoDescriptors": "没有描述符",
+      "Forward": "转发共享",
+      "ForwardSub": "多暴露的单例与作用域",
+      "Monica": "Monica 激活",
+      "MonicaSub": "赋值 CachedServiceProvider",
+      "Attribute": "[Dependency] 声明",
+      "AttributeSub": "{0} 个 Replace · {1} 个 TryAdd"
     },
-    "Composition": {
-      "RegistryLabel": "最终服务集合",
-      "CachedHint": "此处展示主机最终注册集合的缓存快照。刷新会重新读取该注册表。",
-      "LifetimesTitle": "注册生命周期",
-      "CategoriesHint": "注册类别可能重叠。",
-      "Instances": "实例"
+    "FindingParts": {
+      "NotRegisteredOne": "{0} 声明了生命周期却没有暴露任何服务，因此从未进入集合，注入它会在运行时失败",
+      "NotRegistered": "{0} 声明了生命周期却没有暴露任何服务，因此从未进入集合，注入它们会在运行时失败",
+      "Bypass": "{0} 在 {1} 又被手动注册为普通类型，解析时绕过 Monica 激活，CachedServiceProvider 不会被赋值",
+      "ElsewhereFirstOne": "更晚的注册（{1}）接管了 {0}，约定实现只能通过 IEnumerable<T> 取到",
+      "ElsewhereFirst": "更晚的注册（{1}）接管了 {0}，约定实现只能通过 IEnumerable<T> 取到",
+      "ElsewhereOne": "更晚的注册（{1}）接管了 {0}，约定实现只能通过 IEnumerable<T> 取到",
+      "Elsewhere": "更晚的注册（{1}）接管了 {0}，约定实现只能通过 IEnumerable<T> 取到",
+      "Twice": "{0} 注册了两次，枚举时会多创建一个实例",
+      "TwiceMany": "{0} 注册了两次，枚举时会多创建一个实例"
     },
-    "Registry": {
-      "Title": "服务注册表",
-      "Description": "查看服务标识、实现、服务键与约定注册来源。"
+    "ListLast": " 和 ",
+    "ListSeparator": "、",
+    "SheetImpl": "约定实现",
+    "SheetIdentity": "服务标识",
+    "Close": "关闭",
+    "Fields": {
+      "OpenGeneric": "开放泛型",
+      "LifetimeSource": "生命周期来源",
+      "Mode": "注册方式",
+      "Exposed": "暴露服务",
+      "ServiceType": "服务类型",
+      "ServiceAssembly": "服务程序集",
+      "Key": "服务键",
+      "SourceAssembly": "源程序集",
+      "Lifetime": "生命周期",
+      "Outcome": "结果",
+      "Created": "生成的描述符"
     },
-    "Summary": {
-      "AriaLabel": "依赖注入注册摘要",
-      "Total": "描述符",
-      "AutoRegistered": "自动注册",
-      "Keyed": "Keyed",
-      "Factories": "工厂",
+    "Markers": {
+      "Multiple": "多个注册",
+      "Errors": "错误",
       "Warnings": "警告",
-      "Errors": "错误"
+      "Keyed": "Keyed",
+      "Standard": "标准"
     },
-    "Issues": {
-      "Title": "自动注册问题",
-      "Description": "约定注册诊断覆盖整个主机，不受注册表筛选条件影响；这里也包含未生成最终描述符的问题。",
-      "SearchLabel": "查找约定注册问题",
-      "SearchPlaceholder": "搜索源类型、程序集、生命周期或暴露服务",
-      "Showing": "显示 {0} / {1} 个问题",
-      "Empty": "此组证据中没有约定注册问题。",
-      "NoMatches": "没有匹配此搜索的问题。清空搜索可查看完整问题索引。",
-      "NoExposures": "没有暴露服务标识。"
+    "SourceAuto": "自动注册",
+    "UnknownImplText": "此快照中没有约定实现 {0}。",
+    "UnknownService": "此快照中没有服务标识 {0}。",
+    "GetService": "GetService 返回",
+    "Enumerable": "IEnumerable<T> 返回 {0} 个",
+    "EnumerableOne": "IEnumerable<T> 只返回这一个",
+    "LifetimeMix": "这些描述符的生命周期不同，枚举得到的实例寿命也不同。",
+    "Provenance": "约定注册来源",
+    "NotAuto": "该描述符不是由 Monica 约定注册创建的。",
+    "SharedInstance": "这些暴露共享 {0} 的同一个实例。",
+    "ReplacedNote": "Replace 移除了同一服务标识下更早的描述符；快照没有记录被移除的是什么。",
+    "LogicalNote": "推断匹配表示原约定描述符已不在集合中。归属是按服务、生命周期及实现推断的。",
+    "DescriptorFacts": "描述符",
+    "Keyless": "无键",
+    "Yes": "是",
+    "No": "否",
+    "Winner": "GetService",
+    "OpenImpl": "查看约定实现",
+    "AutoBadge": "自动",
+    "LogicalBadge": "推断匹配",
+    "Advice": {
+      "NotRegistered": "Monica 将 {0} 识别为{1}（{2}），但没有找到任何暴露服务类型，因此不会注册描述符。注入它或它的接口会抛出“Unable to resolve service”。",
+      "NotRegisteredNext": "实现一个名称能与类名匹配的接口（例如 {0}），或用 {1} 显式暴露。",
+      "ConcreteOnly": "Monica 只为 {0} 注册了具体类型。如果其他组件应依赖该服务，请考虑暴露抽象类型。",
+      "Bypass": "#{1} 的普通类型描述符在约定注册的 Monica 激活工厂（#{2}）之后注册。GetService<{0}>() 返回它创建的实例，CachedServiceProvider 不会被赋值，访问 Logger 会抛出“Cached service provider is not initialized”。",
+      "BypassNext": "删除 #{0} 的手动注册，让约定注册生效。",
+      "Elsewhere": "{0} 解析为 {1}（{2}，#{3}），而不是约定的 {4}（{5}）。约定实现只出现在 IEnumerable<{0}> 中。",
+      "ElsewhereNext": "如果这是有意的替换（装饰器或过渡期实现），无需处理；否则删除更晚的注册，或改用 [Dependency(ReplaceServices = true)] 表达意图。",
+      "Twice": "{0} 有 {1} 指向同一实现。GetService 返回 #{2}；解析 IEnumerable<{0}> 时每个描述符都会创建自己的实例。",
+      "TwiceNext": "删除手动注册，只保留约定注册。"
+    },
+    "NextStep": "下一步",
+    "ExposuresTitle": "暴露服务如何解析",
+    "TryAddNote": "TryAdd 只在服务标识尚不存在时添加；被跳过的暴露不会出现在快照里。",
+    "None": "—",
+    "ShadowedBy": "被 #{0} 接管",
+    "Outcomes": {
+      "ReplacedExisting": "已替换已有描述符",
+      "Added": "已添加"
+    },
+    "ActivationTips": {
+      "Monica": "类型实现了 ICachedServiceProviderAccessor（ServiceBase、DomainService、EventHandlerBase），由 Monica 工厂创建并赋值 CachedServiceProvider。",
+      "Forward": "单例或作用域类型暴露了多个服务：这个暴露转发到具体类型的注册，所有暴露共享同一个实例。",
+      "Factory": "由注册时提供的委托创建；不调用工厂就无法确定实际类型。",
+      "Direct": "按类型或实例直接创建。"
     },
     "States": {
-      "Loading": "正在加载依赖注入诊断信息...",
-      "Empty": "当前筛选条件下没有匹配的服务描述符。",
-      "LoadFailed": "加载依赖注入诊断信息失败。",
-      "NotAvailable": "不可用"
+      "Bypass": "绕过 Monica 激活",
+      "Elsewhere": "解析到其他实现",
+      "Twice": "重复注册",
+      "Kept": "TryAdd 保留了已有注册",
+      "Absent": "未进入集合",
+      "Resolves": "按声明解析"
     },
-    "Messages": {
-      "RefreshSucceeded": "依赖注入诊断信息已刷新。",
-      "RefreshFailed": "加载依赖注入诊断信息失败：{0}",
-      "DialogOpenFailed": "打开描述符详情失败：{0}"
+    "Copy": "复制",
+    "Copied": "已复制。",
+    "CopyFailed": "无法复制。",
+    "FindingsTitle": "约定注册发现",
+    "FindingsDesc": "覆盖整个主机的约定注册，与服务解析的筛选无关；也包含没有生成描述符的实现。",
+    "FindingSearch": "查找约定实现",
+    "FindingSearchPh": "搜索源类型、程序集或暴露服务",
+    "Showing": "显示 {0} / {1} 个实现",
+    "NoMatches": "没有匹配此搜索的实现。",
+    "ClearSearch": "清空搜索",
+    "NoFindingsCalm": "没有需要处理的约定实现。仅暴露具体类型的实现可在“仅具体类型”中查看。",
+    "NoFindings": "此组证据中没有约定注册问题。",
+    "FindingFilters": {
+      "Attention": "需要处理",
+      "BypassesActivation": "绕过激活",
+      "ConcreteOnly": "仅具体类型"
     },
-    "Filters": {
-      "SearchLabel": "搜索",
-      "SearchPlaceholder": "按服务、实现、程序集或键进行搜索",
-      "SourceLabel": "来源",
-      "LifetimeLabel": "生命周期",
-      "MarkersLabel": "标记",
-      "Showing": "显示 {0} / {1} 个描述符",
-      "CombinationHint": "每组内匹配任意已选项，同时满足所有筛选组。",
-      "StandardHint": "标准表示没有服务键、警告或错误标记。",
-      "Actions": {
-        "SelectAll": "全选",
-        "Clear": "清空",
-        "Reset": "重置筛选"
-      },
-      "SourceOptions": {
-        "AutoRegistered": "自动注册",
-        "Other": "其他描述符"
-      },
-      "MarkerOptions": {
-        "Standard": "标准",
-        "Keyed": "Keyed",
-        "Warnings": "警告",
-        "Errors": "错误"
-      }
+    "Consequence": {
+      "NotRegistered": "没有描述符，注入会失败",
+      "BypassesActivation": "#{0} 绕过 Monica 激活",
+      "ResolvesElsewhere": "{0} → {1}",
+      "RegisteredTwice": "{0} 有 {1} 个描述符",
+      "ConcreteOnly": "只注册了具体类型"
     },
-    "Grid": {
-      "Columns": {
-        "Service": "服务",
-        "Lifetime": "生命周期",
-        "Implementation": "实现",
-        "ServiceKey": "键",
-        "Kind": "实现方式",
-        "Index": "序号",
-        "Actions": "操作"
-      },
-      "Badges": {
-        "AutoRegistered": "由 ModuleDependencyInjection 自动注册",
-        "Warning": "自动注册警告",
-        "Error": "自动注册错误",
-        "Keyed": "Keyed 服务"
-      },
-      "Actions": {
-        "ViewDetails": "详情",
-        "ViewDetailsFor": "查看 {0} 的详情"
-      },
-      "States": {
-        "Unkeyed": "无键"
-      },
-      "Kinds": {
-        "Type": "类型",
-        "Factory": "工厂",
-        "Instance": "实例"
-      }
+    "MatrixTitle": "按解析结果的生命周期与创建方式",
+    "MatrixNote": "按 GetService 返回的最后一个描述符统计；单元格中的条显示约定注册的占比。",
+    "MatrixTotal": "合计",
+    "MatrixInstanceNa": "实例描述符总是单例",
+    "MatrixAuto": "{0} 个约定注册",
+    "IdsLabel": "服务标识",
+    "AllIds": "个服务标识 · {0} 个描述符",
+    "OfIds": "/ {0} 个服务标识",
+    "ScopeDescriptors": "筛选范围内共 {0} 个描述符。",
+    "IdsFinding": "{0} 个服务标识中，{1} 个只有一个注册；{2} 个有多个注册，其中 {3} 个的注册指向不同实现——GetService 返回最后一个，IEnumerable<T> 返回全部。",
+    "IdsFindingConvention": "涉及约定注册的是 {0}。",
+    "IdsFindingCalm": "{0} 个服务标识都只解析到一种实现：{1} 个有多个注册，但它们指向同一实现。",
+    "IdsFindingSingle": "{0} 个服务标识各只有一个注册。",
+    "EmptyRegistry": "最终服务集合没有捕获任何描述符。",
+    "EmptyFilter": "当前筛选条件下没有匹配的服务标识。",
+    "RegistryTitle": "服务注册表",
+    "RegistryDesc": "每行一个服务标识（服务类型加服务键）；展开可看到它的全部描述符。",
+    "Search": "搜索",
+    "SearchPh": "按服务、实现、程序集或键进行搜索",
+    "SourceLabel": "来源",
+    "SourceAll": "全部",
+    "SourceOther": "其他描述符",
+    "MarkersLabel": "标记",
+    "StandardHint": "标准表示没有服务键、多个注册、警告或错误标记。",
+    "RangeClear": "清除范围",
+    "RangeChip": "#{0}–#{1}",
+    "LifetimeChip": "生命周期 · {0}",
+    "KindChip": "方式 · {0}",
+    "ShowingIds": "显示 {0} / {1} 个服务标识",
+    "SortLabel": "排序",
+    "Sorts": {
+      "Order": "注册顺序",
+      "Name": "名称",
+      "Count": "注册数"
     },
-    "Dialog": {
-      "Title": "服务描述符详情",
-      "Close": "关闭",
-      "Sections": {
-        "Descriptor": "描述符",
-        "Implementation": "实现",
-        "AutoRegistration": "约定注册来源"
-      },
-      "Fields": {
-        "ServiceType": "服务类型",
-        "ServiceAssembly": "服务程序集",
-        "Lifetime": "生命周期",
-        "ServiceKey": "服务键",
-        "Index": "序号",
-        "IsKeyed": "是否 Keyed",
-        "IsOpenGeneric": "是否开放泛型",
-        "ImplementationKind": "实现方式",
-        "ImplementationType": "实现类型",
-        "ImplementationAssembly": "实现程序集",
-        "FactoryDisplay": "工厂",
-        "SourceImplementationType": "源实现类型",
-        "SourceImplementationAssembly": "源程序集",
-        "LifetimeSource": "生命周期来源",
-        "RegistrationMode": "注册方式",
-        "Outcome": "结果",
-        "ExposedServices": "暴露服务",
-        "Issues": "问题"
-      },
-      "States": {
-        "NoAutoRegistration": "该描述符不是由 Monica 约定注册创建的。"
-      }
+    "Reset": "重置筛选",
+    "Cols": {
+      "Index": "序号",
+      "Service": "服务",
+      "Resolves": "解析为",
+      "Lifetime": "生命周期",
+      "Kind": "实现方式",
+      "Count": "注册"
     },
-    "Shared": {
-      "Common": {
-        "Yes": "是",
-        "No": "否"
-      },
-      "Lifetimes": {
-        "Singleton": "单例",
-        "Scoped": "作用域",
-        "Transient": "瞬态"
-      },
-      "RegistrationModes": {
-        "Add": "Add",
-        "TryAdd": "TryAdd",
-        "Replace": "Replace"
-      },
-      "Outcomes": {
-        "Added": "已添加",
-        "ReplacedExisting": "已替换已有描述符"
-      },
-      "LifetimeSources": {
-        "Unknown": "未知",
-        "DependencyAttribute": "DependencyAttribute",
-        "TransientMarkerInterface": "ITransientDependency",
-        "ScopedMarkerInterface": "IScopedDependency",
-        "SingletonMarkerInterface": "ISingletonDependency"
-      },
-      "IssueSeverities": {
-        "Warning": "警告",
-        "Error": "错误"
-      },
-      "IssueKinds": {
-        "MissingExposedServices": {
-          "Title": "未找到暴露服务类型",
-          "Summary": "发现的实现没有暴露任何服务标识，因此未注册描述符。",
-          "Description": "Monica 将 {0} 识别为 {1}，但没有找到任何暴露服务类型，因此不会注册任何描述符。"
-        },
-        "ConcreteTypeOnlyExposure": {
-          "Title": "只暴露了具体类型",
-          "Summary": "这些实现仅暴露具体类型，没有暴露抽象类型。",
-          "Description": "Monica 只为 {0} 注册了具体类型。如果其他组件应依赖该服务，请考虑暴露抽象类型。"
-        }
-      }
-    }
-  },
-  "Navigation": {
-    "Category": "依赖注入"
+    "MultiTipDivergent": "{0} 个注册，指向不同实现",
+    "MultiTipSame": "{0} 个注册，指向同一实现",
+    "Page": "第 {0} / {1} 页",
+    "Prev": "上一页",
+    "Next": "下一步",
+    "TapeTitle": "注册顺序",
+    "TapeNote": "最终集合的 {0} 个描述符，按注册顺序排列。同一服务标识下，后注册的描述符在 GetService 中胜出。",
+    "Legend": {
+      "Auto": "约定注册的描述符",
+      "Other": "其他描述符",
+      "Elsewhere": "被更晚的注册接管",
+      "Twice": "重复注册",
+      "Replaced": "Replace 替换了更早的描述符",
+      "Advisory": "仅暴露具体类型",
+      "NotIn": "未进入集合"
+    },
+    "Lanes": {
+      "Segments": "来源",
+      "Arcs": "接管",
+      "Auto": "约定注册",
+      "Advisory": "仅具体类型"
+    },
+    "SegmentLabel": "按来源分段",
+    "SegmentAction": "Enter 在服务解析中查看这一段",
+    "Caption": {
+      "Arc": "{0}：#{1} 被 #{2} 接管",
+      "Range": "已选择 #{0}–#{1} · {2} 个描述符",
+      "Idle": "悬停或使用键盘查看描述符；拖动选择一个范围。",
+      "Descriptor": "#{0} · {1}{2} · {3} · {4}{5}",
+      "ConventionalSuffix": " · 约定注册",
+      "Segment": "#{0}–#{1} · {2} · {3} 个描述符{4} · {5}",
+      "SegmentAuto": "，其中 {0} 个约定注册"
+    },
+    "OpenRange": "在服务解析中查看",
+    "ClearRange": "清除选择",
+    "Status": {
+      "None": "未发现约定注册",
+      "Calm": "约定注册均按声明解析",
+      "AttentionOne": "1 个约定实现需要处理",
+      "Attention": "{0} 个约定实现需要处理"
+    },
+    "Host": "主机 · {0}",
+    "FixedTip": "快照在主机启动、服务集合定型后生成一次，直到进程重启都不会改变。刷新只会重新读取同一份注册表。",
+    "Fixed": "启动时固定",
+    "MaterializedStale": "上次成功读取",
+    "Materialized": "注册表生成于",
+    "Refresh": "刷新",
+    "Export": "导出快照",
+    "Retry": "重试",
+    "NavLabel": "依赖注入页面",
+    "CompositionNav": "组成与约定",
+    "ServicesTitle": "服务解析",
+    "StaleTitle": "重新读取失败",
+    "Stale": "最近一次读取注册表失败，页面仍显示 {0} 读取的快照。服务集合只在进程启动时定型，因此这份证据仍代表当前进程。",
+    "Loading": "正在加载依赖注入诊断信息...",
+    "UnavailableTitle": "此主机未开启注册诊断",
+    "Unavailable": "依赖注入诊断只在 {0} 开启时采集。开启后重启主机，启动时会生成注册表快照。",
+    "LoadFailedTitle": "无法加载依赖注入诊断信息",
+    "LoadFailed": "无法读取最终服务集合的诊断快照。请重试或检查主机日志。",
+    "CompositionTitle": "依赖注入",
+    "RefreshFailed": "重新读取注册表失败，仍显示上次读取的快照。",
+    "Reread": "已重新读取：注册表与 {0} 生成时一致。",
+    "Exported": "已导出 {0} 个描述符的快照。",
+    "ExportFailed": "无法导出快照。",
+    "Lifetimes": {
+      "Singleton": "单例",
+      "Scoped": "作用域",
+      "Transient": "瞬态"
+    },
+    "Kinds": {
+      "Type": "类型",
+      "Factory": "工厂",
+      "Instance": "实例"
+    },
+    "Sources": {
+      "DependencyAttribute": "[Dependency]",
+      "TransientMarkerInterface": "ITransientDependency",
+      "SingletonMarkerInterface": "ISingletonDependency",
+      "ScopedMarkerInterface": "IScopedDependency",
+      "Unknown": "未知"
+    },
+    "Reasons": {
+      "NotRegistered": "未注册",
+      "BypassesActivation": "绕过 Monica 激活",
+      "ResolvesElsewhere": "解析到其他实现",
+      "RegisteredTwice": "重复注册",
+      "ConcreteOnly": "仅暴露具体类型"
+    },
+    "ReasonTips": {
+      "NotRegistered": "Monica 识别出生命周期，但没有可暴露的服务类型，所以没有生成描述符。",
+      "BypassesActivation": "更晚的普通类型注册胜出，解析时不经过 Monica 激活，CachedServiceProvider 不会被赋值。",
+      "ResolvesElsewhere": "某个暴露服务的最后一个描述符指向其他实现，GetService 返回那个实现。",
+      "RegisteredTwice": "同一服务标识下有多个描述符指向这个实现。",
+      "ConcreteOnly": "只注册了具体类型；控制器和事件处理器通常按类型解析，属于预期。"
+    },
+    "Activations": {
+      "Direct": "直接创建",
+      "Forward": "转发到具体类型",
+      "Monica": "Monica 激活",
+      "Factory": "工厂委托"
+    },
+    "UnknownImpl": "未知类型"
   }
 }

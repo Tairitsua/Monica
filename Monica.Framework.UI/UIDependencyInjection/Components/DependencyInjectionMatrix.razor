@@ -1,0 +1,82 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+@inject IJSRuntime JS
+
+@{
+    var counts = Scope.ToLookup(row => (row.Winner.Lifetime, row.Winner.ImplementationKind));
+    var max = counts.Select(g => g.Count()).DefaultIfEmpty(1).Max();
+}
+<div class="di-mx">
+    <div class="di-mx-head"><h3>@L["Workbench:MatrixTitle"]</h3><p>@L["Workbench:MatrixNote"]</p></div>
+    <div class="di-mx-grid" role="grid" aria-label="@L["Workbench:MatrixTitle"]" @ref="_grid">
+        <div role="row" class="di-mx-row is-head">
+            <span role="columnheader" class="di-mx-corner"></span>
+            @foreach (var kind in Kinds)
+            {
+                var pressed = KindFilter == kind && LifetimeFilter is null;
+                <button type="button" role="columnheader" class="di-mx-colhead" aria-pressed="@(pressed ? "true" : "false")"
+                        @onclick="() => Pick.InvokeAsync((null, pressed ? null : kind))">
+                    @Kind(L, kind)<span class="n">@Scope.Count(id => id.Winner.ImplementationKind == kind)</span>
+                </button>
+            }
+            <span role="columnheader" class="di-mx-colhead is-total">@L["Workbench:MatrixTotal"]</span>
+        </div>
+        @for (var index = 0; index < Lifetimes.Length; index++)
+        {
+            var lifetime = Lifetimes[index];
+            var rowSelected = LifetimeFilter == lifetime && KindFilter is null;
+            <div role="row" class="di-mx-row">
+                <button type="button" role="rowheader" class="di-mx-rowhead" aria-pressed="@(rowSelected ? "true" : "false")"
+                        @onclick="() => Pick.InvokeAsync((rowSelected ? null : lifetime, null))">
+                    <i class="swatch role-third" aria-hidden="true"></i>@Lifetime(L, lifetime)
+                </button>
+                @foreach (var kind in Kinds)
+                {
+                    var group = counts[(lifetime, kind)];
+                    var count = group.Count();
+                    var auto = group.Count(id => id.Winner.IsAutoRegistered);
+                    var pressed = LifetimeFilter == lifetime && KindFilter == kind;
+                    @if (kind == DependencyInjectionDescriptorImplementationKind.Instance && lifetime != ServiceLifetime.Singleton)
+                    {
+                        <span role="gridcell" class="di-mx-cell is-na" data-cell="" tabindex="-1" title="@L["Workbench:MatrixInstanceNa"]" aria-label="@L["Workbench:MatrixInstanceNa"]">—</span>
+                    }
+                    else
+                    {
+                        <button type="button" role="gridcell" class="di-mx-cell @(count == 0 ? "is-zero" : null)" data-cell=""
+                                tabindex="@(lifetime == ServiceLifetime.Singleton && kind == Kinds[0] ? "0" : "-1")"
+                                aria-pressed="@(pressed ? "true" : "false")"
+                                aria-label="@($"{Lifetime(L, lifetime)} · {Kind(L, kind)} · {count} · {L["Workbench:MatrixAuto", auto]}")"
+                                @onclick="() => Pick.InvokeAsync((pressed ? null : lifetime, pressed ? null : kind))">
+                            <b class="di-mx-n">@count</b>
+                            <span class="di-mx-bar" aria-hidden="true"><span class="role-info" style="width:@Percent(auto, max)"></span><span class="is-other" style="width:@Percent(count - auto, max)"></span></span>
+                            <small>@(auto > 0 ? L["Workbench:MatrixAuto", auto].Value : "\u00a0")</small>
+                        </button>
+                    }
+                }
+                <span role="gridcell" class="di-mx-cell is-total" data-cell="" tabindex="-1"><b class="di-mx-n">@Scope.Count(x => x.Winner.Lifetime == lifetime)</b></span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceIdentity> Scope { get; set; } = [];
+    [Parameter] public ServiceLifetime? LifetimeFilter { get; set; }
+    [Parameter] public DependencyInjectionDescriptorImplementationKind? KindFilter { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(ServiceLifetime? Lifetime, DependencyInjectionDescriptorImplementationKind? Kind)> Pick { get; set; }
+
+    private ElementReference _grid;
+    private static string Percent(int value, int max) => FormattableString.Invariant($"{100d * value / max:0.###}%");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await using var module = await JS.InvokeAsync<IJSObjectReference>("import", DependencyInjectionTape.ModulePath);
+                await module.InvokeVoidAsync("bindMatrix", _grid);
+            }
+            catch (JSDisconnectedException) { }
+        }
+    }
+}

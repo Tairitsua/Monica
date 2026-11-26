@@ -1,3 +1,5 @@
+using Monica.Framework.UI.UIDependencyInjection.State;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.Core;
 using Monica.Core.Modularity;
 using Monica.Core.Modularity.Abstractions;
@@ -5,7 +7,6 @@ using Monica.Framework.UI.Localization;
 using Monica.Framework.UI.Pages;
 using Monica.UI.Shell.Models;
 using Monica.UI.Icons;
-using MudBlazor;
 
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
@@ -34,6 +35,7 @@ public class ModuleDependencyInjectionUI : MonicaModule<ModuleDependencyInjectio
     {
         module.Require<ModuleDependencyInjection, ModuleDependencyInjectionOption>(
             static option => option.EnableAutoRegistrationDiagnostics = true);
+        module.Require<ModuleHostedService>();
         module.Require<ModuleLocalization, ModuleLocalizationOption>(
             static option => option.AddResource<DependencyInjectionResource>());
         module.Require<ModuleShellUI, ModuleShellUIOption>(static option =>
@@ -52,12 +54,21 @@ public class ModuleDependencyInjectionUI : MonicaModule<ModuleDependencyInjectio
                     addToNav: true,
                     navOrder: 10,
                     descriptionKey: "Pages:DependencyInjection:Description");
+
+                registry.RegisterLocalizedPage<UIDependencyInjectionServicesPage, DependencyInjectionResource>(
+                    UIDependencyInjectionServicesPage.PAGE_URL,
+                    "Pages:DependencyInjectionServices:Title",
+                    MoIcons.ListTree,
+                    category,
+                    addToNav: true,
+                    navOrder: 20,
+                    descriptionKey: "Pages:DependencyInjectionServices:Description");
             }));
     }
 
     public override void ConfigureServices(ModuleContext<ModuleDependencyInjectionUIOption> context)
     {
-        // UI components inject the infrastructure facade directly.
+        context.Services.AddScoped<DependencyInjectionPageSession>();
     }
 }
 

@@ -5,6 +5,9 @@ namespace Monica.DependencyInjection.Models;
 /// </summary>
 public sealed class DependencyInjectionExposedServiceInfo
 {
+    /// <summary>Gets the first index of this exact service identity, or null when absent from the snapshot.</summary>
+    public int? ServiceIdentityIndex { get; init; }
+
     /// <summary>
     /// Gets the full service type name.
     /// </summary>
